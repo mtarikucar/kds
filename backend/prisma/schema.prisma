@@ -1,0 +1,255 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========================================
+// TENANT & USER MANAGEMENT
+// ========================================
+
+model Tenant {
+  id        String   @id @default(uuid())
+  name      String
+  subdomain String?  @unique
+  plan      String   @default("FREE") // FREE, BASIC, PREMIUM
+  status    String   @default("ACTIVE") // ACTIVE, SUSPENDED, DELETED
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users          User[]
+  categories     Category[]
+  products       Product[]
+  tables         Table[]
+  orders         Order[]
+  stockMovements StockMovement[]
+
+  @@map("tenants")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  role      String   // ADMIN, MANAGER, WAITER, KITCHEN, COURIER
+  status    String   @default("ACTIVE") // ACTIVE, INACTIVE
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  orders         Order[]
+  stockMovements StockMovement[]
+
+  @@index([tenantId])
+  @@index([email])
+  @@map("users")
+}
+
+// ========================================
+// MENU MANAGEMENT
+// ========================================
+
+model Category {
+  id           String  @id @default(uuid())
+  name         String
+  description  String?
+  displayOrder Int     @default(0)
+  isActive     Boolean @default(true)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  products Product[]
+
+  @@index([tenantId])
+  @@map("categories")
+}
+
+model Product {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+  price       Decimal @db.Decimal(10, 2)
+  image       String?
+
+  isAvailable  Boolean @default(true)
+  stockTracked Boolean @default(false)
+  currentStock Int     @default(0)
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  orderItems     OrderItem[]
+  stockMovements StockMovement[]
+
+  @@index([tenantId])
+  @@index([categoryId])
+  @@map("products")
+}
+
+// ========================================
+// TABLE MANAGEMENT
+// ========================================
+
+model Table {
+  id       String  @id @default(uuid())
+  number   String
+  capacity Int
+  section  String?
+  status   String  @default("AVAILABLE") // AVAILABLE, OCCUPIED, RESERVED
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  orders Order[]
+
+  @@unique([tenantId, number])
+  @@index([tenantId])
+  @@map("tables")
+}
+
+// ========================================
+// ORDER MANAGEMENT
+// ========================================
+
+model Order {
+  id          String   @id @default(uuid())
+  orderNumber String
+  type        String   // DINE_IN, TAKEAWAY, DELIVERY
+  status      String   @default("PENDING") // PENDING, PREPARING, READY, SERVED, PAID, CANCELLED
+
+  totalAmount  Decimal @db.Decimal(10, 2)
+  discount     Decimal @default(0) @db.Decimal(10, 2)
+  finalAmount  Decimal @db.Decimal(10, 2)
+
+  notes        String?
+  customerName String?
+
+  tableId String?
+  table   Table?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  paidAt    DateTime?
+
+  // Relations
+  orderItems OrderItem[]
+  payments   Payment[]
+
+  @@unique([tenantId, orderNumber])
+  @@index([tenantId])
+  @@index([userId])
+  @@index([tableId])
+  @@index([status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+  subtotal  Decimal @db.Decimal(10, 2)
+  notes     String?
+  status    String  @default("PENDING") // PENDING, PREPARING, READY
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([productId])
+  @@map("order_items")
+}
+
+// ========================================
+// PAYMENT MANAGEMENT
+// ========================================
+
+model Payment {
+  id     String  @id @default(uuid())
+  amount Decimal @db.Decimal(10, 2)
+  method String  // CASH, CARD, DIGITAL
+  status String  @default("PENDING") // PENDING, COMPLETED, FAILED, REFUNDED
+
+  transactionId String?
+  notes         String?
+
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime  @default(now())
+  paidAt    DateTime?
+
+  @@index([orderId])
+  @@index([status])
+  @@map("payments")
+}
+
+// ========================================
+// STOCK MANAGEMENT
+// ========================================
+
+model StockMovement {
+  id       String @id @default(uuid())
+  type     String // IN, OUT, ADJUSTMENT
+  quantity Int
+  reason   String?
+  notes    String?
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([productId])
+  @@index([userId])
+  @@map("stock_movements")
+}

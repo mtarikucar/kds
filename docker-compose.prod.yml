@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: kds_postgres_prod
+    restart: always
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-restaurant_pos}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - '5432:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: kds_redis_prod
+    restart: always
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Backend API (NestJS)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: kds_backend_prod
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-restaurant_pos}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-30d}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    ports:
+      - '3000:3000'
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:3000/api']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Frontend (React)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+    container_name: kds_frontend_prod
+    restart: always
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
+    ports:
+      - '80:80'
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:80']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+  redis_data:

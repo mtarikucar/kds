@@ -1,0 +1,262 @@
+import { Link } from 'react-router-dom';
+// import { format } from 'date-fns';
+import { useOrders } from '../features/orders/ordersApi';
+import { useTables } from '../features/tables/tablesApi';
+import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/Card';
+import Badge from '../components/ui/Badge';
+import Spinner from '../components/ui/Spinner';
+import { formatCurrency, formatTimeAgo } from '../lib/utils';
+import {
+  ShoppingCart,
+  Table as TableIcon,
+  UtensilsCrossed,
+  TrendingUp,
+  Clock,
+} from 'lucide-react';
+import { OrderStatus, TableStatus } from '../types';
+
+const DashboardPage = () => {
+  const { data: orders, isLoading: ordersLoading } = useOrders();
+  const { data: tables, isLoading: tablesLoading } = useTables();
+
+  const todayOrders = orders?.filter((order) => {
+    const orderDate = new Date(order.createdAt);
+    const today = new Date();
+    return orderDate.toDateString() === today.toDateString();
+  }) || [];
+
+  const todaySales = todayOrders.reduce((sum, order) => sum + Number(order.finalAmount || 0), 0);
+
+  const activeOrders = orders?.filter(
+    (order) =>
+      order.status !== OrderStatus.SERVED && order.status !== OrderStatus.CANCELLED
+  ) || [];
+
+  const availableTables = tables?.filter(
+    (table) => table.status === TableStatus.AVAILABLE
+  ) || [];
+
+  const recentOrders = orders?.slice(0, 5) || [];
+
+  const StatCard = ({
+    title,
+    value,
+    icon: Icon,
+    color,
+    link,
+  }: {
+    title: string;
+    value: string | number;
+    icon: any;
+    color: string;
+    link?: string;
+  }) => {
+    const CardWrapper = link ? Link : 'div';
+    return (
+      <CardWrapper to={link || ''}>
+        <Card className={link ? 'hover:shadow-lg transition-shadow cursor-pointer' : ''}>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">{title}</p>
+                <p className="text-3xl font-bold">{value}</p>
+              </div>
+              <div className={`p-4 rounded-full ${color}`}>
+                <Icon className="h-8 w-8 text-white" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </CardWrapper>
+    );
+  };
+
+  const getStatusVariant = (status: OrderStatus) => {
+    switch (status) {
+      case OrderStatus.PENDING:
+        return 'warning';
+      case OrderStatus.PREPARING:
+        return 'primary';
+      case OrderStatus.READY:
+        return 'success';
+      case OrderStatus.SERVED:
+        return 'default';
+      default:
+        return 'danger';
+    }
+  };
+
+  if (ordersLoading || tablesLoading) {
+    return <Spinner />;
+  }
+
+  return (
+    <div>
+      <div className="mb-6">
+        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+        <p className="text-gray-600">Welcome back! Here's your overview for today.</p>
+      </div>
+
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <StatCard
+          title="Today's Sales"
+          value={formatCurrency(todaySales)}
+          icon={TrendingUp}
+          color="bg-green-500"
+          link="/admin/reports"
+        />
+        <StatCard
+          title="Today's Orders"
+          value={todayOrders.length}
+          icon={ShoppingCart}
+          color="bg-blue-500"
+          link="/pos"
+        />
+        <StatCard
+          title="Active Orders"
+          value={activeOrders.length}
+          icon={Clock}
+          color="bg-orange-500"
+          link="/kitchen"
+        />
+        <StatCard
+          title="Available Tables"
+          value={`${availableTables.length}/${tables?.length || 0}`}
+          icon={TableIcon}
+          color="bg-purple-500"
+          link="/admin/tables"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Recent Orders */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Recent Orders</CardTitle>
+            <Link
+              to="/pos"
+              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+            >
+              View all
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {recentOrders.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p>No orders yet</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentOrders.map((order) => (
+                  <div
+                    key={order.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                  >
+                    <div>
+                      <p className="font-semibold">#{order.orderNumber}</p>
+                      <p className="text-sm text-gray-600">
+                        Table {order.table?.number} • {formatTimeAgo(order.createdAt)}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {order.items?.length || 0} items
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <Badge variant={getStatusVariant(order.status)}>
+                        {order.status}
+                      </Badge>
+                      <p className="text-sm font-bold text-gray-900 mt-1">
+                        {formatCurrency(Number(order.finalAmount))}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Quick Actions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Actions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              <Link to="/pos">
+                <div className="p-6 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors text-center cursor-pointer">
+                  <ShoppingCart className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                  <p className="font-semibold text-blue-900">New Order</p>
+                </div>
+              </Link>
+
+              <Link to="/kitchen">
+                <div className="p-6 bg-green-50 rounded-lg hover:bg-green-100 transition-colors text-center cursor-pointer">
+                  <UtensilsCrossed className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                  <p className="font-semibold text-green-900">Kitchen Display</p>
+                </div>
+              </Link>
+
+              <Link to="/admin/menu">
+                <div className="p-6 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors text-center cursor-pointer">
+                  <UtensilsCrossed className="h-8 w-8 text-purple-600 mx-auto mb-2" />
+                  <p className="font-semibold text-purple-900">Manage Menu</p>
+                </div>
+              </Link>
+
+              <Link to="/admin/tables">
+                <div className="p-6 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors text-center cursor-pointer">
+                  <TableIcon className="h-8 w-8 text-orange-600 mx-auto mb-2" />
+                  <p className="font-semibold text-orange-900">Manage Tables</p>
+                </div>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Active Orders Summary */}
+      {activeOrders.length > 0 && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Active Orders Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-4 bg-yellow-50 rounded-lg">
+                <p className="text-sm text-gray-600 mb-1">Pending</p>
+                <p className="text-2xl font-bold text-yellow-600">
+                  {
+                    activeOrders.filter((o) => o.status === OrderStatus.PENDING)
+                      .length
+                  }
+                </p>
+              </div>
+              <div className="p-4 bg-blue-50 rounded-lg">
+                <p className="text-sm text-gray-600 mb-1">Preparing</p>
+                <p className="text-2xl font-bold text-blue-600">
+                  {
+                    activeOrders.filter((o) => o.status === OrderStatus.PREPARING)
+                      .length
+                  }
+                </p>
+              </div>
+              <div className="p-4 bg-green-50 rounded-lg">
+                <p className="text-sm text-gray-600 mb-1">Ready</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {
+                    activeOrders.filter((o) => o.status === OrderStatus.READY)
+                      .length
+                  }
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+};
+
+export default DashboardPage;
