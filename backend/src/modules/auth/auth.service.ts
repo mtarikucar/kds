@@ -30,13 +30,79 @@ export class AuthService {
       throw new ConflictException('Email already in use');
     }
 
-    // Verify tenant exists
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: registerDto.tenantId },
-    });
+    // Validate registration data
+    const hasRestaurantName = !!registerDto.restaurantName;
+    const hasTenantId = !!registerDto.tenantId;
 
-    if (!tenant) {
-      throw new BadRequestException('Invalid tenant');
+    // Mutual exclusion: cannot provide both
+    if (hasRestaurantName && hasTenantId) {
+      throw new BadRequestException('Cannot provide both restaurantName and tenantId');
+    }
+
+    // One of them must be provided
+    if (!hasRestaurantName && !hasTenantId) {
+      throw new BadRequestException('Either restaurantName or tenantId must be provided');
+    }
+
+    let tenantId: string;
+    let userRole = registerDto.role;
+
+    // Scenario 1: Creating a new restaurant (ADMIN only)
+    if (hasRestaurantName) {
+      // If creating a restaurant, role must be ADMIN (or default to ADMIN)
+      if (userRole && userRole !== 'ADMIN') {
+        throw new BadRequestException('Only ADMIN role is allowed when creating a new restaurant');
+      }
+      userRole = 'ADMIN';
+
+      // Generate a subdomain from restaurant name
+      const subdomain = registerDto.restaurantName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-|-$/g, '');
+
+      // Check if subdomain already exists, if so, append a random string
+      let finalSubdomain = subdomain;
+      const existingTenant = await this.prisma.tenant.findUnique({
+        where: { subdomain },
+      });
+
+      if (existingTenant) {
+        finalSubdomain = `${subdomain}-${Math.random().toString(36).substring(2, 8)}`;
+      }
+
+      // Create new tenant
+      const tenant = await this.prisma.tenant.create({
+        data: {
+          name: registerDto.restaurantName,
+          subdomain: finalSubdomain,
+        },
+      });
+
+      tenantId = tenant.id;
+    }
+    // Scenario 2: Joining an existing restaurant
+    else {
+      // Verify tenant exists
+      const tenant = await this.prisma.tenant.findUnique({
+        where: { id: registerDto.tenantId },
+      });
+
+      if (!tenant) {
+        throw new BadRequestException('Invalid tenant');
+      }
+
+      // Cannot join as ADMIN (ADMIN creates their own restaurant)
+      if (userRole === 'ADMIN') {
+        throw new BadRequestException('Cannot join existing restaurant as ADMIN. ADMIN must create their own restaurant.');
+      }
+
+      // Default to WAITER if no role provided
+      if (!userRole) {
+        userRole = 'WAITER';
+      }
+
+      tenantId = registerDto.tenantId;
     }
 
     // Hash password
@@ -49,8 +115,8 @@ export class AuthService {
         password: hashedPassword,
         firstName: registerDto.firstName,
         lastName: registerDto.lastName,
-        role: registerDto.role,
-        tenantId: registerDto.tenantId,
+        role: userRole,
+        tenantId,
       },
       select: {
         id: true,

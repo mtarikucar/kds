@@ -16,7 +16,9 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
+import { SubscriptionLimitsGuard } from '../../common/guards/subscription-limits.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CheckLimit } from '../../common/decorators/check-limit.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
 
 @ApiTags('users')
@@ -28,10 +30,12 @@ export class UsersController {
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @UseGuards(SubscriptionLimitsGuard)
+  @CheckLimit({ resource: 'users', action: 'create' })
   @ApiOperation({ summary: 'Create a new user (ADMIN, MANAGER)' })
   @ApiResponse({ status: 201, description: 'User successfully created' })
   @ApiResponse({ status: 409, description: 'Email already in use' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions or limit reached' })
   create(@Body() createUserDto: CreateUserDto, @Request() req) {
     return this.usersService.create(createUserDto, req.tenantId);
   }

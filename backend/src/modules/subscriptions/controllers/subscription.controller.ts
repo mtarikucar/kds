@@ -112,6 +112,14 @@ export class SubscriptionController {
   }
 
   /**
+   * Apply pending plan change (after payment confirmation)
+   */
+  @Post('apply-plan-change/:pendingChangeId')
+  async applyPlanChange(@Param('pendingChangeId') pendingChangeId: string) {
+    return await this.subscriptionService.applyPlanChange(pendingChangeId);
+  }
+
+  /**
    * Get all invoices for current tenant
    */
   @Get('tenant/invoices')

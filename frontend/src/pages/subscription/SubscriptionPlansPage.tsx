@@ -28,12 +28,13 @@ const SubscriptionPlansPage = () => {
     if (!selectedPlanId) return;
 
     try {
-      await createSubscription.mutateAsync({
+      const subscription = await createSubscription.mutateAsync({
         planId: selectedPlanId,
         billingCycle,
         // Payment provider is determined automatically by the backend based on tenant's region
       });
-      navigate('/subscription/manage');
+      // Redirect to payment page with subscription ID
+      navigate(`/subscription/payment?subscriptionId=${subscription.id}`);
     } catch (error) {
       console.error('Failed to create subscription:', error);
     }

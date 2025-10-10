@@ -117,14 +117,26 @@ export const useChangePlan = () => {
     }: {
       id: string;
       data: ChangePlanDto;
-    }): Promise<Subscription> => {
+    }): Promise<any> => {  // Changed to any to handle new response structure
       const response = await api.post(`/subscriptions/${id}/change-plan`, data);
       return response.data;
     },
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: subscriptionKeys.detail(variables.id) });
-      queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
-      toast.success('Plan changed successfully');
+    onSuccess: (result, variables) => {
+      // Don't invalidate queries yet - plan hasn't actually changed
+      // Only invalidate after payment or scheduled downgrade
+
+      // Show appropriate message based on response
+      if (result.pendingChange) {
+        if (result.pendingChange.requiresPayment) {
+          toast.info('Redirecting to payment...');
+        } else if (result.pendingChange.scheduledFor) {
+          const date = new Date(result.pendingChange.scheduledFor).toLocaleDateString();
+          toast.success(`Downgrade scheduled for ${date}`);
+          // For scheduled downgrade, invalidate to show the pending status
+          queryClient.invalidateQueries({ queryKey: subscriptionKeys.detail(variables.id) });
+          queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
+        }
+      }
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to change plan');
@@ -140,11 +152,13 @@ export const useCancelSubscription = () => {
     mutationFn: async ({
       id,
       immediate = false,
+      reason,
     }: {
       id: string;
       immediate?: boolean;
+      reason?: string;
     }): Promise<Subscription> => {
-      const response = await api.post(`/subscriptions/${id}/cancel`, { immediate });
+      const response = await api.post(`/subscriptions/${id}/cancel`, { immediate, reason });
       return response.data;
     },
     onSuccess: (_, variables) => {

@@ -3,30 +3,48 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link, useNavigate } from 'react-router-dom';
 import { useRegister } from '../../features/auth/authApi';
+import { useGetPublicTenants } from '../../api/tenantsApi';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { UserRole } from '../../types';
+import { useMemo } from 'react';
 
 const registerSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
-  restaurantName: z.string().min(1, 'Restaurant name is required'),
-  role: z.nativeEnum(UserRole).optional(),
-});
+  role: z.nativeEnum(UserRole),
+  restaurantName: z.string().optional(),
+  tenantId: z.string().optional(),
+}).refine(
+  (data) => {
+    // If role is ADMIN, restaurantName is required
+    if (data.role === UserRole.ADMIN) {
+      return !!data.restaurantName;
+    }
+    // If role is not ADMIN, tenantId is required
+    return !!data.tenantId;
+  },
+  {
+    message: 'ADMIN must provide restaurant name, others must select a restaurant',
+    path: ['restaurantName'],
+  }
+);
 
 type RegisterFormData = z.infer<typeof registerSchema>;
 
 const RegisterPage = () => {
   const navigate = useNavigate();
   const { mutate: register, isPending } = useRegister();
+  const { data: tenants, isLoading: tenantsLoading } = useGetPublicTenants();
 
   const {
     register: registerField,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<RegisterFormData>({
     resolver: zodResolver(registerSchema),
@@ -35,8 +53,26 @@ const RegisterPage = () => {
     },
   });
 
+  const selectedRole = watch('role');
+  const isAdmin = selectedRole === UserRole.ADMIN;
+
   const onSubmit = (data: RegisterFormData) => {
-    register(data, {
+    // Clean up: only send the relevant field based on role
+    const payload: any = {
+      email: data.email,
+      password: data.password,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      role: data.role,
+    };
+
+    if (isAdmin) {
+      payload.restaurantName = data.restaurantName;
+    } else {
+      payload.tenantId = data.tenantId;
+    }
+
+    register(payload, {
       onSuccess: () => {
         navigate('/login');
       },
@@ -44,12 +80,20 @@ const RegisterPage = () => {
   };
 
   const roleOptions = [
-    { value: UserRole.ADMIN, label: 'Admin' },
+    { value: UserRole.ADMIN, label: 'Admin (Create New Restaurant)' },
     { value: UserRole.MANAGER, label: 'Manager' },
     { value: UserRole.WAITER, label: 'Waiter' },
-    { value: UserRole.CHEF, label: 'Chef' },
-    { value: UserRole.CASHIER, label: 'Cashier' },
+    { value: UserRole.KITCHEN, label: 'Kitchen' },
+    { value: UserRole.COURIER, label: 'Courier' },
   ];
+
+  const tenantOptions = useMemo(() => {
+    if (!tenants) return [];
+    return tenants.map((tenant) => ({
+      value: tenant.id,
+      label: tenant.name,
+    }));
+  }, [tenants]);
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
@@ -93,19 +137,29 @@ const RegisterPage = () => {
               />
             </div>
 
-            <Input
-              label="Restaurant Name"
-              placeholder="Enter restaurant name"
-              error={errors.restaurantName?.message}
-              {...registerField('restaurantName')}
-            />
-
             <Select
               label="Role"
               options={roleOptions}
               error={errors.role?.message}
               {...registerField('role')}
             />
+
+            {isAdmin ? (
+              <Input
+                label="Restaurant Name"
+                placeholder="Enter your restaurant name"
+                error={errors.restaurantName?.message}
+                {...registerField('restaurantName')}
+              />
+            ) : (
+              <Select
+                label="Select Restaurant"
+                options={tenantOptions}
+                error={errors.tenantId?.message}
+                disabled={tenantsLoading || tenantOptions.length === 0}
+                {...registerField('tenantId')}
+              />
+            )}
 
             <Button
               type="submit"

@@ -119,15 +119,24 @@ const SubscriptionManagementPage = () => {
   const handleChangePlan = async () => {
     if (!currentSubscription || !selectedNewPlanId) return;
     try {
-      await changePlan.mutateAsync({
+      const result = await changePlan.mutateAsync({
         id: currentSubscription.id,
         data: {
           newPlanId: selectedNewPlanId,
           billingCycle: currentSubscription.billingCycle,
         },
       });
+
       setShowChangePlanModal(false);
       setSelectedNewPlanId(null);
+
+      // Check if payment is required
+      if (result.pendingChange && result.pendingChange.requiresPayment) {
+        // Redirect to payment page with pending change ID
+        navigate(`/subscription/payment?pendingChangeId=${result.pendingChange.id}`);
+      } else if (result.pendingChange && result.pendingChange.scheduledFor) {
+        // Downgrade scheduled - show success message (already handled by toast in API)
+      }
     } catch (error) {
       console.error('Failed to change plan:', error);
     }

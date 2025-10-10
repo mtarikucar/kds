@@ -47,6 +47,20 @@ export class TenantsService {
     });
   }
 
+  async findAllPublic() {
+    return this.prisma.tenant.findMany({
+      where: {
+        status: 'ACTIVE',
+      },
+      select: {
+        id: true,
+        name: true,
+        subdomain: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+  }
+
   async findOne(id: string) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id },

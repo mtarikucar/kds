@@ -219,9 +219,14 @@ export class SubscriptionService {
 
   /**
    * Change subscription plan (upgrade or downgrade)
+   * Creates a pending plan change that requires payment for upgrades
    */
   async changePlan(subscriptionId: string, dto: ChangePlanDto) {
     const subscription = await this.getSubscriptionById(subscriptionId);
+
+    const currentPlan = await this.prisma.subscriptionPlan.findUnique({
+      where: { id: subscription.planId },
+    });
 
     const newPlan = await this.prisma.subscriptionPlan.findUnique({
       where: { id: dto.newPlanId },
@@ -231,8 +236,24 @@ export class SubscriptionService {
       throw new NotFoundException('New plan not found or inactive');
     }
 
+    if (!currentPlan) {
+      throw new NotFoundException('Current plan not found');
+    }
+
     if (subscription.planId === dto.newPlanId) {
       throw new BadRequestException('Already subscribed to this plan');
+    }
+
+    // Check if there's already a pending plan change
+    const existingPendingChange = await this.prisma.pendingPlanChange.findFirst({
+      where: {
+        subscriptionId,
+        paymentStatus: 'PENDING',
+      },
+    });
+
+    if (existingPendingChange) {
+      throw new BadRequestException('There is already a pending plan change. Please complete or cancel it first.');
     }
 
     const billingCycle = dto.billingCycle || subscription.billingCycle;
@@ -255,46 +276,175 @@ export class SubscriptionService {
     );
 
     if (isUpgrade) {
-      // Upgrade: Apply immediately with proration
-      const updatedSubscription = await this.prisma.subscription.update({
-        where: { id: subscriptionId },
+      // For upgrades, create pending plan change that requires payment
+      const pendingChange = await this.prisma.pendingPlanChange.create({
         data: {
-          planId: dto.newPlanId,
-          billingCycle,
-          amount: Number(newAmount),
+          subscriptionId,
+          currentPlanId: subscription.planId,
+          newPlanId: dto.newPlanId,
+          newBillingCycle: billingCycle,
+          isUpgrade: true,
+          currentAmount: currentAmount,
+          newAmount: Number(newAmount),
+          prorationAmount: prorationAmount,
           currency: newPlan.currency,
+          paymentRequired: prorationAmount > 0,
+          paymentStatus: 'PENDING',
+          paymentProvider: subscription.paymentProvider,
         },
-        include: { plan: true },
+        include: {
+          currentPlan: true,
+          newPlan: true,
+        },
       });
 
-      // Update tenant's current plan
-      await this.prisma.tenant.update({
-        where: { id: subscription.tenantId },
-        data: { currentPlanId: dto.newPlanId },
-      });
+      this.logger.log(`Pending plan change created: ${pendingChange.id} (proration: ${prorationAmount})`);
 
-      // If there's a proration charge, create payment record
-      if (prorationAmount > 0) {
-        // This would trigger a payment in the payment controller
-        this.logger.log(`Proration charge required: ${prorationAmount}`);
+      // Return the pending change info so frontend knows to redirect to payment
+      return {
+        subscription,
+        pendingChange: {
+          id: pendingChange.id,
+          requiresPayment: prorationAmount > 0,
+          prorationAmount: prorationAmount,
+          currency: newPlan.currency,
+          newPlan: newPlan,
+        },
+      };
+    } else {
+      // For downgrades, validate current usage against new plan limits
+      const usage = await this.getCurrentUsage(subscription.tenantId);
+      const violations: string[] = [];
+
+      if (newPlan.maxUsers !== -1 && usage.users > newPlan.maxUsers) {
+        violations.push(`Users: ${usage.users}/${newPlan.maxUsers}`);
+      }
+      if (newPlan.maxTables !== -1 && usage.tables > newPlan.maxTables) {
+        violations.push(`Tables: ${usage.tables}/${newPlan.maxTables}`);
+      }
+      if (newPlan.maxProducts !== -1 && usage.products > newPlan.maxProducts) {
+        violations.push(`Products: ${usage.products}/${newPlan.maxProducts}`);
+      }
+      if (newPlan.maxCategories !== -1 && usage.categories > newPlan.maxCategories) {
+        violations.push(`Categories: ${usage.categories}/${newPlan.maxCategories}`);
       }
 
-      this.logger.log(`Plan upgraded for subscription ${subscriptionId}`);
-      return updatedSubscription;
-    } else {
-      // Downgrade: Schedule for end of current period
-      const updatedSubscription = await this.prisma.subscription.update({
-        where: { id: subscriptionId },
+      if (violations.length > 0) {
+        throw new BadRequestException(
+          `Cannot downgrade: Current usage exceeds new plan limits. Please reduce: ${violations.join(', ')}`
+        );
+      }
+
+      // Create pending downgrade scheduled for period end (no payment required)
+      const pendingChange = await this.prisma.pendingPlanChange.create({
         data: {
-          cancelAtPeriodEnd: false, // Override any cancellation
-          // Store the new plan to apply at period end (you may want a separate field for this)
+          subscriptionId,
+          currentPlanId: subscription.planId,
+          newPlanId: dto.newPlanId,
+          newBillingCycle: billingCycle,
+          isUpgrade: false,
+          currentAmount: currentAmount,
+          newAmount: Number(newAmount),
+          prorationAmount: 0,
+          currency: newPlan.currency,
+          paymentRequired: false,
+          paymentStatus: 'COMPLETED', // No payment needed
+          scheduledFor: subscription.currentPeriodEnd,
         },
-        include: { plan: true },
+        include: {
+          currentPlan: true,
+          newPlan: true,
+        },
       });
 
-      this.logger.log(`Plan downgrade scheduled for subscription ${subscriptionId} at period end`);
-      return updatedSubscription;
+      this.logger.log(`Downgrade scheduled for ${subscription.currentPeriodEnd}: ${pendingChange.id}`);
+
+      return {
+        subscription,
+        pendingChange: {
+          id: pendingChange.id,
+          requiresPayment: false,
+          scheduledFor: subscription.currentPeriodEnd,
+          newPlan: newPlan,
+        },
+      };
     }
+  }
+
+  /**
+   * Get current resource usage for a tenant
+   */
+  private async getCurrentUsage(tenantId: string) {
+    const [users, tables, products, categories] = await Promise.all([
+      this.prisma.user.count({ where: { tenantId } }),
+      this.prisma.table.count({ where: { tenantId } }),
+      this.prisma.product.count({ where: { tenantId } }),
+      this.prisma.category.count({ where: { tenantId } }),
+    ]);
+
+    return { users, tables, products, categories };
+  }
+
+  /**
+   * Apply a pending plan change after payment is confirmed
+   */
+  async applyPlanChange(pendingChangeId: string) {
+    const pendingChange = await this.prisma.pendingPlanChange.findUnique({
+      where: { id: pendingChangeId },
+      include: {
+        subscription: { include: { plan: true, tenant: true } },
+        newPlan: true,
+      },
+    });
+
+    if (!pendingChange) {
+      throw new NotFoundException('Pending plan change not found');
+    }
+
+    if (pendingChange.paymentStatus !== 'COMPLETED') {
+      throw new BadRequestException('Payment not completed for this plan change');
+    }
+
+    if (pendingChange.appliedAt) {
+      throw new BadRequestException('Plan change already applied');
+    }
+
+    const { subscription, newPlan } = pendingChange;
+
+    // Apply the plan change
+    const updatedSubscription = await this.prisma.subscription.update({
+      where: { id: subscription.id },
+      data: {
+        planId: pendingChange.newPlanId,
+        billingCycle: pendingChange.newBillingCycle,
+        amount: pendingChange.newAmount,
+        currency: pendingChange.currency,
+      },
+      include: { plan: true },
+    });
+
+    // Update tenant's current plan
+    await this.prisma.tenant.update({
+      where: { id: subscription.tenantId },
+      data: { currentPlanId: pendingChange.newPlanId },
+    });
+
+    // Mark pending change as applied
+    await this.prisma.pendingPlanChange.update({
+      where: { id: pendingChangeId },
+      data: {
+        appliedAt: new Date(),
+      },
+    });
+
+    // Send notification (TODO: implement sendPlanChangeConfirmation method)
+    // await this.notificationService.sendPlanChangeConfirmation(
+    //   subscription.tenant.name,
+    //   newPlan.displayName
+    // );
+
+    this.logger.log(`Plan change applied for subscription ${subscription.id} - ${newPlan.displayName}`);
+    return updatedSubscription;
   }
 
   /**

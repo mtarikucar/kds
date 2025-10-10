@@ -10,7 +10,8 @@ import {
   useCreatePaymentIntent,
   useConfirmPayment,
 } from '../../api/paymentsApi';
-import { useGetCurrentSubscription } from '../../features/subscriptions/subscriptionsApi';
+import { useGetCurrentSubscription, subscriptionKeys } from '../../features/subscriptions/subscriptionsApi';
+import { useQueryClient } from '@tanstack/react-query';
 
 // Initialize Stripe with your publishable key
 const stripePromise = loadStripe(
@@ -21,6 +22,8 @@ export default function SubscriptionPaymentPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const subscriptionId = searchParams.get('subscriptionId');
+  const pendingChangeId = searchParams.get('pendingChangeId');
+  const queryClient = useQueryClient();
 
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
@@ -32,6 +35,7 @@ export default function SubscriptionPaymentPage() {
   const [paymentStatus, setPaymentStatus] = useState<
     'idle' | 'processing' | 'success' | 'error'
   >('idle');
+  const [isPlanChange, setIsPlanChange] = useState(false);
 
   const { data: subscription } = useGetCurrentSubscription();
   const createPaymentIntent = useCreatePaymentIntent();
@@ -39,47 +43,99 @@ export default function SubscriptionPaymentPage() {
 
   // Create payment intent on mount
   useEffect(() => {
-    if (!subscriptionId) {
-      toast.error('No subscription ID provided');
-      navigate('/subscription/plans');
-      return;
-    }
+    if (pendingChangeId) {
+      // Handle plan change payment
+      setIsPlanChange(true);
 
-    createPaymentIntent.mutate(
-      { subscriptionId },
-      {
-        onSuccess: (data) => {
+      // TODO: Create API hook for plan change payment intent
+      fetch('/api/payments/create-plan-change-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pendingChangeId }),
+      })
+        .then(res => res.json())
+        .then(data => {
           setClientSecret(data.clientSecret);
           setPaymentIntentId(data.paymentIntentId);
           setAmount(data.amount);
           setCurrency(data.currency);
+          setPaymentProvider(data.provider === 'IYZICO' ? 'iyzico' : 'stripe');
+        })
+        .catch(error => {
+          toast.error('Failed to create payment intent');
+          navigate('/subscription');
+        });
+    } else if (subscriptionId) {
+      // Handle new subscription payment
+      setIsPlanChange(false);
 
-          // Determine payment provider based on currency
-          if (data.currency === 'TRY') {
-            setPaymentProvider('iyzico');
-          } else {
-            setPaymentProvider('stripe');
-          }
-        },
-        onError: (error: any) => {
-          toast.error(error.response?.data?.message || 'Failed to create payment intent');
-          navigate('/subscription/plans');
-        },
-      }
-    );
-  }, [subscriptionId]);
+      createPaymentIntent.mutate(
+        { subscriptionId },
+        {
+          onSuccess: (data) => {
+            setClientSecret(data.clientSecret);
+            setPaymentIntentId(data.paymentIntentId);
+            setAmount(data.amount);
+            setCurrency(data.currency);
+
+            // Determine payment provider based on currency
+            if (data.currency === 'TRY') {
+              setPaymentProvider('iyzico');
+            } else {
+              setPaymentProvider('stripe');
+            }
+          },
+          onError: (error: any) => {
+            toast.error(error.response?.data?.message || 'Failed to create payment intent');
+            navigate('/subscription/plans');
+          },
+        }
+      );
+    } else {
+      toast.error('No payment information provided');
+      navigate('/subscription/plans');
+    }
+  }, [subscriptionId, pendingChangeId]);
 
   const handleStripeSuccess = async () => {
     setPaymentStatus('processing');
-    toast.success('Payment confirmed! Activating subscription...');
 
-    // Wait a moment for webhook to process
-    setTimeout(() => {
-      setPaymentStatus('success');
+    if (isPlanChange && pendingChangeId) {
+      toast.success('Payment confirmed! Applying plan change...');
+
+      // Apply the plan change
+      try {
+        await fetch(`/api/subscriptions/apply-plan-change/${pendingChangeId}`, {
+          method: 'POST',
+        });
+
+        // Invalidate subscription cache to refresh the UI
+        queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
+        queryClient.invalidateQueries({ queryKey: subscriptionKeys.all });
+
+        setPaymentStatus('success');
+        setTimeout(() => {
+          navigate('/subscription');
+        }, 2000);
+      } catch (error) {
+        setPaymentStatus('error');
+        toast.error('Failed to apply plan change');
+      }
+    } else {
+      toast.success('Payment confirmed! Activating subscription...');
+
+      // Invalidate subscription cache
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.all });
+
+      // Wait a moment for webhook to process
       setTimeout(() => {
-        navigate('/subscription');
+        setPaymentStatus('success');
+        setTimeout(() => {
+          navigate('/subscription');
+        }, 2000);
       }, 2000);
-    }, 2000);
+    }
   };
 
   const handleStripeError = (error: string) => {
@@ -88,37 +144,85 @@ export default function SubscriptionPaymentPage() {
   };
 
   const handleIyzicoSubmit = async (data: any) => {
-    if (!paymentIntentId) return;
+    if (!paymentIntentId && !pendingChangeId) return;
 
     setPaymentStatus('processing');
 
-    confirmPayment.mutate(
-      {
-        paymentIntentId,
-        iyzicoPaymentDetails: {
-          cardHolderName: data.cardHolderName,
-          cardNumber: data.cardNumber.replace(/\s/g, ''),
-          expireMonth: data.expireMonth,
-          expireYear: data.expireYear,
-          cvc: data.cvc,
-        },
-      },
-      {
-        onSuccess: () => {
+    if (isPlanChange && pendingChangeId) {
+      // Handle plan change payment with iyzico
+      try {
+        const response = await fetch('/api/payments/confirm-plan-change-payment', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pendingChangeId,
+            iyzicoDetails: {
+              cardHolderName: data.cardHolderName,
+              cardNumber: data.cardNumber.replace(/\s/g, ''),
+              expireMonth: data.expireMonth,
+              expireYear: data.expireYear,
+              cvc: data.cvc,
+            },
+          }),
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          // Apply the plan change
+          await fetch(`/api/subscriptions/apply-plan-change/${pendingChangeId}`, {
+            method: 'POST',
+          });
+
+          // Invalidate subscription cache to refresh the UI
+          queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
+          queryClient.invalidateQueries({ queryKey: subscriptionKeys.all });
+
           setPaymentStatus('success');
-          toast.success('Ödeme başarılı! Aboneliğiniz aktif ediliyor...');
+          toast.success('Ödeme başarılı! Plan değişikliği uygulanıyor...');
           setTimeout(() => {
             navigate('/subscription');
           }, 2000);
-        },
-        onError: (error: any) => {
-          setPaymentStatus('error');
-          toast.error(
-            error.response?.data?.message || 'Ödeme başarısız oldu'
-          );
-        },
+        } else {
+          throw new Error('Payment failed');
+        }
+      } catch (error) {
+        setPaymentStatus('error');
+        toast.error('Ödeme başarısız oldu');
       }
-    );
+    } else {
+      // Handle new subscription payment with iyzico
+      confirmPayment.mutate(
+        {
+          paymentIntentId,
+          iyzicoPaymentDetails: {
+            cardHolderName: data.cardHolderName,
+            cardNumber: data.cardNumber.replace(/\s/g, ''),
+            expireMonth: data.expireMonth,
+            expireYear: data.expireYear,
+            cvc: data.cvc,
+          },
+        },
+        {
+          onSuccess: () => {
+            // Invalidate subscription cache
+            queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
+            queryClient.invalidateQueries({ queryKey: subscriptionKeys.all });
+
+            setPaymentStatus('success');
+            toast.success('Ödeme başarılı! Aboneliğiniz aktif ediliyor...');
+            setTimeout(() => {
+              navigate('/subscription');
+            }, 2000);
+          },
+          onError: (error: any) => {
+            setPaymentStatus('error');
+            toast.error(
+              error.response?.data?.message || 'Ödeme başarısız oldu'
+            );
+          },
+        }
+      );
+    }
   };
 
   if (createPaymentIntent.isPending) {

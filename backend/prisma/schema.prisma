@@ -303,8 +303,10 @@ model SubscriptionPlan {
   updatedAt DateTime @updatedAt
 
   // Relations
-  subscriptions      Subscription[]
-  currentPlanTenants Tenant[]       @relation("CurrentPlan")
+  subscriptions           Subscription[]
+  currentPlanTenants      Tenant[]             @relation("CurrentPlan")
+  pendingChangesFrom      PendingPlanChange[]  @relation("PendingFromPlan")
+  pendingChangesTo        PendingPlanChange[]  @relation("PendingToPlan")
 
   @@map("subscription_plans")
 }
@@ -356,8 +358,9 @@ model Subscription {
   updatedAt DateTime @updatedAt
 
   // Relations
-  payments SubscriptionPayment[]
-  invoices Invoice[]
+  payments           SubscriptionPayment[]
+  invoices           Invoice[]
+  pendingPlanChanges PendingPlanChange[]
 
   @@index([tenantId])
   @@index([planId])
@@ -447,4 +450,49 @@ model Invoice {
   @@index([status])
   @@index([dueDate])
   @@map("invoices")
+}
+
+model PendingPlanChange {
+  id String @id @default(uuid())
+
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  currentPlanId String
+  currentPlan   SubscriptionPlan @relation("PendingFromPlan", fields: [currentPlanId], references: [id], onDelete: Restrict)
+
+  newPlanId String
+  newPlan   SubscriptionPlan @relation("PendingToPlan", fields: [newPlanId], references: [id], onDelete: Restrict)
+
+  // Change details
+  newBillingCycle String // MONTHLY, YEARLY
+  isUpgrade       Boolean
+
+  // Financial details
+  currentAmount   Decimal @db.Decimal(10, 2)
+  newAmount       Decimal @db.Decimal(10, 2)
+  prorationAmount Decimal @db.Decimal(10, 2)
+  currency        String  @default("USD")
+
+  // Payment tracking
+  paymentRequired Boolean @default(true)
+  paymentStatus   String  @default("PENDING") // PENDING, COMPLETED, FAILED
+  paymentIntentId String? // Stripe or Iyzico payment intent ID
+  paymentProvider String? // STRIPE, IYZICO
+
+  // Scheduling
+  scheduledFor DateTime? // For downgrades scheduled at period end
+  appliedAt    DateTime?
+
+  // Metadata
+  reason          String? // User reason for change
+  failureReason   String? // If payment fails
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([subscriptionId])
+  @@index([paymentStatus])
+  @@index([scheduledFor])
+  @@map("pending_plan_changes")
 }

@@ -213,6 +213,225 @@ export class PaymentController {
   }
 
   /**
+   * Create payment intent for plan change
+   */
+  @Post('create-plan-change-intent')
+  async createPlanChangeIntent(@Request() req, @Body() dto: { pendingChangeId: string }) {
+    const tenantId = req.user.tenantId;
+
+    const pendingChange = await this.prisma.pendingPlanChange.findUnique({
+      where: { id: dto.pendingChangeId },
+      include: {
+        subscription: { include: { tenant: true } },
+        newPlan: true,
+      },
+    });
+
+    if (!pendingChange) {
+      throw new BadRequestException('Pending plan change not found');
+    }
+
+    if (pendingChange.subscription.tenantId !== tenantId) {
+      throw new BadRequestException('Unauthorized');
+    }
+
+    if (pendingChange.paymentStatus !== 'PENDING') {
+      throw new BadRequestException('Payment already processed');
+    }
+
+    if (!pendingChange.paymentRequired || Number(pendingChange.prorationAmount) <= 0) {
+      throw new BadRequestException('No payment required for this plan change');
+    }
+
+    const tenant = pendingChange.subscription.tenant;
+    const amount = Number(pendingChange.prorationAmount);
+
+    if (pendingChange.paymentProvider === PaymentProvider.STRIPE) {
+      // Create or get Stripe customer
+      let customerId: string;
+
+      if (pendingChange.subscription.stripeCustomerId) {
+        customerId = pendingChange.subscription.stripeCustomerId;
+      } else {
+        const customer = await this.stripeService.createCustomer(
+          tenant.name,
+          tenant.name,
+          { tenantId: tenant.id },
+        );
+        customerId = customer.id;
+
+        // Update subscription with customer ID
+        await this.prisma.subscription.update({
+          where: { id: pendingChange.subscriptionId },
+          data: { stripeCustomerId: customerId },
+        });
+      }
+
+      const paymentIntent = await this.stripeService.createPaymentIntent(
+        amount,
+        pendingChange.currency,
+        customerId,
+        { pendingChangeId: dto.pendingChangeId, type: 'plan_change' },
+      );
+
+      // Update pending change with payment intent ID
+      await this.prisma.pendingPlanChange.update({
+        where: { id: dto.pendingChangeId },
+        data: { paymentIntentId: paymentIntent.id },
+      });
+
+      return {
+        provider: PaymentProvider.STRIPE,
+        clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        amount,
+        currency: pendingChange.currency,
+      };
+    } else {
+      // For Iyzico, return setup information
+      return {
+        provider: PaymentProvider.IYZICO,
+        amount,
+        currency: pendingChange.currency,
+        pendingChangeId: dto.pendingChangeId,
+      };
+    }
+  }
+
+  /**
+   * Confirm plan change payment
+   */
+  @Post('confirm-plan-change-payment')
+  async confirmPlanChangePayment(@Request() req, @Body() dto: {
+    pendingChangeId: string;
+    paymentIntentId?: string;
+    paymentMethodId?: string;
+    iyzicoDetails?: any;
+  }) {
+    const tenantId = req.user.tenantId;
+
+    const pendingChange = await this.prisma.pendingPlanChange.findUnique({
+      where: { id: dto.pendingChangeId },
+      include: {
+        subscription: { include: { tenant: true, plan: true } },
+        newPlan: true,
+      },
+    });
+
+    if (!pendingChange) {
+      throw new BadRequestException('Pending plan change not found');
+    }
+
+    if (pendingChange.subscription.tenantId !== tenantId) {
+      throw new BadRequestException('Unauthorized');
+    }
+
+    const { subscription } = pendingChange;
+
+    if (pendingChange.paymentProvider === PaymentProvider.STRIPE) {
+      if (!dto.paymentMethodId || !dto.paymentIntentId) {
+        throw new BadRequestException('Payment method ID and payment intent ID required');
+      }
+
+      const confirmedPayment = await this.stripeService.confirmPaymentIntent(
+        dto.paymentIntentId,
+        dto.paymentMethodId,
+      );
+
+      // Create payment record
+      const payment = await this.prisma.subscriptionPayment.create({
+        data: {
+          subscriptionId: subscription.id,
+          amount: pendingChange.prorationAmount,
+          currency: pendingChange.currency,
+          status: PaymentStatus.SUCCEEDED,
+          paymentProvider: PaymentProvider.STRIPE,
+          stripePaymentIntentId: confirmedPayment.id,
+          paidAt: new Date(),
+        },
+      });
+
+      // Mark pending change as completed
+      await this.prisma.pendingPlanChange.update({
+        where: { id: dto.pendingChangeId },
+        data: {
+          paymentStatus: 'COMPLETED',
+        },
+      });
+
+      // Create invoice
+      await this.billingService.createInvoice(
+        subscription.id,
+        payment.id,
+        Number(pendingChange.prorationAmount),
+        pendingChange.currency,
+        subscription.currentPeriodStart,
+        subscription.currentPeriodEnd,
+      );
+
+      return { success: true, payment, pendingChangeId: dto.pendingChangeId };
+    } else {
+      // Process Iyzico payment
+      if (!dto.iyzicoDetails) {
+        throw new BadRequestException('Iyzico payment details required');
+      }
+
+      const customer = this.iyzicoService.formatCustomerData(
+        tenantId,
+        req.user.email,
+        subscription.tenant.name,
+      );
+
+      const result = await this.iyzicoService.createPayment(
+        Number(pendingChange.prorationAmount),
+        pendingChange.currency,
+        customer,
+        dto.iyzicoDetails,
+        `PLAN-CHANGE-${dto.pendingChangeId}`,
+        `Plan change to ${pendingChange.newPlan.displayName}`,
+      );
+
+      if (result.status !== 'success') {
+        throw new BadRequestException(result.errorMessage || 'Payment failed');
+      }
+
+      // Create payment record
+      const payment = await this.prisma.subscriptionPayment.create({
+        data: {
+          subscriptionId: subscription.id,
+          amount: pendingChange.prorationAmount,
+          currency: pendingChange.currency,
+          status: PaymentStatus.SUCCEEDED,
+          paymentProvider: PaymentProvider.IYZICO,
+          iyzicoPaymentId: result.paymentId,
+          paidAt: new Date(),
+        },
+      });
+
+      // Mark pending change as completed
+      await this.prisma.pendingPlanChange.update({
+        where: { id: dto.pendingChangeId },
+        data: {
+          paymentStatus: 'COMPLETED',
+          paymentIntentId: result.paymentId,
+        },
+      });
+
+      // Create invoice
+      await this.billingService.createInvoice(
+        subscription.id,
+        payment.id,
+        Number(pendingChange.prorationAmount),
+        pendingChange.currency,
+        subscription.currentPeriodStart,
+        subscription.currentPeriodEnd,
+      );
+
+      return { success: true, payment, pendingChangeId: dto.pendingChangeId };
+    }
+  }
+
+  /**
    * Get payment history for tenant
    */
   @Post('history')
