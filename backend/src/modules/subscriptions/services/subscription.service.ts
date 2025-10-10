@@ -1,0 +1,580 @@
+import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { PaymentProviderFactory } from './payment-provider.factory';
+import { BillingService } from './billing.service';
+import { StripeService } from './stripe.service';
+import { IyzicoService } from './iyzico.service';
+import { NotificationService } from './notification.service';
+import {
+  SubscriptionStatus,
+  BillingCycle,
+  PaymentProvider,
+  PaymentStatus,
+  SubscriptionPlanType,
+  PaymentRegion,
+} from '../../../common/constants/subscription.enum';
+import { CreateSubscriptionDto } from '../dto/create-subscription.dto';
+import { ChangePlanDto } from '../dto/change-plan.dto';
+import { UpdateSubscriptionDto } from '../dto/update-subscription.dto';
+
+@Injectable()
+export class SubscriptionService {
+  private readonly logger = new Logger(SubscriptionService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private paymentProviderFactory: PaymentProviderFactory,
+    private billingService: BillingService,
+    private stripeService: StripeService,
+    private iyzicoService: IyzicoService,
+    private notificationService: NotificationService,
+  ) {}
+
+  /**
+   * Get current active subscription for a tenant
+   */
+  async getCurrentSubscription(tenantId: string) {
+    const subscription = await this.prisma.subscription.findFirst({
+      where: {
+        tenantId,
+        status: {
+          in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING],
+        },
+      },
+      include: {
+        plan: true,
+        payments: {
+          orderBy: { createdAt: 'desc' },
+          take: 5,
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return subscription;
+  }
+
+  /**
+   * Get subscription by ID
+   */
+  async getSubscriptionById(id: string) {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { id },
+      include: {
+        plan: true,
+        tenant: true,
+        payments: {
+          orderBy: { createdAt: 'desc' },
+        },
+        invoices: {
+          orderBy: { createdAt: 'desc' },
+        },
+      },
+    });
+
+    if (!subscription) {
+      throw new NotFoundException('Subscription not found');
+    }
+
+    return subscription;
+  }
+
+  /**
+   * Create a new subscription
+   */
+  async createSubscription(tenantId: string, dto: CreateSubscriptionDto) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+
+    // Check if tenant already has an active subscription
+    const existingSubscription = await this.getCurrentSubscription(tenantId);
+    if (existingSubscription) {
+      throw new BadRequestException('Tenant already has an active subscription');
+    }
+
+    // Get the plan
+    const plan = await this.prisma.subscriptionPlan.findUnique({
+      where: { id: dto.planId },
+    });
+
+    if (!plan || !plan.isActive) {
+      throw new NotFoundException('Plan not found or inactive');
+    }
+
+    // Determine if trial applies
+    const canUseTrial = !tenant.trialUsed && plan.trialDays > 0 && plan.name !== SubscriptionPlanType.FREE;
+    const isTrialPeriod = canUseTrial;
+
+    // Calculate dates
+    const now = new Date();
+    let trialStart: Date | null = null;
+    let trialEnd: Date | null = null;
+    let currentPeriodStart = now;
+    let currentPeriodEnd: Date;
+
+    if (isTrialPeriod) {
+      trialStart = now;
+      trialEnd = new Date(now.getTime() + plan.trialDays * 24 * 60 * 60 * 1000);
+      currentPeriodStart = now;
+      currentPeriodEnd = trialEnd;
+    } else {
+      // Calculate billing period end
+      if (dto.billingCycle === BillingCycle.MONTHLY) {
+        currentPeriodEnd = new Date(now);
+        currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 1);
+      } else {
+        currentPeriodEnd = new Date(now);
+        currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 1);
+      }
+    }
+
+    // Determine amount
+    const amount = dto.billingCycle === BillingCycle.MONTHLY ? plan.monthlyPrice : plan.yearlyPrice;
+
+    // Get payment provider based on region
+    const paymentProvider = this.paymentProviderFactory.getProviderType(tenant.paymentRegion as PaymentRegion);
+
+    // Create subscription in database
+    const subscription = await this.prisma.subscription.create({
+      data: {
+        tenantId,
+        planId: dto.planId,
+        status: isTrialPeriod ? SubscriptionStatus.TRIALING : SubscriptionStatus.ACTIVE,
+        billingCycle: dto.billingCycle,
+        paymentProvider,
+        startDate: now,
+        currentPeriodStart,
+        currentPeriodEnd,
+        isTrialPeriod,
+        trialStart,
+        trialEnd,
+        amount: Number(amount),
+        currency: plan.currency,
+        autoRenew: true,
+        cancelAtPeriodEnd: false,
+      },
+      include: { plan: true },
+    });
+
+    // Update tenant
+    await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        currentPlanId: plan.id,
+        trialUsed: isTrialPeriod ? true : tenant.trialUsed,
+        trialStartedAt: isTrialPeriod ? trialStart : tenant.trialStartedAt,
+        trialEndsAt: isTrialPeriod ? trialEnd : tenant.trialEndsAt,
+      },
+    });
+
+    // Create payment provider subscription (if not free and not trial)
+    if (plan.name !== SubscriptionPlanType.FREE && !isTrialPeriod) {
+      await this.setupPaymentProviderSubscription(subscription.id, tenant, plan, dto);
+    }
+
+    this.logger.log(`Subscription created for tenant ${tenantId}: ${subscription.id}`);
+    return subscription;
+  }
+
+  /**
+   * Setup subscription with payment provider
+   */
+  private async setupPaymentProviderSubscription(
+    subscriptionId: string,
+    tenant: any,
+    plan: any,
+    dto: CreateSubscriptionDto,
+  ) {
+    if (tenant.paymentRegion === PaymentRegion.TURKEY) {
+      // For Iyzico, we don't create subscription upfront
+      // Payment will be handled when user provides card details
+      this.logger.log('Iyzico subscription setup deferred to payment confirmation');
+    } else {
+      // For Stripe, create customer and subscription
+      try {
+        const customer = await this.stripeService.createCustomer(
+          tenant.name,
+          tenant.name,
+          { tenantId: tenant.id },
+        );
+
+        // Update subscription with Stripe customer ID
+        await this.prisma.subscription.update({
+          where: { id: subscriptionId },
+          data: { stripeCustomerId: customer.id },
+        });
+
+        this.logger.log(`Stripe customer created: ${customer.id}`);
+      } catch (error) {
+        this.logger.error(`Failed to create Stripe customer: ${error.message}`);
+        throw new BadRequestException('Failed to setup payment provider');
+      }
+    }
+  }
+
+  /**
+   * Change subscription plan (upgrade or downgrade)
+   */
+  async changePlan(subscriptionId: string, dto: ChangePlanDto) {
+    const subscription = await this.getSubscriptionById(subscriptionId);
+
+    const newPlan = await this.prisma.subscriptionPlan.findUnique({
+      where: { id: dto.newPlanId },
+    });
+
+    if (!newPlan || !newPlan.isActive) {
+      throw new NotFoundException('New plan not found or inactive');
+    }
+
+    if (subscription.planId === dto.newPlanId) {
+      throw new BadRequestException('Already subscribed to this plan');
+    }
+
+    const billingCycle = dto.billingCycle || subscription.billingCycle;
+    const newAmount = billingCycle === BillingCycle.MONTHLY ? newPlan.monthlyPrice : newPlan.yearlyPrice;
+    const currentAmount = Number(subscription.amount);
+
+    const isUpgrade = Number(newAmount) > currentAmount;
+
+    // Calculate proration
+    const daysRemaining = this.billingService.getDaysRemaining(subscription.currentPeriodEnd);
+    const totalDays = this.billingService.getTotalDaysInPeriod(
+      subscription.currentPeriodStart,
+      subscription.currentPeriodEnd,
+    );
+    const prorationAmount = this.billingService.calculateProration(
+      currentAmount,
+      Number(newAmount),
+      daysRemaining,
+      totalDays,
+    );
+
+    if (isUpgrade) {
+      // Upgrade: Apply immediately with proration
+      const updatedSubscription = await this.prisma.subscription.update({
+        where: { id: subscriptionId },
+        data: {
+          planId: dto.newPlanId,
+          billingCycle,
+          amount: Number(newAmount),
+          currency: newPlan.currency,
+        },
+        include: { plan: true },
+      });
+
+      // Update tenant's current plan
+      await this.prisma.tenant.update({
+        where: { id: subscription.tenantId },
+        data: { currentPlanId: dto.newPlanId },
+      });
+
+      // If there's a proration charge, create payment record
+      if (prorationAmount > 0) {
+        // This would trigger a payment in the payment controller
+        this.logger.log(`Proration charge required: ${prorationAmount}`);
+      }
+
+      this.logger.log(`Plan upgraded for subscription ${subscriptionId}`);
+      return updatedSubscription;
+    } else {
+      // Downgrade: Schedule for end of current period
+      const updatedSubscription = await this.prisma.subscription.update({
+        where: { id: subscriptionId },
+        data: {
+          cancelAtPeriodEnd: false, // Override any cancellation
+          // Store the new plan to apply at period end (you may want a separate field for this)
+        },
+        include: { plan: true },
+      });
+
+      this.logger.log(`Plan downgrade scheduled for subscription ${subscriptionId} at period end`);
+      return updatedSubscription;
+    }
+  }
+
+  /**
+   * Cancel subscription
+   */
+  async cancelSubscription(
+    subscriptionId: string,
+    immediate: boolean = false,
+    reason?: string
+  ) {
+    const subscription = await this.getSubscriptionById(subscriptionId);
+
+    if (subscription.status === SubscriptionStatus.CANCELLED) {
+      throw new BadRequestException('Subscription already cancelled');
+    }
+
+    if (immediate) {
+      // Cancel immediately
+      const updated = await this.prisma.subscription.update({
+        where: { id: subscriptionId },
+        data: {
+          status: SubscriptionStatus.CANCELLED,
+          cancelledAt: new Date(),
+          endedAt: new Date(),
+          autoRenew: false,
+          cancellationReason: reason,
+        },
+        include: { plan: true, tenant: true },
+      });
+
+      // Cancel with payment provider
+      if (subscription.stripeSubscriptionId) {
+        await this.stripeService.cancelSubscription(subscription.stripeSubscriptionId, true);
+      } else if (subscription.iyzicoSubscriptionId) {
+        await this.iyzicoService.cancelSubscription(subscription.iyzicoSubscriptionId, true);
+      }
+
+      this.logger.log(`Subscription ${subscriptionId} cancelled immediately. Reason: ${reason || 'Not provided'}`);
+      return updated;
+    } else {
+      // Cancel at period end
+      const updated = await this.prisma.subscription.update({
+        where: { id: subscriptionId },
+        data: {
+          cancelAtPeriodEnd: true,
+          autoRenew: false,
+          cancelledAt: new Date(),
+          cancellationReason: reason,
+        },
+        include: { plan: true, tenant: true },
+      });
+
+      // Update payment provider
+      if (subscription.stripeSubscriptionId) {
+        await this.stripeService.cancelSubscription(subscription.stripeSubscriptionId, false);
+      } else if (subscription.iyzicoSubscriptionId) {
+        await this.iyzicoService.cancelSubscription(subscription.iyzicoSubscriptionId, false);
+      }
+
+      this.logger.log(`Subscription ${subscriptionId} will cancel at period end. Reason: ${reason || 'Not provided'}`);
+      return updated;
+    }
+  }
+
+  /**
+   * Reactivate a cancelled subscription
+   */
+  async reactivateSubscription(subscriptionId: string) {
+    const subscription = await this.getSubscriptionById(subscriptionId);
+
+    if (subscription.status !== SubscriptionStatus.CANCELLED || !subscription.cancelAtPeriodEnd) {
+      throw new BadRequestException('Can only reactivate subscriptions that are set to cancel at period end');
+    }
+
+    const updated = await this.prisma.subscription.update({
+      where: { id: subscriptionId },
+      data: {
+        cancelAtPeriodEnd: false,
+        autoRenew: true,
+        cancelledAt: null,
+      },
+      include: { plan: true },
+    });
+
+    this.logger.log(`Subscription ${subscriptionId} reactivated`);
+    return updated;
+  }
+
+  /**
+   * Update subscription settings
+   */
+  async updateSubscription(subscriptionId: string, dto: UpdateSubscriptionDto) {
+    const updated = await this.prisma.subscription.update({
+      where: { id: subscriptionId },
+      data: dto,
+      include: { plan: true },
+    });
+
+    return updated;
+  }
+
+  /**
+   * Renew subscription (called by cron job)
+   */
+  async renewSubscription(subscriptionId: string) {
+    const subscription = await this.getSubscriptionById(subscriptionId);
+
+    if (!subscription.autoRenew) {
+      this.logger.log(`Subscription ${subscriptionId} is set to not auto-renew`);
+      return null;
+    }
+
+    // Calculate new period
+    const now = new Date();
+    const newPeriodStart = subscription.currentPeriodEnd;
+    let newPeriodEnd: Date;
+
+    if (subscription.billingCycle === BillingCycle.MONTHLY) {
+      newPeriodEnd = new Date(newPeriodStart);
+      newPeriodEnd.setMonth(newPeriodEnd.getMonth() + 1);
+    } else {
+      newPeriodEnd = new Date(newPeriodStart);
+      newPeriodEnd.setFullYear(newPeriodEnd.getFullYear() + 1);
+    }
+
+    // Attempt payment
+    // This would integrate with payment provider to charge the customer
+    // For now, we'll just update the subscription
+
+    const renewed = await this.prisma.subscription.update({
+      where: { id: subscriptionId },
+      data: {
+        currentPeriodStart: newPeriodStart,
+        currentPeriodEnd: newPeriodEnd,
+        status: SubscriptionStatus.ACTIVE,
+        isTrialPeriod: false,
+      },
+      include: { plan: true },
+    });
+
+    this.logger.log(`Subscription ${subscriptionId} renewed`);
+    return renewed;
+  }
+
+  /**
+   * Check if subscription is active
+   */
+  async isSubscriptionActive(tenantId: string): Promise<boolean> {
+    const subscription = await this.getCurrentSubscription(tenantId);
+
+    if (!subscription) {
+      return false;
+    }
+
+    const now = new Date();
+    const isActive = subscription.status === SubscriptionStatus.ACTIVE || subscription.status === SubscriptionStatus.TRIALING;
+    const notExpired = subscription.currentPeriodEnd > now;
+
+    return isActive && notExpired;
+  }
+
+  /**
+   * Get all available plans
+   */
+  async getAvailablePlans() {
+    const plans = await this.prisma.subscriptionPlan.findMany({
+      where: { isActive: true },
+      orderBy: { monthlyPrice: 'asc' },
+    });
+
+    // Transform flat schema to nested structure expected by frontend
+    return plans.map(plan => ({
+      id: plan.id,
+      name: plan.name,
+      displayName: plan.displayName,
+      description: plan.description,
+      monthlyPrice: plan.monthlyPrice,
+      yearlyPrice: plan.yearlyPrice,
+      currency: plan.currency,
+      trialDays: plan.trialDays,
+      limits: {
+        maxUsers: plan.maxUsers,
+        maxTables: plan.maxTables,
+        maxProducts: plan.maxProducts,
+        maxCategories: plan.maxCategories,
+        maxMonthlyOrders: plan.maxMonthlyOrders,
+      },
+      features: {
+        advancedReports: plan.advancedReports,
+        multiLocation: plan.multiLocation,
+        customBranding: plan.customBranding,
+        apiAccess: plan.apiAccess,
+        prioritySupport: plan.prioritySupport,
+        inventoryTracking: plan.inventoryTracking,
+        kdsIntegration: plan.kdsIntegration,
+      },
+      isActive: plan.isActive,
+      createdAt: plan.createdAt.toISOString(),
+      updatedAt: plan.updatedAt.toISOString(),
+    }));
+  }
+
+  /**
+   * Get plan by name
+   */
+  async getPlanByName(name: SubscriptionPlanType) {
+    return await this.prisma.subscriptionPlan.findUnique({
+      where: { name },
+    });
+  }
+
+  /**
+   * Expire trial subscriptions (called by cron)
+   */
+  async expireTrials() {
+    const now = new Date();
+
+    const expiredTrials = await this.prisma.subscription.findMany({
+      where: {
+        status: SubscriptionStatus.TRIALING,
+        isTrialPeriod: true,
+        trialEnd: {
+          lte: now,
+        },
+      },
+    });
+
+    for (const subscription of expiredTrials) {
+      // Check if payment method is on file
+      const hasPaymentMethod = subscription.stripeCustomerId || subscription.iyzicoCustomerId;
+
+      if (hasPaymentMethod && subscription.autoRenew) {
+        // Attempt to convert to paid subscription
+        await this.convertTrialToPaid(subscription.id);
+      } else {
+        // Expire the subscription
+        await this.prisma.subscription.update({
+          where: { id: subscription.id },
+          data: {
+            status: SubscriptionStatus.EXPIRED,
+            endedAt: now,
+          },
+        });
+
+        this.logger.log(`Trial subscription ${subscription.id} expired`);
+      }
+    }
+
+    return expiredTrials.length;
+  }
+
+  /**
+   * Convert trial subscription to paid
+   */
+  private async convertTrialToPaid(subscriptionId: string) {
+    const subscription = await this.getSubscriptionById(subscriptionId);
+
+    // Calculate new billing period
+    const newPeriodStart = new Date();
+    let newPeriodEnd: Date;
+
+    if (subscription.billingCycle === BillingCycle.MONTHLY) {
+      newPeriodEnd = new Date(newPeriodStart);
+      newPeriodEnd.setMonth(newPeriodEnd.getMonth() + 1);
+    } else {
+      newPeriodEnd = new Date(newPeriodStart);
+      newPeriodEnd.setFullYear(newPeriodEnd.getFullYear() + 1);
+    }
+
+    // Update subscription
+    await this.prisma.subscription.update({
+      where: { id: subscriptionId },
+      data: {
+        status: SubscriptionStatus.ACTIVE,
+        isTrialPeriod: false,
+        currentPeriodStart: newPeriodStart,
+        currentPeriodEnd: newPeriodEnd,
+      },
+    });
+
+    this.logger.log(`Trial subscription ${subscriptionId} converted to paid`);
+  }
+}

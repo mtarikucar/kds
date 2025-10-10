@@ -19,20 +19,29 @@ model Tenant {
   id        String   @id @default(uuid())
   name      String
   subdomain String?  @unique
-  plan      String   @default("FREE") // FREE, BASIC, PREMIUM
   status    String   @default("ACTIVE") // ACTIVE, SUSPENDED, DELETED
+
+  // Subscription details
+  currentPlanId   String?
+  paymentRegion   String   @default("INTERNATIONAL") // TURKEY, INTERNATIONAL
+  trialUsed       Boolean  @default(false)
+  trialStartedAt  DateTime?
+  trialEndsAt     DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  users          User[]
-  categories     Category[]
-  products       Product[]
-  tables         Table[]
-  orders         Order[]
-  stockMovements StockMovement[]
+  users               User[]
+  categories          Category[]
+  products            Product[]
+  tables              Table[]
+  orders              Order[]
+  stockMovements      StockMovement[]
+  subscriptions       Subscription[]
+  currentPlan         SubscriptionPlan?  @relation("CurrentPlan", fields: [currentPlanId], references: [id], onDelete: SetNull)
 
+  @@index([currentPlanId])
   @@map("tenants")
 }
 
@@ -252,4 +261,190 @@ model StockMovement {
   @@index([productId])
   @@index([userId])
   @@map("stock_movements")
+}
+
+// ========================================
+// SUBSCRIPTION MANAGEMENT
+// ========================================
+
+model SubscriptionPlan {
+  id          String  @id @default(uuid())
+  name        String  @unique // FREE, BASIC, PRO, BUSINESS
+  displayName String
+  description String?
+
+  // Pricing
+  monthlyPrice Decimal @db.Decimal(10, 2)
+  yearlyPrice  Decimal @db.Decimal(10, 2)
+  currency     String  @default("USD")
+
+  // Trial settings
+  trialDays Int @default(0)
+
+  // Feature limits
+  maxUsers           Int     @default(1)
+  maxTables          Int     @default(5)
+  maxProducts        Int     @default(50)
+  maxCategories      Int     @default(10)
+  maxMonthlyOrders   Int     @default(100)
+
+  // Feature flags
+  advancedReports    Boolean @default(false)
+  multiLocation      Boolean @default(false)
+  customBranding     Boolean @default(false)
+  apiAccess          Boolean @default(false)
+  prioritySupport    Boolean @default(false)
+  inventoryTracking  Boolean @default(false)
+  kdsIntegration     Boolean @default(true)
+
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  subscriptions      Subscription[]
+  currentPlanTenants Tenant[]       @relation("CurrentPlan")
+
+  @@map("subscription_plans")
+}
+
+model Subscription {
+  id String @id @default(uuid())
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  planId String
+  plan   SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  // Subscription details
+  status          String   @default("ACTIVE") // ACTIVE, CANCELLED, EXPIRED, PAST_DUE, TRIALING
+  billingCycle    String   // MONTHLY, YEARLY
+  paymentProvider String   // STRIPE, IYZICO
+
+  // Dates
+  startDate       DateTime @default(now())
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelledAt     DateTime?
+  endedAt         DateTime?
+
+  // Trial tracking
+  isTrialPeriod Boolean  @default(false)
+  trialStart    DateTime?
+  trialEnd      DateTime?
+
+  // Payment provider IDs
+  stripeSubscriptionId String? @unique
+  iyzicoSubscriptionId String? @unique
+  stripeCustomerId     String?
+  iyzicoCustomerId     String?
+
+  // Pricing at time of subscription
+  amount   Decimal @db.Decimal(10, 2)
+  currency String  @default("USD")
+
+  // Auto-renewal
+  autoRenew       Boolean @default(true)
+  cancelAtPeriodEnd Boolean @default(false)
+
+  // Cancellation tracking
+  cancellationReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  payments SubscriptionPayment[]
+  invoices Invoice[]
+
+  @@index([tenantId])
+  @@index([planId])
+  @@index([status])
+  @@index([currentPeriodEnd])
+  @@map("subscriptions")
+}
+
+model SubscriptionPayment {
+  id String @id @default(uuid())
+
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  // Payment details
+  amount          Decimal @db.Decimal(10, 2)
+  currency        String  @default("USD")
+  status          String  @default("PENDING") // PENDING, SUCCEEDED, FAILED, REFUNDED
+  paymentProvider String  // STRIPE, IYZICO
+
+  // Provider-specific IDs
+  stripePaymentIntentId String? @unique
+  iyzicoPaymentId       String? @unique
+
+  // Payment metadata
+  paymentMethod String? // card, bank_transfer, etc.
+  last4         String?
+  cardBrand     String?
+
+  // Error tracking
+  failureCode    String?
+  failureMessage String?
+  retryCount     Int     @default(0)
+
+  // Dates
+  paidAt    DateTime?
+  refundedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Relations
+  invoice Invoice?
+
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("subscription_payments")
+}
+
+model Invoice {
+  id String @id @default(uuid())
+
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  paymentId String? @unique
+  payment   SubscriptionPayment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  // Invoice details
+  invoiceNumber String  @unique
+  status        String  @default("DRAFT") // DRAFT, OPEN, PAID, VOID, UNCOLLECTIBLE
+
+  // Amounts
+  subtotal Decimal @db.Decimal(10, 2)
+  tax      Decimal @default(0) @db.Decimal(10, 2)
+  total    Decimal @db.Decimal(10, 2)
+  currency String  @default("USD")
+
+  // Billing period
+  periodStart DateTime
+  periodEnd   DateTime
+
+  // Dates
+  dueDate   DateTime?
+  paidAt    DateTime?
+  voidedAt  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  // Metadata
+  description String?
+  notes       String?
+  pdfUrl      String?
+
+  @@index([subscriptionId])
+  @@index([invoiceNumber])
+  @@index([status])
+  @@index([dueDate])
+  @@map("invoices")
 }

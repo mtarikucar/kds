@@ -1,0 +1,202 @@
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import api from '../../lib/api';
+import {
+  Plan,
+  Subscription,
+  Invoice,
+  CreateSubscriptionDto,
+  UpdateSubscriptionDto,
+  ChangePlanDto,
+} from '../../types';
+
+// Query Keys
+export const subscriptionKeys = {
+  all: ['subscriptions'] as const,
+  plans: () => [...subscriptionKeys.all, 'plans'] as const,
+  current: () => [...subscriptionKeys.all, 'current'] as const,
+  detail: (id: string) => [...subscriptionKeys.all, 'detail', id] as const,
+  invoices: (id: string) => [...subscriptionKeys.all, 'invoices', id] as const,
+  tenantInvoices: () => [...subscriptionKeys.all, 'tenant-invoices'] as const,
+};
+
+// Get all available subscription plans
+export const useGetPlans = () => {
+  return useQuery({
+    queryKey: subscriptionKeys.plans(),
+    queryFn: async (): Promise<Plan[]> => {
+      const response = await api.get('/subscriptions/plans');
+      return response.data;
+    },
+  });
+};
+
+// Get current tenant's subscription
+export const useGetCurrentSubscription = () => {
+  return useQuery({
+    queryKey: subscriptionKeys.current(),
+    queryFn: async (): Promise<Subscription | null> => {
+      try {
+        const response = await api.get('/subscriptions/current');
+        return response.data;
+      } catch (error: any) {
+        if (error.response?.status === 404) {
+          return null;
+        }
+        throw error;
+      }
+    },
+  });
+};
+
+// Get subscription by ID
+export const useGetSubscription = (id: string) => {
+  return useQuery({
+    queryKey: subscriptionKeys.detail(id),
+    queryFn: async (): Promise<Subscription> => {
+      const response = await api.get(`/subscriptions/${id}`);
+      return response.data;
+    },
+    enabled: !!id,
+  });
+};
+
+// Create a new subscription
+export const useCreateSubscription = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: CreateSubscriptionDto): Promise<Subscription> => {
+      const response = await api.post('/subscriptions', data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
+      toast.success('Subscription created successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to create subscription');
+    },
+  });
+};
+
+// Update subscription settings
+export const useUpdateSubscription = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: UpdateSubscriptionDto;
+    }): Promise<Subscription> => {
+      const response = await api.patch(`/subscriptions/${id}`, data);
+      return response.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.detail(variables.id) });
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
+      toast.success('Subscription updated successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update subscription');
+    },
+  });
+};
+
+// Change subscription plan (upgrade/downgrade)
+export const useChangePlan = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: ChangePlanDto;
+    }): Promise<Subscription> => {
+      const response = await api.post(`/subscriptions/${id}/change-plan`, data);
+      return response.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.detail(variables.id) });
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
+      toast.success('Plan changed successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to change plan');
+    },
+  });
+};
+
+// Cancel subscription
+export const useCancelSubscription = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      immediate = false,
+    }: {
+      id: string;
+      immediate?: boolean;
+    }): Promise<Subscription> => {
+      const response = await api.post(`/subscriptions/${id}/cancel`, { immediate });
+      return response.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.detail(variables.id) });
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
+      toast.success('Subscription cancelled successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to cancel subscription');
+    },
+  });
+};
+
+// Reactivate a cancelled subscription
+export const useReactivateSubscription = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string): Promise<Subscription> => {
+      const response = await api.post(`/subscriptions/${id}/reactivate`);
+      return response.data;
+    },
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
+      toast.success('Subscription reactivated successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to reactivate subscription');
+    },
+  });
+};
+
+// Get subscription invoices
+export const useGetSubscriptionInvoices = (subscriptionId: string) => {
+  return useQuery({
+    queryKey: subscriptionKeys.invoices(subscriptionId),
+    queryFn: async (): Promise<Invoice[]> => {
+      const response = await api.get(`/subscriptions/${subscriptionId}/invoices`);
+      return response.data;
+    },
+    enabled: !!subscriptionId,
+  });
+};
+
+// Get all invoices for current tenant
+export const useGetTenantInvoices = () => {
+  return useQuery({
+    queryKey: subscriptionKeys.tenantInvoices(),
+    queryFn: async (): Promise<Invoice[]> => {
+      const response = await api.get('/subscriptions/tenant/invoices');
+      return response.data;
+    },
+  });
+};

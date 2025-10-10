@@ -365,3 +365,135 @@ export interface TableStatusChangedEvent {
   status: TableStatus;
   updatedAt: string;
 }
+
+// Subscription Types
+export enum SubscriptionPlanType {
+  FREE = 'FREE',
+  BASIC = 'BASIC',
+  PRO = 'PRO',
+  BUSINESS = 'BUSINESS',
+}
+
+export enum SubscriptionStatus {
+  ACTIVE = 'ACTIVE',
+  CANCELLED = 'CANCELLED',
+  EXPIRED = 'EXPIRED',
+  PAST_DUE = 'PAST_DUE',
+  TRIALING = 'TRIALING',
+}
+
+export enum BillingCycle {
+  MONTHLY = 'MONTHLY',
+  YEARLY = 'YEARLY',
+}
+
+export enum PaymentProvider {
+  STRIPE = 'STRIPE',
+  IYZICO = 'IYZICO',
+}
+
+export enum InvoiceStatus {
+  DRAFT = 'DRAFT',
+  OPEN = 'OPEN',
+  PAID = 'PAID',
+  VOID = 'VOID',
+  UNCOLLECTIBLE = 'UNCOLLECTIBLE',
+}
+
+export interface PlanLimits {
+  maxUsers: number;
+  maxTables: number;
+  maxProducts: number;
+  maxCategories: number;
+  maxMonthlyOrders: number;
+}
+
+export interface PlanFeatures {
+  advancedReports: boolean;
+  multiLocation: boolean;
+  customBranding: boolean;
+  apiAccess: boolean;
+  prioritySupport: boolean;
+  inventoryTracking: boolean;
+  kdsIntegration: boolean;
+}
+
+export interface Plan {
+  id: string;
+  name: SubscriptionPlanType;
+  displayName: string;
+  description?: string;
+  monthlyPrice: number;
+  yearlyPrice: number;
+  currency: string;
+  trialDays: number;
+  limits: PlanLimits;
+  features: PlanFeatures;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Subscription {
+  id: string;
+  tenantId: string;
+  planId: string;
+  status: SubscriptionStatus;
+  billingCycle: BillingCycle;
+  paymentProvider: PaymentProvider;
+  startDate: string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  cancelledAt?: string;
+  endedAt?: string;
+  isTrialPeriod: boolean;
+  trialStart?: string;
+  trialEnd?: string;
+  amount: number;
+  currency: string;
+  autoRenew: boolean;
+  cancelAtPeriodEnd: boolean;
+  plan?: {
+    id: string;
+    name: string;
+    displayName: string;
+    description?: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Invoice {
+  id: string;
+  subscriptionId: string;
+  invoiceNumber: string;
+  status: InvoiceStatus;
+  subtotal: number;
+  tax: number;
+  total: number;
+  currency: string;
+  periodStart: string;
+  periodEnd: string;
+  dueDate?: string;
+  paidAt?: string;
+  description?: string;
+  pdfUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSubscriptionDto {
+  planId: string;
+  billingCycle: BillingCycle;
+  paymentMethodId?: string; // Optional: For Stripe payment method
+  iyzicoPaymentDetails?: any; // Optional: For Iyzico specific payment details
+}
+
+export interface UpdateSubscriptionDto {
+  autoRenew?: boolean;
+}
+
+export interface ChangePlanDto {
+  newPlanId: string;
+  billingCycle?: BillingCycle;
+}

@@ -1,9 +1,9 @@
-FROM node:18-alpine AS development
+FROM node:18 AS development
 
 WORKDIR /app
 
-COPY package*.json ./
-RUN npm install
+COPY package.json ./
+RUN npm install --legacy-peer-deps
 
 COPY . .
 
@@ -11,10 +11,18 @@ EXPOSE 5173
 
 CMD ["npm", "run", "dev", "--", "--host"]
 
-# Production stage
+# Production build stage
 FROM node:18-alpine AS build
 
 WORKDIR /app
+
+# Accept build arguments for environment variables
+ARG VITE_API_URL
+ARG VITE_STRIPE_PUBLISHABLE_KEY
+
+# Set environment variables for build
+ENV VITE_API_URL=$VITE_API_URL
+ENV VITE_STRIPE_PUBLISHABLE_KEY=$VITE_STRIPE_PUBLISHABLE_KEY
 
 COPY package*.json ./
 RUN npm ci
@@ -22,10 +30,14 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
+# Production stage with Nginx
 FROM nginx:alpine AS production
 
+# Copy built assets
 COPY --from=build /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copy nginx configuration if it exists
+COPY nginx.conf /etc/nginx/conf.d/default.conf 2>/dev/null || echo "server { listen 80; location / { root /usr/share/nginx/html; try_files \$uri \$uri/ /index.html; } }" > /etc/nginx/conf.d/default.conf
 
 EXPOSE 80
 

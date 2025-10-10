@@ -6,6 +6,7 @@ import {
   UtensilsCrossed,
   Table,
   BarChart3,
+  CreditCard,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
@@ -47,6 +48,12 @@ const Sidebar = () => {
       to: '/admin/reports',
       icon: BarChart3,
       label: 'Reports',
+      roles: ['ADMIN', 'MANAGER'],
+    },
+    {
+      to: '/subscription/manage',
+      icon: CreditCard,
+      label: 'Subscription',
       roles: ['ADMIN', 'MANAGER'],
     },
   ];

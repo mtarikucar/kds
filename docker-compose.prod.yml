@@ -58,8 +58,28 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-30d}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      # Stripe Configuration (Production)
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      # Iyzico Configuration (Production)
+      IYZICO_API_KEY: ${IYZICO_API_KEY}
+      IYZICO_SECRET_KEY: ${IYZICO_SECRET_KEY}
+      IYZICO_BASE_URL: ${IYZICO_BASE_URL:-https://api.iyzipay.com}
+      # Email Configuration (Production)
+      EMAIL_HOST: ${EMAIL_HOST}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_SECURE: ${EMAIL_SECURE:-false}
+      EMAIL_USER: ${EMAIL_USER}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD}
+      EMAIL_FROM: ${EMAIL_FROM}
+      # Subscription Settings
+      DEFAULT_TRIAL_DAYS: ${DEFAULT_TRIAL_DAYS:-14}
+      TRIAL_REMINDER_DAYS: ${TRIAL_REMINDER_DAYS:-3}
     ports:
       - '3000:3000'
+    volumes:
+      - invoice_storage:/app/storage
     healthcheck:
       test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:3000/api']
       interval: 30s
@@ -72,12 +92,13 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: production
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+        VITE_STRIPE_PUBLISHABLE_KEY: ${VITE_STRIPE_PUBLISHABLE_KEY}
     container_name: kds_frontend_prod
     restart: always
     depends_on:
       - backend
-    environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:3000/api}
     ports:
       - '80:80'
     healthcheck:
@@ -89,3 +110,4 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  invoice_storage:

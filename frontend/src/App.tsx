@@ -8,6 +8,9 @@ import KitchenDisplayPage from './pages/kitchen/KitchenDisplayPage';
 import MenuManagementPage from './pages/admin/MenuManagementPage';
 import TableManagementPage from './pages/admin/TableManagementPage';
 import ReportsPage from './pages/admin/ReportsPage';
+import SubscriptionPlansPage from './pages/subscription/SubscriptionPlansPage';
+import SubscriptionManagementPage from './pages/subscription/SubscriptionManagementPage';
+import SubscriptionPaymentPage from './pages/subscription/SubscriptionPaymentPage';
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -26,6 +29,9 @@ function App() {
         <Route path="/admin/menu" element={<MenuManagementPage />} />
         <Route path="/admin/tables" element={<TableManagementPage />} />
         <Route path="/admin/reports" element={<ReportsPage />} />
+        <Route path="/subscription/plans" element={<SubscriptionPlansPage />} />
+        <Route path="/subscription/manage" element={<SubscriptionManagementPage />} />
+        <Route path="/subscription/payment" element={<SubscriptionPaymentPage />} />
       </Route>
     </Routes>
   );

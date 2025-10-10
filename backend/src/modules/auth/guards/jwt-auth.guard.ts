@@ -15,7 +15,13 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       context.getClass(),
     ]);
 
-    if (isPublic) {
+    // Also check for 'isPublic' metadata (alternative public decorator)
+    const isPublicAlt = this.reflector.getAllAndOverride<boolean>('isPublic', [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublic || isPublicAlt) {
       return true;
     }
 

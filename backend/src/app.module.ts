@@ -12,6 +12,7 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { KdsModule } from './modules/kds/kds.module';
 import { StockModule } from './modules/stock/stock.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { ReportsModule } from './modules/reports/reports.module';
     }),
     PrismaModule,
     AuthModule,
+    SubscriptionsModule,
     TenantsModule,
     UsersModule,
     MenuModule,

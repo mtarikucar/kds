@@ -27,7 +27,6 @@ export class TenantsService {
       data: {
         name: createTenantDto.name,
         subdomain: createTenantDto.subdomain,
-        plan: createTenantDto.plan || 'FREE',
         status: createTenantDto.status || 'ACTIVE',
       },
     });

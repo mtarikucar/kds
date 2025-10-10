@@ -6,13 +6,124 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Seeding database...');
 
+  // Create subscription plans
+  const freePlan = await prisma.subscriptionPlan.upsert({
+    where: { name: 'FREE' },
+    update: {},
+    create: {
+      name: 'FREE',
+      displayName: 'Free Plan',
+      description: 'Perfect for small restaurants getting started',
+      monthlyPrice: 0,
+      yearlyPrice: 0,
+      currency: 'USD',
+      trialDays: 0,
+      maxUsers: 2,
+      maxTables: 5,
+      maxProducts: 25,
+      maxCategories: 5,
+      maxMonthlyOrders: 50,
+      advancedReports: false,
+      multiLocation: false,
+      customBranding: false,
+      apiAccess: false,
+      prioritySupport: false,
+      inventoryTracking: false,
+      kdsIntegration: true,
+      isActive: true,
+    },
+  });
+
+  const basicPlan = await prisma.subscriptionPlan.upsert({
+    where: { name: 'BASIC' },
+    update: {},
+    create: {
+      name: 'BASIC',
+      displayName: 'Basic Plan',
+      description: 'Great for growing restaurants',
+      monthlyPrice: 29.99,
+      yearlyPrice: 299.99,
+      currency: 'USD',
+      trialDays: 14,
+      maxUsers: 5,
+      maxTables: 20,
+      maxProducts: 100,
+      maxCategories: 20,
+      maxMonthlyOrders: 500,
+      advancedReports: false,
+      multiLocation: false,
+      customBranding: false,
+      apiAccess: false,
+      prioritySupport: false,
+      inventoryTracking: true,
+      kdsIntegration: true,
+      isActive: true,
+    },
+  });
+
+  const proPlan = await prisma.subscriptionPlan.upsert({
+    where: { name: 'PRO' },
+    update: {},
+    create: {
+      name: 'PRO',
+      displayName: 'Pro Plan',
+      description: 'For established restaurants with multiple locations',
+      monthlyPrice: 79.99,
+      yearlyPrice: 799.99,
+      currency: 'USD',
+      trialDays: 14,
+      maxUsers: 15,
+      maxTables: 50,
+      maxProducts: 500,
+      maxCategories: 50,
+      maxMonthlyOrders: 2000,
+      advancedReports: true,
+      multiLocation: true,
+      customBranding: true,
+      apiAccess: false,
+      prioritySupport: true,
+      inventoryTracking: true,
+      kdsIntegration: true,
+      isActive: true,
+    },
+  });
+
+  const businessPlan = await prisma.subscriptionPlan.upsert({
+    where: { name: 'BUSINESS' },
+    update: {},
+    create: {
+      name: 'BUSINESS',
+      displayName: 'Business Plan',
+      description: 'Enterprise solution for large restaurant chains',
+      monthlyPrice: 199.99,
+      yearlyPrice: 1999.99,
+      currency: 'USD',
+      trialDays: 14,
+      maxUsers: -1,
+      maxTables: -1,
+      maxProducts: -1,
+      maxCategories: -1,
+      maxMonthlyOrders: -1,
+      advancedReports: true,
+      multiLocation: true,
+      customBranding: true,
+      apiAccess: true,
+      prioritySupport: true,
+      inventoryTracking: true,
+      kdsIntegration: true,
+      isActive: true,
+    },
+  });
+
+  console.log('✅ Subscription plans created');
+
   // Create tenant
   const tenant = await prisma.tenant.create({
     data: {
       name: 'Demo Restaurant',
       subdomain: 'demo',
-      plan: 'PREMIUM',
       status: 'ACTIVE',
+      currentPlanId: freePlan.id,
     },
   });
 

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #F59E0B; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
+    .button { display: inline-block; padding: 12px 30px; background: #F59E0B; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+    .warning { background: #FEF3C7; padding: 15px; border-left: 4px solid #F59E0B; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Your trial ends in {{daysRemaining}} days</h1>
+  </div>
+  <div class="content">
+    <p>Hi {{tenantName}},</p>
+
+    <div class="warning">
+      <strong>Your {{planName}} trial will expire in {{daysRemaining}} days.</strong>
+    </div>
+
+    <p>To continue enjoying all the features of the {{planName}} plan without interruption, please add a payment method before your trial ends.</p>
+
+    <p>Once your trial expires, you'll be automatically downgraded to the Free plan unless you subscribe.</p>
+
+    <a href="https://your-app-url.com/subscription/upgrade" class="button">Subscribe Now</a>
+
+    <p>Questions? We're here to help!</p>
+
+    <p>Best regards,<br>
+    The Restaurant POS Team</p>
+  </div>
+</body>
+</html>
