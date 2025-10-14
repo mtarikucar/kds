@@ -64,6 +64,7 @@ export class IyzicoService {
     paymentCard: IyzicoPaymentCard,
     conversationId: string,
     description: string,
+    clientIp?: string,
   ): Promise<IyzicoPaymentResult> {
     const request = {
       locale: Iyzipay.LOCALE.TR,
@@ -91,7 +92,7 @@ export class IyzicoService {
         email: customer.email,
         identityNumber: customer.identityNumber,
         registrationAddress: customer.address,
-        ip: '85.34.78.112', // This should be the actual client IP
+        ip: clientIp || '127.0.0.1', // Client IP passed from controller
         city: customer.city,
         country: customer.country,
         zipCode: customer.zipCode,
@@ -165,6 +166,7 @@ export class IyzicoService {
     paymentCard: IyzicoPaymentCard,
     conversationId: string,
     description: string,
+    clientIp?: string,
   ): Promise<IyzicoPaymentResult> {
     // Iyzico doesn't have native subscription support like Stripe
     // We need to handle recurring payments manually using scheduled jobs
@@ -196,7 +198,7 @@ export class IyzicoService {
         email: customer.email,
         identityNumber: customer.identityNumber,
         registrationAddress: customer.address,
-        ip: '85.34.78.112',
+        ip: clientIp || '127.0.0.1', // Client IP passed from controller
         city: customer.city,
         country: customer.country,
         zipCode: customer.zipCode,

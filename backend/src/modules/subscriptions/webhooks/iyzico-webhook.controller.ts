@@ -4,7 +4,12 @@ import {
   Body,
   BadRequestException,
   Logger,
+  Headers,
+  RawBodyRequest,
+  Req,
 } from '@nestjs/common';
+import { Request } from 'express';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { IyzicoService } from '../services/iyzico.service';
 import { BillingService } from '../services/billing.service';
@@ -13,6 +18,8 @@ import {
   PaymentStatus,
   SubscriptionStatus,
 } from '../../../common/constants/subscription.enum';
+import { verifyIyzicoWebhook } from '../../../common/utils/iyzico-webhook-verification.util';
+import { getClientIp } from '../../../common/utils/ip-detection.util';
 
 interface IyzicoCallbackPayload {
   status: string;
@@ -34,6 +41,7 @@ export class IyzicoWebhookController {
     private readonly iyzicoService: IyzicoService,
     private readonly billingService: BillingService,
     private readonly notificationService: NotificationService,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -53,14 +61,50 @@ export class IyzicoWebhookController {
   /**
    * Handle Iyzico callback/webhook
    * Iyzico sends payment status updates via callback URL
+   *
+   * IMPORTANT: This endpoint requires raw body for signature verification
    */
   @Post()
-  async handleCallback(@Body() payload: IyzicoCallbackPayload) {
-    this.logger.log(`Received Iyzico callback: ${JSON.stringify(payload)}`);
+  async handleCallback(
+    @Headers('x-iyzico-signature') signature: string,
+    @Req() request: RawBodyRequest<Request>,
+    @Body() payload: IyzicoCallbackPayload,
+  ) {
+    this.logger.log(`Received Iyzico callback for payment: ${payload.paymentId}`);
 
-    // Verify callback (basic validation)
+    // Get webhook secret from environment
+    const webhookSecret = this.configService.get<string>('IYZICO_WEBHOOK_SECRET');
+
+    // Verify webhook signature if secret is configured
+    if (webhookSecret) {
+      if (!signature) {
+        this.logger.error('Missing Iyzico webhook signature');
+        throw new BadRequestException('Missing webhook signature');
+      }
+
+      // Get raw body for signature verification
+      const rawBody = request.rawBody || JSON.stringify(payload);
+      const clientIp = getClientIp(request);
+
+      // Verify signature
+      const verification = verifyIyzicoWebhook(rawBody, signature, webhookSecret, clientIp);
+
+      if (!verification.valid) {
+        this.logger.error(`Iyzico webhook verification failed: ${verification.reason}`);
+        throw new BadRequestException(`Webhook verification failed: ${verification.reason}`);
+      }
+
+      this.logger.log('Iyzico webhook signature verified successfully');
+    } else {
+      this.logger.warn(
+        'IYZICO_WEBHOOK_SECRET not configured - webhook signature verification skipped. ' +
+        'This is a security risk in production!'
+      );
+    }
+
+    // Basic payload validation
     if (!this.iyzicoService.verifyCallback(payload)) {
-      throw new BadRequestException('Invalid callback payload');
+      throw new BadRequestException('Invalid callback payload structure');
     }
 
     try {

@@ -14,6 +14,7 @@ import { IyzicoService } from '../services/iyzico.service';
 import { BillingService } from '../services/billing.service';
 import { CreatePaymentIntentDto, ConfirmPaymentDto } from '../dto/payment-intent.dto';
 import { PaymentProvider, PaymentStatus, PaymentRegion } from '../../../common/constants/subscription.enum';
+import { getProductionSafeIp } from '../../../common/utils/ip-detection.util';
 
 @Controller('payments')
 @UseGuards(JwtAuthGuard)
@@ -172,6 +173,9 @@ export class PaymentController {
         tenant.name,
       );
 
+      // Get client IP for fraud detection
+      const clientIp = getProductionSafeIp(req);
+
       const result = await this.iyzicoService.createPayment(
         Number(subscription.amount),
         subscription.currency,
@@ -179,6 +183,7 @@ export class PaymentController {
         dto.iyzicoDetails,
         `SUB-${subscription.id}`,
         `Subscription payment for ${subscription.plan?.displayName}`,
+        clientIp,
       );
 
       if (result.status !== 'success') {
@@ -382,6 +387,9 @@ export class PaymentController {
         subscription.tenant.name,
       );
 
+      // Get client IP for fraud detection
+      const clientIp = getProductionSafeIp(req);
+
       const result = await this.iyzicoService.createPayment(
         Number(pendingChange.prorationAmount),
         pendingChange.currency,
@@ -389,6 +397,7 @@ export class PaymentController {
         dto.iyzicoDetails,
         `PLAN-CHANGE-${dto.pendingChangeId}`,
         `Plan change to ${pendingChange.newPlan.displayName}`,
+        clientIp,
       );
 
       if (result.status !== 'success') {

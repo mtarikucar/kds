@@ -11,6 +11,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthResponseDto, UserResponseDto } from './dto/auth-response.dto';
+import { UserRole } from '../../common/constants/roles.enum';
 
 @Injectable()
 export class AuthService {
@@ -50,10 +51,10 @@ export class AuthService {
     // Scenario 1: Creating a new restaurant (ADMIN only)
     if (hasRestaurantName) {
       // If creating a restaurant, role must be ADMIN (or default to ADMIN)
-      if (userRole && userRole !== 'ADMIN') {
+      if (userRole && userRole !== UserRole.ADMIN) {
         throw new BadRequestException('Only ADMIN role is allowed when creating a new restaurant');
       }
-      userRole = 'ADMIN';
+      userRole = UserRole.ADMIN;
 
       // Generate a subdomain from restaurant name
       const subdomain = registerDto.restaurantName
@@ -71,11 +72,45 @@ export class AuthService {
         finalSubdomain = `${subdomain}-${Math.random().toString(36).substring(2, 8)}`;
       }
 
-      // Create new tenant
+      // Get FREE plan
+      const freePlan = await this.prisma.subscriptionPlan.findUnique({
+        where: { name: 'FREE' },
+      });
+
+      if (!freePlan) {
+        throw new BadRequestException('FREE plan not found. Please seed the database.');
+      }
+
+      // Create new tenant with FREE subscription
       const tenant = await this.prisma.tenant.create({
         data: {
           name: registerDto.restaurantName,
           subdomain: finalSubdomain,
+          paymentRegion: registerDto.paymentRegion || 'INTERNATIONAL',
+          currentPlanId: freePlan.id,
+        },
+      });
+
+      // Create FREE subscription for new tenant
+      const now = new Date();
+      const currentPeriodEnd = new Date(now);
+      currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 10); // FREE plan never expires
+
+      await this.prisma.subscription.create({
+        data: {
+          tenantId: tenant.id,
+          planId: freePlan.id,
+          status: 'ACTIVE',
+          billingCycle: 'MONTHLY',
+          paymentProvider: registerDto.paymentRegion === 'TURKEY' ? 'IYZICO' : 'STRIPE',
+          startDate: now,
+          currentPeriodStart: now,
+          currentPeriodEnd: currentPeriodEnd,
+          isTrialPeriod: false,
+          amount: 0,
+          currency: freePlan.currency,
+          autoRenew: true,
+          cancelAtPeriodEnd: false,
         },
       });
 
@@ -93,13 +128,13 @@ export class AuthService {
       }
 
       // Cannot join as ADMIN (ADMIN creates their own restaurant)
-      if (userRole === 'ADMIN') {
+      if (userRole === UserRole.ADMIN) {
         throw new BadRequestException('Cannot join existing restaurant as ADMIN. ADMIN must create their own restaurant.');
       }
 
       // Default to WAITER if no role provided
       if (!userRole) {
-        userRole = 'WAITER';
+        userRole = UserRole.WAITER;
       }
 
       tenantId = registerDto.tenantId;

@@ -37,4 +37,9 @@ export class RegisterDto {
   @IsString()
   @IsOptional()
   tenantId?: string;
+
+  @ApiProperty({ example: 'INTERNATIONAL', enum: ['TURKEY', 'INTERNATIONAL'], required: false })
+  @IsString()
+  @IsOptional()
+  paymentRegion?: string;
 }

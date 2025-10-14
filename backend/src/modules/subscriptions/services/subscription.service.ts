@@ -437,11 +437,19 @@ export class SubscriptionService {
       },
     });
 
-    // Send notification (TODO: implement sendPlanChangeConfirmation method)
-    // await this.notificationService.sendPlanChangeConfirmation(
-    //   subscription.tenant.name,
-    //   newPlan.displayName
-    // );
+    // Send notification
+    const adminUser = await this.prisma.user.findFirst({
+      where: { tenantId: subscription.tenantId, role: 'ADMIN' },
+      select: { email: true },
+    });
+
+    if (adminUser?.email) {
+      await this.notificationService.sendPlanChangeConfirmation(
+        adminUser.email,
+        subscription.tenant.name,
+        newPlan.displayName,
+      );
+    }
 
     this.logger.log(`Plan change applied for subscription ${subscription.id} - ${newPlan.displayName}`);
     return updatedSubscription;

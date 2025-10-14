@@ -17,8 +17,8 @@ export class CreatePaymentIntentDto {
 
 export class ConfirmPaymentDto {
   @IsString()
-  @IsNotEmpty()
-  paymentIntentId: string;
+  @IsOptional()
+  paymentIntentId?: string; // Required for Stripe, not used for Iyzico
 
   @IsString()
   @IsOptional()

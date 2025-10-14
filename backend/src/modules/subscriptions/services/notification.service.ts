@@ -290,4 +290,69 @@ export class NotificationService {
       },
     });
   }
+
+  /**
+   * Send plan change confirmation email
+   */
+  async sendPlanChangeConfirmation(email: string, tenantName: string, newPlanName: string) {
+    return this.sendEmail({
+      to: email,
+      subject: `Plan changed to ${newPlanName}`,
+      template: 'plan-change-confirmation',
+      context: {
+        tenantName,
+        planName: newPlanName,
+        changeDate: new Date().toLocaleDateString(),
+      },
+    });
+  }
+
+  /**
+   * Send payment retry notification
+   */
+  async sendPaymentRetryNotification(email: string, tenantName: string, amount: number, currency: string, nextRetryDate: Date) {
+    return this.sendEmail({
+      to: email,
+      subject: 'Payment retry scheduled',
+      template: 'payment-retry',
+      context: {
+        tenantName,
+        amount,
+        currency,
+        nextRetryDate: nextRetryDate.toLocaleDateString(),
+      },
+    });
+  }
+
+  /**
+   * Send subscription past due warning
+   */
+  async sendSubscriptionPastDue(email: string, tenantName: string, planName: string, amount: number, currency: string) {
+    return this.sendEmail({
+      to: email,
+      subject: 'Subscription payment past due - Action required',
+      template: 'subscription-past-due',
+      context: {
+        tenantName,
+        planName,
+        amount,
+        currency,
+      },
+    });
+  }
+
+  /**
+   * Send welcome email for new subscription
+   */
+  async sendWelcomeEmail(email: string, tenantName: string, planName: string) {
+    return this.sendEmail({
+      to: email,
+      subject: `Welcome to ${planName}!`,
+      template: 'welcome',
+      context: {
+        tenantName,
+        planName,
+      },
+    });
+  }
 }
