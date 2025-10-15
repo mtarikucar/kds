@@ -20,7 +20,7 @@ async function bootstrap() {
     new ValidationPipe({
       whitelist: true,
       transform: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: false, // Allow extra properties (they'll be stripped by whitelist)
       transformOptions: {
         enableImplicitConversion: true,
       },

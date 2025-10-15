@@ -24,6 +24,9 @@ COPY . .
 # Generate Prisma client
 RUN npx prisma generate
 
+# Build the application for production stage
+RUN npm run build
+
 # Create directories for file storage
 RUN mkdir -p storage/invoices
 RUN mkdir -p src/modules/subscriptions/templates/emails
