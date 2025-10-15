@@ -13,6 +13,7 @@ import { KdsModule } from './modules/kds/kds.module';
 import { StockModule } from './modules/stock/stock.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { UploadModule } from './modules/upload/upload.module';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { SubscriptionsModule } from './modules/subscriptions/subscriptions.modul
     KdsModule,
     StockModule,
     ReportsModule,
+    UploadModule,
   ],
   controllers: [AppController],
   providers: [AppService],

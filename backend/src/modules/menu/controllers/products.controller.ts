@@ -92,4 +92,42 @@ export class ProductsController {
   ) {
     return this.productsService.updateStock(id, quantity, req.tenantId);
   }
+
+  // Image management endpoints
+  @Get(':id/images')
+  @ApiOperation({ summary: 'Get all images for a product' })
+  @ApiResponse({ status: 200, description: 'List of product images' })
+  @ApiResponse({ status: 404, description: 'Product not found' })
+  getProductImages(@Param('id') id: string, @Request() req) {
+    return this.productsService.getProductImages(id, req.tenantId);
+  }
+
+  @Patch(':id/images/reorder')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Reorder product images (ADMIN, MANAGER)' })
+  @ApiResponse({ status: 200, description: 'Images reordered successfully' })
+  @ApiResponse({ status: 404, description: 'Product not found' })
+  @ApiResponse({ status: 400, description: 'Invalid image IDs' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  reorderImages(
+    @Param('id') id: string,
+    @Body('imageIds') imageIds: string[],
+    @Request() req,
+  ) {
+    return this.productsService.reorderProductImages(id, imageIds, req.tenantId);
+  }
+
+  @Delete(':id/images/:imageId')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Remove an image from product (ADMIN, MANAGER)' })
+  @ApiResponse({ status: 200, description: 'Image removed successfully' })
+  @ApiResponse({ status: 404, description: 'Product or image not found' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  removeImage(
+    @Param('id') id: string,
+    @Param('imageId') imageId: string,
+    @Request() req,
+  ) {
+    return this.productsService.removeImageFromProduct(id, imageId, req.tenantId);
+  }
 }

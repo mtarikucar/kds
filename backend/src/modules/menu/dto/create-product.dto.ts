@@ -7,6 +7,7 @@ import {
   IsNumber,
   IsInt,
   Min,
+  IsArray,
 } from 'class-validator';
 
 export class CreateProductDto {
@@ -50,4 +51,14 @@ export class CreateProductDto {
   @IsString()
   @IsNotEmpty()
   categoryId: string;
+
+  @ApiProperty({
+    example: ['image-uuid-1', 'image-uuid-2'],
+    required: false,
+    description: 'Array of image IDs to attach to this product. First image will be the primary image.'
+  })
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  imageIds?: string[];
 }

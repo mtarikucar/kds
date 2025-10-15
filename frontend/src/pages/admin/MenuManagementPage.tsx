@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Image as ImageIcon } from 'lucide-react';
 import {
   useCategories,
   useProducts,
@@ -13,7 +13,12 @@ import {
   useUpdateProduct,
   useDeleteProduct,
 } from '../../features/menu/menuApi';
-import { Category, Product } from '../../types';
+import {
+  useProductImages,
+  useDeleteProductImage,
+  useUploadProductImages,
+} from '../../features/upload/uploadApi';
+import { Category, Product, ProductImage } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
@@ -21,6 +26,8 @@ import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import Badge from '../../components/ui/Badge';
 import Spinner from '../../components/ui/Spinner';
+import ImageLibraryModal from '../../components/product/ImageLibraryModal';
+import ImageUploadZone from '../../components/ui/ImageUploadZone';
 import { formatCurrency } from '../../lib/utils';
 
 const categorySchema = z.object({
@@ -35,7 +42,8 @@ const productSchema = z.object({
   price: z.number().min(0, 'Price must be positive'),
   categoryId: z.string().min(1, 'Category is required'),
   currentStock: z.number().min(0, 'Stock must be positive').optional(),
-  image: z.string().url('Invalid URL').optional().or(z.literal('')),
+  image: z.string().url('Invalid URL').optional().or(z.literal('')), // Legacy field
+  imageIds: z.array(z.string()).optional(), // New multi-image support
   isAvailable: z.boolean().optional(),
 });
 
@@ -43,20 +51,25 @@ type CategoryFormData = z.infer<typeof categorySchema>;
 type ProductFormData = z.infer<typeof productSchema>;
 
 const MenuManagementPage = () => {
-  const [activeTab, setActiveTab] = useState<'categories' | 'products'>('categories');
+  const [activeTab, setActiveTab] = useState<'categories' | 'products' | 'images'>('categories');
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
+  const [imageLibraryModalOpen, setImageLibraryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [productImages, setProductImages] = useState<ProductImage[]>([]);
 
   const { data: categories, isLoading: categoriesLoading } = useCategories();
   const { data: products, isLoading: productsLoading } = useProducts();
+  const { data: allImages, isLoading: imagesLoading } = useProductImages();
   const { mutate: createCategory } = useCreateCategory();
   const { mutate: updateCategory } = useUpdateCategory();
   const { mutate: deleteCategory } = useDeleteCategory();
   const { mutate: createProduct } = useCreateProduct();
   const { mutate: updateProduct } = useUpdateProduct();
   const { mutate: deleteProduct } = useDeleteProduct();
+  const { mutate: deleteImage } = useDeleteProductImage();
+  const uploadImagesMutation = useUploadProductImages();
 
   const categoryForm = useForm<CategoryFormData>({
     resolver: zodResolver(categorySchema),
@@ -84,6 +97,9 @@ const MenuManagementPage = () => {
   const handleOpenProductModal = (product?: Product) => {
     if (product) {
       setEditingProduct(product);
+      // Safely handle images array
+      const productImagesList = Array.isArray(product.images) ? product.images : [];
+      setProductImages(productImagesList);
       productForm.reset({
         name: product.name,
         description: product.description || '',
@@ -91,11 +107,15 @@ const MenuManagementPage = () => {
         categoryId: product.categoryId,
         currentStock: product.currentStock,
         image: product.image || '',
-        isAvailable: product.isAvailable,
+        imageIds: productImagesList.map((img) => img.id),
+        isAvailable: product.isAvailable ?? true,
       });
     } else {
       setEditingProduct(null);
-      productForm.reset({});
+      setProductImages([]);
+      productForm.reset({
+        isAvailable: true,
+      });
     }
     setProductModalOpen(true);
   };
@@ -126,6 +146,7 @@ const MenuManagementPage = () => {
       ...data,
       price: Number(data.price),
       currentStock: data.currentStock ? Number(data.currentStock) : 0,
+      imageIds: productImages.map((img) => img.id),
     };
 
     if (editingProduct) {
@@ -134,6 +155,7 @@ const MenuManagementPage = () => {
         {
           onSuccess: () => {
             setProductModalOpen(false);
+            setProductImages([]);
             productForm.reset();
           },
         }
@@ -142,9 +164,30 @@ const MenuManagementPage = () => {
       createProduct(submitData, {
         onSuccess: () => {
           setProductModalOpen(false);
+          setProductImages([]);
           productForm.reset();
         },
       });
+    }
+  };
+
+  const handleSelectImagesFromLibrary = (images: ProductImage[]) => {
+    // Replace with selected images from library (not append, to avoid duplicates)
+    setProductImages(images);
+  };
+
+  const handleUploadImagesToLibrary = async (files: File[]) => {
+    if (files.length === 0) return;
+    try {
+      await uploadImagesMutation.mutateAsync(files);
+    } catch (error) {
+      console.error('Failed to upload images:', error);
+    }
+  };
+
+  const handleDeleteImage = (imageId: string) => {
+    if (confirm('Are you sure you want to delete this image? This will remove it from all products.')) {
+      deleteImage(imageId);
     }
   };
 
@@ -170,6 +213,12 @@ const MenuManagementPage = () => {
           onClick={() => setActiveTab('products')}
         >
           Products
+        </Button>
+        <Button
+          variant={activeTab === 'images' ? 'primary' : 'outline'}
+          onClick={() => setActiveTab('images')}
+        >
+          Image Library
         </Button>
       </div>
 
@@ -244,11 +293,17 @@ const MenuManagementPage = () => {
               <Spinner />
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {products?.map((product) => (
+                {products?.map((product) => {
+                  const primaryImage = product.images?.[0] || null;
+                  const imageUrl = primaryImage
+                    ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${primaryImage.url}`
+                    : product.image || null;
+
+                  return (
                   <div key={product.id} className="border rounded-lg p-4">
-                    {product.image && (
+                    {imageUrl && (
                       <img
-                        src={product.image}
+                        src={imageUrl}
                         alt={product.name}
                         className="w-full h-32 object-cover rounded-md mb-3"
                       />
@@ -298,7 +353,80 @@ const MenuManagementPage = () => {
                       </Button>
                     </div>
                   </div>
+                );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Image Library Tab */}
+      {activeTab === 'images' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Image Library</CardTitle>
+            <p className="text-sm text-gray-600 mt-1">
+              Manage all product images in one place. Upload new images or delete unused ones.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {/* Upload Zone */}
+            <div className="mb-6">
+              <ImageUploadZone
+                onFilesSelected={handleUploadImagesToLibrary}
+                disabled={uploadImagesMutation.isPending}
+                maxFiles={20}
+              />
+            </div>
+
+            {/* Images Grid */}
+            {imagesLoading ? (
+              <Spinner />
+            ) : allImages && allImages.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {allImages.map((image) => (
+                  <div
+                    key={image.id}
+                    className="relative group rounded-lg border overflow-hidden bg-white shadow-sm hover:shadow-md transition-all"
+                  >
+                    {/* Image */}
+                    <div className="aspect-square flex items-center justify-center bg-gray-100">
+                      <img
+                        src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${image.url}`}
+                        alt={image.filename}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+
+                    {/* Delete Button */}
+                    <button
+                      onClick={() => handleDeleteImage(image.id)}
+                      className="absolute top-2 right-2 z-10 bg-red-600 text-white p-1.5 rounded-full hover:bg-red-700 transition-all opacity-0 group-hover:opacity-100"
+                      title="Delete image"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+
+                    {/* Info */}
+                    <div className="p-2 bg-gray-50">
+                      <p className="text-xs truncate font-medium text-gray-900">
+                        {image.filename}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {(image.size / 1024).toFixed(1)} KB
+                      </p>
+                    </div>
+                  </div>
                 ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 px-4 border-2 border-dashed border-gray-300 rounded-lg">
+                <ImageIcon className="mx-auto h-12 w-12 text-gray-400" />
+                <p className="mt-2 text-sm font-medium text-gray-900">No images in library</p>
+                <p className="mt-1 text-xs text-gray-500">
+                  Upload images above to get started
+                </p>
               </div>
             )}
           </CardContent>
@@ -392,11 +520,64 @@ const MenuManagementPage = () => {
             error={productForm.formState.errors.currentStock?.message}
             {...productForm.register('currentStock', { valueAsNumber: true })}
           />
-          <Input
-            label="Image URL"
-            error={productForm.formState.errors.image?.message}
-            {...productForm.register('image')}
-          />
+
+          {/* Product Images */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Product Images
+            </label>
+
+            {/* Show selected images */}
+            {productImages.length > 0 ? (
+              <div className="mb-4">
+                <div className="grid grid-cols-4 gap-3">
+                  {productImages.map((image, index) => (
+                    <div key={image.id} className="relative group">
+                      <div className="aspect-square rounded-lg overflow-hidden border-2 border-gray-200">
+                        <img
+                          src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${image.url}`}
+                          alt={image.filename}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      {index === 0 && (
+                        <div className="absolute top-1 left-1 bg-yellow-500 text-white text-xs px-2 py-0.5 rounded">
+                          Primary
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = productImages.filter(img => img.id !== image.id);
+                          setProductImages(updated);
+                        }}
+                        className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="mb-4 text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
+                <ImageIcon className="mx-auto h-10 w-10 text-gray-400" />
+                <p className="mt-2 text-sm text-gray-600">No images selected</p>
+              </div>
+            )}
+
+            {/* Button to open library */}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setImageLibraryModalOpen(true)}
+              className="w-full"
+            >
+              <ImageIcon className="h-4 w-4 mr-2" />
+              Choose Images from Library
+            </Button>
+          </div>
+
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -423,6 +604,15 @@ const MenuManagementPage = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Image Library Modal */}
+      <ImageLibraryModal
+        isOpen={imageLibraryModalOpen}
+        onClose={() => setImageLibraryModalOpen(false)}
+        onSelectImages={handleSelectImagesFromLibrary}
+        selectedImageIds={productImages.map((img) => img.id)}
+        maxSelection={10}
+      />
     </div>
   );
 };

@@ -35,6 +35,7 @@ model Tenant {
   users               User[]
   categories          Category[]
   products            Product[]
+  productImages       ProductImage[]
   tables              Table[]
   orders              Order[]
   stockMovements      StockMovement[]
@@ -98,7 +99,7 @@ model Product {
   name        String
   description String?
   price       Decimal @db.Decimal(10, 2)
-  image       String?
+  image       String? // Legacy field, kept for backwards compatibility
 
   isAvailable  Boolean @default(true)
   stockTracked Boolean @default(false)
@@ -114,12 +115,51 @@ model Product {
   updatedAt DateTime @updatedAt
 
   // Relations
+  productImages  ProductToImage[] // Many-to-many through junction table
   orderItems     OrderItem[]
   stockMovements StockMovement[]
 
   @@index([tenantId])
   @@index([categoryId])
   @@map("products")
+}
+
+model ProductImage {
+  id       String @id @default(uuid())
+  url      String // File path or URL
+  filename String // Original filename
+  size     Int    // File size in bytes
+  mimeType String // image/jpeg, image/png, image/webp
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  products ProductToImage[] // Many-to-many through junction table
+
+  @@index([tenantId])
+  @@map("product_images")
+}
+
+// Junction table for many-to-many relationship between Product and ProductImage
+model ProductToImage {
+  id    String @id @default(uuid())
+  order Int    @default(0) // Display order (0 = primary image)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  imageId String
+  image   ProductImage @relation(fields: [imageId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([productId, imageId]) // Prevent duplicate links
+  @@index([productId, order])
+  @@index([imageId])
+  @@map("product_to_images")
 }
 
 // ========================================

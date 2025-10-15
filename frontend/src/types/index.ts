@@ -95,13 +95,26 @@ export interface CreateCategoryDto {
 
 export interface UpdateCategoryDto extends Partial<CreateCategoryDto> {}
 
+// Product Image Types
+export interface ProductImage {
+  id: string;
+  url: string;
+  filename: string;
+  size: number;
+  mimeType: string;
+  order?: number; // Optional: only present when fetched with product (from junction table)
+  tenantId: string;
+  createdAt: string;
+}
+
 // Product Types
 export interface Product {
   id: string;
   name: string;
   description: string | null;
   price: number;
-  image: string | null;
+  image: string | null; // Legacy field, kept for backwards compatibility
+  images?: ProductImage[]; // New multi-image support
   categoryId: string;
   category?: Category;
   currentStock: number;
@@ -116,7 +129,8 @@ export interface CreateProductDto {
   name: string;
   description?: string;
   price: number;
-  image?: string;
+  image?: string; // Legacy field
+  imageIds?: string[]; // New multi-image support
   categoryId: string;
   currentStock?: number;
   stockTracked?: boolean;
@@ -124,6 +138,21 @@ export interface CreateProductDto {
 }
 
 export interface UpdateProductDto extends Partial<CreateProductDto> {}
+
+// Upload Types
+export interface UploadProductImageResponse {
+  id: string;
+  url: string;
+  filename: string;
+  size: number;
+  mimeType: string;
+  tenantId: string;
+}
+
+export interface UploadMultipleImagesResponse {
+  images: UploadProductImageResponse[];
+  count: number;
+}
 
 // Table Types
 export enum TableStatus {
