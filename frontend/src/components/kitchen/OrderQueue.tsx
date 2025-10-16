@@ -6,6 +6,7 @@ interface OrderQueueProps {
   status: OrderStatus;
   orders: Order[];
   onUpdateStatus: (orderId: string, status: OrderStatus) => void;
+  onCancelOrder?: (orderId: string) => void;
   updatingOrderId?: string;
 }
 
@@ -14,6 +15,7 @@ const OrderQueue = ({
   status,
   orders,
   onUpdateStatus,
+  onCancelOrder,
   updatingOrderId,
 }: OrderQueueProps) => {
   const filteredOrders = orders.filter((order) => order.status === status);
@@ -53,6 +55,7 @@ const OrderQueue = ({
               key={order.id}
               order={order}
               onUpdateStatus={onUpdateStatus}
+              onCancelOrder={onCancelOrder}
               isUpdating={updatingOrderId === order.id}
             />
           ))

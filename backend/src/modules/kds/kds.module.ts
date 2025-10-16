@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { KdsGateway } from './kds.gateway';
@@ -10,7 +10,7 @@ import { OrdersModule } from '../orders/orders.module';
 @Module({
   imports: [
     PrismaModule,
-    OrdersModule,
+    forwardRef(() => OrdersModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

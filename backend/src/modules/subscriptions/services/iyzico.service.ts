@@ -43,8 +43,9 @@ export class IyzicoService {
     const secretKey = this.configService.get<string>('IYZICO_SECRET_KEY');
     const baseUrl = this.configService.get<string>('IYZICO_BASE_URL', 'https://sandbox-api.iyzipay.com');
 
-    if (!apiKey || !secretKey) {
-      this.logger.warn('Iyzico API credentials not configured');
+    // Only initialize if valid credentials are provided (not placeholders)
+    if (!apiKey || !secretKey || apiKey === 'placeholder' || secretKey === 'placeholder') {
+      this.logger.warn('Iyzico API credentials not configured or using placeholder values. Iyzico payments will be disabled.');
     } else {
       this.iyzipay = new Iyzipay({
         apiKey,
@@ -66,6 +67,10 @@ export class IyzicoService {
     description: string,
     clientIp?: string,
   ): Promise<IyzicoPaymentResult> {
+    if (!this.iyzipay) {
+      throw new BadRequestException('Iyzico payment service is not configured');
+    }
+
     const request = {
       locale: Iyzipay.LOCALE.TR,
       conversationId,
@@ -168,6 +173,10 @@ export class IyzicoService {
     description: string,
     clientIp?: string,
   ): Promise<IyzicoPaymentResult> {
+    if (!this.iyzipay) {
+      throw new BadRequestException('Iyzico payment service is not configured');
+    }
+
     // Iyzico doesn't have native subscription support like Stripe
     // We need to handle recurring payments manually using scheduled jobs
     // This method is similar to createPayment but stores card for future use
@@ -266,6 +275,10 @@ export class IyzicoService {
    * Retrieve payment details
    */
   async getPayment(paymentId: string, conversationId: string): Promise<any> {
+    if (!this.iyzipay) {
+      throw new BadRequestException('Iyzico payment service is not configured');
+    }
+
     const request = {
       locale: Iyzipay.LOCALE.TR,
       conversationId,
@@ -288,6 +301,10 @@ export class IyzicoService {
    * Cancel/refund a payment
    */
   async refundPayment(paymentTransactionId: string, amount: number, conversationId: string): Promise<any> {
+    if (!this.iyzipay) {
+      throw new BadRequestException('Iyzico payment service is not configured');
+    }
+
     const request = {
       locale: Iyzipay.LOCALE.TR,
       conversationId,

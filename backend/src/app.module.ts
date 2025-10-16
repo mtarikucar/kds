@@ -14,6 +14,7 @@ import { StockModule } from './modules/stock/stock.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { UploadModule } from './modules/upload/upload.module';
+import { QrModule } from './modules/qr/qr.module';
 
 @Module({
   imports: [
@@ -33,6 +34,7 @@ import { UploadModule } from './modules/upload/upload.module';
     StockModule,
     ReportsModule,
     UploadModule,
+    QrModule,
   ],
   controllers: [AppController],
   providers: [AppService],

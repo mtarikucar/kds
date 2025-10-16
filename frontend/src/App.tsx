@@ -8,6 +8,7 @@ import KitchenDisplayPage from './pages/kitchen/KitchenDisplayPage';
 import MenuManagementPage from './pages/admin/MenuManagementPage';
 import TableManagementPage from './pages/admin/TableManagementPage';
 import UserManagementPage from './pages/admin/UserManagementPage';
+import QRManagementPage from './pages/admin/QRManagementPage';
 import ReportsPage from './pages/admin/ReportsPage';
 import SubscriptionPlansPage from './pages/subscription/SubscriptionPlansPage';
 import SubscriptionManagementPage from './pages/subscription/SubscriptionManagementPage';
@@ -30,6 +31,7 @@ function App() {
         <Route path="/admin/menu" element={<MenuManagementPage />} />
         <Route path="/admin/tables" element={<TableManagementPage />} />
         <Route path="/admin/users" element={<UserManagementPage />} />
+        <Route path="/admin/qr-codes" element={<QRManagementPage />} />
         <Route path="/admin/reports" element={<ReportsPage />} />
         <Route path="/subscription/plans" element={<SubscriptionPlansPage />} />
         <Route path="/subscription/manage" element={<SubscriptionManagementPage />} />

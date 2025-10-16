@@ -240,6 +240,7 @@ export interface CreateOrderDto {
   customerName?: string;
   items: CreateOrderItemDto[];
   notes?: string;
+  discount?: number;
 }
 
 export interface UpdateOrderDto {
@@ -525,4 +526,53 @@ export interface UpdateSubscriptionDto {
 export interface ChangePlanDto {
   newPlanId: string;
   billingCycle?: BillingCycle;
+}
+
+// QR Code & Menu Customization Types
+export interface QrMenuSettings {
+  id: string;
+  tenantId: string;
+  primaryColor: string;
+  secondaryColor: string;
+  backgroundColor: string;
+  fontFamily: string;
+  logoUrl?: string;
+  showRestaurantInfo: boolean;
+  showPrices: boolean;
+  showDescription: boolean;
+  showImages: boolean;
+  layoutStyle: 'GRID' | 'LIST' | 'COMPACT';
+  itemsPerRow: number;
+  enableTableQR: boolean;
+  tableQRMessage: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateQrSettingsDto {
+  primaryColor?: string;
+  secondaryColor?: string;
+  backgroundColor?: string;
+  fontFamily?: string;
+  logoUrl?: string;
+  showRestaurantInfo?: boolean;
+  showPrices?: boolean;
+  showDescription?: boolean;
+  showImages?: boolean;
+  layoutStyle?: 'GRID' | 'LIST' | 'COMPACT';
+  itemsPerRow?: number;
+  enableTableQR?: boolean;
+  tableQRMessage?: string;
+}
+
+export interface UpdateQrSettingsDto extends Partial<CreateQrSettingsDto> {}
+
+export interface QrCodeData {
+  id: string;
+  type: 'TENANT' | 'TABLE';
+  url: string;
+  qrDataUrl: string;
+  label: string;
+  tableId?: string;
+  tableNumber?: string;
 }

@@ -60,4 +60,15 @@ export class KdsController {
   ) {
     return this.kdsService.updateOrderItemStatus(id, updateDto, req.tenantId);
   }
+
+  @Patch('orders/:id/cancel')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN)
+  @ApiOperation({ summary: 'Cancel an order (ADMIN, MANAGER, KITCHEN)' })
+  @ApiResponse({ status: 200, description: 'Order cancelled successfully' })
+  @ApiResponse({ status: 404, description: 'Order not found' })
+  @ApiResponse({ status: 400, description: 'Cannot cancel paid orders' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  cancelOrder(@Param('id') id: string, @Request() req) {
+    return this.kdsService.cancelOrder(id, req.tenantId);
+  }
 }

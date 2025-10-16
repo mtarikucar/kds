@@ -1,6 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useOrders } from '../../features/orders/ordersApi';
-import { useUpdateOrderStatus } from '../../features/orders/ordersApi';
+import { useState } from 'react';
+import { useOrders, useUpdateOrderStatus, useCancelKdsOrder } from '../../features/orders/ordersApi';
 import { useKitchenSocket } from '../../features/kds/useKitchenSocket';
 import OrderQueue from '../../components/kitchen/OrderQueue';
 import { OrderStatus } from '../../types';
@@ -10,20 +9,15 @@ import Badge from '../../components/ui/Badge';
 
 const KitchenDisplayPage = () => {
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
+
+  // Filter to only show active kitchen orders
   const { data: orders, refetch, isLoading } = useOrders({
-    status: undefined, // Get all active orders
+    status: [OrderStatus.PENDING, OrderStatus.PREPARING, OrderStatus.READY].join(',') as any,
   });
+
   const { mutate: updateOrderStatus } = useUpdateOrderStatus();
+  const { mutate: cancelOrder } = useCancelKdsOrder();
   const { isConnected } = useKitchenSocket();
-
-  // Auto-refresh every 30 seconds
-  useEffect(() => {
-    const interval = setInterval(() => {
-      refetch();
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [refetch]);
 
   const handleUpdateStatus = (orderId: string, status: OrderStatus) => {
     setUpdatingOrderId(orderId);
@@ -35,6 +29,15 @@ const KitchenDisplayPage = () => {
         },
       }
     );
+  };
+
+  const handleCancelOrder = (orderId: string) => {
+    setUpdatingOrderId(orderId);
+    cancelOrder(orderId, {
+      onSettled: () => {
+        setUpdatingOrderId(null);
+      },
+    });
   };
 
   const handleRefresh = () => {
@@ -75,6 +78,7 @@ const KitchenDisplayPage = () => {
           status={OrderStatus.PENDING}
           orders={orders || []}
           onUpdateStatus={handleUpdateStatus}
+          onCancelOrder={handleCancelOrder}
           updatingOrderId={updatingOrderId || undefined}
         />
 

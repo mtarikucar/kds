@@ -4,14 +4,39 @@ import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import { formatTimeAgo, formatTime } from '../../lib/utils';
+import { useState, useEffect } from 'react';
 
 interface OrderCardProps {
   order: Order;
   onUpdateStatus: (orderId: string, status: OrderStatus) => void;
+  onCancelOrder?: (orderId: string) => void;
   isUpdating?: boolean;
 }
 
-const OrderCard = ({ order, onUpdateStatus, isUpdating }: OrderCardProps) => {
+const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating }: OrderCardProps) => {
+  const [elapsedTime, setElapsedTime] = useState('');
+
+  // Update elapsed time every second
+  useEffect(() => {
+    const updateElapsedTime = () => {
+      const now = new Date().getTime();
+      const created = new Date(order.createdAt).getTime();
+      const diffMs = now - created;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffSecs = Math.floor((diffMs % 60000) / 1000);
+
+      if (diffMins > 0) {
+        setElapsedTime(`${diffMins}m ${diffSecs}s`);
+      } else {
+        setElapsedTime(`${diffSecs}s`);
+      }
+    };
+
+    updateElapsedTime();
+    const interval = setInterval(updateElapsedTime, 1000);
+
+    return () => clearInterval(interval);
+  }, [order.createdAt]);
   const getNextStatus = (currentStatus: OrderStatus): OrderStatus | null => {
     switch (currentStatus) {
       case OrderStatus.PENDING:
@@ -84,12 +109,12 @@ const OrderCard = ({ order, onUpdateStatus, isUpdating }: OrderCardProps) => {
           </div>
         )}
 
-        <div className="flex items-center justify-between text-sm text-gray-600 mb-4">
-          <div className="flex items-center gap-1">
+        <div className="flex items-center justify-between text-sm mb-4">
+          <div className="flex items-center gap-1 text-blue-600 font-semibold">
             <Clock className="h-4 w-4" />
-            <span>{formatTimeAgo(order.createdAt)}</span>
+            <span>{elapsedTime}</span>
           </div>
-          <span>{formatTime(order.createdAt)}</span>
+          <span className="text-gray-600">{formatTime(order.createdAt)}</span>
         </div>
 
         {nextStatus && (
@@ -103,11 +128,11 @@ const OrderCard = ({ order, onUpdateStatus, isUpdating }: OrderCardProps) => {
           </Button>
         )}
 
-        {order.status === OrderStatus.PENDING && (
+        {order.status === OrderStatus.PENDING && onCancelOrder && (
           <Button
             variant="danger"
             className="w-full mt-2"
-            onClick={() => onUpdateStatus(order.id, OrderStatus.CANCELLED)}
+            onClick={() => onCancelOrder(order.id)}
             isLoading={isUpdating}
           >
             Cancel Order

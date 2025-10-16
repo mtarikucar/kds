@@ -13,21 +13,31 @@ interface CartItem extends Product {
 interface OrderCartProps {
   items: CartItem[];
   discount: number;
+  customerName: string;
+  orderNotes: string;
   onUpdateQuantity: (productId: string, quantity: number) => void;
   onRemoveItem: (productId: string) => void;
   onUpdateDiscount: (discount: number) => void;
+  onUpdateCustomerName: (name: string) => void;
+  onUpdateOrderNotes: (notes: string) => void;
   onClearCart: () => void;
   onCheckout: () => void;
+  isCheckingOut?: boolean;
 }
 
 const OrderCart = ({
   items,
   discount,
+  customerName,
+  orderNotes,
   onUpdateQuantity,
   onRemoveItem,
   onUpdateDiscount,
+  onUpdateCustomerName,
+  onUpdateOrderNotes,
   onClearCart,
   onCheckout,
+  isCheckingOut = false,
 }: OrderCartProps) => {
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const total = subtotal - discount;
@@ -99,6 +109,27 @@ const OrderCart = ({
             </div>
 
             <div className="space-y-3 border-t pt-4">
+              <Input
+                label="Customer Name (Optional)"
+                type="text"
+                placeholder="Enter customer name"
+                value={customerName}
+                onChange={(e) => onUpdateCustomerName(e.target.value)}
+              />
+
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-gray-700">
+                  Order Notes (Optional)
+                </label>
+                <textarea
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  placeholder="Special requests, allergies, etc."
+                  rows={2}
+                  value={orderNotes}
+                  onChange={(e) => onUpdateOrderNotes(e.target.value)}
+                />
+              </div>
+
               <div className="flex justify-between text-sm">
                 <span>Subtotal:</span>
                 <span className="font-medium">{formatCurrency(subtotal)}</span>
@@ -124,6 +155,7 @@ const OrderCart = ({
                 className="w-full"
                 size="lg"
                 onClick={onCheckout}
+                isLoading={isCheckingOut}
               >
                 Checkout
               </Button>

@@ -2,16 +2,23 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateOrderDto } from '../dto/create-order.dto';
 import { UpdateOrderDto } from '../dto/update-order.dto';
 import { UpdateOrderStatusDto } from '../dto/update-order-status.dto';
 import { OrderStatus } from '../../../common/constants/order-status.enum';
+import { KdsGateway } from '../../kds/kds.gateway';
 
 @Injectable()
 export class OrdersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => KdsGateway))
+    private kdsGateway: KdsGateway,
+  ) {}
 
   private generateOrderNumber(): string {
     const timestamp = Date.now();
@@ -71,7 +78,7 @@ export class OrdersService {
       };
     });
 
-    const discount = 0; // Can be extended later
+    const discount = createOrderDto.discount || 0;
     const finalAmount = totalAmount - discount;
 
     // Generate order number
@@ -98,7 +105,7 @@ export class OrdersService {
       createData.tableId = createOrderDto.tableId;
     }
 
-    return this.prisma.order.create({
+    const createdOrder = await this.prisma.order.create({
       data: createData,
       include: {
         orderItems: {
@@ -129,6 +136,11 @@ export class OrdersService {
         },
       },
     });
+
+    // Emit new order to kitchen via WebSocket
+    this.kdsGateway.emitNewOrder(tenantId, createdOrder);
+
+    return createdOrder;
   }
 
   async findAll(
@@ -280,7 +292,7 @@ export class OrdersService {
     // Check if order exists and belongs to tenant
     await this.findOne(id, tenantId);
 
-    return this.prisma.order.update({
+    const updatedOrder = await this.prisma.order.update({
       where: { id },
       data: {
         status: updateStatusDto.status,
@@ -294,6 +306,11 @@ export class OrdersService {
         table: true,
       },
     });
+
+    // Emit status change via WebSocket
+    this.kdsGateway.emitOrderStatusChange(tenantId, id, updateStatusDto.status);
+
+    return updatedOrder;
   }
 
   async remove(id: string, tenantId: string) {

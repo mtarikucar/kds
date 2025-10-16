@@ -61,7 +61,8 @@ export const useUpdateOrderStatus = () => {
       id: string;
       data: UpdateOrderDto;
     }): Promise<Order> => {
-      const response = await api.patch(`/orders/${id}/status`, data);
+      // Use KDS endpoint for real-time updates with WebSocket emission
+      const response = await api.patch(`/kds/orders/${id}/status`, data);
       return response.data;
     },
     onSuccess: () => {
@@ -86,6 +87,26 @@ export const useCancelOrder = () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
       toast.success('Order cancelled successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to cancel order');
+    },
+  });
+};
+
+export const useCancelKdsOrder = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string): Promise<Order> => {
+      // Use KDS-specific cancel endpoint with WebSocket emission
+      const response = await api.patch(`/kds/orders/${id}/cancel`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      toast.success('Order cancelled');
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to cancel order');

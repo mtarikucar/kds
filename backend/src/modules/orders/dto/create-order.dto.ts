@@ -44,6 +44,12 @@ export class CreateOrderDto {
   @IsOptional()
   notes?: string;
 
+  @ApiPropertyOptional({ description: 'Discount amount', minimum: 0 })
+  @IsNumber()
+  @Min(0)
+  @IsOptional()
+  discount?: number;
+
   @ApiProperty({ type: [CreateOrderItemDto], description: 'Order items' })
   @IsArray()
   @ValidateNested({ each: true })

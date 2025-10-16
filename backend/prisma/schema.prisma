@@ -40,6 +40,7 @@ model Tenant {
   orders              Order[]
   stockMovements      StockMovement[]
   subscriptions       Subscription[]
+  qrMenuSettings      QrMenuSettings?
   currentPlan         SubscriptionPlan?  @relation("CurrentPlan", fields: [currentPlanId], references: [id], onDelete: SetNull)
 
   @@index([currentPlanId])
@@ -535,4 +536,39 @@ model PendingPlanChange {
   @@index([paymentStatus])
   @@index([scheduledFor])
   @@map("pending_plan_changes")
+}
+
+// ========================================
+// QR MENU CUSTOMIZATION
+// ========================================
+
+model QrMenuSettings {
+  id        String   @id @default(uuid())
+  tenantId  String   @unique
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Design customization
+  primaryColor      String  @default("#3B82F6")  // Blue
+  secondaryColor    String  @default("#1F2937")  // Gray
+  backgroundColor   String  @default("#F9FAFB")  // Light gray
+  fontFamily        String  @default("Inter")
+  logoUrl           String?
+  showRestaurantInfo Boolean @default(true)
+  showPrices        Boolean @default(true)
+  showDescription   Boolean @default(true)
+  showImages        Boolean @default(true)
+
+  // Layout options
+  layoutStyle       String  @default("GRID") // GRID, LIST, COMPACT
+  itemsPerRow       Int     @default(2)
+
+  // Table-specific settings
+  enableTableQR     Boolean @default(true)
+  tableQRMessage    String  @default("Scan to view our menu")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("qr_menu_settings")
 }

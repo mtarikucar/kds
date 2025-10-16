@@ -140,4 +140,42 @@ export class KdsService {
 
     return updatedOrderItem;
   }
+
+  async cancelOrder(id: string, tenantId: string) {
+    // Verify order exists and belongs to tenant
+    const order = await this.prisma.order.findFirst({
+      where: {
+        id,
+        tenantId,
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException(`Order with ID ${id} not found`);
+    }
+
+    // Don't allow cancelling already paid orders
+    if (order.status === OrderStatus.PAID) {
+      throw new BadRequestException('Cannot cancel paid orders');
+    }
+
+    // Update order status to CANCELLED
+    const updatedOrder = await this.prisma.order.update({
+      where: { id },
+      data: { status: OrderStatus.CANCELLED },
+      include: {
+        orderItems: {
+          include: {
+            product: true,
+          },
+        },
+        table: true,
+      },
+    });
+
+    // Emit status change via WebSocket
+    this.kdsGateway.emitOrderStatusChange(tenantId, id, OrderStatus.CANCELLED);
+
+    return updatedOrder;
+  }
 }

@@ -8,6 +8,7 @@ import {
   BarChart3,
   CreditCard,
   Users,
+  QrCode,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
@@ -49,6 +50,12 @@ const Sidebar = () => {
       to: '/admin/users',
       icon: Users,
       label: 'User Management',
+      roles: ['ADMIN', 'MANAGER'],
+    },
+    {
+      to: '/admin/qr-codes',
+      icon: QrCode,
+      label: 'QR Codes',
       roles: ['ADMIN', 'MANAGER'],
     },
     {

@@ -19,10 +19,12 @@ const POSPage = () => {
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState(0);
+  const [customerName, setCustomerName] = useState('');
+  const [orderNotes, setOrderNotes] = useState('');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
 
-  const { mutate: createOrder } = useCreateOrder();
+  const { mutate: createOrder, isPending: isCreatingOrder } = useCreateOrder();
   const { mutate: createPayment, isPending: isCreatingPayment } = useCreatePayment();
   const { mutate: updateTableStatus } = useUpdateTableStatus();
 
@@ -31,11 +33,8 @@ const POSPage = () => {
       setSelectedTable(table);
       setCartItems([]);
       setDiscount(0);
-      // Update table to occupied
-      updateTableStatus({
-        id: table.id,
-        status: TableStatus.OCCUPIED,
-      });
+      setCustomerName('');
+      setOrderNotes('');
     } else if (table.status === TableStatus.OCCUPIED) {
       setSelectedTable(table);
       toast.info('Table is occupied. You can add to existing order.');
@@ -97,6 +96,9 @@ const POSPage = () => {
       {
         type: OrderType.DINE_IN,
         tableId: selectedTable.id,
+        customerName: customerName || undefined,
+        notes: orderNotes || undefined,
+        discount,
         items: cartItems.map((item) => ({
           productId: item.id,
           quantity: item.quantity,
@@ -108,6 +110,12 @@ const POSPage = () => {
         onSuccess: (order) => {
           setCurrentOrderId(order.id);
           setIsPaymentModalOpen(true);
+
+          // Now mark table as occupied after successful order creation
+          updateTableStatus({
+            id: selectedTable.id,
+            status: TableStatus.OCCUPIED,
+          });
         },
       }
     );
@@ -145,6 +153,8 @@ const POSPage = () => {
           setSelectedTable(null);
           setCartItems([]);
           setDiscount(0);
+          setCustomerName('');
+          setOrderNotes('');
 
           toast.success('Order completed successfully!');
         },
@@ -194,11 +204,16 @@ const POSPage = () => {
           <OrderCart
             items={cartItems}
             discount={discount}
+            customerName={customerName}
+            orderNotes={orderNotes}
             onUpdateQuantity={handleUpdateQuantity}
             onRemoveItem={handleRemoveItem}
             onUpdateDiscount={setDiscount}
+            onUpdateCustomerName={setCustomerName}
+            onUpdateOrderNotes={setOrderNotes}
             onClearCart={handleClearCart}
             onCheckout={handleCheckout}
+            isCheckingOut={isCreatingOrder}
           />
         </div>
       </div>
