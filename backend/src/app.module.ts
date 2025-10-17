@@ -17,6 +17,7 @@ import { UploadModule } from './modules/upload/upload.module';
 import { QrModule } from './modules/qr/qr.module';
 import { PosSettingsModule } from './modules/pos-settings/pos-settings.module';
 import { SettingsModule } from './modules/settings/settings.module';
+import { ContactModule } from './modules/contact/contact.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { SettingsModule } from './modules/settings/settings.module';
     QrModule,
     PosSettingsModule,
     SettingsModule,
+    ContactModule,
   ],
   controllers: [AppController],
   providers: [AppService],
