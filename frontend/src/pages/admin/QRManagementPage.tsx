@@ -3,7 +3,7 @@ import { useQrSettings, useUpdateQrSettings, useQrCodes } from '../../features/q
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/Spinner';
-import { QrCode, Download, Palette, Eye } from 'lucide-react';
+import { QrCode, Download, Palette, Eye, DownloadCloud, FileArchive } from 'lucide-react';
 import DesignEditor from '../../components/qr/DesignEditor';
 import QrCodeDisplay from '../../components/qr/QrCodeDisplay';
 import type { UpdateQrSettingsDto } from '../../types';
@@ -16,6 +16,173 @@ const QRManagementPage = () => {
 
   const handleSettingsUpdate = (updates: UpdateQrSettingsDto) => {
     updateSettings(updates);
+  };
+
+  const downloadAllQRs = () => {
+    const allQRs = qrCodes;
+    
+    allQRs.forEach((qr, index) => {
+      setTimeout(() => {
+        // Try multiple possible QR element IDs
+        let svg = document.getElementById(`qr-${qr.id}-small`) || 
+                  document.getElementById(`qr-${qr.id}-medium`) || 
+                  document.getElementById(`qr-${qr.id}`);
+        
+        if (!svg) {
+          console.warn(`QR element not found for ${qr.id}`);
+          return;
+        }
+
+        try {
+          const svgData = new XMLSerializer().serializeToString(svg);
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          if (!ctx) {
+            console.error('Canvas context not available');
+            return;
+          }
+          
+          const img = new Image();
+          canvas.width = 600;
+          canvas.height = 600;
+
+          img.onload = () => {
+            try {
+              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              const pngFile = canvas.toDataURL('image/png');
+              const downloadLink = document.createElement('a');
+              downloadLink.download = `${tenant?.name || 'restaurant'}-${qr.label.replace(/\\s/g, '-').replace(/[^a-zA-Z0-9-]/g, '')}.png`;
+              downloadLink.href = pngFile;
+              downloadLink.click();
+            } catch (error) {
+              console.error('Error generating download for QR code:', error);
+            }
+          };
+
+          img.onerror = () => {
+            console.error('Error loading SVG for QR code');
+          };
+
+          img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        } catch (error) {
+          console.error('Error processing QR code:', error);
+        }
+      }, index * 500); // Stagger downloads
+    });
+  };
+
+  const printAllTableQRs = () => {
+    const tableQRs = qrCodes.filter(qr => qr.type === 'TABLE');
+    
+    if (tableQRs.length === 0) {
+      alert('No table QR codes found to print.');
+      return;
+    }
+
+    const printWindow = window.open('', '', 'width=800,height=600');
+    if (!printWindow) {
+      alert('Popup blocked. Please allow popups for this site to print QR codes.');
+      return;
+    }
+
+    const qrElements = tableQRs.map((qr) => {
+      const svg = document.getElementById(`qr-${qr.id}-small`) || 
+                  document.getElementById(`qr-${qr.id}-medium`) || 
+                  document.getElementById(`qr-${qr.id}`);
+      return {
+        qr,
+        svgElement: svg ? new XMLSerializer().serializeToString(svg) : null
+      };
+    });
+
+    const validQRs = qrElements.filter(item => item.svgElement);
+
+    if (validQRs.length === 0) {
+      alert('No QR codes could be found for printing. Please ensure QR codes are loaded.');
+      printWindow.close();
+      return;
+    }
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${tenant?.name || 'Restaurant'} - Table QR Codes</title>
+          <style>
+            body { 
+              font-family: Arial, sans-serif; 
+              padding: 20px; 
+              margin: 0;
+            }
+            .qr-grid { 
+              display: grid; 
+              grid-template-columns: repeat(3, 1fr); 
+              gap: 20px; 
+              page-break-inside: avoid; 
+            }
+            .qr-item { 
+              text-align: center; 
+              border: 2px solid #ddd; 
+              padding: 15px; 
+              border-radius: 12px;
+              background: white;
+              box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            }
+            h1 { 
+              text-align: center; 
+              margin-bottom: 30px; 
+              color: #333;
+              font-size: 24px;
+            }
+            h3 { 
+              margin: 10px 0 15px 0; 
+              color: #555;
+              font-size: 16px;
+            }
+            .instructions {
+              font-size: 14px; 
+              color: #666; 
+              margin-top: 15px;
+              font-style: italic;
+            }
+            svg {
+              max-width: 100%;
+              height: auto;
+            }
+            @media print { 
+              .qr-grid { grid-template-columns: repeat(2, 1fr); }
+              body { padding: 10px; }
+              .qr-item { break-inside: avoid; }
+            }
+          </style>
+        </head>
+        <body>
+          <h1>${tenant?.name || 'Restaurant'} - Table QR Codes</h1>
+          <div class="qr-grid">
+            ${validQRs.map(({ qr, svgElement }) => `
+              <div class="qr-item">
+                <h3>${qr.label}</h3>
+                ${svgElement}
+                <p class="instructions">Scan to view our menu</p>
+              </div>
+            `).join('')}
+          </div>
+          <div style="margin-top: 30px; text-align: center; color: #999; font-size: 12px;">
+            Generated on ${new Date().toLocaleDateString()} - ${validQRs.length} QR codes
+          </div>
+        </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
+    printWindow.focus();
+    
+    // Wait for content to load before printing
+    setTimeout(() => {
+      printWindow.print();
+      setTimeout(() => printWindow.close(), 1000);
+    }, 750);
   };
 
   if (settingsLoading || codesLoading) {
@@ -72,6 +239,49 @@ const QRManagementPage = () => {
       {/* Tab Content */}
       {activeTab === 'codes' && (
         <div className="space-y-6">
+          {/* Batch Operations */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileArchive className="h-5 w-5" />
+                Batch Operations
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-600 mb-4">
+                Perform operations on multiple QR codes at once to save time.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  onClick={downloadAllQRs}
+                  variant="outline"
+                  className="flex items-center gap-2"
+                >
+                  <DownloadCloud className="h-4 w-4" />
+                  Download All QR Codes
+                </Button>
+                {settings?.enableTableQR && qrCodes.filter(qr => qr.type === 'TABLE').length > 0 && (
+                  <Button
+                    onClick={printAllTableQRs}
+                    variant="outline"
+                    className="flex items-center gap-2"
+                  >
+                    <Eye className="h-4 w-4" />
+                    Print Table QR Sheet
+                  </Button>
+                )}
+              </div>
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-xs font-medium text-blue-900 mb-1">Batch Tips:</p>
+                <ul className="text-xs text-blue-800 space-y-1">
+                  <li>• Downloads are staggered to prevent browser blocking</li>
+                  <li>• Print sheets are optimized for standard paper sizes</li>
+                  <li>• All QR codes use your current design settings</li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle>Restaurant QR Code</CardTitle>
@@ -81,7 +291,15 @@ const QRManagementPage = () => {
                 This QR code displays your full menu. Perfect for table tents, window signs, or marketing materials.
               </p>
               {qrCodes.filter(qr => qr.type === 'TENANT').map(qr => (
-                <QrCodeDisplay key={qr.id} qrCode={qr} tenant={tenant} />
+                <QrCodeDisplay 
+                  key={qr.id} 
+                  qrCode={qr} 
+                  tenant={tenant} 
+                  settings={{
+                    primaryColor: settings?.primaryColor,
+                    backgroundColor: settings?.backgroundColor
+                  }}
+                />
               ))}
             </CardContent>
           </Card>
@@ -97,7 +315,16 @@ const QRManagementPage = () => {
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {qrCodes.filter(qr => qr.type === 'TABLE').map(qr => (
-                    <QrCodeDisplay key={qr.id} qrCode={qr} tenant={tenant} compact />
+                    <QrCodeDisplay 
+                      key={qr.id} 
+                      qrCode={qr} 
+                      tenant={tenant} 
+                      compact
+                      settings={{
+                        primaryColor: settings?.primaryColor,
+                        backgroundColor: settings?.backgroundColor
+                      }}
+                    />
                   ))}
                 </div>
                 {qrCodes.filter(qr => qr.type === 'TABLE').length === 0 && (
@@ -116,6 +343,7 @@ const QRManagementPage = () => {
           settings={settings}
           onUpdate={handleSettingsUpdate}
           isUpdating={isUpdating}
+          tenant={tenant}
         />
       )}
     </div>

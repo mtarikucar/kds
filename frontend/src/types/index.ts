@@ -186,6 +186,7 @@ export enum OrderStatus {
   PREPARING = 'PREPARING',
   READY = 'READY',
   SERVED = 'SERVED',
+  PAID = 'PAID',
   CANCELLED = 'CANCELLED',
 }
 
@@ -367,7 +368,7 @@ export interface PaginatedResponse<T> {
 }
 
 export interface OrderFilters extends PaginationParams {
-  status?: OrderStatus;
+  status?: OrderStatus | string; // Support both single status and comma-separated statuses
   tableId?: string;
   startDate?: string;
   endDate?: string;
@@ -575,4 +576,19 @@ export interface QrCodeData {
   label: string;
   tableId?: string;
   tableNumber?: string;
+}
+
+// POS Settings Types
+export interface PosSettings {
+  id: string;
+  tenantId: string;
+  enableTablelessMode: boolean;
+  enableTwoStepCheckout: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpdatePosSettingsDto {
+  enableTablelessMode?: boolean;
+  enableTwoStepCheckout?: boolean;
 }

@@ -94,7 +94,7 @@ export const useUpdateTableStatus = () => {
       id: string;
       status: string;
     }): Promise<Table> => {
-      const response = await api.patch(`/tables/${id}`, { status });
+      const response = await api.patch(`/tables/${id}/status`, { status });
       return response.data;
     },
     onSuccess: () => {

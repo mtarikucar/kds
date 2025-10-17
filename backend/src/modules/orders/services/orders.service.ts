@@ -146,7 +146,7 @@ export class OrdersService {
   async findAll(
     tenantId: string,
     tableId?: string,
-    status?: OrderStatus,
+    statuses?: OrderStatus[],
     startDate?: Date,
     endDate?: Date,
   ) {
@@ -156,8 +156,13 @@ export class OrdersService {
       where.tableId = tableId;
     }
 
-    if (status) {
-      where.status = status;
+    if (statuses && statuses.length > 0) {
+      // Support both single status and multiple statuses
+      if (statuses.length === 1) {
+        where.status = statuses[0];
+      } else {
+        where.status = { in: statuses };
+      }
     }
 
     if (startDate || endDate) {
@@ -170,7 +175,9 @@ export class OrdersService {
       }
     }
 
-    return this.prisma.order.findMany({
+    console.log('[Orders Service] Where clause:', JSON.stringify(where, null, 2));
+
+    const orders = await this.prisma.order.findMany({
       where,
       include: {
         orderItems: {
@@ -203,6 +210,10 @@ export class OrdersService {
       },
       orderBy: { createdAt: 'desc' },
     });
+
+    console.log('[Orders Service] Found orders:', orders.length, 'orders with statuses:', orders.map(o => o.status));
+
+    return orders;
   }
 
   async findOne(id: string, tenantId: string) {
@@ -258,12 +269,71 @@ export class OrdersService {
       throw new BadRequestException('Cannot update paid or cancelled orders');
     }
 
-    return this.prisma.order.update({
+    const updateData: any = {
+      notes: updateOrderDto.notes,
+      customerName: updateOrderDto.customerName,
+    };
+
+    // If items are provided, update the order items
+    if (updateOrderDto.items && updateOrderDto.items.length > 0) {
+      // Validate all products exist and belong to tenant
+      const productIds = updateOrderDto.items.map((item) => item.productId);
+      const products = await this.prisma.product.findMany({
+        where: {
+          id: { in: productIds },
+          tenantId,
+        },
+      });
+
+      if (products.length !== productIds.length) {
+        throw new BadRequestException('One or more products are invalid or do not belong to your tenant');
+      }
+
+      // Check product availability
+      const unavailableProducts = products.filter((p) => !p.isAvailable);
+      if (unavailableProducts.length > 0) {
+        throw new BadRequestException(
+          `Products not available: ${unavailableProducts.map((p) => p.name).join(', ')}`
+        );
+      }
+
+      // Calculate new totals
+      let totalAmount = 0;
+      const orderItems = updateOrderDto.items.map((item) => {
+        const subtotal = item.quantity * item.unitPrice;
+        totalAmount += subtotal;
+        return {
+          productId: item.productId,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          subtotal,
+          notes: item.notes,
+        };
+      });
+
+      const discount = updateOrderDto.discount !== undefined ? updateOrderDto.discount : Number(order.discount);
+      const finalAmount = totalAmount - discount;
+
+      // Delete old items and create new ones
+      await this.prisma.orderItem.deleteMany({
+        where: { orderId: id },
+      });
+
+      updateData.orderItems = {
+        create: orderItems,
+      };
+      updateData.totalAmount = totalAmount;
+      updateData.discount = discount;
+      updateData.finalAmount = finalAmount;
+    } else if (updateOrderDto.discount !== undefined) {
+      // Only discount is being updated
+      updateData.discount = updateOrderDto.discount;
+      updateData.finalAmount = Number(order.totalAmount) - updateOrderDto.discount;
+    }
+
+    const updatedOrder = await this.prisma.order.update({
       where: { id },
-      data: {
-        notes: updateOrderDto.notes,
-        customerName: updateOrderDto.customerName,
-      },
+      data: updateData,
       include: {
         orderItems: {
           include: {
@@ -284,8 +354,22 @@ export class OrdersService {
             section: true,
           },
         },
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
       },
     });
+
+    // If items were updated, emit to kitchen via WebSocket
+    if (updateOrderDto.items && updateOrderDto.items.length > 0) {
+      this.kdsGateway.emitOrderUpdated(tenantId, updatedOrder);
+    }
+
+    return updatedOrder;
   }
 
   async updateStatus(id: string, updateStatusDto: UpdateOrderStatusDto, tenantId: string) {

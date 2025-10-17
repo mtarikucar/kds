@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -6,14 +7,20 @@ import {
   UtensilsCrossed,
   Table,
   BarChart3,
-  CreditCard,
+  Settings,
   Users,
   QrCode,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
 const Sidebar = () => {
   const user = useAuthStore((state) => state.user);
+  const location = useLocation();
+  const [settingsOpen, setSettingsOpen] = useState(
+    location.pathname.startsWith('/admin/settings')
+  );
 
   const navItems = [
     {
@@ -64,11 +71,20 @@ const Sidebar = () => {
       label: 'Reports',
       roles: ['ADMIN', 'MANAGER'],
     },
+  ];
+
+  const settingsItems = [
     {
-      to: '/subscription/manage',
-      icon: CreditCard,
+      to: '/admin/settings/subscription',
       label: 'Subscription',
-      roles: ['ADMIN', 'MANAGER'],
+    },
+    {
+      to: '/admin/settings/pos',
+      label: 'POS Settings',
+    },
+    {
+      to: '/admin/settings/integrations',
+      label: 'Integrations',
     },
   ];
 
@@ -99,6 +115,48 @@ const Sidebar = () => {
             <span className="font-medium">{item.label}</span>
           </NavLink>
         ))}
+
+        {/* Settings Dropdown */}
+        {(user?.role === 'ADMIN' || user?.role === 'MANAGER') && (
+          <div className="mt-1">
+            <button
+              onClick={() => setSettingsOpen(!settingsOpen)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                location.pathname.startsWith('/admin/settings')
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+              }`}
+            >
+              <Settings className="h-5 w-5" />
+              <span className="font-medium flex-1 text-left">Settings</span>
+              {settingsOpen ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </button>
+
+            {settingsOpen && (
+              <div className="ml-4 mt-1 space-y-1">
+                {settingsItems.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    className={({ isActive }) =>
+                      `flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
+                        isActive
+                          ? 'bg-blue-500 text-white'
+                          : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                      }`
+                    }
+                  >
+                    <span>{item.label}</span>
+                  </NavLink>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </nav>
     </aside>
   );

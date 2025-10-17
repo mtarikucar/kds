@@ -1,37 +1,142 @@
-import { QRCodeSVG } from 'react-qr-code';
-import Button from '../ui/Button';
-import { Download, ExternalLink } from 'lucide-react';
+import { QRCode } from 'react-qr-code';
+import { useState } from 'react';
+import { Download, Search, Share2, Printer, FileImage, FileText, Copy, Check } from 'lucide-react';
 import type { QrCodeData } from '../../types';
+import Button from '../ui/Button';
 
 interface QrCodeDisplayProps {
   qrCode: QrCodeData;
   tenant?: { id: string; name: string };
   compact?: boolean;
+  settings?: {
+    primaryColor?: string;
+    backgroundColor?: string;
+  };
 }
 
-const QrCodeDisplay = ({ qrCode, tenant, compact = false }: QrCodeDisplayProps) => {
+const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisplayProps) => {
+  const [copied, setCopied] = useState(false);
+  const [selectedSize, setSelectedSize] = useState<'small' | 'medium' | 'large'>('medium');
+  const [downloadFormat, setDownloadFormat] = useState<'png' | 'svg' | 'pdf'>('png');
+
+  const sizePresets = {
+    small: { size: 150, label: 'Table Tent', description: '150x150px' },
+    medium: { size: 300, label: 'Standard', description: '300x300px' },
+    large: { size: 600, label: 'Poster', description: '600x600px' }
+  };
+
+  const currentSize = sizePresets[selectedSize];
   const downloadQR = () => {
-    const svg = document.getElementById(`qr-${qrCode.id}`);
+    const svg = document.getElementById(`qr-${qrCode.id}-${selectedSize}`);
     if (!svg) return;
 
     const svgData = new XMLSerializer().serializeToString(svg);
+    const fileName = `${tenant?.name || 'restaurant'}-${qrCode.label.replace(/\s/g, '-')}-${selectedSize}`;
+
+    if (downloadFormat === 'svg') {
+      const blob = new Blob([svgData], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      const downloadLink = document.createElement('a');
+      downloadLink.download = `${fileName}.svg`;
+      downloadLink.href = url;
+      downloadLink.click();
+      URL.revokeObjectURL(url);
+      return;
+    }
+
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     const img = new Image();
 
-    canvas.width = 1000;
-    canvas.height = 1000;
+    canvas.width = currentSize.size * 2;
+    canvas.height = currentSize.size * 2;
 
     img.onload = () => {
-      ctx?.drawImage(img, 0, 0);
-      const pngFile = canvas.toDataURL('image/png');
-      const downloadLink = document.createElement('a');
-      downloadLink.download = `${tenant?.name || 'restaurant'}-${qrCode.label.replace(/\s/g, '-')}.png`;
-      downloadLink.href = pngFile;
-      downloadLink.click();
+      ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+      
+      if (downloadFormat === 'png') {
+        const pngFile = canvas.toDataURL('image/png');
+        const downloadLink = document.createElement('a');
+        downloadLink.download = `${fileName}.png`;
+        downloadLink.href = pngFile;
+        downloadLink.click();
+      } else if (downloadFormat === 'pdf') {
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const url = URL.createObjectURL(blob);
+            window.open(url, '_blank');
+            URL.revokeObjectURL(url);
+          }
+        });
+      }
     };
 
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+  };
+
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(qrCode.url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const shareQR = () => {
+    if (navigator.share) {
+      navigator.share({
+        title: `${tenant?.name} - ${qrCode.label}`,
+        text: 'Scan this QR code to view our menu',
+        url: qrCode.url
+      });
+    }
+  };
+
+  const printQR = () => {
+    const printWindow = window.open('', '', 'width=600,height=600');
+    if (!printWindow) return;
+
+    const svg = document.getElementById(`qr-${qrCode.id}-${selectedSize}`);
+    if (!svg) return;
+
+    const svgData = new XMLSerializer().serializeToString(svg);
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${tenant?.name} - ${qrCode.label}</title>
+          <style>
+            body { 
+              display: flex; 
+              justify-content: center; 
+              align-items: center; 
+              min-height: 100vh; 
+              margin: 0;
+              text-align: center;
+            }
+            .qr-container {
+              padding: 20px;
+            }
+            h1 { margin-bottom: 10px; }
+            p { margin-top: 10px; color: #666; }
+          </style>
+        </head>
+        <body>
+          <div class="qr-container">
+            <h1>${tenant?.name}</h1>
+            ${svgData}
+            <p>${qrCode.label}</p>
+            <p style="font-size: 14px;">Scan to view our menu</p>
+          </div>
+        </body>
+      </html>
+    `);
+    
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+      printWindow.close();
+    }, 250);
   };
 
   const openPreview = () => {
@@ -40,79 +145,204 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false }: QrCodeDisplayProps) 
 
   if (compact) {
     return (
-      <div className="bg-white border border-gray-200 rounded-lg p-4 flex flex-col items-center">
-        <div className="bg-white p-2 rounded border border-gray-200 mb-2">
-          <QRCodeSVG
-            id={`qr-${qrCode.id}`}
+      <div className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow p-5 flex flex-col items-center">
+        <div className="bg-gradient-to-br from-gray-50 to-white p-3 rounded-lg border border-gray-100 mb-3">
+          <QRCode
+            id={`qr-${qrCode.id}-small`}
             value={qrCode.url}
             size={120}
             level="H"
+            fgColor={settings?.primaryColor || '#000000'}
+            bgColor={settings?.backgroundColor || '#FFFFFF'}
           />
         </div>
-        <p className="font-medium text-sm text-gray-900 mb-2">{qrCode.label}</p>
+        <p className="font-semibold text-sm text-gray-900 mb-1">{qrCode.label}</p>
+        <p className="text-xs text-gray-500 mb-3">Click to view options</p>
         <div className="flex gap-2 w-full">
-          <Button
-            variant="outline"
-            size="sm"
+          <button
             onClick={downloadQR}
-            className="flex-1"
+            className="flex-1 px-3 py-2 text-sm border border-gray-200 bg-white hover:bg-gray-50 rounded-lg flex items-center justify-center gap-1 transition-colors"
+            title="Download QR Code"
           >
-            <Download className="h-3 w-3" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
+            <Download className="h-3.5 w-3.5" />
+          </button>
+          <button
             onClick={openPreview}
-            className="flex-1"
+            className="flex-1 px-3 py-2 text-sm border border-gray-200 bg-white hover:bg-gray-50 rounded-lg flex items-center justify-center gap-1 transition-colors"
+            title="Preview Menu"
           >
-            <ExternalLink className="h-3 w-3" />
-          </Button>
+            <Search className="h-3.5 w-3.5" />
+          </button>
+          <button
+            onClick={printQR}
+            className="flex-1 px-3 py-2 text-sm border border-gray-200 bg-white hover:bg-gray-50 rounded-lg flex items-center justify-center gap-1 transition-colors"
+            title="Print QR Code"
+          >
+            <Printer className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col md:flex-row gap-6 items-center">
-      <div className="bg-white p-4 rounded-lg border-2 border-gray-200 shadow-sm">
-        <QRCodeSVG
-          id={`qr-${qrCode.id}`}
-          value={qrCode.url}
-          size={256}
-          level="H"
-        />
-      </div>
+    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+      <div className="grid md:grid-cols-2 gap-8">
+        {/* QR Code Display Section */}
+        <div className="space-y-4">
+          <div className="text-center">
+            <h3 className="text-xl font-bold text-gray-900 mb-2">{qrCode.label}</h3>
+            <p className="text-sm text-gray-600">Scan to view our digital menu</p>
+          </div>
 
-      <div className="flex-1 space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">{qrCode.label}</h3>
-          <p className="text-sm text-gray-600">
-            Scan this code to view the menu
-          </p>
+          {/* Size Selector */}
+          <div className="bg-gray-50 rounded-lg p-3">
+            <p className="text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">Preview Size</p>
+            <div className="grid grid-cols-3 gap-2">
+              {Object.entries(sizePresets).map(([key, preset]) => (
+                <button
+                  key={key}
+                  onClick={() => setSelectedSize(key as any)}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                    selectedSize === key
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'bg-white text-gray-700 border border-gray-200 hover:border-blue-300'
+                  }`}
+                >
+                  <div className="text-xs">{preset.label}</div>
+                  <div className="text-xs opacity-75">{preset.description}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* QR Code Preview */}
+          <div className="flex justify-center">
+            <div className="bg-gradient-to-br from-gray-50 to-white p-4 rounded-xl border-2 border-gray-200 shadow-inner">
+              <QRCode
+                id={`qr-${qrCode.id}-${selectedSize}`}
+                value={qrCode.url}
+                size={currentSize.size}
+                level="H"
+                fgColor={settings?.primaryColor || '#000000'}
+                bgColor={settings?.backgroundColor || '#FFFFFF'}
+              />
+            </div>
+          </div>
         </div>
 
-        <div className="bg-gray-50 p-3 rounded border border-gray-200">
-          <p className="text-xs text-gray-500 mb-1">URL:</p>
-          <p className="text-sm text-gray-900 font-mono break-all">{qrCode.url}</p>
-        </div>
+        {/* Actions Section */}
+        <div className="space-y-4">
+          {/* URL Display */}
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-medium text-gray-700 uppercase tracking-wide">Menu URL</p>
+              <button
+                onClick={copyToClipboard}
+                className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
+              >
+                {copied ? (
+                  <><Check className="h-3 w-3" /> Copied!</>
+                ) : (
+                  <><Copy className="h-3 w-3" /> Copy</>                )}
+              </button>
+            </div>
+            <p className="text-sm text-gray-900 font-mono break-all bg-white rounded p-2 border border-gray-200">
+              {qrCode.url}
+            </p>
+          </div>
 
-        <div className="flex gap-3">
-          <Button
-            variant="primary"
-            onClick={downloadQR}
-            className="flex items-center gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Download PNG
-          </Button>
-          <Button
-            variant="outline"
-            onClick={openPreview}
-            className="flex items-center gap-2"
-          >
-            <ExternalLink className="h-4 w-4" />
-            Preview Menu
-          </Button>
+          {/* Download Options */}
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-gray-700 uppercase tracking-wide">Download Format</p>
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                onClick={() => setDownloadFormat('png')}
+                className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all ${
+                  downloadFormat === 'png'
+                    ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
+                    : 'bg-white text-gray-700 border border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <FileImage className="h-4 w-4" />
+                PNG
+              </button>
+              <button
+                onClick={() => setDownloadFormat('svg')}
+                className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all ${
+                  downloadFormat === 'svg'
+                    ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
+                    : 'bg-white text-gray-700 border border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <FileImage className="h-4 w-4" />
+                SVG
+              </button>
+              <button
+                onClick={() => setDownloadFormat('pdf')}
+                className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all ${
+                  downloadFormat === 'pdf'
+                    ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
+                    : 'bg-white text-gray-700 border border-gray-200 hover:border-gray-300'
+                }`}
+              >
+                <FileText className="h-4 w-4" />
+                PDF
+              </button>
+            </div>
+          </div>
+
+          {/* Action Buttons */}
+          <div className="space-y-3 pt-4">
+            <Button
+              onClick={downloadQR}
+              variant="primary"
+              className="w-full flex items-center justify-center gap-2"
+            >
+              <Download className="h-5 w-5" />
+              Download {downloadFormat.toUpperCase()} ({currentSize.label})
+            </Button>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <Button
+                onClick={printQR}
+                variant="outline"
+                className="flex items-center justify-center gap-2"
+              >
+                <Printer className="h-4 w-4" />
+                Print
+              </Button>
+              <Button
+                onClick={openPreview}
+                variant="outline"
+                className="flex items-center justify-center gap-2"
+              >
+                <Search className="h-4 w-4" />
+                Preview
+              </Button>
+            </div>
+
+            {navigator.share && (
+              <Button
+                onClick={shareQR}
+                variant="outline"
+                className="w-full flex items-center justify-center gap-2"
+              >
+                <Share2 className="h-4 w-4" />
+                Share QR Code
+              </Button>
+            )}
+          </div>
+
+          {/* Usage Tips */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
+            <p className="text-xs font-medium text-blue-900 mb-1">Pro Tips:</p>
+            <ul className="text-xs text-blue-800 space-y-1">
+              <li>• Use "Table Tent" size for table displays</li>
+              <li>• Choose "Poster" size for wall mounting</li>
+              <li>• SVG format maintains quality at any size</li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>

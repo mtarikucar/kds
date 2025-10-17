@@ -44,8 +44,8 @@ export const useKitchenSocket = () => {
       setIsConnected(false);
     };
 
-    const handleNewOrder = (event: NewOrderEvent) => {
-      console.log('New order received:', event.order);
+    const handleNewOrder = (event: any) => {
+      console.log('[KDS Socket] New order received:', event);
       queryClient.invalidateQueries({ queryKey: ['orders'] });
 
       // Play notification sound
@@ -53,6 +53,21 @@ export const useKitchenSocket = () => {
 
       // Show toast notification
       toast.success(`New Order: #${event.orderNumber}`, {
+        duration: 5000,
+        position: 'top-center',
+      });
+    };
+
+    const handleOrderUpdated = (event: any) => {
+      console.log('Order updated:', event);
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['orders', event.orderId] });
+
+      // Play notification sound for updated orders too
+      playNotificationSound();
+
+      // Show toast notification
+      toast.info(`Order Updated: #${event.orderNumber}`, {
         duration: 5000,
         position: 'top-center',
       });
@@ -67,6 +82,7 @@ export const useKitchenSocket = () => {
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('order:new', handleNewOrder);
+    socket.on('order:updated', handleOrderUpdated);
     socket.on('order:status-changed', handleOrderStatusChanged);
 
     // Join kitchen room
@@ -76,6 +92,7 @@ export const useKitchenSocket = () => {
       socket.off('connect', handleConnect);
       socket.off('disconnect', handleDisconnect);
       socket.off('order:new', handleNewOrder);
+      socket.off('order:updated', handleOrderUpdated);
       socket.off('order:status-changed', handleOrderStatusChanged);
       socket.emit('leave-kitchen');
       disconnectSocket();

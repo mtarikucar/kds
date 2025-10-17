@@ -15,6 +15,8 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { QrModule } from './modules/qr/qr.module';
+import { PosSettingsModule } from './modules/pos-settings/pos-settings.module';
+import { SettingsModule } from './modules/settings/settings.module';
 
 @Module({
   imports: [
@@ -35,6 +37,8 @@ import { QrModule } from './modules/qr/qr.module';
     ReportsModule,
     UploadModule,
     QrModule,
+    PosSettingsModule,
+    SettingsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

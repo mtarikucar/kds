@@ -71,21 +71,6 @@ const QRMenuPage = () => {
     }
   }, [tenantId, tableId]);
 
-  if (!menuData) {
-    const allProducts: Product[] = [];
-    const filteredProducts = allProducts;
-  } else {
-    var allProducts = menuData.categories.flatMap(cat => cat.products);
-    var filteredProducts = allProducts.filter((product) => {
-      const matchesCategory = !selectedCategory || product.categoryId === selectedCategory;
-      const matchesSearch =
-        !searchQuery ||
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.description?.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesCategory && matchesSearch;
-    });
-  }
-
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -110,6 +95,19 @@ const QRMenuPage = () => {
   if (!menuData) return null;
 
   const { tenant, table, settings, categories } = menuData;
+
+  // Get all products from all categories
+  const allProducts = categories.flatMap(cat => cat.products);
+
+  // Filter products based on category and search query
+  const filteredProducts = allProducts.filter((product) => {
+    const matchesCategory = !selectedCategory || product.categoryId === selectedCategory;
+    const matchesSearch =
+      !searchQuery ||
+      product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      product.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
   return (
     <div
@@ -195,7 +193,7 @@ const QRMenuPage = () => {
         </div>
 
         {/* Products */}
-        <div className="space-y-4">
+        <div>
           {filteredProducts.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
@@ -203,48 +201,146 @@ const QRMenuPage = () => {
               </CardContent>
             </Card>
           ) : (
-            filteredProducts.map((product) => (
-              <Card key={product.id} className="overflow-hidden bg-white">
-                <CardContent className="p-0">
-                  <div className="flex gap-4">
-                    {settings.showImages && product.image && (
-                      <img
-                        src={product.image}
-                        alt={product.name}
-                        className="w-32 h-32 object-cover"
-                      />
-                    )}
-                    <div className="flex-1 p-4">
-                      <div className="flex justify-between items-start mb-2">
-                        <div>
+            <>
+              {/* LIST Layout */}
+              {settings.layoutStyle === 'LIST' && (
+                <div className="space-y-4">
+                  {filteredProducts.map((product) => {
+                    const imageUrl = product.image || product.images?.[0]?.url;
+                    return (
+                    <Card key={product.id} className="overflow-hidden bg-white">
+                      <CardContent className="p-0">
+                        <div className="flex gap-4">
+                          {settings.showImages && (
+                            imageUrl ? (
+                              <img
+                                src={imageUrl}
+                                alt={product.name}
+                                className="w-32 h-32 object-cover"
+                              />
+                            ) : (
+                              <div className="w-32 h-32 bg-gray-200 flex items-center justify-center">
+                                <UtensilsCrossed className="h-12 w-12 text-gray-400" />
+                              </div>
+                            )
+                          )}
+                          <div className="flex-1 p-4">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <h3
+                                  className="text-lg font-semibold"
+                                  style={{ color: settings.secondaryColor }}
+                                >
+                                  {product.name}
+                                </h3>
+                                {settings.showDescription && product.description && (
+                                  <p className="text-sm text-gray-600 mt-1">
+                                    {product.description}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            {settings.showPrices && (
+                              <div className="flex items-center justify-between mt-3">
+                                <p
+                                  className="text-xl font-bold"
+                                  style={{ color: settings.primaryColor }}
+                                >
+                                  {formatCurrency(product.price, 'USD')}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* GRID Layout */}
+              {settings.layoutStyle === 'GRID' && (
+                <div
+                  className="grid gap-4"
+                  style={{
+                    gridTemplateColumns: `repeat(${settings.itemsPerRow}, minmax(0, 1fr))`,
+                  }}
+                >
+                  {filteredProducts.map((product) => {
+                    const imageUrl = product.image || product.images?.[0]?.url;
+                    return (
+                    <Card key={product.id} className="overflow-hidden bg-white">
+                      <CardContent className="p-0">
+                        {settings.showImages && (
+                          imageUrl ? (
+                            <img
+                              src={imageUrl}
+                              alt={product.name}
+                              className="w-full h-48 object-cover"
+                            />
+                          ) : (
+                            <div className="w-full h-48 bg-gray-200 flex items-center justify-center">
+                              <UtensilsCrossed className="h-16 w-16 text-gray-400" />
+                            </div>
+                          )
+                        )}
+                        <div className="p-4">
                           <h3
-                            className="text-lg font-semibold"
+                            className="text-lg font-semibold mb-2"
                             style={{ color: settings.secondaryColor }}
                           >
                             {product.name}
                           </h3>
                           {settings.showDescription && product.description && (
-                            <p className="text-sm text-gray-600 mt-1">
+                            <p className="text-sm text-gray-600 mb-3">
                               {product.description}
                             </p>
                           )}
+                          {settings.showPrices && (
+                            <p
+                              className="text-xl font-bold"
+                              style={{ color: settings.primaryColor }}
+                            >
+                              {formatCurrency(product.price, 'USD')}
+                            </p>
+                          )}
                         </div>
-                      </div>
-                      {settings.showPrices && (
-                        <div className="flex items-center justify-between mt-3">
-                          <p
-                            className="text-xl font-bold"
-                            style={{ color: settings.primaryColor }}
+                      </CardContent>
+                    </Card>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* COMPACT Layout */}
+              {settings.layoutStyle === 'COMPACT' && (
+                <div className="space-y-2">
+                  {filteredProducts.map((product) => (
+                    <Card key={product.id} className="bg-white">
+                      <CardContent className="p-3">
+                        <div className="flex justify-between items-center">
+                          <h3
+                            className="text-base font-semibold"
+                            style={{ color: settings.secondaryColor }}
                           >
-                            {formatCurrency(product.price, 'USD')}
-                          </p>
+                            {product.name}
+                          </h3>
+                          {settings.showPrices && (
+                            <p
+                              className="text-lg font-bold"
+                              style={{ color: settings.primaryColor }}
+                            >
+                              {formatCurrency(product.price, 'USD')}
+                            </p>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

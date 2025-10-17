@@ -43,20 +43,26 @@ export class OrdersController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @ApiOperation({ summary: 'Get all orders (ADMIN, MANAGER, WAITER)' })
   @ApiQuery({ name: 'tableId', required: false, description: 'Filter by table ID' })
-  @ApiQuery({ name: 'status', required: false, enum: OrderStatus, description: 'Filter by status' })
+  @ApiQuery({ name: 'status', required: false, description: 'Filter by status (comma-separated for multiple: PENDING,PREPARING,READY)' })
   @ApiQuery({ name: 'startDate', required: false, description: 'Filter by start date (ISO format)' })
   @ApiQuery({ name: 'endDate', required: false, description: 'Filter by end date (ISO format)' })
   @ApiResponse({ status: 200, description: 'List of all orders' })
   findAll(
     @Request() req,
     @Query('tableId') tableId?: string,
-    @Query('status') status?: OrderStatus,
+    @Query('status') status?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
   ) {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
-    return this.ordersService.findAll(req.tenantId, tableId, status, start, end);
+
+    // Convert comma-separated status string to array
+    const statuses = status ? status.split(',').map(s => s.trim()) as OrderStatus[] : undefined;
+
+    console.log('[Orders Controller] Query params:', { tableId, status, statuses });
+
+    return this.ordersService.findAll(req.tenantId, tableId, statuses, start, end);
   }
 
   @Get(':id')

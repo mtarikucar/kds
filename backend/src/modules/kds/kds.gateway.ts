@@ -89,6 +89,24 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.log(`New order ${order.orderNumber} emitted to kitchen-${tenantId}`);
   }
 
+  emitOrderUpdated(tenantId: string, order: any) {
+    this.server.to(`kitchen-${tenantId}`).to(`pos-${tenantId}`).emit('order:updated', {
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      items: order.orderItems,
+      table: order.table,
+      type: order.type,
+      customerName: order.customerName,
+      notes: order.notes,
+      totalAmount: order.totalAmount,
+      discount: order.discount,
+      finalAmount: order.finalAmount,
+      updatedAt: new Date(),
+    });
+
+    this.logger.log(`Order ${order.orderNumber} updated and emitted to kitchen-${tenantId}`);
+  }
+
   emitOrderStatusChange(tenantId: string, orderId: string, status: string) {
     this.server.to(`kitchen-${tenantId}`).to(`pos-${tenantId}`).emit('order:status-changed', {
       orderId,

@@ -61,12 +61,45 @@ export class QrMenuController {
             description: true,
             price: true,
             image: true,
+            categoryId: true,
+            productImages: {
+              select: {
+                order: true,
+                image: {
+                  select: {
+                    id: true,
+                    url: true,
+                    filename: true,
+                  },
+                },
+              },
+              orderBy: { order: 'asc' },
+            },
           },
           orderBy: { name: 'asc' },
         },
       },
       orderBy: { displayOrder: 'asc' },
     });
+
+    // Transform categories to include images array instead of productImages
+    const transformedCategories = categories.map(category => ({
+      ...category,
+      products: category.products.map(product => ({
+        id: product.id,
+        name: product.name,
+        description: product.description,
+        price: product.price,
+        image: product.image,
+        categoryId: product.categoryId,
+        images: product.productImages.map(pi => ({
+          id: pi.image.id,
+          url: pi.image.url,
+          filename: pi.image.filename,
+          order: pi.order,
+        })),
+      })),
+    }));
 
     return {
       tenant: {
@@ -90,7 +123,7 @@ export class QrMenuController {
         layoutStyle: settings.layoutStyle,
         itemsPerRow: settings.itemsPerRow,
       },
-      categories,
+      categories: transformedCategories,
     };
   }
 }

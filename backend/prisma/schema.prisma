@@ -41,6 +41,9 @@ model Tenant {
   stockMovements      StockMovement[]
   subscriptions       Subscription[]
   qrMenuSettings      QrMenuSettings?
+  posSettings         PosSettings?
+  integrationSettings IntegrationSettings[]
+  apiKeys             ApiKey[]
   currentPlan         SubscriptionPlan?  @relation("CurrentPlan", fields: [currentPlanId], references: [id], onDelete: SetNull)
 
   @@index([currentPlanId])
@@ -571,4 +574,95 @@ model QrMenuSettings {
 
   @@index([tenantId])
   @@map("qr_menu_settings")
+}
+
+// ========================================
+// POS SETTINGS
+// ========================================
+
+model PosSettings {
+  id        String   @id @default(uuid())
+  tenantId  String   @unique
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // POS operation modes
+  enableTablelessMode   Boolean @default(false)  // Allow orders without table selection
+  enableTwoStepCheckout Boolean @default(false)  // Separate "Create Order" and "Payment" buttons
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("pos_settings")
+}
+
+// ========================================
+// INTEGRATION SETTINGS
+// ========================================
+
+model IntegrationSettings {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Integration type
+  integrationType String   // PAYMENT_GATEWAY, POS_HARDWARE, THIRD_PARTY_API, DELIVERY_APP, ACCOUNTING, CRM, INVENTORY
+  provider        String   // stripe, iyzico, pos_terminal, quickbooks, etc.
+  name            String   // User-friendly name
+
+  // Configuration (stored as JSON)
+  config          Json     // Flexible config object based on integration type
+
+  // Status
+  isEnabled       Boolean  @default(false)
+  isConfigured    Boolean  @default(false)
+
+  // Metadata
+  lastSyncedAt    DateTime?
+  notes           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, integrationType, provider])
+  @@index([tenantId])
+  @@index([integrationType])
+  @@map("integration_settings")
+}
+
+model ApiKey {
+  id        String   @id @default(uuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // API Key details
+  name        String   // User-friendly name (e.g., "Production API", "Mobile App")
+  key         String   @unique  // The actual API key (should be hashed in production)
+  keyPrefix   String   // First few characters for identification (e.g., "pk_live_...")
+
+  // Permissions & Scopes
+  scopes      String[] // Array of permissions (e.g., ["orders:read", "orders:write", "menu:read"])
+
+  // Webhook configuration
+  webhookUrl  String?
+  webhookEvents String[] @default([]) // Events to send to webhook (e.g., ["order.created", "order.updated"])
+
+  // Status
+  isActive    Boolean  @default(true)
+  expiresAt   DateTime?
+
+  // Usage tracking
+  lastUsedAt  DateTime?
+  usageCount  Int      @default(0)
+
+  // Security
+  ipWhitelist String[] @default([]) // Allowed IP addresses (empty = allow all)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([key])
+  @@index([isActive])
+  @@map("api_keys")
 }

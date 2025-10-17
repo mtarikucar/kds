@@ -11,8 +11,11 @@ import UserManagementPage from './pages/admin/UserManagementPage';
 import QRManagementPage from './pages/admin/QRManagementPage';
 import ReportsPage from './pages/admin/ReportsPage';
 import SubscriptionPlansPage from './pages/subscription/SubscriptionPlansPage';
-import SubscriptionManagementPage from './pages/subscription/SubscriptionManagementPage';
 import SubscriptionPaymentPage from './pages/subscription/SubscriptionPaymentPage';
+import SettingsLayout from './pages/settings/SettingsLayout';
+import POSSettingsPage from './pages/settings/POSSettingsPage';
+import SubscriptionSettingsPage from './pages/settings/SubscriptionSettingsPage';
+import IntegrationsSettingsPage from './pages/settings/IntegrationsSettingsPage';
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -33,8 +36,21 @@ function App() {
         <Route path="/admin/users" element={<UserManagementPage />} />
         <Route path="/admin/qr-codes" element={<QRManagementPage />} />
         <Route path="/admin/reports" element={<ReportsPage />} />
+
+        {/* Settings Routes - Nested */}
+        <Route path="/admin/settings" element={<SettingsLayout />}>
+          <Route index element={<Navigate to="/admin/settings/subscription" replace />} />
+          <Route path="subscription" element={<SubscriptionSettingsPage />} />
+          <Route path="pos" element={<POSSettingsPage />} />
+          <Route path="integrations" element={<IntegrationsSettingsPage />} />
+        </Route>
+
+        {/* Legacy redirects */}
+        <Route path="/admin/pos-settings" element={<Navigate to="/admin/settings/pos" replace />} />
+        <Route path="/subscription/manage" element={<Navigate to="/admin/settings/subscription" replace />} />
+
+        {/* Subscription pages */}
         <Route path="/subscription/plans" element={<SubscriptionPlansPage />} />
-        <Route path="/subscription/manage" element={<SubscriptionManagementPage />} />
         <Route path="/subscription/payment" element={<SubscriptionPaymentPage />} />
       </Route>
     </Routes>

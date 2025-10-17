@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import TableGrid from '../../components/pos/TableGrid';
 import MenuPanel from '../../components/pos/MenuPanel';
 import OrderCart from '../../components/pos/OrderCart';
 import PaymentModal from '../../components/pos/PaymentModal';
-import { useCreateOrder } from '../../features/orders/ordersApi';
+import { useCreateOrder, useUpdateOrder, useOrders } from '../../features/orders/ordersApi';
 import { useCreatePayment } from '../../features/orders/ordersApi';
 import { useUpdateTableStatus } from '../../features/tables/tablesApi';
-import { Product, Table, TableStatus, OrderType } from '../../types';
+import { useGetPosSettings } from '../../features/pos/posApi';
+import { Product, Table, TableStatus, OrderType, OrderStatus } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 
 interface CartItem extends Product {
@@ -24,9 +25,62 @@ const POSPage = () => {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
 
+  // Fetch POS settings
+  const { data: posSettings } = useGetPosSettings();
+
   const { mutate: createOrder, isPending: isCreatingOrder } = useCreateOrder();
+  const { mutate: updateOrder, isPending: isUpdatingOrder } = useUpdateOrder();
   const { mutate: createPayment, isPending: isCreatingPayment } = useCreatePayment();
   const { mutate: updateTableStatus } = useUpdateTableStatus();
+
+  // Determine if tableless mode is enabled
+  const isTablelessMode = posSettings?.enableTablelessMode ?? false;
+  const isTwoStepCheckout = posSettings?.enableTwoStepCheckout ?? false;
+
+  // Fetch active orders for selected table
+  const { data: tableOrders, refetch: refetchOrders } = useOrders(
+    selectedTable
+      ? {
+          tableId: selectedTable.id,
+        }
+      : undefined
+  );
+
+  // Load existing orders when an occupied table is selected
+  useEffect(() => {
+    if (selectedTable?.status === TableStatus.OCCUPIED && tableOrders) {
+      // Find the most recent active order (not PAID or CANCELLED)
+      const activeOrder = tableOrders.find(
+        (order) =>
+          order.status !== OrderStatus.PAID &&
+          order.status !== OrderStatus.CANCELLED
+      );
+
+      if (activeOrder) {
+        setCurrentOrderId(activeOrder.id);
+
+        // Populate cart with existing order items
+        const items = activeOrder.orderItems || activeOrder.items || [];
+        const existingItems: CartItem[] = items.map((item) => ({
+          ...(item.product as Product),
+          quantity: item.quantity,
+          notes: item.notes || undefined,
+        }));
+
+        setCartItems(existingItems);
+        setDiscount(activeOrder.discount || 0);
+        setCustomerName('');
+        setOrderNotes(activeOrder.notes || '');
+
+        toast.info(
+          `Loaded existing order #${activeOrder.orderNumber} with ${items.length} items`
+        );
+      } else {
+        // Table is marked occupied but no active orders found
+        toast.warning('Table is occupied but no active orders found');
+      }
+    }
+  }, [selectedTable, tableOrders]);
 
   const handleSelectTable = (table: Table) => {
     if (table.status === TableStatus.AVAILABLE) {
@@ -35,16 +89,23 @@ const POSPage = () => {
       setDiscount(0);
       setCustomerName('');
       setOrderNotes('');
+      setCurrentOrderId(null);
     } else if (table.status === TableStatus.OCCUPIED) {
       setSelectedTable(table);
-      toast.info('Table is occupied. You can add to existing order.');
+      // Clear cart first - useEffect will load existing orders
+      setCartItems([]);
+      setDiscount(0);
+      setCustomerName('');
+      setOrderNotes('');
+      toast.info('Loading existing order...');
     } else {
       toast.warning('Table is reserved');
     }
   };
 
   const handleAddItem = (product: Product) => {
-    if (!selectedTable) {
+    // In tableless mode, table selection is optional
+    if (!isTablelessMode && !selectedTable) {
       toast.error('Please select a table first');
       return;
     }
@@ -80,8 +141,10 @@ const POSPage = () => {
     setDiscount(0);
   };
 
-  const handleCheckout = () => {
-    if (!selectedTable) {
+  // Create or update order (for two-step checkout)
+  const handleCreateOrder = () => {
+    // In tableless mode, table is optional
+    if (!isTablelessMode && !selectedTable) {
       toast.error('Please select a table');
       return;
     }
@@ -91,34 +154,128 @@ const POSPage = () => {
       return;
     }
 
-    // Create order
-    createOrder(
-      {
-        type: OrderType.DINE_IN,
-        tableId: selectedTable.id,
-        customerName: customerName || undefined,
-        notes: orderNotes || undefined,
-        discount,
-        items: cartItems.map((item) => ({
-          productId: item.id,
-          quantity: item.quantity,
-          unitPrice: item.price,
-          notes: item.notes,
-        })),
-      },
-      {
-        onSuccess: (order) => {
-          setCurrentOrderId(order.id);
-          setIsPaymentModalOpen(true);
+    // Determine order type based on mode
+    const orderType = isTablelessMode && !selectedTable ? OrderType.TAKEAWAY : OrderType.DINE_IN;
 
-          // Now mark table as occupied after successful order creation
-          updateTableStatus({
-            id: selectedTable.id,
-            status: TableStatus.OCCUPIED,
-          });
+    const orderData = {
+      type: orderType,
+      tableId: selectedTable?.id,
+      customerName: customerName || undefined,
+      notes: orderNotes || undefined,
+      discount,
+      items: cartItems.map((item) => ({
+        productId: item.id,
+        quantity: item.quantity,
+        unitPrice: item.price,
+        notes: item.notes,
+      })),
+    };
+
+    // Update existing order if currentOrderId exists, otherwise create new
+    if (currentOrderId) {
+      updateOrder(
+        {
+          id: currentOrderId,
+          data: orderData,
         },
-      }
-    );
+        {
+          onSuccess: (order) => {
+            toast.success('Order updated successfully');
+          },
+        }
+      );
+    } else {
+      // Create new order
+      createOrder(
+        orderData,
+        {
+          onSuccess: (order) => {
+            setCurrentOrderId(order.id);
+            toast.success(`Order #${order.orderNumber} created successfully`);
+
+            // Mark table as occupied after successful order creation (if table mode)
+            if (selectedTable && selectedTable.status === TableStatus.AVAILABLE) {
+              updateTableStatus({
+                id: selectedTable.id,
+                status: TableStatus.OCCUPIED,
+              });
+            }
+          },
+        }
+      );
+    }
+  };
+
+  // Checkout (create order + open payment modal for single-step, or just open payment for two-step)
+  const handleCheckout = () => {
+    // In tableless mode, table is optional
+    if (!isTablelessMode && !selectedTable) {
+      toast.error('Please select a table');
+      return;
+    }
+
+    if (cartItems.length === 0) {
+      toast.error('Cart is empty');
+      return;
+    }
+
+    // If two-step checkout is enabled and order already exists, just open payment
+    if (isTwoStepCheckout && currentOrderId) {
+      setIsPaymentModalOpen(true);
+      return;
+    }
+
+    // Determine order type based on mode
+    const orderType = isTablelessMode && !selectedTable ? OrderType.TAKEAWAY : OrderType.DINE_IN;
+
+    const orderData = {
+      type: orderType,
+      tableId: selectedTable?.id,
+      customerName: customerName || undefined,
+      notes: orderNotes || undefined,
+      discount,
+      items: cartItems.map((item) => ({
+        productId: item.id,
+        quantity: item.quantity,
+        unitPrice: item.price,
+        notes: item.notes,
+      })),
+    };
+
+    // Update existing order if currentOrderId exists, otherwise create new
+    if (currentOrderId) {
+      updateOrder(
+        {
+          id: currentOrderId,
+          data: orderData,
+        },
+        {
+          onSuccess: (order) => {
+            setIsPaymentModalOpen(true);
+            toast.success('Order updated successfully');
+          },
+        }
+      );
+    } else {
+      // Create new order
+      createOrder(
+        orderData,
+        {
+          onSuccess: (order) => {
+            setCurrentOrderId(order.id);
+            setIsPaymentModalOpen(true);
+
+            // Mark table as occupied after successful order creation (if table mode)
+            if (selectedTable && selectedTable.status === TableStatus.AVAILABLE) {
+              updateTableStatus({
+                id: selectedTable.id,
+                status: TableStatus.OCCUPIED,
+              });
+            }
+          },
+        }
+      );
+    }
   };
 
   const handlePaymentConfirm = (data: any) => {
@@ -166,27 +323,33 @@ const POSPage = () => {
     <div className="h-full">
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Point of Sale</h1>
-        <p className="text-gray-600">Select a table and start taking orders</p>
+        <p className="text-gray-600">
+          {isTablelessMode
+            ? 'Start taking orders (table selection is optional)'
+            : 'Select a table and start taking orders'}
+        </p>
       </div>
 
-      <div className="grid grid-cols-12 gap-6 h-[calc(100vh-200px)]">
-        {/* Tables Section */}
-        <div className="col-span-3">
-          <Card className="h-full">
-            <CardHeader>
-              <CardTitle>Tables</CardTitle>
-            </CardHeader>
-            <CardContent className="overflow-y-auto">
-              <TableGrid
-                selectedTable={selectedTable}
-                onSelectTable={handleSelectTable}
-              />
-            </CardContent>
-          </Card>
-        </div>
+      <div className={`grid grid-cols-12 gap-6 h-[calc(100vh-200px)]`}>
+        {/* Tables Section - hidden in tableless mode */}
+        {!isTablelessMode && (
+          <div className="col-span-3">
+            <Card className="h-full">
+              <CardHeader>
+                <CardTitle>Tables</CardTitle>
+              </CardHeader>
+              <CardContent className="overflow-y-auto">
+                <TableGrid
+                  selectedTable={selectedTable}
+                  onSelectTable={handleSelectTable}
+                />
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* Menu Section */}
-        <div className="col-span-6">
+        <div className={isTablelessMode ? 'col-span-9' : 'col-span-6'}>
           <Card className="h-full">
             <CardHeader>
               <CardTitle>
@@ -213,7 +376,10 @@ const POSPage = () => {
             onUpdateOrderNotes={setOrderNotes}
             onClearCart={handleClearCart}
             onCheckout={handleCheckout}
-            isCheckingOut={isCreatingOrder}
+            onCreateOrder={handleCreateOrder}
+            isCheckingOut={isCreatingOrder || isUpdatingOrder}
+            isTwoStepCheckout={isTwoStepCheckout}
+            hasActiveOrder={!!currentOrderId}
           />
         </div>
       </div>

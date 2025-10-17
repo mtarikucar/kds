@@ -22,7 +22,10 @@ interface OrderCartProps {
   onUpdateOrderNotes: (notes: string) => void;
   onClearCart: () => void;
   onCheckout: () => void;
+  onCreateOrder: () => void;
   isCheckingOut?: boolean;
+  isTwoStepCheckout?: boolean;
+  hasActiveOrder?: boolean;
 }
 
 const OrderCart = ({
@@ -37,7 +40,10 @@ const OrderCart = ({
   onUpdateOrderNotes,
   onClearCart,
   onCheckout,
+  onCreateOrder,
   isCheckingOut = false,
+  isTwoStepCheckout = false,
+  hasActiveOrder = false,
 }: OrderCartProps) => {
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const total = subtotal - discount;
@@ -150,15 +156,44 @@ const OrderCart = ({
                 <span>{formatCurrency(total)}</span>
               </div>
 
-              <Button
-                variant="success"
-                className="w-full"
-                size="lg"
-                onClick={onCheckout}
-                isLoading={isCheckingOut}
-              >
-                Checkout
-              </Button>
+              {/* Conditional button rendering based on checkout mode */}
+              {isTwoStepCheckout ? (
+                <div className="space-y-2">
+                  {/* Create Order button */}
+                  <Button
+                    variant="primary"
+                    className="w-full"
+                    size="lg"
+                    onClick={onCreateOrder}
+                    isLoading={isCheckingOut}
+                    disabled={hasActiveOrder && items.length === 0}
+                  >
+                    {hasActiveOrder ? 'Update Order' : 'Create Order'}
+                  </Button>
+
+                  {/* Payment button - only enabled after order is created */}
+                  <Button
+                    variant="success"
+                    className="w-full"
+                    size="lg"
+                    onClick={onCheckout}
+                    disabled={!hasActiveOrder}
+                  >
+                    Proceed to Payment
+                  </Button>
+                </div>
+              ) : (
+                /* Single-step checkout button */
+                <Button
+                  variant="success"
+                  className="w-full"
+                  size="lg"
+                  onClick={onCheckout}
+                  isLoading={isCheckingOut}
+                >
+                  Checkout
+                </Button>
+              )}
             </div>
           </>
         )}

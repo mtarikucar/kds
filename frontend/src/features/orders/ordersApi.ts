@@ -14,7 +14,9 @@ export const useOrders = (filters?: OrderFilters) => {
   return useQuery({
     queryKey: ['orders', filters],
     queryFn: async (): Promise<Order[]> => {
+      console.log('[useOrders] Fetching orders with filters:', filters);
       const response = await api.get('/orders', { params: filters });
+      console.log('[useOrders] Response:', response.data);
       return response.data;
     },
   });
@@ -46,6 +48,31 @@ export const useCreateOrder = () => {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to create order');
+    },
+  });
+};
+
+export const useUpdateOrder = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: UpdateOrderDto;
+    }): Promise<Order> => {
+      const response = await api.patch(`/orders/${id}`, data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      toast.success('Order updated successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update order');
     },
   });
 };
