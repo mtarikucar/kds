@@ -61,9 +61,10 @@ COPY --from=development /app/src/modules/subscriptions/templates ./src/modules/s
 
 # Create storage directories
 RUN mkdir -p storage/invoices
+RUN mkdir -p uploads
 
 # Set permissions
-RUN chown -R node:node /app/storage
+RUN chown -R node:node /app/storage /app/uploads
 
 USER node
 

@@ -158,6 +158,219 @@ docker-compose logs -f
 - Docker Guide: See `DOCKER_DEPLOYMENT.md`
 - Subscription System: See `SUBSCRIPTION_SYSTEM.md`
 
+## 🌍 Multi-Environment Setup
+
+This project supports a professional development workflow with **Development**, **Staging**, and **Production** environments, each with automatic CI/CD deployment via GitHub Actions.
+
+### Environment Overview
+
+| Environment | Branch | Deployment | Port (Backend) | Port (Frontend) | Database | Redis DB |
+|------------|--------|------------|----------------|----------------|----------|----------|
+| **Development** | `develop` | Auto on push | 3001 | 5174 | `restaurant_pos_dev` | 0 |
+| **Staging** | `main` | Auto on push | 3002 | 5175 | `restaurant_pos_staging` | 1 |
+| **Production** | `main` | Manual approval | 3000 | 80 | `restaurant_pos_prod` | 2 |
+
+### Environment Configuration Files
+
+Each environment has its own configuration:
+
+- `.env.development` - Development settings (tracked in Git)
+- `.env.staging` - Staging settings (tracked in Git)
+- `.env.production` - Production secrets (NOT tracked, use `.env.production.template`)
+
+### Local Development
+
+```bash
+# Clone and checkout develop branch
+git clone <your-repo-url>
+cd kds
+git checkout develop
+
+# Start development environment
+docker-compose -f docker-compose.dev.yml up -d
+
+# Run migrations
+docker-compose -f docker-compose.dev.yml exec backend npx prisma migrate deploy
+
+# View logs
+docker-compose -f docker-compose.dev.yml logs -f
+```
+
+Access:
+- Backend: http://localhost:3001
+- Frontend: http://localhost:5174
+- API Docs: http://localhost:3001/api/docs
+
+### Server Deployment Setup
+
+On your VPS/server, set up all environments:
+
+```bash
+# 1. Install prerequisites
+sudo apt update
+sudo apt install -y docker.io docker-compose git
+
+# 2. Clone repository
+cd /opt
+sudo git clone <your-repo-url> kds
+cd kds
+
+# 3. Create production environment file from template
+cp .env.production.template .env.production
+
+# Edit with production values
+sudo nano .env.production
+
+# 4. Set up GitHub Actions secrets
+# Go to GitHub repo → Settings → Secrets and Variables → Actions
+# Add these secrets:
+#   - SERVER_HOST: Your server IP
+#   - SERVER_USERNAME: SSH username
+#   - SERVER_SSH_KEY: Private SSH key
+#   - Plus all environment-specific secrets (JWT_SECRET, STRIPE_SECRET_KEY, etc.)
+```
+
+### Deployment Workflow
+
+#### 1. Development Environment
+```bash
+# Push to develop branch triggers automatic deployment
+git checkout develop
+git add .
+git commit -m "Add new feature"
+git push origin develop
+# GitHub Actions automatically deploys to development environment
+```
+
+#### 2. Staging Environment
+```bash
+# Merge to main triggers automatic deployment to staging
+git checkout main
+git merge develop
+git push origin main
+# GitHub Actions automatically deploys to staging environment
+```
+
+#### 3. Production Environment
+```bash
+# Manual deployment via GitHub Actions
+# Go to GitHub repo → Actions → CI/CD Pipeline → Run workflow
+# Select "production" from dropdown
+# Click "Run workflow"
+```
+
+### Manual Deployment Script
+
+Use the included deployment script for manual deployments:
+
+```bash
+# Deploy to any environment
+./deploy.sh [environment] [action]
+
+# Examples:
+./deploy.sh development deploy    # Deploy to development
+./deploy.sh staging deploy         # Deploy to staging
+./deploy.sh production deploy      # Deploy to production
+
+# Other commands:
+./deploy.sh production status      # Check deployment status
+./deploy.sh production logs        # View logs
+./deploy.sh production backup      # Create database backup
+./deploy.sh production rollback    # Rollback to previous version
+./deploy.sh staging restart        # Restart services
+```
+
+### Database Setup
+
+On your server, create separate databases for each environment:
+
+```bash
+# Connect to PostgreSQL
+docker-compose -f docker-compose.dev.yml exec postgres psql -U postgres
+
+# Create databases
+CREATE DATABASE restaurant_pos_dev;
+CREATE DATABASE restaurant_pos_staging;
+CREATE DATABASE restaurant_pos_prod;
+
+# Exit
+\q
+```
+
+Each environment uses a different Redis database number (0, 1, 2) on the same Redis instance for data isolation.
+
+### CI/CD Pipeline Features
+
+The GitHub Actions workflow includes:
+
+- **Automated Testing**: Runs on all PRs and pushes
+  - Backend linting and tests
+  - Frontend linting and build checks
+  - PostgreSQL service for integration tests
+
+- **Environment Deployment**:
+  - Development: Auto-deploy on push to `develop`
+  - Staging: Auto-deploy on push to `main`
+  - Production: Manual workflow dispatch with approval
+
+- **Safety Features**:
+  - Database backups before production deployments
+  - Health checks after deployment
+  - Automatic rollback on failure
+  - Zero-downtime deployments
+
+### Branching Strategy
+
+```
+develop (development environment)
+   ↓
+   └─→ merge to main → staging environment
+         ↓
+         └─→ manual deploy → production environment
+```
+
+**Workflow:**
+1. Create feature branches from `develop`
+2. Merge features into `develop` → Auto-deploys to development
+3. When stable, merge `develop` to `main` → Auto-deploys to staging
+4. Test thoroughly on staging
+5. Manually trigger production deployment from GitHub Actions
+
+### Monitoring & Troubleshooting
+
+```bash
+# Check all environment statuses
+./deploy.sh development status
+./deploy.sh staging status
+./deploy.sh production status
+
+# View real-time logs
+./deploy.sh development logs
+./deploy.sh staging logs
+./deploy.sh production logs
+
+# Check Docker containers
+docker ps | grep kds
+
+# Check specific environment
+docker-compose -f docker-compose.staging.yml ps
+```
+
+### Environment URLs (on your server)
+
+- **Development**: http://your-server:5174
+- **Staging**: http://your-server:5175
+- **Production**: http://your-server (port 80)
+
+### Best Practices
+
+1. **Never commit secrets**: Use environment variables for all sensitive data
+2. **Test in development first**: Always test changes in dev before staging
+3. **Verify staging**: Thoroughly test on staging before production
+4. **Database backups**: Always backup before major changes (automatic in production)
+5. **Rollback plan**: Know how to rollback if something goes wrong
+6. **Monitor logs**: Check logs after each deployment
+
 ## 📁 Project Structure
 
 ```
@@ -206,9 +419,21 @@ kds/
 │   └── nginx/
 │       └── nginx.conf
 │
-├── docker-compose.yml              # Development setup
-├── docker-compose.prod.yml         # Production setup
-├── .env.docker                     # Environment template
+├── .github/
+│   └── workflows/
+│       └── ci-cd.yml               # GitHub Actions CI/CD
+│
+├── docker-compose.yml              # Local development (legacy)
+├── docker-compose.dev.yml          # Development environment
+├── docker-compose.staging.yml      # Staging environment
+├── docker-compose.prod.yml         # Production environment
+│
+├── .env.development                # Development config (tracked)
+├── .env.staging                    # Staging config (tracked)
+├── .env.production.template        # Production template
+├── .env.docker                     # Legacy environment file
+│
+├── deploy.sh                       # Multi-environment deployment script
 ├── quick-start.sh                  # Automated setup script
 ├── DEPLOYMENT_CHECKLIST.md         # Deployment guide
 ├── DOCKER_DEPLOYMENT.md            # Docker guide

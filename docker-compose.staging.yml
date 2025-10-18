@@ -1,13 +1,13 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database (Shared - uses production database)
+  # PostgreSQL Database (Shared - uses staging database)
   postgres:
     image: postgres:15-alpine
-    container_name: kds_postgres_prod
+    container_name: kds_postgres_staging
     restart: always
     environment:
-      POSTGRES_DB: ${POSTGRES_DB:-restaurant_pos_prod}
+      POSTGRES_DB: ${POSTGRES_DB:-restaurant_pos_staging}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
@@ -22,10 +22,10 @@ services:
     networks:
       - kds_network
 
-  # Redis Cache (Shared - uses DB 2 for production)
+  # Redis Cache (Shared - uses DB 1 for staging)
   redis:
     image: redis:7-alpine
-    container_name: kds_redis_prod
+    container_name: kds_redis_staging
     restart: always
     ports:
       - '6379:6379'
@@ -39,13 +39,13 @@ services:
     networks:
       - kds_network
 
-  # Backend API (NestJS) - Production
+  # Backend API (NestJS) - Staging
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
       target: production
-    container_name: kds_backend_prod
+    container_name: kds_backend_staging
     restart: always
     depends_on:
       postgres:
@@ -53,24 +53,24 @@ services:
       redis:
         condition: service_healthy
     environment:
-      NODE_ENV: production
-      PORT: 3000
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-restaurant_pos_prod}
-      REDIS_URL: redis://redis:6379/2
+      NODE_ENV: staging
+      PORT: 3002
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-restaurant_pos_staging}
+      REDIS_URL: redis://redis:6379/1
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-30d}
-      CORS_ORIGIN: ${CORS_ORIGIN:-*}
-      # Stripe Configuration (Production)
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
-      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
-      # Iyzico Configuration (Production)
-      IYZICO_API_KEY: ${IYZICO_API_KEY}
-      IYZICO_SECRET_KEY: ${IYZICO_SECRET_KEY}
-      IYZICO_BASE_URL: ${IYZICO_BASE_URL:-https://api.iyzipay.com}
-      # Email Configuration (Production)
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      # Stripe Configuration (Test Mode)
+      STRIPE_SECRET_KEY: ${STRIPE_TEST_SECRET_KEY}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_TEST_PUBLISHABLE_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_TEST_WEBHOOK_SECRET}
+      # Iyzico Configuration (Sandbox)
+      IYZICO_API_KEY: ${IYZICO_SANDBOX_API_KEY}
+      IYZICO_SECRET_KEY: ${IYZICO_SANDBOX_SECRET_KEY}
+      IYZICO_BASE_URL: ${IYZICO_BASE_URL:-https://sandbox-api.iyzipay.com}
+      # Email Configuration
       EMAIL_HOST: ${EMAIL_HOST}
       EMAIL_PORT: ${EMAIL_PORT:-587}
       EMAIL_SECURE: ${EMAIL_SECURE:-false}
@@ -81,11 +81,11 @@ services:
       DEFAULT_TRIAL_DAYS: ${DEFAULT_TRIAL_DAYS:-14}
       TRIAL_REMINDER_DAYS: ${TRIAL_REMINDER_DAYS:-3}
     ports:
-      - '3000:3000'
+      - '3002:3002'
     volumes:
-      - invoice_storage:/app/storage
+      - invoice_storage_staging:/app/storage
     healthcheck:
-      test: ['CMD', 'sh', '-c', 'wget --spider -q http://localhost:3000/api 2>&1 || exit 0']
+      test: ['CMD', 'sh', '-c', 'wget --spider -q http://localhost:3002/api 2>&1 || exit 0']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -93,21 +93,21 @@ services:
     networks:
       - kds_network
 
-  # Frontend (React) - Production
+  # Frontend (React) - Staging
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
       target: production
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
-        VITE_STRIPE_PUBLISHABLE_KEY: ${VITE_STRIPE_PUBLISHABLE_KEY}
-    container_name: kds_frontend_prod
+        VITE_API_URL: ${VITE_STAGING_API_URL}
+        VITE_STRIPE_PUBLISHABLE_KEY: ${STRIPE_TEST_PUBLISHABLE_KEY}
+    container_name: kds_frontend_staging
     restart: always
     depends_on:
       - backend
     ports:
-      - '80:80'
+      - '5175:80'
     healthcheck:
       test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:80']
       interval: 30s
@@ -120,7 +120,7 @@ services:
 volumes:
   postgres_data:
   redis_data:
-  invoice_storage:
+  invoice_storage_staging:
 
 networks:
   kds_network:
