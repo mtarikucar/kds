@@ -1,0 +1,26 @@
+[package]
+name = "kds-pos"
+version = "1.0.0"
+description = "KDS Restaurant POS Desktop Application"
+authors = ["Your Team"]
+license = "MIT"
+repository = ""
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+
+[dependencies]
+tauri = { version = "1.6", features = [ "dialog-all", "fs-all", "shell-open", "system-tray", "window-all", "notification-all"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serialport = "4.3"
+escpos = "0.14"
+thiserror = "1.0"
+
+[features]
+# This feature is used for production builds or when `devPath` points to the filesystem
+# DO NOT REMOVE!!
+custom-protocol = ["tauri/custom-protocol"]

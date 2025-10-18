@@ -53,6 +53,12 @@ A modern cloud-based restaurant POS system built with NestJS, React, and Postgre
 - **Routing**: React Router v6
 - **Real-time**: Socket.IO Client
 
+### Desktop App (NEW!)
+- **Framework**: Tauri (Rust + Web)
+- **Features**: Native performance, printer support, offline mode
+- **Bundle Size**: ~10 MB (vs 100+ MB Electron apps)
+- **Platforms**: Windows, macOS, Linux
+
 ### DevOps
 - **Containerization**: Docker + Docker Compose
 - **Reverse Proxy**: Nginx
@@ -154,9 +160,11 @@ docker-compose logs -f
 
 **📚 Detailed Documentation:**
 - Quick Start: Run `./quick-start.sh`
+- **Desktop App**: See `DESKTOP_APP_GUIDE.md` 🆕
 - Deployment Checklist: See `DEPLOYMENT_CHECKLIST.md`
 - Docker Guide: See `DOCKER_DEPLOYMENT.md`
 - Subscription System: See `SUBSCRIPTION_SYSTEM.md`
+- Multi-Environment Setup: See section below
 
 ## 🌍 Multi-Environment Setup
 

@@ -7,7 +7,13 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "tauri:build:windows": "tauri build --target x86_64-pc-windows-msvc",
+    "tauri:build:mac": "tauri build --target aarch64-apple-darwin",
+    "tauri:build:linux": "tauri build --target x86_64-unknown-linux-gnu"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",
@@ -16,6 +22,7 @@
     "@stripe/stripe-js": "^2.4.0",
     "@tanstack/react-query": "^5.17.9",
     "@tanstack/react-query-devtools": "^5.17.9",
+    "@tauri-apps/api": "^1.5.3",
     "axios": "^1.6.5",
     "clsx": "^2.1.1",
     "date-fns": "^3.0.6",
@@ -33,6 +40,7 @@
     "zustand": "^4.4.7"
   },
   "devDependencies": {
+    "@tauri-apps/cli": "^1.5.11",
     "@types/react": "^18.2.48",
     "@types/react-dom": "^18.2.18",
     "@typescript-eslint/eslint-plugin": "^6.17.0",
