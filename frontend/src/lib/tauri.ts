@@ -2,16 +2,229 @@
 // This file provides a clean interface to Tauri desktop features
 // Falls back gracefully when running in browser mode
 
-import { invoke } from '@tauri-apps/api/tauri';
-import { appWindow } from '@tauri-apps/api/window';
-import { sendNotification } from '@tauri-apps/api/notification';
+import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
+import { listen } from '@tauri-apps/api/event';
+import type {
+  DeviceConfig,
+  DeviceStatus,
+  HardwareConfig,
+  HardwareEvent,
+  ReceiptData as NewReceiptData,
+  KitchenOrderData,
+  TextAlignment,
+  TextStyle,
+  BarcodeType,
+} from '../types/hardware';
 
 // Check if running in Tauri
 export const isTauri = (): boolean => {
   return typeof window !== 'undefined' && '__TAURI__' in window;
 };
 
+// Hardware Service - New unified hardware management API
+export class HardwareService {
+  /**
+   * Initialize hardware manager with backend URL
+   */
+  static async initialize(backendUrl: string): Promise<string> {
+    if (!isTauri()) {
+      console.warn('Hardware service only available in desktop mode');
+      return 'Hardware service not available in web mode';
+    }
+
+    try {
+      return await invoke<string>('initialize_hardware', { backendUrl });
+    } catch (error) {
+      console.error('Failed to initialize hardware:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * List all configured hardware devices
+   */
+  static async listDevices(): Promise<DeviceStatus[]> {
+    if (!isTauri()) {
+      return [];
+    }
+
+    try {
+      return await invoke<DeviceStatus[]>('list_devices');
+    } catch (error) {
+      console.error('Failed to list devices:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get status of a specific device
+   */
+  static async getDeviceStatus(deviceId: string): Promise<DeviceStatus> {
+    if (!isTauri()) {
+      throw new Error('Hardware service only available in desktop mode');
+    }
+
+    try {
+      return await invoke<DeviceStatus>('get_device_status', { deviceId });
+    } catch (error) {
+      console.error('Failed to get device status:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Connect to a specific device
+   */
+  static async connectDevice(deviceId: string): Promise<string> {
+    if (!isTauri()) {
+      throw new Error('Hardware service only available in desktop mode');
+    }
+
+    try {
+      return await invoke<string>('connect_device', { deviceId });
+    } catch (error) {
+      console.error('Failed to connect device:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Disconnect from a specific device
+   */
+  static async disconnectDevice(deviceId: string): Promise<string> {
+    if (!isTauri()) {
+      throw new Error('Hardware service only available in desktop mode');
+    }
+
+    try {
+      return await invoke<string>('disconnect_device', { deviceId });
+    } catch (error) {
+      console.error('Failed to disconnect device:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Test a device to verify it's working
+   */
+  static async testDevice(deviceId: string): Promise<string> {
+    if (!isTauri()) {
+      throw new Error('Hardware service only available in desktop mode');
+    }
+
+    try {
+      return await invoke<string>('test_device', { deviceId });
+    } catch (error) {
+      console.error('Failed to test device:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Print receipt to a specific printer device
+   */
+  static async printReceipt(
+    deviceId: string,
+    receipt: NewReceiptData
+  ): Promise<string> {
+    if (!isTauri()) {
+      console.warn('Hardware printing only available in desktop mode');
+      window.print();
+      return 'Printed using browser';
+    }
+
+    try {
+      return await invoke<string>('print_receipt', { deviceId, receipt });
+    } catch (error) {
+      console.error('Failed to print receipt:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Print kitchen order to a specific printer device
+   */
+  static async printKitchenOrder(
+    deviceId: string,
+    order: KitchenOrderData
+  ): Promise<string> {
+    if (!isTauri()) {
+      throw new Error('Hardware printing only available in desktop mode');
+    }
+
+    try {
+      return await invoke<string>('print_kitchen_order', { deviceId, order });
+    } catch (error) {
+      console.error('Failed to print kitchen order:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Open cash drawer via printer
+   */
+  static async openCashDrawer(deviceId: string): Promise<string> {
+    if (!isTauri()) {
+      throw new Error('Hardware control only available in desktop mode');
+    }
+
+    try {
+      return await invoke<string>('open_cash_drawer', { deviceId });
+    } catch (error) {
+      console.error('Failed to open cash drawer:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Call a restaurant pager
+   */
+  static async callPager(
+    deviceId: string,
+    pagerNumber: number,
+    alertType?: string
+  ): Promise<string> {
+    if (!isTauri()) {
+      throw new Error('Hardware control only available in desktop mode');
+    }
+
+    try {
+      return await invoke<string>('call_pager', {
+        deviceId,
+        pagerNumber,
+        alertType,
+      });
+    } catch (error) {
+      console.error('Failed to call pager:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Listen for hardware events
+   */
+  static async listenToHardwareEvents(
+    callback: (event: HardwareEvent) => void
+  ): Promise<() => void> {
+    if (!isTauri()) {
+      return () => {}; // No-op unsubscribe
+    }
+
+    try {
+      const unlisten = await listen<HardwareEvent>('hardware-event', (event) => {
+        callback(event.payload);
+      });
+      return unlisten;
+    } catch (error) {
+      console.error('Failed to listen to hardware events:', error);
+      return () => {};
+    }
+  }
+}
+
 // Printer types
+// @deprecated - Use HardwareService instead
 export interface PrinterInfo {
   name: string;
   port: string;
@@ -141,7 +354,7 @@ export class WindowService {
    */
   static async minimize(): Promise<void> {
     if (!isTauri()) return;
-    await appWindow.minimize();
+    await getCurrentWindow().minimize();
   }
 
   /**
@@ -149,7 +362,7 @@ export class WindowService {
    */
   static async maximize(): Promise<void> {
     if (!isTauri()) return;
-    await appWindow.toggleMaximize();
+    await getCurrentWindow().toggleMaximize();
   }
 
   /**
@@ -160,7 +373,7 @@ export class WindowService {
       window.close();
       return;
     }
-    await appWindow.close();
+    await getCurrentWindow().close();
   }
 
   /**
@@ -168,7 +381,7 @@ export class WindowService {
    */
   static async setFullscreen(fullscreen: boolean): Promise<void> {
     if (!isTauri()) return;
-    await appWindow.setFullscreen(fullscreen);
+    await getCurrentWindow().setFullscreen(fullscreen);
   }
 
   /**
@@ -176,7 +389,7 @@ export class WindowService {
    */
   static async isMaximized(): Promise<boolean> {
     if (!isTauri()) return false;
-    return await appWindow.isMaximized();
+    return await getCurrentWindow().isMaximized();
   }
 
   /**
@@ -184,7 +397,7 @@ export class WindowService {
    */
   static async setAlwaysOnTop(alwaysOnTop: boolean): Promise<void> {
     if (!isTauri()) return;
-    await appWindow.setAlwaysOnTop(alwaysOnTop);
+    await getCurrentWindow().setAlwaysOnTop(alwaysOnTop);
   }
 }
 
@@ -194,18 +407,16 @@ export class NotificationService {
    * Send a desktop notification
    */
   static async send(title: string, body: string): Promise<void> {
-    if (!isTauri()) {
-      // Fallback to browser notifications
-      if ('Notification' in window && Notification.permission === 'granted') {
+    // Use browser notifications for both web and Tauri
+    if ('Notification' in window) {
+      if (Notification.permission === 'granted') {
         new Notification(title, { body });
+      } else if (Notification.permission !== 'denied') {
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          new Notification(title, { body });
+        }
       }
-      return;
-    }
-
-    try {
-      await sendNotification({ title, body });
-    } catch (error) {
-      console.error('Failed to send notification:', error);
     }
   }
 
@@ -213,17 +424,11 @@ export class NotificationService {
    * Request notification permission
    */
   static async requestPermission(): Promise<boolean> {
-    if (!isTauri()) {
-      // Browser notification permission
-      if ('Notification' in window) {
-        const permission = await Notification.requestPermission();
-        return permission === 'granted';
-      }
-      return false;
+    if ('Notification' in window) {
+      const permission = await Notification.requestPermission();
+      return permission === 'granted';
     }
-
-    // Tauri notifications don't need permission
-    return true;
+    return false;
   }
 }
 
@@ -243,7 +448,8 @@ export const setupKeyboardShortcuts = () => {
 
 export default {
   isTauri,
-  PrinterService,
+  HardwareService,
+  PrinterService, // Deprecated
   WindowService,
   NotificationService,
   setupKeyboardShortcuts,

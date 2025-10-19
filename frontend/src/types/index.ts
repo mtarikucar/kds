@@ -592,3 +592,6 @@ export interface UpdatePosSettingsDto {
   enableTablelessMode?: boolean;
   enableTwoStepCheckout?: boolean;
 }
+
+// Re-export hardware types
+export * from './hardware';

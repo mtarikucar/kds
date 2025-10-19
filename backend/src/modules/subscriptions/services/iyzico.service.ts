@@ -47,11 +47,16 @@ export class IyzicoService {
     if (!apiKey || !secretKey || apiKey === 'placeholder' || secretKey === 'placeholder') {
       this.logger.warn('Iyzico API credentials not configured or using placeholder values. Iyzico payments will be disabled.');
     } else {
-      this.iyzipay = new Iyzipay({
-        apiKey,
-        secretKey,
-        uri: baseUrl,
-      });
+      try {
+        this.iyzipay = new Iyzipay({
+          apiKey,
+          secretKey,
+          uri: baseUrl,
+        });
+      } catch (error) {
+        this.logger.error('Failed to initialize Iyzico service:', error.message);
+        this.logger.warn('Iyzico payments will be disabled.');
+      }
     }
   }
 

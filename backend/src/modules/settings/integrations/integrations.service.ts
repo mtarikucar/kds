@@ -94,4 +94,80 @@ export class IntegrationsService {
       data: { lastSyncedAt: new Date() },
     });
   }
+
+  async getHardwareConfig(tenantId: string) {
+    const hardwareTypes = [
+      'THERMAL_PRINTER',
+      'CASH_DRAWER',
+      'RESTAURANT_PAGER',
+      'BARCODE_READER',
+      'CUSTOMER_DISPLAY',
+      'KITCHEN_DISPLAY',
+      'SCALE_DEVICE',
+    ];
+
+    const integrations = await this.prisma.integrationSettings.findMany({
+      where: {
+        tenantId,
+        integrationType: { in: hardwareTypes },
+        isEnabled: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // Transform to format expected by Rust desktop app
+    return {
+      devices: integrations.map((integration) => ({
+        id: integration.id,
+        name: integration.provider,
+        device_type: integration.integrationType,
+        enabled: integration.isEnabled,
+        auto_connect: (integration.config as any)?.auto_connect || true,
+        connection: {
+          connection_type: (integration.config as any)?.connection_type || 'Serial',
+          config: (integration.config as any)?.connection_config || {},
+        },
+        settings: (integration.config as any)?.device_settings || {},
+      })),
+    };
+  }
+
+  async updateDeviceStatus(deviceId: string, tenantId: string, statusData: any) {
+    const integration = await this.findOne(deviceId, tenantId);
+
+    // Store device status in config
+    const currentConfig = (integration.config as any) || {};
+    const updatedConfig = {
+      ...currentConfig,
+      device_status: {
+        ...statusData,
+        last_updated: new Date(),
+      },
+    };
+
+    await this.prisma.integrationSettings.update({
+      where: { id: integration.id },
+      data: {
+        config: updatedConfig as any,
+        lastSyncedAt: new Date(),
+      },
+    });
+
+    return { success: true };
+  }
+
+  async reportDeviceEvent(deviceId: string, tenantId: string, eventData: any) {
+    const integration = await this.findOne(deviceId, tenantId);
+
+    // Log the event (could store in a separate events table in the future)
+    console.log(`Hardware Event for device ${integration.provider}:`, eventData);
+
+    // Update last sync time
+    await this.prisma.integrationSettings.update({
+      where: { id: integration.id },
+      data: { lastSyncedAt: new Date() },
+    });
+
+    return { success: true };
+  }
 }

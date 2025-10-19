@@ -55,3 +55,9 @@ lerna-debug.log*
 .cache/
 temp/
 tmp/
+
+# Rust/Tauri
+frontend/src-tauri/target/
+**/target/
+**/*.rs.bk
+Cargo.lock

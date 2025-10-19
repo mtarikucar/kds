@@ -98,3 +98,51 @@ export class IntegrationsController {
     return this.integrationsService.updateLastSync(id, req.tenantId);
   }
 }
+
+@ApiTags('hardware')
+@ApiBearerAuth()
+@Controller('api/hardware')
+@UseGuards(JwtAuthGuard, TenantGuard)
+export class HardwareConfigController {
+  constructor(private readonly integrationsService: IntegrationsService) {}
+
+  @Get('config')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER, UserRole.KITCHEN)
+  @ApiOperation({ summary: 'Get hardware device configurations for desktop app' })
+  @ApiResponse({ status: 200, description: 'Hardware configurations retrieved successfully' })
+  async getHardwareConfig(@Request() req) {
+    return this.integrationsService.getHardwareConfig(req.tenantId);
+  }
+
+  @Post('devices/:deviceId/status')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER, UserRole.KITCHEN)
+  @ApiOperation({ summary: 'Update device status from desktop app' })
+  @ApiResponse({ status: 200, description: 'Device status updated successfully' })
+  async updateDeviceStatus(
+    @Request() req,
+    @Param('deviceId') deviceId: string,
+    @Body() statusData: any,
+  ) {
+    return this.integrationsService.updateDeviceStatus(
+      deviceId,
+      req.tenantId,
+      statusData,
+    );
+  }
+
+  @Post('devices/:deviceId/events')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER, UserRole.KITCHEN)
+  @ApiOperation({ summary: 'Report hardware event from desktop app' })
+  @ApiResponse({ status: 200, description: 'Event reported successfully' })
+  async reportDeviceEvent(
+    @Request() req,
+    @Param('deviceId') deviceId: string,
+    @Body() eventData: any,
+  ) {
+    return this.integrationsService.reportDeviceEvent(
+      deviceId,
+      req.tenantId,
+      eventData,
+    );
+  }
+}
