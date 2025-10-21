@@ -9,7 +9,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateOrderDto } from '../dto/create-order.dto';
 import { UpdateOrderDto } from '../dto/update-order.dto';
 import { UpdateOrderStatusDto } from '../dto/update-order-status.dto';
-import { OrderStatus } from '../../../common/constants/order-status.enum';
+import { OrderStatus, StockMovementType } from '../../../common/constants/order-status.enum';
 import { KdsGateway } from '../../kds/kds.gateway';
 
 @Injectable()
@@ -439,7 +439,7 @@ export class OrdersService {
           // Create stock movement record
           await tx.stockMovement.create({
             data: {
-              type: 'OUT',
+              type: StockMovementType.OUT,
               quantity: item.quantity,
               reason: `Order ${order.orderNumber}`,
               productId: product.id,

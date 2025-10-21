@@ -15,6 +15,7 @@ import {
   ChevronRight,
   X,
 } from 'lucide-react';
+import { UserRole } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 
 interface SidebarProps {
@@ -41,37 +42,37 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
       to: '/dashboard',
       icon: LayoutDashboard,
       label: 'Dashboard',
-      roles: ['ADMIN', 'MANAGER', 'WAITER', 'KITCHEN', 'COURIER'],
+      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER, UserRole.KITCHEN, UserRole.COURIER],
     },
     {
       to: '/pos',
       icon: ShoppingCart,
       label: 'POS',
-      roles: ['ADMIN', 'MANAGER', 'WAITER'],
+      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER],
     },
     {
       to: '/kitchen',
       icon: ChefHat,
       label: 'Kitchen Display',
-      roles: ['ADMIN', 'MANAGER', 'KITCHEN'],
+      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN],
     },
     {
       to: '/admin/menu',
       icon: UtensilsCrossed,
       label: 'Menu Management',
-      roles: ['ADMIN', 'MANAGER'],
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
     {
       to: '/admin/tables',
       icon: Table,
       label: 'Table Management',
-      roles: ['ADMIN', 'MANAGER'],
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
     {
       to: '/admin/users',
       icon: Users,
       label: 'User Management',
-      roles: ['ADMIN', 'MANAGER'],
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
     {
       to: '/customers',
@@ -83,13 +84,13 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
       to: '/admin/qr-codes',
       icon: QrCode,
       label: 'QR Codes',
-      roles: ['ADMIN', 'MANAGER'],
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
     {
       to: '/admin/reports',
       icon: BarChart3,
       label: 'Reports',
-      roles: ['ADMIN', 'MANAGER'],
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
   ];
 
@@ -150,7 +151,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         ))}
 
         {/* Settings Dropdown */}
-        {(user?.role === 'ADMIN' || user?.role === 'MANAGER') && (
+        {(user?.role === UserRole.ADMIN || user?.role === UserRole.MANAGER) && (
           <div className="mt-1">
             <button
               onClick={() => setSettingsOpen(!settingsOpen)}

@@ -3,6 +3,7 @@ module.exports = function (options, webpack) {
     ...options,
     externals: {
       sharp: 'commonjs sharp',
+      iyzipay: 'commonjs iyzipay',
     },
   };
 };

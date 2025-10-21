@@ -5,7 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrderStatus } from '../../common/constants/order-status.enum';
-import { UpdateOrderItemStatusDto } from './dto/update-order-item-status.dto';
+import { UpdateOrderItemStatusDto, OrderItemStatus } from './dto/update-order-item-status.dto';
 import { KdsGateway } from './kds.gateway';
 
 @Injectable()
@@ -126,7 +126,7 @@ export class KdsService {
       where: { orderId: orderItem.orderId },
     });
 
-    const allReady = allItems.every((item) => item.status === 'READY');
+    const allReady = allItems.every((item) => item.status === OrderItemStatus.READY);
     if (allReady && orderItem.order.status !== OrderStatus.READY) {
       await this.updateOrderStatus(orderItem.orderId, OrderStatus.READY, tenantId);
     }
