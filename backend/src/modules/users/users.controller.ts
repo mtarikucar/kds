@@ -13,7 +13,9 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagg
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UpdateProfileDto, UpdateEmailDto } from './dto/update-profile.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
 import { SubscriptionLimitsGuard } from '../../common/guards/subscription-limits.guard';
@@ -78,5 +80,35 @@ export class UsersController {
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   remove(@Param('id') id: string, @Request() req) {
     return this.usersService.remove(id, req.tenantId);
+  }
+
+  // Profile endpoints (all authenticated users)
+  @Get('me/profile')
+  @ApiOperation({ summary: 'Get current user profile' })
+  @ApiResponse({ status: 200, description: 'User profile retrieved' })
+  getMyProfile(@CurrentUser('id') userId: string) {
+    return this.usersService.getMyProfile(userId);
+  }
+
+  @Patch('me/profile')
+  @ApiOperation({ summary: 'Update current user profile' })
+  @ApiResponse({ status: 200, description: 'Profile successfully updated' })
+  updateMyProfile(
+    @CurrentUser('id') userId: string,
+    @Body() updateProfileDto: UpdateProfileDto,
+  ) {
+    return this.usersService.updateProfile(userId, updateProfileDto);
+  }
+
+  @Patch('me/email')
+  @ApiOperation({ summary: 'Update user email (requires password)' })
+  @ApiResponse({ status: 200, description: 'Email successfully updated' })
+  @ApiResponse({ status: 400, description: 'Invalid password' })
+  @ApiResponse({ status: 409, description: 'Email already in use' })
+  updateMyEmail(
+    @CurrentUser('id') userId: string,
+    @Body() updateEmailDto: UpdateEmailDto,
+  ) {
+    return this.usersService.updateEmail(userId, updateEmailDto);
   }
 }

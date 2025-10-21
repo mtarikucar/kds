@@ -10,17 +10,31 @@ import {
   Settings,
   Users,
   QrCode,
+  UserCircle,
   ChevronDown,
   ChevronRight,
+  X,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore';
 
-const Sidebar = () => {
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const user = useAuthStore((state) => state.user);
   const location = useLocation();
   const [settingsOpen, setSettingsOpen] = useState(
     location.pathname.startsWith('/admin/settings')
   );
+
+  const handleNavClick = () => {
+    // Close sidebar on mobile when navigating
+    if (window.innerWidth < 768) {
+      onClose();
+    }
+  };
 
   const navItems = [
     {
@@ -60,6 +74,12 @@ const Sidebar = () => {
       roles: ['ADMIN', 'MANAGER'],
     },
     {
+      to: '/customers',
+      icon: UserCircle,
+      label: 'Customers',
+      roles: ['ADMIN', 'MANAGER', 'WAITER'],
+    },
+    {
       to: '/admin/qr-codes',
       icon: QrCode,
       label: 'QR Codes',
@@ -93,9 +113,21 @@ const Sidebar = () => {
   );
 
   return (
-    <aside className="w-64 bg-gray-900 text-white min-h-screen">
-      <div className="p-6">
+    <aside
+      className={`fixed md:static inset-y-0 left-0 z-50 w-64 bg-gray-900 text-white min-h-screen transform transition-transform duration-300 ease-in-out ${
+        isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+      }`}
+    >
+      <div className="p-6 flex items-center justify-between">
         <h2 className="text-xl font-bold">Restaurant POS</h2>
+        {/* Close button for mobile */}
+        <button
+          onClick={onClose}
+          className="md:hidden text-gray-400 hover:text-white"
+          aria-label="Close menu"
+        >
+          <X className="h-6 w-6" />
+        </button>
       </div>
 
       <nav className="px-3">
@@ -103,6 +135,7 @@ const Sidebar = () => {
           <NavLink
             key={item.to}
             to={item.to}
+            onClick={handleNavClick}
             className={({ isActive }) =>
               `flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-colors ${
                 isActive
@@ -142,6 +175,7 @@ const Sidebar = () => {
                   <NavLink
                     key={item.to}
                     to={item.to}
+                    onClick={handleNavClick}
                     className={({ isActive }) =>
                       `flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
                         isActive

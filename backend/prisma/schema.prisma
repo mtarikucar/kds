@@ -44,6 +44,8 @@ model Tenant {
   posSettings         PosSettings?
   integrationSettings IntegrationSettings[]
   apiKeys             ApiKey[]
+  customers           Customer[]
+  notifications       Notification[]
   currentPlan         SubscriptionPlan?  @relation("CurrentPlan", fields: [currentPlanId], references: [id], onDelete: SetNull)
 
   @@index([currentPlanId])
@@ -59,6 +61,20 @@ model User {
   role      String   // ADMIN, MANAGER, WAITER, KITCHEN, COURIER
   status    String   @default("ACTIVE") // ACTIVE, INACTIVE
 
+  // Email verification
+  emailVerified              Boolean   @default(false)
+  emailVerificationToken     String?   @unique
+  emailVerificationExpires   DateTime?
+
+  // Password reset
+  resetToken       String?   @unique
+  resetTokenExpiry DateTime?
+
+  // Profile
+  avatar    String?
+  phone     String?
+  lastLogin DateTime?
+
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -66,8 +82,10 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
-  orders         Order[]
-  stockMovements StockMovement[]
+  orders             Order[]
+  stockMovements     StockMovement[]
+  notifications      Notification[]
+  readNotifications  UserNotificationRead[]
 
   @@index([tenantId])
   @@index([email])
@@ -211,6 +229,9 @@ model Order {
   tableId String?
   table   Table?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
 
+  customerId String?
+  customer   Customer? @relation("CustomerOrders", fields: [customerId], references: [id], onDelete: SetNull)
+
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
 
@@ -229,6 +250,7 @@ model Order {
   @@index([tenantId])
   @@index([userId])
   @@index([tableId])
+  @@index([customerId])
   @@index([status])
   @@map("orders")
 }
@@ -690,4 +712,99 @@ model ContactMessage {
   @@index([status])
   @@index([createdAt])
   @@map("contact_messages")
+}
+
+// ========================================
+// CUSTOMER MANAGEMENT (CRM)
+// ========================================
+
+model Customer {
+  id    String  @id @default(uuid())
+  name  String
+  email String?
+  phone String?
+
+  // Loyalty & Engagement
+  loyaltyPoints Int      @default(0)
+  tags          String[] @default([]) // "VIP", "Regular", "New", etc.
+  notes         String?  @db.Text
+
+  // Statistics
+  totalOrders  Int     @default(0)
+  totalSpent   Decimal @default(0) @db.Decimal(10, 2)
+  averageOrder Decimal @default(0) @db.Decimal(10, 2)
+
+  // Birthday & Marketing
+  birthday    DateTime?
+  preferences Json?     // Dietary preferences, favorite items, etc.
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  lastVisit DateTime?
+
+  // Relations
+  orders Order[] @relation("CustomerOrders")
+
+  @@unique([tenantId, email])
+  @@unique([tenantId, phone])
+  @@index([tenantId])
+  @@index([email])
+  @@index([phone])
+  @@map("customers")
+}
+
+// ========================================
+// NOTIFICATION SYSTEM
+// ========================================
+
+model Notification {
+  id    String @id @default(uuid())
+  title String
+  message String @db.Text
+  type  String // INFO, WARNING, ERROR, SUCCESS, ORDER, STOCK, SYSTEM
+
+  // Notification data (for deep links, actions, etc.)
+  data Json?
+
+  // Target
+  userId   String?
+  user     User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // Delivery
+  isGlobal Boolean @default(false) // If true, sent to all users in tenant
+  priority String  @default("NORMAL") // LOW, NORMAL, HIGH, URGENT
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime?
+
+  // Relations
+  readBy UserNotificationRead[]
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model UserNotificationRead {
+  id String @id @default(uuid())
+
+  notificationId String
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  readAt DateTime @default(now())
+
+  @@unique([notificationId, userId])
+  @@index([userId])
+  @@index([notificationId])
+  @@map("user_notification_reads")
 }

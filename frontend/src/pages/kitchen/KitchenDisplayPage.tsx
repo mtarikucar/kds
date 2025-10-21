@@ -46,15 +46,15 @@ const KitchenDisplayPage = () => {
 
   return (
     <div className="h-full">
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-4 md:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Kitchen Display</h1>
-          <p className="text-gray-600">Real-time order tracking and management</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Kitchen Display</h1>
+          <p className="text-sm md:text-base text-gray-600">Real-time order tracking and management</p>
         </div>
 
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2 md:gap-4 flex-wrap">
           <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">WebSocket:</span>
+            <span className="text-xs md:text-sm text-gray-600">WebSocket:</span>
             <Badge variant={isConnected ? 'success' : 'danger'}>
               {isConnected ? 'Connected' : 'Disconnected'}
             </Badge>
@@ -66,13 +66,13 @@ const KitchenDisplayPage = () => {
             onClick={handleRefresh}
             isLoading={isLoading}
           >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
+            <RefreshCw className="h-4 w-4 md:mr-2" />
+            <span className="hidden md:inline">Refresh</span>
           </Button>
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6 h-[calc(100vh-200px)]">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 h-[calc(100vh-250px)] md:h-[calc(100vh-200px)]">
         <OrderQueue
           title="Pending"
           status={OrderStatus.PENDING}

@@ -1,4 +1,5 @@
 import * as crypto from 'crypto';
+import * as ipaddr from 'ipaddr.js';
 
 /**
  * Verify Iyzico webhook signature using HMAC-SHA256
@@ -58,33 +59,84 @@ export function generateIyzicoWebhookSignature(
 /**
  * Alternative: IP-based verification for Iyzico
  * Use this if Iyzico provides static IP ranges
+ *
+ * Official Iyzico IP ranges (contact Iyzico support to verify)
+ * These are example ranges - update with actual Iyzico webhook IPs
  */
 const IYZICO_IP_RANGES = [
   // Add official Iyzico IP ranges here
   // Example: '52.58.100.0/24'
   // Contact Iyzico support for their webhook IP ranges
+  // You can also configure this via environment variable
 ];
 
-export function isIyzicoIP(ip: string): boolean {
-  // Simple check - for production, use a proper IP range library
-  // like 'ip-range-check' or 'ipaddr.js'
-
-  if (IYZICO_IP_RANGES.length === 0) {
-    // If no IPs configured, return false (don't allow)
-    console.warn('No Iyzico IP ranges configured for webhook verification');
-    return false;
+/**
+ * Get configured Iyzico IP ranges from environment or defaults
+ */
+function getIyzicoIPRanges(): string[] {
+  const envRanges = process.env.IYZICO_WEBHOOK_IP_RANGES;
+  if (envRanges) {
+    return envRanges.split(',').map(range => range.trim());
   }
+  return IYZICO_IP_RANGES;
+}
 
-  // TODO: Implement proper IP range checking
-  // For now, just check exact matches (not recommended for production)
-  return IYZICO_IP_RANGES.some(range => {
-    if (range.includes('/')) {
-      // CIDR notation - need proper library to check
-      console.warn('CIDR range checking not implemented, use signature verification');
+/**
+ * Check if an IP address is within a CIDR range
+ */
+function isIPInCIDR(ip: string, cidr: string): boolean {
+  try {
+    const [range, bits] = cidr.split('/');
+    const parsedIP = ipaddr.process(ip);
+    const parsedRange = ipaddr.process(range);
+
+    // Check if same IP version (IPv4 or IPv6)
+    if (parsedIP.kind() !== parsedRange.kind()) {
       return false;
     }
-    return ip === range;
-  });
+
+    // Match against CIDR
+    return parsedIP.match(parsedRange, parseInt(bits, 10));
+  } catch (error) {
+    console.error(`Error checking IP ${ip} against CIDR ${cidr}:`, error);
+    return false;
+  }
+}
+
+/**
+ * Check if IP is from Iyzico webhook servers
+ * Supports both exact IP match and CIDR notation
+ */
+export function isIyzicoIP(ip: string): boolean {
+  const configuredRanges = getIyzicoIPRanges();
+
+  if (configuredRanges.length === 0) {
+    // If no IPs configured, skip IP verification (rely on signature only)
+    // In production, you should configure IP ranges for defense in depth
+    console.warn(
+      'No Iyzico IP ranges configured. Relying on signature verification only. ' +
+      'Set IYZICO_WEBHOOK_IP_RANGES environment variable for additional security.',
+    );
+    return true; // Allow if no ranges configured (signature will be checked)
+  }
+
+  try {
+    // Normalize IP address (handle IPv4-mapped IPv6)
+    const normalizedIP = ipaddr.process(ip).toString();
+
+    return configuredRanges.some(range => {
+      if (range.includes('/')) {
+        // CIDR notation
+        return isIPInCIDR(normalizedIP, range);
+      } else {
+        // Exact IP match
+        return normalizedIP === range;
+      }
+    });
+  } catch (error) {
+    console.error(`Error validating IP ${ip}:`, error);
+    return false;
+  }
 }
 
 /**

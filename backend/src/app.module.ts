@@ -1,8 +1,11 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
+import { CommonModule } from './common/common.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { UsersModule } from './modules/users/users.module';
@@ -18,6 +21,10 @@ import { QrModule } from './modules/qr/qr.module';
 import { PosSettingsModule } from './modules/pos-settings/pos-settings.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { ContactModule } from './modules/contact/contact.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { CustomersModule } from './modules/customers/customers.module';
+import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
+import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './common/middleware/input-sanitizer.middleware';
 
 @Module({
   imports: [
@@ -25,7 +32,26 @@ import { ContactModule } from './modules/contact/contact.module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    // Rate limiting protection
+    ThrottlerModule.forRoot([
+      {
+        name: 'short',
+        ttl: 1000, // 1 second
+        limit: 10, // 10 requests per second
+      },
+      {
+        name: 'medium',
+        ttl: 10000, // 10 seconds
+        limit: 50, // 50 requests per 10 seconds
+      },
+      {
+        name: 'long',
+        ttl: 60000, // 1 minute
+        limit: 100, // 100 requests per minute
+      },
+    ]),
     PrismaModule,
+    CommonModule,
     AuthModule,
     SubscriptionsModule,
     TenantsModule,
@@ -41,8 +67,27 @@ import { ContactModule } from './modules/contact/contact.module';
     PosSettingsModule,
     SettingsModule,
     ContactModule,
+    NotificationsModule,
+    CustomersModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    // Global rate limiting guard
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    // Apply request logger to all routes
+    consumer.apply(RequestLoggerMiddleware).forRoutes('*');
+
+    // Apply input sanitization to all routes
+    consumer
+      .apply(InputSanitizerMiddleware, SqlInjectionPreventionMiddleware)
+      .forRoutes('*');
+  }
+}

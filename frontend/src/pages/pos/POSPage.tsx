@@ -321,22 +321,22 @@ const POSPage = () => {
 
   return (
     <div className="h-full">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Point of Sale</h1>
-        <p className="text-gray-600">
+      <div className="mb-4 md:mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Point of Sale</h1>
+        <p className="text-sm md:text-base text-gray-600">
           {isTablelessMode
             ? 'Start taking orders (table selection is optional)'
             : 'Select a table and start taking orders'}
         </p>
       </div>
 
-      <div className={`grid grid-cols-12 gap-6 h-[calc(100vh-200px)]`}>
+      <div className="flex flex-col lg:flex-row gap-3 md:gap-6 h-[calc(100vh-250px)] md:h-[calc(100vh-200px)]">
         {/* Tables Section - hidden in tableless mode */}
         {!isTablelessMode && (
-          <div className="col-span-3">
-            <Card className="h-full">
+          <div className="lg:w-1/4">
+            <Card className="h-64 lg:h-full">
               <CardHeader>
-                <CardTitle>Tables</CardTitle>
+                <CardTitle className="text-lg md:text-xl">Tables</CardTitle>
               </CardHeader>
               <CardContent className="overflow-y-auto">
                 <TableGrid
@@ -349,38 +349,40 @@ const POSPage = () => {
         )}
 
         {/* Menu Section */}
-        <div className={isTablelessMode ? 'col-span-9' : 'col-span-6'}>
-          <Card className="h-full">
+        <div className={`flex-1 ${isTablelessMode ? 'lg:w-3/4' : 'lg:w-1/2'}`}>
+          <Card className="h-96 lg:h-full">
             <CardHeader>
-              <CardTitle>
+              <CardTitle className="text-lg md:text-xl">
                 Menu {selectedTable && `- Table ${selectedTable.number}`}
               </CardTitle>
             </CardHeader>
-            <CardContent className="h-[calc(100%-80px)]">
+            <CardContent className="h-[calc(100%-60px)] md:h-[calc(100%-80px)] overflow-y-auto">
               <MenuPanel onAddItem={handleAddItem} />
             </CardContent>
           </Card>
         </div>
 
         {/* Order Cart Section */}
-        <div className="col-span-3">
-          <OrderCart
-            items={cartItems}
-            discount={discount}
-            customerName={customerName}
-            orderNotes={orderNotes}
-            onUpdateQuantity={handleUpdateQuantity}
-            onRemoveItem={handleRemoveItem}
-            onUpdateDiscount={setDiscount}
-            onUpdateCustomerName={setCustomerName}
-            onUpdateOrderNotes={setOrderNotes}
-            onClearCart={handleClearCart}
-            onCheckout={handleCheckout}
-            onCreateOrder={handleCreateOrder}
-            isCheckingOut={isCreatingOrder || isUpdatingOrder}
-            isTwoStepCheckout={isTwoStepCheckout}
-            hasActiveOrder={!!currentOrderId}
-          />
+        <div className="lg:w-1/4">
+          <div className="sticky top-0">
+            <OrderCart
+              items={cartItems}
+              discount={discount}
+              customerName={customerName}
+              orderNotes={orderNotes}
+              onUpdateQuantity={handleUpdateQuantity}
+              onRemoveItem={handleRemoveItem}
+              onUpdateDiscount={setDiscount}
+              onUpdateCustomerName={setCustomerName}
+              onUpdateOrderNotes={setOrderNotes}
+              onClearCart={handleClearCart}
+              onCheckout={handleCheckout}
+              onCreateOrder={handleCreateOrder}
+              isCheckingOut={isCreatingOrder || isUpdatingOrder}
+              isTwoStepCheckout={isTwoStepCheckout}
+              hasActiveOrder={!!currentOrderId}
+            />
+          </div>
         </div>
       </div>
 

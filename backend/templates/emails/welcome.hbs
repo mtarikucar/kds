@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome!</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 40px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .logo {
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        .brand {
+            font-size: 24px;
+            font-weight: bold;
+            color: #3b82f6;
+        }
+        h1 {
+            color: #1f2937;
+            font-size: 28px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        p {
+            color: #4b5563;
+            margin-bottom: 20px;
+        }
+        .button {
+            display: inline-block;
+            padding: 14px 28px;
+            background-color: #3b82f6;
+            color: #ffffff !important;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 600;
+            margin: 20px 0;
+        }
+        .button:hover {
+            background-color: #2563eb;
+        }
+        .features {
+            background-color: #f9fafb;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 30px 0;
+        }
+        .feature {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 15px;
+        }
+        .feature-icon {
+            font-size: 24px;
+            margin-right: 12px;
+        }
+        .feature-text {
+            flex: 1;
+        }
+        .feature-title {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            color: #6b7280;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🎉</div>
+            <div class="brand">Restaurant POS</div>
+        </div>
+
+        <h1>Welcome to {{restaurantName}}!</h1>
+
+        <p>Hi {{userName}},</p>
+
+        <p>We're excited to have you on board! Your account has been successfully created and you're ready to start managing your restaurant operations.</p>
+
+        <center>
+            <a href="{{loginLink}}" class="button">Get Started</a>
+        </center>
+
+        <div class="features">
+            <h3 style="margin-top: 0; color: #1f2937;">What you can do:</h3>
+
+            <div class="feature">
+                <div class="feature-icon">📱</div>
+                <div class="feature-text">
+                    <div class="feature-title">POS System</div>
+                    <div>Manage orders, tables, and payments seamlessly</div>
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-icon">👨‍🍳</div>
+                <div class="feature-text">
+                    <div class="feature-title">Kitchen Display</div>
+                    <div>Real-time order tracking for your kitchen staff</div>
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-icon">📊</div>
+                <div class="feature-text">
+                    <div class="feature-title">Reports & Analytics</div>
+                    <div>Track sales, inventory, and business performance</div>
+                </div>
+            </div>
+
+            <div class="feature">
+                <div class="feature-icon">📦</div>
+                <div class="feature-text">
+                    <div class="feature-title">Stock Management</div>
+                    <div>Keep track of inventory with low-stock alerts</div>
+                </div>
+            </div>
+        </div>
+
+        <p>Need help getting started? Check out our documentation or contact our support team anytime.</p>
+
+        <div class="footer">
+            <p>Happy managing! 🚀</p>
+            <p>© {{currentYear}} Restaurant POS. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

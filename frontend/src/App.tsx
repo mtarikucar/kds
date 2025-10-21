@@ -1,6 +1,11 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
+import ResetPasswordPage from './pages/auth/ResetPasswordPage';
+import VerifyEmailPage from './pages/auth/VerifyEmailPage';
+import ProfilePage from './pages/profile/ProfilePage';
+import CustomersPage from './pages/customers/CustomersPage';
 import QRMenuPage from './pages/qr-menu/QRMenuPage';
 import { LandingPage } from './pages/LandingPage';
 import DashboardPage from './pages/DashboardPage';
@@ -27,6 +32,9 @@ function App() {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/qr-menu/:tenantId" element={<QRMenuPage />} />
 
       {/* Protected Routes */}
@@ -55,6 +63,10 @@ function App() {
         {/* Subscription pages */}
         <Route path="/subscription/plans" element={<SubscriptionPlansPage />} />
         <Route path="/subscription/payment" element={<SubscriptionPaymentPage />} />
+
+        {/* Profile & Customers */}
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/customers" element={<CustomersPage />} />
       </Route>
     </Routes>
   );

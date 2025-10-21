@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { DeviceStatus, DeviceType } from '@/types/hardware';
 import { DeviceStatusIndicator } from './DeviceStatusIndicator';
 import { HardwareService } from '@/lib/tauri';
-import { Button } from '@/components/ui/button';
+import Button from '@/components/ui/Button';
 import {
   Card,
   CardContent,
@@ -10,7 +10,7 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card';
+} from '@/components/ui/Card';
 import {
   DropdownMenu,
   DropdownMenuContent,

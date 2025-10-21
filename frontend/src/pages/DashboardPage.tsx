@@ -55,14 +55,14 @@ const DashboardPage = () => {
     return (
       <CardWrapper to={link || ''}>
         <Card className={link ? 'hover:shadow-lg transition-shadow cursor-pointer' : ''}>
-          <CardContent className="pt-6">
+          <CardContent className="pt-4 md:pt-6">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">{title}</p>
-                <p className="text-3xl font-bold">{value}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs md:text-sm text-gray-600 mb-1">{title}</p>
+                <p className="text-2xl md:text-3xl font-bold truncate">{value}</p>
               </div>
-              <div className={`p-4 rounded-full ${color}`}>
-                <Icon className="h-8 w-8 text-white" />
+              <div className={`p-3 md:p-4 rounded-full ${color} flex-shrink-0`}>
+                <Icon className="h-6 w-6 md:h-8 md:w-8 text-white" />
               </div>
             </div>
           </CardContent>
@@ -92,9 +92,9 @@ const DashboardPage = () => {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-600">Welcome back! Here's your overview for today.</p>
+      <div className="mb-4 md:mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Dashboard</h1>
+        <p className="text-sm md:text-base text-gray-600">Welcome back! Here's your overview for today.</p>
       </div>
 
       {/* Stats Grid */}
@@ -147,26 +147,26 @@ const DashboardPage = () => {
                 <p>No orders yet</p>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2 md:space-y-3">
                 {recentOrders.map((order) => (
                   <div
                     key={order.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    className="flex items-center justify-between p-2 md:p-3 bg-gray-50 rounded-lg"
                   >
-                    <div>
-                      <p className="font-semibold">#{order.orderNumber}</p>
-                      <p className="text-sm text-gray-600">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm md:text-base font-semibold truncate">#{order.orderNumber}</p>
+                      <p className="text-xs md:text-sm text-gray-600 truncate">
                         Table {order.table?.number} • {formatTimeAgo(order.createdAt)}
                       </p>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-xs md:text-sm text-gray-600">
                         {order.items?.length || 0} items
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex-shrink-0 ml-2">
                       <Badge variant={getStatusVariant(order.status)}>
                         {order.status}
                       </Badge>
-                      <p className="text-sm font-bold text-gray-900 mt-1">
+                      <p className="text-xs md:text-sm font-bold text-gray-900 mt-1">
                         {formatCurrency(Number(order.finalAmount))}
                       </p>
                     </div>
@@ -183,32 +183,32 @@ const DashboardPage = () => {
             <CardTitle>Quick Actions</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3 md:gap-4">
               <Link to="/pos">
-                <div className="p-6 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors text-center cursor-pointer">
-                  <ShoppingCart className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-                  <p className="font-semibold text-blue-900">New Order</p>
+                <div className="p-4 md:p-6 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors text-center cursor-pointer">
+                  <ShoppingCart className="h-6 w-6 md:h-8 md:w-8 text-blue-600 mx-auto mb-2" />
+                  <p className="text-sm md:text-base font-semibold text-blue-900">New Order</p>
                 </div>
               </Link>
 
               <Link to="/kitchen">
-                <div className="p-6 bg-green-50 rounded-lg hover:bg-green-100 transition-colors text-center cursor-pointer">
-                  <UtensilsCrossed className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                  <p className="font-semibold text-green-900">Kitchen Display</p>
+                <div className="p-4 md:p-6 bg-green-50 rounded-lg hover:bg-green-100 transition-colors text-center cursor-pointer">
+                  <UtensilsCrossed className="h-6 w-6 md:h-8 md:w-8 text-green-600 mx-auto mb-2" />
+                  <p className="text-sm md:text-base font-semibold text-green-900">Kitchen Display</p>
                 </div>
               </Link>
 
               <Link to="/admin/menu">
-                <div className="p-6 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors text-center cursor-pointer">
-                  <UtensilsCrossed className="h-8 w-8 text-purple-600 mx-auto mb-2" />
-                  <p className="font-semibold text-purple-900">Manage Menu</p>
+                <div className="p-4 md:p-6 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors text-center cursor-pointer">
+                  <UtensilsCrossed className="h-6 w-6 md:h-8 md:w-8 text-purple-600 mx-auto mb-2" />
+                  <p className="text-sm md:text-base font-semibold text-purple-900">Manage Menu</p>
                 </div>
               </Link>
 
               <Link to="/admin/tables">
-                <div className="p-6 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors text-center cursor-pointer">
-                  <TableIcon className="h-8 w-8 text-orange-600 mx-auto mb-2" />
-                  <p className="font-semibold text-orange-900">Manage Tables</p>
+                <div className="p-4 md:p-6 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors text-center cursor-pointer">
+                  <TableIcon className="h-6 w-6 md:h-8 md:w-8 text-orange-600 mx-auto mb-2" />
+                  <p className="text-sm md:text-base font-semibold text-orange-900">Manage Tables</p>
                 </div>
               </Link>
             </div>

@@ -68,3 +68,78 @@ export const useLogout = () => {
     },
   });
 };
+
+export const useForgotPassword = () => {
+  return useMutation({
+    mutationFn: async (email: string): Promise<{ message: string }> => {
+      const response = await api.post('/auth/forgot-password', { email });
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Password reset link sent to your email');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to send reset email');
+    },
+  });
+};
+
+export const useResetPassword = () => {
+  return useMutation({
+    mutationFn: async (data: { token: string; newPassword: string }): Promise<{ message: string }> => {
+      const response = await api.post('/auth/reset-password', data);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Password reset successful. Please login with your new password.');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to reset password');
+    },
+  });
+};
+
+export const useChangePassword = () => {
+  return useMutation({
+    mutationFn: async (data: { oldPassword: string; newPassword: string }): Promise<{ message: string }> => {
+      const response = await api.post('/auth/change-password', data);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Password changed successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to change password');
+    },
+  });
+};
+
+export const useVerifyEmail = () => {
+  return useMutation({
+    mutationFn: async (token: string): Promise<{ message: string }> => {
+      const response = await api.post('/auth/verify-email', { token });
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Email verified successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Email verification failed');
+    },
+  });
+};
+
+export const useResendVerificationEmail = () => {
+  return useMutation({
+    mutationFn: async (): Promise<{ message: string }> => {
+      const response = await api.post('/auth/resend-verification');
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Verification email sent');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to send verification email');
+    },
+  });
+};
