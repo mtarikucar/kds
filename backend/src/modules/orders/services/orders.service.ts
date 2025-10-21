@@ -364,10 +364,9 @@ export class OrdersService {
       },
     });
 
-    // If items were updated, emit to kitchen via WebSocket
-    if (updateOrderDto.items && updateOrderDto.items.length > 0) {
-      this.kdsGateway.emitOrderUpdated(tenantId, updatedOrder);
-    }
+    // Always emit to kitchen via WebSocket when order is updated
+    // This ensures KDS updates even when only discount/notes/customerName change
+    this.kdsGateway.emitOrderUpdated(tenantId, updatedOrder);
 
     return updatedOrder;
   }

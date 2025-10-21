@@ -4,12 +4,15 @@ import TableGrid from '../../components/pos/TableGrid';
 import MenuPanel from '../../components/pos/MenuPanel';
 import OrderCart from '../../components/pos/OrderCart';
 import PaymentModal from '../../components/pos/PaymentModal';
+import StickyCartBar from '../../components/pos/StickyCartBar';
+import CartDrawer from '../../components/pos/CartDrawer';
 import { useCreateOrder, useUpdateOrder, useOrders } from '../../features/orders/ordersApi';
 import { useCreatePayment } from '../../features/orders/ordersApi';
 import { useUpdateTableStatus } from '../../features/tables/tablesApi';
 import { useGetPosSettings } from '../../features/pos/posApi';
 import { Product, Table, TableStatus, OrderType, OrderStatus } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
+import { useResponsive } from '../../hooks/useResponsive';
 
 interface CartItem extends Product {
   quantity: number;
@@ -24,6 +27,10 @@ const POSPage = () => {
   const [orderNotes, setOrderNotes] = useState('');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
+  const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
+
+  // Responsive hook
+  const { isDesktop, isMobile, isTablet } = useResponsive();
 
   // Fetch POS settings
   const { data: posSettings } = useGetPosSettings();
@@ -319,8 +326,14 @@ const POSPage = () => {
     );
   };
 
+  // Calculate totals
+  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  const total = subtotal - discount;
+  const hasCartItems = cartItems.length > 0;
+
   return (
-    <div className="h-full">
+    <div className="h-full pb-20 lg:pb-0">
+      {/* Header */}
       <div className="mb-4 md:mb-6">
         <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Point of Sale</h1>
         <p className="text-sm md:text-base text-gray-600">
@@ -328,72 +341,153 @@ const POSPage = () => {
             ? 'Start taking orders (table selection is optional)'
             : 'Select a table and start taking orders'}
         </p>
+        {/* Selected Table Indicator - Mobile/Tablet */}
+        {selectedTable && !isDesktop && (
+          <div className="mt-2 inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+            </svg>
+            Table {selectedTable.number}
+          </div>
+        )}
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-3 md:gap-6 h-[calc(100vh-250px)] md:h-[calc(100vh-200px)]">
-        {/* Tables Section - hidden in tableless mode */}
-        {!isTablelessMode && (
-          <div className="lg:w-1/4">
-            <Card className="h-64 lg:h-full">
+      {/* DESKTOP LAYOUT (≥1024px) - 3-Panel */}
+      {isDesktop && (
+        <div className="flex gap-6 h-[calc(100vh-200px)]">
+          {/* Tables Section - hidden in tableless mode */}
+          {!isTablelessMode && (
+            <div className="w-1/4">
+              <Card className="h-full">
+                <CardHeader>
+                  <CardTitle>Tables</CardTitle>
+                </CardHeader>
+                <CardContent className="overflow-y-auto">
+                  <TableGrid
+                    selectedTable={selectedTable}
+                    onSelectTable={handleSelectTable}
+                  />
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* Menu Section */}
+          <div className={`flex-1 ${isTablelessMode ? 'w-3/4' : 'w-1/2'}`}>
+            <Card className="h-full">
               <CardHeader>
-                <CardTitle className="text-lg md:text-xl">Tables</CardTitle>
+                <CardTitle>
+                  Menu {selectedTable && `- Table ${selectedTable.number}`}
+                </CardTitle>
               </CardHeader>
-              <CardContent className="overflow-y-auto">
+              <CardContent className="h-[calc(100%-80px)] overflow-y-auto">
+                <MenuPanel onAddItem={handleAddItem} />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Order Cart Section */}
+          <div className="w-1/4">
+            <div className="sticky top-0">
+              <OrderCart
+                items={cartItems}
+                discount={discount}
+                customerName={customerName}
+                orderNotes={orderNotes}
+                onUpdateQuantity={handleUpdateQuantity}
+                onRemoveItem={handleRemoveItem}
+                onUpdateDiscount={setDiscount}
+                onUpdateCustomerName={setCustomerName}
+                onUpdateOrderNotes={setOrderNotes}
+                onClearCart={handleClearCart}
+                onCheckout={handleCheckout}
+                onCreateOrder={handleCreateOrder}
+                isCheckingOut={isCreatingOrder || isUpdatingOrder}
+                isTwoStepCheckout={isTwoStepCheckout}
+                hasActiveOrder={!!currentOrderId}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TABLET/MOBILE LAYOUT (<1024px) - Full-screen Menu + Sticky Bar */}
+      {!isDesktop && (
+        <div className="h-[calc(100vh-220px)]">
+          {/* Tables Section - Collapsible on mobile/tablet */}
+          {!isTablelessMode && !selectedTable && (
+            <Card className="mb-4">
+              <CardHeader>
+                <CardTitle className="text-lg">Select a Table</CardTitle>
+              </CardHeader>
+              <CardContent className="max-h-[300px] overflow-y-auto">
                 <TableGrid
                   selectedTable={selectedTable}
                   onSelectTable={handleSelectTable}
                 />
               </CardContent>
             </Card>
-          </div>
-        )}
+          )}
 
-        {/* Menu Section */}
-        <div className={`flex-1 ${isTablelessMode ? 'lg:w-3/4' : 'lg:w-1/2'}`}>
-          <Card className="h-96 lg:h-full">
+          {/* Menu Section - Full Screen */}
+          <Card className="h-full">
             <CardHeader>
-              <CardTitle className="text-lg md:text-xl">
+              <CardTitle className="text-lg">
                 Menu {selectedTable && `- Table ${selectedTable.number}`}
               </CardTitle>
             </CardHeader>
-            <CardContent className="h-[calc(100%-60px)] md:h-[calc(100%-80px)] overflow-y-auto">
+            <CardContent className="h-[calc(100%-70px)] overflow-y-auto">
               <MenuPanel onAddItem={handleAddItem} />
             </CardContent>
           </Card>
         </div>
+      )}
 
-        {/* Order Cart Section */}
-        <div className="lg:w-1/4">
-          <div className="sticky top-0">
-            <OrderCart
-              items={cartItems}
-              discount={discount}
-              customerName={customerName}
-              orderNotes={orderNotes}
-              onUpdateQuantity={handleUpdateQuantity}
-              onRemoveItem={handleRemoveItem}
-              onUpdateDiscount={setDiscount}
-              onUpdateCustomerName={setCustomerName}
-              onUpdateOrderNotes={setOrderNotes}
-              onClearCart={handleClearCart}
-              onCheckout={handleCheckout}
-              onCreateOrder={handleCreateOrder}
-              isCheckingOut={isCreatingOrder || isUpdatingOrder}
-              isTwoStepCheckout={isTwoStepCheckout}
-              hasActiveOrder={!!currentOrderId}
-            />
-          </div>
-        </div>
-      </div>
+      {/* STICKY BOTTOM CART BAR - Mobile/Tablet only */}
+      <StickyCartBar
+        itemCount={cartItems.length}
+        total={total}
+        onViewCart={() => setIsCartDrawerOpen(true)}
+        onCheckout={handleCheckout}
+        onCreateOrder={handleCreateOrder}
+        isCheckingOut={isCreatingOrder || isUpdatingOrder}
+        hasItems={hasCartItems}
+        isTwoStepCheckout={isTwoStepCheckout}
+        hasActiveOrder={!!currentOrderId}
+      />
+
+      {/* CART DRAWER - Mobile only */}
+      <CartDrawer
+        isOpen={isCartDrawerOpen}
+        onClose={() => setIsCartDrawerOpen(false)}
+      >
+        <OrderCart
+          items={cartItems}
+          discount={discount}
+          customerName={customerName}
+          orderNotes={orderNotes}
+          onUpdateQuantity={handleUpdateQuantity}
+          onRemoveItem={handleRemoveItem}
+          onUpdateDiscount={setDiscount}
+          onUpdateCustomerName={setCustomerName}
+          onUpdateOrderNotes={setOrderNotes}
+          onClearCart={handleClearCart}
+          onCheckout={() => {
+            setIsCartDrawerOpen(false);
+            handleCheckout();
+          }}
+          onCreateOrder={handleCreateOrder}
+          isCheckingOut={isCreatingOrder || isUpdatingOrder}
+          isTwoStepCheckout={isTwoStepCheckout}
+          hasActiveOrder={!!currentOrderId}
+        />
+      </CartDrawer>
 
       {/* Payment Modal */}
       <PaymentModal
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
-        total={
-          cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0) -
-          discount
-        }
+        total={total}
         onConfirm={handlePaymentConfirm}
         isLoading={isCreatingPayment}
       />
