@@ -55,6 +55,13 @@ describe('AuthService', () => {
           provide: ConfigService,
           useValue: mockConfigService,
         },
+        {
+          provide: 'EmailService',
+          useValue: {
+            sendVerificationEmail: jest.fn(),
+            sendPasswordResetEmail: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
