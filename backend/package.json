@@ -1,6 +1,6 @@
 {
   "name": "restaurant-pos-backend",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.0-beta.2",
   "description": "Restaurant POS Backend API built with NestJS",
   "author": "Your Team",
   "private": true,
