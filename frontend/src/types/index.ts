@@ -7,6 +7,11 @@ export enum UserRole {
   COURIER = 'COURIER',
 }
 
+export enum UserStatus {
+  ACTIVE = 'ACTIVE',
+  INACTIVE = 'INACTIVE',
+}
+
 export interface User {
   id: string;
   email: string;
@@ -14,7 +19,7 @@ export interface User {
   lastName: string;
   role: string;
   tenantId: string | null;
-  status?: string;
+  status?: UserStatus | string;
   createdAt?: string;
   updatedAt?: string;
 }

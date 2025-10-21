@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
+import { TenantStatus } from '../../common/constants/subscription.enum';
 
 @Injectable()
 export class TenantsService {
@@ -27,7 +28,7 @@ export class TenantsService {
       data: {
         name: createTenantDto.name,
         subdomain: createTenantDto.subdomain,
-        status: createTenantDto.status || 'ACTIVE',
+        status: createTenantDto.status || TenantStatus.ACTIVE,
       },
     });
   }
@@ -50,7 +51,7 @@ export class TenantsService {
   async findAllPublic() {
     return this.prisma.tenant.findMany({
       where: {
-        status: 'ACTIVE',
+        status: TenantStatus.ACTIVE,
       },
       select: {
         id: true,

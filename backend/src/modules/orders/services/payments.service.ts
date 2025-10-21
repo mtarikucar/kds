@@ -5,7 +5,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreatePaymentDto } from '../dto/create-payment.dto';
-import { PaymentStatus, OrderStatus } from '../../../common/constants/order-status.enum';
+import { PaymentStatus, OrderStatus, StockMovementType } from '../../../common/constants/order-status.enum';
+import { TableStatus } from '../../tables/dto/create-table.dto';
 import { OrdersService } from './orders.service';
 
 @Injectable()
@@ -109,7 +110,7 @@ export class PaymentsService {
             // Create stock movement record
             await tx.stockMovement.create({
               data: {
-                type: 'OUT',
+                type: StockMovementType.OUT,
                 quantity: item.quantity,
                 reason: `Order ${payment.order.orderNumber}`,
                 productId: product.id,
@@ -124,7 +125,7 @@ export class PaymentsService {
         if (order.tableId) {
           await tx.table.update({
             where: { id: order.tableId },
-            data: { status: 'AVAILABLE' },
+            data: { status: TableStatus.AVAILABLE },
           });
         }
       }

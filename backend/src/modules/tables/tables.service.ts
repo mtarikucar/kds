@@ -4,9 +4,10 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateTableDto } from './dto/create-table.dto';
+import { CreateTableDto, TableStatus } from './dto/create-table.dto';
 import { UpdateTableDto } from './dto/update-table.dto';
 import { UpdateTableStatusDto } from './dto/update-table-status.dto';
+import { OrderStatus } from '../../common/constants/order-status.enum';
 
 @Injectable()
 export class TablesService {
@@ -34,7 +35,7 @@ export class TablesService {
         number: createTableDto.number,
         capacity: createTableDto.capacity,
         section: createTableDto.section,
-        status: createTableDto.status || 'AVAILABLE',
+        status: createTableDto.status || TableStatus.AVAILABLE,
         tenantId,
       },
     });
@@ -54,7 +55,7 @@ export class TablesService {
             orders: {
               where: {
                 status: {
-                  notIn: ['PAID', 'CANCELLED'],
+                  notIn: [OrderStatus.PAID, OrderStatus.CANCELLED],
                 },
               },
             },
@@ -75,7 +76,7 @@ export class TablesService {
         orders: {
           where: {
             status: {
-              notIn: ['PAID', 'CANCELLED'],
+              notIn: [OrderStatus.PAID, OrderStatus.CANCELLED],
             },
           },
           orderBy: { createdAt: 'desc' },
@@ -139,7 +140,7 @@ export class TablesService {
       where: {
         tableId: id,
         status: {
-          notIn: ['PAID', 'CANCELLED'],
+          notIn: [OrderStatus.PAID, OrderStatus.CANCELLED],
         },
       },
     });

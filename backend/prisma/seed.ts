@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { UserRole } from '../src/common/constants/roles.enum';
 
 const prisma = new PrismaClient();
 
@@ -138,7 +139,7 @@ async function main() {
       password: hashedPassword,
       firstName: 'John',
       lastName: 'Admin',
-      role: 'ADMIN',
+      role: UserRole.ADMIN,
       status: 'ACTIVE',
       tenantId: tenant.id,
     },
@@ -150,7 +151,7 @@ async function main() {
       password: hashedPassword,
       firstName: 'Jane',
       lastName: 'Waiter',
-      role: 'WAITER',
+      role: UserRole.WAITER,
       status: 'ACTIVE',
       tenantId: tenant.id,
     },
@@ -162,7 +163,7 @@ async function main() {
       password: hashedPassword,
       firstName: 'Mike',
       lastName: 'Chef',
-      role: 'KITCHEN',
+      role: UserRole.KITCHEN,
       status: 'ACTIVE',
       tenantId: tenant.id,
     },

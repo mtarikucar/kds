@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { UserPlus, Edit2, Trash2, AlertTriangle, X } from 'lucide-react';
 import { usersApi, User, CreateUserData, UpdateUserData } from '../../api/usersApi';
+import { UserRole, UserStatus } from '../../types';
 import { toast } from 'sonner';
 import { useAuthStore } from '../../store/authStore';
 
@@ -18,7 +19,7 @@ const UserManagementPage = () => {
     password: '',
     firstName: '',
     lastName: '',
-    role: 'WAITER' as const,
+    role: UserRole.WAITER,
   });
 
   useEffect(() => {
@@ -54,7 +55,7 @@ const UserManagementPage = () => {
         password: '',
         firstName: '',
         lastName: '',
-        role: 'WAITER',
+        role: UserRole.WAITER,
       });
     }
     setShowModal(true);
@@ -119,19 +120,19 @@ const UserManagementPage = () => {
     }
   };
 
-  const getRoleBadgeColor = (role: string) => {
-    const colors: Record<string, string> = {
-      ADMIN: 'bg-red-100 text-red-800',
-      MANAGER: 'bg-blue-100 text-blue-800',
-      WAITER: 'bg-green-100 text-green-800',
-      KITCHEN: 'bg-orange-100 text-orange-800',
-      COURIER: 'bg-purple-100 text-purple-800',
+  const getRoleBadgeColor = (role: UserRole) => {
+    const colors: Record<UserRole, string> = {
+      [UserRole.ADMIN]: 'bg-red-100 text-red-800',
+      [UserRole.MANAGER]: 'bg-blue-100 text-blue-800',
+      [UserRole.WAITER]: 'bg-green-100 text-green-800',
+      [UserRole.KITCHEN]: 'bg-orange-100 text-orange-800',
+      [UserRole.COURIER]: 'bg-purple-100 text-purple-800',
     };
     return colors[role] || 'bg-gray-100 text-gray-800';
   };
 
-  const getStatusBadgeColor = (status: string) => {
-    return status === 'ACTIVE'
+  const getStatusBadgeColor = (status: UserStatus | string) => {
+    return status === UserStatus.ACTIVE
       ? 'bg-green-100 text-green-800'
       : 'bg-gray-100 text-gray-800';
   };
