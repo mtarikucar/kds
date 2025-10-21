@@ -1,0 +1,254 @@
+name: Deploy Beta Release
+
+on:
+  push:
+    tags:
+      - 'v*-beta.*'  # Trigger on beta tags like v0.1.0-beta.1
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Beta tag to deploy (e.g., v0.1.0-beta.1)'
+        required: true
+        type: string
+
+env:
+  NODE_VERSION: '18.x'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  test:
+    name: Run Tests
+    uses: ./.github/workflows/test.yml
+
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: read
+      packages: write
+
+    strategy:
+      matrix:
+        service: [backend, frontend]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata (tags, labels)
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/${{ matrix.service }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=ref,event=tag
+            type=sha,prefix={{branch}}-
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./${{ matrix.service }}
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NODE_ENV=production
+            VERSION=${{ github.ref_name }}
+
+  deploy-beta:
+    name: Deploy to Beta Environment
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    environment:
+      name: beta
+      url: https://beta.yourapp.com
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install SSH Key
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+
+      - name: Deploy to Beta Server
+        env:
+          SERVER_HOST: ${{ secrets.BETA_SERVER_HOST }}
+          SERVER_USER: ${{ secrets.BETA_SERVER_USER }}
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          ssh ${SERVER_USER}@${SERVER_HOST} << EOF
+            cd /opt/kds-beta
+
+            # Pull latest changes
+            git fetch --all --tags
+            git checkout ${TAG_NAME}
+
+            # Update environment with beta tag
+            export IMAGE_TAG=${TAG_NAME}
+
+            # Pull new images
+            docker-compose -f docker-compose.beta.yml pull
+
+            # Backup database before deployment
+            ./scripts/backup-database.sh beta
+
+            # Deploy with new images
+            docker-compose -f docker-compose.beta.yml up -d --no-deps backend frontend
+
+            # Run migrations
+            docker-compose -f docker-compose.beta.yml exec -T backend npx prisma migrate deploy
+
+            # Health check
+            sleep 15
+            curl -f http://localhost:3001/api/health || exit 1
+          EOF
+
+      - name: Verify deployment
+        env:
+          SERVER_HOST: ${{ secrets.BETA_SERVER_HOST }}
+          SERVER_USER: ${{ secrets.BETA_SERVER_USER }}
+        run: |
+          ssh ${SERVER_USER}@${SERVER_HOST} << 'EOF'
+            cd /opt/kds-beta
+            docker-compose -f docker-compose.beta.yml ps
+            docker-compose -f docker-compose.beta.yml logs --tail=50 backend
+          EOF
+
+      - name: Run smoke tests
+        env:
+          BETA_URL: https://beta.yourapp.com
+        run: |
+          # Health endpoint
+          curl -f ${BETA_URL}/api/health
+
+          # API version check
+          VERSION=$(curl -s ${BETA_URL}/api | jq -r '.version')
+          echo "Deployed version: $VERSION"
+
+          if [ "$VERSION" != "${{ github.ref_name }}" ]; then
+            echo "Version mismatch! Expected ${{ github.ref_name }}, got $VERSION"
+            exit 1
+          fi
+
+  create-github-release:
+    name: Create GitHub Pre-release
+    runs-on: ubuntu-latest
+    needs: deploy-beta
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get previous beta tag
+          PREV_TAG=$(git describe --tags --abbrev=0 --match="v*-beta.*" HEAD^ 2>/dev/null || echo "")
+
+          if [ -z "$PREV_TAG" ]; then
+            CHANGELOG="Initial beta release"
+          else
+            CHANGELOG=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s" --no-merges)
+          fi
+
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }} - Beta Release
+          body: |
+            ## 🚀 Beta Release ${{ github.ref_name }}
+
+            **Deployment Status:** ✅ Deployed to Beta Environment
+            **Environment URL:** https://beta.yourapp.com
+            **Docker Images:** Available at ghcr.io/${{ github.repository }}
+
+            ### Changes
+            ${{ steps.changelog.outputs.changelog }}
+
+            ### Testing Instructions
+            1. Visit https://beta.yourapp.com
+            2. Test new features and bug fixes
+            3. Report issues on GitHub
+
+            ### Docker Images
+            ```bash
+            # Pull backend image
+            docker pull ghcr.io/${{ github.repository }}/backend:${{ github.ref_name }}
+
+            # Pull frontend image
+            docker pull ghcr.io/${{ github.repository }}/frontend:${{ github.ref_name }}
+            ```
+
+            ---
+            🤖 Automated beta release by GitHub Actions
+          prerelease: true
+          generate_release_notes: false
+
+  notify-deployment:
+    name: Send Deployment Notification
+    runs-on: ubuntu-latest
+    needs: [deploy-beta, create-github-release]
+    if: always()
+
+    steps:
+      - name: Determine deployment status
+        id: status
+        run: |
+          if [ "${{ needs.deploy-beta.result }}" == "success" ]; then
+            echo "emoji=✅" >> $GITHUB_OUTPUT
+            echo "status=Success" >> $GITHUB_OUTPUT
+            echo "color=success" >> $GITHUB_OUTPUT
+          else
+            echo "emoji=❌" >> $GITHUB_OUTPUT
+            echo "status=Failed" >> $GITHUB_OUTPUT
+            echo "color=danger" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create commit comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ steps.status.outputs.status }}';
+            const emoji = '${{ steps.status.outputs.emoji }}';
+
+            github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body: `${emoji} **Beta Deployment: ${status}**\n\n` +
+                    `**Version:** ${{ github.ref_name }}\n` +
+                    `**Environment:** https://beta.yourapp.com\n` +
+                    `**Docker Images:** ghcr.io/${{ github.repository }}\n\n` +
+                    `View full deployment logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`
+            });
