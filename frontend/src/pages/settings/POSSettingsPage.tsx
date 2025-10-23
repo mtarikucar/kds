@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useGetPosSettings, useUpdatePosSettings } from '../../features/pos/posApi';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 const POSSettingsPage = () => {
+  const { t } = useTranslation('settings');
   const { data: posSettings, isLoading } = useGetPosSettings();
   const { mutate: updateSettings, isPending: isUpdating } = useUpdatePosSettings();
 
@@ -26,10 +28,10 @@ const POSSettingsPage = () => {
       },
       {
         onSuccess: () => {
-          toast.success('POS settings updated successfully');
+          toast.success(t('settingsSaved'));
         },
         onError: (error: any) => {
-          toast.error(error.response?.data?.message || 'Failed to update settings');
+          toast.error(error.response?.data?.message || t('settingsFailed'));
         },
       }
     );
@@ -43,7 +45,7 @@ const POSSettingsPage = () => {
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <p className="text-gray-500">Loading POS settings...</p>
+        <p className="text-gray-500">{t('posSettings.loading')}</p>
       </div>
     );
   }
@@ -51,16 +53,16 @@ const POSSettingsPage = () => {
   return (
     <div className="h-full p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">POS Settings</h1>
+        <h1 className="text-2xl font-bold text-gray-900">{t('posSettings.title')}</h1>
         <p className="text-gray-600 mt-1">
-          Configure how your Point of Sale system operates
+          {t('posSettings.description')}
         </p>
       </div>
 
       <div className="max-w-3xl">
         <Card>
           <CardHeader>
-            <CardTitle>Operation Modes</CardTitle>
+            <CardTitle>{t('operationModes')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Tableless Mode */}
@@ -75,12 +77,10 @@ const POSSettingsPage = () => {
                   />
                   <div>
                     <p className="font-semibold text-gray-900">
-                      Enable Tableless Mode
+                      {t('enableTablelessMode')}
                     </p>
                     <p className="text-sm text-gray-600">
-                      Allow orders without table selection. Perfect for self-service,
-                      takeaway, or counter-service restaurants. The table selection
-                      panel will be hidden when enabled.
+                      {t('tablelessModeDescription')}
                     </p>
                   </div>
                 </label>
@@ -100,12 +100,10 @@ const POSSettingsPage = () => {
                     />
                     <div>
                       <p className="font-semibold text-gray-900">
-                        Enable Two-Step Checkout
+                        {t('twoStepCheckout.title')}
                       </p>
                       <p className="text-sm text-gray-600">
-                        Separate order creation and payment steps. Shows two buttons:
-                        "Create Order" and "Proceed to Payment". Useful when you want
-                        to send orders to kitchen before collecting payment.
+                        {t('twoStepCheckout.description')}
                       </p>
                     </div>
                   </label>
@@ -116,8 +114,7 @@ const POSSettingsPage = () => {
             {/* Info box */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <p className="text-sm text-blue-800">
-                <strong>Note:</strong> Changes will take effect immediately in the POS
-                system. Make sure staff are informed of any operational changes.
+                <strong>{t('info.noteLabel')}</strong> {t('info.noteBody')}
               </p>
             </div>
 
@@ -130,7 +127,7 @@ const POSSettingsPage = () => {
                 isLoading={isUpdating}
                 disabled={!hasChanges}
               >
-                Save Changes
+                {t('saveChanges')}
               </Button>
             </div>
           </CardContent>
@@ -139,34 +136,34 @@ const POSSettingsPage = () => {
         {/* Settings Preview */}
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle>Current Configuration</CardTitle>
+            <CardTitle>{t('preview.currentConfiguration')}</CardTitle>
           </CardHeader>
           <CardContent>
             <dl className="space-y-3">
               <div className="flex justify-between">
-                <dt className="text-gray-600">Tableless Mode:</dt>
+                <dt className="text-gray-600">{t('preview.tablelessMode')}:</dt>
                 <dd className="font-semibold">
                   {enableTablelessMode ? (
-                    <span className="text-green-600">Enabled</span>
+                    <span className="text-green-600">{t('preview.enabled')}</span>
                   ) : (
-                    <span className="text-gray-400">Disabled</span>
+                    <span className="text-gray-400">{t('preview.disabled')}</span>
                   )}
                 </dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-gray-600">Two-Step Checkout:</dt>
+                <dt className="text-gray-600">{t('preview.twoStepCheckout')}:</dt>
                 <dd className="font-semibold">
                   {enableTwoStepCheckout ? (
-                    <span className="text-green-600">Enabled</span>
+                    <span className="text-green-600">{t('preview.enabled')}</span>
                   ) : (
-                    <span className="text-gray-400">Disabled</span>
+                    <span className="text-gray-400">{t('preview.disabled')}</span>
                   )}
                 </dd>
               </div>
               <div className="flex justify-between">
-                <dt className="text-gray-600">Order Type (tableless):</dt>
+                <dt className="text-gray-600">{t('preview.orderTypeTableless')}:</dt>
                 <dd className="font-mono text-sm">
-                  {enableTablelessMode ? 'TAKEAWAY' : 'DINE_IN'}
+                  {enableTablelessMode ? t('orderTypes.takeaway') : t('orderTypes.dineIn')}
                 </dd>
               </div>
             </dl>

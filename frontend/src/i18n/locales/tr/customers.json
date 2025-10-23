@@ -1,0 +1,33 @@
+{
+  "customers": {
+    "title": "Müşteriler",
+    "addCustomer": "Müşteri Ekle",
+    "editCustomer": "Müşteriyi Düzenle",
+    "deleteCustomer": "Müşteriyi Sil",
+    "firstName": "Ad",
+    "lastName": "Soyadı",
+    "email": "E-posta",
+    "phone": "Telefon",
+    "address": "Adres",
+    "city": "Şehir",
+    "state": "İl",
+    "zipCode": "Posta Kodu",
+    "country": "Ülke",
+    "totalOrders": "Toplam Sipariş",
+    "totalSpent": "Toplam Harcama",
+    "lastOrder": "Son Sipariş",
+    "joinDate": "Katılım Tarihi",
+    "notes": "Notlar",
+    "active": "Aktif",
+    "inactive": "Pasif",
+    "search": "Müşteri Ara",
+    "noCustomers": "Müşteri bulunamadı",
+    "customerAdded": "Müşteri başarıyla eklendi",
+    "customerUpdated": "Müşteri başarıyla güncellendi",
+    "customerDeleted": "Müşteri başarıyla silindi",
+    "viewHistory": "Sipariş Geçmişini Görüntüle",
+    "sendEmail": "E-posta Gönder",
+    "sendSMS": "SMS Gönder"
+  }
+}
+

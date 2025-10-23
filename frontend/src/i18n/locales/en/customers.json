@@ -1,0 +1,33 @@
+{
+  "customers": {
+    "title": "Customers",
+    "addCustomer": "Add Customer",
+    "editCustomer": "Edit Customer",
+    "deleteCustomer": "Delete Customer",
+    "firstName": "First Name",
+    "lastName": "Last Name",
+    "email": "Email",
+    "phone": "Phone",
+    "address": "Address",
+    "city": "City",
+    "state": "State",
+    "zipCode": "Zip Code",
+    "country": "Country",
+    "totalOrders": "Total Orders",
+    "totalSpent": "Total Spent",
+    "lastOrder": "Last Order",
+    "joinDate": "Join Date",
+    "notes": "Notes",
+    "active": "Active",
+    "inactive": "Inactive",
+    "search": "Search Customers",
+    "noCustomers": "No customers found",
+    "customerAdded": "Customer added successfully",
+    "customerUpdated": "Customer updated successfully",
+    "customerDeleted": "Customer deleted successfully",
+    "viewHistory": "View Order History",
+    "sendEmail": "Send Email",
+    "sendSMS": "Send SMS"
+  }
+}
+

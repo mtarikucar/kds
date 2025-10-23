@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Trash2, Plus, Minus } from 'lucide-react';
 import { Product } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
@@ -45,16 +46,17 @@ const OrderCart = ({
   isTwoStepCheckout = false,
   hasActiveOrder = false,
 }: OrderCartProps) => {
+  const { t } = useTranslation('pos');
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const total = subtotal - discount;
 
   return (
     <Card className="h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>Current Order</CardTitle>
+        <CardTitle>{t('currentOrder')}</CardTitle>
         {items.length > 0 && (
           <Button variant="outline" size="sm" onClick={onClearCart}>
-            Clear All
+            {t('clearAll')}
           </Button>
         )}
       </CardHeader>
@@ -62,7 +64,7 @@ const OrderCart = ({
       <CardContent className="flex-1 flex flex-col">
         {items.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-gray-400">
-            <p>No items in cart</p>
+            <p>{t('pos.noItemsInCart')}</p>
           </div>
         ) : (
           <>
@@ -116,20 +118,20 @@ const OrderCart = ({
 
             <div className="space-y-3 border-t pt-4">
               <Input
-                label="Customer Name (Optional)"
+                label={t('customerNameLabel')}
                 type="text"
-                placeholder="Enter customer name"
+                placeholder={t('customerNamePlaceholder')}
                 value={customerName}
                 onChange={(e) => onUpdateCustomerName(e.target.value)}
               />
 
               <div className="space-y-1">
                 <label className="block text-sm font-medium text-gray-700">
-                  Order Notes (Optional)
+                  {t('orderNotesLabel')}
                 </label>
                 <textarea
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  placeholder="Special requests, allergies, etc."
+                  placeholder={t('orderNotesPlaceholder')}
                   rows={2}
                   value={orderNotes}
                   onChange={(e) => onUpdateOrderNotes(e.target.value)}
@@ -137,12 +139,12 @@ const OrderCart = ({
               </div>
 
               <div className="flex justify-between text-sm">
-                <span>Subtotal:</span>
+                <span>{t('subtotal')}:</span>
                 <span className="font-medium">{formatCurrency(subtotal)}</span>
               </div>
 
               <Input
-                label="Discount"
+                label={t('discount')}
                 type="number"
                 min="0"
                 max={subtotal}
@@ -152,7 +154,7 @@ const OrderCart = ({
               />
 
               <div className="flex justify-between text-lg font-bold border-t pt-2">
-                <span>Total:</span>
+                <span>{t('total')}:</span>
                 <span>{formatCurrency(total)}</span>
               </div>
 
@@ -168,7 +170,7 @@ const OrderCart = ({
                     isLoading={isCheckingOut}
                     disabled={hasActiveOrder && items.length === 0}
                   >
-                    {hasActiveOrder ? 'Update Order' : 'Create Order'}
+                    {hasActiveOrder ? t('updateOrder') : t('createOrder')}
                   </Button>
 
                   {/* Payment button - only enabled after order is created */}
@@ -179,7 +181,7 @@ const OrderCart = ({
                     onClick={onCheckout}
                     disabled={!hasActiveOrder}
                   >
-                    Proceed to Payment
+                    {t('proceedToPayment')}
                   </Button>
                 </div>
               ) : (
@@ -191,7 +193,7 @@ const OrderCart = ({
                   onClick={onCheckout}
                   isLoading={isCheckingOut}
                 >
-                  Checkout
+                  {t('checkout')}
                 </Button>
               )}
             </div>

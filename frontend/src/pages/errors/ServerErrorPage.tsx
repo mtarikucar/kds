@@ -1,7 +1,9 @@
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 export default function ServerErrorPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation('errors');
 
   const handleReload = () => {
     window.location.reload();
@@ -31,9 +33,9 @@ export default function ServerErrorPage() {
         </div>
 
         {/* Content */}
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Server Error</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('pages.serverError.title')}</h2>
         <p className="text-gray-600 mb-8">
-          Oops! Something went wrong on our servers. We're working to fix it. Please try again in a few moments.
+          {t('pages.serverError.description')}
         </p>
 
         {/* Actions */}
@@ -55,24 +57,24 @@ export default function ServerErrorPage() {
                 d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
               />
             </svg>
-            Reload Page
+            {t('app:buttons.reload')}
           </button>
 
           <button
             onClick={() => navigate('/')}
             className="w-full flex justify-center py-3 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors"
           >
-            Go to Homepage
+            {t('pages.serverError.goHome')}
           </button>
         </div>
 
         {/* Status */}
         <div className="mt-8 p-4 bg-red-50 rounded-lg">
           <p className="text-sm text-red-800">
-            Error Code: 500 - Internal Server Error
+            {t('errors:serverError')} - Internal Server Error
           </p>
           <p className="text-xs text-red-600 mt-1">
-            If the problem persists, please contact our support team.
+            {t('pages.serverError.contactSupport')}
           </p>
         </div>
       </div>

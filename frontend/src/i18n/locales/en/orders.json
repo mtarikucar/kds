@@ -1,0 +1,35 @@
+{
+  "orders": {
+    "title": "Orders",
+    "orderNumber": "Order #",
+    "customer": "Customer",
+    "table": "Table",
+    "items": "Items",
+    "total": "Total",
+    "status": "Status",
+    "date": "Date",
+    "time": "Time",
+    "pending": "Pending",
+    "confirmed": "Confirmed",
+    "preparing": "Preparing",
+    "ready": "Ready",
+    "completed": "Completed",
+    "cancelled": "Cancelled",
+    "paymentStatus": "Payment Status",
+    "paid": "Paid",
+    "unpaid": "Unpaid",
+    "partiallyPaid": "Partially Paid",
+    "viewDetails": "View Details",
+    "editOrder": "Edit Order",
+    "cancelOrder": "Cancel Order",
+    "completeOrder": "Complete Order",
+    "printOrder": "Print Order",
+    "noOrders": "No orders found",
+    "orderDetails": "Order Details",
+    "itemCount": "Item Count",
+    "notes": "Notes",
+    "createdAt": "Created",
+    "completedAt": "Completed"
+  }
+}
+

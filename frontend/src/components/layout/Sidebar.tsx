@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -24,6 +25,7 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
+  const { t } = useTranslation('common');
   const user = useAuthStore((state) => state.user);
   const location = useLocation();
   const [settingsOpen, setSettingsOpen] = useState(
@@ -41,55 +43,55 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
     {
       to: '/dashboard',
       icon: LayoutDashboard,
-      label: 'Dashboard',
+      label: t('navigation.dashboard'),
       roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER, UserRole.KITCHEN, UserRole.COURIER],
     },
     {
       to: '/pos',
       icon: ShoppingCart,
-      label: 'POS',
+      label: t('navigation.pos'),
       roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER],
     },
     {
       to: '/kitchen',
       icon: ChefHat,
-      label: 'Kitchen Display',
+      label: t('navigation.kitchen'),
       roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN],
     },
     {
       to: '/admin/menu',
       icon: UtensilsCrossed,
-      label: 'Menu Management',
+      label: t('navigation.menu'),
       roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
     {
       to: '/admin/tables',
       icon: Table,
-      label: 'Table Management',
+      label: t('navigation.tables'),
       roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
     {
       to: '/admin/users',
       icon: Users,
-      label: 'User Management',
+      label: t('navigation.users'),
       roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
     {
       to: '/customers',
       icon: UserCircle,
-      label: 'Customers',
+      label: t('navigation.customers'),
       roles: ['ADMIN', 'MANAGER', 'WAITER'],
     },
     {
       to: '/admin/qr-codes',
       icon: QrCode,
-      label: 'QR Codes',
+      label: t('navigation.qrCodes'),
       roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
     {
       to: '/admin/reports',
       icon: BarChart3,
-      label: 'Reports',
+      label: t('navigation.reports'),
       roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
   ];
@@ -97,15 +99,15 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const settingsItems = [
     {
       to: '/admin/settings/subscription',
-      label: 'Subscription',
+      label: t('navigation.subscription'),
     },
     {
       to: '/admin/settings/pos',
-      label: 'POS Settings',
+      label: t('settings.pos'),
     },
     {
       to: '/admin/settings/integrations',
-      label: 'Integrations',
+      label: t('settings.integrations'),
     },
   ];
 
@@ -162,7 +164,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
               }`}
             >
               <Settings className="h-5 w-5" />
-              <span className="font-medium flex-1 text-left">Settings</span>
+              <span className="font-medium flex-1 text-left">{t('navigation.settings')}</span>
               {settingsOpen ? (
                 <ChevronDown className="h-4 w-4" />
               ) : (

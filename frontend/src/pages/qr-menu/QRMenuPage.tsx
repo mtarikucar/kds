@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { Category, Product } from '../../types';
 import { Card, CardContent } from '../../components/ui/Card';
@@ -36,6 +37,7 @@ interface MenuData {
 }
 
 const QRMenuPage = () => {
+  const { t } = useTranslation('common');
   const { tenantId } = useParams<{ tenantId: string }>();
   const [searchParams] = useSearchParams();
   const tableId = searchParams.get('tableId');
@@ -61,7 +63,7 @@ const QRMenuPage = () => {
         setIsLoading(false);
       } catch (err: any) {
         console.error('Error fetching menu data:', err);
-        setError(err.response?.data?.message || 'Failed to load menu');
+        setError(err.response?.data?.message || t('app:messages.operationFailed'));
         setIsLoading(false);
       }
     };
@@ -85,7 +87,7 @@ const QRMenuPage = () => {
         <Card className="max-w-md">
           <CardContent className="pt-6 text-center">
             <p className="text-red-600 mb-4">{error}</p>
-            <p className="text-gray-600">Please contact the restaurant for assistance.</p>
+            <p className="text-gray-600">{t('app:messages.contactSupport')}</p>
           </CardContent>
         </Card>
       </div>

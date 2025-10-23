@@ -1,5 +1,6 @@
 import { QRCode } from 'react-qr-code';
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Download, Search, Share2, Printer, FileImage, FileText, Copy, Check } from 'lucide-react';
 import type { QrCodeData } from '../../types';
 import Button from '../ui/Button';
@@ -15,14 +16,15 @@ interface QrCodeDisplayProps {
 }
 
 const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisplayProps) => {
+  const { t } = useTranslation('common');
   const [copied, setCopied] = useState(false);
   const [selectedSize, setSelectedSize] = useState<'small' | 'medium' | 'large'>('medium');
   const [downloadFormat, setDownloadFormat] = useState<'png' | 'svg' | 'pdf'>('png');
 
   const sizePresets = {
-    small: { size: 150, label: 'Table Tent', description: '150x150px' },
-    medium: { size: 300, label: 'Standard', description: '300x300px' },
-    large: { size: 600, label: 'Poster', description: '600x600px' }
+    small: { size: 150, label: t('admin.tableTent'), description: '150x150px' },
+    medium: { size: 300, label: t('admin.standard'), description: '300x300px' },
+    large: { size: 600, label: t('admin.poster'), description: '600x600px' }
   };
 
   const currentSize = sizePresets[selectedSize];
@@ -125,7 +127,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
             <h1>${tenant?.name}</h1>
             ${svgData}
             <p>${qrCode.label}</p>
-            <p style="font-size: 14px;">Scan to view our menu</p>
+            <p style="font-size: 14px;">${t('admin.scanToViewMenu')}</p>
           </div>
         </body>
       </html>
@@ -157,7 +159,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
           />
         </div>
         <p className="font-semibold text-sm text-gray-900 mb-1">{qrCode.label}</p>
-        <p className="text-xs text-gray-500 mb-3">Click to view options</p>
+        <p className="text-xs text-gray-500 mb-3">{t('admin.clickToViewOptions')}</p>
         <div className="flex gap-2 w-full">
           <button
             onClick={downloadQR}
@@ -192,7 +194,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
         <div className="space-y-4">
           <div className="text-center">
             <h3 className="text-xl font-bold text-gray-900 mb-2">{qrCode.label}</h3>
-            <p className="text-sm text-gray-600">Scan to view our digital menu</p>
+            <p className="text-sm text-gray-600">{t('admin.scanToViewMenu')}</p>
           </div>
 
           {/* Size Selector */}

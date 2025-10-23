@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useVerifyEmail, useResendVerificationEmail } from '../../features/auth/authApi';
 import Button from '../../components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { useAuthStore } from '../../store/authStore';
 
 const VerifyEmailPage = () => {
+  const { t } = useTranslation('auth');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
@@ -53,7 +55,7 @@ const VerifyEmailPage = () => {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-center text-2xl">Verifying Email</CardTitle>
+            <CardTitle className="text-center text-2xl">{t('verifyEmail.verifying')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-center">
@@ -72,7 +74,7 @@ const VerifyEmailPage = () => {
                   />
                 </svg>
               </div>
-              <p className="text-gray-600">Please wait while we verify your email...</p>
+              <p className="text-gray-600">{t('verifyEmail.verifyingMessage')}</p>
             </div>
           </CardContent>
         </Card>
@@ -86,7 +88,7 @@ const VerifyEmailPage = () => {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-center text-2xl">Email Verified</CardTitle>
+            <CardTitle className="text-center text-2xl">{t('verifyEmail.success')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -107,16 +109,16 @@ const VerifyEmailPage = () => {
                   </svg>
                 </div>
                 <p className="text-gray-600 mb-4">
-                  Your email has been successfully verified!
+                  {t('verifyEmail.successMessage')}
                 </p>
                 <p className="text-sm text-gray-500 mb-6">
-                  Redirecting you now...
+                  {t('verifyEmail.redirecting')}
                 </p>
               </div>
 
               <Link to={isAuthenticated ? '/dashboard' : '/login'}>
                 <Button className="w-full">
-                  {isAuthenticated ? 'Go to Dashboard' : 'Go to Login'}
+                  {isAuthenticated ? t('verifyEmail.goToDashboard') : t('verifyEmail.goToLogin')}
                 </Button>
               </Link>
             </div>
@@ -132,7 +134,7 @@ const VerifyEmailPage = () => {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-center text-2xl">Verification Failed</CardTitle>
+            <CardTitle className="text-center text-2xl">{t('verifyEmail.failed')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -161,14 +163,14 @@ const VerifyEmailPage = () => {
                   className="w-full"
                   isLoading={isResending}
                 >
-                  Resend Verification Email
+                  {t('verifyEmail.resendEmail')}
                 </Button>
               )}
 
               <div className="pt-4 border-t text-center space-y-2">
                 <Link to="/login">
                   <Button variant="outline" className="w-full">
-                    Back to Login
+                    {t('verifyEmail.backToLogin')}
                   </Button>
                 </Link>
               </div>
@@ -184,7 +186,7 @@ const VerifyEmailPage = () => {
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-center text-2xl">Verify Your Email</CardTitle>
+          <CardTitle className="text-center text-2xl">{t('verifyEmail.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
@@ -205,10 +207,10 @@ const VerifyEmailPage = () => {
                 </svg>
               </div>
               <p className="text-gray-600 mb-4">
-                Please verify your email address to access all features.
+                {t('verifyEmail.description')}
               </p>
               <p className="text-sm text-gray-500 mb-6">
-                Check your inbox for the verification link or request a new one below.
+                {t('verifyEmail.checkInbox')}
               </p>
             </div>
 
@@ -217,13 +219,13 @@ const VerifyEmailPage = () => {
               className="w-full"
               isLoading={isResending}
             >
-              Send Verification Email
+              {t('verifyEmail.resendEmail')}
             </Button>
 
             <div className="pt-4 border-t text-center">
               <Link to="/dashboard">
                 <Button variant="outline" className="w-full">
-                  Back to Dashboard
+                  {t('verifyEmail.backToDashboard')}
                 </Button>
               </Link>
             </div>

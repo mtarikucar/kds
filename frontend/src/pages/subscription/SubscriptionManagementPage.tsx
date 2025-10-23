@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   CreditCard,
   Calendar,
@@ -30,6 +31,7 @@ import {
 } from '../../types';
 
 const SubscriptionManagementPage = () => {
+  const { t } = useTranslation('subscriptions');
   const navigate = useNavigate();
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showChangePlanModal, setShowChangePlanModal] = useState(false);
@@ -55,12 +57,12 @@ const SubscriptionManagementPage = () => {
     return (
       <div className="max-w-2xl mx-auto text-center py-12">
         <AlertCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">No Active Subscription</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('subscriptions.noActiveSubscription')}</h2>
         <p className="text-gray-600 mb-6">
-          You don't have an active subscription. Choose a plan to get started.
+          {t('subscriptions.noActiveSubscriptionDescription')}
         </p>
         <Button variant="primary" onClick={() => navigate('/subscription/plans')}>
-          View Plans
+          {t('subscriptions.viewPlans')}
         </Button>
       </div>
     );
@@ -221,7 +223,7 @@ const SubscriptionManagementPage = () => {
                     onClick={() => setShowChangePlanModal(true)}
                   >
                     <RefreshCw className="h-4 w-4 mr-2" />
-                    Change Plan
+                    {t('subscriptions.changePlan')}
                   </Button>
                   {!currentSubscription.cancelAtPeriodEnd && (
                     <Button
@@ -230,7 +232,7 @@ const SubscriptionManagementPage = () => {
                       onClick={() => setShowCancelModal(true)}
                     >
                       <XCircle className="h-4 w-4 mr-2" />
-                      Cancel Subscription
+                      {t('subscriptions.cancelSubscription')}
                     </Button>
                   )}
                 </>
@@ -243,7 +245,7 @@ const SubscriptionManagementPage = () => {
                   isLoading={reactivateSubscription.isPending}
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
-                  Reactivate Subscription
+                  {t('subscriptions.reactivateSubscription')}
                 </Button>
               )}
             </div>

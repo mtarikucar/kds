@@ -1,0 +1,33 @@
+{
+  "kitchen": {
+    "title": "Kitchen Display System",
+    "orders": "Orders",
+    "newOrders": "New Orders",
+    "inProgress": "In Progress",
+    "completed": "Completed",
+    "orderNumber": "Order #",
+    "items": "Items",
+    "quantity": "Qty",
+    "notes": "Notes",
+    "startCooking": "Start Cooking",
+    "markComplete": "Mark Complete",
+    "markReady": "Mark Ready",
+    "time": "Time",
+    "priority": "Priority",
+    "high": "High",
+    "medium": "Medium",
+    "low": "Low",
+    "table": "Table",
+    "customer": "Customer",
+    "specialRequests": "Special Requests",
+    "noOrders": "No orders",
+    "allOrdersCompleted": "All orders completed",
+    "realtimeTracking": "Real-time order tracking and management",
+    "connected": "Connected",
+    "disconnected": "Disconnected",
+    "pending": "Pending",
+    "preparing": "Preparing",
+    "ready": "Ready"
+  }
+}
+

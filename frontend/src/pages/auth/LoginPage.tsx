@@ -3,20 +3,23 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useLogin } from '../../features/auth/authApi';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { useAuthStore } from '../../store/authStore';
 
-const loginSchema = z.object({
-  email: z.string().email('Invalid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
-});
-
-type LoginFormData = z.infer<typeof loginSchema>;
-
 const LoginPage = () => {
+  const { t } = useTranslation(['auth', 'validation']);
+
+  const loginSchema = z.object({
+    email: z.string().email(t('validation:email')),
+    password: z.string().min(6, t('validation:minLength', { count: 6 })),
+  });
+
+  type LoginFormData = z.infer<typeof loginSchema>;
+
   const navigate = useNavigate();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const { mutate: login, isPending } = useLogin();
@@ -27,6 +30,7 @@ const LoginPage = () => {
     formState: { errors },
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
+    mode: 'onBlur',
   });
 
   useEffect(() => {
@@ -48,24 +52,24 @@ const LoginPage = () => {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-center text-2xl">
-            Restaurant POS Login
+            {t('auth:login.title')}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <Input
-              label="Email"
+              label={t('auth:login.email')}
               type="email"
-              placeholder="Enter your email"
+              placeholder={t('auth:login.email')}
               error={errors.email?.message}
               {...register('email')}
             />
 
             <div>
               <Input
-                label="Password"
+                label={t('auth:login.password')}
                 type="password"
-                placeholder="Enter your password"
+                placeholder={t('auth:login.password')}
                 error={errors.password?.message}
                 {...register('password')}
               />
@@ -74,7 +78,7 @@ const LoginPage = () => {
                   to="/forgot-password"
                   className="text-sm text-blue-600 hover:text-blue-700"
                 >
-                  Forgot password?
+                  {t('auth:login.forgotPassword')}
                 </Link>
               </div>
             </div>
@@ -84,16 +88,16 @@ const LoginPage = () => {
               className="w-full"
               isLoading={isPending}
             >
-              Login
+              {t('auth:login.submit')}
             </Button>
 
             <div className="text-center text-sm text-gray-600">
-              Don't have an account?{' '}
+              {t('auth:login.noAccount')}{' '}
               <Link
                 to="/register"
                 className="text-blue-600 hover:text-blue-700 font-medium"
               >
-                Register here
+                {t('auth:login.register')}
               </Link>
             </div>
           </form>

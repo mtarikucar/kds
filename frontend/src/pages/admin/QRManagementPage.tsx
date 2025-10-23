@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useQrSettings, useUpdateQrSettings, useQrCodes } from '../../features/qr/qrApi';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
@@ -9,6 +10,7 @@ import QrCodeDisplay from '../../components/qr/QrCodeDisplay';
 import type { UpdateQrSettingsDto } from '../../types';
 
 const QRManagementPage = () => {
+  const { t } = useTranslation('common');
   const [activeTab, setActiveTab] = useState<'codes' | 'design'>('codes');
   const { data: settingsData, isLoading: settingsLoading } = useQrSettings();
   const { data: qrCodesData, isLoading: codesLoading } = useQrCodes();
@@ -76,13 +78,13 @@ const QRManagementPage = () => {
     const tableQRs = qrCodes.filter(qr => qr.type === 'TABLE');
     
     if (tableQRs.length === 0) {
-      alert('No table QR codes found to print.');
+      alert(t('admin.noTableQRCodesToPrint'));
       return;
     }
 
     const printWindow = window.open('', '', 'width=800,height=600');
     if (!printWindow) {
-      alert('Popup blocked. Please allow popups for this site to print QR codes.');
+      alert(t('admin.popupBlocked'));
       return;
     }
 
@@ -99,7 +101,7 @@ const QRManagementPage = () => {
     const validQRs = qrElements.filter(item => item.svgElement);
 
     if (validQRs.length === 0) {
-      alert('No QR codes could be found for printing. Please ensure QR codes are loaded.');
+      alert(t('admin.noQRCodesForPrinting'));
       printWindow.close();
       return;
     }
@@ -158,18 +160,18 @@ const QRManagementPage = () => {
           </style>
         </head>
         <body>
-          <h1>${tenant?.name || 'Restaurant'} - Table QR Codes</h1>
+          <h1>${tenant?.name || 'Restaurant'} - ${t('admin.tableQRCodes')}</h1>
           <div class="qr-grid">
             ${validQRs.map(({ qr, svgElement }) => `
               <div class="qr-item">
                 <h3>${qr.label}</h3>
                 ${svgElement}
-                <p class="instructions">Scan to view our menu</p>
+                <p class="instructions">${t('admin.scanToViewMenu')}</p>
               </div>
             `).join('')}
           </div>
           <div style="margin-top: 30px; text-align: center; color: #999; font-size: 12px;">
-            Generated on ${new Date().toLocaleDateString()} - ${validQRs.length} QR codes
+            ${t('admin.generatedOn')} ${new Date().toLocaleDateString()} - ${validQRs.length} QR codes
           </div>
         </body>
       </html>
@@ -200,8 +202,8 @@ const QRManagementPage = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">QR Code Management</h1>
-        <p className="text-gray-600">Generate and customize QR codes for your restaurant</p>
+        <h1 className="text-3xl font-bold text-gray-900">{t('admin.qrCodeManagement')}</h1>
+        <p className="text-gray-600">{t('admin.generateCustomizeQR')}</p>
       </div>
 
       {/* Tabs */}
@@ -218,7 +220,7 @@ const QRManagementPage = () => {
             `}
           >
             <QrCode className="h-5 w-5" />
-            QR Codes
+            {t('admin.qrCodes')}
           </button>
           <button
             onClick={() => setActiveTab('design')}
@@ -231,7 +233,7 @@ const QRManagementPage = () => {
             `}
           >
             <Palette className="h-5 w-5" />
-            Design & Settings
+            {t('admin.designSettings')}
           </button>
         </nav>
       </div>
@@ -244,12 +246,12 @@ const QRManagementPage = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileArchive className="h-5 w-5" />
-                Batch Operations
+                {t('admin.batchOperations')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-gray-600 mb-4">
-                Perform operations on multiple QR codes at once to save time.
+                {t('admin.batchOperationsDesc')}
               </p>
               <div className="flex flex-wrap gap-3">
                 <Button
@@ -258,7 +260,7 @@ const QRManagementPage = () => {
                   className="flex items-center gap-2"
                 >
                   <DownloadCloud className="h-4 w-4" />
-                  Download All QR Codes
+                  {t('admin.downloadAllQR')}
                 </Button>
                 {settings?.enableTableQR && qrCodes.filter(qr => qr.type === 'TABLE').length > 0 && (
                   <Button
@@ -267,16 +269,16 @@ const QRManagementPage = () => {
                     className="flex items-center gap-2"
                   >
                     <Eye className="h-4 w-4" />
-                    Print Table QR Sheet
+                    {t('admin.printTableQRSheet')}
                   </Button>
                 )}
               </div>
               <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-xs font-medium text-blue-900 mb-1">Batch Tips:</p>
+                <p className="text-xs font-medium text-blue-900 mb-1">{t('admin.batchTips')}:</p>
                 <ul className="text-xs text-blue-800 space-y-1">
-                  <li>• Downloads are staggered to prevent browser blocking</li>
-                  <li>• Print sheets are optimized for standard paper sizes</li>
-                  <li>• All QR codes use your current design settings</li>
+                  <li>• {t('admin.batchTip1')}</li>
+                  <li>• {t('admin.batchTip2')}</li>
+                  <li>• {t('admin.batchTip3')}</li>
                 </ul>
               </div>
             </CardContent>
@@ -284,11 +286,11 @@ const QRManagementPage = () => {
 
           <Card>
             <CardHeader>
-              <CardTitle>Restaurant QR Code</CardTitle>
+              <CardTitle>{t('admin.restaurantQRCode')}</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-gray-600 mb-4">
-                This QR code displays your full menu. Perfect for table tents, window signs, or marketing materials.
+                {t('admin.restaurantQRDesc')}
               </p>
               {qrCodes.filter(qr => qr.type === 'TENANT').map(qr => (
                 <QrCodeDisplay 
@@ -307,11 +309,11 @@ const QRManagementPage = () => {
           {settings?.enableTableQR && (
             <Card>
               <CardHeader>
-                <CardTitle>Table-Specific QR Codes</CardTitle>
+                <CardTitle>{t('admin.tableSpecificQRCodes')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-600 mb-4">
-                  Each table has its own QR code. Customers scanning these will see which table they're at.
+                  {t('admin.tableSpecificQRDesc')}
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {qrCodes.filter(qr => qr.type === 'TABLE').map(qr => (
@@ -329,7 +331,7 @@ const QRManagementPage = () => {
                 </div>
                 {qrCodes.filter(qr => qr.type === 'TABLE').length === 0 && (
                   <div className="text-center py-8 text-gray-500">
-                    <p>No tables found. Please add tables first.</p>
+                    <p>{t('admin.noTablesFound')}</p>
                   </div>
                 )}
               </CardContent>

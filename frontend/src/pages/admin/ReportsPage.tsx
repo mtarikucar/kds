@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { format, subDays } from 'date-fns';
 import { useSalesReport, useTopProducts } from '../../features/reports/reportsApi';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -15,6 +16,7 @@ interface DateRangeForm {
 }
 
 const ReportsPage = () => {
+  const { t } = useTranslation('reports');
   const today = format(new Date(), 'yyyy-MM-dd');
   const lastWeek = format(subDays(new Date(), 7), 'yyyy-MM-dd');
 
@@ -66,8 +68,8 @@ const ReportsPage = () => {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Reports & Analytics</h1>
-        <p className="text-gray-600">View sales reports and performance metrics</p>
+        <h1 className="text-3xl font-bold text-gray-900">{t('reports.title')}</h1>
+        <p className="text-gray-600">{t('reports.viewReports')}</p>
       </div>
 
       {/* Date Range Filter */}
@@ -75,16 +77,16 @@ const ReportsPage = () => {
         <CardContent className="pt-6">
           <form onSubmit={handleSubmit(onSubmit)} className="flex gap-4 items-end">
             <Input
-              label="Start Date"
+              label={t('reports.from')}
               type="date"
               {...register('startDate')}
             />
             <Input
-              label="End Date"
+              label={t('reports.to')}
               type="date"
               {...register('endDate')}
             />
-            <Button type="submit">Apply Filter</Button>
+            <Button type="submit">{t('common:buttons.apply')}</Button>
           </form>
         </CardContent>
       </Card>
@@ -96,25 +98,25 @@ const ReportsPage = () => {
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
             <StatCard
-              title="Total Sales"
+              title={t('reports.totalSales')}
               value={formatCurrency(salesReport?.totalSales || 0)}
               icon={DollarSign}
               color="bg-green-500"
             />
             <StatCard
-              title="Total Orders"
+              title={t('reports.totalOrders')}
               value={salesReport?.totalOrders || 0}
               icon={ShoppingCart}
               color="bg-blue-500"
             />
             <StatCard
-              title="Average Order Value"
+              title={t('reports.averageOrderValue')}
               value={formatCurrency(salesReport?.averageOrderValue || 0)}
               icon={TrendingUp}
               color="bg-purple-500"
             />
             <StatCard
-              title="Total Discounts"
+              title={t('reports.totalDiscounts')}
               value={formatCurrency(salesReport?.totalDiscount || 0)}
               icon={CreditCard}
               color="bg-orange-500"
@@ -162,7 +164,7 @@ const ReportsPage = () => {
           {/* Daily Sales Chart */}
           <Card className="mb-6">
             <CardHeader>
-              <CardTitle>Daily Sales</CardTitle>
+              <CardTitle>{t('reports.dailyBreakdown')}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
@@ -176,7 +178,7 @@ const ReportsPage = () => {
                         {format(new Date(day.date), 'MMM dd, yyyy')}
                       </p>
                       <p className="text-sm text-gray-600">
-                        {day.orders} orders
+                        {day.orders} {t('orders')}
                       </p>
                     </div>
                     <div className="text-right">
@@ -205,7 +207,7 @@ const ReportsPage = () => {
           {/* Top Products */}
           <Card>
             <CardHeader>
-              <CardTitle>Top Selling Products</CardTitle>
+              <CardTitle>{t('reports.topSellingProducts')}</CardTitle>
             </CardHeader>
             <CardContent>
               {productsLoading ? (
@@ -215,11 +217,11 @@ const ReportsPage = () => {
                   <table className="w-full">
                     <thead>
                       <tr className="border-b">
-                        <th className="text-left py-3 px-4">Rank</th>
-                        <th className="text-left py-3 px-4">Product</th>
-                        <th className="text-left py-3 px-4">Category</th>
-                        <th className="text-right py-3 px-4">Quantity Sold</th>
-                        <th className="text-right py-3 px-4">Revenue</th>
+                        <th className="text-left py-3 px-4">{t('reports.rank')}</th>
+                        <th className="text-left py-3 px-4">{t('reports.product')}</th>
+                        <th className="text-left py-3 px-4">{t('reports.category')}</th>
+                        <th className="text-right py-3 px-4">{t('reports.quantitySold')}</th>
+                        <th className="text-right py-3 px-4">{t('reports.revenue')}</th>
                       </tr>
                     </thead>
                     <tbody>

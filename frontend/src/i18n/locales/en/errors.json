@@ -1,0 +1,85 @@
+{
+  "errors": {
+    "title": "Error",
+    "generic": "An error occurred",
+    "tryAgain": "Please try again",
+    "contactSupport": "Please contact support",
+    "notFound": "Not found",
+    "unauthorized": "Unauthorized",
+    "forbidden": "Forbidden",
+    "badRequest": "Bad request",
+    "serverError": "Server error",
+    "networkError": "Network error",
+    "timeoutError": "Request timeout",
+    "connectionError": "Connection error",
+    "loadingError": "Failed to load data",
+    "savingError": "Failed to save data",
+    "deletingError": "Failed to delete item",
+    "updatingError": "Failed to update item",
+    "uploadError": "Failed to upload file",
+    "downloadError": "Failed to download file",
+    "loginError": "Login failed",
+    "logoutError": "Logout failed",
+    "registrationError": "Registration failed",
+    "passwordResetError": "Password reset failed",
+    "emailVerificationError": "Email verification failed",
+    "paymentError": "Payment failed",
+    "subscriptionError": "Subscription error",
+    "invalidInput": "Invalid input",
+    "missingField": "Missing required field",
+    "duplicateEntry": "This entry already exists",
+    "insufficientPermissions": "You don't have permission to perform this action",
+    "sessionExpired": "Your session has expired. Please login again",
+    "maintenanceMode": "The system is under maintenance. Please try again later",
+    "rateLimitExceeded": "Too many requests. Please try again later"
+  },
+  "pages": {
+    "notFound": {
+      "title": "Page Not Found",
+      "description": "Sorry, we couldn't find the page you're looking for. It might have been moved or deleted.",
+      "goBack": "Go Back",
+      "goHome": "Go to Homepage",
+      "contactSupport": "If you believe this is a mistake, please contact support."
+    },
+    "serverError": {
+      "title": "Server Error",
+      "description": "Something went wrong on our end. Please try again later.",
+      "goBack": "Go Back",
+      "goHome": "Go to Homepage",
+      "contactSupport": "If the problem persists, please contact support."
+    },
+    "networkError": {
+      "title": "Network Error",
+      "description": "Unable to connect to the server. Please check your internet connection and try again.",
+      "retry": "Retry",
+      "goHome": "Go to Homepage",
+      "contactSupport": "If the problem persists, please contact support."
+    },
+    "maintenance": {
+      "title": "Under Maintenance",
+      "description": "We're currently performing scheduled maintenance to improve your experience.",
+      "estimatedTime": "Estimated time: {{time}} minutes",
+      "goHome": "Go to Homepage",
+      "contactSupport": "For more information, please contact support.",
+      "expectedCompletion": "Expected completion",
+      "soon": "Soon",
+      "apology": "We apologize for any inconvenience. We'll be back online shortly.",
+      "whatsHappening": "What's happening:",
+      "upgrade1": "System upgrades",
+      "upgrade2": "Performance improvements",
+      "upgrade3": "Security enhancements",
+      "needHelp": "Need urgent assistance?",
+      "contactSupportLink": "Contact Support"
+    }
+  },
+  "troubleshooting": {
+    "networkError": {
+      "troubleshootingTips": "Troubleshooting tips:",
+      "tip1": "Check your Wi-Fi or mobile data connection",
+      "tip2": "Try disabling VPN if you're using one",
+      "tip3": "Clear your browser cache and cookies",
+      "tip4": "Contact support if the problem persists"
+    }
+  }
+}
+

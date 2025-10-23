@@ -2,21 +2,23 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useForgotPassword } from '../../features/auth/authApi';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { useState } from 'react';
 
-const forgotPasswordSchema = z.object({
-  email: z.string().email('Invalid email address'),
-});
-
-type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
-
 const ForgotPasswordPage = () => {
+  const { t } = useTranslation(['auth', 'validation']);
   const [emailSent, setEmailSent] = useState(false);
   const { mutate: forgotPassword, isPending } = useForgotPassword();
+
+  const forgotPasswordSchema = z.object({
+    email: z.string().email(t('validation:email')),
+  });
+
+  type ForgotPasswordFormData = z.infer<typeof forgotPasswordSchema>;
 
   const {
     register,
@@ -39,7 +41,7 @@ const ForgotPasswordPage = () => {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-center text-2xl">Check Your Email</CardTitle>
+            <CardTitle className="text-center text-2xl">{t('auth:forgotPassword.checkEmail')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -60,10 +62,10 @@ const ForgotPasswordPage = () => {
                   </svg>
                 </div>
                 <p className="text-gray-600 mb-4">
-                  If an account exists with that email address, we've sent you a password reset link.
+                  {t('auth:forgotPassword.emailSent')}
                 </p>
                 <p className="text-sm text-gray-500 mb-6">
-                  The link will expire in 1 hour. Please check your spam folder if you don't see it.
+                  {t('auth:forgotPassword.emailExpiry')}
                 </p>
               </div>
 
@@ -72,7 +74,7 @@ const ForgotPasswordPage = () => {
                   to="/login"
                   className="text-blue-600 hover:text-blue-700 font-medium text-sm block text-center"
                 >
-                  Back to Login
+                  {t('auth:forgotPassword.backToLogin')}
                 </Link>
               </div>
             </div>
@@ -86,26 +88,26 @@ const ForgotPasswordPage = () => {
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-center text-2xl">Forgot Password</CardTitle>
+          <CardTitle className="text-center text-2xl">{t('auth:forgotPassword.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="text-center mb-4">
               <p className="text-gray-600 text-sm">
-                Enter your email address and we'll send you a link to reset your password.
+                {t('auth:forgotPassword.description')}
               </p>
             </div>
 
             <Input
-              label="Email"
+              label={t('auth:forgotPassword.email')}
               type="email"
-              placeholder="Enter your email"
+              placeholder={t('auth:forgotPassword.email')}
               error={errors.email?.message}
               {...register('email')}
             />
 
             <Button type="submit" className="w-full" isLoading={isPending}>
-              Send Reset Link
+              {t('auth:forgotPassword.submit')}
             </Button>
 
             <div className="text-center text-sm space-y-2">
@@ -114,16 +116,16 @@ const ForgotPasswordPage = () => {
                   to="/login"
                   className="text-blue-600 hover:text-blue-700 font-medium"
                 >
-                  Back to Login
+                  {t('auth:forgotPassword.backToLogin')}
                 </Link>
               </div>
               <div className="text-gray-600">
-                Don't have an account?{' '}
+                {t('auth:forgotPassword.noAccount')}{' '}
                 <Link
                   to="/register"
                   className="text-blue-600 hover:text-blue-700 font-medium"
                 >
-                  Register here
+                  {t('auth:forgotPassword.register')}
                 </Link>
               </div>
             </div>

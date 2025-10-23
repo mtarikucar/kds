@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useCategories } from '../../features/menu/menuApi';
 import { useProducts } from '../../features/menu/menuApi';
 import { Product } from '../../types';
@@ -15,6 +16,7 @@ interface MenuPanelProps {
 type ViewMode = 'grid' | 'list';
 
 const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
+  const { t } = useTranslation('pos');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const { data: categories, isLoading: categoriesLoading } = useCategories();
@@ -39,7 +41,7 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
             onClick={() => setSelectedCategoryId('')}
             className="whitespace-nowrap flex-shrink-0"
           >
-            All
+            {t('common:all')}
           </Button>
           {categories?.map((category) => (
             <Button
@@ -63,8 +65,8 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
                 ? 'bg-blue-600 text-white'
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
-            aria-label="Grid view"
-            title="Grid view"
+            aria-label={t('menu.gridView')}
+            title={t('menu.gridView')}
           >
             <Grid3x3 className="h-4 w-4" />
           </button>
@@ -75,8 +77,8 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
                 ? 'bg-blue-600 text-white'
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
-            aria-label="List view"
-            title="List view"
+            aria-label={t('menu.listView')}
+            title={t('menu.listView')}
           >
             <List className="h-4 w-4" />
           </button>
@@ -111,7 +113,7 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
                   </p>
                   {product.stock <= 5 && (
                     <p className="text-xs text-red-600 mt-1">
-                      Low stock: {product.stock}
+                      {t('lowStock')}: {product.stock}
                     </p>
                   )}
                 </div>
@@ -121,7 +123,7 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
                   className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 min-h-[48px]"
                 >
                   <Plus className="h-5 w-5" />
-                  <span>Add to Order</span>
+                  <span>{t('addToOrder')}</span>
                 </button>
               </Card>
             ))}
@@ -154,7 +156,7 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
                     </p>
                     {product.stock <= 5 && (
                       <p className="text-xs text-red-600">
-                        Low stock: {product.stock}
+                        {t('lowStock')}: {product.stock}
                       </p>
                     )}
                   </div>
@@ -163,7 +165,7 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
                   <button
                     onClick={() => onAddItem(product)}
                     className="bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold p-3 md:p-4 rounded-lg transition-colors flex items-center justify-center flex-shrink-0 min-w-[48px] min-h-[48px]"
-                    aria-label="Add to order"
+                    aria-label={t('addToOrder')}
                   >
                     <Plus className="h-5 w-5" />
                   </button>

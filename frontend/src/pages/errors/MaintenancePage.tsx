@@ -1,4 +1,7 @@
+import { useTranslation } from 'react-i18next';
+
 export default function MaintenancePage() {
+  const { t } = useTranslation('errors');
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
       <div className="max-w-md w-full text-center">
@@ -28,9 +31,9 @@ export default function MaintenancePage() {
         </div>
 
         {/* Content */}
-        <h1 className="text-3xl font-extrabold text-gray-900 mb-2">Under Maintenance</h1>
+        <h1 className="text-3xl font-extrabold text-gray-900 mb-2">{t('pages.maintenance.title')}</h1>
         <p className="text-lg text-gray-600 mb-8">
-          We're currently performing scheduled maintenance to improve your experience.
+          {t('pages.maintenance.description')}
         </p>
 
         {/* Timeline */}
@@ -55,19 +58,19 @@ export default function MaintenancePage() {
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               ></path>
             </svg>
-            <span className="text-sm font-medium text-gray-700">Maintenance in progress</span>
+            <span className="text-sm font-medium text-gray-700">{t('app:messages.pleaseWait')}</span>
           </div>
           <p className="text-sm text-gray-500">
-            Expected completion: <span className="font-semibold text-gray-700">Soon</span>
+            {t('pages.maintenance.expectedCompletion')}: <span className="font-semibold text-gray-700">{t('pages.maintenance.soon')}</span>
           </p>
         </div>
 
         {/* Info */}
         <div className="space-y-4 text-sm text-gray-600">
-          <p>We apologize for any inconvenience. We'll be back online shortly.</p>
+          <p>{t('pages.maintenance.apology')}</p>
 
           <div className="pt-4 border-t border-gray-200">
-            <p className="font-medium text-gray-700 mb-2">What's happening:</p>
+            <p className="font-medium text-gray-700 mb-2">{t('pages.maintenance.whatsHappening')}</p>
             <ul className="text-left space-y-2 max-w-xs mx-auto">
               <li className="flex items-start">
                 <svg
@@ -83,7 +86,7 @@ export default function MaintenancePage() {
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                <span>System upgrades</span>
+                <span>{t('pages.maintenance.upgrade1')}</span>
               </li>
               <li className="flex items-start">
                 <svg
@@ -99,7 +102,7 @@ export default function MaintenancePage() {
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                <span>Performance improvements</span>
+                <span>{t('pages.maintenance.upgrade2')}</span>
               </li>
               <li className="flex items-start">
                 <svg
@@ -115,7 +118,7 @@ export default function MaintenancePage() {
                     d="M5 13l4 4L19 7"
                   />
                 </svg>
-                <span>Security enhancements</span>
+                <span>{t('pages.maintenance.upgrade3')}</span>
               </li>
             </ul>
           </div>
@@ -124,9 +127,9 @@ export default function MaintenancePage() {
         {/* Contact */}
         <div className="mt-8 p-4 bg-blue-50 rounded-lg">
           <p className="text-sm text-blue-800">
-            Need urgent assistance?{' '}
+            {t('pages.maintenance.needHelp')}{' '}
             <a href="mailto:support@example.com" className="font-medium underline hover:text-blue-900">
-              Contact Support
+              {t('pages.maintenance.contactSupport')}
             </a>
           </p>
         </div>

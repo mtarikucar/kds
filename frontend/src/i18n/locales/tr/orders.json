@@ -1,0 +1,35 @@
+{
+  "orders": {
+    "title": "Siparişler",
+    "orderNumber": "Sipariş #",
+    "customer": "Müşteri",
+    "table": "Masa",
+    "items": "Ürünler",
+    "total": "Toplam",
+    "status": "Durum",
+    "date": "Tarih",
+    "time": "Zaman",
+    "pending": "Beklemede",
+    "confirmed": "Onaylandı",
+    "preparing": "Hazırlanıyor",
+    "ready": "Hazır",
+    "completed": "Tamamlandı",
+    "cancelled": "İptal Edildi",
+    "paymentStatus": "Ödeme Durumu",
+    "paid": "Ödendi",
+    "unpaid": "Ödenmedi",
+    "partiallyPaid": "Kısmen Ödendi",
+    "viewDetails": "Detayları Görüntüle",
+    "editOrder": "Siparişi Düzenle",
+    "cancelOrder": "Siparişi İptal Et",
+    "completeOrder": "Siparişi Tamamla",
+    "printOrder": "Siparişi Yazdır",
+    "noOrders": "Sipariş bulunamadı",
+    "orderDetails": "Sipariş Detayları",
+    "itemCount": "Ürün Sayısı",
+    "notes": "Notlar",
+    "createdAt": "Oluşturuldu",
+    "completedAt": "Tamamlandı"
+  }
+}
+

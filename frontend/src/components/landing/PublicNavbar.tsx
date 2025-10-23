@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import Button from '../ui/Button';
+import LanguageSwitcher from '../LanguageSwitcher';
 
 export const PublicNavbar = () => {
+  const { t } = useTranslation('common');
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
@@ -26,32 +29,33 @@ export const PublicNavbar = () => {
               onClick={() => scrollToSection('features')}
               className="text-gray-700 hover:text-primary-600 transition-colors"
             >
-              Features
+              {t('landing.features')}
             </button>
             <button
               onClick={() => scrollToSection('pricing')}
               className="text-gray-700 hover:text-primary-600 transition-colors"
             >
-              Pricing
+              {t('landing.pricing')}
             </button>
             <button
               onClick={() => scrollToSection('contact')}
               className="text-gray-700 hover:text-primary-600 transition-colors"
             >
-              Contact
+              {t('landing.contact')}
             </button>
           </div>
 
-          {/* Auth Buttons */}
+          {/* Auth Buttons & Language Switcher */}
           <div className="flex items-center space-x-4">
+            <LanguageSwitcher />
             <Link to="/login">
               <Button variant="outline" size="sm">
-                Login
+                {t('app.login')}
               </Button>
             </Link>
             <Link to="/register">
               <Button variant="primary" size="sm">
-                Get Started
+                {t('landing.getStarted')}
               </Button>
             </Link>
           </div>

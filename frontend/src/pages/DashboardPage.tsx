@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 // import { format } from 'date-fns';
 import { useOrders } from '../features/orders/ordersApi';
 import { useTables } from '../features/tables/tablesApi';
@@ -16,6 +17,7 @@ import {
 import { OrderStatus, TableStatus } from '../types';
 
 const DashboardPage = () => {
+  const { t } = useTranslation('common');
   const { data: orders, isLoading: ordersLoading } = useOrders();
   const { data: tables, isLoading: tablesLoading } = useTables();
 
@@ -93,35 +95,35 @@ const DashboardPage = () => {
   return (
     <div>
       <div className="mb-4 md:mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm md:text-base text-gray-600">Welcome back! Here's your overview for today.</p>
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t('dashboard.title')}</h1>
+        <p className="text-sm md:text-base text-gray-600">{t('dashboard.welcome')}</p>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
         <StatCard
-          title="Today's Sales"
+          title={t('dashboard.todaysSales')}
           value={formatCurrency(todaySales)}
           icon={TrendingUp}
           color="bg-green-500"
           link="/admin/reports"
         />
         <StatCard
-          title="Today's Orders"
+          title={t('dashboard.todaysOrders')}
           value={todayOrders.length}
           icon={ShoppingCart}
           color="bg-blue-500"
           link="/pos"
         />
         <StatCard
-          title="Active Orders"
+          title={t('dashboard.activeOrders')}
           value={activeOrders.length}
           icon={Clock}
           color="bg-orange-500"
           link="/kitchen"
         />
         <StatCard
-          title="Available Tables"
+          title={t('dashboard.availableTables')}
           value={`${availableTables.length}/${tables?.length || 0}`}
           icon={TableIcon}
           color="bg-purple-500"
@@ -133,18 +135,18 @@ const DashboardPage = () => {
         {/* Recent Orders */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Recent Orders</CardTitle>
+            <CardTitle>{t('dashboard.recentOrders')}</CardTitle>
             <Link
               to="/pos"
               className="text-sm text-blue-600 hover:text-blue-700 font-medium"
             >
-              View all
+              {t('dashboard.viewAll')}
             </Link>
           </CardHeader>
           <CardContent>
             {recentOrders.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
-                <p>No orders yet</p>
+                <p>{t('dashboard.noOrders')}</p>
               </div>
             ) : (
               <div className="space-y-2 md:space-y-3">
@@ -159,7 +161,7 @@ const DashboardPage = () => {
                         Table {order.table?.number} • {formatTimeAgo(order.createdAt)}
                       </p>
                       <p className="text-xs md:text-sm text-gray-600">
-                        {order.items?.length || 0} items
+                        {order.items?.length || 0} {t('dashboard.items')}
                       </p>
                     </div>
                     <div className="text-right flex-shrink-0 ml-2">
@@ -180,35 +182,35 @@ const DashboardPage = () => {
         {/* Quick Actions */}
         <Card>
           <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
+            <CardTitle>{t('dashboard.quickActions')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-3 md:gap-4">
               <Link to="/pos">
                 <div className="p-4 md:p-6 bg-blue-50 rounded-lg hover:bg-blue-100 transition-colors text-center cursor-pointer">
                   <ShoppingCart className="h-6 w-6 md:h-8 md:w-8 text-blue-600 mx-auto mb-2" />
-                  <p className="text-sm md:text-base font-semibold text-blue-900">New Order</p>
+                  <p className="text-sm md:text-base font-semibold text-blue-900">{t('dashboard.newOrder')}</p>
                 </div>
               </Link>
 
               <Link to="/kitchen">
                 <div className="p-4 md:p-6 bg-green-50 rounded-lg hover:bg-green-100 transition-colors text-center cursor-pointer">
                   <UtensilsCrossed className="h-6 w-6 md:h-8 md:w-8 text-green-600 mx-auto mb-2" />
-                  <p className="text-sm md:text-base font-semibold text-green-900">Kitchen Display</p>
+                  <p className="text-sm md:text-base font-semibold text-green-900">{t('dashboard.kitchenDisplay')}</p>
                 </div>
               </Link>
 
               <Link to="/admin/menu">
                 <div className="p-4 md:p-6 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors text-center cursor-pointer">
                   <UtensilsCrossed className="h-6 w-6 md:h-8 md:w-8 text-purple-600 mx-auto mb-2" />
-                  <p className="text-sm md:text-base font-semibold text-purple-900">Manage Menu</p>
+                  <p className="text-sm md:text-base font-semibold text-purple-900">{t('dashboard.manageMenu')}</p>
                 </div>
               </Link>
 
               <Link to="/admin/tables">
                 <div className="p-4 md:p-6 bg-orange-50 rounded-lg hover:bg-orange-100 transition-colors text-center cursor-pointer">
                   <TableIcon className="h-6 w-6 md:h-8 md:w-8 text-orange-600 mx-auto mb-2" />
-                  <p className="text-sm md:text-base font-semibold text-orange-900">Manage Tables</p>
+                  <p className="text-sm md:text-base font-semibold text-orange-900">{t('dashboard.manageTables')}</p>
                 </div>
               </Link>
             </div>
@@ -220,12 +222,12 @@ const DashboardPage = () => {
       {activeOrders.length > 0 && (
         <Card className="mt-6">
           <CardHeader>
-            <CardTitle>Active Orders Summary</CardTitle>
+            <CardTitle>{t('dashboard.activeOrdersSummary')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="p-4 bg-yellow-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">Pending</p>
+                <p className="text-sm text-gray-600 mb-1">{t('dashboard.pending')}</p>
                 <p className="text-2xl font-bold text-yellow-600">
                   {
                     activeOrders.filter((o) => o.status === OrderStatus.PENDING)
@@ -234,7 +236,7 @@ const DashboardPage = () => {
                 </p>
               </div>
               <div className="p-4 bg-blue-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">Preparing</p>
+                <p className="text-sm text-gray-600 mb-1">{t('dashboard.preparing')}</p>
                 <p className="text-2xl font-bold text-blue-600">
                   {
                     activeOrders.filter((o) => o.status === OrderStatus.PREPARING)
@@ -243,7 +245,7 @@ const DashboardPage = () => {
                 </p>
               </div>
               <div className="p-4 bg-green-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">Ready</p>
+                <p className="text-sm text-gray-600 mb-1">{t('dashboard.ready')}</p>
                 <p className="text-2xl font-bold text-green-600">
                   {
                     activeOrders.filter((o) => o.status === OrderStatus.READY)

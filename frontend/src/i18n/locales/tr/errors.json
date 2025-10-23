@@ -1,0 +1,85 @@
+{
+  "errors": {
+    "title": "Hata",
+    "generic": "Bir hata oluştu",
+    "tryAgain": "Lütfen tekrar deneyin",
+    "contactSupport": "Lütfen destek ekibiyle iletişime geçin",
+    "notFound": "Bulunamadı",
+    "unauthorized": "Yetkisiz",
+    "forbidden": "Yasak",
+    "badRequest": "Hatalı istek",
+    "serverError": "Sunucu hatası",
+    "networkError": "Ağ hatası",
+    "timeoutError": "İstek zaman aşımı",
+    "connectionError": "Bağlantı hatası",
+    "loadingError": "Veri yükleme başarısız",
+    "savingError": "Veri kaydetme başarısız",
+    "deletingError": "Öğe silme başarısız",
+    "updatingError": "Öğe güncelleme başarısız",
+    "uploadError": "Dosya yükleme başarısız",
+    "downloadError": "Dosya indirme başarısız",
+    "loginError": "Giriş başarısız",
+    "logoutError": "Çıkış başarısız",
+    "registrationError": "Kayıt başarısız",
+    "passwordResetError": "Şifre sıfırlama başarısız",
+    "emailVerificationError": "E-posta doğrulaması başarısız",
+    "paymentError": "Ödeme başarısız",
+    "subscriptionError": "Abonelik hatası",
+    "invalidInput": "Geçersiz giriş",
+    "missingField": "Gerekli alan eksik",
+    "duplicateEntry": "Bu giriş zaten mevcut",
+    "insufficientPermissions": "Bu işlemi gerçekleştirmek için yetkiniz yok",
+    "sessionExpired": "Oturumunuzun süresi dolmuş. Lütfen tekrar giriş yapın",
+    "maintenanceMode": "Sistem bakım altında. Lütfen daha sonra tekrar deneyin",
+    "rateLimitExceeded": "Çok fazla istek. Lütfen daha sonra tekrar deneyin"
+  },
+  "pages": {
+    "notFound": {
+      "title": "Sayfa Bulunamadı",
+      "description": "Üzgünüz, aradığınız sayfayı bulamadık. Sayfa taşınmış veya silinmiş olabilir.",
+      "goBack": "Geri Dön",
+      "goHome": "Ana Sayfaya Git",
+      "contactSupport": "Bunun bir hata olduğunu düşünüyorsanız, lütfen destek ekibiyle iletişime geçin."
+    },
+    "serverError": {
+      "title": "Sunucu Hatası",
+      "description": "Sunucumuzda bir sorun oluştu. Lütfen daha sonra tekrar deneyin.",
+      "goBack": "Geri Dön",
+      "goHome": "Ana Sayfaya Git",
+      "contactSupport": "Sorun devam ederse, lütfen destek ekibiyle iletişime geçin."
+    },
+    "networkError": {
+      "title": "Ağ Hatası",
+      "description": "Sunucuya bağlanılamıyor. Lütfen internet bağlantınızı kontrol edin ve tekrar deneyin.",
+      "retry": "Tekrar Dene",
+      "goHome": "Ana Sayfaya Git",
+      "contactSupport": "Sorun devam ederse, lütfen destek ekibiyle iletişime geçin."
+    },
+    "maintenance": {
+      "title": "Bakım Altında",
+      "description": "Deneyiminizi iyileştirmek için şu anda planlı bakım yapıyoruz.",
+      "estimatedTime": "Tahmini süre: {{time}} dakika",
+      "goHome": "Ana Sayfaya Git",
+      "contactSupport": "Daha fazla bilgi için lütfen destek ekibiyle iletişime geçin.",
+      "expectedCompletion": "Tahmini tamamlanma",
+      "soon": "Yakında",
+      "apology": "Herhangi bir rahatsızlık için özür dileriz. Kısa süre içinde tekrar çevrimiçi olacağız.",
+      "whatsHappening": "Neler oluyor:",
+      "upgrade1": "Sistem yükseltmeleri",
+      "upgrade2": "Performans iyileştirmeleri",
+      "upgrade3": "Güvenlik geliştirmeleri",
+      "needHelp": "Acil yardıma mı ihtiyacınız var?",
+      "contactSupportLink": "Destek Ekibiyle İletişime Geçin"
+    }
+  },
+  "troubleshooting": {
+    "networkError": {
+      "troubleshootingTips": "Sorun Giderme İpuçları:",
+      "tip1": "Wi-Fi veya mobil veri bağlantınızı kontrol edin",
+      "tip2": "Kullanıyorsanız VPN'i devre dışı bırakmayı deneyin",
+      "tip3": "Tarayıcı önbelleğinizi ve çerezleri temizleyin",
+      "tip4": "Sorun devam ederse destek ekibiyle iletişime geçin"
+    }
+  }
+}
+

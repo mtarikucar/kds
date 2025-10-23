@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 export const Footer = () => {
+  const { t } = useTranslation('common');
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
@@ -16,27 +18,27 @@ export const Footer = () => {
           <div>
             <div className="text-2xl font-bold text-white mb-4">KDS</div>
             <p className="text-sm text-gray-400 mb-4">
-              Modern restaurant management solution designed to streamline your operations and boost efficiency.
+              {t('landing.footerDescription')}
             </p>
           </div>
 
           {/* Product */}
           <div>
-            <h4 className="text-white font-semibold mb-4">Product</h4>
+            <h4 className="text-white font-semibold mb-4">{t('landing.product')}</h4>
             <ul className="space-y-2 text-sm">
               <li>
                 <button onClick={() => scrollToSection('features')} className="hover:text-white transition-colors">
-                  Features
+                  {t('landing.features')}
                 </button>
               </li>
               <li>
                 <button onClick={() => scrollToSection('pricing')} className="hover:text-white transition-colors">
-                  Pricing
+                  {t('landing.pricing')}
                 </button>
               </li>
               <li>
                 <Link to="/register" className="hover:text-white transition-colors">
-                  Free Trial
+                  {t('landing.freeTrial')}
                 </Link>
               </li>
             </ul>
@@ -44,21 +46,21 @@ export const Footer = () => {
 
           {/* Company */}
           <div>
-            <h4 className="text-white font-semibold mb-4">Company</h4>
+            <h4 className="text-white font-semibold mb-4">{t('landing.company')}</h4>
             <ul className="space-y-2 text-sm">
               <li>
                 <button onClick={() => scrollToSection('contact')} className="hover:text-white transition-colors">
-                  Contact Us
+                  {t('landing.contactUs')}
                 </button>
               </li>
               <li>
                 <a href="#" className="hover:text-white transition-colors">
-                  About
+                  {t('landing.about')}
                 </a>
               </li>
               <li>
                 <a href="#" className="hover:text-white transition-colors">
-                  Blog
+                  {t('landing.blog')}
                 </a>
               </li>
             </ul>
@@ -66,21 +68,21 @@ export const Footer = () => {
 
           {/* Legal */}
           <div>
-            <h4 className="text-white font-semibold mb-4">Legal</h4>
+            <h4 className="text-white font-semibold mb-4">{t('landing.legal')}</h4>
             <ul className="space-y-2 text-sm">
               <li>
                 <a href="#" className="hover:text-white transition-colors">
-                  Privacy Policy
+                  {t('landing.privacyPolicy')}
                 </a>
               </li>
               <li>
                 <a href="#" className="hover:text-white transition-colors">
-                  Terms of Service
+                  {t('landing.termsOfService')}
                 </a>
               </li>
               <li>
                 <a href="#" className="hover:text-white transition-colors">
-                  Cookie Policy
+                  {t('landing.cookiePolicy')}
                 </a>
               </li>
             </ul>
@@ -90,7 +92,7 @@ export const Footer = () => {
         {/* Bottom Bar */}
         <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center">
           <p className="text-sm text-gray-400 mb-4 md:mb-0">
-            © {new Date().getFullYear()} KDS. All rights reserved.
+            © {new Date().getFullYear()} KDS. {t('landing.allRightsReserved')}
           </p>
 
           {/* Social Links */}

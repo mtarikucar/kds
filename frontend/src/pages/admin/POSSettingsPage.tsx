@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import { useGetPosSettings, useUpdatePosSettings } from '../../features/pos/posApi';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import { Settings } from 'lucide-react';
 
 const POSSettingsPage = () => {
+  const { t } = useTranslation('settings');
   const { data: posSettings, isLoading } = useGetPosSettings();
   const { mutate: updateSettings, isPending: isUpdating } = useUpdatePosSettings();
 
@@ -28,10 +30,10 @@ const POSSettingsPage = () => {
       },
       {
         onSuccess: () => {
-          toast.success('POS settings updated successfully');
+          toast.success(t('app:messages.operationSuccessful'));
         },
         onError: (error: any) => {
-          toast.error(error.response?.data?.message || 'Failed to update settings');
+          toast.error(error.response?.data?.message || t('app:messages.operationFailed'));
         },
       }
     );
@@ -45,7 +47,7 @@ const POSSettingsPage = () => {
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <p className="text-gray-500">Loading POS settings...</p>
+        <p className="text-gray-500">{t('app:app.loading')}</p>
       </div>
     );
   }
@@ -55,17 +57,17 @@ const POSSettingsPage = () => {
       <div className="mb-6">
         <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
           <Settings className="h-8 w-8" />
-          POS Settings
+          {t('settings.pos')}
         </h1>
         <p className="text-gray-600 mt-2">
-          Configure how your Point of Sale system operates
+          {t('settings.configurePos')}
         </p>
       </div>
 
       <div className="max-w-3xl">
         <Card>
           <CardHeader>
-            <CardTitle>Operation Modes</CardTitle>
+            <CardTitle>{t('settings.operationModes')}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             {/* Tableless Mode */}
@@ -80,12 +82,10 @@ const POSSettingsPage = () => {
                   />
                   <div>
                     <p className="font-semibold text-gray-900">
-                      Enable Tableless Mode
+                      {t('settings.enableTablelessMode')}
                     </p>
                     <p className="text-sm text-gray-600">
-                      Allow orders without table selection. Perfect for self-service,
-                      takeaway, or counter-service restaurants. The table selection
-                      panel will be hidden when enabled.
+                      {t('settings.tablelessModeDescription')}
                     </p>
                   </div>
                 </label>
@@ -105,12 +105,10 @@ const POSSettingsPage = () => {
                     />
                     <div>
                       <p className="font-semibold text-gray-900">
-                        Enable Two-Step Checkout
+                        {t('settings.enableTwoStepCheckout')}
                       </p>
                       <p className="text-sm text-gray-600">
-                        Separate order creation and payment steps. Shows two buttons:
-                        "Create Order" and "Proceed to Payment". Useful when you want
-                        to send orders to kitchen before collecting payment.
+                        {t('settings.twoStepCheckoutDescription')}
                       </p>
                     </div>
                   </label>

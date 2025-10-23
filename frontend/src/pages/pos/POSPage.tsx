@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import TableGrid from '../../components/pos/TableGrid';
 import MenuPanel from '../../components/pos/MenuPanel';
 import OrderCart from '../../components/pos/OrderCart';
@@ -20,6 +21,7 @@ interface CartItem extends Product {
 }
 
 const POSPage = () => {
+  const { t } = useTranslation('pos');
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState(0);
@@ -80,11 +82,11 @@ const POSPage = () => {
         setOrderNotes(activeOrder.notes || '');
 
         toast.info(
-          `Loaded existing order #${activeOrder.orderNumber} with ${items.length} items`
+          t('pos.loadedExistingOrder', { orderNumber: activeOrder.orderNumber, count: items.length })
         );
       } else {
         // Table is marked occupied but no active orders found
-        toast.warning('Table is occupied but no active orders found');
+        toast.warning(t('pos.tableOccupiedNoOrders'));
       }
     }
   }, [selectedTable, tableOrders]);
@@ -104,16 +106,16 @@ const POSPage = () => {
       setDiscount(0);
       setCustomerName('');
       setOrderNotes('');
-      toast.info('Loading existing order...');
+      toast.info(t('pos.loadingExistingOrder'));
     } else {
-      toast.warning('Table is reserved');
+      toast.warning(t('pos.tableReserved'));
     }
   };
 
   const handleAddItem = (product: Product) => {
     // In tableless mode, table selection is optional
     if (!isTablelessMode && !selectedTable) {
-      toast.error('Please select a table first');
+      toast.error(t('pos.selectTableFirst'));
       return;
     }
 
@@ -152,12 +154,12 @@ const POSPage = () => {
   const handleCreateOrder = () => {
     // In tableless mode, table is optional
     if (!isTablelessMode && !selectedTable) {
-      toast.error('Please select a table');
+      toast.error(t('pos.selectTable'));
       return;
     }
 
     if (cartItems.length === 0) {
-      toast.error('Cart is empty');
+      toast.error(t('pos.cartEmpty'));
       return;
     }
 
@@ -187,7 +189,7 @@ const POSPage = () => {
         },
         {
           onSuccess: (order) => {
-            toast.success('Order updated successfully');
+            toast.success(t('pos.orderUpdated'));
           },
         }
       );
@@ -198,7 +200,7 @@ const POSPage = () => {
         {
           onSuccess: (order) => {
             setCurrentOrderId(order.id);
-            toast.success(`Order #${order.orderNumber} created successfully`);
+            toast.success(t('pos.orderCreatedSuccess', { orderNumber: order.orderNumber }));
 
             // Mark table as occupied after successful order creation (if table mode)
             if (selectedTable && selectedTable.status === TableStatus.AVAILABLE) {
@@ -217,12 +219,12 @@ const POSPage = () => {
   const handleCheckout = () => {
     // In tableless mode, table is optional
     if (!isTablelessMode && !selectedTable) {
-      toast.error('Please select a table');
+      toast.error(t('pos.selectTable'));
       return;
     }
 
     if (cartItems.length === 0) {
-      toast.error('Cart is empty');
+      toast.error(t('pos.cartEmpty'));
       return;
     }
 
@@ -259,7 +261,7 @@ const POSPage = () => {
         {
           onSuccess: (order) => {
             setIsPaymentModalOpen(true);
-            toast.success('Order updated successfully');
+            toast.success(t('pos.orderUpdated'));
           },
         }
       );
@@ -320,7 +322,7 @@ const POSPage = () => {
           setCustomerName('');
           setOrderNotes('');
 
-          toast.success('Order completed successfully!');
+          toast.success(t('pos.orderCompletedSuccess'));
         },
       }
     );
@@ -335,11 +337,11 @@ const POSPage = () => {
     <div className="h-full pb-20 lg:pb-0">
       {/* Header */}
       <div className="mb-4 md:mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Point of Sale</h1>
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t('pos.title')}</h1>
         <p className="text-sm md:text-base text-gray-600">
           {isTablelessMode
-            ? 'Start taking orders (table selection is optional)'
-            : 'Select a table and start taking orders'}
+            ? t('pos.startTakingOrdersTableless')
+            : t('pos.selectTableAndStart')}
         </p>
         {/* Selected Table Indicator - Mobile/Tablet */}
         {selectedTable && !isDesktop && (
@@ -347,7 +349,7 @@ const POSPage = () => {
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
             </svg>
-            Table {selectedTable.number}
+            {t('pos.table')} {selectedTable.number}
           </div>
         )}
       </div>
@@ -360,7 +362,7 @@ const POSPage = () => {
             <div className="w-1/4">
               <Card className="h-full">
                 <CardHeader>
-                  <CardTitle>Tables</CardTitle>
+                  <CardTitle>{t('navigation.tables')}</CardTitle>
                 </CardHeader>
                 <CardContent className="overflow-y-auto">
                   <TableGrid
@@ -377,7 +379,7 @@ const POSPage = () => {
             <Card className="h-full">
               <CardHeader>
                 <CardTitle>
-                  Menu {selectedTable && `- Table ${selectedTable.number}`}
+                  {t('navigation.menu')} {selectedTable && `- ${t('pos.tableLabel')} ${selectedTable.number}`}
                 </CardTitle>
               </CardHeader>
               <CardContent className="h-[calc(100%-80px)] overflow-y-auto">
@@ -418,7 +420,7 @@ const POSPage = () => {
           {!isTablelessMode && !selectedTable && (
             <Card className="mb-4">
               <CardHeader>
-                <CardTitle className="text-lg">Select a Table</CardTitle>
+                <CardTitle className="text-lg">{t('pos.selectTableTitle')}</CardTitle>
               </CardHeader>
               <CardContent className="max-h-[300px] overflow-y-auto">
                 <TableGrid
@@ -433,7 +435,7 @@ const POSPage = () => {
           <Card className="h-full">
             <CardHeader>
               <CardTitle className="text-lg">
-                Menu {selectedTable && `- Table ${selectedTable.number}`}
+                {t('navigation.menu')} {selectedTable && `- ${t('pos.tableLabel')} ${selectedTable.number}`}
               </CardTitle>
             </CardHeader>
             <CardContent className="h-[calc(100%-70px)] overflow-y-auto">

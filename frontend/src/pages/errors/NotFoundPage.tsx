@@ -1,7 +1,9 @@
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 export default function NotFoundPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation('errors');
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
@@ -27,9 +29,9 @@ export default function NotFoundPage() {
         </div>
 
         {/* Content */}
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Page Not Found</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('pages.notFound.title')}</h2>
         <p className="text-gray-600 mb-8">
-          Sorry, we couldn't find the page you're looking for. It might have been moved or deleted.
+          {t('pages.notFound.description')}
         </p>
 
         {/* Actions */}
@@ -51,20 +53,20 @@ export default function NotFoundPage() {
                 d="M10 19l-7-7m0 0l7-7m-7 7h18"
               />
             </svg>
-            Go Back
+            {t('pages.notFound.goBack')}
           </button>
 
           <button
             onClick={() => navigate('/')}
             className="w-full flex justify-center py-3 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
           >
-            Go to Homepage
+            {t('pages.notFound.goHome')}
           </button>
         </div>
 
         {/* Help text */}
         <p className="mt-8 text-xs text-gray-500">
-          If you believe this is a mistake, please contact support.
+          {t('pages.notFound.contactSupport')}
         </p>
       </div>
     </div>

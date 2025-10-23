@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { UserPlus, Edit2, Trash2, AlertTriangle, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { usersApi, User, CreateUserData, UpdateUserData } from '../../api/usersApi';
 import { UserRole, UserStatus } from '../../types';
 import { toast } from 'sonner';
 import { useAuthStore } from '../../store/authStore';
 
 const UserManagementPage = () => {
+  const { t } = useTranslation('common');
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -32,7 +34,7 @@ const UserManagementPage = () => {
       const data = await usersApi.getAll();
       setUsers(data);
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to fetch users');
+      toast.error(error.response?.data?.message || t('app:app.error'));
     } finally {
       setLoading(false);
     }
@@ -81,7 +83,7 @@ const UserManagementPage = () => {
           updateData.password = formData.password;
         }
         await usersApi.update(editingUser.id, updateData);
-        toast.success('User updated successfully');
+        toast.success(t('app:app.success'));
       } else {
         const createData: CreateUserData = {
           email: formData.email,
@@ -91,13 +93,13 @@ const UserManagementPage = () => {
           role: formData.role,
         };
         await usersApi.create(createData);
-        toast.success('User created successfully');
+        toast.success(t('app:app.success'));
       }
 
       handleCloseModal();
       fetchUsers();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Operation failed');
+      toast.error(error.response?.data?.message || t('app:app.error'));
     }
   };
 
@@ -111,12 +113,12 @@ const UserManagementPage = () => {
 
     try {
       await usersApi.delete(userToDelete.id);
-      toast.success('User deleted successfully');
+      toast.success(t('admin.userDeletedSuccess'));
       setShowDeleteDialog(false);
       setUserToDelete(null);
       fetchUsers();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to delete user');
+      toast.error(error.response?.data?.message || t('admin.userDeleteFailed'));
     }
   };
 
@@ -140,7 +142,7 @@ const UserManagementPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="text-gray-500">Loading users...</div>
+        <div className="text-gray-500">{t('app.loading')}</div>
       </div>
     );
   }
@@ -150,15 +152,15 @@ const UserManagementPage = () => {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">User Management</h1>
-          <p className="text-gray-600 mt-1">Manage restaurant staff and their roles</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('admin.userManagement')}</h1>
+          <p className="text-gray-600 mt-1">{t('admin.manageStaff')}</p>
         </div>
         <button
           onClick={() => handleOpenModal()}
           className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
         >
           <UserPlus className="h-5 w-5" />
-          Add User
+          {t('admin.addUser')}
         </button>
       </div>
 
@@ -166,10 +168,9 @@ const UserManagementPage = () => {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
         <AlertTriangle className="h-5 w-5 text-blue-600 mt-0.5" />
         <div>
-          <h3 className="font-semibold text-blue-900">Current Users: {users.length}</h3>
+          <h3 className="font-semibold text-blue-900">{t('admin.currentUsers')}: {users.length}</h3>
           <p className="text-sm text-blue-700">
-            Your subscription plan determines the maximum number of users you can have.
-            Check your subscription limits to avoid issues.
+            {t('admin.subscriptionLimitInfo')}
           </p>
         </div>
       </div>
@@ -180,22 +181,22 @@ const UserManagementPage = () => {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                User
+                {t('admin.user')}
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Email
+                {t('admin.email')}
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Role
+                {t('admin.role')}
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
+                {t('admin.status')}
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Created
+                {t('admin.created')}
               </th>
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Actions
+                {t('admin.actions')}
               </th>
             </tr>
           </thead>
@@ -212,7 +213,7 @@ const UserManagementPage = () => {
                         {user.firstName} {user.lastName}
                       </div>
                       {currentUser?.id === user.id && (
-                        <span className="text-xs text-blue-600">(You)</span>
+                        <span className="text-xs text-blue-600">({t('admin.you')})</span>
                       )}
                     </div>
                   </div>
@@ -255,7 +256,7 @@ const UserManagementPage = () => {
 
         {users.length === 0 && (
           <div className="text-center py-12 text-gray-500">
-            No users found. Add your first user to get started.
+            {t('admin.noUsersFound')}
           </div>
         )}
       </div>
@@ -266,7 +267,7 @@ const UserManagementPage = () => {
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">
-                {editingUser ? 'Edit User' : 'Add New User'}
+                {editingUser ? t('admin.editUser') : t('admin.addNewUser')}
               </h2>
               <button onClick={handleCloseModal} className="text-gray-400 hover:text-gray-600">
                 <X className="h-6 w-6" />
@@ -276,7 +277,7 @@ const UserManagementPage = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email
+                  {t('admin.email')}
                 </label>
                 <input
                   type="email"
@@ -289,7 +290,7 @@ const UserManagementPage = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Password {editingUser && '(leave blank to keep current)'}
+                  {t('admin.password')} {editingUser && `(${t('admin.leaveBlankKeepCurrent')})`}
                 </label>
                 <input
                   type="password"
@@ -304,7 +305,7 @@ const UserManagementPage = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    First Name
+                    {t('admin.firstName')}
                   </label>
                   <input
                     type="text"
@@ -317,7 +318,7 @@ const UserManagementPage = () => {
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Last Name
+                    {t('admin.lastName')}
                   </label>
                   <input
                     type="text"
@@ -331,18 +332,18 @@ const UserManagementPage = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Role
+                  {t('admin.role')}
                 </label>
                 <select
                   value={formData.role}
                   onChange={(e) => setFormData({ ...formData, role: e.target.value as any })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
-                  <option value="WAITER">Waiter</option>
-                  <option value="KITCHEN">Kitchen Staff</option>
-                  <option value="MANAGER">Manager</option>
-                  <option value="ADMIN">Admin</option>
-                  <option value="COURIER">Courier</option>
+                  <option value="WAITER">{t('admin.waiter')}</option>
+                  <option value="KITCHEN">{t('admin.kitchenStaff')}</option>
+                  <option value="MANAGER">{t('admin.manager')}</option>
+                  <option value="ADMIN">{t('admin.admin')}</option>
+                  <option value="COURIER">{t('admin.courier')}</option>
                 </select>
               </div>
 
@@ -352,13 +353,13 @@ const UserManagementPage = () => {
                   onClick={handleCloseModal}
                   className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
                 >
-                  Cancel
+                  {t('app:app.cancel')}
                 </button>
                 <button
                   type="submit"
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
-                  {editingUser ? 'Update' : 'Create'} User
+                  {editingUser ? t('app:app.update') : t('app:app.create')} {t('admin.user')}
                 </button>
               </div>
             </form>
@@ -375,14 +376,14 @@ const UserManagementPage = () => {
                 <AlertTriangle className="h-6 w-6 text-red-600" />
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Delete User</h3>
-                <p className="text-sm text-gray-500">This action cannot be undone</p>
+                <h3 className="text-lg font-semibold text-gray-900">{t('admin.deleteUser')}</h3>
+                <p className="text-sm text-gray-500">{t('admin.actionCannotBeUndone')}</p>
               </div>
             </div>
 
             <p className="text-gray-700 mb-6">
-              Are you sure you want to delete <strong>{userToDelete.firstName} {userToDelete.lastName}</strong>?
-              This will permanently remove their account and all associated data.
+              {t('admin.confirmDeleteUser')} <strong>{userToDelete.firstName} {userToDelete.lastName}</strong>?
+              {t('admin.permanentlyRemoveAccount')}
             </p>
 
             <div className="flex gap-3">
@@ -393,13 +394,13 @@ const UserManagementPage = () => {
                 }}
                 className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
               >
-                Cancel
+                {t('app:app.cancel')}
               </button>
               <button
                 onClick={handleDeleteConfirm}
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
               >
-                Delete User
+                {t('admin.deleteUser')}
               </button>
             </div>
           </div>
