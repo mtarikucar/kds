@@ -1,6 +1,5 @@
 {
-  "pos": {
-    "title": "Satış Noktası",
+  "title": "Satış Noktası",
     "newOrder": "Yeni Sipariş",
     "orders": "Siparişler",
     "items": "Ürünler",
@@ -8,7 +7,6 @@
     "subtotal": "Ara Toplam",
     "tax": "Vergi",
     "discount": "İndirim",
-    "payment": "Ödeme",
     "paymentMethod": "Ödeme Yöntemi",
     "cash": "Nakit",
     "card": "Kart",
@@ -28,7 +26,7 @@
     "currentOrder": "Mevcut Sipariş",
     "clearAll": "Tümünü Temizle",
     "lowStock": "Düşük stok",
-    "addToOrder": "Siparişe Ekle",
+    "addToOrder": "Ekle",
     "customer": "Müşteri",
     "orderTime": "Sipariş Saati",
     "completedTime": "Tamamlanma Saati",
@@ -46,6 +44,12 @@
     "orderConfirmed": "Sipariş başarıyla onaylandı",
     "orderCancelled": "Sipariş iptal edildi",
     "paymentProcessed": "Ödeme başarıyla işlendi",
+  "orderCreated": "Sipariş başarıyla oluşturuldu",
+  "orderCreateFailed": "Sipariş oluşturulamadı",
+  "orderUpdateFailed": "Sipariş güncellenemedi",
+  "orderCancelFailed": "Sipariş iptal edilemedi",
+  "paymentRecorded": "Ödeme başarıyla kaydedildi",
+  "paymentRecordFailed": "Ödeme kaydedilemedi",
     "startTakingOrdersTableless": "Sipariş almaya başlayın (masa seçimi isteğe bağlı)",
     "selectTableAndStart": "Bir masa seçin ve sipariş almaya başlayın",
     "loadedExistingOrder": "Mevcut sipariş #{{orderNumber}} yüklendi ({{count}} ürün)",
@@ -87,6 +91,5 @@
       "confirmPayment": "\u00d6demeyi Onayla"
     },
     "checkout": "\u00d6deme"
-  }
 }
 

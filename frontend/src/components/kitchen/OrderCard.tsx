@@ -5,6 +5,7 @@ import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import { formatTimeAgo, formatTime } from '../../lib/utils';
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface OrderCardProps {
   order: Order;
@@ -15,6 +16,7 @@ interface OrderCardProps {
 
 const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating }: OrderCardProps) => {
   const [elapsedTime, setElapsedTime] = useState('');
+  const { t } = useTranslation('kitchen');
 
   // Update elapsed time every second
   useEffect(() => {
@@ -64,6 +66,8 @@ const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating }: OrderCa
   };
 
   const nextStatus = getNextStatus(order.status);
+  const statusKey = order.status.toLowerCase();
+  const statusLabel = t(`kitchen.${statusKey}`);
 
   return (
     <Card className="mb-4">
@@ -72,11 +76,11 @@ const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating }: OrderCa
           <div>
             <CardTitle className="text-lg">#{order.orderNumber}</CardTitle>
             <p className="text-sm text-gray-600">
-              Table {order.table?.number}
+              {t('kitchen.table')} {order.table?.number}
             </p>
           </div>
           <Badge variant={getStatusVariant(order.status)}>
-            {order.status}
+            {statusLabel}
           </Badge>
         </div>
       </CardHeader>
@@ -92,7 +96,7 @@ const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating }: OrderCa
                 <p className="font-medium">{item.product?.name}</p>
                 {item.notes && (
                   <p className="text-sm text-gray-600 italic">
-                    Note: {item.notes}
+                    {t('kitchen.noteLabel')}: {item.notes}
                   </p>
                 )}
               </div>
@@ -104,7 +108,7 @@ const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating }: OrderCa
         {order.notes && (
           <div className="mb-4 p-2 bg-yellow-50 border border-yellow-200 rounded">
             <p className="text-sm text-yellow-800">
-              <strong>Order Note:</strong> {order.notes}
+              <strong>{t('kitchen.orderNoteLabel')}:</strong> {order.notes}
             </p>
           </div>
         )}
@@ -124,7 +128,7 @@ const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating }: OrderCa
             onClick={() => onUpdateStatus(order.id, nextStatus)}
             isLoading={isUpdating}
           >
-            Mark as {nextStatus}
+            {t('kitchen.markAs', { status: t(`kitchen.${nextStatus.toLowerCase()}`) })}
           </Button>
         )}
 
@@ -135,7 +139,7 @@ const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating }: OrderCa
             onClick={() => onCancelOrder(order.id)}
             isLoading={isUpdating}
           >
-            Cancel Order
+            {t('kitchen.cancelOrder')}
           </Button>
         )}
       </CardContent>

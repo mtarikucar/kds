@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import i18n from '../../i18n/config';
 import api from '../../lib/api';
 import {
   Order,
@@ -44,10 +45,10 @@ export const useCreateOrder = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
-      toast.success('Order created successfully');
+      toast.success(i18n.t('pos:orderCreated'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to create order');
+      toast.error(error.response?.data?.message || i18n.t('pos:orderCreateFailed'));
     },
   });
 };
@@ -69,10 +70,10 @@ export const useUpdateOrder = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
-      toast.success('Order updated successfully');
+      toast.success(i18n.t('pos:orderUpdated'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to update order');
+      toast.error(error.response?.data?.message || i18n.t('pos:orderUpdateFailed'));
     },
   });
 };
@@ -94,10 +95,10 @@ export const useUpdateOrderStatus = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
-      toast.success('Order updated successfully');
+      toast.success(i18n.t('pos:orderUpdated'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to update order');
+      toast.error(error.response?.data?.message || i18n.t('pos:orderUpdateFailed'));
     },
   });
 };
@@ -113,10 +114,10 @@ export const useCancelOrder = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
-      toast.success('Order cancelled successfully');
+      toast.success(i18n.t('pos:orderCancelled'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to cancel order');
+      toast.error(error.response?.data?.message || i18n.t('pos:orderCancelFailed'));
     },
   });
 };
@@ -133,10 +134,10 @@ export const useCancelKdsOrder = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
-      toast.success('Order cancelled');
+      toast.success(i18n.t('pos:orderCancelled'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to cancel order');
+      toast.error(error.response?.data?.message || i18n.t('pos:orderCancelFailed'));
     },
   });
 };
@@ -153,10 +154,10 @@ export const useCreatePayment = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
-      toast.success('Payment recorded successfully');
+      toast.success(i18n.t('pos:paymentRecorded'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to record payment');
+      toast.error(error.response?.data?.message || i18n.t('pos:paymentRecordFailed'));
     },
   });
 };

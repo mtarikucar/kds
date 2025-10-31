@@ -21,8 +21,8 @@ const SettingsLayout = () => {
     },
     {
       to: '/admin/settings/integrations',
-      icon: Plug,
-      label: t('integrations'),
+  icon: Plug,
+  label: t('integrationsLabel'),
       description: t('integrationsDesc'),
     },
   ];

@@ -202,7 +202,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
       layoutStyle: 'GRID',
       itemsPerRow: 2,
       enableTableQR: true,
-      tableQRMessage: t('common:scanToViewMenu'),
+      tableQRMessage: t('admin.scanToViewMenu'),
     });
   };
 
@@ -249,7 +249,8 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
   const applyTemplate = (template: typeof designTemplates[0]) => {
     setFormData({
       ...formData,
-      ...template.settings
+      ...template.settings,
+      layoutStyle: template.settings.layoutStyle as 'LIST' | 'GRID' | 'COMPACT',
     });
   };
 
@@ -577,7 +578,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                       type="text"
                       value={formData.tableQRMessage}
                       onChange={(e) => setFormData({ ...formData, tableQRMessage: e.target.value })}
-                      placeholder={t('common:scanToViewMenu')}
+                      placeholder={t('admin.scanToViewMenu')}
                     />
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
                       <p className="text-xs font-medium text-blue-900 mb-1">{t('common:qrDesigner.proTip')}</p>
@@ -655,7 +656,9 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                     <QrCodeDisplay
                       qrCode={{
                         id: 'preview',
+                        type: 'TENANT',
                         url: tenant ? `${window.location.origin}/qr-menu/${tenant.id}` : '#',
+                        qrDataUrl: '',
                         label: t('common:qrDesigner.mainQRCode')
                       }}
                       tenant={tenant}

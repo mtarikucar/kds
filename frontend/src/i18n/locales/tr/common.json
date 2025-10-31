@@ -81,7 +81,8 @@
     "enable": "Etkinleştir",
     "disable": "Devre dışı bırak",
     "connect": "Bağlan",
-    "disconnect": "Bağlantıyı kes"
+    "disconnect": "Bağlantıyı kes",
+    "preview": "Önizleme"
   },
   "statuses": {
     "active": "Aktif",
@@ -113,32 +114,7 @@
     "lastMonth": "Geçen Ay",
     "lastYear": "Geçen Yıl"
   },
-  "landing": {
-    "features": "Özellikler",
-    "pricing": "Fiyatlandırma",
-    "contact": "İletişim",
-    "getStarted": "Başla",
-    "badge": "Modern Restoran Yönetim Çözümü",
-    "headline": "Restoranınızı Dönüştürün",
-    "headlineHighlight": "İşletmeleri",
-    "subtitle": "Modern restoranlar için tasarlanmış hepsi bir arada POS ve Mutfak Ekranı Sistemi. Siparişleri kolaylaştırın, masaları yönetin ve verimliliği artırın.",
-    "startFreeTrial": "Ücretsiz Denemeyi Başlat",
-    "learnMore": "Daha Fazla Bilgi",
-    "everythingYouNeed": "İhtiyacınız Olan Her Şey",
-    "featuresDescription": "Restoran işletmenizi kolaylaştırmak ve müşteri deneyimini iyileştirmek için tasarlanmış güçlü özellikler.",
-    "feature1Title": "Satış Noktası Sistemi",
-    "feature1Desc": "Hızlı sipariş alma, masa yönetimi ve birden fazla ödeme yöntemiyle ödeme işleme için sezgisel POS arayüzü.",
-    "feature2Title": "Mutfak Ekranı Sistemi",
-    "feature2Desc": "Durum takibi, hazırlık süreleri ve öncelik yönetimi ile mutfak personeli için gerçek zamanlı sipariş görüntüleme.",
-    "feature3Title": "QR Menü Sistemi",
-    "feature3Desc": "Temassız sipariş için QR kodlar aracılığıyla erişilebilir dijital menüler. Özelleştirilebilir tasarım ve gerçek zamanlı güncellemeler.",
-    "feature4Title": "Masa Yönetimi",
-    "feature4Desc": "Gerçek zamanlı kullanılabilirlik durumu, kapasite takibi ve bölüm organizasyonu ile görsel masa düzeni.",
-    "feature5Title": "Envanter Yönetimi",
-    "feature5Desc": "Stok seviyelerini takip edin, tedarikçileri yönetin, düşük stok uyarıları alın ve kapsamlı hareket geçmişini görüntüleyin.",
-    "feature6Title": "Raporlar ve Analitikler",
-    "feature6Desc": "Detaylı satış raporları, en çok satılan ürünler, gelir trendleri ve özelleştirilebilir tarih aralığı analizi."
-  },
+  
   "dashboard": {
     "title": "Kontrol Paneli",
     "welcome": "Hoş geldiniz! İşte bugünün özeti.",
@@ -353,6 +329,111 @@
     "noQRCodesForPrinting": "Yazdırma için QR kodları bulunamadı. Lütfen QR kodlarının yüklendiğinden emin olun.",
     "noTablesFound": "Masa bulunamadı. Lütfen önce masaları ekleyin."
   },
+  "qrDesigner": {
+    "quickColorThemes": "Hızlı Renk Temaları",
+    "customColors": "Özel Renkler",
+    "primaryColor": "Ana Renk",
+    "secondaryColor": "İkincil Renk",
+    "backgroundColor": "Arka Plan Rengi",
+    "typographySettings": "Yazı Tipi Ayarları",
+    "fontFamily": "Yazı Tipi",
+    "logoUpload": "Logo Yükleme",
+    "chooseFile": "Dosya Seç",
+    "sampleText": "Aa Bb Cc",
+    "uploadLogo": "Restoran logonuzu yükleyin",
+    "layoutDisplayOptions": "Yerleşim ve Görünüm Seçenekleri",
+    "layoutStyle": "Yerleşim Stili",
+    "gridView": "Izgara Görünümü",
+    "gridDesc": "Ürünler ızgarada görülür",
+    "listView": "Liste Görünümü",
+    "listDesc": "Geleneksel liste stili",
+    "compact": "Kompakt",
+    "compactDesc": "Alan verimli görünüm",
+    "itemsPerRow": "Satır Başına Öğe",
+    "displayOptions": "Görüntüleme Seçenekleri",
+    "showRestaurantInfo": "Restoran Bilgilerini Göster",
+    "showPrices": "Fiyatları Göster",
+    "showDescriptions": "Ürün Açıklamalarını Göster",
+    "showImages": "Ürün Görsellerini Göster",
+    "tableQRMessage": "Masa QR Mesajı",
+    "proTip": "İpucu:",
+    "proTipText": "Siparişleri masaya göre takip etmek için URL'ye masa numarası ekleyebilirsiniz",
+    "qrCodePreview": "QR Kod Önizleme",
+    "qrWillUseColors": "QR kodlarınız bu renkleri kullanır:",
+    "qrPattern": "QR Deseni",
+    "background": "Arka Plan",
+    "saveAllChanges": "Tüm Değişiklikleri Kaydet",
+    "resetToDefaults": "Varsayılanlara Döndür",
+    "mainQRCode": "Ana QR Kodu",
+    "liveQRCodePreview": "Canlı QR kod önizlemesi",
+    "updatesAutomatically": "Otomatik güncellenir",
+    "menuPreview": "Menü Önizleme",
+    "mobile": "Mobil",
+    "tablet": "Tablet",
+    "livePreview": "Canlı Önizleme",
+    "restaurantLogo": "Restoran Logosu",
+    "restaurantName": "Restoran Adı",
+    "all": "Tümü",
+    "liveMenuPreview": "Canlı menü önizlemesi",
+    "updatesAutomaticallyWithChanges": "Yaptığınız değişikliklerle otomatik güncellenir",
+    "currentColors": "Geçerli Renkler",
+    "primary": "Ana Renk",
+    "secondary": "İkincil Renk",
+    "themes": {
+      "modernBlue": "Modern Mavi",
+      "elegantDark": "Şık Koyu",
+      "warmOrange": "Sıcak Turuncu",
+      "freshGreen": "Taze Yeşil",
+      "royalPurple": "Asil Mor",
+      "classicRed": "Klasik Kırmızı"
+    },
+    "templates": {
+      "fineDining": {
+        "name": "Zarif Restoran",
+        "description": "Zarif ve sofistike tasarım"
+      },
+      "modernCafe": {
+        "name": "Modern Kafe",
+        "description": "Temiz ve minimal tasarım"
+      },
+      "fastFood": {
+        "name": "Hızlı Servis",
+        "description": "Canlı ve enerjik tasarım"
+      },
+      "healthyFresh": {
+        "name": "Sağlıklı & Taze",
+        "description": "Doğal ve organik hissiyat"
+      },
+      "pizzaPlace": {
+        "name": "Pizza Restoranı",
+        "description": "Sıcak ve davetkâr tasarım"
+      },
+      "minimalist": {
+        "name": "Minimalist",
+        "description": "Siyah beyaz sade tasarım"
+      }
+    },
+    "logoPreview": "Logo önizleme",
+    "sampleCategories": {
+      "appetizers": "Başlangıçlar",
+      "mainCourses": "Ana Yemekler",
+      "desserts": "Tatlılar"
+    },
+    "sampleProducts": {
+      "caesarSaladName": "Sezar Salatası",
+      "caesarSaladDesc": "Taze romana marul ve parmesan",
+      "bruschettaName": "Bruschetta",
+      "bruschettaDesc": "Domates ve fesleğenli kızarmış ekmek",
+      "grilledSalmonName": "Izgara Somon",
+      "grilledSalmonDesc": "Mevsim sebzeleriyle Atlantik somonu",
+      "ribeyeSteakName": "Ribeye Biftek",
+      "ribeyeSteakDesc": "Tereyağlı ot soslu dana biftek",
+      "tiramisuName": "Tiramisu",
+      "tiramisuDesc": "Klasik İtalyan kahveli tatlı",
+      "lavaCakeName": "Çikolatalı Sufle",
+      "lavaCakeDesc": "Sıcak, akışkan merkezli çikolatalı kek"
+    }
+  },
   "pricing": {
     "title": "Basit, Şeffaf Fiyatlandırma",
     "description": "Restoranınız için mükemmel planı seçin. Tüm planlar ücretsiz deneme sürümü içerir.",
@@ -416,6 +497,7 @@
     "product": "Ürün",
     "features": "Özellikler",
     "pricing": "Fiyatlandırma",
+  "contact": "İletişim",
     "freeTrial": "Ücretsiz Deneme",
     "company": "Şirket",
     "contactUs": "Bize Ulaşın",
@@ -427,6 +509,33 @@
     "cookiePolicy": "Çerez Politikası",
     "allRightsReserved": "Tüm hakları saklıdır.",
     "getStarted": "Başlayın"
+  }
+  ,
+  "qrMenu": {
+    "tableLabel": "Masa",
+    "searchPlaceholder": "Menüde ara...",
+    "all": "Tümü",
+    "noItemsFound": "Ürün bulunamadı",
+    "poweredBy": "Restaurant POS Sistemi tarafından desteklenmektedir"
+  },
+  "qr": {
+    "shareText": "Menümüze göz atın",
+    "downloadQrCode": "QR Kodu İndir",
+    "previewMenu": "Menüyü Önizle",
+    "printQrCode": "QR Kodu Yazdır",
+    "previewSize": "Önizleme Boyutu",
+    "menuUrl": "Menü URL'si",
+    "copied": "Kopyalandı!",
+    "downloadFormat": "İndirme Formatı",
+    "png": "PNG",
+    "svg": "SVG",
+    "pdf": "PDF",
+    "downloadFile": "{{size}} boyutunda {{format}} indir",
+    "shareQrCode": "QR Kodu Paylaş",
+    "proTipsTitle": "İpuçları",
+    "proTip1": "Daha iyi tarama için yüksek kontrastlı renkler kullanın.",
+    "proTip2": "En iyi kalite için 300 DPI'da yazdırın.",
+    "proTip3": "Yazdırmadan önce QR kodunu birden fazla cihazda test edin."
   }
 }
 

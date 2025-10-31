@@ -152,10 +152,10 @@ export function DeviceConfigModal({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {mode === 'create' ? t('settings.hardware.addHardwareDevice') : t('settings.hardware.editHardwareDevice')}
+            {mode === 'create' ? t('hardware.addHardwareDevice') : t('hardware.editHardwareDevice')}
           </DialogTitle>
           <DialogDescription>
-            {t('settings.hardware.configureDeviceDescription')}
+            {t('hardware.configureDeviceDescription')}
           </DialogDescription>
         </DialogHeader>
 
@@ -166,12 +166,12 @@ export function DeviceConfigModal({
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t('settings.hardware.deviceName')}</FormLabel>
+                  <FormLabel>{t('hardware.deviceName')}</FormLabel>
                   <FormControl>
-                    <Input placeholder={t('settings.hardware.deviceNamePlaceholder') as string} {...field} />
+                    <Input placeholder={t('hardware.deviceNamePlaceholder') as string} {...field} />
                   </FormControl>
                   <FormDescription>
-                    {t('settings.hardware.deviceNameHelp')}
+                    {t('hardware.deviceNameHelp')}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -183,31 +183,31 @@ export function DeviceConfigModal({
               name="device_type"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t('settings.hardware.deviceType')}</FormLabel>
+                  <FormLabel>{t('hardware.deviceType')}</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={t('settings.hardware.selectDeviceType') as string} />
+                        <SelectValue placeholder={t('hardware.selectDeviceType') as string} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       <SelectItem value={DeviceType.THERMAL_PRINTER}>
-                        {t('settings.integrationTypes.THERMAL_PRINTER')}
+                        {t('integrationTypes.THERMAL_PRINTER')}
                       </SelectItem>
-                      <SelectItem value={DeviceType.CASH_DRAWER}>{t('settings.integrationTypes.CASH_DRAWER')}</SelectItem>
+                      <SelectItem value={DeviceType.CASH_DRAWER}>{t('integrationTypes.CASH_DRAWER')}</SelectItem>
                       <SelectItem value={DeviceType.RESTAURANT_PAGER}>
-                        {t('settings.integrationTypes.RESTAURANT_PAGER')}
+                        {t('integrationTypes.RESTAURANT_PAGER')}
                       </SelectItem>
                       <SelectItem value={DeviceType.BARCODE_READER}>
-                        {t('settings.integrationTypes.BARCODE_READER')}
+                        {t('integrationTypes.BARCODE_READER')}
                       </SelectItem>
                       <SelectItem value={DeviceType.CUSTOMER_DISPLAY}>
-                        {t('settings.integrationTypes.CUSTOMER_DISPLAY')}
+                        {t('integrationTypes.CUSTOMER_DISPLAY')}
                       </SelectItem>
                       <SelectItem value={DeviceType.KITCHEN_DISPLAY}>
-                        {t('settings.integrationTypes.KITCHEN_DISPLAY')}
+                        {t('integrationTypes.KITCHEN_DISPLAY')}
                       </SelectItem>
-                      <SelectItem value={DeviceType.SCALE_DEVICE}>{t('settings.integrationTypes.SCALE_DEVICE')}</SelectItem>
+                      <SelectItem value={DeviceType.SCALE_DEVICE}>{t('integrationTypes.SCALE_DEVICE')}</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -220,22 +220,22 @@ export function DeviceConfigModal({
               name="connection_type"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t('settings.hardware.connectionType')}</FormLabel>
+                  <FormLabel>{t('hardware.connectionType')}</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder={t('settings.hardware.selectConnectionType') as string} />
+                        <SelectValue placeholder={t('hardware.selectConnectionType') as string} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       <SelectItem value={ConnectionType.SERIAL}>
-                        {t('settings.hardware.connectionTypes.serial')}
+                        {t('hardware.connectionTypes.serial')}
                       </SelectItem>
                       <SelectItem value={ConnectionType.NETWORK}>
-                        {t('settings.hardware.connectionTypes.network')}
+                        {t('hardware.connectionTypes.network')}
                       </SelectItem>
-                      <SelectItem value={ConnectionType.USB_HID}>{t('settings.hardware.connectionTypes.usbHid')}</SelectItem>
-                      <SelectItem value={ConnectionType.BLUETOOTH}>{t('settings.hardware.connectionTypes.bluetooth')}</SelectItem>
+                      <SelectItem value={ConnectionType.USB_HID}>{t('hardware.connectionTypes.usbHid')}</SelectItem>
+                      <SelectItem value={ConnectionType.BLUETOOTH}>{t('hardware.connectionTypes.bluetooth')}</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -251,12 +251,12 @@ export function DeviceConfigModal({
                   name="serial_port"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('settings.hardware.serial.port')}</FormLabel>
+                      <FormLabel>{t('hardware.serial.port')}</FormLabel>
                       <FormControl>
-                        <Input placeholder={t('settings.hardware.serial.portPlaceholder') as string} {...field} />
+                        <Input placeholder={t('hardware.serial.portPlaceholder') as string} {...field} />
                       </FormControl>
                       <FormDescription>
-                        {t('settings.hardware.serial.portHelp')}
+                        {t('hardware.serial.portHelp')}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -267,14 +267,14 @@ export function DeviceConfigModal({
                   name="baud_rate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('settings.hardware.serial.baudRate')}</FormLabel>
+                      <FormLabel>{t('hardware.serial.baudRate')}</FormLabel>
                       <Select
                         onValueChange={(value) => field.onChange(parseInt(value))}
                         defaultValue={field.value?.toString()}
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder={t('settings.hardware.serial.selectBaudRate') as string} />
+                            <SelectValue placeholder={t('hardware.serial.selectBaudRate') as string} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -300,7 +300,7 @@ export function DeviceConfigModal({
                   name="ip_address"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('settings.hardware.network.ipAddress')}</FormLabel>
+                      <FormLabel>{t('hardware.network.ipAddress')}</FormLabel>
                       <FormControl>
                         <Input placeholder="192.168.1.100" {...field} />
                       </FormControl>
@@ -313,7 +313,7 @@ export function DeviceConfigModal({
                   name="port"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('settings.hardware.network.port')}</FormLabel>
+                      <FormLabel>{t('hardware.network.port')}</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -331,11 +331,11 @@ export function DeviceConfigModal({
                   name="protocol"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('settings.hardware.network.protocol')}</FormLabel>
+                      <FormLabel>{t('hardware.network.protocol')}</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder={t('settings.hardware.network.selectProtocol') as string} />
+                            <SelectValue placeholder={t('hardware.network.selectProtocol') as string} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -358,7 +358,7 @@ export function DeviceConfigModal({
                   name="vendor_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('settings.hardware.usb.vendorId')}</FormLabel>
+                      <FormLabel>{t('hardware.usb.vendorId')}</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="0x1234"
@@ -370,7 +370,7 @@ export function DeviceConfigModal({
                         />
                       </FormControl>
                       <FormDescription>
-                        {t('settings.hardware.usb.vendorIdHelp')}
+                        {t('hardware.usb.vendorIdHelp')}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -381,7 +381,7 @@ export function DeviceConfigModal({
                   name="product_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{t('settings.hardware.usb.productId')}</FormLabel>
+                      <FormLabel>{t('hardware.usb.productId')}</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="0x5678"
@@ -393,7 +393,7 @@ export function DeviceConfigModal({
                         />
                       </FormControl>
                       <FormDescription>
-                        {t('settings.hardware.usb.productIdHelp')}
+                        {t('hardware.usb.productIdHelp')}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -409,12 +409,12 @@ export function DeviceConfigModal({
                 name="device_address"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>{t('settings.hardware.bluetooth.macAddress')}</FormLabel>
+                    <FormLabel>{t('hardware.bluetooth.macAddress')}</FormLabel>
                     <FormControl>
                       <Input placeholder="00:11:22:33:44:55" {...field} />
                     </FormControl>
                     <FormDescription>
-                      {t('settings.hardware.bluetooth.macHelp')}
+                      {t('hardware.bluetooth.macHelp')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -428,9 +428,9 @@ export function DeviceConfigModal({
               render={({ field }) => (
                 <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
                   <div className="space-y-0.5">
-                    <FormLabel>{t('settings.hardware.autoConnect')}</FormLabel>
+                    <FormLabel>{t('hardware.autoConnect')}</FormLabel>
                     <FormDescription>
-                      {t('settings.hardware.autoConnectHelp')}
+                      {t('hardware.autoConnectHelp')}
                     </FormDescription>
                   </div>
                   <FormControl>
@@ -445,7 +445,7 @@ export function DeviceConfigModal({
                 {t('common:app.cancel')}
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? t('settings.hardware.saving') : mode === 'create' ? t('settings.hardware.addDevice') : t('common:app.save')}
+                {isSubmitting ? t('hardware.saving') : mode === 'create' ? t('hardware.addDevice') : t('common:app.save')}
               </Button>
             </DialogFooter>
           </form>

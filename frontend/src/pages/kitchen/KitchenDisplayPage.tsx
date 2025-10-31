@@ -56,7 +56,7 @@ const KitchenDisplayPage = () => {
 
         <div className="flex items-center gap-2 md:gap-4 flex-wrap">
           <div className="flex items-center gap-2">
-            <span className="text-xs md:text-sm text-gray-600">WebSocket:</span>
+            <span className="text-xs md:text-sm text-gray-600">{t('kitchen.websocket')}</span>
             <Badge variant={isConnected ? 'success' : 'danger'}>
               {isConnected ? t('kitchen.connected') : t('kitchen.disconnected')}
             </Badge>

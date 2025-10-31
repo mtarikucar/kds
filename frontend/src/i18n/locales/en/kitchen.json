@@ -27,7 +27,13 @@
     "disconnected": "Disconnected",
     "pending": "Pending",
     "preparing": "Preparing",
-    "ready": "Ready"
+    "ready": "Ready",
+    "served": "Served",
+    "websocket": "WebSocket",
+    "orderNoteLabel": "Order Note",
+    "noteLabel": "Note",
+    "markAs": "Mark as {{status}}",
+    "cancelOrder": "Cancel Order"
   }
 }
 

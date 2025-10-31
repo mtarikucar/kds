@@ -1,14 +1,13 @@
 {
-  "settings": {
-    "title": "Ayarlar",
-    "general": "Genel",
-    "restaurant": "Restoran",
-    "pos": "POS",
-    "kitchen": "Mutfak",
-    "payment": "Ödeme",
-    "integrations": "Entegrasyonlar",
-    "users": "Kullanıcılar",
-    "subscription": "Abonelik",
+  "title": "Ayarlar",
+  "general": "Genel",
+  "restaurant": "Restoran",
+  "pos": "POS",
+  "kitchen": "Mutfak",
+  "payment": "Ödeme",
+  "integrationsLabel": "Entegrasyonlar",
+  "users": "Kullanıcılar",
+  "subscription": "Abonelik",
     "restaurantName": "Restoran Adı",
     "address": "Adres",
     "phone": "Telefon",
@@ -31,56 +30,56 @@
     "emailNotifications": "E-posta Bildirimleri",
     "smsNotifications": "SMS Bildirimleri",
     "pushNotifications": "Push Bildirimleri",
-    "save": "Ayarları Kaydet",
-    "settingsSaved": "Ayarlar başarıyla kaydedildi",
-    "settingsFailed": "Ayarlar kaydedilemedi",
-    "posSettings": {
+  "save": "Ayarları Kaydet",
+  "settingsSaved": "Ayarlar başarıyla kaydedildi",
+  "settingsFailed": "Ayarlar kaydedilemedi",
+  "posSettings": {
       "loading": "POS ayarları yükleniyor...",
       "title": "POS Ayarları",
       "description": "Satış Noktası sisteminizin nasıl çalışacağını yapılandırın"
-    },
-    "twoStepCheckout": {
+  },
+  "twoStepCheckout": {
       "title": "İki Aşamalı Ödemeyi Etkinleştir",
       "description": "Sipariş oluşturma ve ödeme adımlarını ayırın. İki düğme gösterir: \"Sipariş Oluştur\" ve \"Ödemeye Devam Et\". Siparişleri ödeme toplamadan önce mutfağa göndermek istediğinizde kullanışlıdır."
-    },
-    "info": {
+  },
+  "info": {
       "noteLabel": "Not:",
       "noteBody": "Değişiklikler POS sisteminde hemen etkili olur. Operasyonel değişiklikler hakkında personelin bilgilendirildiğinden emin olun."
-    },
-    "saveChanges": "Değişiklikleri Kaydet",
-    "preview": {
+  },
+  "saveChanges": "Değişiklikleri Kaydet",
+  "preview": {
       "currentConfiguration": "Geçerli Yapılandırma",
       "tablelessMode": "Masasız Mod",
       "twoStepCheckout": "İki Aşamalı Ödeme",
       "enabled": "Etkin",
       "disabled": "Devre Dışı",
       "orderTypeTableless": "Sipariş Türü (masasız)"
-    },
-    "orderTypes": {
+  },
+  "orderTypes": {
       "takeaway": "Paket Servis",
       "dineIn": "Masa İçi"
-    },
-    "configurePos": "Satış Noktası sisteminizin nasıl çalışacağını yapılandırın",
-    "operationModes": "İşletim Modları",
-    "enableTablelessMode": "Masasız Modu Etkinleştir",
-    "tablelessModeDescription": "Masa seçimi olmadan siparişlere izin verin. Self-servis, paket servisi veya tezgah servisi restoranları için mükemmeldir. Etkinleştirildiğinde masa seçim paneli gizlenecektir.",
-    "enableTwoStepCheckout": "İki Aşamalı Ödemeyi Etkinleştir",
-    "twoStepCheckoutDescription": "Sipariş oluşturma ve ödeme adımlarını ayırın. İki düğme gösterir: \"Sipariş Oluştur\" ve \"Ödemeye Devam Et\". Siparişleri ödeme toplamadan önce mutfağa göndermek istediğinizde kullanışlıdır.",
-    "hardwareDevices": "Donanım Cihazları",
-    "integrationsDescription": "Üçüncü taraf hizmetlerini bağlayın ve donanım entegrasyonlarını yönetin",
-    "printers": "Yazıcılar",
-    "cashDrawers": "Kasa Çekmecesi",
-    "pagers": "Çağrı Cihazları",
-    "scanners": "Tarayıcılar",
-    "manageConfiguration": "Sistem yapılandırmanızı yönetin",
-    "tip": "İpucu",
-    "tipDescription": "Ayarlar değişiklikleri hemen etkili olur. Değişiklik yaptıktan sonra test etmeyi unutmayın.",
-    "subscriptionDesc": "Abonelik planınızı ve faturalandırmayı yönetin",
-    "posDesc": "POS işletim modlarını yapılandırın",
-    "integrationsDesc": "Üçüncü taraf hizmetleri ve API'leri bağlayın",
-    "noPrintersConfigured": "Yapılandırılmış yazıcı yok",
-    "noBarcodeScanners": "Yapılandırılmış barkod tarayıcısı yok",
-    "hardware": {
+  },
+  "configurePos": "Satış Noktası sisteminizin nasıl çalışacağını yapılandırın",
+  "operationModes": "İşletim Modları",
+  "enableTablelessMode": "Masasız Modu Etkinleştir",
+  "tablelessModeDescription": "Masa seçimi olmadan siparişlere izin verin. Self-servis, paket servisi veya tezgah servisi restoranları için mükemmeldir. Etkinleştirildiğinde masa seçim paneli gizlenecektir.",
+  "enableTwoStepCheckout": "İki Aşamalı Ödemeyi Etkinleştir",
+  "twoStepCheckoutDescription": "Sipariş oluşturma ve ödeme adımlarını ayırın. İki düğme gösterir: \"Sipariş Oluştur\" ve \"Ödemeye Devam Et\". Siparişleri ödeme toplamadan önce mutfağa göndermek istediğinizde kullanışlıdır.",
+  "hardwareDevices": "Donanım Cihazları",
+  "integrationsDescription": "Üçüncü taraf hizmetlerini bağlayın ve donanım entegrasyonlarını yönetin",
+  "printers": "Yazıcılar",
+  "cashDrawers": "Kasa Çekmecesi",
+  "pagers": "Çağrı Cihazları",
+  "scanners": "Tarayıcılar",
+  "manageConfiguration": "Sistem yapılandırmanızı yönetin",
+  "tip": "İpucu",
+  "tipDescription": "Ayarlar değişiklikleri hemen etkili olur. Değişiklik yaptıktan sonra test etmeyi unutmayın.",
+  "subscriptionDesc": "Abonelik planınızı ve faturalandırmayı yönetin",
+  "posDesc": "POS işletim modlarını yapılandırın",
+  "integrationsDesc": "Üçüncü taraf hizmetleri ve API'leri bağlayın",
+  "noPrintersConfigured": "Yapılandırılmış yazıcı yok",
+  "noBarcodeScanners": "Yapılandırılmış barkod tarayıcısı yok",
+  "hardware": {
       "initialized": "Donanım başarıyla başlatıldı",
       "initFailed": "Donanım başlatılamadı",
       "deviceConnected": "Cihaz bağlandı: {{name}}",
@@ -152,17 +151,24 @@
         "hoursAgo": "{{count}} saat önce",
         "daysAgo": "{{count}} gün önce"
       }
-    },
-    "integrationTypes": {
-      "THERMAL_PRINTER": "Termal Yazıcı",
-      "CASH_DRAWER": "Kasa Çekmecesi",
-      "RESTAURANT_PAGER": "Restoran Çağrı Cihazı",
-      "BARCODE_READER": "Barkod Okuyucu",
-      "CUSTOMER_DISPLAY": "Müşteri Ekranı",
-      "KITCHEN_DISPLAY": "Mutfak Ekranı",
-      "SCALE_DEVICE": "Terazi Cihazı"
-    },
-    "integrations": {
+  },
+  "integrationTypes": {
+    "PAYMENT_GATEWAY": "Ödeme Sağlayıcısı",
+    "POS_HARDWARE": "POS Donanımı",
+    "THIRD_PARTY_API": "Üçüncü Taraf API",
+    "DELIVERY_APP": "Teslimat Uygulaması",
+    "ACCOUNTING": "Muhasebe",
+    "CRM": "CRM",
+    "INVENTORY": "Stok Yönetimi",
+    "THERMAL_PRINTER": "Termal Yazıcı",
+    "CASH_DRAWER": "Kasa Çekmecesi",
+    "RESTAURANT_PAGER": "Restoran Çağrı Cihazı",
+    "BARCODE_READER": "Barkod Okuyucu",
+    "CUSTOMER_DISPLAY": "Müşteri Ekranı",
+    "KITCHEN_DISPLAY": "Mutfak Ekranı",
+    "SCALE_DEVICE": "Terazi Cihazı"
+  },
+  "integrations": {
       "enabledSuccess": "Entegrasyon başarıyla etkinleştirildi",
       "disabledSuccess": "Entegrasyon devre dışı bırakıldı",
       "toggleFailed": "Entegrasyon durumu değiştirilemedi",
@@ -174,10 +180,10 @@
       "loading": "Entegrasyonlar yükleniyor...",
       "none": "Henüz yapılandırılmış entegrasyon yok",
       "lastSynced": "Son senkronizasyon: {{date}}"
-    },
-    "noCashDrawersConfigured": "Yapılandırılmış kasa çekmecesi yok",
-    "noPagersConfigured": "Yapılandırılmış çağrı cihazı yok",
-    "printer": {
+  },
+  "noCashDrawersConfigured": "Yapılandırılmış kasa çekmecesi yok",
+  "noPagersConfigured": "Yapılandırılmış çağrı cihazı yok",
+  "printer": {
       "loadFailed": "Yazıcılar yüklenemedi",
       "selectPrompt": "Lütfen bir yazıcı seçin",
       "saveSuccess": "Yazıcı yapılandırması kaydedildi",
@@ -204,6 +210,5 @@
       "supportedTitle": "Desteklenen Yazıcılar",
       "supportedDesc": "Bu uygulama, ESC/POS uyumlu termal yazıcıları destekler: Epson TM serisi, Star TSP serisi ve genel ESC/POS yazıcılar."
     }
-  }
 }
 

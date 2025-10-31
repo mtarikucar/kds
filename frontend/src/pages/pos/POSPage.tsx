@@ -82,11 +82,11 @@ const POSPage = () => {
         setOrderNotes(activeOrder.notes || '');
 
         toast.info(
-          t('pos.loadedExistingOrder', { orderNumber: activeOrder.orderNumber, count: items.length })
+          t('loadedExistingOrder', { orderNumber: activeOrder.orderNumber, count: items.length })
         );
       } else {
         // Table is marked occupied but no active orders found
-        toast.warning(t('pos.tableOccupiedNoOrders'));
+  toast.warning(t('tableOccupiedNoOrders'));
       }
     }
   }, [selectedTable, tableOrders]);
@@ -106,16 +106,16 @@ const POSPage = () => {
       setDiscount(0);
       setCustomerName('');
       setOrderNotes('');
-      toast.info(t('pos.loadingExistingOrder'));
+  toast.info(t('loadingExistingOrder'));
     } else {
-      toast.warning(t('pos.tableReserved'));
+  toast.warning(t('tableReserved'));
     }
   };
 
   const handleAddItem = (product: Product) => {
     // In tableless mode, table selection is optional
     if (!isTablelessMode && !selectedTable) {
-      toast.error(t('pos.selectTableFirst'));
+  toast.error(t('selectTableFirst'));
       return;
     }
 
@@ -154,12 +154,12 @@ const POSPage = () => {
   const handleCreateOrder = () => {
     // In tableless mode, table is optional
     if (!isTablelessMode && !selectedTable) {
-      toast.error(t('pos.selectTable'));
+  toast.error(t('selectTable'));
       return;
     }
 
     if (cartItems.length === 0) {
-      toast.error(t('pos.cartEmpty'));
+  toast.error(t('cartEmpty'));
       return;
     }
 
@@ -189,7 +189,7 @@ const POSPage = () => {
         },
         {
           onSuccess: (order) => {
-            toast.success(t('pos.orderUpdated'));
+            toast.success(t('orderUpdated'));
           },
         }
       );
@@ -200,7 +200,7 @@ const POSPage = () => {
         {
           onSuccess: (order) => {
             setCurrentOrderId(order.id);
-            toast.success(t('pos.orderCreatedSuccess', { orderNumber: order.orderNumber }));
+            toast.success(t('orderCreatedSuccess', { orderNumber: order.orderNumber }));
 
             // Mark table as occupied after successful order creation (if table mode)
             if (selectedTable && selectedTable.status === TableStatus.AVAILABLE) {
@@ -219,12 +219,12 @@ const POSPage = () => {
   const handleCheckout = () => {
     // In tableless mode, table is optional
     if (!isTablelessMode && !selectedTable) {
-      toast.error(t('pos.selectTable'));
+  toast.error(t('selectTable'));
       return;
     }
 
     if (cartItems.length === 0) {
-      toast.error(t('pos.cartEmpty'));
+  toast.error(t('cartEmpty'));
       return;
     }
 
@@ -261,7 +261,7 @@ const POSPage = () => {
         {
           onSuccess: (order) => {
             setIsPaymentModalOpen(true);
-            toast.success(t('pos.orderUpdated'));
+            toast.success(t('orderUpdated'));
           },
         }
       );
@@ -322,7 +322,7 @@ const POSPage = () => {
           setCustomerName('');
           setOrderNotes('');
 
-          toast.success(t('pos.orderCompletedSuccess'));
+          toast.success(t('orderCompletedSuccess'));
         },
       }
     );
@@ -337,11 +337,11 @@ const POSPage = () => {
     <div className="h-full pb-20 lg:pb-0">
       {/* Header */}
       <div className="mb-4 md:mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t('pos.title')}</h1>
+  <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t('title')}</h1>
         <p className="text-sm md:text-base text-gray-600">
           {isTablelessMode
-            ? t('pos.startTakingOrdersTableless')
-            : t('pos.selectTableAndStart')}
+            ? t('startTakingOrdersTableless')
+            : t('selectTableAndStart')}
         </p>
         {/* Selected Table Indicator - Mobile/Tablet */}
         {selectedTable && !isDesktop && (
@@ -349,7 +349,7 @@ const POSPage = () => {
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
             </svg>
-            {t('pos.table')} {selectedTable.number}
+            {t('table')} {selectedTable.number}
           </div>
         )}
       </div>
@@ -362,7 +362,7 @@ const POSPage = () => {
             <div className="w-1/4">
               <Card className="h-full">
                 <CardHeader>
-                  <CardTitle>{t('navigation.tables')}</CardTitle>
+                  <CardTitle>{t('common:navigation.tables')}</CardTitle>
                 </CardHeader>
                 <CardContent className="overflow-y-auto">
                   <TableGrid
@@ -379,7 +379,7 @@ const POSPage = () => {
             <Card className="h-full">
               <CardHeader>
                 <CardTitle>
-                  {t('navigation.menu')} {selectedTable && `- ${t('pos.tableLabel')} ${selectedTable.number}`}
+                  {t('common:navigation.menu')} {selectedTable && `- ${t('tableLabel')} ${selectedTable.number}`}
                 </CardTitle>
               </CardHeader>
               <CardContent className="h-[calc(100%-80px)] overflow-y-auto">
@@ -420,7 +420,7 @@ const POSPage = () => {
           {!isTablelessMode && !selectedTable && (
             <Card className="mb-4">
               <CardHeader>
-                <CardTitle className="text-lg">{t('pos.selectTableTitle')}</CardTitle>
+                <CardTitle className="text-lg">{t('selectTableTitle')}</CardTitle>
               </CardHeader>
               <CardContent className="max-h-[300px] overflow-y-auto">
                 <TableGrid
@@ -435,7 +435,7 @@ const POSPage = () => {
           <Card className="h-full">
             <CardHeader>
               <CardTitle className="text-lg">
-                {t('navigation.menu')} {selectedTable && `- ${t('pos.tableLabel')} ${selectedTable.number}`}
+                {t('common:navigation.menu')} {selectedTable && `- ${t('tableLabel')} ${selectedTable.number}`}
               </CardTitle>
             </CardHeader>
             <CardContent className="h-[calc(100%-70px)] overflow-y-auto">

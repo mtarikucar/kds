@@ -1,4 +1,4 @@
-import { QRCode } from 'react-qr-code';
+import QRCode from 'react-qr-code';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Download, Search, Share2, Printer, FileImage, FileText, Copy, Check } from 'lucide-react';
@@ -38,7 +38,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
     if (downloadFormat === 'svg') {
       const blob = new Blob([svgData], { type: 'image/svg+xml' });
       const url = URL.createObjectURL(blob);
-      const downloadLink = document.createElement('a');
+  const downloadLink = document.createElement('a');
       downloadLink.download = `${fileName}.svg`;
       downloadLink.href = url;
       downloadLink.click();
@@ -86,7 +86,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
     if (navigator.share) {
       navigator.share({
         title: `${tenant?.name} - ${qrCode.label}`,
-        text: 'Scan this QR code to view our menu',
+        text: t('qr.shareText'),
         url: qrCode.url
       });
     }
@@ -164,21 +164,21 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
           <button
             onClick={downloadQR}
             className="flex-1 px-3 py-2 text-sm border border-gray-200 bg-white hover:bg-gray-50 rounded-lg flex items-center justify-center gap-1 transition-colors"
-            title="Download QR Code"
+            title={t('qr.downloadQrCode')}
           >
             <Download className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={openPreview}
             className="flex-1 px-3 py-2 text-sm border border-gray-200 bg-white hover:bg-gray-50 rounded-lg flex items-center justify-center gap-1 transition-colors"
-            title="Preview Menu"
+            title={t('qr.previewMenu')}
           >
             <Search className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={printQR}
             className="flex-1 px-3 py-2 text-sm border border-gray-200 bg-white hover:bg-gray-50 rounded-lg flex items-center justify-center gap-1 transition-colors"
-            title="Print QR Code"
+            title={t('qr.printQrCode')}
           >
             <Printer className="h-3.5 w-3.5" />
           </button>
@@ -199,7 +199,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
 
           {/* Size Selector */}
           <div className="bg-gray-50 rounded-lg p-3">
-            <p className="text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">Preview Size</p>
+            <p className="text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">{t('qr.previewSize')}</p>
             <div className="grid grid-cols-3 gap-2">
               {Object.entries(sizePresets).map(([key, preset]) => (
                 <button
@@ -238,15 +238,15 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
           {/* URL Display */}
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-gray-700 uppercase tracking-wide">Menu URL</p>
+              <p className="text-xs font-medium text-gray-700 uppercase tracking-wide">{t('qr.menuUrl')}</p>
               <button
                 onClick={copyToClipboard}
                 className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
               >
                 {copied ? (
-                  <><Check className="h-3 w-3" /> Copied!</>
+                  <><Check className="h-3 w-3" /> {t('qr.copied')}</>
                 ) : (
-                  <><Copy className="h-3 w-3" /> Copy</>                )}
+                  <><Copy className="h-3 w-3" /> {t('buttons.copy')}</>                )}
               </button>
             </div>
             <p className="text-sm text-gray-900 font-mono break-all bg-white rounded p-2 border border-gray-200">
@@ -256,7 +256,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
 
           {/* Download Options */}
           <div className="space-y-3">
-            <p className="text-xs font-medium text-gray-700 uppercase tracking-wide">Download Format</p>
+            <p className="text-xs font-medium text-gray-700 uppercase tracking-wide">{t('qr.downloadFormat')}</p>
             <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={() => setDownloadFormat('png')}
@@ -267,7 +267,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
                 }`}
               >
                 <FileImage className="h-4 w-4" />
-                PNG
+                {t('qr.png')}
               </button>
               <button
                 onClick={() => setDownloadFormat('svg')}
@@ -278,7 +278,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
                 }`}
               >
                 <FileImage className="h-4 w-4" />
-                SVG
+                {t('qr.svg')}
               </button>
               <button
                 onClick={() => setDownloadFormat('pdf')}
@@ -289,7 +289,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
                 }`}
               >
                 <FileText className="h-4 w-4" />
-                PDF
+                {t('qr.pdf')}
               </button>
             </div>
           </div>
@@ -302,7 +302,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
               className="w-full flex items-center justify-center gap-2"
             >
               <Download className="h-5 w-5" />
-              Download {downloadFormat.toUpperCase()} ({currentSize.label})
+              {t('qr.downloadFile', { format: downloadFormat.toUpperCase(), size: currentSize.label })}
             </Button>
             
             <div className="grid grid-cols-2 gap-3">
@@ -312,7 +312,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
                 className="flex items-center justify-center gap-2"
               >
                 <Printer className="h-4 w-4" />
-                Print
+                {t('buttons.print')}
               </Button>
               <Button
                 onClick={openPreview}
@@ -320,29 +320,29 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
                 className="flex items-center justify-center gap-2"
               >
                 <Search className="h-4 w-4" />
-                Preview
+                {t('buttons.preview')}
               </Button>
             </div>
 
-            {navigator.share && (
+            {typeof (navigator as any).share === 'function' && (
               <Button
                 onClick={shareQR}
                 variant="outline"
                 className="w-full flex items-center justify-center gap-2"
               >
                 <Share2 className="h-4 w-4" />
-                Share QR Code
+                {t('qr.shareQrCode')}
               </Button>
             )}
           </div>
 
           {/* Usage Tips */}
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
-            <p className="text-xs font-medium text-blue-900 mb-1">Pro Tips:</p>
+            <p className="text-xs font-medium text-blue-900 mb-1">{t('qr.proTipsTitle')}</p>
             <ul className="text-xs text-blue-800 space-y-1">
-              <li>• Use "Table Tent" size for table displays</li>
-              <li>• Choose "Poster" size for wall mounting</li>
-              <li>• SVG format maintains quality at any size</li>
+              <li>• {t('qr.proTip1')}</li>
+              <li>• {t('qr.proTip2')}</li>
+              <li>• {t('qr.proTip3')}</li>
             </ul>
           </div>
         </div>

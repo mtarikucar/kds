@@ -41,11 +41,11 @@ const IntegrationsSettingsPage = () => {
         .then(() => {
           setHardwareInitialized(true);
           loadHardwareDevices();
-          toast.success(t('settings.hardware.initialized'));
+          toast.success(t('hardware.initialized'));
         })
         .catch((error) => {
           console.error('Failed to initialize hardware:', error);
-          toast.error(t('settings.hardware.initFailed'));
+          toast.error(t('hardware.initFailed'));
         });
     }
   }, [hardwareInitialized]);
@@ -86,24 +86,24 @@ const IntegrationsSettingsPage = () => {
   const handleHardwareEvent = (event: HardwareEvent) => {
     switch (event.type) {
       case 'DeviceConnected':
-        toast.success(t('settings.hardware.deviceConnected', { name: event.data.device_name }));
+  toast.success(t('hardware.deviceConnected', { name: event.data.device_name }));
         loadHardwareDevices();
         break;
       case 'DeviceDisconnected':
-        toast.info(t('settings.hardware.deviceDisconnected', { name: event.data.device_name }));
+  toast.info(t('hardware.deviceDisconnected', { name: event.data.device_name }));
         loadHardwareDevices();
         break;
       case 'BarcodeScanned':
-        toast.info(t('settings.hardware.barcodeScanned', { code: event.data.barcode_data }));
+  toast.info(t('hardware.barcodeScanned', { code: event.data.barcode_data }));
         break;
       case 'PaperOut':
-        toast.error(t('settings.hardware.paperOut', { name: event.data.device_id }));
+  toast.error(t('hardware.paperOut', { name: event.data.device_id }));
         break;
       case 'PaperLow':
-        toast.warning(t('settings.hardware.paperLow', { name: event.data.device_id }));
+  toast.warning(t('hardware.paperLow', { name: event.data.device_id }));
         break;
       case 'DeviceError':
-        toast.error(t('settings.hardware.deviceError', { name: event.data.device_id, error: event.data.error }));
+  toast.error(t('hardware.deviceError', { name: event.data.device_id, error: event.data.error }));
         loadHardwareDevices();
         break;
       default:
@@ -113,20 +113,20 @@ const IntegrationsSettingsPage = () => {
 
   const getIntegrationTypeLabel = (type: string) => {
     const types: Record<string, string> = {
-      PAYMENT_GATEWAY: t('settings.integrationTypes.PAYMENT_GATEWAY'),
-      POS_HARDWARE: t('settings.integrationTypes.POS_HARDWARE'),
-      THIRD_PARTY_API: t('settings.integrationTypes.THIRD_PARTY_API'),
-      DELIVERY_APP: t('settings.integrationTypes.DELIVERY_APP'),
-      ACCOUNTING: t('settings.integrationTypes.ACCOUNTING'),
-      CRM: t('settings.integrationTypes.CRM'),
-      INVENTORY: t('settings.integrationTypes.INVENTORY'),
-      THERMAL_PRINTER: t('settings.integrationTypes.THERMAL_PRINTER'),
-      CASH_DRAWER: t('settings.integrationTypes.CASH_DRAWER'),
-      RESTAURANT_PAGER: t('settings.integrationTypes.RESTAURANT_PAGER'),
-      BARCODE_READER: t('settings.integrationTypes.BARCODE_READER'),
-      CUSTOMER_DISPLAY: t('settings.integrationTypes.CUSTOMER_DISPLAY'),
-      KITCHEN_DISPLAY: t('settings.integrationTypes.KITCHEN_DISPLAY'),
-      SCALE_DEVICE: t('settings.integrationTypes.SCALE_DEVICE'),
+  PAYMENT_GATEWAY: t('integrationTypes.PAYMENT_GATEWAY'),
+  POS_HARDWARE: t('integrationTypes.POS_HARDWARE'),
+  THIRD_PARTY_API: t('integrationTypes.THIRD_PARTY_API'),
+  DELIVERY_APP: t('integrationTypes.DELIVERY_APP'),
+  ACCOUNTING: t('integrationTypes.ACCOUNTING'),
+  CRM: t('integrationTypes.CRM'),
+  INVENTORY: t('integrationTypes.INVENTORY'),
+  THERMAL_PRINTER: t('integrationTypes.THERMAL_PRINTER'),
+  CASH_DRAWER: t('integrationTypes.CASH_DRAWER'),
+  RESTAURANT_PAGER: t('integrationTypes.RESTAURANT_PAGER'),
+  BARCODE_READER: t('integrationTypes.BARCODE_READER'),
+  CUSTOMER_DISPLAY: t('integrationTypes.CUSTOMER_DISPLAY'),
+  KITCHEN_DISPLAY: t('integrationTypes.KITCHEN_DISPLAY'),
+  SCALE_DEVICE: t('integrationTypes.SCALE_DEVICE'),
     };
     return types[type] || type;
   };
@@ -136,26 +136,26 @@ const IntegrationsSettingsPage = () => {
       await toggleIntegration.mutateAsync({ id, isEnabled: !currentStatus });
       toast.success(
         !currentStatus
-          ? t('settings.integrations.enabledSuccess')
-          : t('settings.integrations.disabledSuccess')
+          ? t('integrations.enabledSuccess')
+          : t('integrations.disabledSuccess')
       );
       refetch();
       loadHardwareDevices(); // Reload hardware devices if it's a hardware integration
     } catch (error) {
-      toast.error(t('settings.integrations.toggleFailed'));
+  toast.error(t('integrations.toggleFailed'));
     }
   };
 
   const handleDeleteIntegration = async (id: string) => {
-    if (!confirm(t('settings.integrations.confirmDelete'))) return;
+  if (!confirm(t('integrations.confirmDelete'))) return;
 
     try {
       await deleteIntegration.mutateAsync(id);
-      toast.success(t('settings.integrations.deleteSuccess'));
+  toast.success(t('integrations.deleteSuccess'));
       refetch();
       loadHardwareDevices();
     } catch (error) {
-      toast.error(t('settings.integrations.deleteFailed'));
+  toast.error(t('integrations.deleteFailed'));
     }
   };
 
@@ -166,10 +166,10 @@ const IntegrationsSettingsPage = () => {
           id: editingDevice.id,
           data: config,
         });
-        toast.success(t('settings.hardware.deviceUpdated'));
+  toast.success(t('hardware.deviceUpdated'));
       } else {
         await createIntegration.mutateAsync(config);
-        toast.success(t('settings.hardware.deviceAdded'));
+  toast.success(t('hardware.deviceAdded'));
       }
       setDeviceConfigModalOpen(false);
       setEditingDevice(null);
@@ -180,7 +180,7 @@ const IntegrationsSettingsPage = () => {
         loadHardwareDevices();
       }, 1000);
     } catch (error) {
-      toast.error(t('settings.hardware.deviceSaveFailed'));
+  toast.error(t('hardware.deviceSaveFailed'));
     }
   };
 
@@ -195,9 +195,9 @@ const IntegrationsSettingsPage = () => {
   const handleTestDevice = async (deviceId: string) => {
     try {
       await HardwareService.testDevice(deviceId);
-      toast.success(t('settings.hardware.testSuccess'));
+  toast.success(t('hardware.testSuccess'));
     } catch (error) {
-      toast.error(t('settings.hardware.testFailed'));
+  toast.error(t('hardware.testFailed'));
     }
   };
 
@@ -220,9 +220,9 @@ const IntegrationsSettingsPage = () => {
       <div className="mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{t('settings.integrations')}</h1>
+            <h1 className="text-2xl font-bold text-gray-900">{t('integrationsLabel')}</h1>
             <p className="text-gray-600 mt-1">
-              {t('settings.integrationsDescription')}
+              {t('integrationsDescription')}
             </p>
           </div>
         </div>
@@ -233,7 +233,7 @@ const IntegrationsSettingsPage = () => {
         <Card className="mb-6">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle>{t('settings.hardwareDevices')}</CardTitle>
+              <CardTitle>{t('hardwareDevices')}</CardTitle>
               <Button
                 variant="primary"
                 onClick={() => {
@@ -251,19 +251,19 @@ const IntegrationsSettingsPage = () => {
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="printers">
                   <Printer className="h-4 w-4 mr-2" />
-                  {t('settings.printers')}
+                  {t('printers')}
                 </TabsTrigger>
                 <TabsTrigger value="cash-drawers">
                   <DollarSign className="h-4 w-4 mr-2" />
-                  {t('settings.cashDrawers')}
+                  {t('cashDrawers')}
                 </TabsTrigger>
                 <TabsTrigger value="pagers">
                   <Radio className="h-4 w-4 mr-2" />
-                  {t('settings.pagers')}
+                  {t('pagers')}
                 </TabsTrigger>
                 <TabsTrigger value="scanners">
                   <Barcode className="h-4 w-4 mr-2" />
-                  {t('settings.scanners')}
+                  {t('scanners')}
                 </TabsTrigger>
               </TabsList>
 
@@ -281,7 +281,7 @@ const IntegrationsSettingsPage = () => {
                     ))
                   ) : (
                     <div className="col-span-full text-center py-8 text-gray-500">
-                      {t('settings.noPrintersConfigured')}
+                      {t('noPrintersConfigured')}
                     </div>
                   )}
                 </div>
@@ -301,7 +301,7 @@ const IntegrationsSettingsPage = () => {
                     ))
                   ) : (
                     <div className="col-span-full text-center py-8 text-gray-500">
-                      {t('settings.noCashDrawersConfigured')}
+                      {t('noCashDrawersConfigured')}
                     </div>
                   )}
                 </div>
@@ -321,7 +321,7 @@ const IntegrationsSettingsPage = () => {
                     ))
                   ) : (
                     <div className="col-span-full text-center py-8 text-gray-500">
-                      {t('settings.noPagersConfigured')}
+                      {t('noPagersConfigured')}
                     </div>
                   )}
                 </div>
@@ -341,7 +341,7 @@ const IntegrationsSettingsPage = () => {
                     ))
                   ) : (
                     <div className="col-span-full text-center py-8 text-gray-500">
-                      {t('settings.noBarcodeScanners')}
+                      {t('noBarcodeScanners')}
                     </div>
                   )}
                 </div>
@@ -355,22 +355,22 @@ const IntegrationsSettingsPage = () => {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>{t('settings.integrations.otherTitle')}</CardTitle>
+            <CardTitle>{t('integrations.otherTitle')}</CardTitle>
             <Button variant="outline">
               <Plus className="h-4 w-4 mr-2" />
-              {t('settings.integrations.addIntegration')}
+              {t('integrations.addIntegration')}
             </Button>
           </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
             <div className="text-center py-12">
-              <p className="text-gray-600">{t('settings.integrations.loading')}</p>
+              <p className="text-gray-600">{t('integrations.loading')}</p>
             </div>
           ) : regularIntegrations && regularIntegrations.length === 0 ? (
             <div className="text-center py-12">
               <Plug className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 mb-4">{t('settings.integrations.none')}</p>
+              <p className="text-gray-600 mb-4">{t('integrations.none')}</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -406,7 +406,7 @@ const IntegrationsSettingsPage = () => {
                         {getIntegrationTypeLabel(integration.integrationType)} •{' '}
                         {integration.provider}
                         {integration.lastSyncedAt && (
-                            <> • {t('settings.integrations.lastSynced', { date: new Date(integration.lastSyncedAt).toLocaleString() })}</>
+                            <> • {t('integrations.lastSynced', { date: new Date(integration.lastSyncedAt).toLocaleString() })}</>
                           )}
                       </p>
                     </div>

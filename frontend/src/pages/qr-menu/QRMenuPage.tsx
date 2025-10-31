@@ -62,8 +62,8 @@ const QRMenuPage = () => {
         setMenuData(response.data);
         setIsLoading(false);
       } catch (err: any) {
-        console.error('Error fetching menu data:', err);
-        setError(err.response?.data?.message || t('app:messages.operationFailed'));
+  console.error('Error fetching menu data:', err);
+  setError(err.response?.data?.message || t('messages.operationFailed'));
         setIsLoading(false);
       }
     };
@@ -87,7 +87,7 @@ const QRMenuPage = () => {
         <Card className="max-w-md">
           <CardContent className="pt-6 text-center">
             <p className="text-red-600 mb-4">{error}</p>
-            <p className="text-gray-600">{t('app:messages.contactSupport')}</p>
+            <p className="text-gray-600">{t('messages.contactSupport')}</p>
           </CardContent>
         </Card>
       </div>
@@ -144,7 +144,7 @@ const QRMenuPage = () => {
               <div>
                 <h1 className="text-2xl font-bold text-white">{tenant.name}</h1>
                 {table && (
-                  <p className="text-sm text-white/90">Table {table.number}</p>
+                  <p className="text-sm text-white/90">{t('qrMenu.tableLabel')} {table.number}</p>
                 )}
               </div>
             </div>
@@ -155,7 +155,7 @@ const QRMenuPage = () => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-white/70" />
             <input
               type="text"
-              placeholder="Search menu..."
+              placeholder={t('qrMenu.searchPlaceholder')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border-2 border-white/30 bg-white/10 text-white placeholder-white/70 rounded-lg focus:outline-none focus:ring-2 focus:ring-white/50"
@@ -176,7 +176,7 @@ const QRMenuPage = () => {
               borderColor: settings.primaryColor,
             }}
           >
-            All
+            {t('qrMenu.all')}
           </button>
           {categories.map((category) => (
             <button
@@ -199,7 +199,7 @@ const QRMenuPage = () => {
           {filteredProducts.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
-                <p className="text-gray-500">No items found</p>
+                <p className="text-gray-500">{t('qrMenu.noItemsFound')}</p>
               </CardContent>
             </Card>
           ) : (
@@ -356,7 +356,7 @@ const QRMenuPage = () => {
         }}
       >
         <div className="max-w-4xl mx-auto px-4 py-6 text-center text-sm text-white">
-          <p>Powered by Restaurant POS System</p>
+          <p>{t('qrMenu.poweredBy')}</p>
         </div>
       </div>
     </div>

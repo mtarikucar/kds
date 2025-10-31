@@ -81,7 +81,8 @@
     "enable": "Enable",
     "disable": "Disable",
     "connect": "Connect",
-    "disconnect": "Disconnect"
+    "disconnect": "Disconnect",
+    "preview": "Preview"
   },
   "statuses": {
     "active": "Active",
@@ -113,32 +114,7 @@
     "lastMonth": "Last Month",
     "lastYear": "Last Year"
   },
-  "landing": {
-    "features": "Features",
-    "pricing": "Pricing",
-    "contact": "Contact",
-    "getStarted": "Get Started",
-    "badge": "Modern Restaurant Management Solution",
-    "headline": "Transform Your Restaurant",
-    "headlineHighlight": "Operations",
-    "subtitle": "All-in-one POS and Kitchen Display System designed for modern restaurants. Streamline orders, manage tables, and boost efficiency.",
-    "startFreeTrial": "Start Free Trial",
-    "learnMore": "Learn More",
-    "everythingYouNeed": "Everything You Need",
-    "featuresDescription": "Powerful features designed to streamline your restaurant operations and improve customer experience.",
-    "feature1Title": "Point of Sale System",
-    "feature1Desc": "Intuitive POS interface for fast order taking, table management, and payment processing with multiple payment methods.",
-    "feature2Title": "Kitchen Display System",
-    "feature2Desc": "Real-time order display for kitchen staff with status tracking, prep timers, and priority management.",
-    "feature3Title": "QR Menu System",
-    "feature3Desc": "Digital menus accessible via QR codes for contactless ordering. Customizable design and real-time updates.",
-    "feature4Title": "Table Management",
-    "feature4Desc": "Visual table layout with real-time availability status, capacity tracking, and section organization.",
-    "feature5Title": "Inventory Management",
-    "feature5Desc": "Track stock levels, manage suppliers, get low-stock alerts, and view comprehensive movement history.",
-    "feature6Title": "Reports & Analytics",
-    "feature6Desc": "Detailed sales reports, top-selling items, revenue trends, and customizable date range analysis."
-  },
+  
   "dashboard": {
     "title": "Dashboard",
     "welcome": "Welcome back! Here's your overview for today.",
@@ -237,8 +213,7 @@
     "qrStyle": "QR Style",
     "designTemplates": "Design Templates",
     "choosePreDesignedTemplate": "Choose a pre-designed template that matches your restaurant style. All settings will be applied automatically.",
-    "scanToViewMenu": "Scan to view our menu",
-    "tableQRCodes": "Table QR Codes",
+  "scanToViewMenu": "Scan to view our menu",
     "generatedOn": "Generated on",
     "tableSpecificQRCodes": "Table-Specific QR Codes",
     "tableSpecificQRDesc": "Each table has its own QR code. Customers scanning these will see which table they're at.",
@@ -417,6 +392,7 @@
     "product": "Product",
     "features": "Features",
     "pricing": "Pricing",
+  "contact": "Contact",
     "freeTrial": "Free Trial",
     "company": "Company",
     "contactUs": "Contact Us",
@@ -428,6 +404,33 @@
     "cookiePolicy": "Cookie Policy",
     "allRightsReserved": "All rights reserved.",
     "getStarted": "Get Started"
+  }
+  ,
+  "qrMenu": {
+    "tableLabel": "Table",
+    "searchPlaceholder": "Search menu...",
+    "all": "All",
+    "noItemsFound": "No items found",
+    "poweredBy": "Powered by Restaurant POS System"
+  },
+  "qr": {
+    "shareText": "Check out our menu",
+    "downloadQrCode": "Download QR Code",
+    "previewMenu": "Preview Menu",
+    "printQrCode": "Print QR Code",
+    "previewSize": "Preview Size",
+    "menuUrl": "Menu URL",
+    "copied": "Copied!",
+    "downloadFormat": "Download Format",
+    "png": "PNG",
+    "svg": "SVG",
+    "pdf": "PDF",
+    "downloadFile": "Download {{format}} ({{size}})",
+    "shareQrCode": "Share QR Code",
+    "proTipsTitle": "Pro Tips",
+    "proTip1": "Use high contrast colors for better scanning.",
+    "proTip2": "Print at 300 DPI for the best quality.",
+    "proTip3": "Test the QR code on multiple devices before printing."
   }
 }
 

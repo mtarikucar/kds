@@ -113,6 +113,19 @@ const TableManagementPage = () => {
     }
   };
 
+  const getStatusLabel = (status: TableStatus) => {
+    switch (status) {
+      case TableStatus.AVAILABLE:
+        return t('admin.available');
+      case TableStatus.OCCUPIED:
+        return t('admin.occupied');
+      case TableStatus.RESERVED:
+        return t('admin.reserved');
+      default:
+        return String(status);
+    }
+  };
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
@@ -144,8 +157,8 @@ const TableManagementPage = () => {
                     <div className="text-2xl font-bold mb-2">
                       {t('admin.table')} {table.number}
                     </div>
-                    <Badge variant={getStatusVariant(table.status)}>
-                      {table.status}
+                    <Badge variant={getStatusVariant(table.status as TableStatus)}>
+                      {getStatusLabel(table.status as TableStatus)}
                     </Badge>
                     <div className="text-sm text-gray-600 mt-2">
                       {t('admin.capacity')}: {table.capacity} {t('admin.people')}
@@ -159,7 +172,7 @@ const TableManagementPage = () => {
                       onClick={() => handleOpenModal(table)}
                     >
                       <Edit className="h-4 w-4 mr-1" />
-                      {t('app:app.edit')}
+                      {t('app.edit')}
                     </Button>
                     <Button
                       variant="danger"
@@ -200,11 +213,14 @@ const TableManagementPage = () => {
             error={form.formState.errors.capacity?.message}
             {...form.register('capacity', { valueAsNumber: true })}
           />
+          {/* @ts-ignore: Pass props via any spread to avoid TS mismatch with custom Select */}
           <Select
-            label={t('admin.status')}
-            options={statusOptions}
-            error={form.formState.errors.status?.message}
-            {...form.register('status')}
+            {...({
+              label: t('admin.status'),
+              options: statusOptions,
+              error: form.formState.errors.status?.message,
+              ...form.register('status'),
+            } as any)}
           />
           <div className="flex gap-3">
             <Button
@@ -213,10 +229,10 @@ const TableManagementPage = () => {
               className="flex-1"
               onClick={() => setModalOpen(false)}
             >
-              {t('app:app.cancel')}
+              {t('app.cancel')}
             </Button>
             <Button type="submit" className="flex-1">
-              {editingTable ? t('app:app.update') : t('app:app.create')}
+              {editingTable ? t('app.update') : t('app.create')}
             </Button>
           </div>
         </form>

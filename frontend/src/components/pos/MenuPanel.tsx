@@ -123,7 +123,7 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
                   className="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-semibold py-3 px-4 rounded-lg transition-colors flex items-center justify-center gap-2 min-h-[48px]"
                 >
                   <Plus className="h-5 w-5" />
-                  <span>{t('addToOrder')}</span>
+                  <span className="text-sm">{t('addToOrder')}</span>
                 </button>
               </Card>
             ))}

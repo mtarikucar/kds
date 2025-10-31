@@ -27,7 +27,13 @@
     "disconnected": "Bağlantı Kesildi",
     "pending": "Beklemede",
     "preparing": "Hazırlanıyor",
-    "ready": "Hazır"
+    "ready": "Hazır",
+    "served": "Servis Edildi",
+    "websocket": "WebSocket",
+    "orderNoteLabel": "Sipariş Notu",
+    "noteLabel": "Not",
+    "markAs": "{{status}} olarak işaretle",
+    "cancelOrder": "Siparişi İptal Et"
   }
 }
 

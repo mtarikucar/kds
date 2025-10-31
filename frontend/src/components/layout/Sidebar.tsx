@@ -103,11 +103,11 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
     },
     {
       to: '/admin/settings/pos',
-      label: t('settings.pos'),
+      label: t('settings:pos'),
     },
     {
       to: '/admin/settings/integrations',
-      label: t('settings.integrations'),
+      label: t('settings:integrationsLabel'),
     },
   ];
 
