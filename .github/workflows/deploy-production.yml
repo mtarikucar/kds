@@ -22,7 +22,7 @@ jobs:
     needs: test
     environment:
       name: production
-      url: https://yourapp.com
+      url: https://hummytummy.com
 
     steps:
       - name: Checkout code
@@ -73,7 +73,7 @@ jobs:
 
             # Health check
             sleep 15
-            curl -f http://localhost:3000/api/health || exit 1
+            curl -f https://hummytummy.com/api/health || exit 1
           EOF
 
       - name: Verify deployment
@@ -135,5 +135,5 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               commit_sha: context.sha,
-              body: `${status} ${message}\nEnvironment: https://yourapp.com`
+              body: `${status} ${message}\nEnvironment: https://hummytummy.com`
             });

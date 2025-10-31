@@ -1,0 +1,264 @@
+name: Release Deployment
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Matches v1.0.0, v2.1.3, etc.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v1.0.0)'
+        required: true
+        type: string
+
+env:
+  NODE_VERSION: '18.x'
+  SERVER_HOST: '38.242.233.166'
+
+jobs:
+  # Run comprehensive tests
+  test:
+    name: Run Tests
+    uses: ./.github/workflows/test.yml
+
+  # Build and tag Docker images
+  build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Get version from tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build backend image
+        run: |
+          docker build \
+            --target production \
+            --tag kds-backend:${{ steps.version.outputs.VERSION }} \
+            --tag kds-backend:latest \
+            ./backend
+
+      - name: Build frontend image
+        run: |
+          docker build \
+            --target production \
+            --build-arg VITE_API_URL=https://hummytummy.com/api \
+            --build-arg VITE_SOCKET_URL=https://hummytummy.com \
+            --build-arg VITE_WS_URL=wss://hummytummy.com \
+            --tag kds-frontend:${{ steps.version.outputs.VERSION }} \
+            --tag kds-frontend:latest \
+            ./frontend
+
+      - name: Save Docker images
+        run: |
+          docker save kds-backend:${{ steps.version.outputs.VERSION }} | gzip > backend-${{ steps.version.outputs.VERSION }}.tar.gz
+          docker save kds-frontend:${{ steps.version.outputs.VERSION }} | gzip > frontend-${{ steps.version.outputs.VERSION }}.tar.gz
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-images
+          path: |
+            backend-${{ steps.version.outputs.VERSION }}.tar.gz
+            frontend-${{ steps.version.outputs.VERSION }}.tar.gz
+          retention-days: 7
+
+  # Deploy to production using Blue-Green strategy
+  deploy-production:
+    name: Deploy to Production (Blue-Green)
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: production
+      url: https://hummytummy.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download Docker images
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-images
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup SSH
+        uses: shimataro/ssh-key-action@v2
+        with:
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          known_hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+
+      - name: Create database backup
+        run: |
+          ssh root@${{ env.SERVER_HOST }} << 'EOF'
+            cd /root/kds
+            ./scripts/backup-database.sh
+          EOF
+
+      - name: Transfer Docker images
+        run: |
+          scp backend-${{ steps.version.outputs.VERSION }}.tar.gz root@${{ env.SERVER_HOST }}:/root/kds/
+          scp frontend-${{ steps.version.outputs.VERSION }}.tar.gz root@${{ env.SERVER_HOST }}:/root/kds/
+
+      - name: Load Docker images on server
+        run: |
+          ssh root@${{ env.SERVER_HOST }} << EOF
+            cd /root/kds
+            docker load < backend-${{ steps.version.outputs.VERSION }}.tar.gz
+            docker load < frontend-${{ steps.version.outputs.VERSION }}.tar.gz
+            rm -f backend-${{ steps.version.outputs.VERSION }}.tar.gz frontend-${{ steps.version.outputs.VERSION }}.tar.gz
+          EOF
+
+      - name: Deploy with Blue-Green strategy
+        id: deploy
+        run: |
+          ssh root@${{ env.SERVER_HOST }} << 'EOF'
+            cd /root/kds
+
+            # Pull latest code
+            git fetch --all --tags
+            git checkout ${{ steps.version.outputs.VERSION }}
+
+            # Run Blue-Green deployment
+            ./scripts/blue-green-deploy.sh deploy
+
+            if [ $? -ne 0 ]; then
+              echo "Deployment failed!"
+              exit 1
+            fi
+          EOF
+
+      - name: Run health checks
+        run: |
+          echo "Waiting for services to stabilize..."
+          sleep 15
+
+          # Check main API
+          if ! curl -sf https://hummytummy.com/api/health > /dev/null; then
+            echo "API health check failed!"
+            exit 1
+          fi
+
+          # Check homepage
+          if ! curl -sf https://hummytummy.com > /dev/null; then
+            echo "Frontend health check failed!"
+            exit 1
+          fi
+
+          echo "All health checks passed!"
+
+      - name: Create GitHub Release
+        if: success() && github.event_name == 'push'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          name: Release ${{ steps.version.outputs.VERSION }}
+          body: |
+            ## 🚀 Release ${{ steps.version.outputs.VERSION }}
+
+            **Deployed at:** ${{ github.event.head_commit.timestamp }}
+            **Commit:** ${{ github.sha }}
+            **Environment:** https://hummytummy.com
+
+            ### Deployment Strategy
+            - ✅ Blue-Green deployment
+            - ✅ Zero-downtime deployment
+            - ✅ Automatic health checks
+            - ✅ Database backup created
+
+            ### Changes
+            See commit history for details.
+          draft: false
+          prerelease: false
+
+      - name: Notify success
+        if: success()
+        run: |
+          echo "🎉 Production deployment successful!"
+          echo "Version: ${{ steps.version.outputs.VERSION }}"
+          echo "URL: https://hummytummy.com"
+
+      - name: Rollback on failure
+        if: failure() && steps.deploy.outcome == 'failure'
+        run: |
+          echo "⚠️ Deployment failed, initiating rollback..."
+          ssh root@${{ env.SERVER_HOST }} << 'EOF'
+            cd /root/kds
+            ./scripts/blue-green-deploy.sh rollback
+          EOF
+
+      - name: Cleanup on failure
+        if: failure()
+        run: |
+          echo "🧹 Cleaning up failed deployment..."
+          ssh root@${{ env.SERVER_HOST }} << EOF
+            cd /root/kds
+            rm -f backend-${{ steps.version.outputs.VERSION }}.tar.gz
+            rm -f frontend-${{ steps.version.outputs.VERSION }}.tar.gz
+          EOF
+
+  # Post-deployment verification
+  verify:
+    name: Post-Deployment Verification
+    runs-on: ubuntu-latest
+    needs: deploy-production
+
+    steps:
+      - name: Comprehensive health check
+        run: |
+          echo "Running comprehensive health checks..."
+
+          # API health
+          echo "Checking API..."
+          curl -sf https://hummytummy.com/api/health || exit 1
+
+          # Frontend
+          echo "Checking frontend..."
+          curl -sf https://hummytummy.com || exit 1
+
+          # SSL certificate
+          echo "Checking SSL certificate..."
+          echo | openssl s_client -servername hummytummy.com -connect hummytummy.com:443 2>/dev/null | \
+            openssl x509 -noout -dates || exit 1
+
+          echo "✅ All verification checks passed!"
+
+      - name: Performance check
+        run: |
+          echo "Checking response times..."
+
+          start=$(date +%s%3N)
+          curl -sf https://hummytummy.com/api/health > /dev/null
+          end=$(date +%s%3N)
+
+          response_time=$((end - start))
+          echo "API response time: ${response_time}ms"
+
+          if [ $response_time -gt 5000 ]; then
+            echo "⚠️ Warning: Response time is high (${response_time}ms)"
+          else
+            echo "✅ Response time is good (${response_time}ms)"
+          fi

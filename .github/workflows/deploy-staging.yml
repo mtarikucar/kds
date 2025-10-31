@@ -18,7 +18,7 @@ jobs:
     needs: test
     environment:
       name: staging
-      url: https://staging.yourapp.com
+      url: http://38.242.233.166:3002
 
     steps:
       - name: Checkout code
@@ -76,5 +76,5 @@ jobs:
               owner: context.repo.owner,
               repo: context.repo.repo,
               commit_sha: context.sha,
-              body: `Staging Deployment: ${status}\nEnvironment: https://staging.yourapp.com`
+              body: `Staging Deployment: ${status}\nEnvironment: http://38.242.233.166:3002`
             });
