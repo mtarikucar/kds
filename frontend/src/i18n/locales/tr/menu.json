@@ -32,6 +32,7 @@
     "imageLibrary": "Resim Kütüphanesi",
     "displayOrder": "Görüntüleme Sırası",
     "category": "Kategori",
+    "selectCategory": "Kategori seçin",
     "currentStock": "Mevcut Stok",
     "productImages": "Ürün Resimleri",
     "primary": "Birincil",

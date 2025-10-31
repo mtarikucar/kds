@@ -43,7 +43,9 @@
     "reports": "Reports",
     "settings": "Settings",
     "admin": "Admin",
-    "subscription": "Subscription"
+    "subscription": "Subscription",
+    "expandSidebar": "Expand Sidebar",
+    "collapseSidebar": "Collapse Sidebar"
   },
   "header": {
     "notifications": "Notifications",

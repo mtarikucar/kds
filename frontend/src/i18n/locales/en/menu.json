@@ -32,6 +32,7 @@
     "imageLibrary": "Image Library",
     "displayOrder": "Display Order",
     "category": "Category",
+    "selectCategory": "Select a category",
     "currentStock": "Current Stock",
     "productImages": "Product Images",
     "primary": "Primary",

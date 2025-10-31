@@ -47,10 +47,15 @@
     "noteBody": "Changes will take effect immediately in the POS system. Make sure staff are informed of any operational changes."
   },
   "saveChanges": "Save Changes",
+  "showProductImages": {
+    "title": "Show Product Images",
+    "description": "Display product images in the POS menu. When disabled, only product names and prices will be shown."
+  },
   "preview": {
     "currentConfiguration": "Current Configuration",
     "tablelessMode": "Tableless Mode",
     "twoStepCheckout": "Two-Step Checkout",
+    "productImages": "Product Images",
     "enabled": "Enabled",
     "disabled": "Disabled",
     "orderTypeTableless": "Order Type (tableless)"

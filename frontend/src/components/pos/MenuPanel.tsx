@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useCategories } from '../../features/menu/menuApi';
 import { useProducts } from '../../features/menu/menuApi';
+import { useGetPosSettings } from '../../features/pos/posApi';
 import { Product } from '../../types';
 import { Card } from '../ui/Card';
 import Button from '../ui/Button';
@@ -24,6 +25,9 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
     categoryId: selectedCategoryId || undefined,
     isAvailable: true,
   });
+  const { data: posSettings } = useGetPosSettings();
+
+  const showImages = posSettings?.showProductImages ?? true;
 
   if (categoriesLoading) {
     return <Spinner />;
@@ -97,9 +101,9 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
                 key={product.id}
                 className="p-3 md:p-4 hover:shadow-md transition-all"
               >
-                {product.imageUrl && (
+                {showImages && product.images && product.images.length > 0 && (
                   <img
-                    src={product.imageUrl}
+                    src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${product.images[0].url}`}
                     alt={product.name}
                     className="w-full h-32 object-cover rounded-md mb-2"
                   />
@@ -138,9 +142,9 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
               >
                 <div className="flex items-center gap-3">
                   {/* Image - Optional */}
-                  {product.imageUrl && (
+                  {showImages && product.images && product.images.length > 0 && (
                     <img
-                      src={product.imageUrl}
+                      src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${product.images[0].url}`}
                       alt={product.name}
                       className="w-16 h-16 md:w-20 md:h-20 object-cover rounded-md flex-shrink-0"
                     />

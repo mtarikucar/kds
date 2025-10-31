@@ -589,6 +589,7 @@ export interface PosSettings {
   tenantId: string;
   enableTablelessMode: boolean;
   enableTwoStepCheckout: boolean;
+  showProductImages: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -596,6 +597,7 @@ export interface PosSettings {
 export interface UpdatePosSettingsDto {
   enableTablelessMode?: boolean;
   enableTwoStepCheckout?: boolean;
+  showProductImages?: boolean;
 }
 
 // Re-export hardware types

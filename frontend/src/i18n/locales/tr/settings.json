@@ -47,10 +47,15 @@
       "noteBody": "Değişiklikler POS sisteminde hemen etkili olur. Operasyonel değişiklikler hakkında personelin bilgilendirildiğinden emin olun."
   },
   "saveChanges": "Değişiklikleri Kaydet",
+  "showProductImages": {
+      "title": "Ürün Görsellerini Göster",
+      "description": "POS menüsünde ürün görsellerini göster. Devre dışı bırakıldığında, sadece ürün isimleri ve fiyatları gösterilir."
+  },
   "preview": {
       "currentConfiguration": "Geçerli Yapılandırma",
       "tablelessMode": "Masasız Mod",
       "twoStepCheckout": "İki Aşamalı Ödeme",
+      "productImages": "Ürün Görselleri",
       "enabled": "Etkin",
       "disabled": "Devre Dışı",
       "orderTypeTableless": "Sipariş Türü (masasız)"

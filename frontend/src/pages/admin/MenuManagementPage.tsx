@@ -24,7 +24,6 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Ca
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Input from '../../components/ui/Input';
-import Select from '../../components/ui/Select';
 import Badge from '../../components/ui/Badge';
 import Spinner from '../../components/ui/Spinner';
 import ImageLibraryModal from '../../components/product/ImageLibraryModal';
@@ -52,7 +51,7 @@ type CategoryFormData = z.infer<typeof categorySchema>;
 type ProductFormData = z.infer<typeof productSchema>;
 
 const MenuManagementPage = () => {
-  const { t } = useTranslation('menu');
+  const { t } = useTranslation(['menu', 'common']);
   const [activeTab, setActiveTab] = useState<'categories' | 'products' | 'images'>('categories');
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
@@ -67,8 +66,8 @@ const MenuManagementPage = () => {
   const { mutate: createCategory } = useCreateCategory();
   const { mutate: updateCategory } = useUpdateCategory();
   const { mutate: deleteCategory } = useDeleteCategory();
-  const { mutate: createProduct } = useCreateProduct();
-  const { mutate: updateProduct } = useUpdateProduct();
+  const { mutate: createProduct, isPending: isCreatingProduct } = useCreateProduct();
+  const { mutate: updateProduct, isPending: isUpdatingProduct } = useUpdateProduct();
   const { mutate: deleteProduct } = useDeleteProduct();
   const { mutate: deleteImage } = useDeleteProductImage();
   const uploadImagesMutation = useUploadProductImages();
@@ -144,6 +143,9 @@ const MenuManagementPage = () => {
   };
 
   const handleProductSubmit = (data: ProductFormData) => {
+    console.log('Form submitted with data:', data);
+    console.log('Form validation errors:', productForm.formState.errors);
+
     const submitData = {
       ...data,
       price: Number(data.price),
@@ -151,23 +153,33 @@ const MenuManagementPage = () => {
       imageIds: productImages.map((img) => img.id),
     };
 
+    console.log('Submitting product data:', submitData);
+
     if (editingProduct) {
       updateProduct(
         { id: editingProduct.id, data: submitData },
         {
           onSuccess: () => {
+            console.log('Product updated successfully');
             setProductModalOpen(false);
             setProductImages([]);
             productForm.reset();
+          },
+          onError: (error: any) => {
+            console.error('Error updating product:', error);
           },
         }
       );
     } else {
       createProduct(submitData, {
         onSuccess: () => {
+          console.log('Product created successfully');
           setProductModalOpen(false);
           setProductImages([]);
           productForm.reset();
+        },
+        onError: (error: any) => {
+          console.error('Error creating product:', error);
         },
       });
     }
@@ -468,10 +480,10 @@ const MenuManagementPage = () => {
               className="flex-1"
               onClick={() => setCategoryModalOpen(false)}
             >
-              {t('app.cancel')}
+              {t('common:app.cancel')}
             </Button>
             <Button type="submit" className="flex-1">
-              {editingCategory ? t('app.update') : t('app.create')}
+              {editingCategory ? t('common:app.update') : t('common:app.create')}
             </Button>
           </div>
         </form>
@@ -505,17 +517,27 @@ const MenuManagementPage = () => {
             error={productForm.formState.errors.price?.message}
             {...productForm.register('price', { valueAsNumber: true })}
           />
-          <Select
-            label={t('menu.category')}
-            options={
-              categories?.map((cat) => ({
-                value: cat.id,
-                label: cat.name,
-              })) || []
-            }
-            error={productForm.formState.errors.categoryId?.message}
-            {...productForm.register('categoryId')}
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {t('menu.category')}
+            </label>
+            <select
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              {...productForm.register('categoryId')}
+            >
+              <option value="">{t('menu.selectCategory')}</option>
+              {categories?.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+            {productForm.formState.errors.categoryId?.message && (
+              <p className="mt-1 text-sm text-red-600">
+                {productForm.formState.errors.categoryId.message}
+              </p>
+            )}
+          </div>
           <Input
             label={t('menu.currentStock')}
             type="number"
@@ -597,11 +619,17 @@ const MenuManagementPage = () => {
               variant="outline"
               className="flex-1"
               onClick={() => setProductModalOpen(false)}
+              disabled={isCreatingProduct || isUpdatingProduct}
             >
-              {t('app.cancel')}
+              {t('common:app.cancel')}
             </Button>
-            <Button type="submit" className="flex-1">
-              {editingProduct ? t('app.update') : t('app.create')}
+            <Button
+              type="submit"
+              className="flex-1"
+              isLoading={isCreatingProduct || isUpdatingProduct}
+              disabled={isCreatingProduct || isUpdatingProduct}
+            >
+              {editingProduct ? t('common:app.update') : t('common:app.create')}
             </Button>
           </div>
         </form>

@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import Header from './Header';
 import Sidebar from './Sidebar';
+import { useUiStore } from '../../store/uiStore';
 
 const Layout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const { isSidebarCollapsed } = useUiStore();
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
@@ -26,7 +28,7 @@ const Layout = () => {
 
       <Sidebar isOpen={isSidebarOpen} onClose={closeSidebar} />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300`}>
         <Header onMenuClick={toggleSidebar} />
         <main className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-6">
           <Outlet />

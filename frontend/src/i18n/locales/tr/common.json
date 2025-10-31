@@ -43,7 +43,9 @@
     "reports": "Raporlar",
     "settings": "Ayarlar",
     "admin": "Yönetici",
-    "subscription": "Abonelik"
+    "subscription": "Abonelik",
+    "expandSidebar": "Kenar Çubuğunu Genişlet",
+    "collapseSidebar": "Kenar Çubuğunu Daralt"
   },
   "header": {
     "notifications": "Bildirimler",

@@ -11,4 +11,9 @@ export class UpdatePosSettingsDto {
   @IsBoolean()
   @IsOptional()
   enableTwoStepCheckout?: boolean;
+
+  @ApiPropertyOptional({ description: 'Show product images in POS menu' })
+  @IsBoolean()
+  @IsOptional()
+  showProductImages?: boolean;
 }

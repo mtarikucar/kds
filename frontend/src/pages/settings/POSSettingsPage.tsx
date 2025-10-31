@@ -11,12 +11,14 @@ const POSSettingsPage = () => {
 
   const [enableTablelessMode, setEnableTablelessMode] = useState(false);
   const [enableTwoStepCheckout, setEnableTwoStepCheckout] = useState(false);
+  const [showProductImages, setShowProductImages] = useState(true);
 
   // Load settings when data arrives
   useEffect(() => {
     if (posSettings) {
       setEnableTablelessMode(posSettings.enableTablelessMode);
       setEnableTwoStepCheckout(posSettings.enableTwoStepCheckout);
+      setShowProductImages(posSettings.showProductImages);
     }
   }, [posSettings]);
 
@@ -25,6 +27,7 @@ const POSSettingsPage = () => {
       {
         enableTablelessMode,
         enableTwoStepCheckout,
+        showProductImages,
       },
       {
         onSuccess: () => {
@@ -40,7 +43,8 @@ const POSSettingsPage = () => {
   const hasChanges =
     posSettings &&
     (enableTablelessMode !== posSettings.enableTablelessMode ||
-      enableTwoStepCheckout !== posSettings.enableTwoStepCheckout);
+      enableTwoStepCheckout !== posSettings.enableTwoStepCheckout ||
+      showProductImages !== posSettings.showProductImages);
 
   if (isLoading) {
     return (
@@ -111,6 +115,30 @@ const POSSettingsPage = () => {
               </div>
             </div>
 
+            <div className="border-t pt-6">
+              {/* Show Product Images */}
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showProductImages}
+                      onChange={(e) => setShowProductImages(e.target.checked)}
+                      className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <div>
+                      <p className="font-semibold text-gray-900">
+                        {t('showProductImages.title')}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {t('showProductImages.description')}
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+
             {/* Info box */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <p className="text-sm text-blue-800">
@@ -164,6 +192,16 @@ const POSSettingsPage = () => {
                 <dt className="text-gray-600">{t('preview.orderTypeTableless')}:</dt>
                 <dd className="font-mono text-sm">
                   {enableTablelessMode ? t('orderTypes.takeaway') : t('orderTypes.dineIn')}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-gray-600">{t('preview.productImages')}:</dt>
+                <dd className="font-semibold">
+                  {showProductImages ? (
+                    <span className="text-green-600">{t('preview.enabled')}</span>
+                  ) : (
+                    <span className="text-gray-400">{t('preview.disabled')}</span>
+                  )}
                 </dd>
               </div>
             </dl>

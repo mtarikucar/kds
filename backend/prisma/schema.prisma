@@ -610,6 +610,7 @@ model PosSettings {
   // POS operation modes
   enableTablelessMode   Boolean @default(false)  // Allow orders without table selection
   enableTwoStepCheckout Boolean @default(false)  // Separate "Create Order" and "Payment" buttons
+  showProductImages     Boolean @default(true)   // Show product images in POS menu
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
