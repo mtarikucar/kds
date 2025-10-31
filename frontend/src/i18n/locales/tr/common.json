@@ -518,7 +518,16 @@
     "searchPlaceholder": "Menüde ara...",
     "all": "Tümü",
     "noItemsFound": "Ürün bulunamadı",
-    "poweredBy": "Restaurant POS Sistemi tarafından desteklenmektedir"
+    "poweredBy": "Restaurant POS Sistemi tarafından desteklenmektedir",
+    "productDetails": "Ürün Detayları",
+    "price": "Fiyat",
+    "description": "Açıklama",
+    "addToOrder": "Siparişe Ekle",
+    "close": "Kapat",
+    "quantity": "Adet",
+    "available": "Mevcut",
+    "unavailable": "Mevcut Değil",
+    "noDescription": "Açıklama mevcut değil"
   },
   "qr": {
     "shareText": "Menümüze göz atın",

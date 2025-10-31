@@ -413,7 +413,16 @@
     "searchPlaceholder": "Search menu...",
     "all": "All",
     "noItemsFound": "No items found",
-    "poweredBy": "Powered by Restaurant POS System"
+    "poweredBy": "Powered by Restaurant POS System",
+    "productDetails": "Product Details",
+    "price": "Price",
+    "description": "Description",
+    "addToOrder": "Add to Order",
+    "close": "Close",
+    "quantity": "Quantity",
+    "available": "Available",
+    "unavailable": "Unavailable",
+    "noDescription": "No description available"
   },
   "qr": {
     "shareText": "Check out our menu",
