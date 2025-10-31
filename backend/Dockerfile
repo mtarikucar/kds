@@ -59,12 +59,13 @@ COPY --from=development /app/prisma ./prisma
 COPY --from=development /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=development /app/src/modules/subscriptions/templates ./src/modules/subscriptions/templates
 
-# Create storage directories
+# Create storage and logs directories
 RUN mkdir -p storage/invoices
 RUN mkdir -p uploads
+RUN mkdir -p logs
 
 # Set permissions
-RUN chown -R node:node /app/storage /app/uploads
+RUN chown -R node:node /app/storage /app/uploads /app/logs
 
 USER node
 
