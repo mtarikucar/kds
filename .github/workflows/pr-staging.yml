@@ -32,13 +32,9 @@ jobs:
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          cat > ~/.ssh/id_ed25519 <<'EOF'
-${{ secrets.SSH_PRIVATE_KEY }}
-EOF
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          cat > ~/.ssh/known_hosts <<'EOF'
-${{ secrets.SSH_KNOWN_HOSTS }}
-EOF
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
       - name: Setup PR staging environment
@@ -183,13 +179,9 @@ EOF
       - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
-          cat > ~/.ssh/id_ed25519 <<'EOF'
-${{ secrets.SSH_PRIVATE_KEY }}
-EOF
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          cat > ~/.ssh/known_hosts <<'EOF'
-${{ secrets.SSH_KNOWN_HOSTS }}
-EOF
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
       - name: Cleanup staging environment
