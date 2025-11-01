@@ -559,7 +559,13 @@ const QRMenuPage = () => {
               Online
             </span>
             <span className="hidden sm:inline">•</span>
-            <span>{new Date().getFullYear()} © Restaurant POS</span>
+            <span>{new Date().getFullYear()} © HummyTummy</span>
+            {import.meta.env.VITE_APP_VERSION && (
+              <>
+                <span className="hidden sm:inline">•</span>
+                <span className="text-xs">v{import.meta.env.VITE_APP_VERSION.replace('v', '')}</span>
+              </>
+            )}
           </div>
         </div>
       </div>

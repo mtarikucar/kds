@@ -16,7 +16,7 @@ export const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           {/* Company Info */}
           <div>
-            <div className="text-2xl font-bold text-white mb-4">KDS</div>
+            <div className="text-2xl font-bold text-white mb-4">HummyTummy</div>
             <p className="text-sm text-gray-400 mb-4">
               {t('landing.footerDescription')}
             </p>
@@ -91,9 +91,16 @@ export const Footer = () => {
 
         {/* Bottom Bar */}
         <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center">
-          <p className="text-sm text-gray-400 mb-4 md:mb-0">
-            © {new Date().getFullYear()} KDS. {t('landing.allRightsReserved')}
-          </p>
+          <div className="flex flex-col md:flex-row items-center gap-3 mb-4 md:mb-0">
+            <p className="text-sm text-gray-400">
+              © {new Date().getFullYear()} HummyTummy. {t('landing.allRightsReserved')}
+            </p>
+            {import.meta.env.VITE_APP_VERSION && (
+              <span className="text-xs text-gray-500 px-2 py-1 bg-gray-800 rounded border border-gray-700">
+                v{import.meta.env.VITE_APP_VERSION.replace('v', '')}
+              </span>
+            )}
+          </div>
 
           {/* Social Links */}
           <div className="flex space-x-6">

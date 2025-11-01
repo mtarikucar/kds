@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Restaurant POS",
+    "name": "HummyTummy",
     "loading": "Loading...",
     "error": "An error occurred",
     "success": "Success",
@@ -413,7 +413,7 @@
     "searchPlaceholder": "Search menu...",
     "all": "All",
     "noItemsFound": "No items found",
-    "poweredBy": "Powered by Restaurant POS System",
+    "poweredBy": "Powered by HummyTummy",
     "productDetails": "Product Details",
     "price": "Price",
     "description": "Description",

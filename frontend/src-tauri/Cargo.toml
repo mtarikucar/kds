@@ -1,7 +1,7 @@
 [package]
-name = "kds-pos"
+name = "hummytummy"
 version = "1.0.0"
-description = "KDS Restaurant POS Desktop Application"
+description = "HummyTummy Restaurant Management Desktop Application"
 authors = ["Your Team"]
 license = "MIT"
 repository = ""

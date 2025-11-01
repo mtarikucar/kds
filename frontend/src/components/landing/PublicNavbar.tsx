@@ -19,7 +19,7 @@ export const PublicNavbar = () => {
           {/* Logo */}
           <div className="flex items-center">
             <Link to="/" className="text-2xl font-bold text-primary-600">
-              KDS
+              HummyTummy
             </Link>
           </div>
 

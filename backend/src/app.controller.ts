@@ -13,7 +13,7 @@ export class AppController {
   @ApiOperation({ summary: 'Root endpoint' })
   getRoot(): object {
     return {
-      service: 'Restaurant POS API',
+      service: 'HummyTummy API',
       version: '1.0.0',
       documentation: '/api/docs',
     };

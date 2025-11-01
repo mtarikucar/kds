@@ -83,7 +83,7 @@ export class EmailService {
 
       // Send email
       const info = await this.transporter.sendMail({
-        from: `"${this.configService.get<string>('APP_NAME', 'Restaurant POS')}" <${from}>`,
+        from: `"${this.configService.get<string>('APP_NAME', 'HummyTummy')}" <${from}>`,
         to,
         subject,
         html,
@@ -163,7 +163,7 @@ export class EmailService {
   ): Promise<boolean> {
     return this.sendEmail({
       to: email,
-      subject: 'Welcome to Restaurant POS!',
+      subject: 'Welcome to HummyTummy!',
       template: 'welcome',
       context: {
         userName,

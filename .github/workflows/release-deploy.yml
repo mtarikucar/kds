@@ -137,6 +137,7 @@ jobs:
             --build-arg VITE_API_URL=https://hummytummy.com/api \
             --build-arg VITE_SOCKET_URL=https://hummytummy.com \
             --build-arg VITE_WS_URL=wss://hummytummy.com \
+            --build-arg VITE_APP_VERSION=${{ steps.version.outputs.VERSION }} \
             --tag kds-frontend:${{ steps.version.outputs.VERSION }} \
             --tag kds-frontend:latest \
             ./frontend

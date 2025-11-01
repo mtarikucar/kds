@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Restoran POS",
+    "name": "HummyTummy",
     "loading": "Yükleniyor...",
     "error": "Bir hata oluştu",
     "success": "Başarılı",
@@ -518,7 +518,7 @@
     "searchPlaceholder": "Menüde ara...",
     "all": "Tümü",
     "noItemsFound": "Ürün bulunamadı",
-    "poweredBy": "Restaurant POS Sistemi tarafından desteklenmektedir",
+    "poweredBy": "HummyTummy tarafından desteklenmektedir",
     "productDetails": "Ürün Detayları",
     "price": "Fiyat",
     "description": "Açıklama",

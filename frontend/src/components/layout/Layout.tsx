@@ -30,8 +30,13 @@ const Layout = () => {
 
       <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300`}>
         <Header onMenuClick={toggleSidebar} />
-        <main className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-6">
+        <main className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-6 relative">
           <Outlet />
+          {import.meta.env.VITE_APP_VERSION && (
+            <div className="fixed bottom-3 right-3 text-xs text-gray-400 bg-white px-2 py-1 rounded shadow-sm border border-gray-200 z-10">
+              v{import.meta.env.VITE_APP_VERSION.replace('v', '')}
+            </div>
+          )}
         </main>
       </div>
     </div>

@@ -103,7 +103,9 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
               >
                 {showImages && product.images && product.images.length > 0 && (
                   <img
-                    src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${product.images[0].url}`}
+                    src={product.images[0].url.startsWith('http://') || product.images[0].url.startsWith('https://')
+                      ? product.images[0].url
+                      : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${product.images[0].url}`}
                     alt={product.name}
                     className="w-full h-32 object-cover rounded-md mb-2"
                   />
@@ -144,7 +146,9 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
                   {/* Image - Optional */}
                   {showImages && product.images && product.images.length > 0 && (
                     <img
-                      src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${product.images[0].url}`}
+                      src={product.images[0].url.startsWith('http://') || product.images[0].url.startsWith('https://')
+                        ? product.images[0].url
+                        : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${product.images[0].url}`}
                       alt={product.name}
                       className="w-16 h-16 md:w-20 md:h-20 object-cover rounded-md flex-shrink-0"
                     />

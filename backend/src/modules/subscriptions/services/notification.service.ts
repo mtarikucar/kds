@@ -83,7 +83,7 @@ export class NotificationService {
     } catch (error) {
       this.logger.error(`Failed to render template ${templateName}: ${error.message}`);
       // Return a simple fallback template
-      return `<p>${context.message || 'Notification from Restaurant POS'}</p>`;
+      return `<p>${context.message || 'Notification from HummyTummy'}</p>`;
     }
   }
 

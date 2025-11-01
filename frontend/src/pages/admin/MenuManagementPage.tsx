@@ -310,7 +310,9 @@ const MenuManagementPage = () => {
                 {products?.map((product) => {
                   const primaryImage = product.images?.[0] || null;
                   const imageUrl = primaryImage
-                    ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${primaryImage.url}`
+                    ? (primaryImage.url.startsWith('http://') || primaryImage.url.startsWith('https://')
+                        ? primaryImage.url
+                        : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${primaryImage.url}`)
                     : product.image || null;
 
                   return (
@@ -407,7 +409,9 @@ const MenuManagementPage = () => {
                     {/* Image */}
                     <div className="aspect-square flex items-center justify-center bg-gray-100">
                       <img
-                        src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${image.url}`}
+                        src={image.url.startsWith('http://') || image.url.startsWith('https://')
+                          ? image.url
+                          : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${image.url}`}
                         alt={image.filename}
                         className="w-full h-full object-cover"
                       />
@@ -559,7 +563,9 @@ const MenuManagementPage = () => {
                     <div key={image.id} className="relative group">
                       <div className="aspect-square rounded-lg overflow-hidden border-2 border-gray-200">
                         <img
-                          src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${image.url}`}
+                          src={image.url.startsWith('http://') || image.url.startsWith('https://')
+                            ? image.url
+                            : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${image.url}`}
                           alt={image.filename}
                           className="w-full h-full object-cover"
                         />
