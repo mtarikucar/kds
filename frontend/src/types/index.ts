@@ -188,6 +188,7 @@ export interface UpdateTableDto extends Partial<CreateTableDto> {}
 
 // Order Types
 export enum OrderStatus {
+  PENDING_APPROVAL = 'PENDING_APPROVAL',
   PENDING = 'PENDING',
   PREPARING = 'PREPARING',
   READY = 'READY',
@@ -682,6 +683,12 @@ export interface WaiterRequest {
   completedAt?: string;
   createdAt: string;
   updatedAt: string;
+  table?: Table;
+  acknowledgedBy?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  };
 }
 
 export interface CreateWaiterRequestDto {
@@ -701,6 +708,12 @@ export interface BillRequest {
   completedAt?: string;
   createdAt: string;
   updatedAt: string;
+  table?: Table;
+  acknowledgedBy?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  };
 }
 
 export interface CreateBillRequestDto {

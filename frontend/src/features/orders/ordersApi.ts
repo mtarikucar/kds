@@ -9,6 +9,8 @@ import {
   CreatePaymentDto,
   Payment,
   OrderFilters,
+  WaiterRequest,
+  BillRequest,
 } from '../../types';
 
 export const useOrders = (filters?: OrderFilters) => {
@@ -158,6 +160,144 @@ export const useCreatePayment = () => {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || i18n.t('pos:paymentRecordFailed'));
+    },
+  });
+};
+
+// ========================================
+// CUSTOMER ORDERS - STAFF HOOKS
+// ========================================
+
+export const usePendingOrders = () => {
+  return useQuery({
+    queryKey: ['orders', { status: 'PENDING_APPROVAL' }],
+    queryFn: async (): Promise<Order[]> => {
+      const response = await api.get('/orders', {
+        params: { status: 'PENDING_APPROVAL' },
+      });
+      return response.data;
+    },
+    refetchInterval: 10000, // Poll every 10 seconds
+  });
+};
+
+export const useApproveOrder = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (orderId: string): Promise<Order> => {
+      const response = await api.post(`/orders/${orderId}/approve`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      toast.success('Order approved successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to approve order');
+    },
+  });
+};
+
+// ========================================
+// WAITER REQUESTS - STAFF HOOKS
+// ========================================
+
+export const useWaiterRequests = () => {
+  return useQuery({
+    queryKey: ['waiterRequests'],
+    queryFn: async (): Promise<WaiterRequest[]> => {
+      const response = await api.get('/customer-orders/waiter-requests/tenant/active');
+      return response.data;
+    },
+    refetchInterval: 10000, // Poll every 10 seconds
+  });
+};
+
+export const useAcknowledgeWaiterRequest = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (requestId: string): Promise<WaiterRequest> => {
+      const response = await api.patch(`/customer-orders/waiter-requests/${requestId}/acknowledge`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['waiterRequests'] });
+      toast.success('Waiter request acknowledged');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to acknowledge request');
+    },
+  });
+};
+
+export const useCompleteWaiterRequest = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (requestId: string): Promise<WaiterRequest> => {
+      const response = await api.patch(`/customer-orders/waiter-requests/${requestId}/complete`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['waiterRequests'] });
+      toast.success('Waiter request completed');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to complete request');
+    },
+  });
+};
+
+// ========================================
+// BILL REQUESTS - STAFF HOOKS
+// ========================================
+
+export const useBillRequests = () => {
+  return useQuery({
+    queryKey: ['billRequests'],
+    queryFn: async (): Promise<BillRequest[]> => {
+      const response = await api.get('/customer-orders/bill-requests/tenant/active');
+      return response.data;
+    },
+    refetchInterval: 10000, // Poll every 10 seconds
+  });
+};
+
+export const useAcknowledgeBillRequest = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (requestId: string): Promise<BillRequest> => {
+      const response = await api.patch(`/customer-orders/bill-requests/${requestId}/acknowledge`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['billRequests'] });
+      toast.success('Bill request acknowledged');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to acknowledge request');
+    },
+  });
+};
+
+export const useCompleteBillRequest = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (requestId: string): Promise<BillRequest> => {
+      const response = await api.patch(`/customer-orders/bill-requests/${requestId}/complete`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['billRequests'] });
+      toast.success('Bill request completed');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to complete request');
     },
   });
 };

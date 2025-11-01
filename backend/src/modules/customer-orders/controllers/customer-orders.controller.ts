@@ -5,9 +5,17 @@ import {
   Body,
   Param,
   Query,
+  Patch,
+  UseGuards,
+  Request,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { Public } from '../../auth/decorators/public.decorator';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { TenantGuard } from '../../auth/guards/tenant.guard';
+import { RolesGuard } from '../../auth/guards/roles.guard';
+import { Roles } from '../../auth/decorators/roles.decorator';
+import { UserRole } from '../../../common/constants/roles.enum';
 import { CustomerOrdersService } from '../services/customer-orders.service';
 import { CreateCustomerOrderDto } from '../dto/create-customer-order.dto';
 import { CreateWaiterRequestDto, CreateBillRequestDto } from '../dto/waiter-request.dto';
@@ -100,5 +108,81 @@ export class CustomerOrdersController {
     @Query('tenantId') tenantId: string
   ) {
     return this.customerOrdersService.getSessionBillRequests(sessionId, tenantId);
+  }
+
+  // ========================================
+  // STAFF ENDPOINTS (Protected)
+  // ========================================
+
+  @Get('waiter-requests/tenant/active')
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all active waiter requests for tenant (STAFF)' })
+  @ApiResponse({ status: 200, description: 'Active waiter requests retrieved' })
+  async getActiveWaiterRequests(@Request() req) {
+    return this.customerOrdersService.getActiveWaiterRequests(req.tenantId);
+  }
+
+  @Patch('waiter-requests/:id/acknowledge')
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Acknowledge a waiter request (STAFF)' })
+  @ApiResponse({ status: 200, description: 'Waiter request acknowledged' })
+  async acknowledgeWaiterRequest(
+    @Param('id') id: string,
+    @Request() req
+  ) {
+    return this.customerOrdersService.acknowledgeWaiterRequest(id, req.user.id, req.tenantId);
+  }
+
+  @Patch('waiter-requests/:id/complete')
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mark a waiter request as completed (STAFF)' })
+  @ApiResponse({ status: 200, description: 'Waiter request completed' })
+  async completeWaiterRequest(
+    @Param('id') id: string,
+    @Request() req
+  ) {
+    return this.customerOrdersService.completeWaiterRequest(id, req.user.id, req.tenantId);
+  }
+
+  @Get('bill-requests/tenant/active')
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Get all active bill requests for tenant (STAFF)' })
+  @ApiResponse({ status: 200, description: 'Active bill requests retrieved' })
+  async getActiveBillRequests(@Request() req) {
+    return this.customerOrdersService.getActiveBillRequests(req.tenantId);
+  }
+
+  @Patch('bill-requests/:id/acknowledge')
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Acknowledge a bill request (STAFF)' })
+  @ApiResponse({ status: 200, description: 'Bill request acknowledged' })
+  async acknowledgeBillRequest(
+    @Param('id') id: string,
+    @Request() req
+  ) {
+    return this.customerOrdersService.acknowledgeBillRequest(id, req.user.id, req.tenantId);
+  }
+
+  @Patch('bill-requests/:id/complete')
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Mark a bill request as completed (STAFF)' })
+  @ApiResponse({ status: 200, description: 'Bill request completed' })
+  async completeBillRequest(
+    @Param('id') id: string,
+    @Request() req
+  ) {
+    return this.customerOrdersService.completeBillRequest(id, req.user.id, req.tenantId);
   }
 }

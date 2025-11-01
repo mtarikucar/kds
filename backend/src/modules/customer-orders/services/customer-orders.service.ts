@@ -246,6 +246,113 @@ export class CustomerOrdersService {
   }
 
   // ========================================
+  // WAITER REQUESTS - STAFF METHODS
+  // ========================================
+
+  async getActiveWaiterRequests(tenantId: string) {
+    return this.prisma.waiterRequest.findMany({
+      where: {
+        table: {
+          tenantId,
+        },
+        status: {
+          in: ['PENDING', 'ACKNOWLEDGED'],
+        },
+      },
+      include: {
+        table: true,
+        acknowledgedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+  }
+
+  async acknowledgeWaiterRequest(id: string, userId: string, tenantId: string) {
+    const request = await this.prisma.waiterRequest.findFirst({
+      where: {
+        id,
+        table: {
+          tenantId,
+        },
+      },
+    });
+
+    if (!request) {
+      throw new NotFoundException('Waiter request not found');
+    }
+
+    if (request.status !== 'PENDING') {
+      throw new BadRequestException('Waiter request is not pending');
+    }
+
+    return this.prisma.waiterRequest.update({
+      where: { id },
+      data: {
+        status: 'ACKNOWLEDGED',
+        acknowledgedById: userId,
+        acknowledgedAt: new Date(),
+      },
+      include: {
+        table: true,
+        acknowledgedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+  }
+
+  async completeWaiterRequest(id: string, userId: string, tenantId: string) {
+    const request = await this.prisma.waiterRequest.findFirst({
+      where: {
+        id,
+        table: {
+          tenantId,
+        },
+      },
+    });
+
+    if (!request) {
+      throw new NotFoundException('Waiter request not found');
+    }
+
+    if (request.status === 'COMPLETED') {
+      throw new BadRequestException('Waiter request is already completed');
+    }
+
+    return this.prisma.waiterRequest.update({
+      where: { id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        acknowledgedById: request.acknowledgedById || userId,
+        acknowledgedAt: request.acknowledgedAt || new Date(),
+      },
+      include: {
+        table: true,
+        acknowledgedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+  }
+
+  // ========================================
   // BILL REQUESTS
   // ========================================
 
@@ -318,6 +425,113 @@ export class CustomerOrdersService {
       },
       orderBy: {
         createdAt: 'desc',
+      },
+    });
+  }
+
+  // ========================================
+  // BILL REQUESTS - STAFF METHODS
+  // ========================================
+
+  async getActiveBillRequests(tenantId: string) {
+    return this.prisma.billRequest.findMany({
+      where: {
+        table: {
+          tenantId,
+        },
+        status: {
+          in: ['PENDING', 'ACKNOWLEDGED'],
+        },
+      },
+      include: {
+        table: true,
+        acknowledgedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'asc',
+      },
+    });
+  }
+
+  async acknowledgeBillRequest(id: string, userId: string, tenantId: string) {
+    const request = await this.prisma.billRequest.findFirst({
+      where: {
+        id,
+        table: {
+          tenantId,
+        },
+      },
+    });
+
+    if (!request) {
+      throw new NotFoundException('Bill request not found');
+    }
+
+    if (request.status !== 'PENDING') {
+      throw new BadRequestException('Bill request is not pending');
+    }
+
+    return this.prisma.billRequest.update({
+      where: { id },
+      data: {
+        status: 'ACKNOWLEDGED',
+        acknowledgedById: userId,
+        acknowledgedAt: new Date(),
+      },
+      include: {
+        table: true,
+        acknowledgedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+  }
+
+  async completeBillRequest(id: string, userId: string, tenantId: string) {
+    const request = await this.prisma.billRequest.findFirst({
+      where: {
+        id,
+        table: {
+          tenantId,
+        },
+      },
+    });
+
+    if (!request) {
+      throw new NotFoundException('Bill request not found');
+    }
+
+    if (request.status === 'COMPLETED') {
+      throw new BadRequestException('Bill request is already completed');
+    }
+
+    return this.prisma.billRequest.update({
+      where: { id },
+      data: {
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        acknowledgedById: request.acknowledgedById || userId,
+        acknowledgedAt: request.acknowledgedAt || new Date(),
+      },
+      include: {
+        table: true,
+        acknowledgedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
       },
     });
   }

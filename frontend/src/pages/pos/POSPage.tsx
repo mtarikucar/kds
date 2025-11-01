@@ -7,6 +7,10 @@ import OrderCart from '../../components/pos/OrderCart';
 import PaymentModal from '../../components/pos/PaymentModal';
 import StickyCartBar from '../../components/pos/StickyCartBar';
 import CartDrawer from '../../components/pos/CartDrawer';
+import NotificationBar from '../../components/pos/NotificationBar';
+import PendingOrdersPanel from '../../components/pos/PendingOrdersPanel';
+import WaiterRequestsPanel from '../../components/pos/WaiterRequestsPanel';
+import BillRequestsPanel from '../../components/pos/BillRequestsPanel';
 import { useCreateOrder, useUpdateOrder, useOrders } from '../../features/orders/ordersApi';
 import { useCreatePayment } from '../../features/orders/ordersApi';
 import { useUpdateTableStatus } from '../../features/tables/tablesApi';
@@ -30,6 +34,9 @@ const POSPage = () => {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
+  const [isPendingOrdersPanelOpen, setIsPendingOrdersPanelOpen] = useState(false);
+  const [isWaiterRequestsPanelOpen, setIsWaiterRequestsPanelOpen] = useState(false);
+  const [isBillRequestsPanelOpen, setIsBillRequestsPanelOpen] = useState(false);
 
   // Responsive hook
   const { isDesktop, isMobile, isTablet } = useResponsive();
@@ -335,6 +342,13 @@ const POSPage = () => {
 
   return (
     <div className="h-full pb-20 lg:pb-0">
+      {/* Notification Bar */}
+      <NotificationBar
+        onShowPendingOrders={() => setIsPendingOrdersPanelOpen(true)}
+        onShowWaiterRequests={() => setIsWaiterRequestsPanelOpen(true)}
+        onShowBillRequests={() => setIsBillRequestsPanelOpen(true)}
+      />
+
       {/* Header */}
       <div className="mb-4 md:mb-6">
   <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t('title')}</h1>
@@ -492,6 +506,20 @@ const POSPage = () => {
         total={total}
         onConfirm={handlePaymentConfirm}
         isLoading={isCreatingPayment}
+      />
+
+      {/* Notification Panels */}
+      <PendingOrdersPanel
+        isOpen={isPendingOrdersPanelOpen}
+        onClose={() => setIsPendingOrdersPanelOpen(false)}
+      />
+      <WaiterRequestsPanel
+        isOpen={isWaiterRequestsPanelOpen}
+        onClose={() => setIsWaiterRequestsPanelOpen(false)}
+      />
+      <BillRequestsPanel
+        isOpen={isBillRequestsPanelOpen}
+        onClose={() => setIsBillRequestsPanelOpen(false)}
       />
     </div>
   );
