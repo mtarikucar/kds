@@ -16,9 +16,33 @@ env:
   SERVER_HOST: '38.242.233.166'
 
 jobs:
+  # Quick health check before starting expensive operations
+  pre-check:
+    name: Pre-deployment Health Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check production API availability
+        run: |
+          echo "🔍 Checking if production API is accessible..."
+          if ! curl -sf https://hummytummy.com/api/health > /dev/null; then
+            echo "⚠️ Warning: API health check failed, but continuing..."
+          else
+            echo "✅ Production API is healthy"
+          fi
+
+      - name: Check production frontend availability
+        run: |
+          echo "🔍 Checking if production frontend is accessible..."
+          if ! curl -sf https://hummytummy.com > /dev/null; then
+            echo "⚠️ Warning: Frontend check failed, but continuing..."
+          else
+            echo "✅ Production frontend is accessible"
+          fi
+
   # Run comprehensive tests
   test:
     name: Run Tests
+    needs: pre-check
     uses: ./.github/workflows/test.yml
 
   # Build and tag Docker images
@@ -106,12 +130,32 @@ jobs:
           fi
 
       - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          echo "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
+
+          # Debug: Check if key is valid
+          echo "🔑 Validating SSH key..."
+          ssh-keygen -l -f ~/.ssh/id_ed25519
+
+      - name: Test SSH Connection
+        run: |
+          echo "🔌 Testing SSH connection to production server..."
+          if ! ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=yes root@${{ env.SERVER_HOST }} "echo 'SSH connection successful'"; then
+            echo "❌ SSH connection failed! Please check:"
+            echo "  1. SSH_PRIVATE_KEY secret is correctly set"
+            echo "  2. SSH_KNOWN_HOSTS secret is correctly set"
+            echo "  3. Server is accessible"
+            echo "  4. SSH key has proper permissions on server"
+            exit 1
+          fi
+          echo "✅ SSH connection test passed"
 
       - name: Create database backup
         run: |
