@@ -23,6 +23,8 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { ContactModule } from './modules/contact/contact.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { CustomersModule } from './modules/customers/customers.module';
+import { ModifiersModule } from './modules/modifiers/modifiers.module';
+import { CustomerOrdersModule } from './modules/customer-orders/customer-orders.module';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './common/middleware/input-sanitizer.middleware';
 
@@ -69,6 +71,8 @@ import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './co
     ContactModule,
     NotificationsModule,
     CustomersModule,
+    ModifiersModule,
+    CustomerOrdersModule,
   ],
   controllers: [AppController],
   providers: [

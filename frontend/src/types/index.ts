@@ -120,6 +120,7 @@ export interface Product {
   price: number;
   image: string | null; // Legacy field, kept for backwards compatibility
   images?: ProductImage[]; // New multi-image support
+  modifierGroups?: ModifierGroup[]; // Available modifiers for this product
   categoryId: string;
   category?: Category;
   currentStock: number;
@@ -598,6 +599,132 @@ export interface UpdatePosSettingsDto {
   enableTablelessMode?: boolean;
   enableTwoStepCheckout?: boolean;
   showProductImages?: boolean;
+}
+
+// Modifier Types
+export enum SelectionType {
+  SINGLE = 'SINGLE',
+  MULTIPLE = 'MULTIPLE',
+}
+
+export interface Modifier {
+  id: string;
+  name: string;
+  displayName: string;
+  description?: string;
+  priceAdjustment: number;
+  isAvailable: boolean;
+  displayOrder: number;
+  groupId: string;
+  tenantId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ModifierGroup {
+  id: string;
+  name: string;
+  displayName: string;
+  description?: string;
+  selectionType: SelectionType;
+  minSelections: number;
+  maxSelections?: number;
+  isRequired: boolean;
+  displayOrder: number;
+  isActive: boolean;
+  tenantId: string;
+  modifiers: Modifier[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OrderItemModifier {
+  id: string;
+  orderItemId: string;
+  modifierId: string;
+  modifier?: Modifier;
+  quantity: number;
+  priceAdjustment: number;
+  createdAt: string;
+}
+
+// Customer Ordering Types
+export interface CustomerOrderItemModifier {
+  modifierId: string;
+  quantity: number;
+  priceAdjustment: number;
+}
+
+export interface CustomerOrderItem {
+  productId: string;
+  quantity: number;
+  notes?: string;
+  modifiers?: CustomerOrderItemModifier[];
+}
+
+export interface CreateCustomerOrderDto {
+  tenantId: string;
+  tableId: string;
+  sessionId: string;
+  customerPhone?: string;
+  items: CustomerOrderItem[];
+  notes?: string;
+}
+
+export interface WaiterRequest {
+  id: string;
+  tableId: string;
+  sessionId: string;
+  message?: string;
+  status: 'PENDING' | 'ACKNOWLEDGED' | 'COMPLETED';
+  acknowledgedAt?: string;
+  acknowledgedById?: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateWaiterRequestDto {
+  tenantId: string;
+  tableId: string;
+  sessionId: string;
+  message?: string;
+}
+
+export interface BillRequest {
+  id: string;
+  tableId: string;
+  sessionId: string;
+  status: 'PENDING' | 'ACKNOWLEDGED' | 'COMPLETED';
+  acknowledgedAt?: string;
+  acknowledgedById?: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateBillRequestDto {
+  tenantId: string;
+  tableId: string;
+  sessionId: string;
+}
+
+// Cart Types for Customer Ordering
+export interface CartModifier {
+  id: string;
+  name: string;
+  displayName: string;
+  priceAdjustment: number;
+  quantity: number;
+}
+
+export interface CartItem {
+  id: string; // Temporary ID for cart management (use crypto.randomUUID())
+  product: Product;
+  quantity: number;
+  notes?: string;
+  modifiers: CartModifier[];
+  itemTotal: number; // Calculated: (product.price + sum(modifier.priceAdjustment * modifier.quantity)) * quantity
 }
 
 // Re-export hardware types

@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { Category, Product } from '../../types';
 import { Card, CardContent } from '../../components/ui/Card';
 import Spinner from '../../components/ui/Spinner';
 import { formatCurrency } from '../../lib/utils';
-import { UtensilsCrossed, Search, ChevronRight } from 'lucide-react';
-import ProductDetailModal from './ProductDetailModal';
+import { UtensilsCrossed, Search, ChevronRight, ShoppingCart } from 'lucide-react';
+import ProductDetailModalWithCart from './ProductDetailModalWithCart';
+import { useCartStore } from '../../store/cartStore';
 
 interface MenuSettings {
   primaryColor: string;
@@ -38,6 +39,7 @@ interface MenuData {
 
 const QRMenuPage = () => {
   const { t } = useTranslation('common');
+  const navigate = useNavigate();
   const { tenantId } = useParams<{ tenantId: string }>();
   const [searchParams] = useSearchParams();
   const tableId = searchParams.get('tableId');
@@ -49,6 +51,10 @@ const QRMenuPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Cart state
+  const initializeSession = useCartStore(state => state.initializeSession);
+  const getItemCount = useCartStore(state => state.getItemCount);
 
   useEffect(() => {
     const fetchMenuData = async () => {
@@ -74,6 +80,13 @@ const QRMenuPage = () => {
       fetchMenuData();
     }
   }, [tenantId, tableId]);
+
+  // Initialize cart session when menu data is loaded
+  useEffect(() => {
+    if (menuData && tenantId && tableId) {
+      initializeSession(tenantId, tableId);
+    }
+  }, [menuData, tenantId, tableId, initializeSession]);
 
   if (isLoading) {
     return (
@@ -497,7 +510,7 @@ const QRMenuPage = () => {
       </div>
 
       {/* Product Detail Modal */}
-      <ProductDetailModal
+      <ProductDetailModalWithCart
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         product={selectedProduct}
@@ -507,6 +520,23 @@ const QRMenuPage = () => {
         showDescription={settings.showDescription}
         showPrices={settings.showPrices}
       />
+
+      {/* Floating Cart Button */}
+      {getItemCount() > 0 && tableId && (
+        <button
+          onClick={() => navigate(`/qr-menu/${tenantId}/cart?tableId=${tableId}`)}
+          className="fixed bottom-6 right-6 z-30 p-4 rounded-full shadow-2xl transition-all duration-200 transform hover:scale-110 active:scale-95"
+          style={{ backgroundColor: settings.primaryColor }}
+        >
+          <ShoppingCart className="h-6 w-6 text-white" />
+          <span
+            className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-lg"
+            style={{ backgroundColor: settings.secondaryColor }}
+          >
+            {getItemCount()}
+          </span>
+        </button>
+      )}
     </div>
   );
 };

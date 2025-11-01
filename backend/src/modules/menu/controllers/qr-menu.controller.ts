@@ -75,6 +75,43 @@ export class QrMenuController {
               },
               orderBy: { order: 'asc' },
             },
+            modifierGroups: {
+              where: {
+                group: {
+                  isActive: true,
+                },
+              },
+              select: {
+                displayOrder: true,
+                group: {
+                  select: {
+                    id: true,
+                    name: true,
+                    displayName: true,
+                    description: true,
+                    selectionType: true,
+                    minSelections: true,
+                    maxSelections: true,
+                    isRequired: true,
+                    modifiers: {
+                      where: {
+                        isAvailable: true,
+                      },
+                      select: {
+                        id: true,
+                        name: true,
+                        displayName: true,
+                        description: true,
+                        priceAdjustment: true,
+                        displayOrder: true,
+                      },
+                      orderBy: { displayOrder: 'asc' },
+                    },
+                  },
+                },
+              },
+              orderBy: { displayOrder: 'asc' },
+            },
           },
           orderBy: { name: 'asc' },
         },
@@ -98,6 +135,7 @@ export class QrMenuController {
           filename: pi.image.filename,
           order: pi.order,
         })),
+        modifierGroups: product.modifierGroups.map(pmg => pmg.group),
       })),
     }));
 

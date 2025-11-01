@@ -103,6 +103,17 @@ export class OrdersController {
     return this.ordersService.updateStatus(id, updateStatusDto, req.tenantId);
   }
 
+  @Post(':id/approve')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiOperation({ summary: 'Approve a pending customer order (ADMIN, MANAGER, WAITER)' })
+  @ApiResponse({ status: 200, description: 'Order successfully approved' })
+  @ApiResponse({ status: 404, description: 'Order not found' })
+  @ApiResponse({ status: 400, description: 'Order is not pending approval' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  approveOrder(@Param('id') id: string, @Request() req) {
+    return this.ordersService.approveOrder(id, req.user.id, req.tenantId);
+  }
+
   @Delete(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Delete an order (ADMIN, MANAGER)' })

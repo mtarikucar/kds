@@ -451,4 +451,74 @@ export class OrdersService {
       }
     });
   }
+
+  async approveOrder(orderId: string, userId: string, tenantId: string) {
+    // Find the order
+    const order = await this.prisma.order.findFirst({
+      where: {
+        id: orderId,
+        tenantId,
+      },
+      include: {
+        orderItems: {
+          include: {
+            product: true,
+            modifiers: {
+              include: {
+                modifier: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (order.status !== 'PENDING_APPROVAL') {
+      throw new BadRequestException('Order is not pending approval');
+    }
+
+    // Update order status to PENDING and set approval info
+    const updatedOrder = await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        status: OrderStatus.PENDING,
+        requiresApproval: false,
+        approvedAt: new Date(),
+        approvedById: userId,
+      },
+      include: {
+        orderItems: {
+          include: {
+            product: true,
+            modifiers: {
+              include: {
+                modifier: {
+                  include: {
+                    group: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        table: true,
+        approvedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    // Emit WebSocket event for real-time updates
+    this.kdsGateway.emitOrderUpdated(tenantId, updatedOrder);
+
+    return updatedOrder;
+  }
 }
