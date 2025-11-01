@@ -12,6 +12,7 @@ const POSSettingsPage = () => {
   const [enableTablelessMode, setEnableTablelessMode] = useState(false);
   const [enableTwoStepCheckout, setEnableTwoStepCheckout] = useState(false);
   const [showProductImages, setShowProductImages] = useState(true);
+  const [enableCustomerOrdering, setEnableCustomerOrdering] = useState(true);
 
   // Load settings when data arrives
   useEffect(() => {
@@ -19,6 +20,7 @@ const POSSettingsPage = () => {
       setEnableTablelessMode(posSettings.enableTablelessMode);
       setEnableTwoStepCheckout(posSettings.enableTwoStepCheckout);
       setShowProductImages(posSettings.showProductImages);
+      setEnableCustomerOrdering(posSettings.enableCustomerOrdering);
     }
   }, [posSettings]);
 
@@ -28,6 +30,7 @@ const POSSettingsPage = () => {
         enableTablelessMode,
         enableTwoStepCheckout,
         showProductImages,
+        enableCustomerOrdering,
       },
       {
         onSuccess: () => {
@@ -44,7 +47,8 @@ const POSSettingsPage = () => {
     posSettings &&
     (enableTablelessMode !== posSettings.enableTablelessMode ||
       enableTwoStepCheckout !== posSettings.enableTwoStepCheckout ||
-      showProductImages !== posSettings.showProductImages);
+      showProductImages !== posSettings.showProductImages ||
+      enableCustomerOrdering !== posSettings.enableCustomerOrdering);
 
   if (isLoading) {
     return (
@@ -139,6 +143,33 @@ const POSSettingsPage = () => {
               </div>
             </div>
 
+            {/* QR Menu Customer Ordering Section */}
+            <div className="border-t pt-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">QR Menu Settings</h3>
+
+              {/* Enable Customer Ordering */}
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={enableCustomerOrdering}
+                      onChange={(e) => setEnableCustomerOrdering(e.target.checked)}
+                      className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                    <div>
+                      <p className="font-semibold text-gray-900">
+                        {t('enableCustomerOrdering.title')}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {t('enableCustomerOrdering.description')}
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            </div>
+
             {/* Info box */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <p className="text-sm text-blue-800">
@@ -198,6 +229,16 @@ const POSSettingsPage = () => {
                 <dt className="text-gray-600">{t('preview.productImages')}:</dt>
                 <dd className="font-semibold">
                   {showProductImages ? (
+                    <span className="text-green-600">{t('preview.enabled')}</span>
+                  ) : (
+                    <span className="text-gray-400">{t('preview.disabled')}</span>
+                  )}
+                </dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-gray-600">{t('preview.customerOrdering')}:</dt>
+                <dd className="font-semibold">
+                  {enableCustomerOrdering ? (
                     <span className="text-green-600">{t('preview.enabled')}</span>
                   ) : (
                     <span className="text-gray-400">{t('preview.disabled')}</span>

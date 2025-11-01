@@ -592,6 +592,7 @@ export interface PosSettings {
   enableTablelessMode: boolean;
   enableTwoStepCheckout: boolean;
   showProductImages: boolean;
+  enableCustomerOrdering: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -600,6 +601,7 @@ export interface UpdatePosSettingsDto {
   enableTablelessMode?: boolean;
   enableTwoStepCheckout?: boolean;
   showProductImages?: boolean;
+  enableCustomerOrdering?: boolean;
 }
 
 // Modifier Types

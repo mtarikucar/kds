@@ -18,6 +18,7 @@ export class PosSettingsService {
           tenantId,
           enableTablelessMode: false,
           enableTwoStepCheckout: false,
+          enableCustomerOrdering: true,
         },
       });
     }
@@ -38,6 +39,7 @@ export class PosSettingsService {
           tenantId,
           enableTablelessMode: updateDto.enableTablelessMode ?? false,
           enableTwoStepCheckout: updateDto.enableTwoStepCheckout ?? false,
+          enableCustomerOrdering: updateDto.enableCustomerOrdering ?? true,
         },
       });
     } else {

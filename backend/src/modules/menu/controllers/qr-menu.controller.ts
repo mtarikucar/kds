@@ -1,12 +1,16 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { PosSettingsService } from '../../pos-settings/pos-settings.service';
 import { Public } from '../../auth/decorators/public.decorator';
 
 @ApiTags('qr-menu')
 @Controller('qr-menu')
 export class QrMenuController {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private posSettingsService: PosSettingsService,
+  ) {}
 
   @Public()
   @Get(':tenantId')
@@ -139,6 +143,9 @@ export class QrMenuController {
       })),
     }));
 
+    // Get POS settings to check if customer ordering is enabled
+    const posSettings = await this.posSettingsService.findByTenant(tenantId);
+
     return {
       tenant: {
         id: tenant.id,
@@ -161,6 +168,7 @@ export class QrMenuController {
         layoutStyle: settings.layoutStyle,
         itemsPerRow: settings.itemsPerRow,
       },
+      enableCustomerOrdering: posSettings.enableCustomerOrdering,
       categories: transformedCategories,
     };
   }

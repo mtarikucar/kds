@@ -2,14 +2,19 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { PosSettingsService } from '../../pos-settings/pos-settings.service';
 import { CreateCustomerOrderDto } from '../dto/create-customer-order.dto';
 import { CreateWaiterRequestDto, CreateBillRequestDto } from '../dto/waiter-request.dto';
 
 @Injectable()
 export class CustomerOrdersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private posSettingsService: PosSettingsService,
+  ) {}
 
   // ========================================
   // CUSTOMER ORDERS
@@ -23,6 +28,14 @@ export class CustomerOrdersService {
 
     if (!tenant) {
       throw new NotFoundException('Tenant not found');
+    }
+
+    // Check if customer ordering is enabled
+    const posSettings = await this.posSettingsService.findByTenant(dto.tenantId);
+    if (!posSettings.enableCustomerOrdering) {
+      throw new ForbiddenException(
+        'Customer ordering is currently disabled. Please contact staff to place your order.'
+      );
     }
 
     // Verify table exists and belongs to tenant

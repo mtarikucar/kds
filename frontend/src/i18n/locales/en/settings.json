@@ -51,11 +51,16 @@
     "title": "Show Product Images",
     "description": "Display product images in the POS menu. When disabled, only product names and prices will be shown."
   },
+  "enableCustomerOrdering": {
+    "title": "Enable Customer Ordering from QR Menu",
+    "description": "Allow customers to place orders directly from the QR menu. When disabled, customers can view the menu but must contact staff to place orders. They can still call the waiter or request the bill."
+  },
   "preview": {
     "currentConfiguration": "Current Configuration",
     "tablelessMode": "Tableless Mode",
     "twoStepCheckout": "Two-Step Checkout",
     "productImages": "Product Images",
+    "customerOrdering": "Customer Ordering (QR Menu)",
     "enabled": "Enabled",
     "disabled": "Disabled",
     "orderTypeTableless": "Order Type (tableless)"
