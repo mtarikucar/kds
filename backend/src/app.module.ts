@@ -25,6 +25,7 @@ import { NotificationsModule } from './modules/notifications/notifications.modul
 import { CustomersModule } from './modules/customers/customers.module';
 import { ModifiersModule } from './modules/modifiers/modifiers.module';
 import { CustomerOrdersModule } from './modules/customer-orders/customer-orders.module';
+import { DesktopAppModule } from './modules/desktop-app/desktop-app.module';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './common/middleware/input-sanitizer.middleware';
 
@@ -73,6 +74,7 @@ import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './co
     CustomersModule,
     ModifiersModule,
     CustomerOrdersModule,
+    DesktopAppModule,
   ],
   controllers: [AppController],
   providers: [

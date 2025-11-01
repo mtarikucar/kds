@@ -978,3 +978,38 @@ model BillRequest {
   @@index([sessionId])
   @@map("bill_requests")
 }
+
+// ========================================
+// DESKTOP APPLICATION RELEASES
+// ========================================
+
+model DesktopRelease {
+  id          String   @id @default(uuid())
+  version     String   @unique  // e.g., "0.2.6" (synced with web app)
+  releaseTag  String   @unique  // e.g., "v0.2.6"
+
+  published   Boolean  @default(false)
+  pubDate     DateTime @default(now())
+
+  // GitHub Release URLs for each platform
+  windowsUrl       String?
+  windowsSignature String?
+  macArmUrl        String?
+  macArmSignature  String?
+  macIntelUrl      String?
+  macIntelSignature String?
+  linuxUrl         String?
+  linuxSignature   String?
+
+  // Release metadata
+  releaseNotes String  @db.Text // Markdown formatted release notes
+  changelog    String? @db.Text // Detailed changelog
+  downloadCount Int    @default(0) // Total downloads across all platforms
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([version])
+  @@index([published, pubDate])
+  @@map("desktop_releases")
+}

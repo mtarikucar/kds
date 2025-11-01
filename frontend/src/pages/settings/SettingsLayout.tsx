@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Settings, CreditCard, Monitor, Plug } from 'lucide-react';
+import { Settings, CreditCard, Monitor, Plug, Download } from 'lucide-react';
 
 const SettingsLayout = () => {
   const { t } = useTranslation('settings');
@@ -20,9 +20,15 @@ const SettingsLayout = () => {
       description: t('posDesc'),
     },
     {
+      to: '/admin/settings/desktop',
+      icon: Download,
+      label: t('desktopApp'),
+      description: t('desktopAppMenuDesc'),
+    },
+    {
       to: '/admin/settings/integrations',
-  icon: Plug,
-  label: t('integrationsLabel'),
+      icon: Plug,
+      label: t('integrationsLabel'),
       description: t('integrationsDesc'),
     },
   ];

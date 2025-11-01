@@ -24,6 +24,7 @@ import SettingsLayout from './pages/settings/SettingsLayout';
 import POSSettingsPage from './pages/settings/POSSettingsPage';
 import SubscriptionSettingsPage from './pages/settings/SubscriptionSettingsPage';
 import IntegrationsSettingsPage from './pages/settings/IntegrationsSettingsPage';
+import DesktopAppSettingsPage from './pages/settings/DesktopAppSettingsPage';
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -57,6 +58,7 @@ function App() {
           <Route index element={<Navigate to="/admin/settings/subscription" replace />} />
           <Route path="subscription" element={<SubscriptionSettingsPage />} />
           <Route path="pos" element={<POSSettingsPage />} />
+          <Route path="desktop" element={<DesktopAppSettingsPage />} />
           <Route path="integrations" element={<IntegrationsSettingsPage />} />
         </Route>
 
