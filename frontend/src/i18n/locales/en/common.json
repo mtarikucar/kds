@@ -442,6 +442,11 @@
     "proTip1": "Use high contrast colors for better scanning.",
     "proTip2": "Print at 300 DPI for the best quality.",
     "proTip3": "Test the QR code on multiple devices before printing."
+  },
+  "qrMenu": {
+    "orderingDisabled": "Customer ordering is currently unavailable. Please contact staff to place your order.",
+    "orderingDisabledShort": "Ordering Unavailable",
+    "viewOnlyMode": "Menu viewing only - please order with staff assistance"
   }
 }
 

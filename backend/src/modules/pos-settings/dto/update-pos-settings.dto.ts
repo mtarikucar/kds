@@ -16,4 +16,9 @@ export class UpdatePosSettingsDto {
   @IsBoolean()
   @IsOptional()
   showProductImages?: boolean;
+
+  @ApiPropertyOptional({ description: 'Enable customer ordering from QR menu' })
+  @IsBoolean()
+  @IsOptional()
+  enableCustomerOrdering?: boolean;
 }

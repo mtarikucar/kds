@@ -727,9 +727,10 @@ model PosSettings {
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // POS operation modes
-  enableTablelessMode   Boolean @default(false)  // Allow orders without table selection
-  enableTwoStepCheckout Boolean @default(false)  // Separate "Create Order" and "Payment" buttons
-  showProductImages     Boolean @default(true)   // Show product images in POS menu
+  enableTablelessMode    Boolean @default(false)  // Allow orders without table selection
+  enableTwoStepCheckout  Boolean @default(false)  // Separate "Create Order" and "Payment" buttons
+  showProductImages      Boolean @default(true)   // Show product images in POS menu
+  enableCustomerOrdering Boolean @default(true)   // Allow customers to place orders from QR menu
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
