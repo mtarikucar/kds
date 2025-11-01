@@ -32,20 +32,35 @@ The known hosts entry for the production server.
 
 **How to get it:**
 ```bash
-ssh-keyscan -H 38.242.233.166
+ssh-keyscan -H 38.242.233.166 2>/dev/null | grep -v '^#'
 ```
 
-**Format:** Copy ALL output lines from the command. It should look like:
+**Format:** Copy ALL output lines EXCEPT comment lines (lines starting with #). It should look like:
 ```
 |1|hash1|hash2 ssh-ed25519 AAAA...
 |1|hash3|hash4 ssh-rsa AAAA...
 |1|hash5|hash6 ecdsa-sha2-nistp256 AAAA...
 ```
 
-**Important:**
-- Include ALL lines (usually 3 lines)
-- Each line starts with `|1|`
+**IMPORTANT:**
+- Include ONLY lines starting with `|1|`
+- Do NOT include lines starting with `#` (comments)
+- Usually 3 lines total (ed25519, rsa, ecdsa)
 - Do NOT modify the hash values
+- Each line must end with the key type and key data
+
+**Wrong format (with comments):**
+```
+# 38.242.233.166:22 SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.14  ← DON'T COPY THIS
+|1|hash|hash ssh-ed25519 AAAA...  ← COPY THIS
+```
+
+**Correct format (without comments):**
+```
+|1|hash|hash ssh-ed25519 AAAA...  ← COPY ONLY THIS
+|1|hash|hash ssh-rsa AAAA...
+|1|hash|hash ecdsa-sha2-nistp256 AAAA...
+```
 
 ### 3. STAGING_SERVER_HOST (Optional)
 

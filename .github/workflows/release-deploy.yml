@@ -39,6 +39,55 @@ jobs:
             echo "✅ Production frontend is accessible"
           fi
 
+      - name: Setup SSH (for connection test)
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Validate SSH key format
+        run: |
+          echo "🔑 Validating SSH key format..."
+          if ! ssh-keygen -l -f ~/.ssh/id_ed25519 2>/dev/null; then
+            echo "❌ SSH key validation failed!"
+            echo ""
+            echo "The SSH_PRIVATE_KEY secret is not in the correct format."
+            echo "Please check .github/SECRETS_SETUP.md for instructions."
+            echo ""
+            echo "Common issues:"
+            echo "  - Key must include '-----BEGIN OPENSSH PRIVATE KEY-----' header"
+            echo "  - Key must include '-----END OPENSSH PRIVATE KEY-----' footer"
+            echo "  - All lines must be copied exactly as-is"
+            echo "  - No extra spaces or newlines should be added"
+            exit 1
+          fi
+          echo "✅ SSH key format is valid"
+
+      - name: Test SSH connection to production server
+        run: |
+          echo "🔌 Testing SSH connection to ${{ env.SERVER_HOST }}..."
+          if ! ssh -o ConnectTimeout=10 -o BatchMode=yes -o StrictHostKeyChecking=yes root@${{ env.SERVER_HOST }} "echo 'SSH connection successful'" 2>&1; then
+            echo ""
+            echo "❌ SSH connection to production server failed!"
+            echo ""
+            echo "Please verify:"
+            echo "  1. SSH_PRIVATE_KEY secret is correctly set (see .github/SECRETS_SETUP.md)"
+            echo "  2. SSH_KNOWN_HOSTS secret is correctly set (no # comment lines)"
+            echo "  3. Server ${{ env.SERVER_HOST }} is accessible"
+            echo "  4. Public key is in server's ~/.ssh/authorized_keys"
+            echo ""
+            echo "To fix SSH_KNOWN_HOSTS, run locally:"
+            echo "  ssh-keyscan -H ${{ env.SERVER_HOST }}"
+            echo "  (Copy only lines starting with |1|, exclude lines with #)"
+            exit 1
+          fi
+          echo "✅ SSH connection test passed"
+
   # Run comprehensive tests
   test:
     name: Run Tests
@@ -139,23 +188,6 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
-
-          # Debug: Check if key is valid
-          echo "🔑 Validating SSH key..."
-          ssh-keygen -l -f ~/.ssh/id_ed25519
-
-      - name: Test SSH Connection
-        run: |
-          echo "🔌 Testing SSH connection to production server..."
-          if ! ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=yes root@${{ env.SERVER_HOST }} "echo 'SSH connection successful'"; then
-            echo "❌ SSH connection failed! Please check:"
-            echo "  1. SSH_PRIVATE_KEY secret is correctly set"
-            echo "  2. SSH_KNOWN_HOSTS secret is correctly set"
-            echo "  3. Server is accessible"
-            echo "  4. SSH key has proper permissions on server"
-            exit 1
-          fi
-          echo "✅ SSH connection test passed"
 
       - name: Create database backup
         run: |
