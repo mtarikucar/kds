@@ -11,6 +11,10 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: write  # Required for creating releases
+  pull-requests: read
+
 env:
   NODE_VERSION: '18.x'
   SERVER_HOST: '38.242.233.166'
@@ -250,6 +254,7 @@ jobs:
 
       - name: Create GitHub Release
         if: success() && github.event_name == 'push'
+        continue-on-error: true  # Don't fail deployment if release creation fails
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.version.outputs.VERSION }}
