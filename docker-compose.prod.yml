@@ -85,6 +85,7 @@ services:
       - '3000:3000'
     volumes:
       - invoice_storage:/app/storage
+      - uploads_storage:/app/uploads
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:3000/api/health']
       interval: 30s
@@ -140,6 +141,7 @@ services:
       - '3001:3000'
     volumes:
       - invoice_storage:/app/storage
+      - uploads_storage:/app/uploads
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:3000/api/health']
       interval: 30s
@@ -205,6 +207,7 @@ volumes:
   postgres_data:
   redis_data:
   invoice_storage:
+  uploads_storage:
 
 networks:
   kds_network:

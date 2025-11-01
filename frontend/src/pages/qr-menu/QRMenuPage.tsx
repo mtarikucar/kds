@@ -39,7 +39,7 @@ interface MenuData {
 }
 
 const QRMenuPage = () => {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
   const navigate = useNavigate();
   const { tenantId } = useParams<{ tenantId: string }>();
   const [searchParams] = useSearchParams();
@@ -164,6 +164,11 @@ const QRMenuPage = () => {
     setSelectedProduct(null);
   };
 
+  const toggleLanguage = () => {
+    const newLang = i18n.language === 'en' ? 'tr' : 'en';
+    i18n.changeLanguage(newLang);
+  };
+
   return (
     <div
       className="flex flex-col min-h-screen"
@@ -219,6 +224,16 @@ const QRMenuPage = () => {
                   </p>
                 )}
               </div>
+
+              {/* Language Toggle */}
+              <button
+                onClick={toggleLanguage}
+                className="flex-shrink-0 px-3 py-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95"
+              >
+                <span className="text-white font-semibold text-sm">
+                  {i18n.language === 'en' ? 'TR' : 'EN'}
+                </span>
+              </button>
             </div>
           )}
 
