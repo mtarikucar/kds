@@ -94,9 +94,15 @@ switch_nginx() {
 
     # Update proxy_pass to point to new environment
     if [ "$target_env" == "blue" ]; then
+        # Switch backend from 3001 (green) to 3000 (blue)
         sed -i 's/proxy_pass http:\/\/localhost:3001/proxy_pass http:\/\/localhost:3000/g' "$NGINX_CONFIG"
+        # Switch frontend from 8081 (green) to 8080 (blue)
+        sed -i 's/proxy_pass http:\/\/localhost:8081/proxy_pass http:\/\/localhost:8080/g' "$NGINX_CONFIG"
     else
+        # Switch backend from 3000 (blue) to 3001 (green)
         sed -i 's/proxy_pass http:\/\/localhost:3000/proxy_pass http:\/\/localhost:3001/g' "$NGINX_CONFIG"
+        # Switch frontend from 8080 (blue) to 8081 (green)
+        sed -i 's/proxy_pass http:\/\/localhost:8080/proxy_pass http:\/\/localhost:8081/g' "$NGINX_CONFIG"
     fi
 
     # Test nginx configuration
