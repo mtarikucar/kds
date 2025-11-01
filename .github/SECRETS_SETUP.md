@@ -4,27 +4,25 @@ This guide explains how to properly set up GitHub Secrets for CI/CD workflows.
 
 ## Required Secrets
 
-### 1. SSH_PRIVATE_KEY
+### 1. SSH_PRIVATE_KEY_BASE64
 
-The SSH private key used to connect to the production server.
+The SSH private key encoded in base64 to avoid newline issues.
 
 **How to get the key:**
 ```bash
-cat ~/.ssh/id_ed25519
+cat ~/.ssh/id_ed25519 | base64 -w 0
 ```
 
-**Format:** Copy the ENTIRE output including the header and footer:
+**Format:** Copy the ENTIRE base64 string (it will be one long line):
 ```
------BEGIN OPENSSH PRIVATE KEY-----
-[key content here - multiple lines]
------END OPENSSH PRIVATE KEY-----
+LS0tLS1CRUdJTiBPUEVOU1NIIFBSSVZBVEUgS0VZLS0tLS0KYjNCbGJuTn...
 ```
 
 **Important:**
-- Include the BEGIN and END lines
-- Include ALL lines of the key
-- Do NOT add extra newlines at the beginning or end
-- Copy as-is without modifications
+- This is a base64-encoded version of your SSH private key
+- It should be ONE LONG LINE without spaces or newlines
+- Copy the entire output from the command above
+- Do NOT add any extra characters
 
 ### 2. SSH_KNOWN_HOSTS
 
@@ -97,22 +95,31 @@ If this fails, the GitHub Actions will also fail.
 
 ## Troubleshooting
 
-### "Load key error in libcrypto"
+### "Load key error in libcrypto" or "is not a key file"
 
-This means the SSH private key is not in the correct format. Make sure:
-- You copied the ENTIRE key including headers
+This means the SSH_PRIVATE_KEY_BASE64 secret is not correctly set. Make sure:
+- You used the base64-encoded version (`cat ~/.ssh/id_ed25519 | base64 -w 0`)
+- You copied the ENTIRE base64 string (one long line)
 - No extra spaces or newlines were added
-- The key is a valid OpenSSH private key
 
 ### "Permission denied (publickey)"
 
-This means:
-- The public key is not added to the server's `~/.ssh/authorized_keys`
-- Or the private key doesn't match the public key on the server
+This means the public key is not on the server. To fix:
 
-To fix:
+**On the production server (38.242.233.166):**
 ```bash
-# On your local machine (where the private key is)
+# Get your public key
+cat ~/.ssh/id_ed25519.pub
+
+# Add it to authorized_keys
+mkdir -p ~/.ssh
+chmod 700 ~/.ssh
+cat ~/.ssh/id_ed25519.pub >> ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/authorized_keys
+```
+
+Or from your local machine:
+```bash
 ssh-copy-id -i ~/.ssh/id_ed25519 root@38.242.233.166
 ```
 
