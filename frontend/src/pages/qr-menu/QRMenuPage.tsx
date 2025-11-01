@@ -34,6 +34,7 @@ interface MenuData {
     number: string;
   };
   settings: MenuSettings;
+  enableCustomerOrdering: boolean;
   categories: (Category & { products: Product[] })[];
 }
 
@@ -111,7 +112,7 @@ const QRMenuPage = () => {
 
   if (!menuData) return null;
 
-  const { tenant, table, settings, categories } = menuData;
+  const { tenant, table, settings, enableCustomerOrdering, categories } = menuData;
 
   // Get all products from all categories
   const allProducts = categories.flatMap(cat => cat.products);
@@ -151,6 +152,9 @@ const QRMenuPage = () => {
   };
 
   const handleProductClick = (product: Product) => {
+    // Only allow product clicks if customer ordering is enabled
+    if (!enableCustomerOrdering) return;
+
     setSelectedProduct(product);
     setIsModalOpen(true);
   };
@@ -232,6 +236,27 @@ const QRMenuPage = () => {
         </div>
       </div>
 
+      {/* Warning Banner for Disabled Ordering */}
+      {!enableCustomerOrdering && (
+        <div className="mx-4 sm:mx-6 mt-4 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg shadow-md">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-600" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-yellow-800">
+                {t('qrMenu.orderingDisabledShort')}
+              </p>
+              <p className="text-xs text-yellow-700 mt-1">
+                {t('qrMenu.viewOnlyMode')}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 px-4 sm:px-6 py-6">
         {/* Categories - Horizontal Scroll */}
         <div className="mb-8 flex gap-2 overflow-x-auto pb-3 -mx-4 px-4 sm:mx-0 sm:px-0">
@@ -286,7 +311,12 @@ const QRMenuPage = () => {
                       <button
                         key={product.id}
                         onClick={() => handleProductClick(product)}
-                        className="w-full text-left transition-all duration-200 transform hover:scale-102 active:scale-98"
+                        disabled={!enableCustomerOrdering}
+                        className={`w-full text-left transition-all duration-200 transform ${
+                          enableCustomerOrdering
+                            ? 'hover:scale-102 active:scale-98 cursor-pointer'
+                            : 'cursor-default opacity-75'
+                        }`}
                       >
                         <Card className="overflow-hidden bg-white shadow-md hover:shadow-lg transition-shadow">
                           <CardContent className="p-0">
@@ -365,7 +395,12 @@ const QRMenuPage = () => {
                       <button
                         key={product.id}
                         onClick={() => handleProductClick(product)}
-                        className="text-left transition-all duration-200 transform hover:scale-105 active:scale-95"
+                        disabled={!enableCustomerOrdering}
+                        className={`text-left transition-all duration-200 transform ${
+                          enableCustomerOrdering
+                            ? 'hover:scale-105 active:scale-95 cursor-pointer'
+                            : 'cursor-default opacity-75'
+                        }`}
                       >
                         <Card className="overflow-hidden bg-white shadow-md hover:shadow-lg transition-shadow h-full flex flex-col">
                           <CardContent className="p-0 flex-1 flex flex-col">
@@ -429,7 +464,12 @@ const QRMenuPage = () => {
                     <button
                       key={product.id}
                       onClick={() => handleProductClick(product)}
-                      className="w-full text-left transition-all duration-200 transform hover:scale-102 active:scale-98"
+                      disabled={!enableCustomerOrdering}
+                      className={`w-full text-left transition-all duration-200 transform ${
+                        enableCustomerOrdering
+                          ? 'hover:scale-102 active:scale-98 cursor-pointer'
+                          : 'cursor-default opacity-75'
+                      }`}
                     >
                       <Card className="bg-white shadow-md hover:shadow-lg transition-shadow">
                         <CardContent className="p-3 sm:p-4">
@@ -519,10 +559,11 @@ const QRMenuPage = () => {
         showImages={settings.showImages}
         showDescription={settings.showDescription}
         showPrices={settings.showPrices}
+        enableCustomerOrdering={enableCustomerOrdering}
       />
 
-      {/* Floating Cart Button */}
-      {getItemCount() > 0 && tableId && (
+      {/* Floating Cart Button - Only show when ordering is enabled */}
+      {enableCustomerOrdering && getItemCount() > 0 && tableId && (
         <button
           onClick={() => navigate(`/qr-menu/${tenantId}/cart?tableId=${tableId}`)}
           className="fixed bottom-6 right-6 z-30 p-4 rounded-full shadow-2xl transition-all duration-200 transform hover:scale-110 active:scale-95"

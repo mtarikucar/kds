@@ -51,11 +51,16 @@
       "title": "Ürün Görsellerini Göster",
       "description": "POS menüsünde ürün görsellerini göster. Devre dışı bırakıldığında, sadece ürün isimleri ve fiyatları gösterilir."
   },
+  "enableCustomerOrdering": {
+    "title": "QR Menüden Müşteri Siparişlerini Etkinleştir",
+    "description": "Müşterilerin QR menüden direkt sipariş vermesine izin verin. Devre dışı bırakıldığında, müşteriler menüyü görüntüleyebilir ancak sipariş vermek için personelle iletişime geçmeleri gerekir. Garson çağırma ve hesap isteme özellikleri kullanılabilir kalır."
+  },
   "preview": {
       "currentConfiguration": "Geçerli Yapılandırma",
       "tablelessMode": "Masasız Mod",
       "twoStepCheckout": "İki Aşamalı Ödeme",
       "productImages": "Ürün Görselleri",
+      "customerOrdering": "Müşteri Siparişi (QR Menü)",
       "enabled": "Etkin",
       "disabled": "Devre Dışı",
       "orderTypeTableless": "Sipariş Türü (masasız)"

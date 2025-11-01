@@ -12,6 +12,11 @@ interface MenuSettings {
   secondaryColor: string;
 }
 
+interface MenuData {
+  settings: MenuSettings;
+  enableCustomerOrdering: boolean;
+}
+
 const CartPage = () => {
   const { t } = useTranslation('common');
   const navigate = useNavigate();
@@ -33,6 +38,7 @@ const CartPage = () => {
     primaryColor: '#FF6B6B',
     secondaryColor: '#4ECDC4',
   });
+  const [enableCustomerOrdering, setEnableCustomerOrdering] = useState(true);
   const [customerPhone, setCustomerPhone] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -40,7 +46,7 @@ const CartPage = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Fetch menu settings for colors
+    // Fetch menu settings for colors and ordering status
     const fetchSettings = async () => {
       try {
         const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
@@ -49,6 +55,7 @@ const CartPage = () => {
           primaryColor: response.data.settings.primaryColor,
           secondaryColor: response.data.settings.secondaryColor,
         });
+        setEnableCustomerOrdering(response.data.enableCustomerOrdering ?? true);
       } catch (err) {
         console.error('Error fetching settings:', err);
       }
@@ -62,6 +69,12 @@ const CartPage = () => {
   const handleSubmitOrder = async () => {
     if (!tenantId || !tableId || !sessionId) {
       setError('Missing required information');
+      return;
+    }
+
+    // Check if customer ordering is enabled
+    if (!enableCustomerOrdering) {
+      setError(t('qrMenu.orderingDisabled'));
       return;
     }
 
@@ -103,7 +116,14 @@ const CartPage = () => {
       }, 2000);
     } catch (err: any) {
       console.error('Error submitting order:', err);
-      setError(err.response?.data?.message || 'Failed to submit order');
+
+      // Handle 403 Forbidden specifically (ordering disabled)
+      if (err.response?.status === 403) {
+        setError(t('qrMenu.orderingDisabled'));
+      } else {
+        setError(err.response?.data?.message || 'Failed to submit order');
+      }
+
       setIsSubmitting(false);
     }
   };

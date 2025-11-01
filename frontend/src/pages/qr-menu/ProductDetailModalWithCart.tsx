@@ -14,6 +14,7 @@ interface ProductDetailModalWithCartProps {
   showImages: boolean;
   showDescription: boolean;
   showPrices: boolean;
+  enableCustomerOrdering: boolean;
 }
 
 const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
@@ -25,6 +26,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
   showImages,
   showDescription,
   showPrices,
+  enableCustomerOrdering,
 }) => {
   const { t } = useTranslation('common');
   const addItem = useCartStore(state => state.addItem);
@@ -364,21 +366,26 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
               {/* Add to Cart Button */}
               <button
                 onClick={handleAddToCart}
-                disabled={!canAddToCart() || showSuccess}
+                disabled={!enableCustomerOrdering || !canAddToCart() || showSuccess}
                 className={cn(
                   'flex-1 py-4 px-6 rounded-xl font-semibold text-white transition-all duration-200 flex items-center justify-center gap-2',
-                  canAddToCart() && !showSuccess
+                  enableCustomerOrdering && canAddToCart() && !showSuccess
                     ? 'hover:shadow-lg active:scale-95'
                     : 'opacity-50 cursor-not-allowed'
                 )}
                 style={{
-                  backgroundColor: showSuccess ? '#10b981' : (canAddToCart() ? primaryColor : '#9ca3af'),
+                  backgroundColor: showSuccess ? '#10b981' : (enableCustomerOrdering && canAddToCart() ? primaryColor : '#9ca3af'),
                 }}
               >
                 {showSuccess ? (
                   <>
                     <Check className="w-5 h-5" />
                     {t('qrMenu.added', 'Added!')}
+                  </>
+                ) : !enableCustomerOrdering ? (
+                  <>
+                    <X className="w-5 h-5" />
+                    {t('qrMenu.orderingDisabledShort', 'Ordering Unavailable')}
                   </>
                 ) : (
                   <>
@@ -389,7 +396,11 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
               </button>
             </div>
 
-            {!canAddToCart() && (
+            {!enableCustomerOrdering ? (
+              <p className="text-sm text-yellow-600 mt-2 text-center">
+                {t('qrMenu.viewOnlyMode', 'Menu viewing only - please order with staff assistance')}
+              </p>
+            ) : !canAddToCart() && (
               <p className="text-sm text-red-500 mt-2 text-center">
                 {t('qrMenu.requiredModifiers', 'Please select required options')}
               </p>

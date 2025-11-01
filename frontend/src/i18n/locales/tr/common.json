@@ -527,7 +527,10 @@
     "quantity": "Adet",
     "available": "Mevcut",
     "unavailable": "Mevcut Değil",
-    "noDescription": "Açıklama mevcut değil"
+    "noDescription": "Açıklama mevcut değil",
+    "orderingDisabled": "Müşteri siparişleri şu anda mevcut değil. Lütfen sipariş vermek için personelle iletişime geçin.",
+    "orderingDisabledShort": "Sipariş Verilemiyor",
+    "viewOnlyMode": "Sadece menü görüntüleme - sipariş vermek için personel yardımı gereklidir"
   },
   "qr": {
     "shareText": "Menümüze göz atın",
