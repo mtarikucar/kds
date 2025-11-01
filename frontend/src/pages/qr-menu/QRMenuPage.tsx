@@ -113,11 +113,28 @@ const QRMenuPage = () => {
     return matchesCategory && matchesSearch;
   });
 
-  // Normalize image URL - convert Windows paths to forward slashes
+  // Normalize image URL - convert to absolute URL
   const normalizeImageUrl = (url: string | null | undefined): string | null => {
     if (!url) return null;
-    // Replace backslashes with forward slashes
-    return url.replace(/\\/g, '/');
+
+    // Replace backslashes with forward slashes for Windows paths
+    const normalizedPath = url.replace(/\\/g, '/');
+
+    // If URL is already absolute, return as is
+    if (normalizedPath.startsWith('http://') || normalizedPath.startsWith('https://')) {
+      return normalizedPath;
+    }
+
+    // Get API URL from environment or use default
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+    // Extract base URL (remove /api suffix if present)
+    const BASE_URL = API_URL.replace(/\/api$/, '');
+
+    // Remove leading slash if present to avoid double slashes
+    const path = normalizedPath.startsWith('/') ? normalizedPath.substring(1) : normalizedPath;
+
+    // Construct full URL
+    return `${BASE_URL}/${path}`;
   };
 
   const handleProductClick = (product: Product) => {
