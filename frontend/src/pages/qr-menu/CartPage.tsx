@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
-import { ArrowLeft, Trash2, Plus, Minus, ShoppingBag, Check, Phone, MessageSquare } from 'lucide-react';
+import { ArrowLeft, Trash2, Plus, Minus, ShoppingBag, Check, Phone, MessageSquare, ClipboardList } from 'lucide-react';
 import { useCartStore } from '../../store/cartStore';
 import { formatCurrency } from '../../lib/utils';
 import Spinner from '../../components/ui/Spinner';
+import MobileBottomMenu from '../../components/qr-menu/MobileBottomMenu';
 
 interface MenuSettings {
-  primaryColor: string;
+  primaryColor: string; 
   secondaryColor: string;
 }
 
@@ -170,35 +171,51 @@ const CartPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+    <div className="min-h-screen bg-gray-50 animate-in fade-in duration-300">
+      {/* Header - Fixed */}
       <div
-        className="sticky top-0 z-20 shadow-lg"
+        className="fixed top-0 left-0 right-0 z-20 shadow-2xl animate-in slide-in-from-top duration-300"
         style={{
           background: `linear-gradient(135deg, ${settings.primaryColor} 0%, ${settings.secondaryColor} 100%)`,
         }}
       >
-        <div className="px-4 py-4 flex items-center gap-4">
+        <div className="px-4 py-5 flex items-center gap-4">
           <button
             onClick={() => navigate(`/qr-menu/${tenantId}${tableId ? `?tableId=${tableId}` : ''}`)}
-            className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+            className="p-2.5 rounded-full bg-white/20 hover:bg-white/30 transition-all duration-200 transform hover:scale-110 active:scale-95"
           >
             <ArrowLeft className="h-5 w-5 text-white" />
           </button>
-          <h1 className="text-xl font-bold text-white flex-1">
-            {t('cart.title', 'Your Cart')}
-          </h1>
-          <div className="text-white text-sm font-semibold">
-            {items.length} {t('cart.items', 'Items')}
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold text-white">
+              {t('cart.title', 'Your Cart')}
+            </h1>
+            <p className="text-white/80 text-sm mt-0.5">
+              {items.length} {t('cart.items', 'Items')}
+            </p>
           </div>
+          {/* My Orders Button */}
+          {tableId && sessionId && (
+            <button
+              onClick={() => navigate(`/qr-menu/${tenantId}/orders?tableId=${tableId}&sessionId=${sessionId}`)}
+              className="p-2.5 rounded-full bg-white/20 hover:bg-white/30 transition-all duration-200 transform hover:scale-110 active:scale-95"
+              title={t('orders.myOrders', 'My Orders')}
+            >
+              <ClipboardList className="h-5 w-5 text-white" />
+            </button>
+          )}
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto p-4 pb-32">
+      <div className="max-w-2xl mx-auto p-4 pt-28 pb-40">
         {/* Cart Items */}
         <div className="space-y-4 mb-6">
-          {items.map(item => (
-            <div key={item.id} className="bg-white rounded-xl shadow-sm p-4">
+          {items.map((item, index) => (
+            <div
+              key={item.id}
+              className="bg-white rounded-xl shadow-sm p-4 animate-in fade-in slide-in-from-bottom duration-300"
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
               <div className="flex gap-4">
                 <div className="flex-1">
                   <h3 className="font-semibold text-gray-900 mb-1">{item.product.name}</h3>
@@ -276,7 +293,7 @@ const CartPage = () => {
             onChange={(e) => setCustomerPhone(e.target.value)}
             placeholder="+90 555 123 4567"
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50"
-            style={{ focusRing: settings.primaryColor }}
+            style={{ '--tw-ring-color': settings.primaryColor } as React.CSSProperties}
           />
         </div>
 
@@ -291,7 +308,7 @@ const CartPage = () => {
             onChange={(e) => setOrderNotes(e.target.value)}
             placeholder={t('cart.notesPlaceholder', 'Any special requests?')}
             className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50 resize-none"
-            style={{ focusRing: settings.primaryColor }}
+            style={{ '--tw-ring-color': settings.primaryColor } as React.CSSProperties}
             rows={3}
           />
         </div>
@@ -302,11 +319,9 @@ const CartPage = () => {
             <p className="text-red-600 text-sm">{error}</p>
           </div>
         )}
-      </div>
 
-      {/* Fixed Bottom: Summary and Checkout */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-2xl">
-        <div className="max-w-2xl mx-auto p-4">
+        {/* Summary and Checkout */}
+        <div className="bg-white border-t border-gray-200 shadow-lg rounded-t-2xl p-4 mt-6">
           {/* Summary */}
           <div className="space-y-2 mb-4">
             <div className="flex justify-between text-sm">
@@ -342,6 +357,15 @@ const CartPage = () => {
           </p>
         </div>
       </div>
+
+      {/* Mobile Bottom Menu */}
+      <MobileBottomMenu
+        tenantId={tenantId}
+        tableId={tableId}
+        primaryColor={settings.primaryColor}
+        secondaryColor={settings.secondaryColor}
+        currentPage="cart"
+      />
     </div>
   );
 };

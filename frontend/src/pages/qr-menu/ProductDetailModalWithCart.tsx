@@ -169,12 +169,15 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
 
     addItem(product, quantity, allModifiers, notes || undefined);
 
-    // Show success animation
+    // Show success animation with smooth transition
     setShowSuccess(true);
     setTimeout(() => {
       setShowSuccess(false);
-      onClose();
-    }, 1000);
+      // Close modal after animation completes
+      setTimeout(() => {
+        onClose();
+      }, 300);
+    }, 1200);
   };
 
   return (
@@ -344,7 +347,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
             </div>
 
             {/* Quantity and Add to Cart */}
-            <div className="flex items-center gap-4">
+            <div className="flex items-center justify-between gap-4">
               {/* Quantity */}
               <div className="flex items-center gap-2 border-2 border-gray-200 rounded-lg p-1">
                 <button
@@ -363,35 +366,26 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
                 </button>
               </div>
 
-              {/* Add to Cart Button */}
+              {/* Add to Cart Button - Icon Only */}
               <button
                 onClick={handleAddToCart}
                 disabled={!enableCustomerOrdering || !canAddToCart() || showSuccess}
                 className={cn(
-                  'flex-1 py-4 px-6 rounded-xl font-semibold text-white transition-all duration-200 flex items-center justify-center gap-2',
+                  'py-4 px-4 rounded-xl font-semibold text-white transition-all duration-300 flex items-center justify-center transform',
                   enableCustomerOrdering && canAddToCart() && !showSuccess
-                    ? 'hover:shadow-lg active:scale-95'
-                    : 'opacity-50 cursor-not-allowed'
+                    ? 'hover:shadow-lg active:scale-95 hover:scale-110'
+                    : 'opacity-50 cursor-not-allowed',
+                  showSuccess ? 'scale-95' : ''
                 )}
                 style={{
                   backgroundColor: showSuccess ? '#10b981' : (enableCustomerOrdering && canAddToCart() ? primaryColor : '#9ca3af'),
                 }}
+                title={showSuccess ? t('qrMenu.added', 'Added!') : t('qrMenu.addToCart', 'Add to Cart')}
               >
                 {showSuccess ? (
-                  <>
-                    <Check className="w-5 h-5" />
-                    {t('qrMenu.added', 'Added!')}
-                  </>
-                ) : !enableCustomerOrdering ? (
-                  <>
-                    <X className="w-5 h-5" />
-                    {t('qrMenu.orderingDisabledShort', 'Ordering Unavailable')}
-                  </>
+                  <Check className="w-6 h-6 animate-pulse" />
                 ) : (
-                  <>
-                    <ShoppingCart className="w-5 h-5" />
-                    {t('qrMenu.addToCart', 'Add to Cart')} - {formatCurrency(calculateTotal(), 'USD')}
-                  </>
+                  <ShoppingCart className="w-6 h-6" />
                 )}
               </button>
             </div>

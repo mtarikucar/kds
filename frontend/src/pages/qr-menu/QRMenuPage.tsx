@@ -6,8 +6,9 @@ import { Category, Product } from '../../types';
 import { Card, CardContent } from '../../components/ui/Card';
 import Spinner from '../../components/ui/Spinner';
 import { formatCurrency } from '../../lib/utils';
-import { UtensilsCrossed, Search, ChevronRight, ShoppingCart } from 'lucide-react';
+import { UtensilsCrossed, Search, ChevronRight, ShoppingCart, ClipboardList } from 'lucide-react';
 import ProductDetailModalWithCart from './ProductDetailModalWithCart';
+import MobileBottomMenu from '../../components/qr-menu/MobileBottomMenu';
 import { useCartStore } from '../../store/cartStore';
 
 interface MenuSettings {
@@ -52,10 +53,11 @@ const QRMenuPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [addedProductId, setAddedProductId] = useState<string | null>(null);
 
   // Cart state
   const initializeSession = useCartStore(state => state.initializeSession);
-  const getItemCount = useCartStore(state => state.getItemCount);
+  const addItem = useCartStore(state => state.addItem);
 
   useEffect(() => {
     const fetchMenuData = async () => {
@@ -171,15 +173,15 @@ const QRMenuPage = () => {
 
   return (
     <div
-      className="flex flex-col min-h-screen"
+      className="flex flex-col min-h-screen animate-in fade-in duration-300"
       style={{
         backgroundColor: settings.backgroundColor,
         fontFamily: settings.fontFamily,
       }}
     >
-      {/* Header - Modern gradient design */}
+      {/* Header - Modern gradient design - Fixed */}
       <div
-        className="sticky top-0 z-20 shadow-2xl"
+        className="sticky top-0 left-0 right-0 z-20 shadow-2xl animate-in slide-in-from-top duration-300"
         style={{
           background: `linear-gradient(135deg, ${settings.primaryColor} 0%, ${settings.secondaryColor} 100%)`,
         }}
@@ -225,6 +227,22 @@ const QRMenuPage = () => {
                 )}
               </div>
 
+              {/* My Orders Button */}
+              {tableId && (
+                <button
+                  onClick={() => {
+                    const sessionId = useCartStore.getState().sessionId;
+                    if (sessionId) {
+                      navigate(`/qr-menu/${tenantId}/orders?tableId=${tableId}&sessionId=${sessionId}`);
+                    }
+                  }}
+                  className="flex-shrink-0 p-2.5 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95"
+                  title={t('orders.myOrders', 'My Orders')}
+                >
+                  <ClipboardList className="h-5 w-5 text-white" />
+                </button>
+              )}
+
               {/* Language Toggle */}
               <button
                 onClick={toggleLanguage}
@@ -253,7 +271,7 @@ const QRMenuPage = () => {
 
       {/* Warning Banner for Disabled Ordering */}
       {!enableCustomerOrdering && (
-        <div className="mx-4 sm:mx-6 mt-4 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg shadow-md">
+        <div className="fixed top-0 left-0 right-0 z-10 mx-4 sm:mx-6 mt-40 sm:mt-44 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg shadow-md">
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0">
               <svg className="h-5 w-5 text-yellow-600" viewBox="0 0 20 20" fill="currentColor">
@@ -320,18 +338,19 @@ const QRMenuPage = () => {
               {/* LIST Layout */}
               {settings.layoutStyle === 'LIST' && (
                 <div className="space-y-4">
-                  {filteredProducts.map((product) => {
+                  {filteredProducts.map((product, index) => {
                     const imageUrl = normalizeImageUrl(product.image || product.images?.[0]?.url);
                     return (
                       <button
                         key={product.id}
                         onClick={() => handleProductClick(product)}
                         disabled={!enableCustomerOrdering}
-                        className={`w-full text-left transition-all duration-200 transform ${
+                        className={`w-full text-left transition-all duration-200 transform animate-in fade-in slide-in-from-left ${
                           enableCustomerOrdering
                             ? 'hover:scale-102 active:scale-98 cursor-pointer'
                             : 'cursor-default opacity-75'
                         }`}
+                        style={{ animationDelay: `${index * 50}ms` }}
                       >
                         <Card className="overflow-hidden bg-white shadow-md hover:shadow-lg transition-shadow">
                           <CardContent className="p-0">
@@ -381,7 +400,34 @@ const QRMenuPage = () => {
                                   </p>
                                 )}
                               </div>
-                              <div className="flex items-center justify-center pr-4 flex-shrink-0">
+                              <div className="flex items-center justify-center gap-3 pr-4 flex-shrink-0">
+                                {enableCustomerOrdering && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const allModifiers = product.modifierGroups || [];
+                                      const hasRequiredModifiers = allModifiers.some(g => g.isRequired);
+                                      if (hasRequiredModifiers) {
+                                        handleProductClick(product);
+                                      } else {
+                                        addItem(product, 1, []);
+                                        setAddedProductId(product.id);
+                                        setTimeout(() => setAddedProductId(null), 1500);
+                                      }
+                                    }}
+                                    className={`p-2 rounded-lg transition-all duration-300 ${
+                                      addedProductId === product.id
+                                        ? 'scale-110 animate-pulse'
+                                        : 'hover:scale-110 active:scale-95'
+                                    }`}
+                                    style={{
+                                      backgroundColor: addedProductId === product.id ? '#10b981' : settings.primaryColor,
+                                    }}
+                                    title={t('qrMenu.addToCart', 'Add to Cart')}
+                                  >
+                                    <ShoppingCart className="h-5 w-5 text-white" />
+                                  </button>
+                                )}
                                 <ChevronRight
                                   className="h-5 w-5"
                                   style={{ color: settings.primaryColor }}
@@ -404,18 +450,19 @@ const QRMenuPage = () => {
                     gridTemplateColumns: `repeat(auto-fill, minmax(160px, 1fr))`,
                   }}
                 >
-                  {filteredProducts.map((product) => {
+                  {filteredProducts.map((product, index) => {
                     const imageUrl = normalizeImageUrl(product.image || product.images?.[0]?.url);
                     return (
                       <button
                         key={product.id}
                         onClick={() => handleProductClick(product)}
                         disabled={!enableCustomerOrdering}
-                        className={`text-left transition-all duration-200 transform ${
+                        className={`text-left transition-all duration-200 transform animate-in fade-in zoom-in-95 ${
                           enableCustomerOrdering
                             ? 'hover:scale-105 active:scale-95 cursor-pointer'
                             : 'cursor-default opacity-75'
                         }`}
+                        style={{ animationDelay: `${index * 50}ms` }}
                       >
                         <Card className="overflow-hidden bg-white shadow-md hover:shadow-lg transition-shadow h-full flex flex-col">
                           <CardContent className="p-0 flex-1 flex flex-col">
@@ -455,14 +502,43 @@ const QRMenuPage = () => {
                                   </p>
                                 )}
                               </div>
-                              {settings.showPrices && (
-                                <p
-                                  className="text-base font-bold mt-2"
-                                  style={{ color: settings.primaryColor }}
-                                >
-                                  {formatCurrency(product.price, 'USD')}
-                                </p>
-                              )}
+                              <div className="flex items-end justify-between gap-2 mt-2">
+                                {settings.showPrices && (
+                                  <p
+                                    className="text-base font-bold"
+                                    style={{ color: settings.primaryColor }}
+                                  >
+                                    {formatCurrency(product.price, 'USD')}
+                                  </p>
+                                )}
+                                {enableCustomerOrdering && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const allModifiers = product.modifierGroups || [];
+                                      const hasRequiredModifiers = allModifiers.some(g => g.isRequired);
+                                      if (hasRequiredModifiers) {
+                                        handleProductClick(product);
+                                      } else {
+                                        addItem(product, 1, []);
+                                        setAddedProductId(product.id);
+                                        setTimeout(() => setAddedProductId(null), 1500);
+                                      }
+                                    }}
+                                    className={`p-2 rounded-lg transition-all duration-300 ${
+                                      addedProductId === product.id
+                                        ? 'scale-110 animate-pulse'
+                                        : 'hover:scale-110 active:scale-95'
+                                    }`}
+                                    style={{
+                                      backgroundColor: addedProductId === product.id ? '#10b981' : settings.primaryColor,
+                                    }}
+                                    title={t('qrMenu.addToCart', 'Add to Cart')}
+                                  >
+                                    <ShoppingCart className="h-4 w-4 text-white" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </CardContent>
                         </Card>
@@ -475,16 +551,17 @@ const QRMenuPage = () => {
               {/* COMPACT Layout */}
               {settings.layoutStyle === 'COMPACT' && (
                 <div className="space-y-2">
-                  {filteredProducts.map((product) => (
+                  {filteredProducts.map((product, index) => (
                     <button
                       key={product.id}
                       onClick={() => handleProductClick(product)}
                       disabled={!enableCustomerOrdering}
-                      className={`w-full text-left transition-all duration-200 transform ${
+                      className={`w-full text-left transition-all duration-200 transform animate-in fade-in slide-in-from-left ${
                         enableCustomerOrdering
                           ? 'hover:scale-102 active:scale-98 cursor-pointer'
                           : 'cursor-default opacity-75'
                       }`}
+                      style={{ animationDelay: `${index * 50}ms` }}
                     >
                       <Card className="bg-white shadow-md hover:shadow-lg transition-shadow">
                         <CardContent className="p-3 sm:p-4">
@@ -510,6 +587,33 @@ const QRMenuPage = () => {
                                 >
                                   {formatCurrency(product.price, 'USD')}
                                 </p>
+                              )}
+                              {enableCustomerOrdering && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const allModifiers = product.modifierGroups || [];
+                                    const hasRequiredModifiers = allModifiers.some(g => g.isRequired);
+                                    if (hasRequiredModifiers) {
+                                      handleProductClick(product);
+                                    } else {
+                                      addItem(product, 1, []);
+                                      setAddedProductId(product.id);
+                                      setTimeout(() => setAddedProductId(null), 1500);
+                                    }
+                                  }}
+                                  className={`p-2 rounded-lg transition-all duration-300 ${
+                                    addedProductId === product.id
+                                      ? 'scale-110 animate-pulse'
+                                      : 'hover:scale-110 active:scale-95'
+                                  }`}
+                                  style={{
+                                    backgroundColor: addedProductId === product.id ? '#10b981' : settings.primaryColor,
+                                  }}
+                                  title={t('qrMenu.addToCart', 'Add to Cart')}
+                                >
+                                  <ShoppingCart className="h-5 w-5 text-white" />
+                                </button>
                               )}
                               <ChevronRight
                                 className="h-5 w-5"
@@ -577,22 +681,14 @@ const QRMenuPage = () => {
         enableCustomerOrdering={enableCustomerOrdering}
       />
 
-      {/* Floating Cart Button - Only show when ordering is enabled */}
-      {enableCustomerOrdering && getItemCount() > 0 && tableId && (
-        <button
-          onClick={() => navigate(`/qr-menu/${tenantId}/cart?tableId=${tableId}`)}
-          className="fixed bottom-6 right-6 z-30 p-4 rounded-full shadow-2xl transition-all duration-200 transform hover:scale-110 active:scale-95"
-          style={{ backgroundColor: settings.primaryColor }}
-        >
-          <ShoppingCart className="h-6 w-6 text-white" />
-          <span
-            className="absolute -top-2 -right-2 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-lg"
-            style={{ backgroundColor: settings.secondaryColor }}
-          >
-            {getItemCount()}
-          </span>
-        </button>
-      )}
+      {/* Mobile Bottom Menu */}
+      <MobileBottomMenu
+        tenantId={tenantId}
+        tableId={tableId}
+        primaryColor={settings.primaryColor}
+        secondaryColor={settings.secondaryColor}
+        currentPage="menu"
+      />
     </div>
   );
 };
