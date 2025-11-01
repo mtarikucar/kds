@@ -1,58 +1,60 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, Monitor, CheckCircle, AlertCircle, Clock, ExternalLink } from 'lucide-react';
+import { Download, Monitor, CheckCircle, AlertCircle, Clock, ExternalLink, Loader2 } from 'lucide-react';
+import { useLatestRelease, getPlatformInfo, trackDownload } from '../../features/desktop-app/desktopAppApi';
 
 const DesktopAppSettingsPage = () => {
   const { t } = useTranslation('settings');
   const [selectedPlatform, setSelectedPlatform] = useState<string>('windows');
 
-  // Simulated data - will be replaced with API call
-  const latestRelease = {
-    version: '0.2.6',
-    pubDate: new Date().toISOString(),
-    releaseNotes: '## What\'s New\n\n- Improved performance\n- Bug fixes\n- New features',
-  };
+  const { data: latestRelease, isLoading, error } = useLatestRelease();
+  const platforms = getPlatformInfo(latestRelease);
 
-  const platforms = [
-    {
-      id: 'windows',
-      name: 'Windows',
-      icon: '🪟',
-      description: 'Windows 10/11 (64-bit)',
-      fileSize: '85 MB',
-      downloadUrl: '#',
-    },
-    {
-      id: 'mac-arm',
-      name: 'macOS (Apple Silicon)',
-      icon: '🍎',
-      description: 'macOS 11+ (M1/M2/M3)',
-      fileSize: '78 MB',
-      downloadUrl: '#',
-    },
-    {
-      id: 'mac-intel',
-      name: 'macOS (Intel)',
-      icon: '🍎',
-      description: 'macOS 10.15+',
-      fileSize: '82 MB',
-      downloadUrl: '#',
-    },
-    {
-      id: 'linux',
-      name: 'Linux',
-      icon: '🐧',
-      description: 'Ubuntu/Debian (64-bit)',
-      fileSize: '90 MB',
-      downloadUrl: '#',
-    },
-  ];
+  const handleDownload = async (platform: typeof platforms[0]) => {
+    if (!platform.downloadUrl) {
+      alert('Download not available for this platform yet.');
+      return;
+    }
 
-  const handleDownload = (platform: typeof platforms[0]) => {
-    console.log(`Downloading for ${platform.name}`);
     // Track download analytics
-    // window.location.href = platform.downloadUrl;
+    if (latestRelease) {
+      await trackDownload(latestRelease.version, platform.id);
+    }
+
+    // Start download
+    window.open(platform.downloadUrl, '_blank');
   };
+
+  if (isLoading) {
+    return (
+      <div className="p-8 max-w-6xl mx-auto">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 text-blue-600 animate-spin mx-auto mb-4" />
+            <p className="text-gray-600">Loading desktop app information...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8 max-w-6xl mx-auto">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-6 w-6 text-yellow-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-semibold text-yellow-900 mb-1">No Desktop Releases Available</h3>
+              <p className="text-yellow-800 text-sm">
+                Desktop app releases haven't been published yet. Please check back later or contact support.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
@@ -66,21 +68,23 @@ const DesktopAppSettingsPage = () => {
       </div>
 
       {/* Latest Version Banner */}
-      <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 mb-8 text-white">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <CheckCircle className="h-5 w-5" />
-              <span className="text-sm font-medium opacity-90">Latest Version</span>
+      {latestRelease && (
+        <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 mb-8 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle className="h-5 w-5" />
+                <span className="text-sm font-medium opacity-90">Latest Version</span>
+              </div>
+              <h2 className="text-4xl font-bold mb-1">v{latestRelease.version}</h2>
+              <p className="text-blue-100 text-sm">
+                Released {new Date(latestRelease.pubDate).toLocaleDateString()}
+              </p>
             </div>
-            <h2 className="text-4xl font-bold mb-1">v{latestRelease.version}</h2>
-            <p className="text-blue-100 text-sm">
-              Released {new Date(latestRelease.pubDate).toLocaleDateString()}
-            </p>
+            <Download className="h-16 w-16 opacity-20" />
           </div>
-          <Download className="h-16 w-16 opacity-20" />
         </div>
-      </div>
+      )}
 
       {/* Platform Selection */}
       <div className="mb-8">
@@ -188,15 +192,17 @@ const DesktopAppSettingsPage = () => {
       </div>
 
       {/* Release Notes */}
-      <div className="bg-white rounded-xl p-6 border border-gray-200">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <ExternalLink className="h-5 w-5 text-gray-600" />
-          {t('releaseNotes')}
-        </h3>
-        <div className="prose prose-sm max-w-none text-gray-700">
-          <p className="whitespace-pre-wrap">{latestRelease.releaseNotes}</p>
+      {latestRelease && (
+        <div className="bg-white rounded-xl p-6 border border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <ExternalLink className="h-5 w-5 text-gray-600" />
+            {t('releaseNotes')}
+          </h3>
+          <div className="prose prose-sm max-w-none text-gray-700">
+            <p className="whitespace-pre-wrap">{latestRelease.releaseNotes}</p>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
