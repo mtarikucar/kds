@@ -148,7 +148,7 @@ jobs:
           path: |
             backend-${{ steps.version.outputs.VERSION }}.tar.gz
             frontend-${{ steps.version.outputs.VERSION }}.tar.gz
-          retention-days: 7
+          retention-days: 1
 
   # Deploy to production using Blue-Green strategy
   deploy-production:

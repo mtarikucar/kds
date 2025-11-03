@@ -122,23 +122,33 @@ jobs:
           npm run tauri build -- --target ${{ matrix.target }}
 
       - name: Sign Windows binary
-        if: matrix.platform == 'windows-x86_64' && secrets.WINDOWS_CERTIFICATE != ''
+        if: matrix.platform == 'windows-x86_64'
         working-directory: frontend
         shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: |
-          # Decode certificate from base64
-          $certBytes = [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
-          $certPath = ".\certificate.pfx"
-          [IO.File]::WriteAllBytes($certPath, $certBytes)
+          if ($env:WINDOWS_CERTIFICATE) {
+            Write-Host "🔐 Signing Windows binary..."
 
-          # Sign MSI files
-          Get-ChildItem -Path "src-tauri/target/release/bundle/msi" -Filter "*.msi" | ForEach-Object {
-            Write-Host "Signing: $($_.Name)"
-            & signtool sign /f $certPath /p $env:WINDOWS_CERTIFICATE_PASSWORD /tr http://timestamp.digicert.com /td sha256 /fd sha256 $_.FullName
+            # Decode certificate from base64
+            $certBytes = [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
+            $certPath = ".\certificate.pfx"
+            [IO.File]::WriteAllBytes($certPath, $certBytes)
+
+            # Sign MSI files
+            Get-ChildItem -Path "src-tauri/target/release/bundle/msi" -Filter "*.msi" | ForEach-Object {
+              Write-Host "Signing: $($_.Name)"
+              & signtool sign /f $certPath /p $env:WINDOWS_CERTIFICATE_PASSWORD /tr http://timestamp.digicert.com /td sha256 /fd sha256 $_.FullName
+            }
+
+            # Clean up certificate
+            Remove-Item $certPath
+            Write-Host "✅ Signing completed"
+          } else {
+            Write-Host "⚠️ Windows certificate not configured, skipping signing"
           }
-
-          # Clean up certificate
-          Remove-Item $certPath
 
       - name: Rename artifacts
         shell: bash
@@ -172,7 +182,7 @@ jobs:
         with:
           name: desktop-app-${{ matrix.platform }}
           path: frontend/${{ matrix.artifact_path }}${{ env.ARTIFACT_NAME }}
-          retention-days: 7
+          retention-days: 1
 
   # Create GitHub release and upload all platform binaries
   release:
