@@ -17,6 +17,7 @@ import { UpdateManifestDto } from './dto/update-manifest.dto';
 import { DesktopRelease } from './entities/desktop-release.entity';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { ApiKeyGuard } from '../auth/guards/api-key.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
@@ -95,6 +96,39 @@ export class DesktopAppController {
   ): Promise<{ message: string }> {
     await this.desktopAppService.trackDownload(version, platform);
     return { message: 'Download tracked' };
+  }
+
+  // ===========================================
+  // CI/CD ENDPOINTS (API Key Required)
+  // ===========================================
+
+  /**
+   * Create a new release via CI/CD (API Key required)
+   * Used by GitHub Actions for automated releases
+   */
+  @Post('ci/releases')
+  @UseGuards(ApiKeyGuard)
+  @ApiOperation({ summary: 'Create a new desktop release via CI/CD (API Key)' })
+  @ApiResponse({ status: 201, description: 'Release created', type: DesktopRelease })
+  @ApiResponse({ status: 400, description: 'Bad request - Version exists' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid API Key' })
+  async createReleaseCI(@Body() createReleaseDto: CreateReleaseDto): Promise<DesktopRelease> {
+    return this.desktopAppService.create(createReleaseDto);
+  }
+
+  /**
+   * Publish a release via CI/CD (API Key required)
+   * Used by GitHub Actions for automated publishing
+   */
+  @Post('ci/releases/:id/publish')
+  @UseGuards(ApiKeyGuard)
+  @ApiOperation({ summary: 'Publish a release via CI/CD (API Key)' })
+  @ApiResponse({ status: 200, description: 'Release published', type: DesktopRelease })
+  @ApiResponse({ status: 400, description: 'Already published' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid API Key' })
+  @ApiResponse({ status: 404, description: 'Release not found' })
+  async publishReleaseCI(@Param('id') id: string): Promise<DesktopRelease> {
+    return this.desktopAppService.publish(id);
   }
 
   // ===========================================

@@ -310,9 +310,9 @@ jobs:
 
           echo "📤 Pushing release to backend API..."
 
-          RESPONSE=$(curl -X POST https://hummytummy.com/api/desktop/releases \
+          RESPONSE=$(curl -X POST https://hummytummy.com/api/desktop/ci/releases \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${{ secrets.BACKEND_ADMIN_TOKEN }}" \
+            -H "X-API-Key: ${{ secrets.DESKTOP_RELEASE_API_KEY }}" \
             -d "{
               \"version\": \"$VERSION\",
               \"releaseTag\": \"$TAG\",
@@ -341,8 +341,8 @@ jobs:
               echo "Publishing release..."
 
               # Publish the release
-              PUBLISH_RESPONSE=$(curl -X POST "https://hummytummy.com/api/desktop/releases/$RELEASE_ID/publish" \
-                -H "Authorization: Bearer ${{ secrets.BACKEND_ADMIN_TOKEN }}" \
+              PUBLISH_RESPONSE=$(curl -X POST "https://hummytummy.com/api/desktop/ci/releases/$RELEASE_ID/publish" \
+                -H "X-API-Key: ${{ secrets.DESKTOP_RELEASE_API_KEY }}" \
                 -w "\n%{http_code}" \
                 -s)
 

@@ -31,21 +31,16 @@ dW50cnVzdGVkIGNvbW1lbnQ6IHJzaWduIGVuY3J5cHRlZCBzZWNyZXQga2V5ClJXUlRZMEl5ejJlZzFr
 
 ---
 
-### 3. BACKEND_ADMIN_TOKEN (Required)
+### 3. DESKTOP_RELEASE_API_KEY (Required)
 
-**Description:** JWT token for authenticating with the backend API
+**Description:** Static API key for authenticating GitHub Actions with the backend API
 
-**How to get it:**
+**Value:**
+```
+35e6700cc5d60cd9a3656e9a17c65f6b99360f87efd0cbdf1ffdc5e74ef7a6cc
+```
 
-1. Log in to your HummyTummy admin panel: https://hummytummy.com
-2. Open browser DevTools (F12)
-3. Go to Application → Local Storage → https://hummytummy.com
-4. Find the `auth_token` key and copy its value
-5. Paste it as the secret value
-
-**Format:** `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiIuLi4ifQ...`
-
-**Note:** Make sure the token belongs to an admin user with permissions to create desktop releases.
+**Note:** This is the same key configured in your backend `.env` file. It never expires and is independent of user sessions.
 
 ---
 
@@ -94,10 +89,11 @@ dW50cnVzdGVkIGNvbW1lbnQ6IHJzaWduIGVuY3J5cHRlZCBzZWNyZXQga2V5ClJXUlRZMEl5ejJlZzFr
 After adding the secrets, verify everything is set up:
 
 - [ ] `TAURI_PRIVATE_KEY` is added
-- [ ] `BACKEND_ADMIN_TOKEN` is added (test: call API with it)
+- [ ] `DESKTOP_RELEASE_API_KEY` is added
 - [ ] (Optional) `WINDOWS_CERTIFICATE` and `WINDOWS_CERTIFICATE_PASSWORD` are added
 - [ ] Public key is in `frontend/src-tauri/tauri.conf.json` (already done ✓)
 - [ ] Updater endpoint is configured in `tauri.conf.json` (already done ✓)
+- [ ] API key is configured in backend `.env` file (already done ✓)
 
 ---
 
@@ -129,10 +125,11 @@ Once all secrets are added, test the workflow:
 
 ## Troubleshooting
 
-### Workflow fails with "Authentication failed"
+### Workflow fails with "Authentication failed" or "Invalid API key"
 
-- Double-check `BACKEND_ADMIN_TOKEN` is valid and belongs to an admin user
-- Try getting a fresh token from the admin panel
+- Verify `DESKTOP_RELEASE_API_KEY` matches the key in backend `.env` file
+- Check backend logs for authentication errors
+- Ensure the API key guard is properly configured in the backend
 
 ### Windows signing fails
 
