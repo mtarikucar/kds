@@ -121,6 +121,19 @@ jobs:
         run: |
           npm run tauri build -- --target ${{ matrix.target }}
 
+      - name: Debug - List build output
+        working-directory: frontend
+        shell: bash
+        run: |
+          echo "📦 Checking build output..."
+          echo "Looking in src-tauri/target/release/bundle/"
+          ls -lah src-tauri/target/release/bundle/ || echo "Bundle directory not found"
+          echo ""
+          echo "Checking specific bundle directories:"
+          ls -lah src-tauri/target/release/bundle/*/ || echo "No bundle subdirectories found"
+          echo ""
+          find src-tauri/target/release/bundle -type f -name "*.msi" -o -name "*.exe" -o -name "*.AppImage" 2>/dev/null || echo "No installer files found"
+
       - name: Sign Windows binary
         if: matrix.platform == 'windows-x86_64'
         working-directory: frontend
@@ -150,38 +163,54 @@ jobs:
             Write-Host "⚠️ Windows certificate not configured, skipping signing"
           }
 
-      - name: Rename artifacts
+      - name: Find and rename artifacts
         shell: bash
+        working-directory: frontend
         run: |
-          cd frontend/${{ matrix.artifact_path }}
+          echo "🔍 Finding build artifacts..."
 
-          # Find the artifact file
-          ARTIFACT=$(ls ${{ matrix.artifact_name }} | head -n 1)
-
-          if [ -z "$ARTIFACT" ]; then
-            echo "❌ No artifact found matching pattern: ${{ matrix.artifact_name }}"
-            exit 1
-          fi
-
-          # Get file extension
-          EXT="${ARTIFACT##*.}"
-
-          # Rename to standardized format
+          # Search for artifacts in the bundle directory
           if [ "${{ matrix.platform }}" == "windows-x86_64" ]; then
-            NEW_NAME="hummytummy-kds_${{ needs.prepare.outputs.version_number }}_x64_en-US.msi"
+            # Prefer MSI, fallback to NSIS installer
+            ARTIFACT=$(find src-tauri/target/release/bundle -type f -name "*.msi" | head -n 1)
+            if [ -z "$ARTIFACT" ]; then
+              ARTIFACT=$(find src-tauri/target/release/bundle -type f -name "*-setup.exe" | head -n 1)
+              EXT="exe"
+              NEW_NAME="hummytummy-kds_${{ needs.prepare.outputs.version_number }}_x64_en-US-setup.exe"
+            else
+              EXT="msi"
+              NEW_NAME="hummytummy-kds_${{ needs.prepare.outputs.version_number }}_x64_en-US.msi"
+            fi
           else
+            # Look for AppImage
+            ARTIFACT=$(find src-tauri/target/release/bundle -type f -name "*.AppImage" | head -n 1)
+            EXT="AppImage"
             NEW_NAME="hummytummy-kds_${{ needs.prepare.outputs.version_number }}_amd64.AppImage"
           fi
 
-          mv "$ARTIFACT" "$NEW_NAME"
-          echo "✅ Renamed: $ARTIFACT -> $NEW_NAME"
+          if [ -z "$ARTIFACT" ]; then
+            echo "❌ No artifact found!"
+            echo "Contents of bundle directory:"
+            find src-tauri/target/release/bundle -type f 2>/dev/null || echo "Bundle directory not found"
+            exit 1
+          fi
+
+          echo "✅ Found artifact: $ARTIFACT (extension: $EXT)"
+
+          # Create output directory and copy artifact
+          mkdir -p output
+          cp "$ARTIFACT" "output/$NEW_NAME"
+
+          echo "✅ Renamed and copied: $(basename $ARTIFACT) -> $NEW_NAME"
           echo "ARTIFACT_NAME=$NEW_NAME" >> $GITHUB_ENV
+          echo "ARTIFACT_PATH=output/$NEW_NAME" >> $GITHUB_ENV
+          echo "ARTIFACT_EXTENSION=$EXT" >> $GITHUB_ENV
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: desktop-app-${{ matrix.platform }}
-          path: frontend/${{ matrix.artifact_path }}${{ env.ARTIFACT_NAME }}
+          path: frontend/output/${{ env.ARTIFACT_NAME }}
           retention-days: 1
 
   # Create GitHub release and upload all platform binaries
@@ -232,7 +261,7 @@ jobs:
 
           ### 📥 Downloads
 
-          - **Windows (x64):** Download the \`.msi\` installer below
+          - **Windows (x64):** Download the installer below (.msi or .exe)
           - **Linux (x64):** Download the \`.AppImage\` file below
 
           ### 🔄 Auto-Updates
@@ -264,8 +293,8 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            artifacts/desktop-app-windows-x86_64/*.msi
-            artifacts/desktop-app-linux-x86_64/*.AppImage
+            artifacts/desktop-app-windows-x86_64/*
+            artifacts/desktop-app-linux-x86_64/*
 
       - name: Get asset download URLs
         id: upload
@@ -282,12 +311,8 @@ jobs:
           echo "📦 Release assets:"
           echo "$ASSETS"
 
-          # Extract URLs
-          WINDOWS_URL=$(echo "$ASSETS" | grep "\.msi" | cut -d'|' -f2 | sed 's|https://api.github.com/repos/|https://github.com/|; s|/releases/assets/|/releases/download/'"$VERSION"'/|')
-          LINUX_URL=$(echo "$ASSETS" | grep "\.AppImage" | cut -d'|' -f2 | sed 's|https://api.github.com/repos/|https://github.com/|; s|/releases/assets/|/releases/download/'"$VERSION"'/|')
-
-          # Get actual filenames for URL construction
-          WINDOWS_FILE=$(echo "$ASSETS" | grep "\.msi" | cut -d'|' -f1)
+          # Get actual filenames for URL construction (support both .msi and .exe)
+          WINDOWS_FILE=$(echo "$ASSETS" | grep -E "\.(msi|exe)" | grep -i "x64\|windows" | cut -d'|' -f1 | head -n 1)
           LINUX_FILE=$(echo "$ASSETS" | grep "\.AppImage" | cut -d'|' -f1)
 
           WINDOWS_URL="https://github.com/$REPO/releases/download/$VERSION/$WINDOWS_FILE"

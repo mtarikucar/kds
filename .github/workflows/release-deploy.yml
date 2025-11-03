@@ -92,11 +92,14 @@ jobs:
           fi
           echo "✅ SSH connection test passed"
 
-  # Build and tag Docker images
-  build:
-    name: Build Docker Images
+  # Build and deploy to production using Blue-Green strategy
+  deploy-production:
+    name: Build and Deploy to Production
     runs-on: ubuntu-latest
     needs: pre-check
+    environment:
+      name: production
+      url: https://hummytummy.com
 
     steps:
       - name: Checkout code
@@ -107,7 +110,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Get version from tag
+      - name: Get version
         id: version
         run: |
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
@@ -140,42 +143,6 @@ jobs:
         run: |
           docker save kds-backend:${{ steps.version.outputs.VERSION }} | gzip > backend-${{ steps.version.outputs.VERSION }}.tar.gz
           docker save kds-frontend:${{ steps.version.outputs.VERSION }} | gzip > frontend-${{ steps.version.outputs.VERSION }}.tar.gz
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: docker-images
-          path: |
-            backend-${{ steps.version.outputs.VERSION }}.tar.gz
-            frontend-${{ steps.version.outputs.VERSION }}.tar.gz
-          retention-days: 1
-
-  # Deploy to production using Blue-Green strategy
-  deploy-production:
-    name: Deploy to Production (Blue-Green)
-    runs-on: ubuntu-latest
-    needs: build
-    environment:
-      name: production
-      url: https://hummytummy.com
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download Docker images
-        uses: actions/download-artifact@v4
-        with:
-          name: docker-images
-
-      - name: Get version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
-          else
-            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-          fi
 
       - name: Setup SSH
         env:
