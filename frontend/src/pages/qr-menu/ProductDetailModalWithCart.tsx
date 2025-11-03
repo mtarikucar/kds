@@ -278,7 +278,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
                         {group.selectionType === SelectionType.SINGLE
                           ? t('qrMenu.selectOne', 'Select one')
                           : group.maxSelections
-                          ? t('qrMenu.selectUpTo', { max: group.maxSelections }, `Select up to ${group.maxSelections}`)
+                          ? t('qrMenu.selectUpTo', `Select up to ${group.maxSelections}`, { max: group.maxSelections })
                           : t('qrMenu.selectMultiple', 'Select multiple')}
                       </p>
                     </div>
@@ -341,7 +341,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder={t('qrMenu.notesPlaceholder', 'E.g., No onions, extra sauce...')}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50 resize-none"
-                style={{ focusRing: primaryColor }}
+                style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
                 rows={3}
               />
             </div>

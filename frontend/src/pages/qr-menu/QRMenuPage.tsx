@@ -6,7 +6,7 @@ import { Category, Product } from '../../types';
 import { Card, CardContent } from '../../components/ui/Card';
 import Spinner from '../../components/ui/Spinner';
 import { formatCurrency } from '../../lib/utils';
-import { UtensilsCrossed, Search, ChevronRight, ShoppingCart, ClipboardList } from 'lucide-react';
+import { UtensilsCrossed, Search, ChevronRight, ShoppingCart, ClipboardList, Check } from 'lucide-react';
 import ProductDetailModalWithCart from './ProductDetailModalWithCart';
 import MobileBottomMenu from '../../components/qr-menu/MobileBottomMenu';
 import { useCartStore } from '../../store/cartStore';
@@ -227,22 +227,7 @@ const QRMenuPage = () => {
                 )}
               </div>
 
-              {/* My Orders Button */}
-              {tableId && (
-                <button
-                  onClick={() => {
-                    const sessionId = useCartStore.getState().sessionId;
-                    if (sessionId) {
-                      navigate(`/qr-menu/${tenantId}/orders?tableId=${tableId}&sessionId=${sessionId}`);
-                    }
-                  }}
-                  className="flex-shrink-0 p-2.5 bg-white/20 hover:bg-white/30 backdrop-blur-sm rounded-xl shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95"
-                  title={t('orders.myOrders', 'My Orders')}
-                >
-                  <ClipboardList className="h-5 w-5 text-white" />
-                </button>
-              )}
-
+              
               {/* Language Toggle */}
               <button
                 onClick={toggleLanguage}
@@ -335,9 +320,9 @@ const QRMenuPage = () => {
             </div>
           ) : (
             <>
-              {/* LIST Layout */}
+              {/* LIST Layout - Enhanced Horizontal Cards */}
               {settings.layoutStyle === 'LIST' && (
-                <div className="space-y-4">
+                <div className="space-y-3">
                   {filteredProducts.map((product, index) => {
                     const imageUrl = normalizeImageUrl(product.image || product.images?.[0]?.url);
                     return (
@@ -345,62 +330,70 @@ const QRMenuPage = () => {
                         key={product.id}
                         onClick={() => handleProductClick(product)}
                         disabled={!enableCustomerOrdering}
-                        className={`w-full text-left transition-all duration-200 transform animate-in fade-in slide-in-from-left ${
+                        className={`w-full text-left transition-all duration-300 transform animate-in fade-in slide-in-from-left ${
                           enableCustomerOrdering
-                            ? 'hover:scale-102 active:scale-98 cursor-pointer'
+                            ? 'hover:shadow-xl active:scale-98 cursor-pointer'
                             : 'cursor-default opacity-75'
                         }`}
-                        style={{ animationDelay: `${index * 50}ms` }}
+                        style={{ animationDelay: `${index * 20}ms` }}
                       >
-                        <Card className="overflow-hidden bg-white shadow-md hover:shadow-lg transition-shadow">
+                        <Card className="overflow-hidden bg-white shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-opacity-20" style={{ '--tw-border-opacity': '0.2', borderColor: settings.primaryColor } as React.CSSProperties}>
                           <CardContent className="p-0">
-                            <div className="flex gap-4">
+                            <div className="flex items-stretch h-28">
+                              {/* Left: Image Section */}
                               {settings.showImages && (
-                                <div className="relative flex-shrink-0 w-28 h-28 sm:w-32 sm:h-32 bg-gray-100 overflow-hidden">
+                                <div className="relative flex-shrink-0 w-36 overflow-hidden">
                                   {imageUrl ? (
-                                    <img
-                                      src={imageUrl}
-                                      alt={product.name}
-                                      className="w-full h-full object-cover"
-                                    />
+                                    <>
+                                      <img
+                                        src={imageUrl}
+                                        alt={product.name}
+                                        className="w-full h-full object-cover hover:scale-110 transition-transform duration-500"
+                                      />
+                                      <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/20" />
+                                    </>
                                   ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
-                                      <UtensilsCrossed className="h-10 w-10 text-gray-400" />
+                                    <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${settings.primaryColor}20 0%, ${settings.secondaryColor}20 100%)` }}>
+                                      <UtensilsCrossed className="h-10 w-10" style={{ color: settings.primaryColor, opacity: 0.4 }} />
                                     </div>
                                   )}
+                                  
+                                  {/* Unavailable Badge */}
                                   {product.isAvailable && (
-                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                      <span className="text-white text-xs font-bold">
-                                        {t('qrMenu.unavailable')}
+                                    <div className="absolute top-1 right-1">
+                                      <span className="px-2 py-0.5 rounded-full text-xs font-bold text-white bg-red-500 shadow-lg">
+                                        N/A
                                       </span>
                                     </div>
                                   )}
                                 </div>
                               )}
-                              <div className="flex-1 p-4 flex flex-col justify-between">
-                                <div>
-                                  <h3
-                                    className="text-base sm:text-lg font-bold line-clamp-2"
-                                    style={{ color: settings.secondaryColor }}
-                                  >
+
+                              {/* Right: Content Section */}
+                              <div className="flex-1 flex items-center justify-between px-5 gap-4">
+                                {/* Product Info */}
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-bold text-lg line-clamp-1 mb-1" style={{ color: settings.secondaryColor }}>
                                     {product.name}
                                   </h3>
                                   {settings.showDescription && product.description && (
-                                    <p className="text-xs sm:text-sm text-gray-600 mt-1 line-clamp-2">
+                                    <p className="text-sm text-gray-500 line-clamp-1 mb-1.5">
                                       {product.description}
                                     </p>
                                   )}
+                                  {settings.showPrices && (
+                                    <p className="text-2xl font-black" style={{ 
+                                      background: `linear-gradient(135deg, ${settings.primaryColor} 0%, ${settings.secondaryColor} 100%)`,
+                                      WebkitBackgroundClip: 'text',
+                                      WebkitTextFillColor: 'transparent',
+                                      backgroundClip: 'text'
+                                    }}>
+                                      {formatCurrency(product.price, 'USD')}
+                                    </p>
+                                  )}
                                 </div>
-                                {settings.showPrices && (
-                                  <p
-                                    className="text-lg sm:text-xl font-bold mt-2"
-                                    style={{ color: settings.primaryColor }}
-                                  >
-                                    {formatCurrency(product.price, 'USD')}
-                                  </p>
-                                )}
-                              </div>
-                              <div className="flex items-center justify-center gap-3 pr-4 flex-shrink-0">
+
+                                {/* Add Button */}
                                 {enableCustomerOrdering && (
                                   <button
                                     onClick={(e) => {
@@ -415,23 +408,29 @@ const QRMenuPage = () => {
                                         setTimeout(() => setAddedProductId(null), 1500);
                                       }
                                     }}
-                                    className={`p-2 rounded-lg transition-all duration-300 ${
+                                    className={`font-bold px-5 py-3 rounded-lg transition-all flex items-center justify-center gap-2 flex-shrink-0 min-w-[110px] shadow-md ${
                                       addedProductId === product.id
-                                        ? 'scale-110 animate-pulse'
-                                        : 'hover:scale-110 active:scale-95'
+                                        ? 'bg-green-500 scale-105 animate-pulse'
+                                        : 'hover:scale-105 active:scale-95'
                                     }`}
                                     style={{
-                                      backgroundColor: addedProductId === product.id ? '#10b981' : settings.primaryColor,
+                                      background: addedProductId === product.id ? '#10b981' : `linear-gradient(135deg, ${settings.primaryColor} 0%, ${settings.secondaryColor} 100%)`,
+                                      color: 'white'
                                     }}
-                                    title={t('qrMenu.addToCart', 'Add to Cart')}
                                   >
-                                    <ShoppingCart className="h-5 w-5 text-white" />
+                                    {addedProductId === product.id ? (
+                                      <>
+                                        <Check className="h-5 w-5" />
+                                        <span className="text-sm hidden md:inline">{t('qrMenu.added')}</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <ShoppingCart className="h-5 w-5" />
+                                        <span className="text-sm hidden md:inline">{t('qrMenu.addToCart')}</span>
+                                      </>
+                                    )}
                                   </button>
                                 )}
-                                <ChevronRight
-                                  className="h-5 w-5"
-                                  style={{ color: settings.primaryColor }}
-                                />
                               </div>
                             </div>
                           </CardContent>
@@ -442,14 +441,9 @@ const QRMenuPage = () => {
                 </div>
               )}
 
-              {/* GRID Layout */}
+              {/* GRID Layout - Enhanced Modern Design */}
               {settings.layoutStyle === 'GRID' && (
-                <div
-                  className="grid gap-4 sm:gap-5"
-                  style={{
-                    gridTemplateColumns: `repeat(auto-fill, minmax(160px, 1fr))`,
-                  }}
-                >
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {filteredProducts.map((product, index) => {
                     const imageUrl = normalizeImageUrl(product.image || product.images?.[0]?.url);
                     return (
@@ -457,137 +451,64 @@ const QRMenuPage = () => {
                         key={product.id}
                         onClick={() => handleProductClick(product)}
                         disabled={!enableCustomerOrdering}
-                        className={`text-left transition-all duration-200 transform animate-in fade-in zoom-in-95 ${
+                        className={`group text-left transition-all duration-300 transform animate-in fade-in zoom-in-95 ${
                           enableCustomerOrdering
-                            ? 'hover:scale-105 active:scale-95 cursor-pointer'
+                            ? 'hover:-translate-y-1 active:scale-95 cursor-pointer'
                             : 'cursor-default opacity-75'
                         }`}
-                        style={{ animationDelay: `${index * 50}ms` }}
+                        style={{ animationDelay: `${index * 30}ms` }}
                       >
-                        <Card className="overflow-hidden bg-white shadow-md hover:shadow-lg transition-shadow h-full flex flex-col">
-                          <CardContent className="p-0 flex-1 flex flex-col">
-                            {settings.showImages && (
-                              <div className="relative w-full h-40 bg-gray-100 overflow-hidden flex-shrink-0">
-                                {imageUrl ? (
-                                  <img
-                                    src={imageUrl}
-                                    alt={product.name}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
-                                    <UtensilsCrossed className="h-12 w-12 text-gray-400" />
-                                  </div>
-                                )}
-                                {product.isAvailable && (
-                                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                                    <span className="text-white text-xs font-bold text-center px-2">
-                                      {t('qrMenu.unavailable')}
-                                    </span>
-                                  </div>
-                                )}
+                        <Card className="overflow-hidden bg-white shadow-lg hover:shadow-2xl transition-all duration-300 h-56 relative">
+                          {/* Background Image with Overlay */}
+                          <div className="absolute inset-0">
+                            {settings.showImages && imageUrl ? (
+                              <>
+                                <img
+                                  src={imageUrl}
+                                  alt={product.name}
+                                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20" />
+                              </>
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${settings.primaryColor}15 0%, ${settings.secondaryColor}15 100%)` }}>
+                                <UtensilsCrossed className="h-16 w-16 text-gray-300" />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                               </div>
                             )}
-                            <div className="p-3 flex-1 flex flex-col justify-between">
-                              <div>
-                                <h3
-                                  className="text-sm font-bold line-clamp-2"
-                                  style={{ color: settings.secondaryColor }}
-                                >
-                                  {product.name}
-                                </h3>
-                                {settings.showDescription && product.description && (
-                                  <p className="text-xs text-gray-600 mt-1 line-clamp-2">
-                                    {product.description}
-                                  </p>
-                                )}
+                            
+                            {/* Unavailable Badge */}
+                            {product.isAvailable && (
+                              <div className="absolute top-2 right-2">
+                                <span className="px-3 py-1 rounded-full text-xs font-bold text-white bg-red-500/90 backdrop-blur-sm shadow-lg">
+                                  {t('qrMenu.unavailable')}
+                                </span>
                               </div>
-                              <div className="flex items-end justify-between gap-2 mt-2">
-                                {settings.showPrices && (
-                                  <p
-                                    className="text-base font-bold"
-                                    style={{ color: settings.primaryColor }}
-                                  >
-                                    {formatCurrency(product.price, 'USD')}
-                                  </p>
-                                )}
-                                {enableCustomerOrdering && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      const allModifiers = product.modifierGroups || [];
-                                      const hasRequiredModifiers = allModifiers.some(g => g.isRequired);
-                                      if (hasRequiredModifiers) {
-                                        handleProductClick(product);
-                                      } else {
-                                        addItem(product, 1, []);
-                                        setAddedProductId(product.id);
-                                        setTimeout(() => setAddedProductId(null), 1500);
-                                      }
-                                    }}
-                                    className={`p-2 rounded-lg transition-all duration-300 ${
-                                      addedProductId === product.id
-                                        ? 'scale-110 animate-pulse'
-                                        : 'hover:scale-110 active:scale-95'
-                                    }`}
-                                    style={{
-                                      backgroundColor: addedProductId === product.id ? '#10b981' : settings.primaryColor,
-                                    }}
-                                    title={t('qrMenu.addToCart', 'Add to Cart')}
-                                  >
-                                    <ShoppingCart className="h-4 w-4 text-white" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+                            )}
+                          </div>
 
-              {/* COMPACT Layout */}
-              {settings.layoutStyle === 'COMPACT' && (
-                <div className="space-y-2">
-                  {filteredProducts.map((product, index) => (
-                    <button
-                      key={product.id}
-                      onClick={() => handleProductClick(product)}
-                      disabled={!enableCustomerOrdering}
-                      className={`w-full text-left transition-all duration-200 transform animate-in fade-in slide-in-from-left ${
-                        enableCustomerOrdering
-                          ? 'hover:scale-102 active:scale-98 cursor-pointer'
-                          : 'cursor-default opacity-75'
-                      }`}
-                      style={{ animationDelay: `${index * 50}ms` }}
-                    >
-                      <Card className="bg-white shadow-md hover:shadow-lg transition-shadow">
-                        <CardContent className="p-3 sm:p-4">
-                          <div className="flex justify-between items-center gap-3">
-                            <div className="flex-1 min-w-0">
-                              <h3
-                                className="text-sm sm:text-base font-semibold truncate"
-                                style={{ color: settings.secondaryColor }}
-                              >
+                          {/* Content Overlay */}
+                          <CardContent className="absolute inset-0 p-4 flex flex-col justify-between">
+                            {/* Top: Product Name */}
+                            <div>
+                              <h3 className="font-bold text-white text-base leading-tight line-clamp-2 drop-shadow-lg">
                                 {product.name}
                               </h3>
-                              {product.isAvailable && (
-                                <p className="text-xs text-red-500 mt-1">
-                                  {t('qrMenu.unavailable')}
+                              {settings.showDescription && product.description && (
+                                <p className="text-white/90 text-xs mt-1.5 line-clamp-1 drop-shadow-md">
+                                  {product.description}
                                 </p>
                               )}
                             </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
+
+                            {/* Bottom: Price & Add Button */}
+                            <div className="space-y-2.5">
                               {settings.showPrices && (
-                                <p
-                                  className="text-base sm:text-lg font-bold"
-                                  style={{ color: settings.primaryColor }}
-                                >
+                                <p className="text-white font-black text-2xl drop-shadow-lg">
                                   {formatCurrency(product.price, 'USD')}
                                 </p>
                               )}
+
                               {enableCustomerOrdering && (
                                 <button
                                   onClick={(e) => {
@@ -602,22 +523,112 @@ const QRMenuPage = () => {
                                       setTimeout(() => setAddedProductId(null), 1500);
                                     }
                                   }}
-                                  className={`p-2 rounded-lg transition-all duration-300 ${
+                                  className={`w-full font-bold py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 backdrop-blur-sm shadow-lg ${
                                     addedProductId === product.id
-                                      ? 'scale-110 animate-pulse'
+                                      ? 'bg-green-500/95 scale-105 animate-pulse'
+                                      : 'bg-white/95 hover:bg-white hover:scale-105 active:scale-95'
+                                  }`}
+                                  style={{
+                                    color: addedProductId === product.id ? 'white' : settings.primaryColor,
+                                  }}
+                                >
+                                  {addedProductId === product.id ? (
+                                    <>
+                                      <Check className="h-5 w-5" />
+                                      <span className="text-sm">{t('qrMenu.added')}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <ShoppingCart className="h-5 w-5" />
+                                      <span className="text-sm">{t('qrMenu.addToCart')}</span>
+                                    </>
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* COMPACT Layout - Minimal Clean Design */}
+              {settings.layoutStyle === 'COMPACT' && (
+                <div className="space-y-2">
+                  {filteredProducts.map((product, index) => (
+                    <button
+                      key={product.id}
+                      onClick={() => handleProductClick(product)}
+                      disabled={!enableCustomerOrdering}
+                      className={`w-full text-left transition-all duration-300 transform animate-in fade-in slide-in-from-left ${
+                        enableCustomerOrdering
+                          ? 'hover:shadow-lg active:scale-98 cursor-pointer'
+                          : 'cursor-default opacity-75'
+                      }`}
+                      style={{ animationDelay: `${index * 20}ms` }}
+                    >
+                      <Card className="bg-white shadow-md hover:shadow-xl transition-all duration-300 border-l-4" style={{ borderLeftColor: settings.primaryColor }}>
+                        <CardContent className="p-4">
+                          <div className="flex justify-between items-center gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3 className="text-base font-bold truncate" style={{ color: settings.secondaryColor }}>
+                                  {product.name}
+                                </h3>
+                                {product.isAvailable && (
+                                  <span className="px-2 py-0.5 rounded-full text-xs font-bold text-white bg-red-500 flex-shrink-0">
+                                    {t('qrMenu.unavailable')}
+                                  </span>
+                                )}
+                              </div>
+                              {settings.showPrices && (
+                                <p className="text-lg font-black" style={{ 
+                                  background: `linear-gradient(135deg, ${settings.primaryColor} 0%, ${settings.secondaryColor} 100%)`,
+                                  WebkitBackgroundClip: 'text',
+                                  WebkitTextFillColor: 'transparent',
+                                  backgroundClip: 'text'
+                                }}>
+                                  {formatCurrency(product.price, 'USD')}
+                                </p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              {enableCustomerOrdering && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const allModifiers = product.modifierGroups || [];
+                                    const hasRequiredModifiers = allModifiers.some(g => g.isRequired);
+                                    if (hasRequiredModifiers) {
+                                      handleProductClick(product);
+                                    } else {
+                                      addItem(product, 1, []);
+                                      setAddedProductId(product.id);
+                                      setTimeout(() => setAddedProductId(null), 1500);
+                                    }
+                                  }}
+                                  className={`p-3 rounded-lg transition-all duration-300 shadow-md ${
+                                    addedProductId === product.id
+                                      ? 'scale-110 animate-pulse bg-green-500'
                                       : 'hover:scale-110 active:scale-95'
                                   }`}
                                   style={{
-                                    backgroundColor: addedProductId === product.id ? '#10b981' : settings.primaryColor,
+                                    background: addedProductId === product.id ? '#10b981' : `linear-gradient(135deg, ${settings.primaryColor} 0%, ${settings.secondaryColor} 100%)`,
                                   }}
                                   title={t('qrMenu.addToCart', 'Add to Cart')}
                                 >
-                                  <ShoppingCart className="h-5 w-5 text-white" />
+                                  {addedProductId === product.id ? (
+                                    <Check className="h-5 w-5 text-white" />
+                                  ) : (
+                                    <ShoppingCart className="h-5 w-5 text-white" />
+                                  )}
                                 </button>
                               )}
                               <ChevronRight
                                 className="h-5 w-5"
-                                style={{ color: settings.primaryColor }}
+                                style={{ color: settings.primaryColor, opacity: 0.5 }}
                               />
                             </div>
                           </div>
@@ -634,7 +645,7 @@ const QRMenuPage = () => {
 
       {/* Footer - Modern gradient design */}
       <div
-        className="shadow-2xl"
+        className="relative shadow-2xl mt-12 mb-20"
         style={{
           background: `linear-gradient(135deg, ${settings.primaryColor} 0%, ${settings.secondaryColor} 100%)`,
         }}

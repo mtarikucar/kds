@@ -61,10 +61,34 @@ const resources = {
   },
 };
 
-// Get saved language from localStorage or default to 'en'
-const getSavedLanguage = (): string => {
+// Detect user's preferred language based on browser and location
+const getInitialLanguage = (): string => {
+  // First check if user has manually selected a language before
   const saved = localStorage.getItem('i18n_language');
-  return saved && ['en', 'tr'].includes(saved) ? saved : 'en';
+  if (saved && ['en', 'tr'].includes(saved)) {
+    return saved;
+  }
+
+  // Check browser language
+  const browserLang = navigator.language || (navigator as any).userLanguage;
+  
+  // If browser language is Turkish, use Turkish
+  if (browserLang.toLowerCase().startsWith('tr')) {
+    return 'tr';
+  }
+
+  // Check if browser languages array includes Turkish
+  if (navigator.languages) {
+    const hasTurkish = navigator.languages.some(lang => 
+      lang.toLowerCase().startsWith('tr')
+    );
+    if (hasTurkish) {
+      return 'tr';
+    }
+  }
+
+  // Default to English for all other cases
+  return 'en';
 };
 
 // Initialize i18next
@@ -73,7 +97,7 @@ i18next
   .use(initReactI18next)
   .init({
     resources,
-    lng: getSavedLanguage(),
+    lng: getInitialLanguage(),
     fallbackLng: 'en',
     defaultNS: 'common',
     ns: ['common', 'auth', 'pos', 'kitchen', 'menu', 'orders', 'customers', 'settings', 'subscriptions', 'reports', 'validation', 'errors'],

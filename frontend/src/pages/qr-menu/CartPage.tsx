@@ -131,18 +131,31 @@ const CartPage = () => {
 
   if (items.length === 0 && !orderSuccess) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
-        <ShoppingBag className="h-24 w-24 text-gray-300 mb-4" />
-        <h2 className="text-2xl font-bold text-gray-700 mb-2">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-gray-50 via-white to-gray-50 p-4 animate-in fade-in duration-500">
+        <div className="relative">
+          <div className="absolute inset-0 animate-pulse"
+            style={{
+              background: `radial-gradient(circle, ${settings.primaryColor}20 0%, transparent 70%)`
+            }}
+          ></div>
+          <ShoppingBag className="h-28 w-28 mb-6 relative" style={{ color: settings.primaryColor, opacity: 0.4 }} />
+        </div>
+        <h2 className="text-3xl font-black mb-3"
+          style={{
+            color: settings.primaryColor
+          }}
+        >
           {t('cart.empty', 'Your cart is empty')}
         </h2>
-        <p className="text-gray-500 mb-6 text-center">
+        <p className="text-gray-600 mb-8 text-center text-lg font-medium">
           {t('cart.emptyDescription', 'Add some delicious items to get started')}
         </p>
         <button
           onClick={() => navigate(`/qr-menu/${tenantId}${tableId ? `?tableId=${tableId}` : ''}`)}
-          className="px-6 py-3 rounded-lg font-semibold text-white transition-all"
-          style={{ backgroundColor: settings.primaryColor }}
+          className="px-8 py-4 rounded-xl font-bold text-white transition-all hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl"
+          style={{ 
+            background: `linear-gradient(135deg, ${settings.primaryColor} 0%, ${settings.secondaryColor} 100%)`
+          }}
         >
           {t('cart.backToMenu', 'Back to Menu')}
         </button>
@@ -152,14 +165,17 @@ const CartPage = () => {
 
   if (orderSuccess) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
-        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mb-4">
-          <Check className="h-12 w-12 text-green-600" />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-green-50 via-white to-green-50 p-4 animate-in fade-in zoom-in duration-500">
+        <div className="relative mb-6">
+          <div className="absolute inset-0 bg-green-400/20 rounded-full animate-ping"></div>
+          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center shadow-2xl relative">
+            <Check className="h-14 w-14 text-white animate-in zoom-in duration-300" style={{ animationDelay: '200ms' }} />
+          </div>
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        <h2 className="text-3xl font-black text-gray-900 mb-3">
           {t('cart.orderSuccess', 'Order Submitted!')}
         </h2>
-        <p className="text-gray-600 text-center mb-4">
+        <p className="text-gray-600 text-center text-lg mb-6 max-w-md">
           {t('cart.orderSuccessMessage', 'Your order has been sent to the kitchen and is awaiting approval')}
         </p>
         <Spinner size="sm" />
@@ -208,29 +224,37 @@ const CartPage = () => {
       </div>
 
       <div className="max-w-2xl mx-auto p-4 pt-28 pb-40">
-        {/* Cart Items */}
-        <div className="space-y-4 mb-6">
+        {/* Cart Items - Enhanced Design */}
+        <div className="space-y-3 mb-6">
           {items.map((item, index) => (
             <div
               key={item.id}
-              className="bg-white rounded-xl shadow-sm p-4 animate-in fade-in slide-in-from-bottom duration-300"
-              style={{ animationDelay: `${index * 50}ms` }}
+              className="bg-white rounded-2xl shadow-lg hover:shadow-xl p-4 animate-in fade-in slide-in-from-bottom duration-300 transition-all border-l-4"
+              style={{ 
+                animationDelay: `${index * 30}ms`,
+                borderLeftColor: settings.primaryColor
+              }}
             >
               <div className="flex gap-4">
                 <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900 mb-1">{item.product.name}</h3>
-                  <p className="text-sm text-gray-600 mb-2">
+                  <h3 className="font-bold text-lg mb-1" style={{ color: settings.secondaryColor }}>
+                    {item.product.name}
+                  </h3>
+                  <p className="text-sm font-semibold mb-2" style={{ color: settings.primaryColor }}>
                     {formatCurrency(item.product.price, 'USD')}
                   </p>
 
                   {/* Modifiers */}
                   {item.modifiers.length > 0 && (
-                    <div className="space-y-1 mb-2">
+                    <div className="space-y-1 mb-3 p-2 bg-gray-50 rounded-lg">
                       {item.modifiers.map(mod => (
-                        <div key={mod.id} className="text-xs text-gray-500 flex items-center gap-2">
-                          <span>• {mod.displayName}</span>
+                        <div key={mod.id} className="text-xs text-gray-600 flex items-center justify-between gap-2">
+                          <span className="flex items-center gap-1">
+                            <span className="w-1 h-1 rounded-full" style={{ backgroundColor: settings.primaryColor }}></span>
+                            {mod.displayName}
+                          </span>
                           {mod.priceAdjustment > 0 && (
-                            <span className="text-green-600">
+                            <span className="font-semibold text-green-600">
                               +{formatCurrency(mod.priceAdjustment, 'USD')}
                             </span>
                           )}
@@ -241,26 +265,36 @@ const CartPage = () => {
 
                   {/* Notes */}
                   {item.notes && (
-                    <div className="text-xs text-gray-500 flex items-center gap-1 mb-2">
-                      <MessageSquare className="h-3 w-3" />
-                      <span>{item.notes}</span>
+                    <div className="text-sm text-gray-600 flex items-start gap-2 mb-3 p-2 bg-blue-50 rounded-lg">
+                      <MessageSquare className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: settings.primaryColor }} />
+                      <span className="italic">{item.notes}</span>
                     </div>
                   )}
 
-                  {/* Quantity Controls */}
-                  <div className="flex items-center gap-2">
+                  {/* Quantity Controls - Enhanced */}
+                  <div className="flex items-center gap-3">
                     <button
                       onClick={() => updateItemQuantity(item.id, item.quantity - 1)}
-                      className="p-1 rounded border border-gray-300 hover:bg-gray-50"
+                      className="p-2 rounded-lg border-2 transition-all hover:scale-110 active:scale-95"
+                      style={{ 
+                        borderColor: settings.primaryColor,
+                        color: settings.primaryColor
+                      }}
                     >
-                      <Minus className="h-4 w-4 text-gray-600" />
+                      <Minus className="h-4 w-4" />
                     </button>
-                    <span className="w-8 text-center font-semibold">{item.quantity}</span>
+                    <span className="w-10 text-center font-bold text-lg" style={{ color: settings.secondaryColor }}>
+                      {item.quantity}
+                    </span>
                     <button
                       onClick={() => updateItemQuantity(item.id, item.quantity + 1)}
-                      className="p-1 rounded border border-gray-300 hover:bg-gray-50"
+                      className="p-2 rounded-lg border-2 transition-all hover:scale-110 active:scale-95"
+                      style={{ 
+                        borderColor: settings.primaryColor,
+                        color: settings.primaryColor
+                      }}
                     >
-                      <Plus className="h-4 w-4 text-gray-600" />
+                      <Plus className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
@@ -268,12 +302,17 @@ const CartPage = () => {
                 <div className="flex flex-col items-end justify-between">
                   <button
                     onClick={() => removeItem(item.id)}
-                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-all hover:scale-110 active:scale-95"
                   >
                     <Trash2 className="h-5 w-5" />
                   </button>
-                  <div className="font-bold text-gray-900">
-                    {formatCurrency(item.itemTotal, 'USD')}
+                  <div className="text-right">
+                    <div className="text-xs text-gray-500 mb-1">{t('cart.total')}</div>
+                    <div className="font-black text-xl" style={{ 
+                      color: settings.primaryColor
+                    }}>
+                      {formatCurrency(item.itemTotal, 'USD')}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -281,10 +320,12 @@ const CartPage = () => {
           ))}
         </div>
 
-        {/* Customer Phone */}
-        <div className="bg-white rounded-xl shadow-sm p-4 mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            <Phone className="h-4 w-4 inline mr-1" />
+        {/* Customer Phone - Enhanced */}
+        <div className="bg-white rounded-2xl shadow-lg p-5 mb-4 border-l-4 hover:shadow-xl transition-all"
+          style={{ borderLeftColor: settings.primaryColor }}
+        >
+          <label className="block text-sm font-bold mb-3 flex items-center gap-2" style={{ color: settings.secondaryColor }}>
+            <Phone className="h-5 w-5" style={{ color: settings.primaryColor }} />
             {t('cart.phoneNumber', 'Phone Number (Optional)')}
           </label>
           <input
@@ -292,56 +333,75 @@ const CartPage = () => {
             value={customerPhone}
             onChange={(e) => setCustomerPhone(e.target.value)}
             placeholder="+90 555 123 4567"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50"
-            style={{ '--tw-ring-color': settings.primaryColor } as React.CSSProperties}
+            className="w-full px-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-opacity-50 transition-all"
+            style={{ 
+              '--tw-ring-color': settings.primaryColor,
+              borderColor: customerPhone ? settings.primaryColor : '#e5e7eb'
+            } as React.CSSProperties}
           />
         </div>
 
-        {/* Order Notes */}
-        <div className="bg-white rounded-xl shadow-sm p-4 mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            <MessageSquare className="h-4 w-4 inline mr-1" />
+        {/* Order Notes - Enhanced */}
+        <div className="bg-white rounded-2xl shadow-lg p-5 mb-4 border-l-4 hover:shadow-xl transition-all"
+          style={{ borderLeftColor: settings.secondaryColor }}
+        >
+          <label className="block text-sm font-bold mb-3 flex items-center gap-2" style={{ color: settings.secondaryColor }}>
+            <MessageSquare className="h-5 w-5" style={{ color: settings.secondaryColor }} />
             {t('cart.orderNotes', 'Order Notes (Optional)')}
           </label>
           <textarea
             value={orderNotes}
             onChange={(e) => setOrderNotes(e.target.value)}
             placeholder={t('cart.notesPlaceholder', 'Any special requests?')}
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50 resize-none"
+            className="w-full px-4 py-3 border-2 rounded-xl focus:outline-none focus:ring-2 focus:ring-opacity-50 resize-none transition-all"
             style={{ '--tw-ring-color': settings.primaryColor } as React.CSSProperties}
             rows={3}
           />
         </div>
 
-        {/* Error Message */}
+        {/* Error Message - Enhanced */}
         {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-            <p className="text-red-600 text-sm">{error}</p>
+          <div className="bg-red-50 border-l-4 border-red-500 rounded-xl p-4 mb-4 shadow-lg animate-in slide-in-from-top">
+            <p className="text-red-700 font-semibold text-sm flex items-center gap-2">
+              <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+              {error}
+            </p>
           </div>
         )}
 
-        {/* Summary and Checkout */}
-        <div className="bg-white border-t border-gray-200 shadow-lg rounded-t-2xl p-4 mt-6">
+        {/* Summary and Checkout - Enhanced */}
+        <div className="bg-white shadow-2xl rounded-2xl p-6 mt-6 border-2"
+          style={{ borderColor: settings.primaryColor }}
+        >
           {/* Summary */}
-          <div className="space-y-2 mb-4">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">{t('cart.subtotal', 'Subtotal')}</span>
-              <span className="font-semibold">{formatCurrency(getSubtotal(), 'USD')}</span>
+          <div className="space-y-3 mb-6">
+            <div className="flex justify-between text-base">
+              <span className="text-gray-600 font-medium">{t('cart.subtotal', 'Subtotal')}</span>
+              <span className="font-bold text-gray-900">{formatCurrency(getSubtotal(), 'USD')}</span>
             </div>
-            <div className="flex justify-between text-lg font-bold">
-              <span>{t('cart.total', 'Total')}</span>
-              <span style={{ color: settings.primaryColor }}>
+            <div className="h-px bg-gradient-to-r opacity-30"
+              style={{ 
+                backgroundImage: `linear-gradient(90deg, ${settings.primaryColor}, ${settings.secondaryColor})`
+              }}
+            ></div>
+            <div className="flex justify-between text-xl font-black">
+              <span style={{ color: settings.secondaryColor }}>{t('cart.total', 'Total')}</span>
+              <span style={{ 
+                color: settings.primaryColor
+              }}>
                 {formatCurrency(getTotal(), 'USD')}
               </span>
             </div>
           </div>
 
-          {/* Checkout Button */}
+          {/* Checkout Button - Enhanced */}
           <button
             onClick={handleSubmitOrder}
             disabled={isSubmitting}
-            className="w-full py-4 rounded-xl font-bold text-white text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{ backgroundColor: settings.primaryColor }}
+            className="w-full py-4 rounded-xl font-black text-white text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl"
+            style={{ 
+              background: `linear-gradient(135deg, ${settings.primaryColor} 0%, ${settings.secondaryColor} 100%)`
+            }}
           >
             {isSubmitting ? (
               <span className="flex items-center justify-center gap-2">
