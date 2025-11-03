@@ -2,6 +2,7 @@ import { X, Check, Receipt, MapPin, Clock } from 'lucide-react';
 import { useBillRequests, useAcknowledgeBillRequest, useCompleteBillRequest } from '../../features/orders/ordersApi';
 import { BillRequest } from '../../types';
 import Spinner from '../ui/Spinner';
+import { useTranslation } from 'react-i18next';
 
 interface BillRequestsPanelProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface BillRequestsPanelProps {
 }
 
 const BillRequestsPanel = ({ isOpen, onClose }: BillRequestsPanelProps) => {
+  const { t } = useTranslation('pos');
   const { data: billRequests = [], isLoading } = useBillRequests();
   const acknowledgeRequest = useAcknowledgeBillRequest();
   const completeRequest = useCompleteBillRequest();
@@ -34,13 +36,13 @@ const BillRequestsPanel = ({ isOpen, onClose }: BillRequestsPanelProps) => {
       case 'PENDING':
         return (
           <span className="px-2 py-1 text-xs font-semibold bg-yellow-100 text-yellow-800 rounded">
-            Pending
+            {t('billRequests.pending')}
           </span>
         );
       case 'ACKNOWLEDGED':
         return (
           <span className="px-2 py-1 text-xs font-semibold bg-blue-100 text-blue-800 rounded">
-            In Progress
+            {t('billRequests.inProgress')}
           </span>
         );
       default:
@@ -65,8 +67,8 @@ const BillRequestsPanel = ({ isOpen, onClose }: BillRequestsPanelProps) => {
           <div className="flex items-center gap-3">
             <Receipt className="h-6 w-6" />
             <div>
-              <h2 className="text-xl font-bold">Bill Requests</h2>
-              <p className="text-sm opacity-90">{billRequests.length} active request{billRequests.length !== 1 ? 's' : ''}</p>
+              <h2 className="text-xl font-bold">{t('billRequests.title')}</h2>
+              <p className="text-sm opacity-90">{billRequests.length} {billRequests.length !== 1 ? t('billRequests.activeRequests') : t('billRequests.activeRequest')}</p>
             </div>
           </div>
           <button
@@ -86,8 +88,8 @@ const BillRequestsPanel = ({ isOpen, onClose }: BillRequestsPanelProps) => {
           ) : billRequests.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-gray-400">
               <Receipt className="h-16 w-16 mb-4" />
-              <p className="text-lg font-medium">No bill requests</p>
-              <p className="text-sm">All requests have been handled</p>
+              <p className="text-lg font-medium">{t('billRequests.noRequests')}</p>
+              <p className="text-sm">{t('billRequests.allHandled')}</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -125,12 +127,12 @@ const BillRequestsPanel = ({ isOpen, onClose }: BillRequestsPanelProps) => {
                   {/* Request Content */}
                   <div className="p-4">
                     <p className="text-sm text-gray-600 mb-3">
-                      Customer has requested the bill for this table.
+                      {t('billRequests.customerRequested')}
                     </p>
 
                     {request.acknowledgedBy && (
                       <div className="text-xs text-gray-500">
-                        Acknowledged by {request.acknowledgedBy.firstName} {request.acknowledgedBy.lastName}
+                        {t('billRequests.acknowledgedBy')} {request.acknowledgedBy.firstName} {request.acknowledgedBy.lastName}
                       </div>
                     )}
                   </div>
@@ -148,7 +150,7 @@ const BillRequestsPanel = ({ isOpen, onClose }: BillRequestsPanelProps) => {
                         ) : (
                           <>
                             <Check className="h-4 w-4" />
-                            Acknowledge
+                            {t('billRequests.acknowledge')}
                           </>
                         )}
                       </button>
@@ -163,7 +165,7 @@ const BillRequestsPanel = ({ isOpen, onClose }: BillRequestsPanelProps) => {
                         ) : (
                           <>
                             <Check className="h-4 w-4" />
-                            Complete
+                            {t('billRequests.complete')}
                           </>
                         )}
                       </button>

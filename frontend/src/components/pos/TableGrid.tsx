@@ -5,6 +5,7 @@ import { Card } from '../ui/Card';
 import Badge from '../ui/Badge';
 import Spinner from '../ui/Spinner';
 import { Clock, User, Receipt } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 // import { getStatusColor } from '../../lib/utils';
 
 interface TableGridProps {
@@ -13,6 +14,7 @@ interface TableGridProps {
 }
 
 const TableGrid = ({ selectedTable, onSelectTable }: TableGridProps) => {
+  const { t } = useTranslation('pos');
   const { data: tables, isLoading } = useTables();
   const { data: pendingOrders = [] } = usePendingOrders();
   const { data: waiterRequests = [] } = useWaiterRequests();
@@ -90,7 +92,7 @@ const TableGrid = ({ selectedTable, onSelectTable }: TableGridProps) => {
               {/* Status Badge - Larger */}
               <div className="mb-3">
                 <Badge variant={getTableVariant(table.status)} className="text-sm px-3 py-1">
-                  {table.status}
+                  {t(`tableGrid.status.${table.status}`)}
                 </Badge>
               </div>
 
@@ -118,19 +120,19 @@ const TableGrid = ({ selectedTable, onSelectTable }: TableGridProps) => {
                   {notifications.orders > 0 && (
                     <div className="text-xs font-semibold text-orange-600 flex items-center justify-center gap-1">
                       <Clock className="h-3 w-3" />
-                      {notifications.orders} pending order{notifications.orders !== 1 ? 's' : ''}
+                      {notifications.orders} {notifications.orders !== 1 ? t('tableGrid.pendingOrders') : t('tableGrid.pendingOrder')}
                     </div>
                   )}
                   {notifications.waiter > 0 && (
                     <div className="text-xs font-semibold text-blue-600 flex items-center justify-center gap-1">
                       <User className="h-3 w-3" />
-                      Waiter needed
+                      {notifications.waiter} {notifications.waiter !== 1 ? t('tableGrid.waiterCalls') : t('tableGrid.waiterCall')}
                     </div>
                   )}
                   {notifications.bill > 0 && (
                     <div className="text-xs font-semibold text-purple-600 flex items-center justify-center gap-1">
                       <Receipt className="h-3 w-3" />
-                      Bill requested
+                      {notifications.bill} {notifications.bill !== 1 ? t('tableGrid.billRequests') : t('tableGrid.billRequest')}
                     </div>
                   )}
                 </div>
@@ -150,7 +152,7 @@ const TableGrid = ({ selectedTable, onSelectTable }: TableGridProps) => {
                       clipRule="evenodd"
                     />
                   </svg>
-                  Selected
+                  {t('tableGrid.selected')}
                 </div>
               )}
             </div>

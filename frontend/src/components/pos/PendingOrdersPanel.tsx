@@ -3,6 +3,7 @@ import { usePendingOrders, useApproveOrder, useCancelOrder } from '../../feature
 import { formatCurrency } from '../../lib/utils';
 import { Order } from '../../types';
 import Spinner from '../ui/Spinner';
+import { useTranslation } from 'react-i18next';
 
 interface PendingOrdersPanelProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface PendingOrdersPanelProps {
 }
 
 const PendingOrdersPanel = ({ isOpen, onClose }: PendingOrdersPanelProps) => {
+  const { t } = useTranslation('pos');
   const { data: pendingOrders = [], isLoading } = usePendingOrders();
   const approveOrder = useApproveOrder();
   const cancelOrder = useCancelOrder();
@@ -23,7 +25,7 @@ const PendingOrdersPanel = ({ isOpen, onClose }: PendingOrdersPanelProps) => {
   };
 
   const handleReject = async (orderId: string) => {
-    if (window.confirm('Are you sure you want to reject this order?')) {
+    if (window.confirm(t('pendingOrders.confirmReject'))) {
       try {
         await cancelOrder.mutateAsync(orderId);
       } catch (error) {
@@ -49,8 +51,8 @@ const PendingOrdersPanel = ({ isOpen, onClose }: PendingOrdersPanelProps) => {
           <div className="flex items-center gap-3">
             <Clock className="h-6 w-6" />
             <div>
-              <h2 className="text-xl font-bold">Pending Orders</h2>
-              <p className="text-sm opacity-90">{pendingOrders.length} order{pendingOrders.length !== 1 ? 's' : ''} awaiting approval</p>
+              <h2 className="text-xl font-bold">{t('pendingOrders.title')}</h2>
+              <p className="text-sm opacity-90">{pendingOrders.length} {pendingOrders.length !== 1 ? t('pendingOrders.awaitingApproval') : t('pendingOrders.awaitingApproval')}</p>
             </div>
           </div>
           <button
@@ -70,8 +72,8 @@ const PendingOrdersPanel = ({ isOpen, onClose }: PendingOrdersPanelProps) => {
           ) : pendingOrders.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-gray-400">
               <Clock className="h-16 w-16 mb-4" />
-              <p className="text-lg font-medium">No pending orders</p>
-              <p className="text-sm">All orders have been approved</p>
+              <p className="text-lg font-medium">{t('pendingOrders.noOrders')}</p>
+              <p className="text-sm">{t('pendingOrders.allApproved')}</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -150,7 +152,7 @@ const PendingOrdersPanel = ({ isOpen, onClose }: PendingOrdersPanelProps) => {
 
                     {/* Total */}
                     <div className="border-t pt-3 flex justify-between items-center">
-                      <span className="font-bold text-gray-900">Total</span>
+                      <span className="font-bold text-gray-900">{t('pendingOrders.totalAmount')}</span>
                       <span className="text-xl font-bold text-orange-600">
                         {formatCurrency(Number(order.finalAmount), 'USD')}
                       </span>
@@ -165,7 +167,7 @@ const PendingOrdersPanel = ({ isOpen, onClose }: PendingOrdersPanelProps) => {
                       className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white border-2 border-red-200 text-red-600 rounded-lg hover:bg-red-50 font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <X className="h-5 w-5" />
-                      Reject
+                      {t('pendingOrders.reject')}
                     </button>
                     <button
                       onClick={() => handleApprove(order.id)}
@@ -177,7 +179,7 @@ const PendingOrdersPanel = ({ isOpen, onClose }: PendingOrdersPanelProps) => {
                       ) : (
                         <>
                           <Check className="h-5 w-5" />
-                          Approve
+                          {t('pendingOrders.approve')}
                         </>
                       )}
                     </button>

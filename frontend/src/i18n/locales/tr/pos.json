@@ -27,6 +27,8 @@
     "clearAll": "Tümünü Temizle",
     "lowStock": "Düşük stok",
     "addToOrder": "Ekle",
+    "outOfStock": "Stokta Yok",
+    "left": "kaldı",
     "customer": "Müşteri",
     "orderTime": "Sipariş Saati",
     "completedTime": "Tamamlanma Saati",
@@ -74,8 +76,14 @@
     },
     "menu": {
       "all": "Tümü",
-      "gridView": "Izgara g\u00f6r\u00fcn\u00fcm",
-      "listView": "Liste g\u00f6r\u00fcn\u00fcm"
+      "gridView": "Izgara görünüm",
+      "listView": "Liste görünüm",
+      "searchProducts": "Ürün ara...",
+      "noProducts": "Ürün bulunamadı",
+      "noProductsFound": "Arama sonucu bulunamadı",
+      "tryDifferentSearch": "Farklı bir arama terimi deneyin",
+      "selectDifferentCategory": "Farklı bir kategori seçin veya yeni ürün ekleyin",
+      "clearSearch": "Aramayı Temizle"
     },
     "payment": {
       "title": "\u00d6deme",
@@ -90,6 +98,74 @@
       "transactionIdPlaceholder": "\u0130\u015flem numaras\u0131 girin",
       "confirmPayment": "\u00d6demeyi Onayla"
     },
-    "checkout": "\u00d6deme"
+    "checkout": "\u00d6deme",
+    "notifications": {
+      "pending": "Bekleyen",
+      "notification": "Bildirim",
+      "notifications": "Bildirim",
+      "order": "Sipariş",
+      "orders": "Sipariş",
+      "call": "Çağrı",
+      "calls": "Çağrı",
+      "bill": "Hesap",
+      "bills": "Hesap"
+    },
+    "pendingOrders": {
+      "title": "Bekleyen Siparişler",
+      "awaitingApproval": "onay bekliyor",
+      "noOrders": "Bekleyen sipariş yok",
+      "allApproved": "Tüm siparişler onaylandı",
+      "reject": "Reddet",
+      "approve": "Onayla",
+      "confirmReject": "Bu siparişi reddetmek istediğinizden emin misiniz?",
+      "totalAmount": "Toplam Tutar"
+    },
+    "waiterRequests": {
+      "title": "Garson Çağrıları",
+      "activeRequest": "aktif istek",
+      "activeRequests": "aktif istek",
+      "noRequests": "Garson çağrısı yok",
+      "allHandled": "Tüm istekler halledildi",
+      "pending": "Bekliyor",
+      "inProgress": "İşlemde",
+      "acknowledge": "Kabul Et",
+      "complete": "Tamamla",
+      "acknowledgedBy": "Kabul eden"
+    },
+    "billRequests": {
+      "title": "Hesap İstekleri",
+      "activeRequest": "aktif istek",
+      "activeRequests": "aktif istek",
+      "noRequests": "Hesap isteği yok",
+      "allHandled": "Tüm istekler halledildi",
+      "pending": "Bekliyor",
+      "inProgress": "İşlemde",
+      "customerRequested": "Müşteri bu masa için hesap istedi.",
+      "acknowledge": "Kabul Et",
+      "complete": "Tamamla",
+      "acknowledgedBy": "Kabul eden"
+    },
+    "tableGrid": {
+      "selected": "Seçili",
+      "pendingOrder": "Bekleyen Sipariş",
+      "pendingOrders": "Bekleyen Sipariş",
+      "waiterCall": "Garson Çağrısı",
+      "waiterCalls": "Garson Çağrısı",
+      "billRequest": "Hesap İsteği",
+      "billRequests": "Hesap İsteği",
+      "status": {
+        "AVAILABLE": "Müsait",
+        "OCCUPIED": "Dolu",
+        "RESERVED": "Rezerve"
+      },
+      "capacity": "Kapasite"
+    },
+    "stickyCart": {
+      "item": "ürün",
+      "items": "ürün",
+      "update": "Güncelle",
+      "create": "Oluştur",
+      "payment": "Ödeme"
+    }
 }
 

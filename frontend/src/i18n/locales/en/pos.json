@@ -28,6 +28,8 @@
   "clearAll": "Clear All",
   "lowStock": "Low stock",
   "addToOrder": "Add",
+  "outOfStock": "Out of Stock",
+  "left": "left",
   "customer": "Customer",
   "orderTime": "Order Time",
   "completedTime": "Completed Time",
@@ -77,7 +79,13 @@
   "menu": {
     "all": "All",
     "gridView": "Grid view",
-    "listView": "List view"
+    "listView": "List view",
+    "searchProducts": "Search products...",
+    "noProducts": "No products found",
+    "noProductsFound": "No search results found",
+    "tryDifferentSearch": "Try a different search term",
+    "selectDifferentCategory": "Select a different category or add new products",
+    "clearSearch": "Clear Search"
   },
   "payment": {
     "title": "Payment",
@@ -91,6 +99,74 @@
     "transactionIdLabel": "Transaction ID (Optional)",
     "transactionIdPlaceholder": "Enter transaction ID",
     "confirmPayment": "Confirm Payment"
+  },
+  "notifications": {
+    "pending": "Pending",
+    "notification": "Notification",
+    "notifications": "Notifications",
+    "order": "Order",
+    "orders": "Orders",
+    "call": "Call",
+    "calls": "Calls",
+    "bill": "Bill",
+    "bills": "Bills"
+  },
+  "pendingOrders": {
+    "title": "Pending Orders",
+    "awaitingApproval": "awaiting approval",
+    "noOrders": "No pending orders",
+    "allApproved": "All orders have been approved",
+    "reject": "Reject",
+    "approve": "Approve",
+    "confirmReject": "Are you sure you want to reject this order?",
+    "totalAmount": "Total Amount"
+  },
+  "waiterRequests": {
+    "title": "Waiter Requests",
+    "activeRequest": "active request",
+    "activeRequests": "active requests",
+    "noRequests": "No waiter requests",
+    "allHandled": "All requests have been handled",
+    "pending": "Pending",
+    "inProgress": "In Progress",
+    "acknowledge": "Acknowledge",
+    "complete": "Complete",
+    "acknowledgedBy": "Acknowledged by"
+  },
+  "billRequests": {
+    "title": "Bill Requests",
+    "activeRequest": "active request",
+    "activeRequests": "active requests",
+    "noRequests": "No bill requests",
+    "allHandled": "All requests have been handled",
+    "pending": "Pending",
+    "inProgress": "In Progress",
+    "customerRequested": "Customer has requested the bill for this table.",
+    "acknowledge": "Acknowledge",
+    "complete": "Complete",
+    "acknowledgedBy": "Acknowledged by"
+  },
+  "tableGrid": {
+    "selected": "Selected",
+    "pendingOrder": "Pending Order",
+    "pendingOrders": "Pending Orders",
+    "waiterCall": "Waiter Call",
+    "waiterCalls": "Waiter Calls",
+    "billRequest": "Bill Request",
+    "billRequests": "Bill Requests",
+    "status": {
+      "AVAILABLE": "Available",
+      "OCCUPIED": "Occupied",
+      "RESERVED": "Reserved"
+    },
+    "capacity": "Capacity"
+  },
+  "stickyCart": {
+    "item": "item",
+    "items": "items",
+    "update": "Update",
+    "create": "Create",
+    "payment": "Payment"
   }
 }
 

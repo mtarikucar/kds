@@ -17,7 +17,7 @@ export class PosSettingsService {
         data: {
           tenantId,
           enableTablelessMode: false,
-          enableTwoStepCheckout: false,
+          enableTwoStepCheckout: true, // Default to true for better workflow
           enableCustomerOrdering: true,
         },
       });
@@ -38,7 +38,7 @@ export class PosSettingsService {
         data: {
           tenantId,
           enableTablelessMode: updateDto.enableTablelessMode ?? false,
-          enableTwoStepCheckout: updateDto.enableTwoStepCheckout ?? false,
+          enableTwoStepCheckout: updateDto.enableTwoStepCheckout ?? true, // Default to true
           enableCustomerOrdering: updateDto.enableCustomerOrdering ?? true,
         },
       });

@@ -326,7 +326,7 @@ const OrderTrackingPage = () => {
 
                     {/* Order Total */}
                     <div className="border-t pt-3 mt-3 flex justify-between items-center">
-                      <span className="font-bold text-gray-900">Total</span>
+                      <span className="font-bold text-gray-900">{t('orders.total', 'Toplam')}</span>
                       <span
                         className="text-xl font-bold"
                         style={{ color: settings.primaryColor }}
@@ -339,7 +339,7 @@ const OrderTrackingPage = () => {
                     {order.notes && (
                       <div className="mt-3 p-3 bg-gray-50 rounded-lg">
                         <p className="text-xs text-gray-600">
-                          <strong>Note:</strong> {order.notes}
+                          <strong>{t('orders.note', 'Not')}:</strong> {order.notes}
                         </p>
                       </div>
                     )}

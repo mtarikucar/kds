@@ -15,6 +15,7 @@ import { useCreateOrder, useUpdateOrder, useOrders } from '../../features/orders
 import { useCreatePayment } from '../../features/orders/ordersApi';
 import { useUpdateTableStatus } from '../../features/tables/tablesApi';
 import { useGetPosSettings } from '../../features/pos/posApi';
+import { usePosSocket } from '../../features/pos/usePosSocket';
 import { Product, Table, TableStatus, OrderType, OrderStatus } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { useResponsive } from '../../hooks/useResponsive';
@@ -44,6 +45,9 @@ const POSPage = () => {
   // Fetch POS settings
   const { data: posSettings } = useGetPosSettings();
 
+  // Connect to WebSocket for real-time order updates
+  const { isConnected } = usePosSocket();
+
   const { mutate: createOrder, isPending: isCreatingOrder } = useCreateOrder();
   const { mutate: updateOrder, isPending: isUpdatingOrder } = useUpdateOrder();
   const { mutate: createPayment, isPending: isCreatingPayment } = useCreatePayment();
@@ -51,7 +55,7 @@ const POSPage = () => {
 
   // Determine if tableless mode is enabled
   const isTablelessMode = posSettings?.enableTablelessMode ?? false;
-  const isTwoStepCheckout = posSettings?.enableTwoStepCheckout ?? false;
+  const isTwoStepCheckout = posSettings?.enableTwoStepCheckout ?? true; // Default to true for two-step workflow
 
   // Fetch active orders for selected table
   const { data: tableOrders, refetch: refetchOrders } = useOrders(
@@ -62,60 +66,140 @@ const POSPage = () => {
       : undefined
   );
 
-  // Load existing orders when an occupied table is selected
+  // Load existing orders when a table is selected or tableOrders change
   useEffect(() => {
-    if (selectedTable?.status === TableStatus.OCCUPIED && tableOrders) {
-      // Find the most recent active order (not PAID or CANCELLED)
-      const activeOrder = tableOrders.find(
-        (order) =>
-          order.status !== OrderStatus.PAID &&
-          order.status !== OrderStatus.CANCELLED
-      );
+    // Skip if no table is selected
+    if (!selectedTable) {
+      return;
+    }
 
-      if (activeOrder) {
-        setCurrentOrderId(activeOrder.id);
+    // Wait for tableOrders to load
+    if (tableOrders === undefined) {
+      return;
+    }
 
-        // Populate cart with existing order items
-        const items = activeOrder.orderItems || activeOrder.items || [];
-        const existingItems: CartItem[] = items.map((item) => ({
-          ...(item.product as Product),
-          quantity: item.quantity,
-          notes: item.notes || undefined,
-        }));
+    // Find ALL unpaid orders (not PAID, CANCELLED, or PENDING_APPROVAL)
+    const activeOrders = tableOrders.filter(
+      (order) =>
+        order.status !== OrderStatus.PAID &&
+        order.status !== OrderStatus.CANCELLED &&
+        order.status !== 'PENDING_APPROVAL'
+    );
 
-        setCartItems(existingItems);
-        setDiscount(activeOrder.discount || 0);
+    if (activeOrders.length > 0) {
+      // Combine all order items from all active orders
+      const allItems: CartItem[] = [];
+      let totalDiscount = 0;
+      let combinedNotes = '';
+      const orderIds: string[] = [];
+
+      activeOrders.forEach((order) => {
+        orderIds.push(order.id);
+        totalDiscount += order.discount || 0;
+        if (order.notes) {
+          combinedNotes += (combinedNotes ? '\n' : '') + order.notes;
+        }
+
+        const items = order.orderItems || order.items || [];
+        items.forEach((item) => {
+          if (!item.product) return;
+          
+          // Check if this product already exists in cart
+          const existingItemIndex = allItems.findIndex((ci) => ci.id === item.product?.id);
+          
+          if (existingItemIndex >= 0) {
+            // Add to existing quantity
+            allItems[existingItemIndex].quantity += item.quantity;
+          } else {
+            // Add new item
+            allItems.push({
+              ...(item.product as Product),
+              quantity: item.quantity,
+              notes: item.notes || undefined,
+            });
+          }
+        });
+      });
+
+      // Check if orders have changed
+      const currentOrderIds = orderIds.sort().join(',');
+      const loadedOrderIds = currentOrderId ? currentOrderId.split(',').sort().join(',') : '';
+
+      // Only update if order IDs have actually changed (new orders added/removed)
+      if (currentOrderIds !== loadedOrderIds) {
+        console.log(`[POS] Loading ${activeOrders.length} order(s) for table ${selectedTable.number}`);
+        console.log(`[POS] Order IDs: ${orderIds.join(', ')}`);
+        
+        // If we already have a currentOrderId and it exists in the new list, keep it
+        // Otherwise, use the most recent order (last in array)
+        let orderIdToSet: string;
+        if (currentOrderId && orderIds.includes(currentOrderId)) {
+          // Keep existing order ID if it's still valid
+          orderIdToSet = currentOrderId;
+          console.log(`[POS] Keeping existing order ID: ${currentOrderId}`);
+        } else if (activeOrders.length === 1) {
+          // Single order - use it
+          orderIdToSet = orderIds[0];
+          console.log(`[POS] Using single order ID: ${orderIdToSet}`);
+        } else {
+          // Multiple orders - store all but work with the last one
+          orderIdToSet = orderIds.join(',');
+          console.log(`[POS] Multiple orders, storing: ${orderIdToSet}`);
+        }
+        
+        setCurrentOrderId(orderIdToSet);
+        setCartItems(allItems);
+        setDiscount(totalDiscount);
         setCustomerName('');
-        setOrderNotes(activeOrder.notes || '');
+        setOrderNotes(combinedNotes);
 
+        const orderNumbers = activeOrders.map(o => o.orderNumber).join(', ');
+        const totalItemCount = allItems.reduce((sum, item) => sum + item.quantity, 0);
+        
         toast.info(
-          t('loadedExistingOrder', { orderNumber: activeOrder.orderNumber, count: items.length })
+          t('loadedExistingOrder', { orderNumber: orderNumbers, count: totalItemCount })
         );
-      } else {
-        // Table is marked occupied but no active orders found
-  toast.warning(t('tableOccupiedNoOrders'));
+      }
+    } else {
+      // No active order found for this table
+      // Only clear if we currently have an order loaded
+      if (currentOrderId !== null) {
+        console.log(`[POS] No active orders for table ${selectedTable.number}, clearing cart`);
+        setCurrentOrderId(null);
+        setCartItems([]);
+        setDiscount(0);
+        setCustomerName('');
+        setOrderNotes('');
       }
     }
-  }, [selectedTable, tableOrders]);
+    // Note: We intentionally don't include currentOrderId in dependencies
+    // to avoid infinite loops. We check it manually inside the effect.
+  }, [selectedTable?.id, tableOrders, t]);
 
   const handleSelectTable = (table: Table) => {
-    if (table.status === TableStatus.AVAILABLE) {
-      setSelectedTable(table);
-      setCartItems([]);
-      setDiscount(0);
-      setCustomerName('');
-      setOrderNotes('');
-      setCurrentOrderId(null);
-    } else if (table.status === TableStatus.OCCUPIED) {
-      setSelectedTable(table);
-      // Clear cart first - useEffect will load existing orders
-      setCartItems([]);
-      setDiscount(0);
-      setCustomerName('');
-      setOrderNotes('');
-  toast.info(t('loadingExistingOrder'));
-    } else {
-  toast.warning(t('tableReserved'));
+    // Don't re-select the same table
+    if (selectedTable?.id === table.id) {
+      return;
+    }
+
+    if (table.status === TableStatus.RESERVED) {
+      toast.warning(t('tableReserved'));
+      return;
+    }
+
+    // Set the new table
+    setSelectedTable(table);
+    
+    // Clear cart - useEffect will load existing orders if any
+    setCartItems([]);
+    setDiscount(0);
+    setCustomerName('');
+    setOrderNotes('');
+    setCurrentOrderId(null);
+
+    // Show loading message for occupied tables
+    if (table.status === TableStatus.OCCUPIED) {
+      toast.info(t('loadingExistingOrder'));
     }
   };
 
@@ -187,21 +271,33 @@ const POSPage = () => {
       })),
     };
 
-    // Update existing order if currentOrderId exists, otherwise create new
-    if (currentOrderId) {
+    // Check if we have a single order ID (can be updated) or multiple orders
+    const hasMultipleOrders = currentOrderId && currentOrderId.includes(',');
+    
+    // If we have multiple orders, use the LAST one (most recent) for updates
+    const orderIdToUpdate = hasMultipleOrders 
+      ? currentOrderId.split(',').pop() 
+      : currentOrderId;
+
+    // Update existing order if we have an order ID
+    if (orderIdToUpdate) {
+      console.log(`[POS] Updating order: ${orderIdToUpdate}`);
       updateOrder(
         {
-          id: currentOrderId,
+          id: orderIdToUpdate,
           data: orderData,
         },
         {
           onSuccess: (order) => {
+            // Keep the updated order as current
+            setCurrentOrderId(order.id);
             toast.success(t('orderUpdated'));
           },
         }
       );
     } else {
       // Create new order
+      console.log(`[POS] Creating new order`);
       createOrder(
         orderData,
         {
@@ -235,7 +331,15 @@ const POSPage = () => {
       return;
     }
 
-    // If two-step checkout is enabled and order already exists, just open payment
+    // Check if we have multiple orders or single order
+    const hasMultipleOrders = currentOrderId && currentOrderId.includes(',');
+    
+    // If we have multiple orders, use the LAST one (most recent)
+    const orderIdToUpdate = hasMultipleOrders 
+      ? currentOrderId.split(',').pop() 
+      : currentOrderId;
+
+    // If two-step checkout is enabled and we have order(s), just open payment
     if (isTwoStepCheckout && currentOrderId) {
       setIsPaymentModalOpen(true);
       return;
@@ -258,15 +362,18 @@ const POSPage = () => {
       })),
     };
 
-    // Update existing order if currentOrderId exists, otherwise create new
-    if (currentOrderId) {
+    // Update existing order if we have an order ID
+    if (orderIdToUpdate) {
+      console.log(`[POS] Updating order before payment: ${orderIdToUpdate}`);
       updateOrder(
         {
-          id: currentOrderId,
+          id: orderIdToUpdate,
           data: orderData,
         },
         {
           onSuccess: (order) => {
+            // Keep the updated order as current
+            setCurrentOrderId(order.id);
             setIsPaymentModalOpen(true);
             toast.success(t('orderUpdated'));
           },
@@ -303,9 +410,17 @@ const POSPage = () => {
     );
     const total = subtotal - discount;
 
+    // If we have multiple orders, use the first one for payment
+    // (In a real scenario, you might want to create a combined payment or handle each separately)
+    const orderIdForPayment = currentOrderId.includes(',') 
+      ? currentOrderId.split(',')[0] 
+      : currentOrderId;
+
+    console.log(`[POS] Creating payment for order: ${orderIdForPayment}`);
+
     createPayment(
       {
-        orderId: currentOrderId,
+        orderId: orderIdForPayment,
         amount: total,
         method: data.method,
         transactionId: data.transactionId,
@@ -378,7 +493,7 @@ const POSPage = () => {
                 <CardHeader>
                   <CardTitle>{t('common:navigation.tables')}</CardTitle>
                 </CardHeader>
-                <CardContent className="overflow-y-auto">
+                <CardContent className="overflow-y-auto h-[calc(100%-80px)]">
                   <TableGrid
                     selectedTable={selectedTable}
                     onSelectTable={handleSelectTable}

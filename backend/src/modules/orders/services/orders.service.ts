@@ -516,7 +516,10 @@ export class OrdersService {
       },
     });
 
-    // Emit WebSocket event for real-time updates
+    // Emit WebSocket events for real-time updates
+    // Emit as new order for kitchen and POS systems
+    this.kdsGateway.emitNewOrder(tenantId, updatedOrder);
+    // Also emit update event for any listening clients
     this.kdsGateway.emitOrderUpdated(tenantId, updatedOrder);
 
     return updatedOrder;

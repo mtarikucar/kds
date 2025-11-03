@@ -1,6 +1,7 @@
 import { ShoppingCart } from 'lucide-react';
 import Button from '../ui/Button';
 import { formatCurrency } from '../../lib/utils';
+import { useTranslation } from 'react-i18next';
 
 interface StickyCartBarProps {
   itemCount: number;
@@ -25,6 +26,7 @@ const StickyCartBar = ({
   isTwoStepCheckout = false,
   hasActiveOrder = false,
 }: StickyCartBarProps) => {
+  const { t } = useTranslation('pos');
   if (!hasItems) return null;
 
   return (
@@ -47,7 +49,7 @@ const StickyCartBar = ({
               </div>
               <div className="flex-1 text-left min-w-0">
                 <p className="text-xs text-gray-500">
-                  {itemCount} {itemCount === 1 ? 'item' : 'items'}
+                  {itemCount} {itemCount === 1 ? t('stickyCart.item') : t('stickyCart.items')}
                 </p>
                 <p className="text-lg font-bold text-gray-900 truncate">
                   {formatCurrency(total)}
@@ -67,7 +69,7 @@ const StickyCartBar = ({
                   disabled={hasActiveOrder && itemCount === 0}
                   className="min-w-[100px] h-14 text-sm font-semibold"
                 >
-                  {hasActiveOrder ? 'Update' : 'Create'}
+                  {hasActiveOrder ? t('stickyCart.update') : t('stickyCart.create')}
                 </Button>
 
                 {/* Payment Button */}
@@ -78,7 +80,7 @@ const StickyCartBar = ({
                   disabled={!hasActiveOrder}
                   className="min-w-[100px] h-14 text-sm font-semibold"
                 >
-                  Payment
+                  {t('stickyCart.payment')}
                 </Button>
               </div>
             ) : (
@@ -90,7 +92,7 @@ const StickyCartBar = ({
                 isLoading={isCheckingOut}
                 className="min-w-[120px] h-14 text-base font-semibold"
               >
-                Checkout
+                {t('checkout')}
               </Button>
             )}
           </div>

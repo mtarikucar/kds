@@ -45,7 +45,11 @@ export const useCreateOrder = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      // Invalidate all order queries (including filtered ones)
+      queryClient.invalidateQueries({ 
+        queryKey: ['orders'],
+        refetchType: 'all' 
+      });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
       toast.success(i18n.t('pos:orderCreated'));
     },
@@ -70,7 +74,11 @@ export const useUpdateOrder = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      // Invalidate all order queries (including filtered ones)
+      queryClient.invalidateQueries({ 
+        queryKey: ['orders'],
+        refetchType: 'all' 
+      });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
       toast.success(i18n.t('pos:orderUpdated'));
     },
@@ -96,7 +104,11 @@ export const useUpdateOrderStatus = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      // Invalidate all order queries (including filtered ones)
+      queryClient.invalidateQueries({ 
+        queryKey: ['orders'],
+        refetchType: 'all' 
+      });
       toast.success(i18n.t('pos:orderUpdated'));
     },
     onError: (error: any) => {
@@ -114,7 +126,11 @@ export const useCancelOrder = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      // Invalidate all order queries (including filtered ones)
+      queryClient.invalidateQueries({ 
+        queryKey: ['orders'],
+        refetchType: 'all' 
+      });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
       toast.success(i18n.t('pos:orderCancelled'));
     },
@@ -134,7 +150,11 @@ export const useCancelKdsOrder = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      // Invalidate all order queries (including filtered ones)
+      queryClient.invalidateQueries({ 
+        queryKey: ['orders'],
+        refetchType: 'all' 
+      });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
       toast.success(i18n.t('pos:orderCancelled'));
     },
@@ -154,8 +174,13 @@ export const useCreatePayment = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      // Invalidate all order queries (including filtered ones)
+      queryClient.invalidateQueries({ 
+        queryKey: ['orders'],
+        refetchType: 'all' 
+      });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
       toast.success(i18n.t('pos:paymentRecorded'));
     },
     onError: (error: any) => {
@@ -190,7 +215,11 @@ export const useApproveOrder = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      // Invalidate all order queries (including filtered ones)
+      queryClient.invalidateQueries({ 
+        queryKey: ['orders'],
+        refetchType: 'all' 
+      });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
       toast.success('Order approved successfully');
     },
@@ -224,7 +253,10 @@ export const useAcknowledgeWaiterRequest = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['waiterRequests'] });
+      queryClient.invalidateQueries({ 
+        queryKey: ['waiterRequests'],
+        refetchType: 'all' 
+      });
       toast.success('Waiter request acknowledged');
     },
     onError: (error: any) => {
@@ -242,7 +274,10 @@ export const useCompleteWaiterRequest = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['waiterRequests'] });
+      queryClient.invalidateQueries({ 
+        queryKey: ['waiterRequests'],
+        refetchType: 'all' 
+      });
       toast.success('Waiter request completed');
     },
     onError: (error: any) => {
@@ -275,7 +310,10 @@ export const useAcknowledgeBillRequest = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['billRequests'] });
+      queryClient.invalidateQueries({ 
+        queryKey: ['billRequests'],
+        refetchType: 'all' 
+      });
       toast.success('Bill request acknowledged');
     },
     onError: (error: any) => {
@@ -293,7 +331,10 @@ export const useCompleteBillRequest = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['billRequests'] });
+      queryClient.invalidateQueries({ 
+        queryKey: ['billRequests'],
+        refetchType: 'all' 
+      });
       toast.success('Bill request completed');
     },
     onError: (error: any) => {

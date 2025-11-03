@@ -432,7 +432,11 @@
     "viewOnlyMode": "Menu viewing only - please order with staff assistance",
     "addToCart": "Add to Cart",
     "added": "Added!",
-    "requiredModifiers": "Please select required options"
+    "requiredModifiers": "Please select required options",
+    "selectOne": "Select one",
+    "selectUpTo": "Select up to {{max}}",
+    "selectMultiple": "Select multiple",
+    "specialInstructions": "Special Instructions"
   },
   "qr": {
     "shareText": "Check out our menu",
@@ -476,7 +480,9 @@
     "myOrders": "My Orders",
     "trackYourOrders": "Track your orders in real-time",
     "noOrders": "No orders yet",
-    "noOrdersDescription": "Start by browsing our menu"
+    "noOrdersDescription": "Start by browsing our menu",
+    "total": "Total",
+    "note": "Note"
   },
   "waiter": {
     "call": "Call Waiter",
@@ -494,10 +500,6 @@
     "preparing": "Preparing",
     "ready": "Ready",
     "served": "Served"
-  },
-  "common": {
-    "backToMenu": "Back to Menu",
-    "browseMenu": "Browse Menu"
   }
 }
 

@@ -2,6 +2,7 @@ import { X, Check, User, MapPin, Clock, MessageSquare } from 'lucide-react';
 import { useWaiterRequests, useAcknowledgeWaiterRequest, useCompleteWaiterRequest } from '../../features/orders/ordersApi';
 import { WaiterRequest } from '../../types';
 import Spinner from '../ui/Spinner';
+import { useTranslation } from 'react-i18next';
 
 interface WaiterRequestsPanelProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface WaiterRequestsPanelProps {
 }
 
 const WaiterRequestsPanel = ({ isOpen, onClose }: WaiterRequestsPanelProps) => {
+  const { t } = useTranslation('pos');
   const { data: waiterRequests = [], isLoading } = useWaiterRequests();
   const acknowledgeRequest = useAcknowledgeWaiterRequest();
   const completeRequest = useCompleteWaiterRequest();
@@ -34,13 +36,13 @@ const WaiterRequestsPanel = ({ isOpen, onClose }: WaiterRequestsPanelProps) => {
       case 'PENDING':
         return (
           <span className="px-2 py-1 text-xs font-semibold bg-yellow-100 text-yellow-800 rounded">
-            Pending
+            {t('waiterRequests.pending')}
           </span>
         );
       case 'ACKNOWLEDGED':
         return (
           <span className="px-2 py-1 text-xs font-semibold bg-blue-100 text-blue-800 rounded">
-            In Progress
+            {t('waiterRequests.inProgress')}
           </span>
         );
       default:
@@ -65,8 +67,8 @@ const WaiterRequestsPanel = ({ isOpen, onClose }: WaiterRequestsPanelProps) => {
           <div className="flex items-center gap-3">
             <User className="h-6 w-6" />
             <div>
-              <h2 className="text-xl font-bold">Waiter Requests</h2>
-              <p className="text-sm opacity-90">{waiterRequests.length} active request{waiterRequests.length !== 1 ? 's' : ''}</p>
+              <h2 className="text-xl font-bold">{t('waiterRequests.title')}</h2>
+              <p className="text-sm opacity-90">{waiterRequests.length} {waiterRequests.length !== 1 ? t('waiterRequests.activeRequests') : t('waiterRequests.activeRequest')}</p>
             </div>
           </div>
           <button
@@ -86,8 +88,8 @@ const WaiterRequestsPanel = ({ isOpen, onClose }: WaiterRequestsPanelProps) => {
           ) : waiterRequests.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-64 text-gray-400">
               <User className="h-16 w-16 mb-4" />
-              <p className="text-lg font-medium">No waiter requests</p>
-              <p className="text-sm">All requests have been handled</p>
+              <p className="text-lg font-medium">{t('waiterRequests.noRequests')}</p>
+              <p className="text-sm">{t('waiterRequests.allHandled')}</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -133,7 +135,7 @@ const WaiterRequestsPanel = ({ isOpen, onClose }: WaiterRequestsPanelProps) => {
 
                     {request.acknowledgedBy && (
                       <div className="text-xs text-gray-500">
-                        Acknowledged by {request.acknowledgedBy.firstName} {request.acknowledgedBy.lastName}
+                        {t('waiterRequests.acknowledgedBy')} {request.acknowledgedBy.firstName} {request.acknowledgedBy.lastName}
                       </div>
                     )}
                   </div>
@@ -151,7 +153,7 @@ const WaiterRequestsPanel = ({ isOpen, onClose }: WaiterRequestsPanelProps) => {
                         ) : (
                           <>
                             <Check className="h-4 w-4" />
-                            Acknowledge
+                            {t('waiterRequests.acknowledge')}
                           </>
                         )}
                       </button>
@@ -166,7 +168,7 @@ const WaiterRequestsPanel = ({ isOpen, onClose }: WaiterRequestsPanelProps) => {
                         ) : (
                           <>
                             <Check className="h-4 w-4" />
-                            Complete
+                            {t('waiterRequests.complete')}
                           </>
                         )}
                       </button>

@@ -78,7 +78,7 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   emitNewOrder(tenantId: string, order: any) {
-    this.server.to(`kitchen-${tenantId}`).emit('order:new', {
+    this.server.to(`kitchen-${tenantId}`).to(`pos-${tenantId}`).emit('order:new', {
       orderId: order.id,
       orderNumber: order.orderNumber,
       items: order.orderItems,
@@ -89,7 +89,7 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       createdAt: order.createdAt,
     });
 
-    this.logger.log(`New order ${order.orderNumber} emitted to kitchen-${tenantId}`);
+    this.logger.log(`New order ${order.orderNumber} emitted to kitchen-${tenantId} and pos-${tenantId}`);
   }
 
   emitOrderUpdated(tenantId: string, order: any) {

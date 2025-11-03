@@ -537,7 +537,11 @@
     "viewOnlyMode": "Sadece menü görüntüleme - sipariş vermek için personel yardımı gereklidir",
     "addToCart": "Sepete Ekle",
     "added": "Eklendi!",
-    "requiredModifiers": "Lütfen gerekli seçenekleri seçin"
+    "requiredModifiers": "Lütfen gerekli seçenekleri seçin",
+    "selectOne": "Bir tane seçin",
+    "selectUpTo": "En fazla {{max}} tane seçin",
+    "selectMultiple": "Birden fazla seçin",
+    "specialInstructions": "Özel Talimatlar"
   },
   "qr": {
     "shareText": "Menümüze göz atın",
@@ -581,7 +585,9 @@
     "myOrders": "Siparişlerim",
     "trackYourOrders": "Siparişlerinizi gerçek zamanlı olarak takip edin",
     "noOrders": "Henüz sipariş yok",
-    "noOrdersDescription": "Menüyü inceleyerek başlayın"
+    "noOrdersDescription": "Menüyü inceleyerek başlayın",
+    "total": "Toplam",
+    "note": "Not"
   },
   "waiter": {
     "call": "Garson Çağır",
@@ -599,10 +605,6 @@
     "preparing": "Hazırlanıyor",
     "ready": "Hazır",
     "served": "Servis Edildi"
-  },
-  "common": {
-    "backToMenu": "Menüye Dön",
-    "browseMenu": "Menüyü Gözat"
   }
 }
 
