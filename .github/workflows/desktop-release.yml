@@ -40,10 +40,77 @@ jobs:
           echo "VERSION_NUMBER=$VERSION_NUMBER" >> $GITHUB_OUTPUT
           echo "📦 Building version: $VERSION"
 
+  # Create GitHub release first (before parallel builds)
+  create-release:
+    name: Create GitHub Release
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate release notes
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+
+          # Get previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 $VERSION^ 2>/dev/null || echo "")
+
+          if [ -n "$PREV_TAG" ]; then
+            echo "Generating changelog from $PREV_TAG to $VERSION"
+            CHANGELOG=$(git log $PREV_TAG..$VERSION --pretty=format:"- %s (%h)" --no-merges)
+          else
+            echo "No previous tag found, using recent commits"
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -10)
+          fi
+
+          # Write release notes to file
+          cat > release_notes.md << EOF
+          ## 🎉 HummyTummy Desktop App $VERSION
+
+          ### 📥 Downloads
+
+          Installers will be available shortly after builds complete.
+
+          - **Windows (x64):** .msi or .exe installer
+          - **Linux (x64):** .AppImage file
+
+          ### 🔄 Auto-Updates
+
+          This release includes automatic update checking. The app will notify you when new versions are available.
+
+          ### 📝 Changes
+
+          $CHANGELOG
+
+          ### 🐛 Issues?
+
+          Please report any issues on our [GitHub Issues](https://github.com/mtarikucar/kds/issues) page.
+
+          ---
+
+          🤖 Generated with [Claude Code](https://claude.com/claude-code)
+          EOF
+
+          cat release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.version }}
+          name: Release ${{ needs.prepare.outputs.version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   # Build desktop app for each platform
   build:
     name: Build ${{ matrix.platform }}
-    needs: prepare
+    needs: [prepare, create-release]
     runs-on: ${{ matrix.os }}
 
     strategy:
@@ -238,9 +305,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Create GitHub release and upload all platform binaries
-  release:
-    name: Create GitHub Release
+  # Get asset URLs after builds complete
+  get-asset-urls:
+    name: Get Asset Download URLs
     needs: [prepare, build]
     runs-on: ubuntu-latest
     outputs:
@@ -248,75 +315,16 @@ jobs:
       linux_url: ${{ steps.upload.outputs.linux_url }}
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Generate release notes
-        id: release_notes
+      - name: Wait for assets to be available
         run: |
-          VERSION="${{ needs.prepare.outputs.version }}"
-
-          # Get previous tag
-          PREV_TAG=$(git describe --tags --abbrev=0 $VERSION^ 2>/dev/null || echo "")
-
-          if [ -n "$PREV_TAG" ]; then
-            echo "Generating changelog from $PREV_TAG to $VERSION"
-            CHANGELOG=$(git log $PREV_TAG..$VERSION --pretty=format:"- %s (%h)" --no-merges)
-          else
-            echo "No previous tag found, using recent commits"
-            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -10)
-          fi
-
-          # Write release notes to file
-          cat > release_notes.md << EOF
-          ## 🎉 HummyTummy Desktop App $VERSION
-
-          ### 📥 Downloads
-
-          - **Windows (x64):** Download the installer below (.msi or .exe)
-          - **Linux (x64):** Download the \`.AppImage\` file below
-
-          ### 🔄 Auto-Updates
-
-          This release includes automatic update checking. The app will notify you when new versions are available.
-
-          ### 📝 Changes
-
-          $CHANGELOG
-
-          ### 🐛 Issues?
-
-          Please report any issues on our [GitHub Issues](https://github.com/mtarikucar/kds/issues) page.
-
-          ---
-
-          🤖 Generated with [Claude Code](https://claude.com/claude-code)
-          EOF
-
-          cat release_notes.md
-
-      - name: Update GitHub Release with notes
-        id: create_release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ needs.prepare.outputs.version }}
-          name: Release ${{ needs.prepare.outputs.version }}
-          body_path: release_notes.md
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          echo "⏳ Waiting for GitHub to process uploaded assets..."
+          sleep 10
 
       - name: Get asset download URLs
         id: upload
         run: |
           VERSION="${{ needs.prepare.outputs.version }}"
           REPO="${{ github.repository }}"
-
-          # Wait a bit for GitHub to process the release
-          sleep 5
 
           # Fetch release assets
           ASSETS=$(gh release view $VERSION --json assets -q '.assets[] | "\(.name)|\(.url)"')
@@ -342,7 +350,7 @@ jobs:
   # Push release info to backend API
   sync-backend:
     name: Sync with Backend API
-    needs: [prepare, release]
+    needs: [prepare, get-asset-urls]
     runs-on: ubuntu-latest
 
     steps:
@@ -350,8 +358,8 @@ jobs:
         run: |
           VERSION="${{ needs.prepare.outputs.version_number }}"
           TAG="${{ needs.prepare.outputs.version }}"
-          WINDOWS_URL="${{ needs.release.outputs.windows_url }}"
-          LINUX_URL="${{ needs.release.outputs.linux_url }}"
+          WINDOWS_URL="${{ needs.get-asset-urls.outputs.windows_url }}"
+          LINUX_URL="${{ needs.get-asset-urls.outputs.linux_url }}"
 
           # Create release notes (simplified for API)
           RELEASE_NOTES="Release $TAG of HummyTummy Desktop App"
@@ -412,7 +420,7 @@ jobs:
   # Final verification
   verify:
     name: Verify Release
-    needs: [prepare, release, sync-backend]
+    needs: [prepare, get-asset-urls, sync-backend]
     runs-on: ubuntu-latest
 
     steps:
@@ -457,8 +465,8 @@ jobs:
 
       - name: Test download URLs
         run: |
-          WINDOWS_URL="${{ needs.release.outputs.windows_url }}"
-          LINUX_URL="${{ needs.release.outputs.linux_url }}"
+          WINDOWS_URL="${{ needs.get-asset-urls.outputs.windows_url }}"
+          LINUX_URL="${{ needs.get-asset-urls.outputs.linux_url }}"
 
           echo "🔍 Testing download URLs..."
 
@@ -485,8 +493,8 @@ jobs:
           echo "🎉 Desktop app release completed successfully!"
           echo ""
           echo "Version: ${{ needs.prepare.outputs.version }}"
-          echo "Windows: ${{ needs.release.outputs.windows_url }}"
-          echo "Linux: ${{ needs.release.outputs.linux_url }}"
+          echo "Windows: ${{ needs.get-asset-urls.outputs.windows_url }}"
+          echo "Linux: ${{ needs.get-asset-urls.outputs.linux_url }}"
           echo ""
           echo "Users can now download the new version from:"
           echo "https://github.com/${{ github.repository }}/releases/tag/${{ needs.prepare.outputs.version }}"
