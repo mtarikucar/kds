@@ -51,6 +51,22 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Delete existing release if present
+        continue-on-error: true
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+          echo "🗑️ Checking for existing release $VERSION..."
+
+          if gh release view $VERSION &>/dev/null; then
+            echo "Found existing release, deleting..."
+            gh release delete $VERSION --yes
+            echo "✅ Deleted existing release"
+          else
+            echo "No existing release found, proceeding with creation"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Generate release notes
         run: |
           VERSION="${{ needs.prepare.outputs.version }}"
