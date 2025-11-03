@@ -166,9 +166,15 @@ jobs:
             $certPath = ".\certificate.pfx"
             [IO.File]::WriteAllBytes($certPath, $certBytes)
 
-            # Sign MSI files
-            Get-ChildItem -Path "src-tauri/target/release/bundle/msi" -Filter "*.msi" | ForEach-Object {
-              Write-Host "Signing: $($_.Name)"
+            # Sign MSI files (Tauri 2.0 uses target-specific paths)
+            Get-ChildItem -Path "src-tauri/target" -Recurse -Filter "*.msi" | ForEach-Object {
+              Write-Host "Signing: $($_.FullName)"
+              & signtool sign /f $certPath /p $env:WINDOWS_CERTIFICATE_PASSWORD /tr http://timestamp.digicert.com /td sha256 /fd sha256 $_.FullName
+            }
+
+            # Also sign NSIS installers if they exist
+            Get-ChildItem -Path "src-tauri/target" -Recurse -Filter "*-setup.exe" | ForEach-Object {
+              Write-Host "Signing: $($_.FullName)"
               & signtool sign /f $certPath /p $env:WINDOWS_CERTIFICATE_PASSWORD /tr http://timestamp.digicert.com /td sha256 /fd sha256 $_.FullName
             }
 
@@ -185,12 +191,12 @@ jobs:
         run: |
           echo "🔍 Finding build artifacts..."
 
-          # Search for artifacts in the bundle directory
+          # Tauri 2.0 uses target-specific directories: src-tauri/target/$TARGET/release/bundle
           if [ "${{ matrix.platform }}" == "windows-x86_64" ]; then
             # Prefer MSI, fallback to NSIS installer
-            ARTIFACT=$(find src-tauri/target/release/bundle -type f -name "*.msi" | head -n 1)
+            ARTIFACT=$(find src-tauri/target -type f -name "*.msi" | head -n 1)
             if [ -z "$ARTIFACT" ]; then
-              ARTIFACT=$(find src-tauri/target/release/bundle -type f -name "*-setup.exe" | head -n 1)
+              ARTIFACT=$(find src-tauri/target -type f -name "*-setup.exe" | head -n 1)
               EXT="exe"
               NEW_NAME="hummytummy-kds_${{ needs.prepare.outputs.version_number }}_x64_en-US-setup.exe"
             else
@@ -199,15 +205,16 @@ jobs:
             fi
           else
             # Look for AppImage
-            ARTIFACT=$(find src-tauri/target/release/bundle -type f -name "*.AppImage" | head -n 1)
+            ARTIFACT=$(find src-tauri/target -type f -name "*.AppImage" | head -n 1)
             EXT="AppImage"
             NEW_NAME="hummytummy-kds_${{ needs.prepare.outputs.version_number }}_amd64.AppImage"
           fi
 
           if [ -z "$ARTIFACT" ]; then
             echo "❌ No artifact found!"
-            echo "Contents of bundle directory:"
-            find src-tauri/target/release/bundle -type f 2>/dev/null || echo "Bundle directory not found"
+            echo "Searched in entire src-tauri/target directory"
+            echo "All installer files found:"
+            find src-tauri/target -type f \( -name "*.msi" -o -name "*.exe" -o -name "*.AppImage" \) 2>/dev/null || echo "No installer files found"
             exit 1
           fi
 
