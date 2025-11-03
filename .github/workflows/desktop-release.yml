@@ -53,12 +53,14 @@ jobs:
           - platform: 'windows-x86_64'
             os: windows-latest
             target: 'x86_64-pc-windows-msvc'
+            bundles: 'msi nsis'
             artifact_name: '*.msi'
             artifact_path: 'src-tauri/target/release/bundle/msi/'
 
           - platform: 'linux-x86_64'
             os: ubuntu-latest
             target: 'x86_64-unknown-linux-gnu'
+            bundles: 'appimage'
             artifact_name: '*.AppImage'
             artifact_path: 'src-tauri/target/release/bundle/appimage/'
 
@@ -119,20 +121,34 @@ jobs:
           WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
         run: |
-          npm run tauri build -- --target ${{ matrix.target }}
+          echo "🔨 Starting Tauri build for target: ${{ matrix.target }}"
+          echo "Bundles: ${{ matrix.bundles }}"
+          npm run tauri build -- --ci --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --verbose || {
+            echo "❌ Tauri build failed!"
+            echo "Checking if target directory was created..."
+            ls -lah src-tauri/target/ 2>/dev/null || echo "No target directory found"
+            exit 1
+          }
+          echo "✅ Tauri build completed"
 
       - name: Debug - List build output
+        if: always()
         working-directory: frontend
         shell: bash
         run: |
           echo "📦 Checking build output..."
-          echo "Looking in src-tauri/target/release/bundle/"
-          ls -lah src-tauri/target/release/bundle/ || echo "Bundle directory not found"
           echo ""
-          echo "Checking specific bundle directories:"
-          ls -lah src-tauri/target/release/bundle/*/ || echo "No bundle subdirectories found"
+          echo "=== Target directory structure ==="
+          find src-tauri/target -type d -maxdepth 3 2>/dev/null || echo "No target directory found"
           echo ""
-          find src-tauri/target/release/bundle -type f -name "*.msi" -o -name "*.exe" -o -name "*.AppImage" 2>/dev/null || echo "No installer files found"
+          echo "=== Release directory ==="
+          ls -lah src-tauri/target/release/ 2>/dev/null || echo "No release directory found"
+          echo ""
+          echo "=== Bundle directory ==="
+          ls -lah src-tauri/target/release/bundle/ 2>/dev/null || echo "No bundle directory found"
+          echo ""
+          echo "=== Looking for any installer files ==="
+          find src-tauri/target -type f \( -name "*.msi" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) 2>/dev/null || echo "No installer files found anywhere"
 
       - name: Sign Windows binary
         if: matrix.platform == 'windows-x86_64'
