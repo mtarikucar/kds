@@ -15,6 +15,7 @@ import {
 import { Order } from '../../types';
 import { formatCurrency } from '../../lib/utils';
 import Spinner from '../../components/ui/Spinner';
+import MobileBottomMenu from '../../components/qr-menu/MobileBottomMenu';
 
 interface MenuSettings {
   primaryColor: string;
@@ -183,45 +184,62 @@ const OrderTrackingPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+    <div className="min-h-screen bg-gray-50 animate-in fade-in duration-300">
+      {/* Header - Fixed */}
       <div
-        className="sticky top-0 z-20 shadow-lg"
+        className="fixed top-0 left-0 right-0 z-20 shadow-2xl animate-in slide-in-from-top duration-300"
         style={{
           background: `linear-gradient(135deg, ${settings.primaryColor} 0%, ${settings.secondaryColor} 100%)`,
         }}
       >
-        <div className="px-4 py-4 flex items-center gap-4">
+        <div className="px-4 py-5 flex items-center gap-4">
           <button
             onClick={() => navigate(`/qr-menu/${tenantId}${tableId ? `?tableId=${tableId}` : ''}`)}
-            className="p-2 rounded-full bg-white/20 hover:bg-white/30 transition-colors"
+            className="p-2.5 rounded-full bg-white/20 hover:bg-white/30 transition-all duration-200 transform hover:scale-110 active:scale-95"
           >
             <ArrowLeft className="h-5 w-5 text-white" />
           </button>
-          <h1 className="text-xl font-bold text-white flex-1">
-            {t('orders.title', 'My Orders')}
-          </h1>
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold text-white">
+              {t('orders.title', 'My Orders')}
+            </h1>
+            <p className="text-white/80 text-sm mt-0.5">
+              {t('orders.trackYourOrders', 'Track your orders in real-time')}
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto p-4">
+      <div className="max-w-2xl mx-auto p-4 pt-28 pb-40">
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-4 mb-6">
           <button
             onClick={handleCallWaiter}
-            className="bg-white rounded-xl shadow-sm p-4 flex flex-col items-center gap-2 hover:shadow-md transition-shadow"
+            className="bg-white rounded-2xl shadow-md p-5 flex flex-col items-center gap-3 hover:shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95 animate-in fade-in slide-in-from-bottom"
+            style={{ animationDelay: '100ms' }}
           >
-            <User className="h-8 w-8" style={{ color: settings.primaryColor }} />
-            <span className="font-semibold text-gray-900">
+            <div
+              className="p-3 rounded-full"
+              style={{ backgroundColor: `${settings.primaryColor}15` }}
+            >
+              <User className="h-6 w-6" style={{ color: settings.primaryColor }} />
+            </div>
+            <span className="font-semibold text-gray-900 text-center">
               {t('waiter.call', 'Call Waiter')}
             </span>
           </button>
           <button
             onClick={handleRequestBill}
-            className="bg-white rounded-xl shadow-sm p-4 flex flex-col items-center gap-2 hover:shadow-md transition-shadow"
+            className="bg-white rounded-2xl shadow-md p-5 flex flex-col items-center gap-3 hover:shadow-lg transition-all duration-200 transform hover:scale-105 active:scale-95 animate-in fade-in slide-in-from-bottom"
+            style={{ animationDelay: '150ms' }}
           >
-            <Receipt className="h-8 w-8" style={{ color: settings.secondaryColor }} />
-            <span className="font-semibold text-gray-900">
+            <div
+              className="p-3 rounded-full"
+              style={{ backgroundColor: `${settings.secondaryColor}15` }}
+            >
+              <Receipt className="h-6 w-6" style={{ color: settings.secondaryColor }} />
+            </div>
+            <span className="font-semibold text-gray-900 text-center">
               {t('bill.request', 'Request Bill')}
             </span>
           </button>
@@ -229,8 +247,8 @@ const OrderTrackingPage = () => {
 
         {/* Orders List */}
         {orders.length === 0 ? (
-          <div className="bg-white rounded-xl shadow-sm p-8 text-center">
-            <Clock className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+          <div className="bg-white rounded-2xl shadow-md p-8 text-center animate-in fade-in zoom-in-95 duration-300">
+            <Clock className="h-16 w-16 text-gray-300 mx-auto mb-4 animate-pulse" />
             <h2 className="text-xl font-semibold text-gray-700 mb-2">
               {t('orders.noOrders', 'No orders yet')}
             </h2>
@@ -239,7 +257,7 @@ const OrderTrackingPage = () => {
             </p>
             <button
               onClick={() => navigate(`/qr-menu/${tenantId}${tableId ? `?tableId=${tableId}` : ''}`)}
-              className="px-6 py-3 rounded-lg font-semibold text-white"
+              className="px-6 py-3 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105 active:scale-95"
               style={{ backgroundColor: settings.primaryColor }}
             >
               {t('common.browseMenu', 'Browse Menu')}
@@ -247,12 +265,16 @@ const OrderTrackingPage = () => {
           </div>
         ) : (
           <div className="space-y-4">
-            {orders.map(order => {
+            {orders.map((order, index) => {
               const statusInfo = getStatusInfo(order.status);
               const StatusIcon = statusInfo.icon;
 
               return (
-                <div key={order.id} className="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div
+                  key={order.id}
+                  className="bg-white rounded-2xl shadow-md overflow-hidden animate-in fade-in slide-in-from-bottom transition-all duration-200 hover:shadow-lg"
+                  style={{ animationDelay: `${index * 50}ms` }}
+                >
                   {/* Order Header */}
                   <div className={`p-4 border-b-2 ${statusInfo.border} ${statusInfo.bg}`}>
                     <div className="flex items-center justify-between mb-2">
@@ -336,6 +358,17 @@ const OrderTrackingPage = () => {
           </div>
         )}
       </div>
+
+
+
+      {/* Mobile Bottom Menu */}
+      <MobileBottomMenu
+        tenantId={tenantId}
+        tableId={tableId}
+        primaryColor={settings.primaryColor}
+        secondaryColor={settings.secondaryColor}
+        currentPage="orders"
+      />
     </div>
   );
 };

@@ -30,6 +30,10 @@
     "update": "Update",
     "create": "Create"
   },
+  "common": {
+    "browseMenu": "Browse Menu",
+    "backToMenu": "Back to Menu"
+  },
   "navigation": {
     "dashboard": "Dashboard",
     "pos": "POS",
@@ -422,7 +426,13 @@
     "quantity": "Quantity",
     "available": "Available",
     "unavailable": "Unavailable",
-    "noDescription": "No description available"
+    "noDescription": "No description available",
+    "orderingDisabled": "Customer ordering is currently unavailable. Please contact staff to place your order.",
+    "orderingDisabledShort": "Ordering Unavailable",
+    "viewOnlyMode": "Menu viewing only - please order with staff assistance",
+    "addToCart": "Add to Cart",
+    "added": "Added!",
+    "requiredModifiers": "Please select required options"
   },
   "qr": {
     "shareText": "Check out our menu",
@@ -443,10 +453,51 @@
     "proTip2": "Print at 300 DPI for the best quality.",
     "proTip3": "Test the QR code on multiple devices before printing."
   },
-  "qrMenu": {
-    "orderingDisabled": "Customer ordering is currently unavailable. Please contact staff to place your order.",
-    "orderingDisabledShort": "Ordering Unavailable",
-    "viewOnlyMode": "Menu viewing only - please order with staff assistance"
+  "cart": {
+    "title": "Your Cart",
+    "items": "Items",
+    "empty": "Your cart is empty",
+    "emptyDescription": "Add some delicious items to get started",
+    "backToMenu": "Back to Menu",
+    "phoneNumber": "Phone Number (Optional)",
+    "orderNotes": "Order Notes (Optional)",
+    "notesPlaceholder": "Any special requests?",
+    "subtotal": "Subtotal",
+    "total": "Total",
+    "placeOrder": "Place Order",
+    "submitting": "Submitting...",
+    "approvalNote": "Your order will be sent to staff for approval",
+    "orderSuccess": "Order Submitted!",
+    "orderSuccessMessage": "Your order has been sent to the kitchen and is awaiting approval",
+    "redirecting": "Redirecting to order tracking..."
+  },
+  "orders": {
+    "title": "My Orders",
+    "myOrders": "My Orders",
+    "trackYourOrders": "Track your orders in real-time",
+    "noOrders": "No orders yet",
+    "noOrdersDescription": "Start by browsing our menu"
+  },
+  "waiter": {
+    "call": "Call Waiter",
+    "callSuccess": "Waiter has been notified!",
+    "callError": "Failed to call waiter"
+  },
+  "bill": {
+    "request": "Request Bill",
+    "requestSuccess": "Bill request sent!",
+    "requestError": "Failed to request bill"
+  },
+  "orderStatus": {
+    "pendingApproval": "Awaiting Approval",
+    "pending": "Confirmed",
+    "preparing": "Preparing",
+    "ready": "Ready",
+    "served": "Served"
+  },
+  "common": {
+    "backToMenu": "Back to Menu",
+    "browseMenu": "Browse Menu"
   }
 }
 

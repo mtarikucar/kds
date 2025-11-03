@@ -30,6 +30,10 @@
     "update": "Güncelle",
     "create": "Oluştur"
   },
+  "common": {
+    "browseMenu": "Menüyü Gözat",
+    "backToMenu": "Menüye Dön"
+  },
   "navigation": {
     "dashboard": "Kontrol Paneli",
     "pos": "POS",
@@ -530,7 +534,10 @@
     "noDescription": "Açıklama mevcut değil",
     "orderingDisabled": "Müşteri siparişleri şu anda mevcut değil. Lütfen sipariş vermek için personelle iletişime geçin.",
     "orderingDisabledShort": "Sipariş Verilemiyor",
-    "viewOnlyMode": "Sadece menü görüntüleme - sipariş vermek için personel yardımı gereklidir"
+    "viewOnlyMode": "Sadece menü görüntüleme - sipariş vermek için personel yardımı gereklidir",
+    "addToCart": "Sepete Ekle",
+    "added": "Eklendi!",
+    "requiredModifiers": "Lütfen gerekli seçenekleri seçin"
   },
   "qr": {
     "shareText": "Menümüze göz atın",
@@ -550,6 +557,52 @@
     "proTip1": "Daha iyi tarama için yüksek kontrastlı renkler kullanın.",
     "proTip2": "En iyi kalite için 300 DPI'da yazdırın.",
     "proTip3": "Yazdırmadan önce QR kodunu birden fazla cihazda test edin."
+  },
+  "cart": {
+    "title": "Sepetim",
+    "items": "Ürün",
+    "empty": "Sepetiniz boş",
+    "emptyDescription": "Başlamak için lezzetli ürünler ekleyin",
+    "backToMenu": "Menüye Dön",
+    "phoneNumber": "Telefon Numarası (İsteğe Bağlı)",
+    "orderNotes": "Sipariş Notları (İsteğe Bağlı)",
+    "notesPlaceholder": "Özel istekleriniz var mı?",
+    "subtotal": "Ara Toplam",
+    "total": "Toplam",
+    "placeOrder": "Siparişi Gönder",
+    "submitting": "Gönderiliyor...",
+    "approvalNote": "Siparişiniz personele onay için gönderilecektir",
+    "orderSuccess": "Sipariş Gönderildi!",
+    "orderSuccessMessage": "Siparişiniz mutfağa gönderildi ve onay bekleniyor",
+    "redirecting": "Sipariş takibine yönlendiriliyorsunuz..."
+  },
+  "orders": {
+    "title": "Siparişlerim",
+    "myOrders": "Siparişlerim",
+    "trackYourOrders": "Siparişlerinizi gerçek zamanlı olarak takip edin",
+    "noOrders": "Henüz sipariş yok",
+    "noOrdersDescription": "Menüyü inceleyerek başlayın"
+  },
+  "waiter": {
+    "call": "Garson Çağır",
+    "callSuccess": "Garson bilgilendirildi!",
+    "callError": "Garson çağırılamadı"
+  },
+  "bill": {
+    "request": "Hesap İste",
+    "requestSuccess": "Hesap isteği gönderildi!",
+    "requestError": "Hesap isteği gönderilemedi"
+  },
+  "orderStatus": {
+    "pendingApproval": "Onay Bekleniyor",
+    "pending": "Onaylandı",
+    "preparing": "Hazırlanıyor",
+    "ready": "Hazır",
+    "served": "Servis Edildi"
+  },
+  "common": {
+    "backToMenu": "Menüye Dön",
+    "browseMenu": "Menüyü Gözat"
   }
 }
 
