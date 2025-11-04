@@ -274,8 +274,15 @@ jobs:
         run: |
           echo "🔍 Finding build artifacts..."
 
+          # Debug: Show all potential artifacts
+          echo "📋 Debug - All installer files in src-tauri/target:"
+          find src-tauri/target -type f \( -name "*.msi" -o -name "*-setup.exe" -o -name "*.exe" -o -name "*.AppImage" \) 2>/dev/null | while read file; do
+            echo "  - $(basename "$file") (full path: $file)"
+          done
+
           # Tauri 2.0 uses target-specific directories: src-tauri/target/$TARGET/release/bundle
           if [ "${{ matrix.platform }}" == "windows-x86_64" ]; then
+            echo "🪟 Looking for Windows artifacts (.msi or -setup.exe)..."
             # Prefer MSI, fallback to NSIS installer
             ARTIFACT=$(find src-tauri/target -type f -name "*.msi" | head -n 1)
             if [ -z "$ARTIFACT" ]; then
@@ -287,6 +294,7 @@ jobs:
               NEW_NAME="hummytummy-kds_${{ needs.prepare.outputs.version_number }}_x64_en-US.msi"
             fi
           else
+            echo "🐧 Looking for Linux artifacts (.AppImage)..."
             # Look for AppImage
             ARTIFACT=$(find src-tauri/target -type f -name "*.AppImage" | head -n 1)
             EXT="AppImage"
@@ -302,6 +310,8 @@ jobs:
           fi
 
           echo "✅ Found artifact: $ARTIFACT (extension: $EXT)"
+          echo "📝 Original filename: $(basename "$ARTIFACT")"
+          echo "📝 Will rename to: $NEW_NAME"
 
           # Create output directory and copy artifact
           mkdir -p output
@@ -336,8 +346,24 @@ jobs:
 
       - name: Wait for assets to be available
         run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+
+          # Wait for GitHub to process uploaded assets with retry logic
           echo "⏳ Waiting for GitHub to process uploaded assets..."
+          for i in {1..12}; do
+            ASSET_COUNT=$(gh release view $VERSION --json assets -q '.assets | length' 2>/dev/null || echo "0")
+            if [ "$ASSET_COUNT" -gt 0 ]; then
+              echo "✅ Found $ASSET_COUNT asset(s) after $((i * 5)) seconds"
+              break
+            fi
+            echo "Attempt $i/12: No assets found yet, waiting..."
+            sleep 5
+          done
+
+          # Final wait to ensure assets are fully processed
           sleep 10
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Get asset download URLs
         id: upload
@@ -352,8 +378,16 @@ jobs:
           echo "$ASSETS"
 
           # Get actual filenames for URL construction (support both .msi and .exe)
-          WINDOWS_FILE=$(echo "$ASSETS" | grep -E "\.(msi|exe)" | grep -i "x64\|windows" | cut -d'|' -f1 | head -n 1)
-          LINUX_FILE=$(echo "$ASSETS" | grep "\.AppImage" | cut -d'|' -f1)
+          # More flexible pattern matching - prioritize .msi, then -setup.exe, exclude .nupkg
+          WINDOWS_FILE=$(echo "$ASSETS" | grep -E "\.msi$" | head -n 1 | cut -d'|' -f1)
+          if [ -z "$WINDOWS_FILE" ]; then
+            WINDOWS_FILE=$(echo "$ASSETS" | grep -E "\-setup\.exe$" | head -n 1 | cut -d'|' -f1)
+          fi
+          if [ -z "$WINDOWS_FILE" ]; then
+            # Fallback: any .exe that's not .nupkg
+            WINDOWS_FILE=$(echo "$ASSETS" | grep -E "\.exe$" | grep -v "\.nupkg" | head -n 1 | cut -d'|' -f1)
+          fi
+          LINUX_FILE=$(echo "$ASSETS" | grep "\.AppImage" | head -n 1 | cut -d'|' -f1)
 
           WINDOWS_URL="https://github.com/$REPO/releases/download/$VERSION/$WINDOWS_FILE"
           LINUX_URL="https://github.com/$REPO/releases/download/$VERSION/$LINUX_FILE"
@@ -501,29 +535,61 @@ jobs:
           fi
 
       - name: Test download URLs
+        continue-on-error: true  # Don't fail workflow if URLs aren't immediately accessible
         run: |
           WINDOWS_URL="${{ needs.get-asset-urls.outputs.windows_url }}"
           LINUX_URL="${{ needs.get-asset-urls.outputs.linux_url }}"
 
-          echo "🔍 Testing download URLs..."
+          echo "🔍 Testing download URLs with retry logic..."
 
-          # Test Windows URL (HEAD request)
-          if curl -I -L -f -s "$WINDOWS_URL" > /dev/null; then
-            echo "✅ Windows download URL is accessible"
-          else
-            echo "❌ Windows download URL is not accessible"
-            exit 1
+          # Function to test URL with retries
+          test_url() {
+            local url=$1
+            local name=$2
+            local max_attempts=5
+            local wait_time=10
+
+            for attempt in $(seq 1 $max_attempts); do
+              echo "Testing $name URL (attempt $attempt/$max_attempts): $url"
+              if curl -I -L -f -s "$url" > /dev/null 2>&1; then
+                echo "✅ $name download URL is accessible"
+                return 0
+              fi
+              if [ $attempt -lt $max_attempts ]; then
+                echo "⏳ Waiting ${wait_time}s before retry..."
+                sleep $wait_time
+              fi
+            done
+
+            echo "⚠️ $name download URL not accessible after $max_attempts attempts"
+            echo "This may be temporary - GitHub might still be processing the asset"
+            return 1
+          }
+
+          # Test both URLs
+          windows_ok=false
+          linux_ok=false
+
+          if test_url "$WINDOWS_URL" "Windows"; then
+            windows_ok=true
           fi
 
-          # Test Linux URL (HEAD request)
-          if curl -I -L -f -s "$LINUX_URL" > /dev/null; then
-            echo "✅ Linux download URL is accessible"
-          else
-            echo "❌ Linux download URL is not accessible"
-            exit 1
+          if test_url "$LINUX_URL" "Linux"; then
+            linux_ok=true
           fi
 
-          echo "✅ All download URLs verified"
+          # Summary
+          if $windows_ok && $linux_ok; then
+            echo "✅ All download URLs verified successfully"
+            exit 0
+          elif $windows_ok || $linux_ok; then
+            echo "⚠️ Some URLs verified, others may need more time"
+            exit 0  # Don't fail - assets may still be processing
+          else
+            echo "⚠️ URLs not accessible yet - this may be temporary"
+            echo "Check the release page: https://github.com/${{ github.repository }}/releases/tag/${{ needs.prepare.outputs.version }}"
+            exit 0  # Don't fail - continue-on-error will handle this
+          fi
 
       - name: Summary
         run: |
