@@ -331,6 +331,9 @@ jobs:
       linux_url: ${{ steps.upload.outputs.linux_url }}
 
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Wait for assets to be available
         run: |
           echo "⏳ Waiting for GitHub to process uploaded assets..."
