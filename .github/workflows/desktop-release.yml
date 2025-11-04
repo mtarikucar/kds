@@ -198,6 +198,11 @@ jobs:
       - name: Build Tauri app
         working-directory: frontend
         env:
+          # Production API URLs
+          VITE_API_URL: https://hummytummy.com/api
+          VITE_SOCKET_URL: https://hummytummy.com
+          VITE_WS_URL: wss://hummytummy.com
+          # Tauri signing
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
           # Windows signing
