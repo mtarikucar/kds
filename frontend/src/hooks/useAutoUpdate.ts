@@ -1,6 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { check, Update } from '@tauri-apps/plugin-updater';
-import { relaunch } from '@tauri-apps/plugin-process';
 
 interface UpdateState {
   available: boolean;
@@ -10,16 +8,30 @@ interface UpdateState {
   currentVersion?: string;
 }
 
+// Check if running in Tauri environment
+const isTauri = () => {
+  return typeof window !== 'undefined' && '__TAURI__' in window;
+};
+
 export const useAutoUpdate = (checkOnMount = true) => {
   const [updateState, setUpdateState] = useState<UpdateState>({
     available: false,
     downloading: false,
   });
-  const [update, setUpdate] = useState<Update | null>(null);
+  const [update, setUpdate] = useState<any>(null);
 
   const checkForUpdates = useCallback(async () => {
+    // Only run in Tauri environment
+    if (!isTauri()) {
+      console.log('⚠️ Auto-update is only available in desktop app');
+      return;
+    }
+
     try {
       console.log('🔍 Checking for updates...');
+
+      // Dynamically import Tauri plugins
+      const { check } = await import('@tauri-apps/plugin-updater');
       const updateInfo = await check();
 
       if (updateInfo) {
@@ -54,6 +66,12 @@ export const useAutoUpdate = (checkOnMount = true) => {
   }, []);
 
   const downloadAndInstall = useCallback(async () => {
+    // Only run in Tauri environment
+    if (!isTauri()) {
+      console.error('⚠️ Auto-update is only available in desktop app');
+      return;
+    }
+
     if (!update) {
       console.error('❌ No update available to install');
       return;
@@ -65,7 +83,7 @@ export const useAutoUpdate = (checkOnMount = true) => {
       console.log('⬇️ Downloading and installing update...');
 
       // Download and install the update
-      await update.downloadAndInstall((event) => {
+      await update.downloadAndInstall((event: any) => {
         switch (event.event) {
           case 'Started':
             console.log(`📦 Update download started - ${event.data.contentLength} bytes`);
@@ -81,7 +99,8 @@ export const useAutoUpdate = (checkOnMount = true) => {
 
       console.log('🔄 Restarting application...');
 
-      // Relaunch the application to apply the update
+      // Dynamically import relaunch function
+      const { relaunch } = await import('@tauri-apps/plugin-process');
       await relaunch();
     } catch (error) {
       console.error('❌ Failed to download and install update:', error);
@@ -95,7 +114,7 @@ export const useAutoUpdate = (checkOnMount = true) => {
 
   // Check for updates on mount if enabled
   useEffect(() => {
-    if (checkOnMount) {
+    if (checkOnMount && isTauri()) {
       // Delay check by 3 seconds to avoid blocking app startup
       const timer = setTimeout(() => {
         checkForUpdates();
