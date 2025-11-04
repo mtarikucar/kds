@@ -145,20 +145,10 @@ const DesktopAppSettingsPage = () => {
               <li>The app will automatically check for updates on startup</li>
             </ol>
           )}
-          {(selectedPlatform === 'mac-arm' || selectedPlatform === 'mac-intel') && (
-            <ol className="list-decimal list-inside space-y-2 text-gray-700">
-              <li>Download the macOS installer (.dmg)</li>
-              <li>Open the .dmg file and drag the app to your Applications folder</li>
-              <li>Launch HummyTummy KDS from Applications</li>
-              <li>If you see a security warning, go to System Preferences → Security & Privacy and click "Open Anyway"</li>
-              <li>The app will automatically check for updates on startup</li>
-            </ol>
-          )}
           {selectedPlatform === 'linux' && (
             <ol className="list-decimal list-inside space-y-2 text-gray-700">
-              <li>Download the Linux package (.deb or .AppImage)</li>
-              <li>For .deb: Run `sudo dpkg -i filename.deb`</li>
-              <li>For .AppImage: Make it executable with `chmod +x filename.AppImage` and run it</li>
+              <li>Download the Linux package (.AppImage)</li>
+              <li>Make it executable with `chmod +x filename.AppImage` and run it</li>
               <li>Launch HummyTummy KDS from your applications menu</li>
               <li>The app will automatically check for updates on startup</li>
             </ol>

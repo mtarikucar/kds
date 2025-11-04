@@ -88,9 +88,9 @@ jobs:
 
           ### 📥 Downloads
 
-          Installers will be available shortly after builds complete.
+          Available installers:
 
-          - **Windows (x64):** .msi or .exe installer
+          - **Windows (x64):** .msi installer
           - **Linux (x64):** .AppImage file
 
           ### 🔄 Auto-Updates
