@@ -31,7 +31,15 @@ export const useAutoUpdate = (checkOnMount = true) => {
       console.log('🔍 Checking for updates...');
 
       // Dynamically import Tauri plugins
-      const { check } = await import('@tauri-apps/plugin-updater');
+      let check;
+      try {
+        const updaterModule = await import('@tauri-apps/plugin-updater');
+        check = updaterModule.check;
+      } catch (importError) {
+        console.warn('⚠️ Failed to load updater plugin:', importError);
+        return;
+      }
+
       const updateInfo = await check();
 
       if (updateInfo) {
@@ -100,7 +108,20 @@ export const useAutoUpdate = (checkOnMount = true) => {
       console.log('🔄 Restarting application...');
 
       // Dynamically import relaunch function
-      const { relaunch } = await import('@tauri-apps/plugin-process');
+      let relaunch;
+      try {
+        const processModule = await import('@tauri-apps/plugin-process');
+        relaunch = processModule.relaunch;
+      } catch (importError) {
+        console.error('⚠️ Failed to load process plugin:', importError);
+        setUpdateState((prev) => ({
+          ...prev,
+          downloading: false,
+          error: 'Failed to load update system',
+        }));
+        return;
+      }
+
       await relaunch();
     } catch (error) {
       console.error('❌ Failed to download and install update:', error);

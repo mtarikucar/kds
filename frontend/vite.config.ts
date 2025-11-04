@@ -55,5 +55,13 @@ export default defineConfig({
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
     // Produce sourcemaps for debug builds
     sourcemap: !!process.env.TAURI_DEBUG,
+    rollupOptions: {
+      // Mark Tauri plugins as external for web builds
+      // These are only available in Tauri desktop environment
+      external: process.env.TAURI_PLATFORM ? [] : [
+        '@tauri-apps/plugin-updater',
+        '@tauri-apps/plugin-process',
+      ],
+    },
   },
 });
