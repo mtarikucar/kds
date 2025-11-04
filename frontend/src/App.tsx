@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
@@ -27,10 +28,31 @@ import IntegrationsSettingsPage from './pages/settings/IntegrationsSettingsPage'
 import DesktopAppSettingsPage from './pages/settings/DesktopAppSettingsPage';
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import { UpdateDialog } from './components/UpdateDialog';
+import { useAutoUpdate } from './hooks/useAutoUpdate';
 
 function App() {
+  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+
+  // Auto-update hook - check for updates on app startup
+  const updateState = useAutoUpdate(true);
+
+  // Show update dialog when update is available
+  if (updateState.available && !showUpdateDialog) {
+    setShowUpdateDialog(true);
+  }
+
+  const handleUpdate = () => {
+    updateState.downloadAndInstall();
+  };
+
+  const handleDismiss = () => {
+    setShowUpdateDialog(false);
+  };
+
   return (
-    <Routes>
+    <>
+      <Routes>
       {/* Public Routes */}
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
@@ -75,6 +97,20 @@ function App() {
         <Route path="/customers" element={<CustomersPage />} />
       </Route>
     </Routes>
+
+      {/* Update Dialog */}
+      {showUpdateDialog && (
+        <UpdateDialog
+          available={updateState.available}
+          version={updateState.version}
+          currentVersion={updateState.currentVersion}
+          downloading={updateState.downloading}
+          error={updateState.error}
+          onUpdate={handleUpdate}
+          onDismiss={handleDismiss}
+        />
+      )}
+    </>
   );
 }
 

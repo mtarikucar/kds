@@ -327,11 +327,65 @@ jobs:
           echo "ARTIFACT_PATH=output/$NEW_NAME" >> $GITHUB_ENV
           echo "ARTIFACT_EXTENSION=$EXT" >> $GITHUB_ENV
 
-      - name: Upload to GitHub Release
+      - name: Find updater bundles and signatures
+        shell: bash
+        working-directory: frontend
+        run: |
+          echo "🔍 Looking for updater bundles and signatures..."
+
+          # Tauri updater creates .tar.gz (Linux) and .zip (Windows) bundles with .sig files
+          if [ "${{ matrix.platform }}" == "windows-x86_64" ]; then
+            echo "🪟 Looking for Windows updater bundles (.msi.zip and .msi.zip.sig)..."
+            UPDATER_BUNDLE=$(find src-tauri/target -type f -name "*.msi.zip" | head -n 1)
+            UPDATER_SIG=$(find src-tauri/target -type f -name "*.msi.zip.sig" | head -n 1)
+          else
+            echo "🐧 Looking for Linux updater bundles (.AppImage.tar.gz and .AppImage.tar.gz.sig)..."
+            UPDATER_BUNDLE=$(find src-tauri/target -type f -name "*.AppImage.tar.gz" | head -n 1)
+            UPDATER_SIG=$(find src-tauri/target -type f -name "*.AppImage.tar.gz.sig" | head -n 1)
+          fi
+
+          if [ -n "$UPDATER_BUNDLE" ] && [ -n "$UPDATER_SIG" ]; then
+            echo "✅ Found updater bundle: $UPDATER_BUNDLE"
+            echo "✅ Found signature file: $UPDATER_SIG"
+
+            # Copy to output directory
+            cp "$UPDATER_BUNDLE" output/
+            cp "$UPDATER_SIG" output/
+
+            BUNDLE_NAME=$(basename "$UPDATER_BUNDLE")
+            SIG_NAME=$(basename "$UPDATER_SIG")
+
+            echo "UPDATER_BUNDLE_NAME=$BUNDLE_NAME" >> $GITHUB_ENV
+            echo "UPDATER_SIG_NAME=$SIG_NAME" >> $GITHUB_ENV
+            echo "HAS_UPDATER_BUNDLE=true" >> $GITHUB_ENV
+
+            # Read signature content for backend API
+            SIGNATURE_CONTENT=$(cat "$UPDATER_SIG")
+            echo "SIGNATURE_CONTENT<<EOF" >> $GITHUB_ENV
+            echo "$SIGNATURE_CONTENT" >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+
+            echo "✅ Updater files prepared for upload"
+          else
+            echo "⚠️ Updater bundles not found (signing may not be configured)"
+            echo "  This is normal if TAURI_SIGNING_PRIVATE_KEY is not set"
+            echo "HAS_UPDATER_BUNDLE=false" >> $GITHUB_ENV
+          fi
+
+      - name: Upload installer to GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.version }}
           files: frontend/output/${{ env.ARTIFACT_NAME }}
+
+      - name: Upload updater bundles to GitHub Release
+        if: env.HAS_UPDATER_BUNDLE == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.version }}
+          files: |
+            frontend/output/${{ env.UPDATER_BUNDLE_NAME }}
+            frontend/output/${{ env.UPDATER_SIG_NAME }}
           draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -344,6 +398,8 @@ jobs:
     outputs:
       windows_url: ${{ steps.upload.outputs.windows_url }}
       linux_url: ${{ steps.upload.outputs.linux_url }}
+      windows_signature: ${{ steps.upload.outputs.windows_signature }}
+      linux_signature: ${{ steps.upload.outputs.linux_signature }}
 
     steps:
       - name: Checkout code
@@ -394,14 +450,63 @@ jobs:
           fi
           LINUX_FILE=$(echo "$ASSETS" | grep "\.AppImage" | head -n 1 | cut -d'|' -f1)
 
-          WINDOWS_URL="https://github.com/$REPO/releases/download/$VERSION/$WINDOWS_FILE"
-          LINUX_URL="https://github.com/$REPO/releases/download/$VERSION/$LINUX_FILE"
+          # Get updater bundle URLs (for auto-update) - these are the .zip/.tar.gz versions
+          WINDOWS_UPDATER=$(echo "$ASSETS" | grep "\.msi\.zip$" | head -n 1 | cut -d'|' -f1)
+          LINUX_UPDATER=$(echo "$ASSETS" | grep "\.AppImage\.tar\.gz$" | head -n 1 | cut -d'|' -f1)
 
+          # Construct download URLs - use updater bundles if available, otherwise use installers
+          if [ -n "$WINDOWS_UPDATER" ]; then
+            WINDOWS_URL="https://github.com/$REPO/releases/download/$VERSION/$WINDOWS_UPDATER"
+          else
+            WINDOWS_URL="https://github.com/$REPO/releases/download/$VERSION/$WINDOWS_FILE"
+          fi
+
+          if [ -n "$LINUX_UPDATER" ]; then
+            LINUX_URL="https://github.com/$REPO/releases/download/$VERSION/$LINUX_UPDATER"
+          else
+            LINUX_URL="https://github.com/$REPO/releases/download/$VERSION/$LINUX_FILE"
+          fi
+
+          # Get signature files
+          WINDOWS_SIG_FILE=$(echo "$ASSETS" | grep "\.msi\.zip\.sig$" | head -n 1 | cut -d'|' -f1)
+          LINUX_SIG_FILE=$(echo "$ASSETS" | grep "\.AppImage\.tar\.gz\.sig$" | head -n 1 | cut -d'|' -f1)
+
+          # Download and read signature content
+          WINDOWS_SIG=""
+          LINUX_SIG=""
+
+          if [ -n "$WINDOWS_SIG_FILE" ]; then
+            echo "📥 Downloading Windows signature: $WINDOWS_SIG_FILE"
+            WINDOWS_SIG_URL="https://github.com/$REPO/releases/download/$VERSION/$WINDOWS_SIG_FILE"
+            WINDOWS_SIG=$(curl -sL "$WINDOWS_SIG_URL")
+            echo "✅ Windows signature downloaded"
+          else
+            echo "⚠️ No Windows signature file found (auto-update will not work)"
+          fi
+
+          if [ -n "$LINUX_SIG_FILE" ]; then
+            echo "📥 Downloading Linux signature: $LINUX_SIG_FILE"
+            LINUX_SIG_URL="https://github.com/$REPO/releases/download/$VERSION/$LINUX_SIG_FILE"
+            LINUX_SIG=$(curl -sL "$LINUX_SIG_URL")
+            echo "✅ Linux signature downloaded"
+          else
+            echo "⚠️ No Linux signature file found (auto-update will not work)"
+          fi
+
+          # Set outputs
           echo "windows_url=$WINDOWS_URL" >> $GITHUB_OUTPUT
           echo "linux_url=$LINUX_URL" >> $GITHUB_OUTPUT
+          echo "windows_signature<<EOF" >> $GITHUB_OUTPUT
+          echo "$WINDOWS_SIG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "linux_signature<<EOF" >> $GITHUB_OUTPUT
+          echo "$LINUX_SIG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
 
           echo "✅ Windows URL: $WINDOWS_URL"
           echo "✅ Linux URL: $LINUX_URL"
+          echo "✅ Windows Signature: ${WINDOWS_SIG:0:50}..."
+          echo "✅ Linux Signature: ${LINUX_SIG:0:50}..."
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -419,13 +524,17 @@ jobs:
           TAG="${{ needs.prepare.outputs.version }}"
           WINDOWS_URL="${{ needs.get-asset-urls.outputs.windows_url }}"
           LINUX_URL="${{ needs.get-asset-urls.outputs.linux_url }}"
+          WINDOWS_SIG="${{ needs.get-asset-urls.outputs.windows_signature }}"
+          LINUX_SIG="${{ needs.get-asset-urls.outputs.linux_signature }}"
 
-          # Debug: Check if URLs are populated
+          # Debug: Check if URLs and signatures are populated
           echo "🔍 Debug - Release information:"
           echo "VERSION: $VERSION"
           echo "TAG: $TAG"
           echo "WINDOWS_URL: $WINDOWS_URL"
           echo "LINUX_URL: $LINUX_URL"
+          echo "WINDOWS_SIG: ${WINDOWS_SIG:0:50}..."
+          echo "LINUX_SIG: ${LINUX_SIG:0:50}..."
 
           # Validate URLs before sending
           if [ -z "$WINDOWS_URL" ] || [ -z "$LINUX_URL" ]; then
@@ -446,7 +555,9 @@ jobs:
               \"version\": \"$VERSION\",
               \"releaseTag\": \"$TAG\",
               \"windowsUrl\": \"$WINDOWS_URL\",
+              \"windowsSignature\": \"$WINDOWS_SIG\",
               \"linuxUrl\": \"$LINUX_URL\",
+              \"linuxSignature\": \"$LINUX_SIG\",
               \"releaseNotes\": \"$RELEASE_NOTES\",
               \"published\": false
             }" \
