@@ -405,7 +405,7 @@ jobs:
     name: Sync with Backend API
     needs: [prepare, get-asset-urls]
     runs-on: ubuntu-latest
-    continue-on-error: true  # Don't fail the workflow if backend sync fails
+    continue-on-error: false  # Fail the workflow if backend sync fails so we catch issues
 
     steps:
       - name: Push release to backend
