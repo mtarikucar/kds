@@ -106,6 +106,7 @@ export class DesktopAppController {
    * Create a new release via CI/CD (API Key required)
    * Used by GitHub Actions for automated releases
    */
+  @Public()
   @Post('ci/releases')
   @UseGuards(ApiKeyGuard)
   @ApiOperation({ summary: 'Create a new desktop release via CI/CD (API Key)' })
@@ -120,6 +121,7 @@ export class DesktopAppController {
    * Publish a release via CI/CD (API Key required)
    * Used by GitHub Actions for automated publishing
    */
+  @Public()
   @Post('ci/releases/:id/publish')
   @UseGuards(ApiKeyGuard)
   @ApiOperation({ summary: 'Publish a release via CI/CD (API Key)' })

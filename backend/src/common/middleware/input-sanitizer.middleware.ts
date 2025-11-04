@@ -114,6 +114,12 @@ export class SqlInjectionPreventionMiddleware implements NestMiddleware {
         return false;
       }
 
+      // Skip valid GitHub URLs (for desktop app releases and other GitHub integrations)
+      const githubUrlPattern = /^https:\/\/(github\.com|raw\.githubusercontent\.com|api\.github\.com)\/.+$/;
+      if (githubUrlPattern.test(data)) {
+        return false;
+      }
+
       return this.sqlPatterns.some((pattern) => pattern.test(data));
     }
 
