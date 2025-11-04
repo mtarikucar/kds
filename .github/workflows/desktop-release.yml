@@ -371,6 +371,7 @@ jobs:
     name: Sync with Backend API
     needs: [prepare, get-asset-urls]
     runs-on: ubuntu-latest
+    continue-on-error: true  # Don't fail the workflow if backend sync fails
 
     steps:
       - name: Push release to backend
@@ -379,6 +380,20 @@ jobs:
           TAG="${{ needs.prepare.outputs.version }}"
           WINDOWS_URL="${{ needs.get-asset-urls.outputs.windows_url }}"
           LINUX_URL="${{ needs.get-asset-urls.outputs.linux_url }}"
+
+          # Debug: Check if URLs are populated
+          echo "🔍 Debug - Release information:"
+          echo "VERSION: $VERSION"
+          echo "TAG: $TAG"
+          echo "WINDOWS_URL: $WINDOWS_URL"
+          echo "LINUX_URL: $LINUX_URL"
+
+          # Validate URLs before sending
+          if [ -z "$WINDOWS_URL" ] || [ -z "$LINUX_URL" ]; then
+            echo "❌ Error: One or both download URLs are empty!"
+            echo "Cannot sync to backend without valid URLs"
+            exit 1
+          fi
 
           # Create release notes (simplified for API)
           RELEASE_NOTES="Release $TAG of HummyTummy Desktop App"
@@ -433,7 +448,7 @@ jobs:
           else
             echo "❌ Failed to create release in backend"
             echo "Please manually add the release via the admin panel"
-            exit 1
+            echo "⚠️ This is not critical - GitHub release was created successfully"
           fi
 
   # Final verification
