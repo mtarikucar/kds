@@ -195,6 +195,20 @@ jobs:
           "
           echo "✅ Updated tauri.conf.json version to $VERSION_NUMBER"
 
+      - name: Create production .env file
+        working-directory: frontend
+        shell: bash
+        run: |
+          echo "Creating .env file with production URLs..."
+          cat > .env << EOF
+          VITE_API_URL=https://hummytummy.com/api
+          VITE_SOCKET_URL=https://hummytummy.com
+          VITE_WS_URL=wss://hummytummy.com
+          VITE_APP_VERSION=${{ needs.prepare.outputs.version }}
+          EOF
+          echo "✅ .env file created:"
+          cat .env
+
       - name: Build Tauri app
         working-directory: frontend
         env:
