@@ -103,7 +103,20 @@ const POSSettingsPage = () => {
                     <input
                       type="checkbox"
                       checked={enableTwoStepCheckout}
-                      onChange={(e) => setEnableTwoStepCheckout(e.target.checked)}
+                      onChange={(e) => {
+                        const newValue = e.target.checked;
+
+                        // Prevent disabling two-step checkout if customer ordering is active
+                        if (!newValue && enableCustomerOrdering) {
+                          toast.error(
+                            'QR menü sipariş aktifken iki aşamalı ödeme kapatılamaz. ' +
+                            'Lütfen önce QR menüden müşteri sipariş oluşturmayı kapatın.'
+                          );
+                          return;
+                        }
+
+                        setEnableTwoStepCheckout(newValue);
+                      }}
                       className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
                     <div>
@@ -113,6 +126,11 @@ const POSSettingsPage = () => {
                       <p className="text-sm text-gray-600">
                         {t('twoStepCheckout.description')}
                       </p>
+                      {enableCustomerOrdering && (
+                        <p className="text-xs text-orange-600 mt-1">
+                          ⚠️ QR menü sipariş için gereklidir
+                        </p>
+                      )}
                     </div>
                   </label>
                 </div>
@@ -154,7 +172,17 @@ const POSSettingsPage = () => {
                     <input
                       type="checkbox"
                       checked={enableCustomerOrdering}
-                      onChange={(e) => setEnableCustomerOrdering(e.target.checked)}
+                      onChange={(e) => {
+                        const newValue = e.target.checked;
+
+                        // Auto-enable two-stage payment when enabling customer ordering
+                        if (newValue && !enableTwoStepCheckout) {
+                          setEnableTwoStepCheckout(true);
+                          toast.info('İki aşamalı ödeme otomatik olarak etkinleştirildi');
+                        }
+
+                        setEnableCustomerOrdering(newValue);
+                      }}
                       className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                     />
                     <div>

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdatePosSettingsDto } from './dto/update-pos-settings.dto';
 
@@ -31,6 +31,37 @@ export class PosSettingsService {
     let settings = await this.prisma.posSettings.findUnique({
       where: { tenantId },
     });
+
+    // Validation: QR menu ordering requires two-stage payment
+    if (updateDto.enableCustomerOrdering === true) {
+      // If enabling customer ordering, check if two-stage payment is enabled
+      const willHaveTwoStepCheckout =
+        updateDto.enableTwoStepCheckout !== undefined
+          ? updateDto.enableTwoStepCheckout
+          : settings?.enableTwoStepCheckout ?? true;
+
+      if (!willHaveTwoStepCheckout) {
+        throw new BadRequestException(
+          'İki aşamalı ödeme, QR menüden müşteri sipariş oluşturma için zorunludur. ' +
+          'Lütfen önce iki aşamalı ödemeyi etkinleştirin.'
+        );
+      }
+    }
+
+    // Validation: Cannot disable two-stage payment if customer ordering is active
+    if (updateDto.enableTwoStepCheckout === false) {
+      const willHaveCustomerOrdering =
+        updateDto.enableCustomerOrdering !== undefined
+          ? updateDto.enableCustomerOrdering
+          : settings?.enableCustomerOrdering ?? true;
+
+      if (willHaveCustomerOrdering) {
+        throw new BadRequestException(
+          'QR menü sipariş aktifken iki aşamalı ödeme kapatılamaz. ' +
+          'Lütfen önce QR menüden müşteri sipariş oluşturmayı kapatın.'
+        );
+      }
+    }
 
     if (!settings) {
       // Create new settings if they don't exist

@@ -47,9 +47,9 @@ export const usePosSocket = () => {
       console.log('[POS Socket] New order received:', event);
 
       // Invalidate queries to refresh data
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['orders', 'pending'] });
-      queryClient.invalidateQueries({ queryKey: ['orders', 'table'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['orders', 'pending'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['orders', 'table'], refetchType: 'all' });
 
       // Play notification sound
       playNotificationSound();
@@ -66,22 +66,22 @@ export const usePosSocket = () => {
 
     const handleOrderUpdated = (event: any) => {
       console.log('[POS Socket] Order updated:', event);
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['orders', event.orderId] });
-      queryClient.invalidateQueries({ queryKey: ['orders', 'table'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['orders', event.orderId], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['orders', 'table'], refetchType: 'all' });
     };
 
     const handleOrderStatusChanged = (event: any) => {
       console.log('[POS Socket] Order status changed:', event);
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      queryClient.invalidateQueries({ queryKey: ['orders', event.orderId] });
-      queryClient.invalidateQueries({ queryKey: ['orders', 'pending'] });
-      queryClient.invalidateQueries({ queryKey: ['orders', 'table'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['orders', event.orderId], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['orders', 'pending'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['orders', 'table'], refetchType: 'all' });
     };
 
     const handleOrderItemStatusChanged = (event: any) => {
       console.log('[POS Socket] Order item status changed:', event);
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      queryClient.invalidateQueries({ queryKey: ['orders'], refetchType: 'all' });
     };
 
     socket.on('connect', handleConnect);
