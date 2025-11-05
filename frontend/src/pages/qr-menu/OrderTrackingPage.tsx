@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
+import { toast } from 'sonner';
 import {
   ArrowLeft,
   Clock,
@@ -16,6 +17,7 @@ import { Order } from '../../types';
 import { formatCurrency } from '../../lib/utils';
 import Spinner from '../../components/ui/Spinner';
 import MobileBottomMenu from '../../components/qr-menu/MobileBottomMenu';
+import { useCustomerSocket } from '../../features/qr-menu/useCustomerSocket';
 
 interface MenuSettings {
   primaryColor: string;
@@ -38,44 +40,81 @@ const OrderTrackingPage = () => {
     secondaryColor: '#4ECDC4',
   });
 
-  useEffect(() => {
-    const fetchData = async () => {
-      if (!tenantId || !sessionId) {
-        setError('Missing required information');
-        setIsLoading(false);
-        return;
-      }
+  // Fetch data function
+  const fetchData = useCallback(async () => {
+    if (!tenantId || !sessionId) {
+      setError('Missing required information');
+      setIsLoading(false);
+      return;
+    }
 
-      try {
-        setIsLoading(true);
-        const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+    try {
+      setIsLoading(true);
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
-        // Fetch menu settings
-        const settingsResponse = await axios.get(`${API_URL}/qr-menu/${tenantId}`);
-        setSettings({
-          primaryColor: settingsResponse.data.settings.primaryColor,
-          secondaryColor: settingsResponse.data.settings.secondaryColor,
-        });
+      // Fetch menu settings
+      const settingsResponse = await axios.get(`${API_URL}/qr-menu/${tenantId}`);
+      setSettings({
+        primaryColor: settingsResponse.data.settings.primaryColor,
+        secondaryColor: settingsResponse.data.settings.secondaryColor,
+      });
 
-        // Fetch session orders
-        const ordersResponse = await axios.get(
-          `${API_URL}/customer-orders/session/${sessionId}?tenantId=${tenantId}`
-        );
-        setOrders(ordersResponse.data);
-        setIsLoading(false);
-      } catch (err: any) {
-        console.error('Error fetching orders:', err);
-        setError(err.response?.data?.message || 'Failed to load orders');
-        setIsLoading(false);
-      }
-    };
-
-    fetchData();
-
-    // Poll for updates every 10 seconds
-    const interval = setInterval(fetchData, 10000);
-    return () => clearInterval(interval);
+      // Fetch session orders
+      const ordersResponse = await axios.get(
+        `${API_URL}/customer-orders/session/${sessionId}?tenantId=${tenantId}`
+      );
+      setOrders(ordersResponse.data);
+      setIsLoading(false);
+    } catch (err: any) {
+      console.error('Error fetching orders:', err);
+      setError(err.response?.data?.message || 'Failed to load orders');
+      setIsLoading(false);
+    }
   }, [tenantId, sessionId]);
+
+  // Socket.IO event handlers
+  const handleOrderCreated = useCallback(() => {
+    fetchData();
+    toast.success('New order created!', { position: 'top-center' });
+  }, [fetchData]);
+
+  const handleOrderApproved = useCallback(() => {
+    fetchData();
+    toast.success('Order approved! Sending to kitchen...', { position: 'top-center' });
+  }, [fetchData]);
+
+  const handleOrderStatusUpdated = useCallback((data: any) => {
+    fetchData();
+    const statusMessages: Record<string, string> = {
+      PREPARING: 'Your order is being prepared',
+      READY: 'Your order is ready!',
+      SERVED: 'Bon appétit!',
+    };
+    if (statusMessages[data.status]) {
+      toast.info(statusMessages[data.status], { position: 'top-center' });
+    }
+  }, [fetchData]);
+
+  const handleLoyaltyEarned = useCallback((data: any) => {
+    toast.success(`You earned ${data.pointsEarned} loyalty points!`, {
+      position: 'top-center',
+      duration: 5000,
+    });
+  }, []);
+
+  // Setup Socket.IO for real-time updates
+  useCustomerSocket({
+    sessionId: sessionId || '',
+    onOrderCreated: handleOrderCreated,
+    onOrderApproved: handleOrderApproved,
+    onOrderStatusUpdated: handleOrderStatusUpdated,
+    onLoyaltyEarned: handleLoyaltyEarned,
+  });
+
+  // Initial data fetch
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const getStatusInfo = (status: string) => {
     switch (status) {

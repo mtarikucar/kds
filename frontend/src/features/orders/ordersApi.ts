@@ -195,14 +195,14 @@ export const useCreatePayment = () => {
 
 export const usePendingOrders = () => {
   return useQuery({
-    queryKey: ['orders', { status: 'PENDING_APPROVAL' }],
+    queryKey: ['orders', 'pending'],
     queryFn: async (): Promise<Order[]> => {
       const response = await api.get('/orders', {
         params: { status: 'PENDING_APPROVAL' },
       });
       return response.data;
     },
-    refetchInterval: 10000, // Poll every 10 seconds
+    // Real-time updates via Socket.IO - no polling needed
   });
 };
 

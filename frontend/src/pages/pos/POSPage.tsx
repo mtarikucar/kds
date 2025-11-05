@@ -15,6 +15,7 @@ import { useCreateOrder, useUpdateOrder, useOrders } from '../../features/orders
 import { useCreatePayment } from '../../features/orders/ordersApi';
 import { useUpdateTableStatus } from '../../features/tables/tablesApi';
 import { useGetPosSettings } from '../../features/pos/posApi';
+import { usePosSocket } from '../../features/pos/usePosSocket';
 import { Product, Table, TableStatus, OrderType, OrderStatus } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { useResponsive } from '../../hooks/useResponsive';
@@ -40,6 +41,9 @@ const POSPage = () => {
 
   // Responsive hook
   const { isDesktop, isMobile, isTablet } = useResponsive();
+
+  // Socket.IO for real-time updates
+  usePosSocket();
 
   // Fetch POS settings
   const { data: posSettings } = useGetPosSettings();
