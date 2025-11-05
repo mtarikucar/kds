@@ -1,0 +1,103 @@
+name: Test Environment Deployment
+
+on:
+  push:
+    branches:
+      - test
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual deployment'
+        required: false
+        default: 'Manual deployment'
+
+jobs:
+  deploy-test:
+    name: Deploy to Test Environment
+    runs-on: ubuntu-latest
+
+    env:
+      SERVER_HOST: ${{ secrets.SERVER_HOST }}
+      SERVER_USER: ${{ secrets.SERVER_USER }}
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      PROJECT_PATH: /root/kds
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: test
+          fetch-depth: 0
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H $SERVER_HOST >> ~/.ssh/known_hosts
+
+      - name: Verify SSH connection
+        run: |
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST "echo 'SSH connection successful'"
+
+      - name: Get commit information
+        id: commit_info
+        run: |
+          echo "commit_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "commit_message=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
+          echo "author=$(git log -1 --pretty=%an)" >> $GITHUB_OUTPUT
+
+      - name: Deploy to test environment
+        run: |
+          ssh $SERVER_USER@$SERVER_HOST << 'EOF'
+            set -e
+
+            echo "=========================================="
+            echo "Test Environment Deployment Started"
+            echo "=========================================="
+            echo ""
+            echo "Commit: ${{ steps.commit_info.outputs.commit_sha }}"
+            echo "Author: ${{ steps.commit_info.outputs.author }}"
+            echo "Message: ${{ steps.commit_info.outputs.commit_message }}"
+            echo "Trigger: ${{ github.event_name }}"
+            echo ""
+
+            cd ${{ env.PROJECT_PATH }}
+
+            # Run deployment script
+            bash scripts/test-deploy.sh deploy
+
+            echo ""
+            echo "=========================================="
+            echo "Deployment completed successfully!"
+            echo "=========================================="
+          EOF
+
+      - name: Verify deployment health
+        run: |
+          echo "Waiting 30 seconds for services to stabilize..."
+          sleep 30
+
+          ssh $SERVER_USER@$SERVER_HOST << 'EOF'
+            cd ${{ env.PROJECT_PATH }}
+            bash scripts/test-deploy.sh health
+          EOF
+
+      - name: Send success notification
+        if: success()
+        run: |
+          echo "✅ Test deployment successful!"
+          echo "🌐 URL: https://staging.hummytummy.com"
+          echo "📝 Commit: ${{ steps.commit_info.outputs.commit_sha }}"
+
+      - name: Send failure notification
+        if: failure()
+        run: |
+          echo "❌ Test deployment failed!"
+          echo "📝 Commit: ${{ steps.commit_info.outputs.commit_sha }}"
+          echo "🔄 Rollback may have been triggered automatically"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f ~/.ssh/id_ed25519

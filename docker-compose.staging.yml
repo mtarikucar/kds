@@ -100,8 +100,10 @@ services:
       dockerfile: Dockerfile
       target: production
       args:
-        VITE_API_URL: ${VITE_STAGING_API_URL}
-        VITE_STRIPE_PUBLISHABLE_KEY: ${STRIPE_TEST_PUBLISHABLE_KEY}
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL}
+        VITE_WS_URL: ${VITE_WS_URL}
+        VITE_STRIPE_PUBLISHABLE_KEY: ${VITE_STRIPE_PUBLISHABLE_KEY}
     container_name: kds_frontend_staging
     restart: always
     depends_on:
