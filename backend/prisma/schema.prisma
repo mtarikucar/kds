@@ -844,11 +844,17 @@ model Customer {
   name  String
   email String?
   phone String?
+  phoneVerified Boolean @default(false)
 
   // Loyalty & Engagement
   loyaltyPoints Int      @default(0)
+  loyaltyTier   String   @default("BRONZE") // BRONZE, SILVER, GOLD, PLATINUM
   tags          String[] @default([]) // "VIP", "Regular", "New", etc.
   notes         String?  @db.Text
+
+  // Referral System
+  referralCode  String?   @unique // Unique code for this customer to share (optional)
+  referredBy    String? // Referral code that was used to sign up
 
   // Statistics
   totalOrders  Int     @default(0)
@@ -870,12 +876,16 @@ model Customer {
   orders Order[] @relation("CustomerOrders")
   sessions CustomerSession[]
   loyaltyTransactions LoyaltyTransaction[]
+  referralsMade CustomerReferral[] @relation("ReferralsMade")
+  referralsReceived CustomerReferral? @relation("ReferralsReceived")
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])
   @@index([tenantId])
   @@index([email])
   @@index([phone])
+  @@index([referralCode])
+  @@index([loyaltyTier])
   @@map("customers")
 }
 
@@ -923,7 +933,7 @@ model LoyaltyTransaction {
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
   // Transaction details
-  type        String  // EARNED, REDEEMED, EXPIRED, ADJUSTMENT, BONUS
+  type        String  // EARNED, REDEEMED, EXPIRED, ADJUSTMENT, BONUS, REFERRAL
   points      Int     // Positive for earned, negative for redeemed
   description String
 
@@ -931,6 +941,9 @@ model LoyaltyTransaction {
   orderId String?
   orderNumber String?
   orderAmount Decimal? @db.Decimal(10, 2)
+
+  // Referral tracking
+  referredCustomerId String? // Customer who was referred (for referral bonuses)
 
   // Balance tracking
   balanceBefore Int // Points balance before transaction
@@ -945,6 +958,60 @@ model LoyaltyTransaction {
   @@index([createdAt])
   @@index([type])
   @@map("loyalty_transactions")
+}
+
+model PhoneVerification {
+  id        String   @id @default(uuid())
+  phone     String
+  code      String   // 6-digit OTP code
+  verified  Boolean  @default(false)
+  expiresAt DateTime // OTP expires after 10 minutes
+
+  // Session tracking
+  sessionId String?
+  tenantId  String
+
+  // Rate limiting
+  attempts  Int      @default(0)
+  maxAttempts Int    @default(3)
+
+  createdAt DateTime @default(now())
+  verifiedAt DateTime?
+
+  @@index([phone, tenantId])
+  @@index([code])
+  @@index([expiresAt])
+  @@map("phone_verifications")
+}
+
+model CustomerReferral {
+  id              String   @id @default(uuid())
+
+  // Referrer (person who shared the referral code)
+  referrerId      String
+  referrer        Customer @relation("ReferralsMade", fields: [referrerId], references: [id], onDelete: Cascade)
+
+  // Referred (person who used the referral code)
+  referredId      String   @unique
+  referred        Customer @relation("ReferralsReceived", fields: [referredId], references: [id], onDelete: Cascade)
+
+  // Referral details
+  referralCode    String   // Unique code used
+  status          String   @default("PENDING") // PENDING, COMPLETED, EXPIRED
+
+  // Rewards
+  referrerReward  Int      @default(0) // Points given to referrer
+  referredReward  Int      @default(0) // Points given to referred customer
+  rewardedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  completedAt DateTime? // When referred customer completed qualifying action
+
+  @@index([referrerId])
+  @@index([referredId])
+  @@index([referralCode])
+  @@index([status])
+  @@map("customer_referrals")
 }
 
 // ========================================

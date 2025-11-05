@@ -7,6 +7,15 @@ export enum LoyaltyTransactionType {
   EXPIRED = 'EXPIRED',
   ADJUSTMENT = 'ADJUSTMENT',
   BONUS = 'BONUS',
+  REFERRAL = 'REFERRAL',
+}
+
+// Loyalty tier thresholds
+export enum LoyaltyTier {
+  BRONZE = 'BRONZE',
+  SILVER = 'SILVER',
+  GOLD = 'GOLD',
+  PLATINUM = 'PLATINUM',
 }
 
 // Loyalty program configuration
@@ -25,6 +34,14 @@ const LOYALTY_CONFIG = {
 
   // Birthday bonus points
   birthdayBonus: 100,
+
+  // Tier thresholds (total lifetime points earned)
+  tiers: {
+    BRONZE: { threshold: 0, multiplier: 1.0, name: 'Bronze' },
+    SILVER: { threshold: 500, multiplier: 1.25, name: 'Silver' },
+    GOLD: { threshold: 2000, multiplier: 1.5, name: 'Gold' },
+    PLATINUM: { threshold: 5000, multiplier: 2.0, name: 'Platinum' },
+  },
 };
 
 @Injectable()
@@ -231,6 +248,174 @@ export class LoyaltyService {
       pointsEarned,
       pointsRedeemed,
       redemptionRate: pointsEarned > 0 ? (pointsRedeemed / pointsEarned) * 100 : 0,
+    };
+  }
+
+  // ========================================
+  // TIER MANAGEMENT
+  // ========================================
+
+  /**
+   * Calculate tier based on lifetime points earned
+   */
+  calculateTier(lifetimePoints: number): LoyaltyTier {
+    if (lifetimePoints >= LOYALTY_CONFIG.tiers.PLATINUM.threshold) {
+      return LoyaltyTier.PLATINUM;
+    } else if (lifetimePoints >= LOYALTY_CONFIG.tiers.GOLD.threshold) {
+      return LoyaltyTier.GOLD;
+    } else if (lifetimePoints >= LOYALTY_CONFIG.tiers.SILVER.threshold) {
+      return LoyaltyTier.SILVER;
+    } else {
+      return LoyaltyTier.BRONZE;
+    }
+  }
+
+  /**
+   * Get tier information including thresholds and benefits
+   */
+  getTierInfo(tier: LoyaltyTier) {
+    return LOYALTY_CONFIG.tiers[tier];
+  }
+
+  /**
+   * Check and upgrade customer tier if needed
+   */
+  async checkAndUpgradeTier(customerId: string): Promise<{
+    upgraded: boolean;
+    oldTier?: LoyaltyTier;
+    newTier: LoyaltyTier;
+  }> {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: {
+        id: true,
+        loyaltyTier: true,
+      },
+    });
+
+    if (!customer) {
+      throw new BadRequestException('Customer not found');
+    }
+
+    // Calculate lifetime points earned (sum of all positive transactions)
+    const transactions = await this.prisma.loyaltyTransaction.findMany({
+      where: {
+        customerId,
+        points: { gt: 0 },
+      },
+      select: { points: true },
+    });
+
+    const lifetimePoints = transactions.reduce((sum, t) => sum + t.points, 0);
+    const calculatedTier = this.calculateTier(lifetimePoints);
+    const currentTier = customer.loyaltyTier as LoyaltyTier;
+
+    // Check if tier needs to be upgraded
+    const tierOrder = [LoyaltyTier.BRONZE, LoyaltyTier.SILVER, LoyaltyTier.GOLD, LoyaltyTier.PLATINUM];
+    const currentTierIndex = tierOrder.indexOf(currentTier);
+    const calculatedTierIndex = tierOrder.indexOf(calculatedTier);
+
+    if (calculatedTierIndex > currentTierIndex) {
+      // Upgrade tier
+      await this.prisma.customer.update({
+        where: { id: customerId },
+        data: { loyaltyTier: calculatedTier },
+      });
+
+      console.log(`[Loyalty] Customer ${customerId} upgraded from ${currentTier} to ${calculatedTier}`);
+
+      return {
+        upgraded: true,
+        oldTier: currentTier,
+        newTier: calculatedTier,
+      };
+    }
+
+    return {
+      upgraded: false,
+      newTier: currentTier,
+    };
+  }
+
+  /**
+   * Get customer's tier status and progress
+   */
+  async getTierStatus(customerId: string) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+      select: {
+        loyaltyTier: true,
+      },
+    });
+
+    if (!customer) {
+      throw new BadRequestException('Customer not found');
+    }
+
+    // Calculate lifetime points
+    const transactions = await this.prisma.loyaltyTransaction.findMany({
+      where: {
+        customerId,
+        points: { gt: 0 },
+      },
+      select: { points: true },
+    });
+
+    const lifetimePoints = transactions.reduce((sum, t) => sum + t.points, 0);
+    const currentTier = customer.loyaltyTier as LoyaltyTier;
+    const currentTierInfo = this.getTierInfo(currentTier);
+
+    // Calculate next tier info
+    const tierOrder = [LoyaltyTier.BRONZE, LoyaltyTier.SILVER, LoyaltyTier.GOLD, LoyaltyTier.PLATINUM];
+    const currentTierIndex = tierOrder.indexOf(currentTier);
+    const nextTier = currentTierIndex < tierOrder.length - 1 ? tierOrder[currentTierIndex + 1] : null;
+    const nextTierInfo = nextTier ? this.getTierInfo(nextTier) : null;
+
+    return {
+      currentTier,
+      currentTierInfo,
+      lifetimePoints,
+      nextTier,
+      nextTierInfo,
+      pointsToNextTier: nextTierInfo ? nextTierInfo.threshold - lifetimePoints : 0,
+      progressPercentage: nextTierInfo
+        ? Math.min(100, (lifetimePoints / nextTierInfo.threshold) * 100)
+        : 100,
+    };
+  }
+
+  // ========================================
+  // GENERIC POINTS MANAGEMENT (for Referral Service)
+  // ========================================
+
+  /**
+   * Add points to customer (generic method for external services)
+   */
+  async addPoints(params: {
+    customerId: string;
+    points: number;
+    type: string;
+    description: string;
+    source: string;
+    metadata?: any;
+  }) {
+    const { customerId, points, type, description, metadata } = params;
+
+    // Award points
+    const result = await this.awardPoints(
+      customerId,
+      points,
+      type as LoyaltyTransactionType,
+      description,
+      metadata,
+    );
+
+    // Check for tier upgrade
+    const tierResult = await this.checkAndUpgradeTier(customerId);
+
+    return {
+      ...result,
+      tierUpgrade: tierResult.upgraded ? tierResult : null,
     };
   }
 

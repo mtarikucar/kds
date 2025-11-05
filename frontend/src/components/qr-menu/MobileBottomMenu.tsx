@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ShoppingCart, ClipboardList, Home } from 'lucide-react';
+import { ShoppingCart, ClipboardList, Home, Award } from 'lucide-react';
 import { useCartStore } from '../../store/cartStore';
 
 interface MobileBottomMenuProps {
@@ -9,7 +9,7 @@ interface MobileBottomMenuProps {
   tableId: string | null;
   primaryColor: string;
   secondaryColor: string;
-  currentPage: 'menu' | 'cart' | 'orders';
+  currentPage: 'menu' | 'cart' | 'orders' | 'loyalty';
 }
 
 const MobileBottomMenu: React.FC<MobileBottomMenuProps> = ({
@@ -45,6 +45,12 @@ const MobileBottomMenu: React.FC<MobileBottomMenuProps> = ({
     }
   };
 
+  const handleLoyaltyClick = () => {
+    if (sessionId) {
+      navigate(`/qr-menu/${tenantId}/loyalty?tableId=${tableId}&sessionId=${sessionId}`);
+    }
+  };
+
   const menuItems = [
     {
       id: 'menu',
@@ -67,6 +73,14 @@ const MobileBottomMenu: React.FC<MobileBottomMenuProps> = ({
       icon: ClipboardList,
       onClick: handleOrdersClick,
       active: currentPage === 'orders',
+      disabled: !sessionId,
+    },
+    {
+      id: 'loyalty',
+      label: t('loyalty.rewards', 'Rewards'),
+      icon: Award,
+      onClick: handleLoyaltyClick,
+      active: currentPage === 'loyalty',
       disabled: !sessionId,
     },
   ];

@@ -10,6 +10,7 @@ import CustomersPage from './pages/customers/CustomersPage';
 import QRMenuPage from './pages/qr-menu/QRMenuPage';
 import CartPage from './pages/qr-menu/CartPage';
 import OrderTrackingPage from './pages/qr-menu/OrderTrackingPage';
+import LoyaltyPage from './pages/qr-menu/LoyaltyPage';
 import { LandingPage } from './pages/LandingPage';
 import DashboardPage from './pages/DashboardPage';
 import POSPage from './pages/pos/POSPage';
@@ -63,6 +64,7 @@ function App() {
       <Route path="/qr-menu/:tenantId" element={<QRMenuPage />} />
       <Route path="/qr-menu/:tenantId/cart" element={<CartPage />} />
       <Route path="/qr-menu/:tenantId/orders" element={<OrderTrackingPage />} />
+      <Route path="/qr-menu/:tenantId/loyalty" element={<LoyaltyPage />} />
 
       {/* Protected Routes */}
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
