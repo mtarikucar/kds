@@ -868,6 +868,8 @@ model Customer {
 
   // Relations
   orders Order[] @relation("CustomerOrders")
+  sessions CustomerSession[]
+  loyaltyTransactions LoyaltyTransaction[]
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])
@@ -875,6 +877,74 @@ model Customer {
   @@index([email])
   @@index([phone])
   @@map("customers")
+}
+
+// ========================================
+// CUSTOMER SESSIONS & LOYALTY
+// ========================================
+
+model CustomerSession {
+  id        String   @id @default(uuid())
+  sessionId String   @unique // Public session identifier
+
+  // Customer identification
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  // Session details
+  tableId   String?
+  phone     String? // Optional phone for identification
+  isActive  Boolean  @default(true)
+
+  // Session metadata
+  userAgent String?
+  ipAddress String?
+
+  // Expiration
+  expiresAt DateTime
+  lastActivity DateTime @default(now())
+
+  tenantId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sessionId])
+  @@index([customerId])
+  @@index([tenantId])
+  @@index([expiresAt])
+  @@map("customer_sessions")
+}
+
+model LoyaltyTransaction {
+  id          String   @id @default(uuid())
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  // Transaction details
+  type        String  // EARNED, REDEEMED, EXPIRED, ADJUSTMENT, BONUS
+  points      Int     // Positive for earned, negative for redeemed
+  description String
+
+  // Order reference (if applicable)
+  orderId String?
+  orderNumber String?
+  orderAmount Decimal? @db.Decimal(10, 2)
+
+  // Balance tracking
+  balanceBefore Int // Points balance before transaction
+  balanceAfter  Int // Points balance after transaction
+
+  // Metadata
+  metadata Json? // Additional data like promotion ID, birthday bonus, etc.
+
+  createdAt DateTime @default(now())
+
+  @@index([customerId])
+  @@index([createdAt])
+  @@index([type])
+  @@map("loyalty_transactions")
 }
 
 // ========================================

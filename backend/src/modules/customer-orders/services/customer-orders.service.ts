@@ -6,6 +6,10 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { PosSettingsService } from '../../pos-settings/pos-settings.service';
+import { KdsGateway } from '../../kds/kds.gateway';
+import { CustomersService } from '../../customers/customers.service';
+import { LoyaltyService } from '../../customers/loyalty.service';
+import { CustomerSessionService } from '../../customers/customer-session.service';
 import { CreateCustomerOrderDto } from '../dto/create-customer-order.dto';
 import { CreateWaiterRequestDto, CreateBillRequestDto } from '../dto/waiter-request.dto';
 
@@ -14,6 +18,10 @@ export class CustomerOrdersService {
   constructor(
     private prisma: PrismaService,
     private posSettingsService: PosSettingsService,
+    private kdsGateway: KdsGateway,
+    private customersService: CustomersService,
+    private loyaltyService: LoyaltyService,
+    private customerSessionService: CustomerSessionService,
   ) {}
 
   // ========================================
@@ -118,6 +126,9 @@ export class CustomerOrdersService {
         table: true,
       },
     });
+
+    // Emit Socket.IO events to staff (POS & Kitchen) and customer
+    this.kdsGateway.emitNewOrderWithCustomer(dto.tenantId, order, dto.sessionId);
 
     return order;
   }
