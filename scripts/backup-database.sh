@@ -51,15 +51,22 @@ echo "Backup file: ${BACKUP_FILE}"
 # Check if running in Docker environment
 if command -v docker &> /dev/null && docker ps | grep -q postgres; then
   # Use docker exec to run pg_dump inside postgres container
-  # For production, look for kds_postgres_prod first, then fall back to any postgres container
-  if docker ps --format '{{.Names}}' | grep -q 'kds_postgres_prod'; then
-    POSTGRES_CONTAINER='kds_postgres_prod'
+  # Match container to database name to avoid using wrong database
+  if [[ "$DB_NAME" == *"staging"* ]]; then
+    POSTGRES_CONTAINER='kds_postgres_staging'
   else
-    POSTGRES_CONTAINER=$(docker ps --format '{{.Names}}' | grep postgres | grep -v staging | head -1)
-    if [ -z "$POSTGRES_CONTAINER" ]; then
-      POSTGRES_CONTAINER=$(docker ps --format '{{.Names}}' | grep postgres | head -1)
-    fi
+    # For production database, use production container
+    POSTGRES_CONTAINER='kds_postgres_prod'
   fi
+
+  # Verify container exists and is running
+  if ! docker ps --format '{{.Names}}' | grep -q "^${POSTGRES_CONTAINER}$"; then
+    echo "❌ Error: Container ${POSTGRES_CONTAINER} is not running"
+    echo "Database: ${DB_NAME}"
+    echo "Please ensure the correct postgres container is running"
+    exit 1
+  fi
+
   echo "Using Docker container: ${POSTGRES_CONTAINER}"
 
   docker exec ${POSTGRES_CONTAINER} pg_dump -U ${DB_USER} -d ${DB_NAME} -F p > ${BACKUP_FILE}
