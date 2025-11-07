@@ -86,8 +86,8 @@ const QRMenuPage = () => {
 
   // Initialize cart session when menu data is loaded
   useEffect(() => {
-    if (menuData && tenantId && tableId) {
-      initializeSession(tenantId, tableId);
+    if (menuData && tenantId) {
+      initializeSession(tenantId, tableId || null);
     }
   }, [menuData, tenantId, tableId, initializeSession]);
 

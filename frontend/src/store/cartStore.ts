@@ -9,7 +9,8 @@ interface CartState {
   tableId: string | null;
 
   // Actions
-  initializeSession: (tenantId: string, tableId: string) => void;
+  initializeSession: (tenantId: string, tableId: string | null) => void;
+  setTableId: (tableId: string) => void;
   addItem: (product: Product, quantity: number, modifiers: CartModifier[], notes?: string) => void;
   updateItemQuantity: (itemId: string, quantity: number) => void;
   updateItemNotes: (itemId: string, notes: string) => void;
@@ -46,13 +47,13 @@ export const useCartStore = create<CartState>()(
       tenantId: null,
       tableId: null,
 
-      initializeSession: (tenantId: string, tableId: string) => {
+      initializeSession: (tenantId: string, tableId: string | null) => {
         const currentSession = get().sessionId;
         const currentTenantId = get().tenantId;
         const currentTableId = get().tableId;
 
-        // If changing table/tenant, clear cart and create new session
-        if (currentTenantId !== tenantId || currentTableId !== tableId) {
+        // If changing tenant, clear cart and create new session
+        if (currentTenantId !== tenantId) {
           set({
             sessionId: generateSessionId(),
             tenantId,
@@ -66,7 +67,14 @@ export const useCartStore = create<CartState>()(
             tenantId,
             tableId,
           });
+        } else if (tableId && currentTableId !== tableId) {
+          // Update tableId if provided and different (but keep cart items)
+          set({ tableId });
         }
+      },
+
+      setTableId: (tableId: string) => {
+        set({ tableId });
       },
 
       addItem: (product: Product, quantity: number, modifiers: CartModifier[], notes?: string) => {

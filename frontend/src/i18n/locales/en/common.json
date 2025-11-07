@@ -500,6 +500,19 @@
     "preparing": "Preparing",
     "ready": "Ready",
     "served": "Served"
+  },
+  "tableSelection": {
+    "title": "Select Your Table",
+    "description": "Please select which table you're sitting at",
+    "searchPlaceholder": "Search table number...",
+    "selectTable": "Select Table",
+    "tableNumber": "Table",
+    "capacity": "Capacity",
+    "available": "Available",
+    "occupied": "Occupied",
+    "noTablesAvailable": "No tables available",
+    "selectDropdown": "Choose a table...",
+    "cancel": "Cancel"
   }
 }
 
