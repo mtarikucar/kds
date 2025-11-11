@@ -95,6 +95,8 @@ services:
 
   # Frontend (React) - Staging
   frontend:
+    env_file:
+      - .env.test
     build:
       context: ./frontend
       dockerfile: Dockerfile
