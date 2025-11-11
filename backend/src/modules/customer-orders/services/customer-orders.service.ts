@@ -47,13 +47,6 @@ export class CustomerOrdersService {
       );
     }
 
-    // Check if tableless mode is enabled (incompatible with QR menu ordering)
-    if (posSettings.enableTablelessMode) {
-      throw new ForbiddenException(
-        'QR menu ordering is not available. The restaurant is operating in tableless mode. Please contact staff to place your order.'
-      );
-    }
-
     // Verify table exists and belongs to tenant
     const table = await this.prisma.table.findFirst({
       where: {

@@ -83,12 +83,6 @@ const CartPage = () => {
       return;
     }
 
-    // Check if tableless mode is enabled (QR menu ordering not available)
-    if (enableTablelessMode) {
-      setError(t('qrMenu.tablelessModeActive', 'QR menu ordering is not available. The restaurant is operating in tableless mode.'));
-      return;
-    }
-
     // Check if customer ordering is enabled
     if (!enableCustomerOrdering) {
       setError(t('qrMenu.orderingDisabled'));
@@ -388,24 +382,8 @@ const CartPage = () => {
         </div>
 
         {/* Tableless Mode Warning */}
-        {enableTablelessMode && (
-          <div className="bg-amber-50 border-l-4 border-amber-500 rounded-xl p-4 mb-4 shadow-lg animate-in slide-in-from-top">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-amber-800 font-semibold text-sm mb-1">
-                  {t('qrMenu.tablelessModeActive', 'Tableless Mode Active')}
-                </p>
-                <p className="text-amber-700 text-xs">
-                  {t('qrMenu.tablelessModeDescription', 'This restaurant is operating in tableless mode. You can view the menu but cannot place orders through QR.')}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Ordering Disabled Warning */}
-        {!enableCustomerOrdering && !enableTablelessMode && (
+        {!enableCustomerOrdering && (
           <div className="bg-blue-50 border-l-4 border-blue-500 rounded-xl p-4 mb-4 shadow-lg animate-in slide-in-from-top">
             <div className="flex items-start gap-3">
               <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
@@ -459,7 +437,7 @@ const CartPage = () => {
           {/* Checkout Button - Enhanced */}
           <button
             onClick={handleSubmitOrder}
-            disabled={isSubmitting || enableTablelessMode || !enableCustomerOrdering}
+            disabled={isSubmitting || !enableCustomerOrdering}
             className="w-full py-4 rounded-xl font-black text-white text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl"
             style={{
               background: `linear-gradient(135deg, ${settings.primaryColor} 0%, ${settings.secondaryColor} 100%)`
@@ -470,15 +448,13 @@ const CartPage = () => {
                 <Spinner size="sm" />
                 {t('cart.submitting', 'Submitting...')}
               </span>
-            ) : enableTablelessMode ? (
-              t('cart.orderingUnavailable', 'Ordering Unavailable')
             ) : !enableCustomerOrdering ? (
               t('cart.orderingDisabled', 'Ordering Disabled')
             ) : (
               t('cart.placeOrder', 'Place Order')
             )}
           </button>
-          {!enableTablelessMode && enableCustomerOrdering && (
+          {enableCustomerOrdering && (
             <p className="text-xs text-center text-gray-500 mt-2">
               {t('cart.approvalNote', 'Your order will be sent to staff for approval')}
             </p>

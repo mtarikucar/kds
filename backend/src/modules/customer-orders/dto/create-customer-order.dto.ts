@@ -7,6 +7,7 @@ import {
   IsInt,
   Min,
   IsNumber,
+  IsDefined,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
@@ -58,6 +59,7 @@ export class CreateCustomerOrderDto {
   tenantId: string;
 
   @ApiProperty({ example: 'uuid-of-table' })
+  @IsDefined()
   @IsString()
   @IsNotEmpty()
   tableId: string;
