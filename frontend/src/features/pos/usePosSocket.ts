@@ -58,7 +58,9 @@ export const usePosSocket = () => {
 
       // 2. Add to table-specific cache if table present
       if (event.tableId) {
-        const tableQueryKey = ['orders', { tableId: event.tableId }];
+        // Match POS page query key format with status filter
+        const activeStatuses = 'PENDING,PREPARING,READY,SERVED';
+        const tableQueryKey = ['orders', { tableId: event.tableId, status: activeStatuses }];
         const tableOrders = queryClient.getQueryData<any[]>(tableQueryKey) || [];
 
         // Only add if not PENDING_APPROVAL (those stay in separate panel)
@@ -100,7 +102,9 @@ export const usePosSocket = () => {
 
         // Add/update in table-specific cache
         if (event.tableId) {
-          const tableQueryKey = ['orders', { tableId: event.tableId }];
+          // Match POS page query key format with status filter
+          const activeStatuses = 'PENDING,PREPARING,READY,SERVED';
+          const tableQueryKey = ['orders', { tableId: event.tableId, status: activeStatuses }];
           const tableOrders = queryClient.getQueryData<any[]>(tableQueryKey) || [];
 
           const existingIndex = tableOrders.findIndex(order => order.id === event.id);
@@ -141,9 +145,13 @@ export const usePosSocket = () => {
           if (!Array.isArray(oldData)) return oldData;
           const existingIndex = oldData.findIndex((order: any) => order.id === event.id);
           if (existingIndex >= 0) {
+            // Update existing order
             const updated = [...oldData];
             updated[existingIndex] = event;
             return updated;
+          } else if (event.status === 'PENDING') {
+            // Add newly approved order (transitioned from PENDING_APPROVAL to PENDING)
+            return [event, ...oldData];
           }
           return oldData;
         }
