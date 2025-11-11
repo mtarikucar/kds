@@ -70,6 +70,10 @@ export const useCartStore = create<CartState>()(
         } else if (tableId && currentTableId !== tableId) {
           // Update tableId if provided and different (but keep cart items)
           set({ tableId });
+        } else if (tableId === null && currentTableId !== null) {
+          // Clear tableId when using tenant-wide QR (no tableId in URL)
+          // This ensures table selection modal appears for general QR codes
+          set({ tableId: null });
         }
       },
 
