@@ -169,6 +169,7 @@ export class QrMenuController {
         itemsPerRow: settings.itemsPerRow,
       },
       enableCustomerOrdering: posSettings.enableCustomerOrdering,
+      enableTablelessMode: posSettings.enableTablelessMode,
       categories: transformedCategories,
     };
   }

@@ -43,6 +43,7 @@ const CartPage = () => {
     secondaryColor: '#4ECDC4',
   });
   const [enableCustomerOrdering, setEnableCustomerOrdering] = useState(true);
+  const [enableTablelessMode, setEnableTablelessMode] = useState(false);
   const [customerPhone, setCustomerPhone] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -61,6 +62,7 @@ const CartPage = () => {
           secondaryColor: response.data.settings.secondaryColor,
         });
         setEnableCustomerOrdering(response.data.enableCustomerOrdering ?? true);
+        setEnableTablelessMode(response.data.enableTablelessMode ?? false);
       } catch (err) {
         console.error('Error fetching settings:', err);
       }
@@ -94,6 +96,12 @@ const CartPage = () => {
     // Check if customer ordering is enabled
     if (!enableCustomerOrdering) {
       setError(t('qrMenu.orderingDisabled'));
+      return;
+    }
+
+    // Check if tableless mode is enabled (incompatible with QR menu ordering)
+    if (enableTablelessMode) {
+      setError('QR menu ordering is not available. The restaurant is operating in tableless mode.');
       return;
     }
 

@@ -36,6 +36,7 @@ interface MenuData {
   };
   settings: MenuSettings;
   enableCustomerOrdering: boolean;
+  enableTablelessMode: boolean;
   categories: (Category & { products: Product[] })[];
 }
 
@@ -114,7 +115,7 @@ const QRMenuPage = () => {
 
   if (!menuData) return null;
 
-  const { tenant, table, settings, enableCustomerOrdering, categories } = menuData;
+  const { tenant, table, settings, enableCustomerOrdering, enableTablelessMode, categories } = menuData;
 
   // Get all products from all categories
   const allProducts = categories.flatMap(cat => cat.products);
@@ -154,8 +155,8 @@ const QRMenuPage = () => {
   };
 
   const handleProductClick = (product: Product) => {
-    // Only allow product clicks if customer ordering is enabled
-    if (!enableCustomerOrdering) return;
+    // Only allow product clicks if customer ordering is enabled and tableless mode is disabled
+    if (!enableCustomerOrdering || enableTablelessMode) return;
 
     setSelectedProduct(product);
     setIsModalOpen(true);
@@ -255,7 +256,7 @@ const QRMenuPage = () => {
       </div>
 
       {/* Warning Banner for Disabled Ordering */}
-      {!enableCustomerOrdering && (
+      {(!enableCustomerOrdering || enableTablelessMode) && (
         <div className="fixed top-0 left-0 right-0 z-10 mx-4 sm:mx-6 mt-40 sm:mt-44 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg shadow-md">
           <div className="flex items-start gap-3">
             <div className="flex-shrink-0">
@@ -268,7 +269,9 @@ const QRMenuPage = () => {
                 {t('qrMenu.orderingDisabledShort')}
               </p>
               <p className="text-xs text-yellow-700 mt-1">
-                {t('qrMenu.viewOnlyMode')}
+                {enableTablelessMode
+                  ? 'QR menu ordering is not available. The restaurant is operating in tableless mode.'
+                  : t('qrMenu.viewOnlyMode')}
               </p>
             </div>
           </div>
@@ -329,7 +332,7 @@ const QRMenuPage = () => {
                       <button
                         key={product.id}
                         onClick={() => handleProductClick(product)}
-                        disabled={!enableCustomerOrdering}
+                        disabled={!enableCustomerOrdering || enableTablelessMode}
                         className={`w-full text-left transition-all duration-300 transform animate-in fade-in slide-in-from-left ${
                           enableCustomerOrdering
                             ? 'hover:shadow-xl active:scale-98 cursor-pointer'
@@ -394,7 +397,7 @@ const QRMenuPage = () => {
                                 </div>
 
                                 {/* Add Button */}
-                                {enableCustomerOrdering && (
+                                {enableCustomerOrdering && !enableTablelessMode && (
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
@@ -450,7 +453,7 @@ const QRMenuPage = () => {
                       <button
                         key={product.id}
                         onClick={() => handleProductClick(product)}
-                        disabled={!enableCustomerOrdering}
+                        disabled={!enableCustomerOrdering || enableTablelessMode}
                         className={`group text-left transition-all duration-300 transform animate-in fade-in zoom-in-95 ${
                           enableCustomerOrdering
                             ? 'hover:-translate-y-1 active:scale-95 cursor-pointer'
@@ -509,7 +512,7 @@ const QRMenuPage = () => {
                                 </p>
                               )}
 
-                              {enableCustomerOrdering && (
+                              {enableCustomerOrdering && !enableTablelessMode && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -561,9 +564,9 @@ const QRMenuPage = () => {
                     <button
                       key={product.id}
                       onClick={() => handleProductClick(product)}
-                      disabled={!enableCustomerOrdering}
+                      disabled={!enableCustomerOrdering || enableTablelessMode}
                       className={`w-full text-left transition-all duration-300 transform animate-in fade-in slide-in-from-left ${
-                        enableCustomerOrdering
+                        enableCustomerOrdering && !enableTablelessMode
                           ? 'hover:shadow-lg active:scale-98 cursor-pointer'
                           : 'cursor-default opacity-75'
                       }`}
@@ -595,7 +598,7 @@ const QRMenuPage = () => {
                               )}
                             </div>
                             <div className="flex items-center gap-2 flex-shrink-0">
-                              {enableCustomerOrdering && (
+                              {enableCustomerOrdering && !enableTablelessMode && (
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
