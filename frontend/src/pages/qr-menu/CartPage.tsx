@@ -7,6 +7,7 @@ import { useCartStore } from '../../store/cartStore';
 import { formatCurrency } from '../../lib/utils';
 import Spinner from '../../components/ui/Spinner';
 import MobileBottomMenu from '../../components/qr-menu/MobileBottomMenu';
+import TableSelectionModal from '../../components/qr-menu/TableSelectionModal';
 
 interface MenuSettings {
   primaryColor: string; 
@@ -28,11 +29,13 @@ const CartPage = () => {
   const {
     items,
     sessionId,
+    tableId: cartTableId,
     updateItemQuantity,
     removeItem,
     clearCart,
     getSubtotal,
     getTotal,
+    setTableId,
   } = useCartStore();
 
   const [settings, setSettings] = useState<MenuSettings>({
@@ -40,11 +43,13 @@ const CartPage = () => {
     secondaryColor: '#4ECDC4',
   });
   const [enableCustomerOrdering, setEnableCustomerOrdering] = useState(true);
+  const [enableTablelessMode, setEnableTablelessMode] = useState(false);
   const [customerPhone, setCustomerPhone] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showTableSelection, setShowTableSelection] = useState(false);
 
   useEffect(() => {
     // Fetch menu settings for colors and ordering status
@@ -57,6 +62,7 @@ const CartPage = () => {
           secondaryColor: response.data.settings.secondaryColor,
         });
         setEnableCustomerOrdering(response.data.enableCustomerOrdering ?? true);
+        setEnableTablelessMode(response.data.enableTablelessMode ?? false);
       } catch (err) {
         console.error('Error fetching settings:', err);
       }
@@ -68,14 +74,34 @@ const CartPage = () => {
   }, [tenantId]);
 
   const handleSubmitOrder = async () => {
-    if (!tenantId || !tableId || !sessionId) {
+    // Determine effective tableId (from URL or cart store)
+    const effectiveTableId = tableId || cartTableId;
+
+    if (!tenantId || !sessionId) {
       setError('Missing required information');
+      return;
+    }
+
+    // If tableId is missing and customer ordering is enabled, show table selection
+    if (!effectiveTableId && enableCustomerOrdering) {
+      setShowTableSelection(true);
+      return;
+    }
+
+    if (!effectiveTableId) {
+      setError('Please select a table');
       return;
     }
 
     // Check if customer ordering is enabled
     if (!enableCustomerOrdering) {
       setError(t('qrMenu.orderingDisabled'));
+      return;
+    }
+
+    // Check if tableless mode is enabled (incompatible with QR menu ordering)
+    if (enableTablelessMode) {
+      setError('QR menu ordering is not available. The restaurant is operating in tableless mode.');
       return;
     }
 
@@ -99,7 +125,7 @@ const CartPage = () => {
 
       const orderData = {
         tenantId,
-        tableId,
+        tableId: effectiveTableId,
         sessionId,
         customerPhone: customerPhone || undefined,
         items: orderItems,
@@ -113,7 +139,7 @@ const CartPage = () => {
 
       // Redirect to order tracking after 2 seconds
       setTimeout(() => {
-        navigate(`/qr-menu/${tenantId}/orders?tableId=${tableId}&sessionId=${sessionId}`);
+        navigate(`/qr-menu/${tenantId}/orders?tableId=${effectiveTableId}&sessionId=${sessionId}`);
       }, 2000);
     } catch (err: any) {
       console.error('Error submitting order:', err);
@@ -426,6 +452,23 @@ const CartPage = () => {
         secondaryColor={settings.secondaryColor}
         currentPage="cart"
       />
+
+      {/* Table Selection Modal */}
+      {showTableSelection && tenantId && (
+        <TableSelectionModal
+          isOpen={showTableSelection}
+          onClose={() => setShowTableSelection(false)}
+          onSelectTable={(selectedTableId) => {
+            setTableId(selectedTableId);
+            setShowTableSelection(false);
+            // Auto-retry order submission after table selection
+            setTimeout(() => handleSubmitOrder(), 300);
+          }}
+          tenantId={tenantId}
+          primaryColor={settings.primaryColor}
+          secondaryColor={settings.secondaryColor}
+        />
+      )}
     </div>
   );
 };

@@ -32,9 +32,38 @@ export class PosSettingsService {
       where: { tenantId },
     });
 
-    // Validation: QR menu ordering requires two-stage payment
+    // Validation: Tableless mode and customer ordering are mutually exclusive
+    if (updateDto.enableTablelessMode === true) {
+      const willHaveCustomerOrdering =
+        updateDto.enableCustomerOrdering !== undefined
+          ? updateDto.enableCustomerOrdering
+          : settings?.enableCustomerOrdering ?? true;
+
+      if (willHaveCustomerOrdering) {
+        throw new BadRequestException(
+          'Masasız mod etkinleştirildiğinde QR menüden müşteri sipariş oluşturma kullanılamaz. ' +
+          'Müşteriler masa QR kodlarını tarayarak sipariş verirler. ' +
+          'Lütfen önce QR menüden müşteri sipariş oluşturmayı kapatın.'
+        );
+      }
+    }
+
+    // Validation: Cannot enable customer ordering if tableless mode is active
     if (updateDto.enableCustomerOrdering === true) {
-      // If enabling customer ordering, check if two-stage payment is enabled
+      const willHaveTablelessMode =
+        updateDto.enableTablelessMode !== undefined
+          ? updateDto.enableTablelessMode
+          : settings?.enableTablelessMode ?? false;
+
+      if (willHaveTablelessMode) {
+        throw new BadRequestException(
+          'QR menüden müşteri sipariş oluşturma etkinleştirildiğinde masasız mod kullanılamaz. ' +
+          'Müşteriler masa QR kodlarını tarayarak sipariş verirler. ' +
+          'Lütfen önce masasız modu kapatın.'
+        );
+      }
+
+      // Also check if two-stage payment is enabled
       const willHaveTwoStepCheckout =
         updateDto.enableTwoStepCheckout !== undefined
           ? updateDto.enableTwoStepCheckout

@@ -19,6 +19,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
 
 @ApiTags('tables')
@@ -44,6 +45,14 @@ export class TablesController {
   @ApiResponse({ status: 200, description: 'List of all tables' })
   findAll(@Request() req, @Query('section') section?: string) {
     return this.tablesService.findAll(req.tenantId, section);
+  }
+
+  @Public()
+  @Get('public/:tenantId')
+  @ApiOperation({ summary: 'Get available tables for customer selection (no auth required)' })
+  @ApiResponse({ status: 200, description: 'List of available tables for customers' })
+  getPublicTables(@Param('tenantId') tenantId: string) {
+    return this.tablesService.findAvailableForCustomers(tenantId);
   }
 
   @Get(':id')

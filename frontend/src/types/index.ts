@@ -186,6 +186,13 @@ export interface CreateTableDto {
 
 export interface UpdateTableDto extends Partial<CreateTableDto> {}
 
+export interface PublicTable {
+  id: string;
+  number: string;
+  capacity: number;
+  status: TableStatus;
+}
+
 // Order Types
 export enum OrderStatus {
   PENDING_APPROVAL = 'PENDING_APPROVAL',

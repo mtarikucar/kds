@@ -605,6 +605,19 @@
     "preparing": "Hazırlanıyor",
     "ready": "Hazır",
     "served": "Servis Edildi"
+  },
+  "tableSelection": {
+    "title": "Masanızı Seçin",
+    "description": "Lütfen oturduğunuz masayı seçin",
+    "searchPlaceholder": "Masa numarası ara...",
+    "selectTable": "Masa Seç",
+    "tableNumber": "Masa",
+    "capacity": "Kapasite",
+    "available": "Müsait",
+    "occupied": "Dolu",
+    "noTablesAvailable": "Müsait masa yok",
+    "selectDropdown": "Bir masa seçin...",
+    "cancel": "İptal"
   }
 }
 

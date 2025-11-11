@@ -141,6 +141,8 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       type: order.type,
       customerName: order.customerName,
       notes: order.notes,
+      status: order.status,
+      requiresApproval: order.requiresApproval,
       createdAt: order.createdAt,
     });
 
@@ -156,6 +158,8 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       type: order.type,
       customerName: order.customerName,
       notes: order.notes,
+      status: order.status,
+      requiresApproval: order.requiresApproval,
       totalAmount: order.totalAmount,
       discount: order.discount,
       finalAmount: order.finalAmount,

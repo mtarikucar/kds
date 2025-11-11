@@ -17,9 +17,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      SERVER_HOST: ${{ secrets.SERVER_HOST }}
-      SERVER_USER: ${{ secrets.SERVER_USER }}
-      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      SERVER_HOST: '38.242.233.166'
       PROJECT_PATH: /root/kds
 
     steps:
@@ -30,26 +28,44 @@ jobs:
           fetch-depth: 0
 
       - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY_BASE64: ${{ secrets.SSH_PRIVATE_KEY_BASE64 }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
         run: |
           mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          echo "$SSH_PRIVATE_KEY_BASE64" | base64 -d > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H $SERVER_HOST >> ~/.ssh/known_hosts
+          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Validate SSH key format
+        run: |
+          echo "🔑 Validating SSH key format..."
+          if ! ssh-keygen -l -f ~/.ssh/id_ed25519 2>/dev/null; then
+            echo "❌ SSH key validation failed!"
+            exit 1
+          fi
+          echo "✅ SSH key format is valid"
 
       - name: Verify SSH connection
         run: |
-          ssh -o BatchMode=yes -o StrictHostKeyChecking=no $SERVER_USER@$SERVER_HOST "echo 'SSH connection successful'"
+          echo "🔌 Testing SSH connection to ${{ env.SERVER_HOST }}..."
+          if ! ssh -o ConnectTimeout=10 -o BatchMode=yes -o StrictHostKeyChecking=yes root@${{ env.SERVER_HOST }} "echo 'SSH connection successful'" 2>&1; then
+            echo "❌ SSH connection to test server failed!"
+            exit 1
+          fi
+          echo "✅ SSH connection test passed"
 
       - name: Get commit information
         id: commit_info
         run: |
           echo "commit_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-          echo "commit_message=$(git log -1 --pretty=%B)" >> $GITHUB_OUTPUT
+          echo "commit_message=$(git log -1 --pretty=%s | head -c 100)" >> $GITHUB_OUTPUT
           echo "author=$(git log -1 --pretty=%an)" >> $GITHUB_OUTPUT
 
       - name: Deploy to test environment
         run: |
-          ssh $SERVER_USER@$SERVER_HOST << 'EOF'
+          ssh root@${{ env.SERVER_HOST }} << 'EOF'
             set -e
 
             echo "=========================================="
@@ -78,7 +94,7 @@ jobs:
           echo "Waiting 30 seconds for services to stabilize..."
           sleep 30
 
-          ssh $SERVER_USER@$SERVER_HOST << 'EOF'
+          ssh root@${{ env.SERVER_HOST }} << 'EOF'
             cd ${{ env.PROJECT_PATH }}
             bash scripts/test-deploy.sh health
           EOF

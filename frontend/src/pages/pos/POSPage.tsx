@@ -57,11 +57,17 @@ const POSPage = () => {
   const isTablelessMode = posSettings?.enableTablelessMode ?? false;
   const isTwoStepCheckout = posSettings?.enableTwoStepCheckout ?? false;
 
-  // Fetch active orders for selected table
+  // Fetch active orders for selected table (exclude pending approval, paid, and cancelled)
   const { data: tableOrders, refetch: refetchOrders } = useOrders(
     selectedTable
       ? {
           tableId: selectedTable.id,
+          status: [
+            OrderStatus.PENDING,
+            OrderStatus.PREPARING,
+            OrderStatus.READY,
+            OrderStatus.SERVED,
+          ].join(','),
         }
       : undefined
   );
