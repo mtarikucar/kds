@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
-import { ArrowLeft, Trash2, Plus, Minus, ShoppingBag, Check, Phone, MessageSquare, ClipboardList } from 'lucide-react';
+import { ArrowLeft, Trash2, Plus, Minus, ShoppingBag, Check, Phone, MessageSquare, ClipboardList, AlertCircle } from 'lucide-react';
 import { useCartStore } from '../../store/cartStore';
 import { formatCurrency } from '../../lib/utils';
 import Spinner from '../../components/ui/Spinner';
@@ -77,19 +77,15 @@ const CartPage = () => {
     // Determine effective tableId (from URL or cart store)
     const effectiveTableId = tableId || cartTableId;
 
-    if (!tenantId || !sessionId) {
+    // Check basic tenant requirement
+    if (!tenantId) {
       setError('Missing required information');
       return;
     }
 
-    // If tableId is missing and customer ordering is enabled, show table selection
-    if (!effectiveTableId && enableCustomerOrdering) {
-      setShowTableSelection(true);
-      return;
-    }
-
-    if (!effectiveTableId) {
-      setError('Please select a table');
+    // Check if tableless mode is enabled (QR menu ordering not available)
+    if (enableTablelessMode) {
+      setError(t('qrMenu.tablelessModeActive', 'QR menu ordering is not available. The restaurant is operating in tableless mode.'));
       return;
     }
 
@@ -99,9 +95,15 @@ const CartPage = () => {
       return;
     }
 
-    // Check if tableless mode is enabled (incompatible with QR menu ordering)
-    if (enableTablelessMode) {
-      setError('QR menu ordering is not available. The restaurant is operating in tableless mode.');
+    // If tableId is missing, show table selection modal
+    if (!effectiveTableId) {
+      setShowTableSelection(true);
+      return;
+    }
+
+    // Final validation before submission
+    if (!sessionId) {
+      setError('Missing session information. Please refresh the page.');
       return;
     }
 
@@ -385,6 +387,40 @@ const CartPage = () => {
           />
         </div>
 
+        {/* Tableless Mode Warning */}
+        {enableTablelessMode && (
+          <div className="bg-amber-50 border-l-4 border-amber-500 rounded-xl p-4 mb-4 shadow-lg animate-in slide-in-from-top">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-amber-800 font-semibold text-sm mb-1">
+                  {t('qrMenu.tablelessModeActive', 'Tableless Mode Active')}
+                </p>
+                <p className="text-amber-700 text-xs">
+                  {t('qrMenu.tablelessModeDescription', 'This restaurant is operating in tableless mode. You can view the menu but cannot place orders through QR.')}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Ordering Disabled Warning */}
+        {!enableCustomerOrdering && !enableTablelessMode && (
+          <div className="bg-blue-50 border-l-4 border-blue-500 rounded-xl p-4 mb-4 shadow-lg animate-in slide-in-from-top">
+            <div className="flex items-start gap-3">
+              <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-blue-800 font-semibold text-sm mb-1">
+                  {t('qrMenu.orderingDisabled', 'Ordering Currently Disabled')}
+                </p>
+                <p className="text-blue-700 text-xs">
+                  {t('qrMenu.orderingDisabledDescription', 'Online ordering is temporarily disabled. Please contact staff to place your order.')}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Error Message - Enhanced */}
         {error && (
           <div className="bg-red-50 border-l-4 border-red-500 rounded-xl p-4 mb-4 shadow-lg animate-in slide-in-from-top">
@@ -423,9 +459,9 @@ const CartPage = () => {
           {/* Checkout Button - Enhanced */}
           <button
             onClick={handleSubmitOrder}
-            disabled={isSubmitting}
+            disabled={isSubmitting || enableTablelessMode || !enableCustomerOrdering}
             className="w-full py-4 rounded-xl font-black text-white text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl"
-            style={{ 
+            style={{
               background: `linear-gradient(135deg, ${settings.primaryColor} 0%, ${settings.secondaryColor} 100%)`
             }}
           >
@@ -434,13 +470,19 @@ const CartPage = () => {
                 <Spinner size="sm" />
                 {t('cart.submitting', 'Submitting...')}
               </span>
+            ) : enableTablelessMode ? (
+              t('cart.orderingUnavailable', 'Ordering Unavailable')
+            ) : !enableCustomerOrdering ? (
+              t('cart.orderingDisabled', 'Ordering Disabled')
             ) : (
               t('cart.placeOrder', 'Place Order')
             )}
           </button>
-          <p className="text-xs text-center text-gray-500 mt-2">
-            {t('cart.approvalNote', 'Your order will be sent to staff for approval')}
-          </p>
+          {!enableTablelessMode && enableCustomerOrdering && (
+            <p className="text-xs text-center text-gray-500 mt-2">
+              {t('cart.approvalNote', 'Your order will be sent to staff for approval')}
+            </p>
+          )}
         </div>
       </div>
 

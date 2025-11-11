@@ -104,6 +104,9 @@ services:
         VITE_SOCKET_URL: ${VITE_SOCKET_URL}
         VITE_WS_URL: ${VITE_WS_URL}
         VITE_STRIPE_PUBLISHABLE_KEY: ${VITE_STRIPE_PUBLISHABLE_KEY}
+        VITE_APP_VERSION: ${VITE_APP_VERSION:-test-dev}
+        VITE_BUILD_TIME: ${VITE_BUILD_TIME}
+        VITE_COMMIT_SHA: ${VITE_COMMIT_SHA}
     container_name: kds_frontend_staging
     restart: always
     depends_on:

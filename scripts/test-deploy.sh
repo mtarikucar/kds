@@ -106,6 +106,15 @@ backup_database() {
 deploy_containers() {
     log_info "Building and deploying containers..."
 
+    # Generate version information
+    export VITE_APP_VERSION="${VERSION:-$(git describe --tags --always)}"
+    export VITE_BUILD_TIME="${BUILD_TIME:-$(date -u +"%Y-%m-%dT%H:%M:%SZ")}"
+    export VITE_COMMIT_SHA="$(git rev-parse --short HEAD)"
+
+    log_info "Version: $VITE_APP_VERSION"
+    log_info "Build Time: $VITE_BUILD_TIME"
+    log_info "Commit: $VITE_COMMIT_SHA"
+
     # Build images
     log_info "Building Docker images..."
     docker-compose -f "$COMPOSE_FILE" --env-file "$PROJECT_ROOT/.env" build --no-cache
