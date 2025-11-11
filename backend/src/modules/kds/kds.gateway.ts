@@ -133,37 +133,65 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   emitNewOrder(tenantId: string, order: any) {
+    // Send complete order object with all fields for Pure Socket.IO approach
+    // This allows frontend to directly inject into React Query cache without API calls
     this.server.to(`kitchen-${tenantId}`).to(`pos-${tenantId}`).emit('order:new', {
-      orderId: order.id,
+      id: order.id,
       orderNumber: order.orderNumber,
-      items: order.orderItems,
+      tableId: order.tableId,
       table: order.table,
+      userId: order.userId,
+      user: order.user,
+      sessionId: order.sessionId,
+      customerPhone: order.customerPhone,
       type: order.type,
       customerName: order.customerName,
-      notes: order.notes,
       status: order.status,
       requiresApproval: order.requiresApproval,
+      totalAmount: order.totalAmount,
+      discount: order.discount,
+      finalAmount: order.finalAmount,
+      notes: order.notes,
+      orderItems: order.orderItems,
+      payments: order.payments || [],
+      approvedAt: order.approvedAt,
+      approvedById: order.approvedById,
+      approvedBy: order.approvedBy,
+      tenantId: order.tenantId,
       createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
     });
 
     this.logger.log(`New order ${order.orderNumber} emitted to kitchen-${tenantId} and pos-${tenantId}`);
   }
 
   emitOrderUpdated(tenantId: string, order: any) {
+    // Send complete order object with all fields for Pure Socket.IO approach
     this.server.to(`kitchen-${tenantId}`).to(`pos-${tenantId}`).emit('order:updated', {
-      orderId: order.id,
+      id: order.id,
       orderNumber: order.orderNumber,
-      items: order.orderItems,
+      tableId: order.tableId,
       table: order.table,
+      userId: order.userId,
+      user: order.user,
+      sessionId: order.sessionId,
+      customerPhone: order.customerPhone,
       type: order.type,
       customerName: order.customerName,
-      notes: order.notes,
       status: order.status,
       requiresApproval: order.requiresApproval,
       totalAmount: order.totalAmount,
       discount: order.discount,
       finalAmount: order.finalAmount,
-      updatedAt: new Date(),
+      notes: order.notes,
+      orderItems: order.orderItems,
+      payments: order.payments || [],
+      approvedAt: order.approvedAt,
+      approvedById: order.approvedById,
+      approvedBy: order.approvedBy,
+      tenantId: order.tenantId,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
     });
 
     this.logger.log(`Order ${order.orderNumber} updated and emitted to kitchen-${tenantId}`);

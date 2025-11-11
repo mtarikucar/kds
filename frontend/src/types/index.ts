@@ -211,7 +211,12 @@ export interface OrderItem {
   product?: Product;
   quantity: number;
   price: number;
+  unitPrice?: number; // Product unit price (same as price for backwards compatibility)
+  subtotal?: number; // Calculated: (unitPrice + modifierTotal) * quantity
+  modifierTotal?: number; // Sum of all modifier price adjustments
+  status?: string; // Item-level status (e.g., PENDING, PREPARING, READY)
   notes: string | null;
+  modifiers?: OrderItemModifier[]; // Applied modifiers for this order item
   createdAt: string;
   updatedAt: string;
 }
@@ -223,7 +228,19 @@ export interface Order {
   table?: Table;
   userId: string;
   user?: User;
+  type?: OrderType; // Order type: DINE_IN, TAKEAWAY, DELIVERY
+  customerName?: string; // Customer name (for non-QR orders)
+  customerPhone?: string; // Customer phone (for QR menu orders)
+  sessionId?: string; // Customer session ID (for QR menu orders)
   status: OrderStatus;
+  requiresApproval?: boolean; // If order requires staff approval (QR orders)
+  approvedAt?: string; // When order was approved
+  approvedById?: string; // ID of user who approved
+  approvedBy?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+  }; // User who approved the order
   totalAmount: number;
   discount: number;
   finalAmount: number;
