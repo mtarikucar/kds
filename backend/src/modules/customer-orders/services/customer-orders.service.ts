@@ -12,6 +12,7 @@ import { LoyaltyService } from '../../customers/loyalty.service';
 import { CustomerSessionService } from '../../customers/customer-session.service';
 import { CreateCustomerOrderDto } from '../dto/create-customer-order.dto';
 import { CreateWaiterRequestDto, CreateBillRequestDto } from '../dto/waiter-request.dto';
+import { OrderStatus } from '../../../common/constants/order-status.enum';
 
 @Injectable()
 export class CustomerOrdersService {
@@ -89,7 +90,7 @@ export class CustomerOrdersService {
         tableId: dto.tableId,
         sessionId: dto.sessionId,
         customerPhone: dto.customerPhone,
-        status: 'PENDING_APPROVAL',
+        status: OrderStatus.PENDING_APPROVAL,
         requiresApproval: true,
         type: 'DINE_IN',
         totalAmount,

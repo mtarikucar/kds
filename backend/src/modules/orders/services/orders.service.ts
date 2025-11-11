@@ -477,7 +477,7 @@ export class OrdersService {
       throw new NotFoundException('Order not found');
     }
 
-    if (order.status !== 'PENDING_APPROVAL') {
+    if (order.status !== OrderStatus.PENDING_APPROVAL) {
       throw new BadRequestException('Order is not pending approval');
     }
 
@@ -521,6 +521,11 @@ export class OrdersService {
     this.kdsGateway.emitNewOrder(tenantId, updatedOrder);
     // Also emit update event for any listening clients
     this.kdsGateway.emitOrderUpdated(tenantId, updatedOrder);
+
+    // CRITICAL: Notify customer if this is a QR menu order
+    if (updatedOrder.sessionId) {
+      this.kdsGateway.emitCustomerOrderApproved(updatedOrder.sessionId, updatedOrder);
+    }
 
     return updatedOrder;
   }
