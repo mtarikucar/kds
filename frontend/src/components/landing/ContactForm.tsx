@@ -152,8 +152,8 @@ export const ContactForm = () => {
             </div>
             <h4 className="font-semibold text-gray-900 mb-1">{t('landing.emailLabel')}</h4>
             <p className="text-gray-600">
-              <a href="mailto:admin@hummytummy.com" className="hover:text-primary-600 transition-colors">
-                admin@hummytummy.com
+              <a href="mailto:contact@hummytummy.com" className="hover:text-primary-600 transition-colors">
+                contact@hummytummy.com
               </a>
             </p>
           </div>
