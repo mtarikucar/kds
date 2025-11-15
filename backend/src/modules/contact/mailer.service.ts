@@ -15,20 +15,20 @@ export class MailerService {
 
   private initializeTransporter() {
     // Check if email is configured
-    if (!process.env.SMTP_HOST || !process.env.SMTP_PORT) {
+    if (!process.env.EMAIL_HOST || !process.env.EMAIL_PORT) {
       this.logger.warn(
-        'Email service not configured. SMTP_HOST and SMTP_PORT environment variables are required.',
+        'Email service not configured. EMAIL_HOST and EMAIL_PORT environment variables are required.',
       );
       return;
     }
 
     this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: parseInt(process.env.SMTP_PORT, 10),
-      secure: process.env.SMTP_SECURE === 'true', // true for 465, false for other ports
+      host: process.env.EMAIL_HOST,
+      port: parseInt(process.env.EMAIL_PORT, 10),
+      secure: process.env.EMAIL_SECURE === 'true', // true for 465, false for other ports
       auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASSWORD,
       },
     });
 
@@ -72,7 +72,7 @@ export class MailerService {
       });
 
       const mailOptions = {
-        from: process.env.SMTP_FROM || 'noreply@hummytummy.com',
+        from: process.env.EMAIL_FROM || 'admin@hummytummy.com',
         to: process.env.ADMIN_EMAIL || 'admin@hummytummy.com',
         subject: `New Contact Form Submission from ${data.name}`,
         html,
@@ -101,7 +101,7 @@ export class MailerService {
       const html = await this.loadTemplate('user-confirmation', data);
 
       const mailOptions = {
-        from: process.env.SMTP_FROM || 'noreply@hummytummy.com',
+        from: process.env.EMAIL_FROM || 'admin@hummytummy.com',
         to: data.email,
         subject: 'Thank You for Contacting HummyTummy',
         html,

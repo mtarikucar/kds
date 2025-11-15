@@ -71,7 +71,7 @@ export const Footer = () => {
             <h4 className="text-white font-semibold mb-4">{t('landing.legal')}</h4>
             <ul className="space-y-2 text-sm">
               <li>
-                <a href="mailto:support@hummytummy.com" className="hover:text-white transition-colors">
+                <a href="mailto:admin@hummytummy.com" className="hover:text-white transition-colors">
                   {t('landing.support')}
                 </a>
               </li>
@@ -107,8 +107,8 @@ export const Footer = () => {
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
-            <a href="mailto:support@hummytummy.com" className="hover:text-white transition-colors">
-              support@hummytummy.com
+            <a href="mailto:admin@hummytummy.com" className="hover:text-white transition-colors">
+              admin@hummytummy.com
             </a>
           </div>
         </div>
