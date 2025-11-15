@@ -66,8 +66,8 @@ services:
       IYZICO_API_KEY: ${IYZICO_API_KEY:-placeholder}
       IYZICO_SECRET_KEY: ${IYZICO_SECRET_KEY:-placeholder}
       IYZICO_BASE_URL: ${IYZICO_BASE_URL:-https://sandbox-api.iyzipay.com}
-      # Email Configuration
-      EMAIL_HOST: ${EMAIL_HOST:-smtp.titan.email}
+      # Email Configuration (GoDaddy SMTP)
+      EMAIL_HOST: ${EMAIL_HOST:-smtpout.secureserver.net}
       EMAIL_PORT: ${EMAIL_PORT:-587}
       EMAIL_SECURE: ${EMAIL_SECURE:-false}
       EMAIL_USER: ${EMAIL_USER:-admin@hummytummy.com}
