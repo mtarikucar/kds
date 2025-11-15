@@ -90,6 +90,7 @@ export class OrdersService {
       orderNumber,
       type: createOrderDto.type,
       status: OrderStatus.PENDING,
+      requiresApproval: false, // POS orders don't require approval
       totalAmount,
       discount,
       finalAmount,

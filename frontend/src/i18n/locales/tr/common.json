@@ -514,7 +514,24 @@
     "termsOfService": "Hizmet Şartları",
     "cookiePolicy": "Çerez Politikası",
     "allRightsReserved": "Tüm hakları saklıdır.",
-    "getStarted": "Başlayın"
+    "getStarted": "Başlayın",
+    "freeTrialNoCreditCard": "Kredi kartı gerekmiyor",
+    "setupIn5Minutes": "5 dakikada kurulum",
+    "cancelAnytime": "İstediğiniz zaman iptal edin",
+    "testimonials": "Müşteri Yorumları",
+    "whatClientsSay": "Müşterilerimiz Ne Diyor",
+    "testimonialSubtitle": "Günlük operasyonları için HummyTummy'ye güvenen yüzlerce restorana katılın",
+    "testimonial1": "HummyTummy restoran operasyonlarımızı tamamen dönüştürdü. Mutfak ekranı sistemi inanılmaz!",
+    "testimonial2": "Şimdiye kadar kullandığımız en iyi POS sistemi. Öğrenmesi kolay, güçlü özellikler ve harika destek.",
+    "testimonial3": "HummyTummy'ye geçtikten sonra sipariş işleme süremiz %40 azaldı. Şiddetle tavsiye ediyoruz!",
+    "testimonial4": "QR menü özelliği bizi modern çağa taşıdı. Müşterilerimiz bu kolaylığa bayılıyor!",
+    "happyClients": "Mutlu Müşteriler",
+    "avgRating": "Ortalama Puan",
+    "satisfaction": "Memnuniyet",
+    "liveChat": "Canlı Sohbet",
+    "chatWithUs": "Ekibimizle sohbet edin",
+    "documentation": "Dokümantasyon",
+    "support": "Destek"
   }
   ,
   "qrMenu": {

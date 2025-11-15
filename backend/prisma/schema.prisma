@@ -314,7 +314,7 @@ model Order {
   // Customer ordering fields
   sessionId        String? // UUID for customer session tracking
   customerPhone    String? // Optional customer phone
-  requiresApproval Boolean @default(true) // If true, waiter must approve before going to kitchen
+  requiresApproval Boolean @default(false) // If true, waiter must approve before going to kitchen
   approvedAt       DateTime? // When the order was approved
 
   tableId String?

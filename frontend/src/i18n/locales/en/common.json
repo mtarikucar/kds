@@ -409,7 +409,24 @@
     "termsOfService": "Terms of Service",
     "cookiePolicy": "Cookie Policy",
     "allRightsReserved": "All rights reserved.",
-    "getStarted": "Get Started"
+    "getStarted": "Get Started",
+    "freeTrialNoCreditCard": "No credit card required",
+    "setupIn5Minutes": "Setup in 5 minutes",
+    "cancelAnytime": "Cancel anytime",
+    "testimonials": "Testimonials",
+    "whatClientsSay": "What Our Clients Say",
+    "testimonialSubtitle": "Join hundreds of restaurants that trust HummyTummy for their daily operations",
+    "testimonial1": "HummyTummy completely transformed our restaurant operations. The kitchen display system is incredible!",
+    "testimonial2": "The best POS system we've ever used. Easy to learn, powerful features, and great support.",
+    "testimonial3": "Our order processing time decreased by 40% after switching to HummyTummy. Highly recommended!",
+    "testimonial4": "The QR menu feature brought us into the modern age. Our customers love the convenience!",
+    "happyClients": "Happy Clients",
+    "avgRating": "Average Rating",
+    "satisfaction": "Satisfaction",
+    "liveChat": "Live Chat",
+    "chatWithUs": "Chat with our team",
+    "documentation": "Documentation",
+    "support": "Support"
   }
   ,
   "qrMenu": {

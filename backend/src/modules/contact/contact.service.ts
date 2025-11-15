@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateContactDto } from './dto/create-contact.dto';
+import { MailerService } from './mailer.service';
 
 @Injectable()
 export class ContactService {
@@ -8,6 +9,7 @@ export class ContactService {
 
   constructor(
     private prisma: PrismaService,
+    private mailerService: MailerService,
   ) {}
 
   async create(createContactDto: CreateContactDto) {
@@ -25,8 +27,21 @@ export class ContactService {
 
       this.logger.log(`New contact message received from ${createContactDto.email}`);
 
-      // TODO: Send email notification (requires MailerModule configuration)
-      // For now, messages are only saved to database and can be viewed in admin panel
+      // Send email notifications (admin notification + user confirmation)
+      const emailResults = await this.mailerService.sendBothEmails({
+        name: createContactDto.name,
+        email: createContactDto.email,
+        phone: createContactDto.phone,
+        message: createContactDto.message,
+      });
+
+      if (!emailResults.adminSent) {
+        this.logger.warn('Admin notification email was not sent');
+      }
+
+      if (!emailResults.userSent) {
+        this.logger.warn('User confirmation email was not sent');
+      }
 
       return {
         success: true,
