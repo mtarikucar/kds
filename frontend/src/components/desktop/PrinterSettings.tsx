@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { PrinterService, PrinterInfo, isTauri } from '../../lib/tauri';
 import { Button } from '../ui/Button';
 import { toast } from 'sonner';
 import { Select } from '../ui/Select';
 
 export function PrinterSettings() {
+  const { t } = useTranslation(['settings', 'common']);
   const [printers, setPrinters] = useState<PrinterInfo[]>([]);
   const [selectedPrinter, setSelectedPrinter] = useState<string | null>(null);
   const [currentPrinter, setCurrentPrinter] = useState<string | null>(null);
@@ -27,7 +29,7 @@ export function PrinterSettings() {
       setPrinters(printerList);
     } catch (error) {
       console.error('Failed to load printers:', error);
-      toast.error('Failed to load printers');
+      toast.error(t('settings.printer.loadFailed'));
     } finally {
       setLoading(false);
     }
@@ -45,7 +47,7 @@ export function PrinterSettings() {
 
   const handleSavePrinter = async () => {
     if (!selectedPrinter) {
-      toast.error('Please select a printer');
+      toast.error(t('settings.printer.selectPrompt'));
       return;
     }
 
@@ -53,10 +55,10 @@ export function PrinterSettings() {
     try {
       await PrinterService.setPrinter(selectedPrinter);
       setCurrentPrinter(selectedPrinter);
-      toast.success('Printer configuration saved');
+      toast.success(t('settings.printer.saveSuccess'));
     } catch (error) {
       console.error('Failed to save printer:', error);
-      toast.error('Failed to save printer configuration');
+      toast.error(t('settings.printer.saveFailed'));
     } finally {
       setLoading(false);
     }
@@ -76,10 +78,10 @@ export function PrinterSettings() {
       };
 
       await PrinterService.printReceipt(testReceipt);
-      toast.success('Test print sent to printer');
+      toast.success(t('settings.printer.testPrintSuccess'));
     } catch (error) {
       console.error('Test print failed:', error);
-      toast.error('Test print failed');
+      toast.error(t('settings.printer.testPrintFailed'));
     } finally {
       setLoading(false);
     }
@@ -89,8 +91,7 @@ export function PrinterSettings() {
     return (
       <div className="p-6 bg-yellow-50 border border-yellow-200 rounded-lg">
         <p className="text-yellow-800">
-          Printer settings are only available in the desktop application.
-          Download the desktop app to enable thermal printer support.
+          {t('settings.printer.desktopOnly1')} {t('settings.printer.desktopOnly2')}
         </p>
       </div>
     );
@@ -99,16 +100,16 @@ export function PrinterSettings() {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold mb-4">Printer Configuration</h3>
+        <h3 className="text-lg font-semibold mb-4">{t('settings.printer.title')}</h3>
         <p className="text-sm text-gray-600 mb-4">
-          Configure thermal printers for receipts and kitchen orders.
+          {t('settings.printer.description')}
         </p>
       </div>
 
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Select Printer Port
+            {t('settings.printer.selectPort')}
           </label>
           <div className="flex gap-2">
             <Select
@@ -117,7 +118,7 @@ export function PrinterSettings() {
               disabled={loading}
               className="flex-1"
             >
-              <option value="">Select a printer...</option>
+              <option value="">{t('settings.printer.selectPlaceholder')}</option>
               {printers.map((printer) => (
                 <option key={printer.port} value={printer.port}>
                   {printer.name} ({printer.status})
@@ -129,7 +130,7 @@ export function PrinterSettings() {
               disabled={loading}
               variant="outline"
             >
-              Refresh
+              {t('common:buttons.refresh')}
             </Button>
           </div>
         </div>
@@ -137,7 +138,7 @@ export function PrinterSettings() {
         {currentPrinter && (
           <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
             <p className="text-sm text-green-800">
-              Current printer: <strong>{currentPrinter}</strong>
+              {t('settings.printer.currentPrinter')}: <strong>{currentPrinter}</strong>
             </p>
           </div>
         )}
@@ -147,34 +148,33 @@ export function PrinterSettings() {
             onClick={handleSavePrinter}
             disabled={loading || !selectedPrinter || selectedPrinter === currentPrinter}
           >
-            Save Configuration
+            {t('settings.printer.saveConfig')}
           </Button>
           <Button
             onClick={handleTestPrint}
             disabled={loading || !currentPrinter}
             variant="outline"
           >
-            Test Print
+            {t('settings.printer.testPrint')}
           </Button>
         </div>
       </div>
 
       <div className="border-t pt-4">
-        <h4 className="text-sm font-semibold mb-2">Printer Setup Instructions</h4>
+        <h4 className="text-sm font-semibold mb-2">{t('settings.printer.setupTitle')}</h4>
         <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
-          <li>Connect your thermal printer via USB or Serial port</li>
-          <li>Click "Refresh" to scan for available printers</li>
-          <li>Select your printer from the dropdown</li>
-          <li>Click "Save Configuration"</li>
-          <li>Use "Test Print" to verify the connection</li>
+          <li>{t('settings.printer.steps.connect')}</li>
+          <li>{t('settings.printer.steps.refresh')}</li>
+          <li>{t('settings.printer.steps.select')}</li>
+          <li>{t('settings.printer.steps.save')}</li>
+          <li>{t('settings.printer.steps.test')}</li>
         </ol>
       </div>
 
       <div className="border-t pt-4">
-        <h4 className="text-sm font-semibold mb-2">Supported Printers</h4>
+        <h4 className="text-sm font-semibold mb-2">{t('settings.printer.supportedTitle')}</h4>
         <p className="text-sm text-gray-600">
-          This application supports ESC/POS compatible thermal printers including:
-          Epson TM series, Star TSP series, and generic ESC/POS printers.
+          {t('settings.printer.supportedDesc')}
         </p>
       </div>
     </div>

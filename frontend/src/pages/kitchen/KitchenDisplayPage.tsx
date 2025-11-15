@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useOrders, useUpdateOrderStatus, useCancelKdsOrder } from '../../features/orders/ordersApi';
 import { useKitchenSocket } from '../../features/kds/useKitchenSocket';
 import OrderQueue from '../../components/kitchen/OrderQueue';
@@ -8,6 +9,7 @@ import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
 
 const KitchenDisplayPage = () => {
+  const { t } = useTranslation('kitchen');
   const [updatingOrderId, setUpdatingOrderId] = useState<string | null>(null);
 
   // Filter to only show active kitchen orders
@@ -48,15 +50,15 @@ const KitchenDisplayPage = () => {
     <div className="h-full">
       <div className="mb-4 md:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Kitchen Display</h1>
-          <p className="text-sm md:text-base text-gray-600">Real-time order tracking and management</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t('kitchen.title')}</h1>
+          <p className="text-sm md:text-base text-gray-600">{t('kitchen.realtimeTracking')}</p>
         </div>
 
         <div className="flex items-center gap-2 md:gap-4 flex-wrap">
           <div className="flex items-center gap-2">
-            <span className="text-xs md:text-sm text-gray-600">WebSocket:</span>
+            <span className="text-xs md:text-sm text-gray-600">{t('kitchen.websocket')}</span>
             <Badge variant={isConnected ? 'success' : 'danger'}>
-              {isConnected ? 'Connected' : 'Disconnected'}
+              {isConnected ? t('kitchen.connected') : t('kitchen.disconnected')}
             </Badge>
           </div>
 
@@ -67,14 +69,14 @@ const KitchenDisplayPage = () => {
             isLoading={isLoading}
           >
             <RefreshCw className="h-4 w-4 md:mr-2" />
-            <span className="hidden md:inline">Refresh</span>
+            <span className="hidden md:inline">{t('common:buttons.refresh')}</span>
           </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 h-[calc(100vh-250px)] md:h-[calc(100vh-200px)]">
         <OrderQueue
-          title="Pending"
+          title={t('kitchen.pending')}
           status={OrderStatus.PENDING}
           orders={orders || []}
           onUpdateStatus={handleUpdateStatus}
@@ -83,7 +85,7 @@ const KitchenDisplayPage = () => {
         />
 
         <OrderQueue
-          title="Preparing"
+          title={t('kitchen.preparing')}
           status={OrderStatus.PREPARING}
           orders={orders || []}
           onUpdateStatus={handleUpdateStatus}
@@ -91,7 +93,7 @@ const KitchenDisplayPage = () => {
         />
 
         <OrderQueue
-          title="Ready"
+          title={t('kitchen.ready')}
           status={OrderStatus.READY}
           orders={orders || []}
           onUpdateStatus={handleUpdateStatus}

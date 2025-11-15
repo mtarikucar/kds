@@ -1,8 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 export default function NetworkErrorPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation('errors');
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isRetrying, setIsRetrying] = useState(false);
 
@@ -56,12 +58,10 @@ export default function NetworkErrorPage() {
 
         {/* Content */}
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          {isOnline ? 'Connection Error' : 'No Internet Connection'}
+          {t('pages.networkError.title')}
         </h2>
         <p className="text-gray-600 mb-8">
-          {isOnline
-            ? 'Unable to reach the server. The service might be temporarily unavailable.'
-            : 'Please check your internet connection and try again.'}
+          {t('pages.networkError.description')}
         </p>
 
         {/* Status indicator */}
@@ -73,7 +73,7 @@ export default function NetworkErrorPage() {
               } animate-pulse`}
             />
             <span className="text-sm text-gray-600">
-              {isOnline ? 'Server Unreachable' : 'Offline'}
+              {isOnline ? t('errors:connectionError') : t('errors:networkError')}
             </span>
           </div>
         </div>
@@ -107,7 +107,7 @@ export default function NetworkErrorPage() {
                     d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                   ></path>
                 </svg>
-                Retrying...
+                {t('app:messages.pleaseWait')}
               </>
             ) : (
               <>
@@ -124,7 +124,7 @@ export default function NetworkErrorPage() {
                     d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
                   />
                 </svg>
-                Try Again
+                {t('pages.networkError.retry')}
               </>
             )}
           </button>
@@ -133,18 +133,18 @@ export default function NetworkErrorPage() {
             onClick={() => navigate('/')}
             className="w-full flex justify-center py-3 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors"
           >
-            Go to Homepage
+            {t('pages.networkError.goHome')}
           </button>
         </div>
 
         {/* Tips */}
         <div className="mt-8 p-4 bg-yellow-50 rounded-lg text-left">
-          <p className="text-sm font-medium text-yellow-800 mb-2">Troubleshooting tips:</p>
+          <p className="text-sm font-medium text-yellow-800 mb-2">{t('pages.networkError.troubleshootingTips')}</p>
           <ul className="text-xs text-yellow-700 space-y-1 list-disc list-inside">
-            <li>Check your Wi-Fi or mobile data connection</li>
-            <li>Try disabling VPN if you're using one</li>
-            <li>Clear your browser cache and cookies</li>
-            <li>Contact support if the problem persists</li>
+            <li>{t('pages.networkError.tip1')}</li>
+            <li>{t('pages.networkError.tip2')}</li>
+            <li>{t('pages.networkError.tip3')}</li>
+            <li>{t('pages.networkError.tip4')}</li>
           </ul>
         </div>
       </div>

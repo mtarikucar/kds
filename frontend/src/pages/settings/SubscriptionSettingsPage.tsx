@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   CreditCard,
   Calendar,
@@ -30,6 +31,7 @@ import {
 } from '../../types';
 
 const SubscriptionManagementPage = () => {
+  const { t } = useTranslation('subscriptions');
   const navigate = useNavigate();
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showChangePlanModal, setShowChangePlanModal] = useState(false);
@@ -55,12 +57,12 @@ const SubscriptionManagementPage = () => {
     return (
       <div className="max-w-2xl mx-auto text-center py-12">
         <AlertCircle className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">No Active Subscription</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('subscriptions.noActiveSubscription')}</h2>
         <p className="text-gray-600 mb-6">
-          You don't have an active subscription. Choose a plan to get started.
+          {t('subscriptions.noActiveSubscriptionDescription')}
         </p>
         <Button variant="primary" onClick={() => navigate('/subscription/plans')}>
-          View Plans
+          {t('subscriptions.viewPlans')}
         </Button>
       </div>
     );
@@ -68,11 +70,11 @@ const SubscriptionManagementPage = () => {
 
   const getStatusBadge = (status: SubscriptionStatus) => {
     const statusConfig = {
-      [SubscriptionStatus.ACTIVE]: { variant: 'success' as const, label: 'Active' },
-      [SubscriptionStatus.TRIALING]: { variant: 'info' as const, label: 'Trial' },
-      [SubscriptionStatus.CANCELLED]: { variant: 'warning' as const, label: 'Cancelled' },
-      [SubscriptionStatus.EXPIRED]: { variant: 'danger' as const, label: 'Expired' },
-      [SubscriptionStatus.PAST_DUE]: { variant: 'danger' as const, label: 'Past Due' },
+      [SubscriptionStatus.ACTIVE]: { variant: 'success' as const, label: t('subscriptions.status.active') },
+      [SubscriptionStatus.TRIALING]: { variant: 'info' as const, label: t('subscriptions.status.trial') },
+      [SubscriptionStatus.CANCELLED]: { variant: 'warning' as const, label: t('subscriptions.status.cancelled') },
+      [SubscriptionStatus.EXPIRED]: { variant: 'danger' as const, label: t('subscriptions.status.expired') },
+      [SubscriptionStatus.PAST_DUE]: { variant: 'danger' as const, label: t('subscriptions.status.pastDue') },
     };
 
     const config = statusConfig[status] || { variant: 'default' as const, label: status };
@@ -81,11 +83,11 @@ const SubscriptionManagementPage = () => {
 
   const getInvoiceStatusBadge = (status: InvoiceStatus) => {
     const statusConfig = {
-      [InvoiceStatus.PAID]: { variant: 'success' as const, label: 'Paid' },
-      [InvoiceStatus.OPEN]: { variant: 'warning' as const, label: 'Open' },
-      [InvoiceStatus.DRAFT]: { variant: 'default' as const, label: 'Draft' },
-      [InvoiceStatus.VOID]: { variant: 'danger' as const, label: 'Void' },
-      [InvoiceStatus.UNCOLLECTIBLE]: { variant: 'danger' as const, label: 'Uncollectible' },
+      [InvoiceStatus.PAID]: { variant: 'success' as const, label: t('subscriptions.invoiceStatus.paid') },
+      [InvoiceStatus.OPEN]: { variant: 'warning' as const, label: t('subscriptions.invoiceStatus.open') },
+      [InvoiceStatus.DRAFT]: { variant: 'default' as const, label: t('subscriptions.invoiceStatus.draft') },
+      [InvoiceStatus.VOID]: { variant: 'danger' as const, label: t('subscriptions.invoiceStatus.void') },
+      [InvoiceStatus.UNCOLLECTIBLE]: { variant: 'danger' as const, label: t('subscriptions.invoiceStatus.uncollectible') },
     };
 
     const config = statusConfig[status] || { variant: 'default' as const, label: status };
@@ -157,11 +159,11 @@ const SubscriptionManagementPage = () => {
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Subscription</h1>
-          <p className="text-gray-600 mt-1">Manage your subscription plan and billing</p>
+          <h1 className="text-2xl font-bold text-gray-900">{t('subscriptions.title')}</h1>
+          <p className="text-gray-600 mt-1">{t('subscriptions.manageSubscription')}</p>
         </div>
         <Button variant="outline" onClick={() => navigate('/subscription/plans')}>
-          View All Plans
+          {t('subscriptions.viewAllPlans')}
         </Button>
       </div>
 
@@ -169,7 +171,7 @@ const SubscriptionManagementPage = () => {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Current Subscription</CardTitle>
+            <CardTitle>{t('subscriptions.currentSubscription')}</CardTitle>
             {getStatusBadge(currentSubscription.status)}
           </div>
         </CardHeader>
@@ -185,21 +187,21 @@ const SubscriptionManagementPage = () => {
                   <span className="text-gray-600">
                     ${Number(currentSubscription.amount).toFixed(2)} /{' '}
                     {currentSubscription.billingCycle === BillingCycle.MONTHLY
-                      ? 'month'
-                      : 'year'}
+                      ? t('subscriptions.month')
+                      : t('subscriptions.year')}
                   </span>
                 </div>
                 <div className="flex items-center text-sm">
                   <Calendar className="h-4 w-4 text-gray-400 mr-2" />
                   <span className="text-gray-600">
-                    Next billing: {formatDate(currentSubscription.currentPeriodEnd)}
+                    {t('subscriptions.nextBillingDate')}: {formatDate(currentSubscription.currentPeriodEnd)}
                   </span>
                 </div>
                 {currentSubscription.isTrialPeriod && currentSubscription.trialEnd && (
                   <div className="flex items-center text-sm">
                     <CheckCircle className="h-4 w-4 text-blue-500 mr-2" />
                     <span className="text-blue-600">
-                      Trial ends: {formatDate(currentSubscription.trialEnd)}
+                      {t('subscriptions.trialEnds')}: {formatDate(currentSubscription.trialEnd)}
                     </span>
                   </div>
                 )}
@@ -207,7 +209,7 @@ const SubscriptionManagementPage = () => {
                   <div className="flex items-center text-sm">
                     <AlertCircle className="h-4 w-4 text-orange-500 mr-2" />
                     <span className="text-orange-600">
-                      Cancels on: {formatDate(currentSubscription.currentPeriodEnd)}
+                      {t('subscriptions.cancelsOn')}: {formatDate(currentSubscription.currentPeriodEnd)}
                     </span>
                   </div>
                 )}
@@ -224,7 +226,7 @@ const SubscriptionManagementPage = () => {
                     onClick={() => setShowChangePlanModal(true)}
                   >
                     <RefreshCw className="h-4 w-4 mr-2" />
-                    Change Plan
+                    {t('changePlan')}
                   </Button>
                   {!currentSubscription.cancelAtPeriodEnd && (
                     <Button
@@ -233,7 +235,7 @@ const SubscriptionManagementPage = () => {
                       onClick={() => setShowCancelModal(true)}
                     >
                       <XCircle className="h-4 w-4 mr-2" />
-                      Cancel Subscription
+                      {t('cancelSubscription')}
                     </Button>
                   )}
                 </>
@@ -246,7 +248,7 @@ const SubscriptionManagementPage = () => {
                   isLoading={reactivateSubscription.isPending}
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
-                  Reactivate Subscription
+                  {t('reactivateSubscription')}
                 </Button>
               )}
             </div>
@@ -255,37 +257,37 @@ const SubscriptionManagementPage = () => {
           {/* Plan Features */}
           {currentPlan && (
             <div className="mt-6 pt-6 border-t">
-              <h4 className="font-semibold text-gray-900 mb-3">Plan Limits & Features</h4>
+              <h4 className="font-semibold text-gray-900 mb-3">{t('subscriptions.planLimitsFeatures')}</h4>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
-                  <p className="text-sm text-gray-500">Users</p>
+                  <p className="text-sm text-gray-500">{t('subscriptions.planLimits.users')}</p>
                   <p className="font-semibold">
                     {currentPlan.limits.maxUsers === -1
-                      ? 'Unlimited'
+                      ? t('subscriptions.unlimited')
                       : currentPlan.limits.maxUsers}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Tables</p>
+                  <p className="text-sm text-gray-500">{t('subscriptions.planLimits.tables')}</p>
                   <p className="font-semibold">
                     {currentPlan.limits.maxTables === -1
-                      ? 'Unlimited'
+                      ? t('subscriptions.unlimited')
                       : currentPlan.limits.maxTables}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Products</p>
+                  <p className="text-sm text-gray-500">{t('subscriptions.planLimits.products')}</p>
                   <p className="font-semibold">
                     {currentPlan.limits.maxProducts === -1
-                      ? 'Unlimited'
+                      ? t('subscriptions.unlimited')
                       : currentPlan.limits.maxProducts}
                   </p>
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Monthly Orders</p>
+                  <p className="text-sm text-gray-500">{t('subscriptions.planLimits.monthlyOrders')}</p>
                   <p className="font-semibold">
                     {currentPlan.limits.maxMonthlyOrders === -1
-                      ? 'Unlimited'
+                      ? t('subscriptions.unlimited')
                       : currentPlan.limits.maxMonthlyOrders}
                   </p>
                 </div>
@@ -298,7 +300,7 @@ const SubscriptionManagementPage = () => {
       {/* Billing History */}
       <Card>
         <CardHeader>
-          <CardTitle>Billing History</CardTitle>
+          <CardTitle>{t('subscriptions.billingHistory')}</CardTitle>
         </CardHeader>
         <CardContent>
           {invoicesLoading ? (
@@ -306,26 +308,26 @@ const SubscriptionManagementPage = () => {
               <Spinner />
             </div>
           ) : !invoices || invoices.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No invoices yet</p>
+            <p className="text-gray-500 text-center py-8">{t('subscriptions.noInvoicesYet')}</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Invoice
+                      {t('subscriptions.invoiceTable.invoice')}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
+                      {t('subscriptions.invoiceTable.date')}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Amount
+                      {t('subscriptions.invoiceTable.amount')}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
+                      {t('subscriptions.invoiceTable.status')}
                     </th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
+                      {t('subscriptions.invoiceTable.actions')}
                     </th>
                   </tr>
                 </thead>
@@ -353,7 +355,7 @@ const SubscriptionManagementPage = () => {
                             className="text-blue-600 hover:text-blue-800 inline-flex items-center"
                           >
                             <Download className="h-4 w-4 mr-1" />
-                            Download
+                            {t('subscriptions.download')}
                           </a>
                         )}
                       </td>
@@ -373,18 +375,16 @@ const SubscriptionManagementPage = () => {
           setShowCancelModal(false);
           setCancellationReason('');
         }}
-        title="Cancel Subscription"
+        title={t('subscriptions.cancelSubscription')}
       >
         <div className="space-y-4">
           <p className="text-gray-600">
-            Are you sure you want to cancel your subscription? You'll continue to have access until
-            the end of your current billing period on{' '}
-            <strong>{formatDate(currentSubscription.currentPeriodEnd)}</strong>.
+            {t('subscriptions.cancelConfirmWithDate', { date: formatDate(currentSubscription.currentPeriodEnd) })}
           </p>
 
           <div>
             <label htmlFor="cancellation-reason" className="block text-sm font-medium text-gray-700 mb-2">
-              Help us improve - Why are you cancelling? (Optional)
+              {t('subscriptions.cancelReasonLabel')}
             </label>
             <select
               id="cancellation-reason"
@@ -392,14 +392,14 @@ const SubscriptionManagementPage = () => {
               onChange={(e) => setCancellationReason(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="">Select a reason...</option>
-              <option value="Too expensive">Too expensive</option>
-              <option value="Missing features I need">Missing features I need</option>
-              <option value="Switching to competitor">Switching to competitor</option>
-              <option value="No longer needed">No longer needed</option>
-              <option value="Poor customer support">Poor customer support</option>
-              <option value="Technical issues">Technical issues</option>
-              <option value="Other">Other</option>
+              <option value="">{t('subscriptions.cancelReasons.select')}</option>
+              <option value="Too expensive">{t('subscriptions.cancelReasons.tooExpensive')}</option>
+              <option value="Missing features I need">{t('subscriptions.cancelReasons.missingFeatures')}</option>
+              <option value="Switching to competitor">{t('subscriptions.cancelReasons.switching')}</option>
+              <option value="No longer needed">{t('subscriptions.cancelReasons.noLongerNeeded')}</option>
+              <option value="Poor customer support">{t('subscriptions.cancelReasons.poorSupport')}</option>
+              <option value="Technical issues">{t('subscriptions.cancelReasons.technicalIssues')}</option>
+              <option value="Other">{t('subscriptions.cancelReasons.other')}</option>
             </select>
           </div>
 
@@ -411,14 +411,14 @@ const SubscriptionManagementPage = () => {
                 setCancellationReason('');
               }}
             >
-              Keep Subscription
+              {t('subscriptions.keepSubscription')}
             </Button>
             <Button
               variant="danger"
               onClick={handleCancelSubscription}
               isLoading={cancelSubscription.isPending}
             >
-              Cancel Subscription
+              {t('subscriptions.cancelSubscription')}
             </Button>
           </div>
         </div>
@@ -431,10 +431,10 @@ const SubscriptionManagementPage = () => {
           setShowChangePlanModal(false);
           setSelectedNewPlanId(null);
         }}
-        title="Change Plan"
+        title={t('subscriptions.changePlan')}
       >
         <div className="space-y-4">
-          <p className="text-gray-600">Select a new plan:</p>
+          <p className="text-gray-600">{t('subscriptions.selectNewPlan')}</p>
           <div className="space-y-2">
             {availablePlans.map((plan) => (
               <div
@@ -459,7 +459,7 @@ const SubscriptionManagementPage = () => {
                         : Number(plan.yearlyPrice).toFixed(2)}
                     </p>
                     <p className="text-xs text-gray-500">
-                      /{currentSubscription.billingCycle === BillingCycle.MONTHLY ? 'mo' : 'yr'}
+                      /{currentSubscription.billingCycle === BillingCycle.MONTHLY ? t('subscriptions.perMonthShort') : t('subscriptions.perYearShort')}
                     </p>
                   </div>
                 </div>
@@ -474,7 +474,7 @@ const SubscriptionManagementPage = () => {
                 setSelectedNewPlanId(null);
               }}
             >
-              Cancel
+              {t('common:app.cancel')}
             </Button>
             <Button
               variant="primary"
@@ -482,7 +482,7 @@ const SubscriptionManagementPage = () => {
               disabled={!selectedNewPlanId}
               isLoading={changePlan.isPending}
             >
-              Change Plan
+              {t('subscriptions.changePlan')}
             </Button>
           </div>
         </div>

@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -8,6 +9,7 @@ interface CartDrawerProps {
 }
 
 const CartDrawer = ({ isOpen, onClose, children }: CartDrawerProps) => {
+  const { t } = useTranslation('pos');
   // Prevent body scroll when drawer is open
   useEffect(() => {
     if (isOpen) {
@@ -52,11 +54,11 @@ const CartDrawer = ({ isOpen, onClose, children }: CartDrawerProps) => {
         <div className="bg-white rounded-t-2xl shadow-2xl h-full flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-            <h2 className="text-lg font-bold text-gray-900">Your Order</h2>
+            <h2 className="text-lg font-bold text-gray-900">{t('cart.yourOrder')}</h2>
             <button
               onClick={onClose}
               className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-              aria-label="Close cart"
+              aria-label={t('cart.closeCart')}
             >
               <X className="h-5 w-5 text-gray-600" />
             </button>

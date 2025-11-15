@@ -1,4 +1,4 @@
-import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
@@ -23,6 +23,9 @@ import { SettingsModule } from './modules/settings/settings.module';
 import { ContactModule } from './modules/contact/contact.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { CustomersModule } from './modules/customers/customers.module';
+import { ModifiersModule } from './modules/modifiers/modifiers.module';
+import { CustomerOrdersModule } from './modules/customer-orders/customer-orders.module';
+import { DesktopAppModule } from './modules/desktop-app/desktop-app.module';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './common/middleware/input-sanitizer.middleware';
 
@@ -69,6 +72,9 @@ import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './co
     ContactModule,
     NotificationsModule,
     CustomersModule,
+    ModifiersModule,
+    CustomerOrdersModule,
+    DesktopAppModule,
   ],
   controllers: [AppController],
   providers: [
@@ -85,9 +91,14 @@ export class AppModule implements NestModule {
     // Apply request logger to all routes
     consumer.apply(RequestLoggerMiddleware).forRoutes('*');
 
-    // Apply input sanitization to all routes
+    // Apply SQL injection check BEFORE sanitization (so URLs aren't escaped yet)
+    // Exclude desktop CI endpoints from input sanitization (they use API key auth and need raw URLs)
     consumer
-      .apply(InputSanitizerMiddleware, SqlInjectionPreventionMiddleware)
+      .apply(SqlInjectionPreventionMiddleware, InputSanitizerMiddleware)
+      .exclude(
+        { path: 'desktop/ci/releases', method: RequestMethod.POST },
+        { path: 'desktop/ci/releases/:id/publish', method: RequestMethod.POST },
+      )
       .forRoutes('*');
   }
 }

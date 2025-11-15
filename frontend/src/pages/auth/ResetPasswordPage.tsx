@@ -3,30 +3,32 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useResetPassword } from '../../features/auth/authApi';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 
-const resetPasswordSchema = z
-  .object({
-    newPassword: z.string().min(8, 'Password must be at least 8 characters'),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.newPassword === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ['confirmPassword'],
-  });
-
-type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
-
 const ResetPasswordPage = () => {
+  const { t } = useTranslation(['auth', 'validation']);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
   const [resetSuccess, setResetSuccess] = useState(false);
 
   const { mutate: resetPassword, isPending } = useResetPassword();
+
+  const resetPasswordSchema = z
+    .object({
+      newPassword: z.string().min(8, t('validation:minLength', { count: 8 })),
+      confirmPassword: z.string(),
+    })
+    .refine((data) => data.newPassword === data.confirmPassword, {
+      message: t('auth:resetPassword.passwordMismatch'),
+      path: ['confirmPassword'],
+    });
+
+  type ResetPasswordFormData = z.infer<typeof resetPasswordSchema>;
 
   const {
     register,
@@ -65,7 +67,7 @@ const ResetPasswordPage = () => {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle className="text-center text-2xl">Password Reset Successful</CardTitle>
+            <CardTitle className="text-center text-2xl">{t('auth:resetPassword.passwordReset')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -86,15 +88,15 @@ const ResetPasswordPage = () => {
                   </svg>
                 </div>
                 <p className="text-gray-600 mb-4">
-                  Your password has been successfully reset.
+                  {t('auth:resetPassword.passwordResetMessage')}
                 </p>
                 <p className="text-sm text-gray-500 mb-6">
-                  Redirecting to login page...
+                  {t('auth:resetPassword.redirecting')}
                 </p>
               </div>
 
               <Link to="/login">
-                <Button className="w-full">Go to Login</Button>
+                <Button className="w-full">{t('auth:resetPassword.goToLogin')}</Button>
               </Link>
             </div>
           </CardContent>
@@ -111,43 +113,43 @@ const ResetPasswordPage = () => {
     <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-center text-2xl">Reset Password</CardTitle>
+          <CardTitle className="text-center text-2xl">{t('auth:resetPassword.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div className="text-center mb-4">
               <p className="text-gray-600 text-sm">
-                Please enter your new password below.
+                {t('auth:resetPassword.description')}
               </p>
             </div>
 
             <Input
-              label="New Password"
+              label={t('auth:resetPassword.newPassword')}
               type="password"
-              placeholder="Enter new password"
+              placeholder={t('auth:resetPassword.newPassword')}
               error={errors.newPassword?.message}
               {...register('newPassword')}
             />
 
             <Input
-              label="Confirm Password"
+              label={t('auth:resetPassword.confirmPassword')}
               type="password"
-              placeholder="Confirm new password"
+              placeholder={t('auth:resetPassword.confirmPassword')}
               error={errors.confirmPassword?.message}
               {...register('confirmPassword')}
             />
 
             <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800">
-              <p className="font-medium mb-1">Password Requirements:</p>
+              <p className="font-medium mb-1">{t('auth:resetPassword.requirements')}</p>
               <ul className="list-disc list-inside space-y-1 text-xs">
-                <li>At least 8 characters long</li>
-                <li>Mix of uppercase and lowercase letters recommended</li>
-                <li>Include numbers and special characters for better security</li>
+                <li>{t('auth:resetPassword.requirement1')}</li>
+                <li>{t('auth:resetPassword.requirement2')}</li>
+                <li>{t('auth:resetPassword.requirement3')}</li>
               </ul>
             </div>
 
             <Button type="submit" className="w-full" isLoading={isPending}>
-              Reset Password
+              {t('auth:resetPassword.submit')}
             </Button>
 
             <div className="text-center text-sm">

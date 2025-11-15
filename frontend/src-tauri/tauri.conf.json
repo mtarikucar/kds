@@ -1,7 +1,7 @@
 {
-  "productName": "KDS POS",
+  "productName": "HummyTummy",
   "version": "1.0.0",
-  "identifier": "com.kds.pos",
+  "identifier": "com.hummytummy.app",
   "build": {
     "beforeDevCommand": "",
     "devUrl": "http://localhost:5174",
@@ -11,7 +11,7 @@
   "app": {
     "windows": [
       {
-        "title": "KDS POS",
+        "title": "HummyTummy",
         "width": 1280,
         "height": 800,
         "minWidth": 1024,
@@ -30,7 +30,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all",
+    "targets": ["msi", "nsis", "appimage"],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -39,14 +39,30 @@
       "icons/icon.ico"
     ],
     "category": "Business",
-    "shortDescription": "Restaurant POS System",
-    "longDescription": "Professional Restaurant POS and Kitchen Display System",
-    "copyright": "Copyright (c) 2024. All rights reserved.",
+    "shortDescription": "HummyTummy - Restaurant Management System",
+    "longDescription": "HummyTummy - Professional Restaurant Management and Kitchen Display System",
+    "copyright": "Copyright (c) 2024 HummyTummy. All rights reserved.",
     "windows": {
       "certificateThumbprint": null,
       "digestAlgorithm": "sha256",
-      "timestampUrl": ""
+      "timestampUrl": "",
+      "wix": {},
+      "nsis": {}
+    },
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": false
+      }
     }
   },
-  "plugins": {}
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://hummytummy.com/api/desktop/updates/{{target}}/{{current_version}}"
+      ],
+      "dialog": true,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERDMTNDN0ExMzA4NEU2RUMKUldUczVvUXdvY2NUM0RvUlVmSlZSREQ2NlFPUG1YWXJkOERIbjNqUDcxRmxaSDN3ekdJZnkxMU0K"
+    }
+  }
 }

@@ -20,7 +20,7 @@ export class AppService {
     const checks: any = {
       status: 'ok',
       timestamp,
-      service: 'Restaurant POS API',
+      service: 'HummyTummy API',
       version: '1.0.0',
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development',

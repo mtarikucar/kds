@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
@@ -7,6 +8,9 @@ import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 import ProfilePage from './pages/profile/ProfilePage';
 import CustomersPage from './pages/customers/CustomersPage';
 import QRMenuPage from './pages/qr-menu/QRMenuPage';
+import CartPage from './pages/qr-menu/CartPage';
+import OrderTrackingPage from './pages/qr-menu/OrderTrackingPage';
+import LoyaltyPage from './pages/qr-menu/LoyaltyPage';
 import { LandingPage } from './pages/LandingPage';
 import DashboardPage from './pages/DashboardPage';
 import POSPage from './pages/pos/POSPage';
@@ -22,12 +26,42 @@ import SettingsLayout from './pages/settings/SettingsLayout';
 import POSSettingsPage from './pages/settings/POSSettingsPage';
 import SubscriptionSettingsPage from './pages/settings/SubscriptionSettingsPage';
 import IntegrationsSettingsPage from './pages/settings/IntegrationsSettingsPage';
+import DesktopAppSettingsPage from './pages/settings/DesktopAppSettingsPage';
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import { UpdateDialog } from './components/UpdateDialog';
+import { useAutoUpdate } from './hooks/useAutoUpdate';
+import { useNotificationSocket } from './features/notifications/notificationsApi';
+import { useAuthStore } from './store/authStore';
 
 function App() {
+  const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+  const isAuthenticated = useAuthStore((state) => !!state.accessToken);
+
+  // Auto-update hook - check for updates on app startup
+  const updateState = useAutoUpdate(true);
+
+  // Initialize WebSocket for real-time notifications (only when authenticated)
+  if (isAuthenticated) {
+    useNotificationSocket();
+  }
+
+  // Show update dialog when update is available
+  if (updateState.available && !showUpdateDialog) {
+    setShowUpdateDialog(true);
+  }
+
+  const handleUpdate = () => {
+    updateState.downloadAndInstall();
+  };
+
+  const handleDismiss = () => {
+    setShowUpdateDialog(false);
+  };
+
   return (
-    <Routes>
+    <>
+      <Routes>
       {/* Public Routes */}
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<LoginPage />} />
@@ -36,6 +70,9 @@ function App() {
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/qr-menu/:tenantId" element={<QRMenuPage />} />
+      <Route path="/qr-menu/:tenantId/cart" element={<CartPage />} />
+      <Route path="/qr-menu/:tenantId/orders" element={<OrderTrackingPage />} />
+      <Route path="/qr-menu/:tenantId/loyalty" element={<LoyaltyPage />} />
 
       {/* Protected Routes */}
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
@@ -53,6 +90,7 @@ function App() {
           <Route index element={<Navigate to="/admin/settings/subscription" replace />} />
           <Route path="subscription" element={<SubscriptionSettingsPage />} />
           <Route path="pos" element={<POSSettingsPage />} />
+          <Route path="desktop" element={<DesktopAppSettingsPage />} />
           <Route path="integrations" element={<IntegrationsSettingsPage />} />
         </Route>
 
@@ -69,6 +107,20 @@ function App() {
         <Route path="/customers" element={<CustomersPage />} />
       </Route>
     </Routes>
+
+      {/* Update Dialog */}
+      {showUpdateDialog && (
+        <UpdateDialog
+          available={updateState.available}
+          version={updateState.version}
+          currentVersion={updateState.currentVersion}
+          downloading={updateState.downloading}
+          error={updateState.error}
+          onUpdate={handleUpdate}
+          onDismiss={handleDismiss}
+        />
+      )}
+    </>
   );
 }
 

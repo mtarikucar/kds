@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useTranslation } from 'react-i18next';
 import { Plus, Edit, Trash2 } from 'lucide-react';
 import {
   useTables,
@@ -19,15 +20,16 @@ import Badge from '../../components/ui/Badge';
 import Spinner from '../../components/ui/Spinner';
 // import { getStatusColor } from '../../lib/utils';
 
-const tableSchema = z.object({
-  number: z.string().min(1, 'Table number is required'),
-  capacity: z.number().min(1, 'Capacity must be at least 1'),
-  status: z.nativeEnum(TableStatus),
-});
-
-type TableFormData = z.infer<typeof tableSchema>;
-
 const TableManagementPage = () => {
+  const { t } = useTranslation('common');
+
+  const tableSchema = z.object({
+    number: z.string().min(1, t('admin.tableNumberRequired')),
+    capacity: z.number().min(1, t('admin.capacityMin')),
+    status: z.nativeEnum(TableStatus),
+  });
+
+  type TableFormData = z.infer<typeof tableSchema>;
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
 
@@ -93,9 +95,9 @@ const TableManagementPage = () => {
   };
 
   const statusOptions = [
-    { value: TableStatus.AVAILABLE, label: 'Available' },
-    { value: TableStatus.OCCUPIED, label: 'Occupied' },
-    { value: TableStatus.RESERVED, label: 'Reserved' },
+    { value: TableStatus.AVAILABLE, label: t('admin.available') },
+    { value: TableStatus.OCCUPIED, label: t('admin.occupied') },
+    { value: TableStatus.RESERVED, label: t('admin.reserved') },
   ];
 
   const getStatusVariant = (status: TableStatus) => {
@@ -111,22 +113,35 @@ const TableManagementPage = () => {
     }
   };
 
+  const getStatusLabel = (status: TableStatus) => {
+    switch (status) {
+      case TableStatus.AVAILABLE:
+        return t('admin.available');
+      case TableStatus.OCCUPIED:
+        return t('admin.occupied');
+      case TableStatus.RESERVED:
+        return t('admin.reserved');
+      default:
+        return String(status);
+    }
+  };
+
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Table Management</h1>
-          <p className="text-gray-600">Manage restaurant tables and seating</p>
+          <h1 className="text-3xl font-bold text-gray-900">{t('admin.tableManagement')}</h1>
+          <p className="text-gray-600">{t('admin.manageTablesSeating')}</p>
         </div>
         <Button onClick={() => handleOpenModal()}>
           <Plus className="h-4 w-4 mr-2" />
-          Add Table
+          {t('admin.addTable')}
         </Button>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Tables</CardTitle>
+          <CardTitle>{t('admin.tables')}</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -140,13 +155,13 @@ const TableManagementPage = () => {
                 >
                   <div className="text-center mb-3">
                     <div className="text-2xl font-bold mb-2">
-                      Table {table.number}
+                      {t('admin.table')} {table.number}
                     </div>
-                    <Badge variant={getStatusVariant(table.status)}>
-                      {table.status}
+                    <Badge variant={getStatusVariant(table.status as TableStatus)}>
+                      {getStatusLabel(table.status as TableStatus)}
                     </Badge>
                     <div className="text-sm text-gray-600 mt-2">
-                      Capacity: {table.capacity} people
+                      {t('admin.capacity')}: {table.capacity} {t('admin.people')}
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -157,13 +172,13 @@ const TableManagementPage = () => {
                       onClick={() => handleOpenModal(table)}
                     >
                       <Edit className="h-4 w-4 mr-1" />
-                      Edit
+                      {t('app.edit')}
                     </Button>
                     <Button
                       variant="danger"
                       size="sm"
                       onClick={() => {
-                        if (confirm('Delete this table?')) {
+                        if (confirm(t('admin.deleteTableConfirm'))) {
                           deleteTable(table.id);
                         }
                       }}
@@ -182,27 +197,30 @@ const TableManagementPage = () => {
       <Modal
         isOpen={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editingTable ? 'Edit Table' : 'Add Table'}
+        title={editingTable ? t('admin.editTable') : t('admin.addTable')}
       >
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
           <Input
-            label="Table Number"
-            placeholder="e.g., 1, 2, A1, B2"
+            label={t('admin.tableNumber')}
+            placeholder={t('admin.tableNumberPlaceholder')}
             error={form.formState.errors.number?.message}
             {...form.register('number')}
           />
           <Input
-            label="Capacity"
+            label={t('admin.capacity')}
             type="number"
             min="1"
             error={form.formState.errors.capacity?.message}
             {...form.register('capacity', { valueAsNumber: true })}
           />
+          {/* @ts-ignore: Pass props via any spread to avoid TS mismatch with custom Select */}
           <Select
-            label="Status"
-            options={statusOptions}
-            error={form.formState.errors.status?.message}
-            {...form.register('status')}
+            {...({
+              label: t('admin.status'),
+              options: statusOptions,
+              error: form.formState.errors.status?.message,
+              ...form.register('status'),
+            } as any)}
           />
           <div className="flex gap-3">
             <Button
@@ -211,10 +229,10 @@ const TableManagementPage = () => {
               className="flex-1"
               onClick={() => setModalOpen(false)}
             >
-              Cancel
+              {t('app.cancel')}
             </Button>
             <Button type="submit" className="flex-1">
-              {editingTable ? 'Update' : 'Create'}
+              {editingTable ? t('app.update') : t('app.create')}
             </Button>
           </div>
         </form>

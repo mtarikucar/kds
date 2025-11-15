@@ -26,7 +26,7 @@ export class NotificationService {
 
   private initializeTransporter() {
     const emailConfig = {
-      host: this.configService.get('EMAIL_HOST', 'smtp.gmail.com'),
+      host: this.configService.get('EMAIL_HOST', 'smtpout.secureserver.net'),
       port: this.configService.get('EMAIL_PORT', 587),
       secure: this.configService.get('EMAIL_SECURE', false),
       auth: {
@@ -83,7 +83,7 @@ export class NotificationService {
     } catch (error) {
       this.logger.error(`Failed to render template ${templateName}: ${error.message}`);
       // Return a simple fallback template
-      return `<p>${context.message || 'Notification from Restaurant POS'}</p>`;
+      return `<p>${context.message || 'Notification from HummyTummy'}</p>`;
     }
   }
 

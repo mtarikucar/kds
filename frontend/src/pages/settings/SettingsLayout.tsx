@@ -1,27 +1,35 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { Settings, CreditCard, Monitor, Plug } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Settings, CreditCard, Monitor, Plug, Download } from 'lucide-react';
 
 const SettingsLayout = () => {
+  const { t } = useTranslation('settings');
   const location = useLocation();
 
   const settingsNavItems = [
     {
       to: '/admin/settings/subscription',
       icon: CreditCard,
-      label: 'Subscription',
-      description: 'Manage your subscription plan and billing',
+      label: t('subscription'),
+      description: t('subscriptionDesc'),
     },
     {
       to: '/admin/settings/pos',
       icon: Monitor,
-      label: 'POS Settings',
-      description: 'Configure POS operation modes',
+      label: t('pos'),
+      description: t('posDesc'),
+    },
+    {
+      to: '/admin/settings/desktop',
+      icon: Download,
+      label: t('desktopApp'),
+      description: t('desktopAppMenuDesc'),
     },
     {
       to: '/admin/settings/integrations',
       icon: Plug,
-      label: 'Integrations',
-      description: 'Connect third-party services and APIs',
+      label: t('integrationsLabel'),
+      description: t('integrationsDesc'),
     },
   ];
 
@@ -32,10 +40,10 @@ const SettingsLayout = () => {
         <div className="mb-6">
           <div className="flex items-center gap-3 mb-2">
             <Settings className="h-6 w-6 text-gray-700" />
-            <h2 className="text-xl font-bold text-gray-900">Settings</h2>
+            <h2 className="text-xl font-bold text-gray-900">{t('title')}</h2>
           </div>
           <p className="text-sm text-gray-600">
-            Manage your system configuration
+            {t('manageConfiguration')}
           </p>
         </div>
 
@@ -70,8 +78,7 @@ const SettingsLayout = () => {
 
         <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
           <p className="text-sm text-blue-800">
-            <strong>Tip:</strong> Changes to settings take effect immediately.
-            Make sure to test after making changes.
+            <strong>{t('tip')}:</strong> {t('tipDescription')}
           </p>
         </div>
       </div>

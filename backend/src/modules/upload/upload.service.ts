@@ -15,6 +15,7 @@ import { randomUUID } from 'crypto';
 export class UploadService {
   private readonly logger = new Logger(UploadService.name);
   private readonly uploadsDir: string;
+  private readonly baseUrl: string;
   private readonly maxFileSize = 5 * 1024 * 1024; // 5MB
   private readonly allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -23,6 +24,10 @@ export class UploadService {
     private readonly configService: ConfigService,
   ) {
     this.uploadsDir = path.join(process.cwd(), 'uploads', 'products');
+    // Get base URL from environment or construct from FRONTEND_URL
+    this.baseUrl = this.configService.get('BACKEND_URL') ||
+                   this.configService.get('FRONTEND_URL') ||
+                   'http://localhost:3000';
     this.ensureUploadDir();
   }
 
@@ -81,10 +86,11 @@ export class UploadService {
 
       await fs.writeFile(filePath, optimizedBuffer);
 
-      // Save to database
+      // Save to database with absolute URL
+      const absoluteUrl = `${this.baseUrl}/${relativePath}`;
       const productImage = await this.prisma.productImage.create({
         data: {
-          url: `/${relativePath}`,
+          url: absoluteUrl,
           filename: file.originalname,
           size: optimizedBuffer.length,
           mimeType: file.mimetype,
@@ -135,7 +141,9 @@ export class UploadService {
     }
 
     // Delete file from filesystem
-    const filePath = path.join(process.cwd(), image.url);
+    // Extract relative path from absolute URL
+    const urlPath = image.url.replace(this.baseUrl, '');
+    const filePath = path.join(process.cwd(), urlPath);
     try {
       await fs.unlink(filePath);
     } catch (error) {

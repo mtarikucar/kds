@@ -1,15 +1,18 @@
 import { LogOut, User, Menu } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../store/authStore';
 import { useLogout } from '../../features/auth/authApi';
 import Button from '../ui/Button';
 import NotificationCenter from '../NotificationCenter';
+import LanguageSwitcher from '../LanguageSwitcher';
 
 interface HeaderProps {
   onMenuClick: () => void;
 }
 
 const Header = ({ onMenuClick }: HeaderProps) => {
+  const { t } = useTranslation('common');
   const user = useAuthStore((state) => state.user);
   const { mutate: logout, isPending } = useLogout();
 
@@ -26,10 +29,13 @@ const Header = ({ onMenuClick }: HeaderProps) => {
             <Menu className="h-6 w-6" />
           </button>
 
-          <h1 className="text-xl md:text-2xl font-bold text-gray-900">Restaurant POS</h1>
+          <h1 className="text-xl md:text-2xl font-bold text-gray-900">{t('app.name')}</h1>
         </div>
 
         <div className="flex items-center gap-2 md:gap-4">
+          {/* Language Switcher */}
+          <LanguageSwitcher />
+
           {/* Notification Center */}
           <NotificationCenter />
 
@@ -54,7 +60,7 @@ const Header = ({ onMenuClick }: HeaderProps) => {
             className="hidden sm:flex"
           >
             <LogOut className="h-4 w-4 mr-2" />
-            Logout
+            {t('app.logout')}
           </Button>
 
           {/* Mobile logout button - icon only */}

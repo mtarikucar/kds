@@ -64,8 +64,8 @@ async function bootstrap() {
 
   // Swagger documentation
   const config = new DocumentBuilder()
-    .setTitle('Restaurant POS API')
-    .setDescription('Cloud-based restaurant management and POS system')
+    .setTitle('HummyTummy API')
+    .setDescription('Cloud-based restaurant management system')
     .setVersion('1.0')
     .addBearerAuth()
     .addTag('auth', 'Authentication endpoints')

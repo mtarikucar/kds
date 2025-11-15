@@ -76,6 +76,13 @@ export class PaymentsService {
 
       // If fully paid, update order status and deduct stock
       if (totalPaidAmount >= orderAmount) {
+        // Prevent payment for orders awaiting approval
+        if (order.requiresApproval && order.status === OrderStatus.PENDING_APPROVAL) {
+          throw new BadRequestException(
+            'Order requires approval before payment can be processed. Please approve the order first.'
+          );
+        }
+
         await tx.order.update({
           where: { id: orderId },
           data: {

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import {
   LayoutDashboard,
   ShoppingCart,
@@ -13,10 +14,12 @@ import {
   UserCircle,
   ChevronDown,
   ChevronRight,
+  ChevronLeft,
   X,
 } from 'lucide-react';
 import { UserRole } from '../../types';
 import { useAuthStore } from '../../store/authStore';
+import { useUiStore } from '../../store/uiStore';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -24,8 +27,10 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
+  const { t } = useTranslation('common');
   const user = useAuthStore((state) => state.user);
   const location = useLocation();
+  const { isSidebarCollapsed, toggleSidebar } = useUiStore();
   const [settingsOpen, setSettingsOpen] = useState(
     location.pathname.startsWith('/admin/settings')
   );
@@ -41,55 +46,55 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
     {
       to: '/dashboard',
       icon: LayoutDashboard,
-      label: 'Dashboard',
+      label: t('navigation.dashboard'),
       roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER, UserRole.KITCHEN, UserRole.COURIER],
     },
     {
       to: '/pos',
       icon: ShoppingCart,
-      label: 'POS',
+      label: t('navigation.pos'),
       roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER],
     },
     {
       to: '/kitchen',
       icon: ChefHat,
-      label: 'Kitchen Display',
+      label: t('navigation.kitchen'),
       roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN],
     },
     {
       to: '/admin/menu',
       icon: UtensilsCrossed,
-      label: 'Menu Management',
+      label: t('navigation.menu'),
       roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
     {
       to: '/admin/tables',
       icon: Table,
-      label: 'Table Management',
+      label: t('navigation.tables'),
       roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
     {
       to: '/admin/users',
       icon: Users,
-      label: 'User Management',
+      label: t('navigation.users'),
       roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
     {
       to: '/customers',
       icon: UserCircle,
-      label: 'Customers',
+      label: t('navigation.customers'),
       roles: ['ADMIN', 'MANAGER', 'WAITER'],
     },
     {
       to: '/admin/qr-codes',
       icon: QrCode,
-      label: 'QR Codes',
+      label: t('navigation.qrCodes'),
       roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
     {
       to: '/admin/reports',
       icon: BarChart3,
-      label: 'Reports',
+      label: t('navigation.reports'),
       roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
   ];
@@ -97,15 +102,15 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const settingsItems = [
     {
       to: '/admin/settings/subscription',
-      label: 'Subscription',
+      label: t('navigation.subscription'),
     },
     {
       to: '/admin/settings/pos',
-      label: 'POS Settings',
+      label: t('settings:pos'),
     },
     {
       to: '/admin/settings/integrations',
-      label: 'Integrations',
+      label: t('settings:integrationsLabel'),
     },
   ];
 
@@ -115,19 +120,29 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
 
   return (
     <aside
-      className={`fixed md:static inset-y-0 left-0 z-50 w-64 bg-gray-900 text-white min-h-screen transform transition-transform duration-300 ease-in-out ${
+      className={`fixed md:static inset-y-0 left-0 z-50 bg-gray-900 text-white min-h-screen transform transition-all duration-300 ease-in-out ${
         isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-      }`}
+      } ${isSidebarCollapsed ? 'md:w-16' : 'md:w-64'} w-64`}
     >
       <div className="p-6 flex items-center justify-between">
-        <h2 className="text-xl font-bold">Restaurant POS</h2>
-        {/* Close button for mobile */}
+        {!isSidebarCollapsed && <h2 className="text-xl font-bold">Restaurant POS</h2>}
+        {isSidebarCollapsed && <div className="w-full" />}
+        {/* Mobile close button */}
         <button
           onClick={onClose}
           className="md:hidden text-gray-400 hover:text-white"
           aria-label="Close menu"
         >
           <X className="h-6 w-6" />
+        </button>
+        {/* Desktop collapse toggle button */}
+        <button
+          onClick={toggleSidebar}
+          className="hidden md:block text-gray-400 hover:text-white"
+          aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={isSidebarCollapsed ? t('navigation.expandSidebar') : t('navigation.collapseSidebar')}
+        >
+          {isSidebarCollapsed ? <ChevronRight className="h-6 w-6" /> : <ChevronLeft className="h-6 w-6" />}
         </button>
       </div>
 
@@ -142,11 +157,12 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
                 isActive
                   ? 'bg-blue-600 text-white'
                   : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-              }`
+              } ${isSidebarCollapsed ? 'justify-center' : ''}`
             }
+            title={isSidebarCollapsed ? item.label : undefined}
           >
             <item.icon className="h-5 w-5" />
-            <span className="font-medium">{item.label}</span>
+            {!isSidebarCollapsed && <span className="font-medium">{item.label}</span>}
           </NavLink>
         ))}
 
@@ -154,23 +170,28 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
         {(user?.role === UserRole.ADMIN || user?.role === UserRole.MANAGER) && (
           <div className="mt-1">
             <button
-              onClick={() => setSettingsOpen(!settingsOpen)}
+              onClick={() => !isSidebarCollapsed && setSettingsOpen(!settingsOpen)}
               className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
                 location.pathname.startsWith('/admin/settings')
                   ? 'bg-blue-600 text-white'
                   : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-              }`}
+              } ${isSidebarCollapsed ? 'justify-center' : ''}`}
+              title={isSidebarCollapsed ? t('navigation.settings') : undefined}
             >
               <Settings className="h-5 w-5" />
-              <span className="font-medium flex-1 text-left">Settings</span>
-              {settingsOpen ? (
-                <ChevronDown className="h-4 w-4" />
-              ) : (
-                <ChevronRight className="h-4 w-4" />
+              {!isSidebarCollapsed && (
+                <>
+                  <span className="font-medium flex-1 text-left">{t('navigation.settings')}</span>
+                  {settingsOpen ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </>
               )}
             </button>
 
-            {settingsOpen && (
+            {!isSidebarCollapsed && settingsOpen && (
               <div className="ml-4 mt-1 space-y-1">
                 {settingsItems.map((item) => (
                   <NavLink

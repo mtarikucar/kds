@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { DeviceStatus, DeviceType } from '@/types/hardware';
 import { DeviceStatusIndicator } from './DeviceStatusIndicator';
 import { HardwareService } from '@/lib/tauri';
@@ -32,6 +33,7 @@ export function HardwareDeviceCard({
   onDelete,
   onTest,
 }: HardwareDeviceCardProps) {
+  const { t } = useTranslation(['settings', 'common']);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
 
@@ -85,16 +87,16 @@ export function HardwareDeviceCard({
   };
 
   const formatLastActivity = (lastActivity?: string) => {
-    if (!lastActivity) return 'Never';
+    if (!lastActivity) return t('settings.hardware.lastActivity.never');
     const date = new Date(lastActivity);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
-    return `${Math.floor(diffMins / 1440)}d ago`;
+    if (diffMins < 1) return t('settings.hardware.lastActivity.justNow');
+    if (diffMins < 60) return t('settings.hardware.lastActivity.minutesAgo', { count: diffMins });
+    if (diffMins < 1440) return t('settings.hardware.lastActivity.hoursAgo', { count: Math.floor(diffMins / 60) });
+    return t('settings.hardware.lastActivity.daysAgo', { count: Math.floor(diffMins / 1440) });
   };
 
   return (
@@ -106,7 +108,7 @@ export function HardwareDeviceCard({
           </div>
           <div>
             <CardTitle className="text-lg">{device.name}</CardTitle>
-            <CardDescription>{device.device_type.replace('_', ' ')}</CardDescription>
+            <CardDescription>{t(`settings.integrationTypes.${device.device_type}`)}</CardDescription>
           </div>
         </div>
         <DropdownMenu>
@@ -117,16 +119,16 @@ export function HardwareDeviceCard({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={() => onEdit?.(device.id)}>
-              Edit Configuration
+              {t('settings.hardware.editConfiguration')}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleTest} disabled={isTesting}>
-              {isTesting ? 'Testing...' : 'Test Device'}
+              {isTesting ? t('settings.hardware.testing') : t('settings.hardware.testDevice')}
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => onDelete?.(device.id)}
               className="text-red-600"
             >
-              Delete Device
+              {t('settings.hardware.deleteDevice')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -134,7 +136,7 @@ export function HardwareDeviceCard({
 
       <CardContent className="space-y-2">
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Status:</span>
+          <span className="text-sm text-muted-foreground">{t('settings.hardware.statusLabel')}</span>
           <DeviceStatusIndicator
             connectionStatus={device.connection_status}
             health={device.health}
@@ -143,7 +145,7 @@ export function HardwareDeviceCard({
         </div>
 
         <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">Last Activity:</span>
+          <span className="text-sm text-muted-foreground">{t('settings.hardware.lastActivity.label')}</span>
           <span className="text-sm">{formatLastActivity(device.last_activity)}</span>
         </div>
 
@@ -162,7 +164,7 @@ export function HardwareDeviceCard({
             onClick={handleDisconnect}
             disabled={isConnecting}
           >
-            {isConnecting ? 'Disconnecting...' : 'Disconnect'}
+            {isConnecting ? t('settings.hardware.disconnecting') : t('common:buttons.disconnect')}
           </Button>
         ) : (
           <Button
@@ -171,7 +173,7 @@ export function HardwareDeviceCard({
             onClick={handleConnect}
             disabled={isConnecting}
           >
-            {isConnecting ? 'Connecting...' : 'Connect'}
+            {isConnecting ? t('settings.hardware.connecting') : t('common:buttons.connect')}
           </Button>
         )}
       </CardFooter>

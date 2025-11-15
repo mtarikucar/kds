@@ -39,13 +39,13 @@ services:
     networks:
       - kds_network
 
-  # Backend API (NestJS) - Production
-  backend:
+  # Backend API (NestJS) - Production Blue Environment
+  backend-blue:
     build:
       context: ./backend
       dockerfile: Dockerfile
       target: production
-    container_name: kds_backend_prod
+    container_name: kds_backend_blue
     restart: always
     depends_on:
       postgres:
@@ -62,6 +62,7 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-30d}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
       # Stripe Configuration (Production)
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
       STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
@@ -77,6 +78,8 @@ services:
       EMAIL_USER: ${EMAIL_USER}
       EMAIL_PASSWORD: ${EMAIL_PASSWORD}
       EMAIL_FROM: ${EMAIL_FROM}
+      # Desktop App CI/CD
+      DESKTOP_RELEASE_API_KEY: ${DESKTOP_RELEASE_API_KEY}
       # Subscription Settings
       DEFAULT_TRIAL_DAYS: ${DEFAULT_TRIAL_DAYS:-14}
       TRIAL_REMINDER_DAYS: ${TRIAL_REMINDER_DAYS:-3}
@@ -84,6 +87,7 @@ services:
       - '3000:3000'
     volumes:
       - invoice_storage:/app/storage
+      - uploads_storage:/app/uploads
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:3000/api/health']
       interval: 30s
@@ -93,8 +97,68 @@ services:
     networks:
       - kds_network
 
-  # Frontend (React) - Production
-  frontend:
+  # Backend API (NestJS) - Production Green Environment
+  backend-green:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: kds_backend_green
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-restaurant_pos_prod}
+      REDIS_URL: redis://redis:6379/2
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-30d}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      # Stripe Configuration (Production)
+      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
+      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
+      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
+      # Iyzico Configuration (Production)
+      IYZICO_API_KEY: ${IYZICO_API_KEY}
+      IYZICO_SECRET_KEY: ${IYZICO_SECRET_KEY}
+      IYZICO_BASE_URL: ${IYZICO_BASE_URL:-https://api.iyzipay.com}
+      # Email Configuration (Production)
+      EMAIL_HOST: ${EMAIL_HOST}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_SECURE: ${EMAIL_SECURE:-false}
+      EMAIL_USER: ${EMAIL_USER}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD}
+      EMAIL_FROM: ${EMAIL_FROM}
+      # Desktop App CI/CD
+      DESKTOP_RELEASE_API_KEY: ${DESKTOP_RELEASE_API_KEY}
+      # Subscription Settings
+      DEFAULT_TRIAL_DAYS: ${DEFAULT_TRIAL_DAYS:-14}
+      TRIAL_REMINDER_DAYS: ${TRIAL_REMINDER_DAYS:-3}
+    ports:
+      - '3001:3000'
+    volumes:
+      - invoice_storage:/app/storage
+      - uploads_storage:/app/uploads
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:3000/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - kds_network
+    profiles:
+      - green  # Only start with specific profile
+
+  # Frontend (React) - Production Blue Environment
+  frontend-blue:
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -102,12 +166,12 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
         VITE_STRIPE_PUBLISHABLE_KEY: ${VITE_STRIPE_PUBLISHABLE_KEY}
-    container_name: kds_frontend_prod
+    container_name: kds_frontend_blue
     restart: always
     depends_on:
-      - backend
+      - backend-blue
     ports:
-      - '80:80'
+      - '8080:80'
     healthcheck:
       test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:80']
       interval: 30s
@@ -117,10 +181,37 @@ services:
     networks:
       - kds_network
 
+  # Frontend (React) - Production Green Environment
+  frontend-green:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+        VITE_STRIPE_PUBLISHABLE_KEY: ${VITE_STRIPE_PUBLISHABLE_KEY}
+    container_name: kds_frontend_green
+    restart: always
+    depends_on:
+      - backend-green
+    ports:
+      - '8081:80'
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1:80']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - kds_network
+    profiles:
+      - green  # Only start with specific profile
+
 volumes:
   postgres_data:
   redis_data:
   invoice_storage:
+  uploads_storage:
 
 networks:
   kds_network:

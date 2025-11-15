@@ -5,33 +5,79 @@
 
 set -e
 
-BACKUP_DIR="/opt/kds/backups/database"
+# Determine script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+BACKUP_DIR="${PROJECT_ROOT}/backups/database"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 BACKUP_FILE="${BACKUP_DIR}/backup_${TIMESTAMP}.sql"
 
 # Create backup directory if it doesn't exist
 mkdir -p ${BACKUP_DIR}
 
-# Get database credentials from .env.production
-source /opt/kds/.env.production
+# Get database credentials
+# Try to get from DATABASE_URL first, then fallback to docker-compose defaults
+if [ -f "${PROJECT_ROOT}/.env.production" ]; then
+  source ${PROJECT_ROOT}/.env.production
+elif [ -f "${PROJECT_ROOT}/.env" ]; then
+  source ${PROJECT_ROOT}/.env
+fi
 
-# Extract database info from DATABASE_URL
-# Format: postgresql://user:password@host:port/database
-DB_URL=${DATABASE_URL}
-DB_USER=$(echo $DB_URL | sed -n 's/.*\/\/\([^:]*\):.*/\1/p')
-DB_PASS=$(echo $DB_URL | sed -n 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/p')
-DB_HOST=$(echo $DB_URL | sed -n 's/.*@\([^:]*\):.*/\1/p')
-DB_PORT=$(echo $DB_URL | sed -n 's/.*:\([0-9]*\)\/.*/\1/p')
-DB_NAME=$(echo $DB_URL | sed -n 's/.*\/\([^?]*\).*/\1/p')
+# If DATABASE_URL exists, parse it
+if [ ! -z "$DATABASE_URL" ]; then
+  # Extract database info from DATABASE_URL
+  # Format: postgresql://user:password@host:port/database
+  DB_URL=${DATABASE_URL}
+  DB_USER=$(echo $DB_URL | sed -n 's/.*\/\/\([^:]*\):.*/\1/p')
+  DB_PASS=$(echo $DB_URL | sed -n 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/p')
+  DB_HOST=$(echo $DB_URL | sed -n 's/.*@\([^:]*\):.*/\1/p')
+  DB_PORT=$(echo $DB_URL | sed -n 's/.*:\([0-9]*\)\/.*/\1/p')
+  DB_NAME=$(echo $DB_URL | sed -n 's/.*\/\([^?]*\).*/\1/p')
+else
+  # Use docker-compose defaults
+  DB_USER=${POSTGRES_USER:-postgres}
+  DB_PASS=${POSTGRES_PASSWORD:-postgres}
+  DB_HOST=${POSTGRES_HOST:-localhost}
+  DB_PORT=${POSTGRES_PORT:-5432}
+  DB_NAME=${POSTGRES_DB:-restaurant_pos_prod}
+fi
 
 echo "📦 Creating database backup..."
 echo "Database: ${DB_NAME}"
 echo "Host: ${DB_HOST}:${DB_PORT}"
 echo "Backup file: ${BACKUP_FILE}"
 
-# Create backup using pg_dump
-export PGPASSWORD=${DB_PASS}
-pg_dump -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} -F p -f ${BACKUP_FILE} ${DB_NAME}
+# Check if running in Docker environment
+if command -v docker &> /dev/null && docker ps | grep -q postgres; then
+  # Use docker exec to run pg_dump inside postgres container
+  # Match container to database name to avoid using wrong database
+  if [[ "$DB_NAME" == *"staging"* ]]; then
+    POSTGRES_CONTAINER='kds_postgres_staging'
+  else
+    # For production database, use production container
+    POSTGRES_CONTAINER='kds_postgres_prod'
+  fi
+
+  # Verify container exists and is running
+  if ! docker ps --format '{{.Names}}' | grep -q "^${POSTGRES_CONTAINER}$"; then
+    echo "❌ Error: Container ${POSTGRES_CONTAINER} is not running"
+    echo "Database: ${DB_NAME}"
+    echo "Please ensure the correct postgres container is running"
+    exit 1
+  fi
+
+  echo "Using Docker container: ${POSTGRES_CONTAINER}"
+
+  docker exec ${POSTGRES_CONTAINER} pg_dump -U ${DB_USER} -d ${DB_NAME} -F p > ${BACKUP_FILE}
+elif command -v pg_dump &> /dev/null; then
+  # Use local pg_dump
+  export PGPASSWORD=${DB_PASS}
+  pg_dump -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} -F p -f ${BACKUP_FILE} ${DB_NAME}
+else
+  echo "❌ Error: Neither Docker nor pg_dump available"
+  exit 1
+fi
 
 # Compress backup
 gzip ${BACKUP_FILE}

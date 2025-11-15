@@ -1,12 +1,16 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { PosSettingsService } from '../../pos-settings/pos-settings.service';
 import { Public } from '../../auth/decorators/public.decorator';
 
 @ApiTags('qr-menu')
 @Controller('qr-menu')
 export class QrMenuController {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private posSettingsService: PosSettingsService,
+  ) {}
 
   @Public()
   @Get(':tenantId')
@@ -75,6 +79,43 @@ export class QrMenuController {
               },
               orderBy: { order: 'asc' },
             },
+            modifierGroups: {
+              where: {
+                group: {
+                  isActive: true,
+                },
+              },
+              select: {
+                displayOrder: true,
+                group: {
+                  select: {
+                    id: true,
+                    name: true,
+                    displayName: true,
+                    description: true,
+                    selectionType: true,
+                    minSelections: true,
+                    maxSelections: true,
+                    isRequired: true,
+                    modifiers: {
+                      where: {
+                        isAvailable: true,
+                      },
+                      select: {
+                        id: true,
+                        name: true,
+                        displayName: true,
+                        description: true,
+                        priceAdjustment: true,
+                        displayOrder: true,
+                      },
+                      orderBy: { displayOrder: 'asc' },
+                    },
+                  },
+                },
+              },
+              orderBy: { displayOrder: 'asc' },
+            },
           },
           orderBy: { name: 'asc' },
         },
@@ -98,8 +139,12 @@ export class QrMenuController {
           filename: pi.image.filename,
           order: pi.order,
         })),
+        modifierGroups: product.modifierGroups.map(pmg => pmg.group),
       })),
     }));
+
+    // Get POS settings to check if customer ordering is enabled
+    const posSettings = await this.posSettingsService.findByTenant(tenantId);
 
     return {
       tenant: {
@@ -123,6 +168,8 @@ export class QrMenuController {
         layoutStyle: settings.layoutStyle,
         itemsPerRow: settings.itemsPerRow,
       },
+      enableCustomerOrdering: posSettings.enableCustomerOrdering,
+      enableTablelessMode: posSettings.enableTablelessMode,
       categories: transformedCategories,
     };
   }

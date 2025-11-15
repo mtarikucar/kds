@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useTranslation } from 'react-i18next';
 import { Plus, Edit, Trash2, Image as ImageIcon } from 'lucide-react';
 import {
   useCategories,
@@ -23,7 +24,6 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Ca
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Input from '../../components/ui/Input';
-import Select from '../../components/ui/Select';
 import Badge from '../../components/ui/Badge';
 import Spinner from '../../components/ui/Spinner';
 import ImageLibraryModal from '../../components/product/ImageLibraryModal';
@@ -51,6 +51,7 @@ type CategoryFormData = z.infer<typeof categorySchema>;
 type ProductFormData = z.infer<typeof productSchema>;
 
 const MenuManagementPage = () => {
+  const { t } = useTranslation(['menu', 'common']);
   const [activeTab, setActiveTab] = useState<'categories' | 'products' | 'images'>('categories');
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
@@ -65,8 +66,8 @@ const MenuManagementPage = () => {
   const { mutate: createCategory } = useCreateCategory();
   const { mutate: updateCategory } = useUpdateCategory();
   const { mutate: deleteCategory } = useDeleteCategory();
-  const { mutate: createProduct } = useCreateProduct();
-  const { mutate: updateProduct } = useUpdateProduct();
+  const { mutate: createProduct, isPending: isCreatingProduct } = useCreateProduct();
+  const { mutate: updateProduct, isPending: isUpdatingProduct } = useUpdateProduct();
   const { mutate: deleteProduct } = useDeleteProduct();
   const { mutate: deleteImage } = useDeleteProductImage();
   const uploadImagesMutation = useUploadProductImages();
@@ -142,6 +143,9 @@ const MenuManagementPage = () => {
   };
 
   const handleProductSubmit = (data: ProductFormData) => {
+    console.log('Form submitted with data:', data);
+    console.log('Form validation errors:', productForm.formState.errors);
+
     const submitData = {
       ...data,
       price: Number(data.price),
@@ -149,23 +153,33 @@ const MenuManagementPage = () => {
       imageIds: productImages.map((img) => img.id),
     };
 
+    console.log('Submitting product data:', submitData);
+
     if (editingProduct) {
       updateProduct(
         { id: editingProduct.id, data: submitData },
         {
           onSuccess: () => {
+            console.log('Product updated successfully');
             setProductModalOpen(false);
             setProductImages([]);
             productForm.reset();
+          },
+          onError: (error: any) => {
+            console.error('Error updating product:', error);
           },
         }
       );
     } else {
       createProduct(submitData, {
         onSuccess: () => {
+          console.log('Product created successfully');
           setProductModalOpen(false);
           setProductImages([]);
           productForm.reset();
+        },
+        onError: (error: any) => {
+          console.error('Error creating product:', error);
         },
       });
     }
@@ -195,8 +209,8 @@ const MenuManagementPage = () => {
     <div>
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Menu Management</h1>
-          <p className="text-gray-600">Manage categories and products</p>
+          <h1 className="text-3xl font-bold text-gray-900">{t('menu.title')}</h1>
+          <p className="text-gray-600">{t('menu.manageCategoriesAndProducts')}</p>
         </div>
       </div>
 
@@ -206,19 +220,19 @@ const MenuManagementPage = () => {
           variant={activeTab === 'categories' ? 'primary' : 'outline'}
           onClick={() => setActiveTab('categories')}
         >
-          Categories
+          {t('menu.categories')}
         </Button>
         <Button
           variant={activeTab === 'products' ? 'primary' : 'outline'}
           onClick={() => setActiveTab('products')}
         >
-          Products
+          {t('menu.items')}
         </Button>
         <Button
           variant={activeTab === 'images' ? 'primary' : 'outline'}
           onClick={() => setActiveTab('images')}
         >
-          Image Library
+          {t('menu.imageLibrary')}
         </Button>
       </div>
 
@@ -226,10 +240,10 @@ const MenuManagementPage = () => {
       {activeTab === 'categories' && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Categories</CardTitle>
+            <CardTitle>{t('menu.categories')}</CardTitle>
             <Button onClick={() => handleOpenCategoryModal()}>
               <Plus className="h-4 w-4 mr-2" />
-              Add Category
+              {t('menu.addCategory')}
             </Button>
           </CardHeader>
           <CardContent>
@@ -262,7 +276,7 @@ const MenuManagementPage = () => {
                         variant="danger"
                         size="sm"
                         onClick={() => {
-                          if (confirm('Delete this category?')) {
+                          if (confirm(t('menu.confirmDeleteCategory'))) {
                             deleteCategory(category.id);
                           }
                         }}
@@ -282,10 +296,10 @@ const MenuManagementPage = () => {
       {activeTab === 'products' && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Products</CardTitle>
+            <CardTitle>{t('menu.items')}</CardTitle>
             <Button onClick={() => handleOpenProductModal()}>
               <Plus className="h-4 w-4 mr-2" />
-              Add Product
+              {t('menu.addItem')}
             </Button>
           </CardHeader>
           <CardContent>
@@ -296,7 +310,9 @@ const MenuManagementPage = () => {
                 {products?.map((product) => {
                   const primaryImage = product.images?.[0] || null;
                   const imageUrl = primaryImage
-                    ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${primaryImage.url}`
+                    ? (primaryImage.url.startsWith('http://') || primaryImage.url.startsWith('https://')
+                        ? primaryImage.url
+                        : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${primaryImage.url}`)
                     : product.image || null;
 
                   return (
@@ -338,13 +354,13 @@ const MenuManagementPage = () => {
                         onClick={() => handleOpenProductModal(product)}
                       >
                         <Edit className="h-4 w-4 mr-1" />
-                        Edit
+                        {t('app.edit')}
                       </Button>
                       <Button
                         variant="danger"
                         size="sm"
                         onClick={() => {
-                          if (confirm('Delete this product?')) {
+                          if (confirm(t('menu.confirmDeleteItem'))) {
                             deleteProduct(product.id);
                           }
                         }}
@@ -393,7 +409,9 @@ const MenuManagementPage = () => {
                     {/* Image */}
                     <div className="aspect-square flex items-center justify-center bg-gray-100">
                       <img
-                        src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${image.url}`}
+                        src={image.url.startsWith('http://') || image.url.startsWith('https://')
+                          ? image.url
+                          : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${image.url}`}
                         alt={image.filename}
                         className="w-full h-full object-cover"
                       />
@@ -437,24 +455,24 @@ const MenuManagementPage = () => {
       <Modal
         isOpen={categoryModalOpen}
         onClose={() => setCategoryModalOpen(false)}
-        title={editingCategory ? 'Edit Category' : 'Add Category'}
+        title={editingCategory ? t('menu.editCategory') : t('menu.addCategory')}
       >
         <form
           onSubmit={categoryForm.handleSubmit(handleCategorySubmit)}
           className="space-y-4"
         >
           <Input
-            label="Name"
+            label={t('menu.categoryName')}
             error={categoryForm.formState.errors.name?.message}
             {...categoryForm.register('name')}
           />
           <Input
-            label="Description"
+            label={t('menu.description')}
             error={categoryForm.formState.errors.description?.message}
             {...categoryForm.register('description')}
           />
           <Input
-            label="Display Order"
+            label={t('menu.displayOrder')}
             type="number"
             error={categoryForm.formState.errors.displayOrder?.message}
             {...categoryForm.register('displayOrder', { valueAsNumber: true })}
@@ -466,10 +484,10 @@ const MenuManagementPage = () => {
               className="flex-1"
               onClick={() => setCategoryModalOpen(false)}
             >
-              Cancel
+              {t('common:app.cancel')}
             </Button>
             <Button type="submit" className="flex-1">
-              {editingCategory ? 'Update' : 'Create'}
+              {editingCategory ? t('common:app.update') : t('common:app.create')}
             </Button>
           </div>
         </form>
@@ -479,7 +497,7 @@ const MenuManagementPage = () => {
       <Modal
         isOpen={productModalOpen}
         onClose={() => setProductModalOpen(false)}
-        title={editingProduct ? 'Edit Product' : 'Add Product'}
+        title={editingProduct ? t('menu.editItem') : t('menu.addItem')}
         size="lg"
       >
         <form
@@ -487,35 +505,45 @@ const MenuManagementPage = () => {
           className="space-y-4"
         >
           <Input
-            label="Name"
+            label={t('menu.itemName')}
             error={productForm.formState.errors.name?.message}
             {...productForm.register('name')}
           />
           <Input
-            label="Description"
+            label={t('menu.description')}
             error={productForm.formState.errors.description?.message}
             {...productForm.register('description')}
           />
           <Input
-            label="Price"
+            label={t('menu.price')}
             type="number"
             step="0.01"
             error={productForm.formState.errors.price?.message}
             {...productForm.register('price', { valueAsNumber: true })}
           />
-          <Select
-            label="Category"
-            options={
-              categories?.map((cat) => ({
-                value: cat.id,
-                label: cat.name,
-              })) || []
-            }
-            error={productForm.formState.errors.categoryId?.message}
-            {...productForm.register('categoryId')}
-          />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {t('menu.category')}
+            </label>
+            <select
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              {...productForm.register('categoryId')}
+            >
+              <option value="">{t('menu.selectCategory')}</option>
+              {categories?.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+            {productForm.formState.errors.categoryId?.message && (
+              <p className="mt-1 text-sm text-red-600">
+                {productForm.formState.errors.categoryId.message}
+              </p>
+            )}
+          </div>
           <Input
-            label="Current Stock"
+            label={t('menu.currentStock')}
             type="number"
             error={productForm.formState.errors.currentStock?.message}
             {...productForm.register('currentStock', { valueAsNumber: true })}
@@ -524,7 +552,7 @@ const MenuManagementPage = () => {
           {/* Product Images */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Product Images
+              {t('menu.productImages')}
             </label>
 
             {/* Show selected images */}
@@ -535,14 +563,16 @@ const MenuManagementPage = () => {
                     <div key={image.id} className="relative group">
                       <div className="aspect-square rounded-lg overflow-hidden border-2 border-gray-200">
                         <img
-                          src={`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${image.url}`}
+                          src={image.url.startsWith('http://') || image.url.startsWith('https://')
+                            ? image.url
+                            : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${image.url}`}
                           alt={image.filename}
                           className="w-full h-full object-cover"
                         />
                       </div>
                       {index === 0 && (
                         <div className="absolute top-1 left-1 bg-yellow-500 text-white text-xs px-2 py-0.5 rounded">
-                          Primary
+                          {t('menu.primary')}
                         </div>
                       )}
                       <button
@@ -562,7 +592,7 @@ const MenuManagementPage = () => {
             ) : (
               <div className="mb-4 text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
                 <ImageIcon className="mx-auto h-10 w-10 text-gray-400" />
-                <p className="mt-2 text-sm text-gray-600">No images selected</p>
+                <p className="mt-2 text-sm text-gray-600">{t('menu.noImagesSelected')}</p>
               </div>
             )}
 
@@ -574,7 +604,7 @@ const MenuManagementPage = () => {
               className="w-full"
             >
               <ImageIcon className="h-4 w-4 mr-2" />
-              Choose Images from Library
+              {t('menu.chooseImagesFromLibrary')}
             </Button>
           </div>
 
@@ -586,7 +616,7 @@ const MenuManagementPage = () => {
               className="rounded"
             />
             <label htmlFor="isAvailable" className="text-sm font-medium">
-              Available
+              {t('menu.available')}
             </label>
           </div>
           <div className="flex gap-3">
@@ -595,11 +625,17 @@ const MenuManagementPage = () => {
               variant="outline"
               className="flex-1"
               onClick={() => setProductModalOpen(false)}
+              disabled={isCreatingProduct || isUpdatingProduct}
             >
-              Cancel
+              {t('common:app.cancel')}
             </Button>
-            <Button type="submit" className="flex-1">
-              {editingProduct ? 'Update' : 'Create'}
+            <Button
+              type="submit"
+              className="flex-1"
+              isLoading={isCreatingProduct || isUpdatingProduct}
+              disabled={isCreatingProduct || isUpdatingProduct}
+            >
+              {editingProduct ? t('common:app.update') : t('common:app.create')}
             </Button>
           </div>
         </form>

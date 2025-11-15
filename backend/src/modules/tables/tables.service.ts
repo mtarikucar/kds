@@ -66,6 +66,24 @@ export class TablesService {
     });
   }
 
+  async findAvailableForCustomers(tenantId: string) {
+    return this.prisma.table.findMany({
+      where: {
+        tenantId,
+        status: {
+          in: [TableStatus.AVAILABLE, TableStatus.OCCUPIED],
+        },
+      },
+      select: {
+        id: true,
+        number: true,
+        capacity: true,
+        status: true,
+      },
+      orderBy: { number: 'asc' },
+    });
+  }
+
   async findOne(id: string, tenantId: string) {
     const table = await this.prisma.table.findFirst({
       where: {

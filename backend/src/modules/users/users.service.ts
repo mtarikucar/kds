@@ -3,16 +3,23 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateProfileDto, UpdateEmailDto } from './dto/update-profile.dto';
+import { AuthService } from '../auth/auth.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => AuthService))
+    private authService: AuthService,
+  ) {}
 
   async create(createUserDto: CreateUserDto, tenantId: string) {
     // Check if user already exists
@@ -203,7 +210,7 @@ export class UsersService {
     }
 
     // Update email and mark as unverified
-    return this.prisma.user.update({
+    const updatedUser = await this.prisma.user.update({
       where: { id: userId },
       data: {
         email: updateEmailDto.email,
@@ -224,6 +231,16 @@ export class UsersService {
         updatedAt: true,
       },
     });
+
+    // Send verification code to new email address
+    try {
+      await this.authService.sendEmailVerification(userId);
+    } catch (error) {
+      // Log error but don't fail email update if email sending fails
+      console.error('Failed to send verification email after email update:', error);
+    }
+
+    return updatedUser;
   }
 
   /**

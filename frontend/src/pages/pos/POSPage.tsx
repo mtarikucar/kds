@@ -1,15 +1,21 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import { useTranslation } from 'react-i18next';
 import TableGrid from '../../components/pos/TableGrid';
 import MenuPanel from '../../components/pos/MenuPanel';
 import OrderCart from '../../components/pos/OrderCart';
 import PaymentModal from '../../components/pos/PaymentModal';
 import StickyCartBar from '../../components/pos/StickyCartBar';
 import CartDrawer from '../../components/pos/CartDrawer';
+import NotificationBar from '../../components/pos/NotificationBar';
+import PendingOrdersPanel from '../../components/pos/PendingOrdersPanel';
+import WaiterRequestsPanel from '../../components/pos/WaiterRequestsPanel';
+import BillRequestsPanel from '../../components/pos/BillRequestsPanel';
 import { useCreateOrder, useUpdateOrder, useOrders } from '../../features/orders/ordersApi';
 import { useCreatePayment } from '../../features/orders/ordersApi';
 import { useUpdateTableStatus } from '../../features/tables/tablesApi';
 import { useGetPosSettings } from '../../features/pos/posApi';
+import { usePosSocket } from '../../features/pos/usePosSocket';
 import { Product, Table, TableStatus, OrderType, OrderStatus } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { useResponsive } from '../../hooks/useResponsive';
@@ -20,6 +26,7 @@ interface CartItem extends Product {
 }
 
 const POSPage = () => {
+  const { t } = useTranslation('pos');
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState(0);
@@ -28,9 +35,15 @@ const POSPage = () => {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
+  const [isPendingOrdersPanelOpen, setIsPendingOrdersPanelOpen] = useState(false);
+  const [isWaiterRequestsPanelOpen, setIsWaiterRequestsPanelOpen] = useState(false);
+  const [isBillRequestsPanelOpen, setIsBillRequestsPanelOpen] = useState(false);
 
   // Responsive hook
   const { isDesktop, isMobile, isTablet } = useResponsive();
+
+  // Socket.IO for real-time updates
+  usePosSocket();
 
   // Fetch POS settings
   const { data: posSettings } = useGetPosSettings();
@@ -44,11 +57,17 @@ const POSPage = () => {
   const isTablelessMode = posSettings?.enableTablelessMode ?? false;
   const isTwoStepCheckout = posSettings?.enableTwoStepCheckout ?? false;
 
-  // Fetch active orders for selected table
+  // Fetch active orders for selected table (exclude pending approval, paid, and cancelled)
   const { data: tableOrders, refetch: refetchOrders } = useOrders(
     selectedTable
       ? {
           tableId: selectedTable.id,
+          status: [
+            OrderStatus.PENDING,
+            OrderStatus.PREPARING,
+            OrderStatus.READY,
+            OrderStatus.SERVED,
+          ].join(','),
         }
       : undefined
   );
@@ -80,11 +99,11 @@ const POSPage = () => {
         setOrderNotes(activeOrder.notes || '');
 
         toast.info(
-          `Loaded existing order #${activeOrder.orderNumber} with ${items.length} items`
+          t('loadedExistingOrder', { orderNumber: activeOrder.orderNumber, count: items.length })
         );
       } else {
         // Table is marked occupied but no active orders found
-        toast.warning('Table is occupied but no active orders found');
+  toast.warning(t('tableOccupiedNoOrders'));
       }
     }
   }, [selectedTable, tableOrders]);
@@ -104,16 +123,16 @@ const POSPage = () => {
       setDiscount(0);
       setCustomerName('');
       setOrderNotes('');
-      toast.info('Loading existing order...');
+  toast.info(t('loadingExistingOrder'));
     } else {
-      toast.warning('Table is reserved');
+  toast.warning(t('tableReserved'));
     }
   };
 
   const handleAddItem = (product: Product) => {
     // In tableless mode, table selection is optional
     if (!isTablelessMode && !selectedTable) {
-      toast.error('Please select a table first');
+  toast.error(t('selectTableFirst'));
       return;
     }
 
@@ -152,12 +171,12 @@ const POSPage = () => {
   const handleCreateOrder = () => {
     // In tableless mode, table is optional
     if (!isTablelessMode && !selectedTable) {
-      toast.error('Please select a table');
+  toast.error(t('selectTable'));
       return;
     }
 
     if (cartItems.length === 0) {
-      toast.error('Cart is empty');
+  toast.error(t('cartEmpty'));
       return;
     }
 
@@ -187,7 +206,7 @@ const POSPage = () => {
         },
         {
           onSuccess: (order) => {
-            toast.success('Order updated successfully');
+            toast.success(t('orderUpdated'));
           },
         }
       );
@@ -198,7 +217,7 @@ const POSPage = () => {
         {
           onSuccess: (order) => {
             setCurrentOrderId(order.id);
-            toast.success(`Order #${order.orderNumber} created successfully`);
+            toast.success(t('orderCreatedSuccess', { orderNumber: order.orderNumber }));
 
             // Mark table as occupied after successful order creation (if table mode)
             if (selectedTable && selectedTable.status === TableStatus.AVAILABLE) {
@@ -217,12 +236,12 @@ const POSPage = () => {
   const handleCheckout = () => {
     // In tableless mode, table is optional
     if (!isTablelessMode && !selectedTable) {
-      toast.error('Please select a table');
+  toast.error(t('selectTable'));
       return;
     }
 
     if (cartItems.length === 0) {
-      toast.error('Cart is empty');
+  toast.error(t('cartEmpty'));
       return;
     }
 
@@ -259,7 +278,7 @@ const POSPage = () => {
         {
           onSuccess: (order) => {
             setIsPaymentModalOpen(true);
-            toast.success('Order updated successfully');
+            toast.success(t('orderUpdated'));
           },
         }
       );
@@ -320,7 +339,7 @@ const POSPage = () => {
           setCustomerName('');
           setOrderNotes('');
 
-          toast.success('Order completed successfully!');
+          toast.success(t('orderCompletedSuccess'));
         },
       }
     );
@@ -333,13 +352,20 @@ const POSPage = () => {
 
   return (
     <div className="h-full pb-20 lg:pb-0">
+      {/* Notification Bar */}
+      <NotificationBar
+        onShowPendingOrders={() => setIsPendingOrdersPanelOpen(true)}
+        onShowWaiterRequests={() => setIsWaiterRequestsPanelOpen(true)}
+        onShowBillRequests={() => setIsBillRequestsPanelOpen(true)}
+      />
+
       {/* Header */}
       <div className="mb-4 md:mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">Point of Sale</h1>
+  <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t('title')}</h1>
         <p className="text-sm md:text-base text-gray-600">
           {isTablelessMode
-            ? 'Start taking orders (table selection is optional)'
-            : 'Select a table and start taking orders'}
+            ? t('startTakingOrdersTableless')
+            : t('selectTableAndStart')}
         </p>
         {/* Selected Table Indicator - Mobile/Tablet */}
         {selectedTable && !isDesktop && (
@@ -347,7 +373,7 @@ const POSPage = () => {
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
             </svg>
-            Table {selectedTable.number}
+            {t('table')} {selectedTable.number}
           </div>
         )}
       </div>
@@ -360,7 +386,7 @@ const POSPage = () => {
             <div className="w-1/4">
               <Card className="h-full">
                 <CardHeader>
-                  <CardTitle>Tables</CardTitle>
+                  <CardTitle>{t('common:navigation.tables')}</CardTitle>
                 </CardHeader>
                 <CardContent className="overflow-y-auto">
                   <TableGrid
@@ -377,7 +403,7 @@ const POSPage = () => {
             <Card className="h-full">
               <CardHeader>
                 <CardTitle>
-                  Menu {selectedTable && `- Table ${selectedTable.number}`}
+                  {t('common:navigation.menu')} {selectedTable && `- ${t('tableLabel')} ${selectedTable.number}`}
                 </CardTitle>
               </CardHeader>
               <CardContent className="h-[calc(100%-80px)] overflow-y-auto">
@@ -418,7 +444,7 @@ const POSPage = () => {
           {!isTablelessMode && !selectedTable && (
             <Card className="mb-4">
               <CardHeader>
-                <CardTitle className="text-lg">Select a Table</CardTitle>
+                <CardTitle className="text-lg">{t('selectTableTitle')}</CardTitle>
               </CardHeader>
               <CardContent className="max-h-[300px] overflow-y-auto">
                 <TableGrid
@@ -433,7 +459,7 @@ const POSPage = () => {
           <Card className="h-full">
             <CardHeader>
               <CardTitle className="text-lg">
-                Menu {selectedTable && `- Table ${selectedTable.number}`}
+                {t('common:navigation.menu')} {selectedTable && `- ${t('tableLabel')} ${selectedTable.number}`}
               </CardTitle>
             </CardHeader>
             <CardContent className="h-[calc(100%-70px)] overflow-y-auto">
@@ -490,6 +516,20 @@ const POSPage = () => {
         total={total}
         onConfirm={handlePaymentConfirm}
         isLoading={isCreatingPayment}
+      />
+
+      {/* Notification Panels */}
+      <PendingOrdersPanel
+        isOpen={isPendingOrdersPanelOpen}
+        onClose={() => setIsPendingOrdersPanelOpen(false)}
+      />
+      <WaiterRequestsPanel
+        isOpen={isWaiterRequestsPanelOpen}
+        onClose={() => setIsWaiterRequestsPanelOpen(false)}
+      />
+      <BillRequestsPanel
+        isOpen={isBillRequestsPanelOpen}
+        onClose={() => setIsBillRequestsPanelOpen(false)}
       />
     </div>
   );

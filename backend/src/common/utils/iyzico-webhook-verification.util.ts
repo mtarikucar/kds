@@ -96,7 +96,8 @@ function isIPInCIDR(ip: string, cidr: string): boolean {
     }
 
     // Match against CIDR
-    return parsedIP.match(parsedRange, parseInt(bits, 10));
+    // Cast to any to handle union type issue with ipaddr.js
+    return (parsedIP as any).match(parsedRange, parseInt(bits, 10));
   } catch (error) {
     console.error(`Error checking IP ${ip} against CIDR ${cidr}:`, error);
     return false;

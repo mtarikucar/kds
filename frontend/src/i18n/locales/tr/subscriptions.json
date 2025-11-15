@@ -1,0 +1,96 @@
+{
+  "subscriptions": {
+    "title": "Abonelik",
+    "plans": "Planlar",
+    "currentPlan": "Mevcut Plan",
+    "upgradePlan": "Planı Yükselt",
+    "downgrade": "Planı Düşür",
+    "cancel": "Aboneliği İptal Et",
+    "renew": "Yenile",
+    "billing": "Faturalandırma",
+    "billingCycle": "Faturalandırma Döngüsü",
+    "monthly": "Aylık",
+    "yearly": "Yıllık",
+    "nextBillingDate": "Sonraki Faturalandırma Tarihi",
+    "paymentMethod": "Ödeme Yöntemi",
+    "updatePaymentMethod": "Ödeme Yöntemini Güncelle",
+    "invoices": "Faturalar",
+    "downloadInvoice": "Faturayı İndir",
+    "features": "Özellikler",
+    "price": "Fiyat",
+    "perMonth": "aylık",
+    "perYear": "yıllık",
+    "selectPlan": "Plan Seç",
+    "currentlyActive": "Şu Anda Aktif",
+    "subscriptionActive": "Abonelik aktif",
+    "subscriptionExpired": "Abonelik süresi dolmuş",
+    "subscriptionCancelled": "Abonelik iptal edildi",
+    "upgradeSuccess": "Plan başarıyla yükseltildi",
+    "downgradePending": "Plan düşürme, faturalandırma döngüsünün sonunda geçerli olacak",
+    "cancelConfirm": "Aboneliğinizi iptal etmek istediğinizden emin misiniz?",
+    "noActiveSubscription": "Aktif Abonelik Yok",
+    "noActiveSubscriptionDescription": "Aktif bir aboneliğiniz yok. Başlamak için bir plan seçin.",
+    "viewPlans": "Planları Görüntüle",
+    "changePlan": "Planı Değiştir",
+    "cancelSubscription": "Aboneliği İptal Et",
+    "reactivateSubscription": "Aboneliği Yeniden Etkinleştir",
+    "manageSubscription": "Abonelik planınızı ve faturalandırmayı yönetin",
+    "viewAllPlans": "Tüm Planları Görüntüle"
+    ,
+    "status": {
+      "active": "Aktif",
+      "trial": "Deneme",
+      "cancelled": "İptal Edildi",
+      "expired": "Süresi Doldu",
+      "pastDue": "Gecikmiş"
+    },
+    "invoiceStatus": {
+      "paid": "Ödendi",
+      "open": "Açık",
+      "draft": "Taslak",
+      "void": "Geçersiz",
+      "uncollectible": "Tahsil Edilemez"
+    },
+    "currentSubscription": "Mevcut Abonelik",
+    "month": "ay",
+    "year": "yıl",
+    "trialEnds": "Deneme biter",
+    "cancelsOn": "İptal tarihi",
+    "planLimitsFeatures": "Plan Limitleri ve Özellikler",
+    "planLimits": {
+      "users": "Kullanıcı",
+      "tables": "Masa",
+      "products": "Ürün",
+      "monthlyOrders": "Aylık Sipariş"
+    },
+    "unlimited": "Sınırsız",
+    "billingHistory": "Fatura Geçmişi",
+    "noInvoicesYet": "Henüz fatura yok",
+    "invoiceTable": {
+      "invoice": "Fatura",
+      "date": "Tarih",
+      "amount": "Tutar",
+      "status": "Durum",
+      "actions": "İşlemler"
+    },
+    "download": "İndir",
+    "cancelConfirmWithDate": "Aboneliğinizi iptal etmek istediğinizden emin misiniz? Mevcut faturalandırma döneminizin sonuna kadar erişime sahip olmaya devam edeceksiniz: {{date}}.",
+    "cancelReasonLabel": "Bize yardımcı olun - Neden iptal ediyorsunuz? (İsteğe bağlı)",
+    "cancelReasons": {
+      "select": "Bir neden seçin...",
+      "tooExpensive": "Çok pahalı",
+      "missingFeatures": "İhtiyacım olan özellikler yok",
+      "switching": "Rakibe geçiyorum",
+      "noLongerNeeded": "Artık gerekmiyor",
+      "poorSupport": "Zayıf müşteri desteği",
+      "technicalIssues": "Teknik sorunlar",
+      "other": "Diğer"
+    },
+    "selectNewPlan": "Yeni bir plan seçin:",
+    "perMonthShort": "ay",
+    "perYearShort": "yıl",
+    "keepSubscription": "Aboneliği Koru"
+  }
+}
+
+

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { HexColorPicker } from 'react-colorful';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import Button from '../ui/Button';
@@ -15,16 +16,17 @@ interface DesignEditorProps {
 }
 
 const colorThemes = [
-  { name: 'Modern Blue', primary: '#3B82F6', secondary: '#1E40AF', background: '#F0F9FF' },
-  { name: 'Elegant Dark', primary: '#1F2937', secondary: '#111827', background: '#F9FAFB' },
-  { name: 'Warm Orange', primary: '#F97316', secondary: '#EA580C', background: '#FFF7ED' },
-  { name: 'Fresh Green', primary: '#10B981', secondary: '#059669', background: '#F0FDF4' },
-  { name: 'Royal Purple', primary: '#8B5CF6', secondary: '#7C3AED', background: '#FAF5FF' },
-  { name: 'Classic Red', primary: '#EF4444', secondary: '#DC2626', background: '#FEF2F2' }
+  { id: 'modernBlue', name: 'Modern Blue', primary: '#3B82F6', secondary: '#1E40AF', background: '#F0F9FF' },
+  { id: 'elegantDark', name: 'Elegant Dark', primary: '#1F2937', secondary: '#111827', background: '#F9FAFB' },
+  { id: 'warmOrange', name: 'Warm Orange', primary: '#F97316', secondary: '#EA580C', background: '#FFF7ED' },
+  { id: 'freshGreen', name: 'Fresh Green', primary: '#10B981', secondary: '#059669', background: '#F0FDF4' },
+  { id: 'royalPurple', name: 'Royal Purple', primary: '#8B5CF6', secondary: '#7C3AED', background: '#FAF5FF' },
+  { id: 'classicRed', name: 'Classic Red', primary: '#EF4444', secondary: '#DC2626', background: '#FEF2F2' }
 ];
 
 const designTemplates = [
   {
+    id: 'fineDining',
     name: 'Fine Dining',
     description: 'Elegant and sophisticated design',
     preview: '🍽️',
@@ -42,6 +44,7 @@ const designTemplates = [
     }
   },
   {
+    id: 'modernCafe',
     name: 'Modern Cafe',
     description: 'Clean and minimal design',
     preview: '☕',
@@ -59,6 +62,7 @@ const designTemplates = [
     }
   },
   {
+    id: 'fastFood',
     name: 'Fast Food',
     description: 'Vibrant and energetic design',
     preview: '🍔',
@@ -76,6 +80,7 @@ const designTemplates = [
     }
   },
   {
+    id: 'healthyFresh',
     name: 'Healthy & Fresh',
     description: 'Natural and organic feel',
     preview: '🥗',
@@ -93,6 +98,7 @@ const designTemplates = [
     }
   },
   {
+    id: 'pizzaPlace',
     name: 'Pizza Place',
     description: 'Warm and inviting design',
     preview: '🍕',
@@ -110,6 +116,7 @@ const designTemplates = [
     }
   },
   {
+    id: 'minimalist',
     name: 'Minimalist',
     description: 'Simple black and white',
     preview: '⚫',
@@ -138,6 +145,7 @@ const fontOptions = [
 ];
 
 const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorProps) => {
+  const { t } = useTranslation('common');
   const [formData, setFormData] = useState<UpdateQrSettingsDto>({
     primaryColor: settings.primaryColor,
     secondaryColor: settings.secondaryColor,
@@ -194,7 +202,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
       layoutStyle: 'GRID',
       itemsPerRow: 2,
       enableTableQR: true,
-      tableQRMessage: 'Scan to view our menu',
+      tableQRMessage: t('admin.scanToViewMenu'),
     });
   };
 
@@ -241,7 +249,8 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
   const applyTemplate = (template: typeof designTemplates[0]) => {
     setFormData({
       ...formData,
-      ...template.settings
+      ...template.settings,
+      layoutStyle: template.settings.layoutStyle as 'LIST' | 'GRID' | 'COMPACT',
     });
   };
 
@@ -258,18 +267,18 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
 
   // Sample data for preview
   const sampleCategories = [
-    { id: '1', name: 'Appetizers' },
-    { id: '2', name: 'Main Courses' },
-    { id: '3', name: 'Desserts' }
+    { id: '1', name: t('common:qrDesigner.sampleCategories.appetizers') },
+    { id: '2', name: t('common:qrDesigner.sampleCategories.mainCourses') },
+    { id: '3', name: t('common:qrDesigner.sampleCategories.desserts') }
   ];
 
   const sampleProducts = [
-    { id: '1', name: 'Caesar Salad', description: 'Fresh romaine lettuce with parmesan', price: 12.99, categoryId: '1', image: null },
-    { id: '2', name: 'Bruschetta', description: 'Toasted bread with tomatoes and basil', price: 9.99, categoryId: '1', image: null },
-    { id: '3', name: 'Grilled Salmon', description: 'Atlantic salmon with seasonal vegetables', price: 24.99, categoryId: '2', image: null },
-    { id: '4', name: 'Ribeye Steak', description: 'Premium beef with herb butter', price: 32.99, categoryId: '2', image: null },
-    { id: '5', name: 'Tiramisu', description: 'Classic Italian coffee-flavored dessert', price: 8.99, categoryId: '3', image: null },
-    { id: '6', name: 'Chocolate Lava Cake', description: 'Warm chocolate cake with molten center', price: 9.99, categoryId: '3', image: null }
+    { id: '1', name: t('common:qrDesigner.sampleProducts.caesarSaladName'), description: t('common:qrDesigner.sampleProducts.caesarSaladDesc'), price: 12.99, categoryId: '1', image: null },
+    { id: '2', name: t('common:qrDesigner.sampleProducts.bruschettaName'), description: t('common:qrDesigner.sampleProducts.bruschettaDesc'), price: 9.99, categoryId: '1', image: null },
+    { id: '3', name: t('common:qrDesigner.sampleProducts.grilledSalmonName'), description: t('common:qrDesigner.sampleProducts.grilledSalmonDesc'), price: 24.99, categoryId: '2', image: null },
+    { id: '4', name: t('common:qrDesigner.sampleProducts.ribeyeSteakName'), description: t('common:qrDesigner.sampleProducts.ribeyeSteakDesc'), price: 32.99, categoryId: '2', image: null },
+    { id: '5', name: t('common:qrDesigner.sampleProducts.tiramisuName'), description: t('common:qrDesigner.sampleProducts.tiramisuDesc'), price: 8.99, categoryId: '3', image: null },
+    { id: '6', name: t('common:qrDesigner.sampleProducts.lavaCakeName'), description: t('common:qrDesigner.sampleProducts.lavaCakeDesc'), price: 9.99, categoryId: '3', image: null }
   ];
 
   const filteredPreviewProducts = sampleProducts.filter(
@@ -282,11 +291,11 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex flex-wrap gap-4">
           {[
-            { id: 'templates', label: 'Templates', icon: Sparkles },
-            { id: 'colors', label: 'Colors', icon: Palette },
-            { id: 'typography', label: 'Typography', icon: Type },
-            { id: 'layout', label: 'Layout', icon: Layout },
-            { id: 'qr', label: 'QR Style', icon: QrCode }
+            { id: 'templates', label: t('admin.templates'), icon: Sparkles },
+            { id: 'colors', label: t('admin.colors'), icon: Palette },
+            { id: 'typography', label: t('admin.typography'), icon: Type },
+            { id: 'layout', label: t('admin.layout'), icon: Layout },
+            { id: 'qr', label: t('admin.qrStyle'), icon: QrCode }
           ].map(tab => (
             <button
               key={tab.id}
@@ -318,17 +327,17 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5" />
-                Design Templates
+                {t('admin.designTemplates')}
               </CardTitle>
             </CardHeader>
             <CardContent>
               <p className="text-sm text-gray-600 mb-4">
-                Choose a pre-designed template that matches your restaurant style. All settings will be applied automatically.
+                {t('admin.choosePreDesignedTemplate')}
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {designTemplates.map((template) => (
                   <button
-                    key={template.name}
+                    key={template.id}
                     type="button"
                     onClick={() => applyTemplate(template)}
                     className="p-4 rounded-lg border-2 border-gray-200 hover:border-blue-500 transition-all hover:shadow-md text-left"
@@ -341,8 +350,8 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                         <div className="w-3 h-3 rounded-full border border-gray-300" style={{ backgroundColor: template.settings.backgroundColor }} />
                       </div>
                     </div>
-                    <p className="font-semibold text-gray-900 mb-1">{template.name}</p>
-                    <p className="text-xs text-gray-600">{template.description}</p>
+                    <p className="font-semibold text-gray-900 mb-1">{t(`common:qrDesigner.templates.${template.id}.name`)}</p>
+                    <p className="text-xs text-gray-600">{t(`common:qrDesigner.templates.${template.id}.description`)}</p>
                     <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
                       <span>{template.settings.layoutStyle}</span>
                       <span>•</span>
@@ -363,14 +372,14 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Palette className="h-5 w-5" />
-                  Quick Color Themes
+                  {t('common:qrDesigner.quickColorThemes')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {colorThemes.map((theme) => (
                     <button
-                      key={theme.name}
+                      key={theme.id}
                       type="button"
                       onClick={() => applyTheme(theme)}
                       className="p-3 rounded-lg border-2 border-gray-200 hover:border-blue-500 transition-colors"
@@ -382,7 +391,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                           <div className="w-5 h-5 rounded border border-gray-200" style={{ backgroundColor: theme.background }} />
                         </div>
                       </div>
-                      <p className="text-sm font-medium text-gray-700">{theme.name}</p>
+                      <p className="text-sm font-medium text-gray-700">{t(`common:qrDesigner.themes.${theme.id}`)}</p>
                     </button>
                   ))}
                 </div>
@@ -391,13 +400,13 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
 
             <Card>
               <CardHeader>
-                <CardTitle>Custom Colors</CardTitle>
+                <CardTitle>{t('common:qrDesigner.customColors')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <ColorPickerButton label="Primary Color" colorKey="primaryColor" />
-                  <ColorPickerButton label="Secondary Color" colorKey="secondaryColor" />
-                  <ColorPickerButton label="Background Color" colorKey="backgroundColor" />
+                  <ColorPickerButton label={t('common:qrDesigner.primaryColor')} colorKey="primaryColor" />
+                  <ColorPickerButton label={t('common:qrDesigner.secondaryColor')} colorKey="secondaryColor" />
+                  <ColorPickerButton label={t('common:qrDesigner.backgroundColor')} colorKey="backgroundColor" />
                 </div>
               </CardContent>
             </Card>
@@ -408,11 +417,11 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
         {activeTab === 'typography' && (
           <Card>
             <CardHeader>
-              <CardTitle>Typography Settings</CardTitle>
+              <CardTitle>{t('common:qrDesigner.typographySettings')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">Font Family</label>
+                <label className="block text-sm font-medium text-gray-700 mb-3">{t('common:qrDesigner.fontFamily')}</label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {fontOptions.map((font) => (
                     <button
@@ -426,17 +435,17 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                       }`}
                     >
                       <p className={`text-lg ${font.className} font-medium`}>{font.label}</p>
-                      <p className="text-xs text-gray-500 mt-1">Aa Bb Cc</p>
+                      <p className="text-xs text-gray-500 mt-1">{t('common:qrDesigner.sampleText')}</p>
                     </button>
                   ))}
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">Logo Upload</label>
+                <label className="block text-sm font-medium text-gray-700 mb-3">{t('common:qrDesigner.logoUpload')}</label>
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
                   <Upload className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                  <p className="text-sm text-gray-600 mb-2">Upload your restaurant logo</p>
+                  <p className="text-sm text-gray-600 mb-2">{t('common:qrDesigner.uploadLogo')}</p>
                   <input
                     type="file"
                     accept="image/*"
@@ -448,11 +457,11 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                     htmlFor="logo-upload"
                     className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-700"
                   >
-                    Choose File
+                    {t('common:qrDesigner.chooseFile')}
                   </label>
                   {formData.logoUrl && (
                     <div className="mt-4">
-                      <img src={formData.logoUrl} alt="Logo preview" className="h-16 mx-auto" />
+                      <img src={formData.logoUrl} alt={t('common:qrDesigner.logoPreview')} className="h-16 mx-auto" />
                     </div>
                   )}
                 </div>
@@ -465,16 +474,16 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
         {activeTab === 'layout' && (
           <Card>
             <CardHeader>
-              <CardTitle>Layout & Display Options</CardTitle>
+              <CardTitle>{t('common:qrDesigner.layoutDisplayOptions')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">Layout Style</label>
+                <label className="block text-sm font-medium text-gray-700 mb-3">{t('common:qrDesigner.layoutStyle')}</label>
                 <div className="grid grid-cols-3 gap-3">
                   {[
-                    { value: 'GRID', label: 'Grid View', description: 'Items in a grid layout' },
-                    { value: 'LIST', label: 'List View', description: 'Traditional list style' },
-                    { value: 'COMPACT', label: 'Compact', description: 'Space-efficient view' }
+                    { value: 'GRID', label: t('common:qrDesigner.gridView'), description: t('common:qrDesigner.gridDesc') },
+                    { value: 'LIST', label: t('common:qrDesigner.listView'), description: t('common:qrDesigner.listDesc') },
+                    { value: 'COMPACT', label: t('common:qrDesigner.compact'), description: t('common:qrDesigner.compactDesc') }
                   ].map((style) => (
                     <button
                       key={style.value}
@@ -495,7 +504,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
 
               {formData.layoutStyle === 'GRID' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Items Per Row</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('common:qrDesigner.itemsPerRow')}</label>
                   <div className="flex gap-2">
                     {[1, 2, 3, 4].map((num) => (
                       <button
@@ -516,13 +525,13 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
               )}
 
               <div className="space-y-3">
-                <p className="text-sm font-medium text-gray-700">Display Options</p>
+                <p className="text-sm font-medium text-gray-700">{t('common:qrDesigner.displayOptions')}</p>
                 <div className="space-y-2">
                   {[
-                    { key: 'showRestaurantInfo', label: 'Show Restaurant Information' },
-                    { key: 'showPrices', label: 'Show Prices' },
-                    { key: 'showDescription', label: 'Show Product Descriptions' },
-                    { key: 'showImages', label: 'Show Product Images' }
+                    { key: 'showRestaurantInfo', label: t('common:qrDesigner.showRestaurantInfo') },
+                    { key: 'showPrices', label: t('common:qrDesigner.showPrices') },
+                    { key: 'showDescription', label: t('common:qrDesigner.showDescriptions') },
+                    { key: 'showImages', label: t('common:qrDesigner.showImages') }
                   ].map((option) => (
                     <label key={option.key} className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
                       <input
@@ -544,11 +553,11 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
         {activeTab === 'qr' && (
           <Card>
             <CardHeader>
-              <CardTitle>QR Code Customization</CardTitle>
+              <CardTitle>{t('admin.qrCodeCustomization')}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <p className="text-sm font-medium text-gray-700">Table QR Codes</p>
+                <p className="text-sm font-medium text-gray-700">{t('admin.tableQRCodes')}</p>
                 <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
                   <input
                     type="checkbox"
@@ -557,24 +566,24 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                     className="rounded border-gray-300 text-blue-600"
                   />
                   <div>
-                    <span className="text-sm font-medium text-gray-700">Enable Table-Specific QR Codes</span>
-                    <p className="text-xs text-gray-500">Generate unique QR codes for each table</p>
+                    <span className="text-sm font-medium text-gray-700">{t('admin.enableTableQR')}</span>
+                    <p className="text-xs text-gray-500">{t('admin.enableTableQRDesc')}</p>
                   </div>
                 </label>
 
                 {formData.enableTableQR && (
                   <div className="ml-6 space-y-4">
                     <Input
-                      label="Table QR Message"
+                      label={t('common:qrDesigner.tableQRMessage')}
                       type="text"
                       value={formData.tableQRMessage}
                       onChange={(e) => setFormData({ ...formData, tableQRMessage: e.target.value })}
-                      placeholder="Scan to view our menu"
+                      placeholder={t('admin.scanToViewMenu')}
                     />
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <p className="text-xs font-medium text-blue-900 mb-1">Pro Tip:</p>
+                      <p className="text-xs font-medium text-blue-900 mb-1">{t('common:qrDesigner.proTip')}</p>
                       <p className="text-xs text-blue-800">
-                        You can include table numbers in the URL to track orders by table
+                        {t('common:qrDesigner.proTipText')}
                       </p>
                     </div>
                   </div>
@@ -582,23 +591,23 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
               </div>
 
               <div className="pt-4 border-t border-gray-200">
-                <p className="text-sm font-medium text-gray-700 mb-3">QR Code Preview</p>
+                <p className="text-sm font-medium text-gray-700 mb-3">{t('common:qrDesigner.qrCodePreview')}</p>
                 <div className="bg-gray-50 rounded-lg p-4 text-center">
-                  <p className="text-xs text-gray-500 mb-2">Your QR codes will use these colors:</p>
+                  <p className="text-xs text-gray-500 mb-2">{t('common:qrDesigner.qrWillUseColors')}</p>
                   <div className="flex justify-center gap-4">
                     <div className="text-center">
                       <div 
                         className="w-16 h-16 rounded-lg border-2 border-gray-300 mb-1" 
                         style={{ backgroundColor: formData.primaryColor }}
                       />
-                      <p className="text-xs text-gray-600">QR Pattern</p>
+                      <p className="text-xs text-gray-600">{t('common:qrDesigner.qrPattern')}</p>
                     </div>
                     <div className="text-center">
                       <div 
                         className="w-16 h-16 rounded-lg border-2 border-gray-300 mb-1" 
                         style={{ backgroundColor: formData.backgroundColor }}
                       />
-                      <p className="text-xs text-gray-600">Background</p>
+                      <p className="text-xs text-gray-600">{t('common:qrDesigner.background')}</p>
                     </div>
                   </div>
                 </div>
@@ -615,7 +624,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                 className="flex items-center gap-2"
               >
                 <Save className="h-4 w-4" />
-                Save All Changes
+                {t('common:qrDesigner.saveAllChanges')}
               </Button>
               <Button
                 type="button"
@@ -624,7 +633,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                 className="flex items-center gap-2"
               >
                 <RotateCcw className="h-4 w-4" />
-                Reset to Defaults
+                {t('common:qrDesigner.resetToDefaults')}
               </Button>
             </div>
           </form>
@@ -638,7 +647,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <QrCode className="h-4 w-4" />
-                  QR Code Preview
+                  {t('admin.qrCodePreview')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -647,8 +656,10 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                     <QrCodeDisplay
                       qrCode={{
                         id: 'preview',
+                        type: 'TENANT',
                         url: tenant ? `${window.location.origin}/qr-menu/${tenant.id}` : '#',
-                        label: 'Main QR Code'
+                        qrDataUrl: '',
+                        label: t('common:qrDesigner.mainQRCode')
                       }}
                       tenant={tenant}
                       compact
@@ -659,8 +670,8 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                     />
                   </div>
                   <div className="text-center">
-                    <p className="text-xs text-gray-500">Live QR code preview</p>
-                    <p className="text-xs text-gray-400">Updates automatically</p>
+                    <p className="text-xs text-gray-500">{t('common:qrDesigner.liveQRCodePreview')}</p>
+                    <p className="text-xs text-gray-400">{t('common:qrDesigner.updatesAutomatically')}</p>
                   </div>
                 </div>
               </CardContent>
@@ -672,7 +683,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                 <div className="flex items-center justify-between">
                   <CardTitle className="flex items-center gap-2">
                     <Eye className="h-4 w-4" />
-                    Menu Preview
+                    {t('common:qrDesigner.menuPreview')}
                   </CardTitle>
                   <button
                     type="button"
@@ -722,7 +733,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                         className="text-xs text-center py-1"
                         style={{ backgroundColor: formData.backgroundColor }}
                       >
-                        <p className="text-gray-600">Live Preview</p>
+                        <p className="text-gray-600">{t('common:qrDesigner.livePreview')}</p>
                       </div>
 
                       {/* Actual Menu Preview */}
@@ -745,7 +756,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                                 {formData.logoUrl ? (
                                   <img
                                     src={formData.logoUrl}
-                                    alt="Restaurant Logo"
+                                    alt={t('common:qrDesigner.restaurantLogo')}
                                     className="h-8 w-8 rounded-full object-cover"
                                   />
                                 ) : (
@@ -757,7 +768,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                                   </div>
                                 )}
                                 <h1 className="text-base font-bold text-white">
-                                  {tenant?.name || 'Restaurant Name'}
+                                  {tenant?.name || t('common:qrDesigner.restaurantName')}
                                 </h1>
                               </div>
                             )}
@@ -777,7 +788,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                                 borderColor: formData.primaryColor,
                               }}
                             >
-                              All
+                              {t('common:qrDesigner.all')}
                             </button>
                             {sampleCategories.map((category) => (
                               <button
@@ -897,8 +908,8 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                     </div>
 
                     <div className="text-center">
-                      <p className="text-xs text-gray-500">Live menu preview</p>
-                      <p className="text-xs text-gray-400">Updates automatically with your changes</p>
+                      <p className="text-xs text-gray-500">{t('common:qrDesigner.liveMenuPreview')}</p>
+                      <p className="text-xs text-gray-400">{t('common:qrDesigner.updatesAutomaticallyWithChanges')}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -910,7 +921,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Palette className="h-4 w-4" />
-                  Current Colors
+                  {t('common:qrDesigner.currentColors')}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -921,7 +932,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                       style={{ backgroundColor: formData.primaryColor }}
                     />
                     <div>
-                      <p className="text-sm font-medium text-gray-900">Primary</p>
+                      <p className="text-sm font-medium text-gray-900">{t('common:qrDesigner.primary')}</p>
                       <p className="text-xs text-gray-500 font-mono">{formData.primaryColor}</p>
                     </div>
                   </div>
@@ -931,7 +942,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                       style={{ backgroundColor: formData.secondaryColor }}
                     />
                     <div>
-                      <p className="text-sm font-medium text-gray-900">Secondary</p>
+                      <p className="text-sm font-medium text-gray-900">{t('common:qrDesigner.secondary')}</p>
                       <p className="text-xs text-gray-500 font-mono">{formData.secondaryColor}</p>
                     </div>
                   </div>
@@ -941,7 +952,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                       style={{ backgroundColor: formData.backgroundColor }}
                     />
                     <div>
-                      <p className="text-sm font-medium text-gray-900">Background</p>
+                      <p className="text-sm font-medium text-gray-900">{t('common:qrDesigner.background')}</p>
                       <p className="text-xs text-gray-500 font-mono">{formData.backgroundColor}</p>
                     </div>
                   </div>

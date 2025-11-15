@@ -10,6 +10,7 @@ import { CreateOrderDto } from '../dto/create-order.dto';
 import { UpdateOrderDto } from '../dto/update-order.dto';
 import { UpdateOrderStatusDto } from '../dto/update-order-status.dto';
 import { OrderStatus, StockMovementType } from '../../../common/constants/order-status.enum';
+import { TableStatus } from '../../tables/dto/create-table.dto';
 import { KdsGateway } from '../../kds/kds.gateway';
 
 @Injectable()
@@ -89,6 +90,7 @@ export class OrdersService {
       orderNumber,
       type: createOrderDto.type,
       status: OrderStatus.PENDING,
+      requiresApproval: false, // POS orders don't require approval
       totalAmount,
       discount,
       finalAmount,
@@ -373,7 +375,14 @@ export class OrdersService {
 
   async updateStatus(id: string, updateStatusDto: UpdateOrderStatusDto, tenantId: string) {
     // Check if order exists and belongs to tenant
-    await this.findOne(id, tenantId);
+    const order = await this.findOne(id, tenantId);
+
+    // Prevent status updates for orders awaiting approval
+    if (order.requiresApproval && order.status === OrderStatus.PENDING_APPROVAL) {
+      throw new BadRequestException(
+        'Order requires approval before status can be changed. Please approve the order first.'
+      );
+    }
 
     const updatedOrder = await this.prisma.order.update({
       where: { id },
@@ -450,5 +459,91 @@ export class OrdersService {
         }
       }
     });
+  }
+
+  async approveOrder(orderId: string, userId: string, tenantId: string) {
+    // Find the order
+    const order = await this.prisma.order.findFirst({
+      where: {
+        id: orderId,
+        tenantId,
+      },
+      include: {
+        orderItems: {
+          include: {
+            product: true,
+            modifiers: {
+              include: {
+                modifier: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    if (order.status !== OrderStatus.PENDING_APPROVAL) {
+      throw new BadRequestException('Order is not pending approval');
+    }
+
+    // Update order status to PENDING and set approval info
+    const updatedOrder = await this.prisma.order.update({
+      where: { id: orderId },
+      data: {
+        status: OrderStatus.PENDING,
+        requiresApproval: false,
+        approvedAt: new Date(),
+        approvedById: userId,
+      },
+      include: {
+        orderItems: {
+          include: {
+            product: true,
+            modifiers: {
+              include: {
+                modifier: {
+                  include: {
+                    group: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        table: true,
+        approvedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+      },
+    });
+
+    // Mark table as occupied if this order has a table
+    if (updatedOrder.tableId) {
+      await this.prisma.table.update({
+        where: { id: updatedOrder.tableId },
+        data: { status: TableStatus.OCCUPIED },
+      });
+    }
+
+    // Emit WebSocket events for real-time updates
+    // Emit as new order for kitchen and POS systems
+    this.kdsGateway.emitNewOrder(tenantId, updatedOrder);
+    // Also emit update event for any listening clients
+    this.kdsGateway.emitOrderUpdated(tenantId, updatedOrder);
+
+    // CRITICAL: Notify customer if this is a QR menu order
+    if (updatedOrder.sessionId) {
+      this.kdsGateway.emitCustomerOrderApproved(updatedOrder.sessionId, updatedOrder);
+    }
+
+    return updatedOrder;
   }
 }

@@ -108,6 +108,18 @@ export class SqlInjectionPreventionMiddleware implements NestMiddleware {
 
   private detectSqlInjection(data: any): boolean {
     if (typeof data === 'string') {
+      // Skip hex color codes (e.g., #FFFFFF, #3B82F6)
+      const hexColorPattern = /^#[0-9A-Fa-f]{3,8}$/;
+      if (hexColorPattern.test(data)) {
+        return false;
+      }
+
+      // Skip valid GitHub URLs (for desktop app releases and other GitHub integrations)
+      const githubUrlPattern = /^https:\/\/(github\.com|raw\.githubusercontent\.com|api\.github\.com)\/.+$/;
+      if (githubUrlPattern.test(data)) {
+        return false;
+      }
+
       return this.sqlPatterns.some((pattern) => pattern.test(data));
     }
 

@@ -191,7 +191,7 @@ export class InvoicePdfService {
 <body>
     <div class="header">
         <div>
-            <div class="company-name">Restaurant POS</div>
+            <div class="company-name">HummyTummy</div>
             <div style="color: #666; margin-top: 5px;">Subscription Management</div>
         </div>
         <div style="text-align: right;">

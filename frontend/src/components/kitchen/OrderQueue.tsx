@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Order, OrderStatus } from '../../types';
 import OrderCard from './OrderCard';
 
@@ -18,6 +19,7 @@ const OrderQueue = ({
   onCancelOrder,
   updatingOrderId,
 }: OrderQueueProps) => {
+  const { t } = useTranslation('kitchen');
   const filteredOrders = orders.filter((order) => order.status === status);
 
   const getColumnColor = (status: OrderStatus) => {
@@ -47,7 +49,7 @@ const OrderQueue = ({
       <div className="overflow-y-auto h-[calc(100vh-250px)] pr-2">
         {filteredOrders.length === 0 ? (
           <div className="flex items-center justify-center h-32 text-gray-400">
-            <p>No orders</p>
+            <p>{t('kitchen.noOrders')}</p>
           </div>
         ) : (
           filteredOrders.map((order) => (

@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useCustomers, useDeleteCustomer } from '../../features/customers/customersApi';
 import Button from '../../components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 
 const CustomersPage = () => {
+  const { t } = useTranslation('customers');
   const { data: customers = [], isLoading } = useCustomers();
   const { mutate: deleteCustomer } = useDeleteCustomer();
   const [searchTerm, setSearchTerm] = useState('');
@@ -15,7 +17,7 @@ const CustomersPage = () => {
   );
 
   const handleDelete = (id: string, name: string) => {
-    if (window.confirm(`Are you sure you want to delete ${name}?`)) {
+    if (window.confirm(`${t('app:messages.confirmDelete')} ${name}?`)) {
       deleteCustomer(id);
     }
   };
@@ -23,7 +25,7 @@ const CustomersPage = () => {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-600">Loading customers...</div>
+        <div className="text-gray-600">{t('app:app.loading')}</div>
       </div>
     );
   }
@@ -31,8 +33,8 @@ const CustomersPage = () => {
   return (
     <div className="container mx-auto p-4 md:p-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4 md:mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold">Customers</h1>
-        <Button size="sm" className="sm:text-base">Add Customer</Button>
+        <h1 className="text-2xl md:text-3xl font-bold">{t('customers.title')}</h1>
+        <Button size="sm" className="sm:text-base">{t('customers.addCustomer')}</Button>
       </div>
 
       {/* Search */}
@@ -40,7 +42,7 @@ const CustomersPage = () => {
         <CardContent className="pt-4 md:pt-6">
           <input
             type="text"
-            placeholder="Search by name, email, or phone..."
+            placeholder={t('customers.search')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full px-3 md:px-4 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -53,7 +55,7 @@ const CustomersPage = () => {
         {filteredCustomers.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center text-gray-500">
-              {searchTerm ? 'No customers found matching your search.' : 'No customers yet.'}
+              {searchTerm ? t('customers.noCustomers') : t('customers.noCustomers')}
             </CardContent>
           </Card>
         ) : (
@@ -75,15 +77,15 @@ const CustomersPage = () => {
                     {/* Stats */}
                     <div className="flex flex-wrap gap-3 md:gap-6 mt-2 md:mt-3 text-xs md:text-sm">
                       <div>
-                        <span className="text-gray-600">Orders:</span>
+                        <span className="text-gray-600">{t('customers.totalOrders')}:</span>
                         <span className="ml-1 font-medium">{customer.totalOrders || 0}</span>
                       </div>
                       <div>
-                        <span className="text-gray-600">Total Spent:</span>
+                        <span className="text-gray-600">{t('customers.totalSpent')}:</span>
                         <span className="ml-1 font-medium">${customer.totalSpent || '0.00'}</span>
                       </div>
                       <div>
-                        <span className="text-gray-600">Loyalty:</span>
+                        <span className="text-gray-600">{t('app:app.profile')}:</span>
                         <span className="ml-1 font-medium">{customer.loyaltyPoints || 0}</span>
                       </div>
                     </div>
@@ -106,7 +108,7 @@ const CustomersPage = () => {
                   {/* Actions */}
                   <div className="flex gap-2 w-full sm:w-auto">
                     <Button size="sm" variant="outline" className="flex-1 sm:flex-none">
-                      View
+                      {t('app:app.view')}
                     </Button>
                     <Button
                       size="sm"
@@ -114,7 +116,7 @@ const CustomersPage = () => {
                       onClick={() => handleDelete(customer.id, customer.name)}
                       className="flex-1 sm:flex-none"
                     >
-                      Delete
+                      {t('app:app.delete')}
                     </Button>
                   </div>
                 </div>
@@ -128,25 +130,25 @@ const CustomersPage = () => {
       {customers.length > 0 && (
         <Card className="mt-4 md:mt-6">
           <CardHeader>
-            <CardTitle className="text-lg md:text-xl">Summary</CardTitle>
+            <CardTitle className="text-lg md:text-xl">{t('app:app.profile')}</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 text-center">
               <div className="p-3 bg-blue-50 rounded-lg sm:bg-transparent sm:p-0">
                 <p className="text-xl md:text-2xl font-bold text-blue-600">{customers.length}</p>
-                <p className="text-xs md:text-sm text-gray-600">Total Customers</p>
+                <p className="text-xs md:text-sm text-gray-600">{t('customers.title')}</p>
               </div>
               <div className="p-3 bg-green-50 rounded-lg sm:bg-transparent sm:p-0">
                 <p className="text-xl md:text-2xl font-bold text-green-600">
                   ${customers.reduce((sum: number, c: any) => sum + (parseFloat(c.totalSpent) || 0), 0).toFixed(2)}
                 </p>
-                <p className="text-xs md:text-sm text-gray-600">Total Revenue</p>
+                <p className="text-xs md:text-sm text-gray-600">{t('customers.totalSpent')}</p>
               </div>
               <div className="p-3 bg-purple-50 rounded-lg sm:bg-transparent sm:p-0">
                 <p className="text-xl md:text-2xl font-bold text-purple-600">
                   {customers.reduce((sum: number, c: any) => sum + (c.totalOrders || 0), 0)}
                 </p>
-                <p className="text-xs md:text-sm text-gray-600">Total Orders</p>
+                <p className="text-xs md:text-sm text-gray-600">{t('customers.totalOrders')}</p>
               </div>
             </div>
           </CardContent>

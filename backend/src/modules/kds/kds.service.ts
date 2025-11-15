@@ -69,6 +69,13 @@ export class KdsService {
       throw new NotFoundException(`Order with ID ${id} not found`);
     }
 
+    // Prevent status updates for orders awaiting approval
+    if (order.requiresApproval && order.status === OrderStatus.PENDING_APPROVAL) {
+      throw new BadRequestException(
+        'Order requires approval before status can be changed. Please approve the order first.'
+      );
+    }
+
     // Update order status
     const updatedOrder = await this.prisma.order.update({
       where: { id },
@@ -128,7 +135,10 @@ export class KdsService {
 
     const allReady = allItems.every((item) => item.status === OrderItemStatus.READY);
     if (allReady && orderItem.order.status !== OrderStatus.READY) {
-      await this.updateOrderStatus(orderItem.orderId, OrderStatus.READY, tenantId);
+      // Only auto-promote to READY if order doesn't require approval or is already approved
+      if (!orderItem.order.requiresApproval || orderItem.order.status !== OrderStatus.PENDING_APPROVAL) {
+        await this.updateOrderStatus(orderItem.orderId, OrderStatus.READY, tenantId);
+      }
     }
 
     // Emit item status change via WebSocket

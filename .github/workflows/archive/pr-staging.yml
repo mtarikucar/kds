@@ -1,0 +1,225 @@
+name: PR Staging Environment
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: '18.x'
+  SERVER_HOST: '38.242.233.166'
+
+jobs:
+  # Run tests for PR
+  test:
+    name: Run Tests
+    if: github.event.action != 'closed'
+    uses: ./.github/workflows/test.yml
+
+  # Setup staging environment for PR
+  setup-staging:
+    name: Setup PR Staging Environment
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event.action != 'closed'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY_BASE64: ${{ secrets.SSH_PRIVATE_KEY_BASE64 }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY_BASE64" | base64 -d > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Setup PR staging environment
+        id: setup
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          BRANCH_NAME=${{ github.event.pull_request.head.ref }}
+
+          echo "PR_NUMBER=$PR_NUMBER" >> $GITHUB_OUTPUT
+          echo "BRANCH_NAME=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+          # Calculate ports
+          BACKEND_PORT=$((8000 + PR_NUMBER))
+          FRONTEND_PORT=$((8100 + PR_NUMBER))
+
+          echo "BACKEND_PORT=$BACKEND_PORT" >> $GITHUB_OUTPUT
+          echo "FRONTEND_PORT=$FRONTEND_PORT" >> $GITHUB_OUTPUT
+
+          ssh root@${{ env.SERVER_HOST }} << EOF
+            cd /root/kds
+
+            # Setup PR staging environment
+            ./scripts/pr-staging-setup.sh $PR_NUMBER $BRANCH_NAME
+
+            # Get deployment status
+            echo "Deployment Status:"
+            docker ps | grep "pr_${PR_NUMBER}" || echo "No containers found"
+          EOF
+
+      - name: Wait for environment to be ready
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+          BACKEND_PORT=${{ steps.setup.outputs.BACKEND_PORT }}
+
+          echo "Waiting for staging environment to be ready..."
+          max_attempts=60
+          attempt=0
+
+          while [ $attempt -lt $max_attempts ]; do
+            if curl -sf "http://${{ env.SERVER_HOST }}:${BACKEND_PORT}/api/health" > /dev/null 2>&1; then
+              echo "Staging environment is ready!"
+              break
+            fi
+
+            attempt=$((attempt + 1))
+            echo "Attempt $attempt/$max_attempts..."
+            sleep 5
+          done
+
+          if [ $attempt -eq $max_attempts ]; then
+            echo "Staging environment failed to become ready"
+            exit 1
+          fi
+
+      - name: Comment PR with staging URLs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = ${{ github.event.pull_request.number }};
+            const backendPort = ${{ steps.setup.outputs.BACKEND_PORT }};
+            const frontendPort = ${{ steps.setup.outputs.FRONTEND_PORT }};
+            const serverHost = '${{ env.SERVER_HOST }}';
+
+            const comment = `## 🚀 PR Staging Environment Ready!
+
+            Your PR has been deployed to a staging environment for testing.
+
+            ### 🔗 URLs
+            - **Frontend:** http://${serverHost}:${frontendPort}
+            - **Backend API:** http://${serverHost}:${backendPort}/api
+            - **API Health:** http://${serverHost}:${backendPort}/api/health
+
+            ### 📊 Environment Details
+            - **PR Number:** #${prNumber}
+            - **Branch:** \`${{ github.event.pull_request.head.ref }}\`
+            - **Commit:** \`${{ github.event.pull_request.head.sha }}\`
+            - **Last Updated:** ${new Date().toISOString()}
+
+            ### 🧪 Testing
+            You can now test your changes in this isolated staging environment.
+
+            ### ⚠️ Note
+            - This environment will be automatically cleaned up when the PR is closed or merged.
+            - The staging environment shares the same database schema but uses a separate database instance.
+
+            ---
+            *This comment will be updated with each new push to the PR.*
+            `;
+
+            // Find existing comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber
+            });
+
+            const botComment = comments.find(comment =>
+              comment.user.type === 'Bot' &&
+              comment.body.includes('PR Staging Environment')
+            );
+
+            if (botComment) {
+              // Update existing comment
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: comment
+              });
+            } else {
+              // Create new comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: comment
+              });
+            }
+
+      - name: Add status check
+        uses: actions/github-script@v7
+        if: success()
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.payload.pull_request.head.sha,
+              state: 'success',
+              target_url: `http://${{ env.SERVER_HOST }}:${{ steps.setup.outputs.FRONTEND_PORT }}`,
+              description: 'PR staging environment is ready',
+              context: 'staging/deployment'
+            });
+
+  # Cleanup staging environment when PR is closed
+  cleanup-staging:
+    name: Cleanup PR Staging Environment
+    runs-on: ubuntu-latest
+    if: github.event.action == 'closed'
+
+    steps:
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY_BASE64: ${{ secrets.SSH_PRIVATE_KEY_BASE64 }}
+          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY_BASE64" | base64 -d > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Cleanup staging environment
+        run: |
+          PR_NUMBER=${{ github.event.pull_request.number }}
+
+          ssh root@${{ env.SERVER_HOST }} << EOF
+            cd /root/kds
+
+            # Cleanup PR staging environment
+            ./scripts/pr-staging-cleanup.sh $PR_NUMBER
+
+            echo "Staging environment cleaned up for PR #${PR_NUMBER}"
+          EOF
+
+      - name: Comment PR about cleanup
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = ${{ github.event.pull_request.number }};
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body: `## 🧹 Staging Environment Cleaned Up
+
+              The staging environment for this PR has been removed.
+
+              - Containers stopped and removed
+              - Docker volumes deleted
+              - Resources freed up
+
+              *PR #${prNumber} closed at ${new Date().toISOString()}*`
+            });

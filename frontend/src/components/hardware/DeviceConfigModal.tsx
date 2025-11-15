@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogContent,
@@ -31,34 +32,14 @@ import Button from '@/components/ui/Button';
 import { Switch } from '@/components/ui/switch';
 import { DeviceType, ConnectionType } from '@/types/hardware';
 
-const deviceConfigSchema = z.object({
-  name: z.string().min(1, 'Device name is required'),
-  device_type: z.nativeEnum(DeviceType),
-  connection_type: z.nativeEnum(ConnectionType),
-  // Serial connection fields
-  serial_port: z.string().optional(),
-  baud_rate: z.number().optional(),
-  // Network connection fields
-  ip_address: z.string().optional(),
-  port: z.number().optional(),
-  protocol: z.enum(['Tcp', 'Udp']).optional(),
-  // USB HID fields
-  vendor_id: z.number().optional(),
-  product_id: z.number().optional(),
-  // Bluetooth fields
-  device_address: z.string().optional(),
-  // General settings
-  auto_connect: z.boolean().default(true),
-  timeout_ms: z.number().optional(),
-});
+// Schema will be created inside the component to access i18n messages
 
-type DeviceConfigFormData = z.infer<typeof deviceConfigSchema>;
 
 interface DeviceConfigModalProps {
   open: boolean;
   onClose: () => void;
   onSave: (config: any) => void;
-  initialData?: Partial<DeviceConfigFormData>;
+  initialData?: any;
   mode?: 'create' | 'edit';
 }
 
@@ -69,7 +50,31 @@ export function DeviceConfigModal({
   initialData,
   mode = 'create',
 }: DeviceConfigModalProps) {
+  const { t } = useTranslation(['settings', 'common', 'validation']);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const deviceConfigSchema = z.object({
+    name: z.string().min(1, { message: t('validation.required') as string }),
+    device_type: z.nativeEnum(DeviceType),
+    connection_type: z.nativeEnum(ConnectionType),
+    // Serial connection fields
+    serial_port: z.string().optional(),
+    baud_rate: z.number().optional(),
+    // Network connection fields
+    ip_address: z.string().optional(),
+    port: z.number().optional(),
+    protocol: z.enum(['Tcp', 'Udp']).optional(),
+    // USB HID fields
+    vendor_id: z.number().optional(),
+    product_id: z.number().optional(),
+    // Bluetooth fields
+    device_address: z.string().optional(),
+    // General settings
+    auto_connect: z.boolean().default(true),
+    timeout_ms: z.number().optional(),
+  });
+
+  type DeviceConfigFormData = z.infer<typeof deviceConfigSchema>;
 
   const form = useForm<DeviceConfigFormData>({
     resolver: zodResolver(deviceConfigSchema),
@@ -147,10 +152,10 @@ export function DeviceConfigModal({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {mode === 'create' ? 'Add Hardware Device' : 'Edit Hardware Device'}
+            {mode === 'create' ? t('hardware.addHardwareDevice') : t('hardware.editHardwareDevice')}
           </DialogTitle>
           <DialogDescription>
-            Configure your hardware device connection settings
+            {t('hardware.configureDeviceDescription')}
           </DialogDescription>
         </DialogHeader>
 
@@ -161,12 +166,12 @@ export function DeviceConfigModal({
               name="name"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Device Name</FormLabel>
+                  <FormLabel>{t('hardware.deviceName')}</FormLabel>
                   <FormControl>
-                    <Input placeholder="Main Receipt Printer" {...field} />
+                    <Input placeholder={t('hardware.deviceNamePlaceholder') as string} {...field} />
                   </FormControl>
                   <FormDescription>
-                    A friendly name to identify this device
+                    {t('hardware.deviceNameHelp')}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -178,31 +183,31 @@ export function DeviceConfigModal({
               name="device_type"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Device Type</FormLabel>
+                  <FormLabel>{t('hardware.deviceType')}</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select device type" />
+                        <SelectValue placeholder={t('hardware.selectDeviceType') as string} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       <SelectItem value={DeviceType.THERMAL_PRINTER}>
-                        Thermal Printer
+                        {t('integrationTypes.THERMAL_PRINTER')}
                       </SelectItem>
-                      <SelectItem value={DeviceType.CASH_DRAWER}>Cash Drawer</SelectItem>
+                      <SelectItem value={DeviceType.CASH_DRAWER}>{t('integrationTypes.CASH_DRAWER')}</SelectItem>
                       <SelectItem value={DeviceType.RESTAURANT_PAGER}>
-                        Restaurant Pager
+                        {t('integrationTypes.RESTAURANT_PAGER')}
                       </SelectItem>
                       <SelectItem value={DeviceType.BARCODE_READER}>
-                        Barcode Reader
+                        {t('integrationTypes.BARCODE_READER')}
                       </SelectItem>
                       <SelectItem value={DeviceType.CUSTOMER_DISPLAY}>
-                        Customer Display
+                        {t('integrationTypes.CUSTOMER_DISPLAY')}
                       </SelectItem>
                       <SelectItem value={DeviceType.KITCHEN_DISPLAY}>
-                        Kitchen Display
+                        {t('integrationTypes.KITCHEN_DISPLAY')}
                       </SelectItem>
-                      <SelectItem value={DeviceType.SCALE_DEVICE}>Scale Device</SelectItem>
+                      <SelectItem value={DeviceType.SCALE_DEVICE}>{t('integrationTypes.SCALE_DEVICE')}</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -215,22 +220,22 @@ export function DeviceConfigModal({
               name="connection_type"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Connection Type</FormLabel>
+                  <FormLabel>{t('hardware.connectionType')}</FormLabel>
                   <Select onValueChange={field.onChange} defaultValue={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select connection type" />
+                        <SelectValue placeholder={t('hardware.selectConnectionType') as string} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       <SelectItem value={ConnectionType.SERIAL}>
-                        Serial (RS-232/USB)
+                        {t('hardware.connectionTypes.serial')}
                       </SelectItem>
                       <SelectItem value={ConnectionType.NETWORK}>
-                        Network (TCP/IP)
+                        {t('hardware.connectionTypes.network')}
                       </SelectItem>
-                      <SelectItem value={ConnectionType.USB_HID}>USB HID</SelectItem>
-                      <SelectItem value={ConnectionType.BLUETOOTH}>Bluetooth</SelectItem>
+                      <SelectItem value={ConnectionType.USB_HID}>{t('hardware.connectionTypes.usbHid')}</SelectItem>
+                      <SelectItem value={ConnectionType.BLUETOOTH}>{t('hardware.connectionTypes.bluetooth')}</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />
@@ -246,12 +251,12 @@ export function DeviceConfigModal({
                   name="serial_port"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Serial Port</FormLabel>
+                      <FormLabel>{t('hardware.serial.port')}</FormLabel>
                       <FormControl>
-                        <Input placeholder="COM1 or /dev/ttyUSB0" {...field} />
+                        <Input placeholder={t('hardware.serial.portPlaceholder') as string} {...field} />
                       </FormControl>
                       <FormDescription>
-                        Windows: COM1, COM2, etc. | Linux: /dev/ttyUSB0, /dev/ttyS0
+                        {t('hardware.serial.portHelp')}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -262,14 +267,14 @@ export function DeviceConfigModal({
                   name="baud_rate"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Baud Rate</FormLabel>
+                      <FormLabel>{t('hardware.serial.baudRate')}</FormLabel>
                       <Select
                         onValueChange={(value) => field.onChange(parseInt(value))}
                         defaultValue={field.value?.toString()}
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select baud rate" />
+                            <SelectValue placeholder={t('hardware.serial.selectBaudRate') as string} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -295,7 +300,7 @@ export function DeviceConfigModal({
                   name="ip_address"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>IP Address</FormLabel>
+                      <FormLabel>{t('hardware.network.ipAddress')}</FormLabel>
                       <FormControl>
                         <Input placeholder="192.168.1.100" {...field} />
                       </FormControl>
@@ -308,7 +313,7 @@ export function DeviceConfigModal({
                   name="port"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Port</FormLabel>
+                      <FormLabel>{t('hardware.network.port')}</FormLabel>
                       <FormControl>
                         <Input
                           type="number"
@@ -326,11 +331,11 @@ export function DeviceConfigModal({
                   name="protocol"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Protocol</FormLabel>
+                      <FormLabel>{t('hardware.network.protocol')}</FormLabel>
                       <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select protocol" />
+                            <SelectValue placeholder={t('hardware.network.selectProtocol') as string} />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
@@ -353,7 +358,7 @@ export function DeviceConfigModal({
                   name="vendor_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Vendor ID (Hex)</FormLabel>
+                      <FormLabel>{t('hardware.usb.vendorId')}</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="0x1234"
@@ -365,7 +370,7 @@ export function DeviceConfigModal({
                         />
                       </FormControl>
                       <FormDescription>
-                        USB Vendor ID in hexadecimal format (e.g., 0x04B8)
+                        {t('hardware.usb.vendorIdHelp')}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -376,7 +381,7 @@ export function DeviceConfigModal({
                   name="product_id"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Product ID (Hex)</FormLabel>
+                      <FormLabel>{t('hardware.usb.productId')}</FormLabel>
                       <FormControl>
                         <Input
                           placeholder="0x5678"
@@ -388,7 +393,7 @@ export function DeviceConfigModal({
                         />
                       </FormControl>
                       <FormDescription>
-                        USB Product ID in hexadecimal format (e.g., 0x0202)
+                        {t('hardware.usb.productIdHelp')}
                       </FormDescription>
                       <FormMessage />
                     </FormItem>
@@ -404,12 +409,12 @@ export function DeviceConfigModal({
                 name="device_address"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Bluetooth MAC Address</FormLabel>
+                    <FormLabel>{t('hardware.bluetooth.macAddress')}</FormLabel>
                     <FormControl>
                       <Input placeholder="00:11:22:33:44:55" {...field} />
                     </FormControl>
                     <FormDescription>
-                      The Bluetooth MAC address of the device
+                      {t('hardware.bluetooth.macHelp')}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -423,9 +428,9 @@ export function DeviceConfigModal({
               render={({ field }) => (
                 <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
                   <div className="space-y-0.5">
-                    <FormLabel>Auto Connect</FormLabel>
+                    <FormLabel>{t('hardware.autoConnect')}</FormLabel>
                     <FormDescription>
-                      Automatically connect to this device on startup
+                      {t('hardware.autoConnectHelp')}
                     </FormDescription>
                   </div>
                   <FormControl>
@@ -437,10 +442,10 @@ export function DeviceConfigModal({
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={onClose}>
-                Cancel
+                {t('common:app.cancel')}
               </Button>
               <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Saving...' : mode === 'create' ? 'Add Device' : 'Save Changes'}
+                {isSubmitting ? t('hardware.saving') : mode === 'create' ? t('hardware.addDevice') : t('common:app.save')}
               </Button>
             </DialogFooter>
           </form>

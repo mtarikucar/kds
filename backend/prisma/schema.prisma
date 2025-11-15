@@ -36,6 +36,8 @@ model Tenant {
   categories          Category[]
   products            Product[]
   productImages       ProductImage[]
+  modifierGroups      ModifierGroup[]
+  modifiers           Modifier[]
   tables              Table[]
   orders              Order[]
   stockMovements      StockMovement[]
@@ -61,10 +63,10 @@ model User {
   role      String   // ADMIN, MANAGER, WAITER, KITCHEN, COURIER
   status    String   @default("ACTIVE") // ACTIVE, INACTIVE
 
-  // Email verification
-  emailVerified              Boolean   @default(false)
-  emailVerificationToken     String?   @unique
-  emailVerificationExpires   DateTime?
+  // Email verification (code-based)
+  emailVerified                 Boolean   @default(false)
+  emailVerificationCode         String?   @db.VarChar(6)
+  emailVerificationCodeExpires  DateTime?
 
   // Password reset
   resetToken       String?   @unique
@@ -82,10 +84,13 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
-  orders             Order[]
-  stockMovements     StockMovement[]
-  notifications      Notification[]
-  readNotifications  UserNotificationRead[]
+  orders                         Order[]
+  approvedOrders                 Order[] @relation("ApprovedOrders")
+  acknowledgedWaiterRequests     WaiterRequest[] @relation("AcknowledgedWaiterRequests")
+  acknowledgedBillRequests       BillRequest[] @relation("AcknowledgedBillRequests")
+  stockMovements                 StockMovement[]
+  notifications                  Notification[]
+  readNotifications              UserNotificationRead[]
 
   @@index([tenantId])
   @@index([email])
@@ -137,9 +142,10 @@ model Product {
   updatedAt DateTime @updatedAt
 
   // Relations
-  productImages  ProductToImage[] // Many-to-many through junction table
-  orderItems     OrderItem[]
-  stockMovements StockMovement[]
+  productImages      ProductToImage[]      // Many-to-many through junction table
+  orderItems         OrderItem[]
+  stockMovements     StockMovement[]
+  modifierGroups     ProductModifierGroup[] // Many-to-many for modifiers
 
   @@index([tenantId])
   @@index([categoryId])
@@ -185,6 +191,83 @@ model ProductToImage {
 }
 
 // ========================================
+// PRODUCT MODIFIER SYSTEM
+// ========================================
+
+model ModifierGroup {
+  id             String  @id @default(uuid())
+  name           String  // Internal name (e.g., "sauces")
+  displayName    String  // Display name (e.g., "Soslar", "Sauces")
+  description    String?
+  selectionType  String  @default("SINGLE") // SINGLE or MULTIPLE
+  minSelections  Int     @default(0) // Minimum number of selections required
+  maxSelections  Int? // Maximum number of selections allowed (null = unlimited)
+  isRequired     Boolean @default(false)
+  displayOrder   Int     @default(0)
+  isActive       Boolean @default(true)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  modifiers        Modifier[]
+  productMappings  ProductModifierGroup[]
+
+  @@index([tenantId])
+  @@index([isActive])
+  @@map("modifier_groups")
+}
+
+model Modifier {
+  id              String  @id @default(uuid())
+  name            String  // Internal name (e.g., "ranch_sauce")
+  displayName     String  // Display name (e.g., "Ranch Sos", "Ranch Sauce")
+  description     String?
+  priceAdjustment Decimal @default(0) @db.Decimal(10, 2) // Price change (can be positive or negative)
+  isAvailable     Boolean @default(true)
+  displayOrder    Int     @default(0)
+
+  groupId String
+  group   ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  orderItemModifiers OrderItemModifier[]
+
+  @@index([groupId])
+  @@index([tenantId])
+  @@index([isAvailable])
+  @@map("modifiers")
+}
+
+// Junction table for many-to-many relationship between Product and ModifierGroup
+model ProductModifierGroup {
+  id           String @id @default(uuid())
+  displayOrder Int    @default(0)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  groupId String
+  group   ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([productId, groupId])
+  @@index([productId])
+  @@index([groupId])
+  @@map("product_modifier_groups")
+}
+
+// ========================================
 // TABLE MANAGEMENT
 // ========================================
 
@@ -202,7 +285,9 @@ model Table {
   updatedAt DateTime @updatedAt
 
   // Relations
-  orders Order[]
+  orders         Order[]
+  waiterRequests WaiterRequest[]
+  billRequests   BillRequest[]
 
   @@unique([tenantId, number])
   @@index([tenantId])
@@ -217,7 +302,7 @@ model Order {
   id          String   @id @default(uuid())
   orderNumber String
   type        String   // DINE_IN, TAKEAWAY, DELIVERY
-  status      String   @default("PENDING") // PENDING, PREPARING, READY, SERVED, PAID, CANCELLED
+  status      String   @default("PENDING") // PENDING_APPROVAL, PENDING, PREPARING, READY, SERVED, PAID, CANCELLED
 
   totalAmount  Decimal @db.Decimal(10, 2)
   discount     Decimal @default(0) @db.Decimal(10, 2)
@@ -226,14 +311,23 @@ model Order {
   notes        String?
   customerName String?
 
+  // Customer ordering fields
+  sessionId        String? // UUID for customer session tracking
+  customerPhone    String? // Optional customer phone
+  requiresApproval Boolean @default(false) // If true, waiter must approve before going to kitchen
+  approvedAt       DateTime? // When the order was approved
+
   tableId String?
   table   Table?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
 
   customerId String?
   customer   Customer? @relation("CustomerOrders", fields: [customerId], references: [id], onDelete: SetNull)
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
+  userId String? // Nullable for customer orders
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  approvedById String? // Staff who approved the order
+  approvedBy   User?   @relation("ApprovedOrders", fields: [approvedById], references: [id], onDelete: SetNull)
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -252,16 +346,19 @@ model Order {
   @@index([tableId])
   @@index([customerId])
   @@index([status])
+  @@index([sessionId])
+  @@index([approvedById])
   @@map("orders")
 }
 
 model OrderItem {
-  id        String  @id @default(uuid())
-  quantity  Int
-  unitPrice Decimal @db.Decimal(10, 2)
-  subtotal  Decimal @db.Decimal(10, 2)
-  notes     String?
-  status    String  @default("PENDING") // PENDING, PREPARING, READY
+  id            String  @id @default(uuid())
+  quantity      Int
+  unitPrice     Decimal @db.Decimal(10, 2)
+  subtotal      Decimal @db.Decimal(10, 2)
+  modifierTotal Decimal @default(0) @db.Decimal(10, 2) // Total cost of modifiers
+  notes         String?
+  status        String  @default("PENDING") // PENDING, PREPARING, READY
 
   orderId String
   order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -272,9 +369,31 @@ model OrderItem {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Relations
+  modifiers OrderItemModifier[]
+
   @@index([orderId])
   @@index([productId])
   @@map("order_items")
+}
+
+// Modifiers selected for a specific order item
+model OrderItemModifier {
+  id              String  @id @default(uuid())
+  quantity        Int     @default(1) // How many of this modifier (e.g., 2x extra cheese)
+  priceAdjustment Decimal @db.Decimal(10, 2) // Price at the time of order
+
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+
+  modifierId String
+  modifier   Modifier @relation(fields: [modifierId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([orderItemId])
+  @@index([modifierId])
+  @@map("order_item_modifiers")
 }
 
 // ========================================
@@ -608,8 +727,10 @@ model PosSettings {
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // POS operation modes
-  enableTablelessMode   Boolean @default(false)  // Allow orders without table selection
-  enableTwoStepCheckout Boolean @default(false)  // Separate "Create Order" and "Payment" buttons
+  enableTablelessMode    Boolean @default(false)  // Allow orders without table selection
+  enableTwoStepCheckout  Boolean @default(false)  // Separate "Create Order" and "Payment" buttons
+  showProductImages      Boolean @default(true)   // Show product images in POS menu
+  enableCustomerOrdering Boolean @default(true)   // Allow customers to place orders from QR menu
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -723,11 +844,17 @@ model Customer {
   name  String
   email String?
   phone String?
+  phoneVerified Boolean @default(false)
 
   // Loyalty & Engagement
   loyaltyPoints Int      @default(0)
+  loyaltyTier   String   @default("BRONZE") // BRONZE, SILVER, GOLD, PLATINUM
   tags          String[] @default([]) // "VIP", "Regular", "New", etc.
   notes         String?  @db.Text
+
+  // Referral System
+  referralCode  String?   @unique // Unique code for this customer to share (optional)
+  referredBy    String? // Referral code that was used to sign up
 
   // Statistics
   totalOrders  Int     @default(0)
@@ -747,13 +874,144 @@ model Customer {
 
   // Relations
   orders Order[] @relation("CustomerOrders")
+  sessions CustomerSession[]
+  loyaltyTransactions LoyaltyTransaction[]
+  referralsMade CustomerReferral[] @relation("ReferralsMade")
+  referralsReceived CustomerReferral? @relation("ReferralsReceived")
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])
   @@index([tenantId])
   @@index([email])
   @@index([phone])
+  @@index([referralCode])
+  @@index([loyaltyTier])
   @@map("customers")
+}
+
+// ========================================
+// CUSTOMER SESSIONS & LOYALTY
+// ========================================
+
+model CustomerSession {
+  id        String   @id @default(uuid())
+  sessionId String   @unique // Public session identifier
+
+  // Customer identification
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  // Session details
+  tableId   String?
+  phone     String? // Optional phone for identification
+  isActive  Boolean  @default(true)
+
+  // Session metadata
+  userAgent String?
+  ipAddress String?
+
+  // Expiration
+  expiresAt DateTime
+  lastActivity DateTime @default(now())
+
+  tenantId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sessionId])
+  @@index([customerId])
+  @@index([tenantId])
+  @@index([expiresAt])
+  @@map("customer_sessions")
+}
+
+model LoyaltyTransaction {
+  id          String   @id @default(uuid())
+
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  // Transaction details
+  type        String  // EARNED, REDEEMED, EXPIRED, ADJUSTMENT, BONUS, REFERRAL
+  points      Int     // Positive for earned, negative for redeemed
+  description String
+
+  // Order reference (if applicable)
+  orderId String?
+  orderNumber String?
+  orderAmount Decimal? @db.Decimal(10, 2)
+
+  // Referral tracking
+  referredCustomerId String? // Customer who was referred (for referral bonuses)
+
+  // Balance tracking
+  balanceBefore Int // Points balance before transaction
+  balanceAfter  Int // Points balance after transaction
+
+  // Metadata
+  metadata Json? // Additional data like promotion ID, birthday bonus, etc.
+
+  createdAt DateTime @default(now())
+
+  @@index([customerId])
+  @@index([createdAt])
+  @@index([type])
+  @@map("loyalty_transactions")
+}
+
+model PhoneVerification {
+  id        String   @id @default(uuid())
+  phone     String
+  code      String   // 6-digit OTP code
+  verified  Boolean  @default(false)
+  expiresAt DateTime // OTP expires after 10 minutes
+
+  // Session tracking
+  sessionId String?
+  tenantId  String
+
+  // Rate limiting
+  attempts  Int      @default(0)
+  maxAttempts Int    @default(3)
+
+  createdAt DateTime @default(now())
+  verifiedAt DateTime?
+
+  @@index([phone, tenantId])
+  @@index([code])
+  @@index([expiresAt])
+  @@map("phone_verifications")
+}
+
+model CustomerReferral {
+  id              String   @id @default(uuid())
+
+  // Referrer (person who shared the referral code)
+  referrerId      String
+  referrer        Customer @relation("ReferralsMade", fields: [referrerId], references: [id], onDelete: Cascade)
+
+  // Referred (person who used the referral code)
+  referredId      String   @unique
+  referred        Customer @relation("ReferralsReceived", fields: [referredId], references: [id], onDelete: Cascade)
+
+  // Referral details
+  referralCode    String   // Unique code used
+  status          String   @default("PENDING") // PENDING, COMPLETED, EXPIRED
+
+  // Rewards
+  referrerReward  Int      @default(0) // Points given to referrer
+  referredReward  Int      @default(0) // Points given to referred customer
+  rewardedAt      DateTime?
+
+  createdAt DateTime @default(now())
+  completedAt DateTime? // When referred customer completed qualifying action
+
+  @@index([referrerId])
+  @@index([referredId])
+  @@index([referralCode])
+  @@index([status])
+  @@map("customer_referrals")
 }
 
 // ========================================
@@ -807,4 +1065,88 @@ model UserNotificationRead {
   @@index([userId])
   @@index([notificationId])
   @@map("user_notification_reads")
+}
+
+// ========================================
+// CUSTOMER REQUEST SYSTEM
+// ========================================
+
+model WaiterRequest {
+  id      String @id @default(uuid())
+  message String?
+  status  String @default("PENDING") // PENDING, ACKNOWLEDGED, COMPLETED
+  sessionId String
+
+  tableId String
+  table   Table @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  acknowledgedAt   DateTime?
+  acknowledgedById String?
+  acknowledgedBy   User? @relation("AcknowledgedWaiterRequests", fields: [acknowledgedById], references: [id], onDelete: SetNull)
+
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tableId])
+  @@index([status])
+  @@index([sessionId])
+  @@map("waiter_requests")
+}
+
+model BillRequest {
+  id        String @id @default(uuid())
+  status    String @default("PENDING") // PENDING, ACKNOWLEDGED, COMPLETED
+  sessionId String
+
+  tableId String
+  table   Table @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  acknowledgedAt   DateTime?
+  acknowledgedById String?
+  acknowledgedBy   User? @relation("AcknowledgedBillRequests", fields: [acknowledgedById], references: [id], onDelete: SetNull)
+
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tableId])
+  @@index([status])
+  @@index([sessionId])
+  @@map("bill_requests")
+}
+
+// ========================================
+// DESKTOP APPLICATION RELEASES
+// ========================================
+
+model DesktopRelease {
+  id          String   @id @default(uuid())
+  version     String   @unique  // e.g., "0.2.6" (synced with web app)
+  releaseTag  String   @unique  // e.g., "v0.2.6"
+
+  published   Boolean  @default(false)
+  pubDate     DateTime @default(now())
+
+  // GitHub Release URLs for each platform
+  windowsUrl       String?
+  windowsSignature String?
+  macArmUrl        String?
+  macArmSignature  String?
+  macIntelUrl      String?
+  macIntelSignature String?
+  linuxUrl         String?
+  linuxSignature   String?
+
+  // Release metadata
+  releaseNotes String  @db.Text // Markdown formatted release notes
+  changelog    String? @db.Text // Detailed changelog
+  downloadCount Int    @default(0) // Total downloads across all platforms
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([version])
+  @@index([published, pubDate])
+  @@map("desktop_releases")
 }

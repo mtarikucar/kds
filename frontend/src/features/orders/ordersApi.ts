@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import i18n from '../../i18n/config';
 import api from '../../lib/api';
 import {
   Order,
@@ -8,6 +9,8 @@ import {
   CreatePaymentDto,
   Payment,
   OrderFilters,
+  WaiterRequest,
+  BillRequest,
 } from '../../types';
 
 export const useOrders = (filters?: OrderFilters) => {
@@ -42,12 +45,16 @@ export const useCreateOrder = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      // Invalidate all order queries (including filtered ones)
+      queryClient.invalidateQueries({ 
+        queryKey: ['orders'],
+        refetchType: 'all' 
+      });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
-      toast.success('Order created successfully');
+      toast.success(i18n.t('pos:orderCreated'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to create order');
+      toast.error(error.response?.data?.message || i18n.t('pos:orderCreateFailed'));
     },
   });
 };
@@ -67,12 +74,16 @@ export const useUpdateOrder = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      // Invalidate all order queries (including filtered ones)
+      queryClient.invalidateQueries({ 
+        queryKey: ['orders'],
+        refetchType: 'all' 
+      });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
-      toast.success('Order updated successfully');
+      toast.success(i18n.t('pos:orderUpdated'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to update order');
+      toast.error(error.response?.data?.message || i18n.t('pos:orderUpdateFailed'));
     },
   });
 };
@@ -93,11 +104,15 @@ export const useUpdateOrderStatus = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
-      toast.success('Order updated successfully');
+      // Invalidate all order queries (including filtered ones)
+      queryClient.invalidateQueries({ 
+        queryKey: ['orders'],
+        refetchType: 'all' 
+      });
+      toast.success(i18n.t('pos:orderUpdated'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to update order');
+      toast.error(error.response?.data?.message || i18n.t('pos:orderUpdateFailed'));
     },
   });
 };
@@ -111,12 +126,16 @@ export const useCancelOrder = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      // Invalidate all order queries (including filtered ones)
+      queryClient.invalidateQueries({ 
+        queryKey: ['orders'],
+        refetchType: 'all' 
+      });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
-      toast.success('Order cancelled successfully');
+      toast.success(i18n.t('pos:orderCancelled'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to cancel order');
+      toast.error(error.response?.data?.message || i18n.t('pos:orderCancelFailed'));
     },
   });
 };
@@ -131,12 +150,16 @@ export const useCancelKdsOrder = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      // Invalidate all order queries (including filtered ones)
+      queryClient.invalidateQueries({ 
+        queryKey: ['orders'],
+        refetchType: 'all' 
+      });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
-      toast.success('Order cancelled');
+      toast.success(i18n.t('pos:orderCancelled'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to cancel order');
+      toast.error(error.response?.data?.message || i18n.t('pos:orderCancelFailed'));
     },
   });
 };
@@ -151,12 +174,171 @@ export const useCreatePayment = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      // Invalidate all order queries (including filtered ones)
+      queryClient.invalidateQueries({ 
+        queryKey: ['orders'],
+        refetchType: 'all' 
+      });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
-      toast.success('Payment recorded successfully');
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      toast.success(i18n.t('pos:paymentRecorded'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to record payment');
+      toast.error(error.response?.data?.message || i18n.t('pos:paymentRecordFailed'));
+    },
+  });
+};
+
+// ========================================
+// CUSTOMER ORDERS - STAFF HOOKS
+// ========================================
+
+export const usePendingOrders = () => {
+  return useQuery({
+    queryKey: ['orders', 'pending'],
+    queryFn: async (): Promise<Order[]> => {
+      const response = await api.get('/orders', {
+        params: { status: 'PENDING_APPROVAL' },
+      });
+      return response.data;
+    },
+    // Real-time updates via Socket.IO - no polling needed
+  });
+};
+
+export const useApproveOrder = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (orderId: string): Promise<Order> => {
+      const response = await api.post(`/orders/${orderId}/approve`);
+      return response.data;
+    },
+    onSuccess: () => {
+      // Invalidate all order queries (including filtered ones)
+      queryClient.invalidateQueries({ 
+        queryKey: ['orders'],
+        refetchType: 'all' 
+      });
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      toast.success('Order approved successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to approve order');
+    },
+  });
+};
+
+// ========================================
+// WAITER REQUESTS - STAFF HOOKS
+// ========================================
+
+export const useWaiterRequests = () => {
+  return useQuery({
+    queryKey: ['waiterRequests'],
+    queryFn: async (): Promise<WaiterRequest[]> => {
+      const response = await api.get('/customer-orders/waiter-requests/tenant/active');
+      return response.data;
+    },
+    refetchInterval: 10000, // Poll every 10 seconds
+  });
+};
+
+export const useAcknowledgeWaiterRequest = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (requestId: string): Promise<WaiterRequest> => {
+      const response = await api.patch(`/customer-orders/waiter-requests/${requestId}/acknowledge`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ 
+        queryKey: ['waiterRequests'],
+        refetchType: 'all' 
+      });
+      toast.success('Waiter request acknowledged');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to acknowledge request');
+    },
+  });
+};
+
+export const useCompleteWaiterRequest = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (requestId: string): Promise<WaiterRequest> => {
+      const response = await api.patch(`/customer-orders/waiter-requests/${requestId}/complete`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ 
+        queryKey: ['waiterRequests'],
+        refetchType: 'all' 
+      });
+      toast.success('Waiter request completed');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to complete request');
+    },
+  });
+};
+
+// ========================================
+// BILL REQUESTS - STAFF HOOKS
+// ========================================
+
+export const useBillRequests = () => {
+  return useQuery({
+    queryKey: ['billRequests'],
+    queryFn: async (): Promise<BillRequest[]> => {
+      const response = await api.get('/customer-orders/bill-requests/tenant/active');
+      return response.data;
+    },
+    refetchInterval: 10000, // Poll every 10 seconds
+  });
+};
+
+export const useAcknowledgeBillRequest = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (requestId: string): Promise<BillRequest> => {
+      const response = await api.patch(`/customer-orders/bill-requests/${requestId}/acknowledge`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ 
+        queryKey: ['billRequests'],
+        refetchType: 'all' 
+      });
+      toast.success('Bill request acknowledged');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to acknowledge request');
+    },
+  });
+};
+
+export const useCompleteBillRequest = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (requestId: string): Promise<BillRequest> => {
+      const response = await api.patch(`/customer-orders/bill-requests/${requestId}/complete`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ 
+        queryKey: ['billRequests'],
+        refetchType: 'all' 
+      });
+      toast.success('Bill request completed');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to complete request');
     },
   });
 };

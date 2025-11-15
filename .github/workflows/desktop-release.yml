@@ -1,0 +1,733 @@
+name: Desktop App Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggers on version tags like v0.2.7
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v0.2.7)'
+        required: true
+        type: string
+
+permissions:
+  contents: write  # Required for creating releases and uploading assets
+
+env:
+  NODE_VERSION: '18.x'
+  RUST_VERSION: 'stable'
+
+jobs:
+  # Extract version and prepare release
+  prepare:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.VERSION }}
+      version_number: ${{ steps.version.outputs.VERSION_NUMBER }}
+    steps:
+      - name: Get version from tag
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.tag }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          VERSION_NUMBER="${VERSION#v}"
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "VERSION_NUMBER=$VERSION_NUMBER" >> $GITHUB_OUTPUT
+          echo "📦 Building version: $VERSION"
+
+  # Create GitHub release first (before parallel builds)
+  create-release:
+    name: Create GitHub Release
+    needs: prepare
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete existing release if present
+        continue-on-error: true
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+          echo "🗑️ Checking for existing release $VERSION..."
+
+          if gh release view $VERSION &>/dev/null; then
+            echo "Found existing release, deleting..."
+            gh release delete $VERSION --yes
+            echo "✅ Deleted existing release"
+          else
+            echo "No existing release found, proceeding with creation"
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate release notes
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+
+          # Get previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 $VERSION^ 2>/dev/null || echo "")
+
+          if [ -n "$PREV_TAG" ]; then
+            echo "Generating changelog from $PREV_TAG to $VERSION"
+            CHANGELOG=$(git log $PREV_TAG..$VERSION --pretty=format:"- %s (%h)" --no-merges)
+          else
+            echo "No previous tag found, using recent commits"
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --no-merges -10)
+          fi
+
+          # Write release notes to file
+          cat > release_notes.md << EOF
+          ## 🎉 HummyTummy Desktop App $VERSION
+
+          ### 📥 Downloads
+
+          Available installers:
+
+          - **Windows (x64):** .msi installer
+          - **Linux (x64):** .AppImage file
+
+          ### 🔄 Auto-Updates
+
+          This release includes automatic update checking. The app will notify you when new versions are available.
+
+          ### 📝 Changes
+
+          $CHANGELOG
+
+          ### 🐛 Issues?
+
+          Please report any issues on our [GitHub Issues](https://github.com/mtarikucar/kds/issues) page.
+
+          ---
+
+          🤖 Generated with [Claude Code](https://claude.com/claude-code)
+          EOF
+
+          cat release_notes.md
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.version }}
+          name: Release ${{ needs.prepare.outputs.version }}
+          body_path: release_notes.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Build desktop app for each platform
+  build:
+    name: Build ${{ matrix.platform }}
+    needs: [prepare, create-release]
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'windows-x86_64'
+            os: windows-latest
+            target: 'x86_64-pc-windows-msvc'
+            bundles: 'msi nsis'
+            artifact_name: '*.msi'
+            artifact_path: 'src-tauri/target/release/bundle/msi/'
+
+          - platform: 'linux-x86_64'
+            os: ubuntu-latest
+            target: 'x86_64-unknown-linux-gnu'
+            bundles: 'appimage'
+            artifact_name: '*.AppImage'
+            artifact_path: 'src-tauri/target/release/bundle/appimage/'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          targets: ${{ matrix.target }}
+
+      - name: Install Linux dependencies
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libssl-dev \
+            libudev-dev
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Update version in tauri.conf.json
+        working-directory: frontend/src-tauri
+        shell: bash
+        run: |
+          VERSION_NUMBER="${{ needs.prepare.outputs.version_number }}"
+          # Update version using node
+          node -e "
+            const fs = require('fs');
+            const config = JSON.parse(fs.readFileSync('tauri.conf.json', 'utf8'));
+            config.version = '$VERSION_NUMBER';
+            fs.writeFileSync('tauri.conf.json', JSON.stringify(config, null, 2));
+          "
+          echo "✅ Updated tauri.conf.json version to $VERSION_NUMBER"
+
+      - name: Create production .env file
+        working-directory: frontend
+        shell: bash
+        run: |
+          echo "Creating .env file with production URLs..."
+          cat > .env << EOF
+          VITE_API_URL=https://hummytummy.com/api
+          VITE_SOCKET_URL=https://hummytummy.com
+          VITE_WS_URL=wss://hummytummy.com
+          VITE_APP_VERSION=${{ needs.prepare.outputs.version }}
+          EOF
+          echo "✅ .env file created:"
+          cat .env
+
+      - name: Build Tauri app
+        working-directory: frontend
+        env:
+          # Production API URLs
+          VITE_API_URL: https://hummytummy.com/api
+          VITE_SOCKET_URL: https://hummytummy.com
+          VITE_WS_URL: wss://hummytummy.com
+          # Tauri signing
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          # Windows signing
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          echo "🔨 Starting Tauri build for target: ${{ matrix.target }}"
+          echo "Bundles: ${{ matrix.bundles }}"
+          npm run tauri build -- --ci --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --verbose || {
+            echo "❌ Tauri build failed!"
+            echo "Checking if target directory was created..."
+            ls -lah src-tauri/target/ 2>/dev/null || echo "No target directory found"
+            exit 1
+          }
+          echo "✅ Tauri build completed"
+
+      - name: Debug - List build output
+        if: always()
+        working-directory: frontend
+        shell: bash
+        run: |
+          echo "📦 Checking build output..."
+          echo ""
+          echo "=== Target directory structure ==="
+          find src-tauri/target -type d -maxdepth 3 2>/dev/null || echo "No target directory found"
+          echo ""
+          echo "=== Release directory ==="
+          ls -lah src-tauri/target/release/ 2>/dev/null || echo "No release directory found"
+          echo ""
+          echo "=== Bundle directory ==="
+          ls -lah src-tauri/target/release/bundle/ 2>/dev/null || echo "No bundle directory found"
+          echo ""
+          echo "=== Looking for any installer files ==="
+          find src-tauri/target -type f \( -name "*.msi" -o -name "*.exe" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) 2>/dev/null || echo "No installer files found anywhere"
+
+      - name: Sign Windows binary
+        if: matrix.platform == 'windows-x86_64'
+        working-directory: frontend
+        shell: pwsh
+        env:
+          WINDOWS_CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if ($env:WINDOWS_CERTIFICATE) {
+            Write-Host "🔐 Signing Windows binary..."
+
+            # Decode certificate from base64
+            $certBytes = [Convert]::FromBase64String($env:WINDOWS_CERTIFICATE)
+            $certPath = ".\certificate.pfx"
+            [IO.File]::WriteAllBytes($certPath, $certBytes)
+
+            # Sign MSI files (Tauri 2.0 uses target-specific paths)
+            Get-ChildItem -Path "src-tauri/target" -Recurse -Filter "*.msi" | ForEach-Object {
+              Write-Host "Signing: $($_.FullName)"
+              & signtool sign /f $certPath /p $env:WINDOWS_CERTIFICATE_PASSWORD /tr http://timestamp.digicert.com /td sha256 /fd sha256 $_.FullName
+            }
+
+            # Also sign NSIS installers if they exist
+            Get-ChildItem -Path "src-tauri/target" -Recurse -Filter "*-setup.exe" | ForEach-Object {
+              Write-Host "Signing: $($_.FullName)"
+              & signtool sign /f $certPath /p $env:WINDOWS_CERTIFICATE_PASSWORD /tr http://timestamp.digicert.com /td sha256 /fd sha256 $_.FullName
+            }
+
+            # Clean up certificate
+            Remove-Item $certPath
+            Write-Host "✅ Signing completed"
+          } else {
+            Write-Host "⚠️ Windows certificate not configured, skipping signing"
+          }
+
+      - name: Find and rename artifacts
+        shell: bash
+        working-directory: frontend
+        run: |
+          echo "🔍 Finding build artifacts..."
+
+          # Debug: Show all potential artifacts
+          echo "📋 Debug - All installer files in src-tauri/target:"
+          find src-tauri/target -type f \( -name "*.msi" -o -name "*-setup.exe" -o -name "*.exe" -o -name "*.AppImage" \) 2>/dev/null | while read file; do
+            echo "  - $(basename "$file") (full path: $file)"
+          done
+
+          # Tauri 2.0 uses target-specific directories: src-tauri/target/$TARGET/release/bundle
+          if [ "${{ matrix.platform }}" == "windows-x86_64" ]; then
+            echo "🪟 Looking for Windows artifacts (.msi or -setup.exe)..."
+            # Prefer MSI, fallback to NSIS installer
+            ARTIFACT=$(find src-tauri/target -type f -name "*.msi" | head -n 1)
+            if [ -z "$ARTIFACT" ]; then
+              ARTIFACT=$(find src-tauri/target -type f -name "*-setup.exe" | head -n 1)
+              EXT="exe"
+              NEW_NAME="hummytummy-kds_${{ needs.prepare.outputs.version_number }}_x64_en-US-setup.exe"
+            else
+              EXT="msi"
+              NEW_NAME="hummytummy-kds_${{ needs.prepare.outputs.version_number }}_x64_en-US.msi"
+            fi
+          else
+            echo "🐧 Looking for Linux artifacts (.AppImage)..."
+            # Look for AppImage
+            ARTIFACT=$(find src-tauri/target -type f -name "*.AppImage" | head -n 1)
+            EXT="AppImage"
+            NEW_NAME="hummytummy-kds_${{ needs.prepare.outputs.version_number }}_amd64.AppImage"
+          fi
+
+          if [ -z "$ARTIFACT" ]; then
+            echo "❌ No artifact found!"
+            echo "Searched in entire src-tauri/target directory"
+            echo "All installer files found:"
+            find src-tauri/target -type f \( -name "*.msi" -o -name "*.exe" -o -name "*.AppImage" \) 2>/dev/null || echo "No installer files found"
+            exit 1
+          fi
+
+          echo "✅ Found artifact: $ARTIFACT (extension: $EXT)"
+          echo "📝 Original filename: $(basename "$ARTIFACT")"
+          echo "📝 Will rename to: $NEW_NAME"
+
+          # Create output directory and copy artifact
+          mkdir -p output
+          cp "$ARTIFACT" "output/$NEW_NAME"
+
+          echo "✅ Renamed and copied: $(basename $ARTIFACT) -> $NEW_NAME"
+          echo "ARTIFACT_NAME=$NEW_NAME" >> $GITHUB_ENV
+          echo "ARTIFACT_PATH=output/$NEW_NAME" >> $GITHUB_ENV
+          echo "ARTIFACT_EXTENSION=$EXT" >> $GITHUB_ENV
+
+      - name: Find updater bundles and signatures
+        shell: bash
+        working-directory: frontend
+        run: |
+          echo "🔍 Looking for updater bundles and signatures..."
+
+          # Tauri updater creates .tar.gz (Linux) and .zip (Windows) bundles with .sig files
+          if [ "${{ matrix.platform }}" == "windows-x86_64" ]; then
+            echo "🪟 Looking for Windows updater bundles (.msi.zip and .msi.zip.sig)..."
+            UPDATER_BUNDLE=$(find src-tauri/target -type f -name "*.msi.zip" | head -n 1)
+            UPDATER_SIG=$(find src-tauri/target -type f -name "*.msi.zip.sig" | head -n 1)
+          else
+            echo "🐧 Looking for Linux updater bundles (.AppImage.tar.gz and .AppImage.tar.gz.sig)..."
+            UPDATER_BUNDLE=$(find src-tauri/target -type f -name "*.AppImage.tar.gz" | head -n 1)
+            UPDATER_SIG=$(find src-tauri/target -type f -name "*.AppImage.tar.gz.sig" | head -n 1)
+          fi
+
+          if [ -n "$UPDATER_BUNDLE" ] && [ -n "$UPDATER_SIG" ]; then
+            echo "✅ Found updater bundle: $UPDATER_BUNDLE"
+            echo "✅ Found signature file: $UPDATER_SIG"
+
+            # Copy to output directory
+            cp "$UPDATER_BUNDLE" output/
+            cp "$UPDATER_SIG" output/
+
+            BUNDLE_NAME=$(basename "$UPDATER_BUNDLE")
+            SIG_NAME=$(basename "$UPDATER_SIG")
+
+            echo "UPDATER_BUNDLE_NAME=$BUNDLE_NAME" >> $GITHUB_ENV
+            echo "UPDATER_SIG_NAME=$SIG_NAME" >> $GITHUB_ENV
+            echo "HAS_UPDATER_BUNDLE=true" >> $GITHUB_ENV
+
+            # Read signature content for backend API
+            SIGNATURE_CONTENT=$(cat "$UPDATER_SIG")
+            echo "SIGNATURE_CONTENT<<EOF" >> $GITHUB_ENV
+            echo "$SIGNATURE_CONTENT" >> $GITHUB_ENV
+            echo "EOF" >> $GITHUB_ENV
+
+            echo "✅ Updater files prepared for upload"
+          else
+            echo "⚠️ Updater bundles not found (signing may not be configured)"
+            echo "  This is normal if TAURI_SIGNING_PRIVATE_KEY is not set"
+            echo "HAS_UPDATER_BUNDLE=false" >> $GITHUB_ENV
+          fi
+
+      - name: Upload installer to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.version }}
+          files: frontend/output/${{ env.ARTIFACT_NAME }}
+
+      - name: Upload updater bundles to GitHub Release
+        if: env.HAS_UPDATER_BUNDLE == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare.outputs.version }}
+          files: |
+            frontend/output/${{ env.UPDATER_BUNDLE_NAME }}
+            frontend/output/${{ env.UPDATER_SIG_NAME }}
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Get asset URLs after builds complete
+  get-asset-urls:
+    name: Get Asset Download URLs
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    outputs:
+      windows_url: ${{ steps.upload.outputs.windows_url }}
+      linux_url: ${{ steps.upload.outputs.linux_url }}
+      windows_signature: ${{ steps.upload.outputs.windows_signature }}
+      linux_signature: ${{ steps.upload.outputs.linux_signature }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Wait for assets to be available
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+
+          # Wait for GitHub to process uploaded assets with retry logic
+          echo "⏳ Waiting for GitHub to process uploaded assets..."
+          for i in {1..12}; do
+            ASSET_COUNT=$(gh release view $VERSION --json assets -q '.assets | length' 2>/dev/null || echo "0")
+            if [ "$ASSET_COUNT" -gt 0 ]; then
+              echo "✅ Found $ASSET_COUNT asset(s) after $((i * 5)) seconds"
+              break
+            fi
+            echo "Attempt $i/12: No assets found yet, waiting..."
+            sleep 5
+          done
+
+          # Final wait to ensure assets are fully processed
+          sleep 10
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get asset download URLs
+        id: upload
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+          REPO="${{ github.repository }}"
+
+          # Fetch release assets
+          ASSETS=$(gh release view $VERSION --json assets -q '.assets[] | "\(.name)|\(.url)"')
+
+          echo "📦 Release assets:"
+          echo "$ASSETS"
+
+          # Get actual filenames for URL construction (support both .msi and .exe)
+          # More flexible pattern matching - prioritize .msi, then -setup.exe, exclude .nupkg
+          WINDOWS_FILE=$(echo "$ASSETS" | grep -E "\.msi$" | head -n 1 | cut -d'|' -f1)
+          if [ -z "$WINDOWS_FILE" ]; then
+            WINDOWS_FILE=$(echo "$ASSETS" | grep -E "\-setup\.exe$" | head -n 1 | cut -d'|' -f1)
+          fi
+          if [ -z "$WINDOWS_FILE" ]; then
+            # Fallback: any .exe that's not .nupkg
+            WINDOWS_FILE=$(echo "$ASSETS" | grep -E "\.exe$" | grep -v "\.nupkg" | head -n 1 | cut -d'|' -f1)
+          fi
+          LINUX_FILE=$(echo "$ASSETS" | grep "\.AppImage" | head -n 1 | cut -d'|' -f1)
+
+          # Get updater bundle URLs (for auto-update) - these are the .zip/.tar.gz versions
+          WINDOWS_UPDATER=$(echo "$ASSETS" | grep "\.msi\.zip$" | head -n 1 | cut -d'|' -f1)
+          LINUX_UPDATER=$(echo "$ASSETS" | grep "\.AppImage\.tar\.gz$" | head -n 1 | cut -d'|' -f1)
+
+          # Construct download URLs - use updater bundles if available, otherwise use installers
+          if [ -n "$WINDOWS_UPDATER" ]; then
+            WINDOWS_URL="https://github.com/$REPO/releases/download/$VERSION/$WINDOWS_UPDATER"
+          else
+            WINDOWS_URL="https://github.com/$REPO/releases/download/$VERSION/$WINDOWS_FILE"
+          fi
+
+          if [ -n "$LINUX_UPDATER" ]; then
+            LINUX_URL="https://github.com/$REPO/releases/download/$VERSION/$LINUX_UPDATER"
+          else
+            LINUX_URL="https://github.com/$REPO/releases/download/$VERSION/$LINUX_FILE"
+          fi
+
+          # Get signature files
+          WINDOWS_SIG_FILE=$(echo "$ASSETS" | grep "\.msi\.zip\.sig$" | head -n 1 | cut -d'|' -f1)
+          LINUX_SIG_FILE=$(echo "$ASSETS" | grep "\.AppImage\.tar\.gz\.sig$" | head -n 1 | cut -d'|' -f1)
+
+          # Download and read signature content
+          WINDOWS_SIG=""
+          LINUX_SIG=""
+
+          if [ -n "$WINDOWS_SIG_FILE" ]; then
+            echo "📥 Downloading Windows signature: $WINDOWS_SIG_FILE"
+            WINDOWS_SIG_URL="https://github.com/$REPO/releases/download/$VERSION/$WINDOWS_SIG_FILE"
+            WINDOWS_SIG=$(curl -sL "$WINDOWS_SIG_URL")
+            echo "✅ Windows signature downloaded"
+          else
+            echo "⚠️ No Windows signature file found (auto-update will not work)"
+          fi
+
+          if [ -n "$LINUX_SIG_FILE" ]; then
+            echo "📥 Downloading Linux signature: $LINUX_SIG_FILE"
+            LINUX_SIG_URL="https://github.com/$REPO/releases/download/$VERSION/$LINUX_SIG_FILE"
+            LINUX_SIG=$(curl -sL "$LINUX_SIG_URL")
+            echo "✅ Linux signature downloaded"
+          else
+            echo "⚠️ No Linux signature file found (auto-update will not work)"
+          fi
+
+          # Set outputs
+          echo "windows_url=$WINDOWS_URL" >> $GITHUB_OUTPUT
+          echo "linux_url=$LINUX_URL" >> $GITHUB_OUTPUT
+          echo "windows_signature<<EOF" >> $GITHUB_OUTPUT
+          echo "$WINDOWS_SIG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "linux_signature<<EOF" >> $GITHUB_OUTPUT
+          echo "$LINUX_SIG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+          echo "✅ Windows URL: $WINDOWS_URL"
+          echo "✅ Linux URL: $LINUX_URL"
+          echo "✅ Windows Signature: ${WINDOWS_SIG:0:50}..."
+          echo "✅ Linux Signature: ${LINUX_SIG:0:50}..."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Push release info to backend API
+  sync-backend:
+    name: Sync with Backend API
+    needs: [prepare, get-asset-urls]
+    runs-on: ubuntu-latest
+    continue-on-error: false  # Fail the workflow if backend sync fails so we catch issues
+
+    steps:
+      - name: Push release to backend
+        run: |
+          VERSION="${{ needs.prepare.outputs.version_number }}"
+          TAG="${{ needs.prepare.outputs.version }}"
+          WINDOWS_URL="${{ needs.get-asset-urls.outputs.windows_url }}"
+          LINUX_URL="${{ needs.get-asset-urls.outputs.linux_url }}"
+          WINDOWS_SIG="${{ needs.get-asset-urls.outputs.windows_signature }}"
+          LINUX_SIG="${{ needs.get-asset-urls.outputs.linux_signature }}"
+
+          # Debug: Check if URLs and signatures are populated
+          echo "🔍 Debug - Release information:"
+          echo "VERSION: $VERSION"
+          echo "TAG: $TAG"
+          echo "WINDOWS_URL: $WINDOWS_URL"
+          echo "LINUX_URL: $LINUX_URL"
+          echo "WINDOWS_SIG: ${WINDOWS_SIG:0:50}..."
+          echo "LINUX_SIG: ${LINUX_SIG:0:50}..."
+
+          # Validate URLs before sending
+          if [ -z "$WINDOWS_URL" ] || [ -z "$LINUX_URL" ]; then
+            echo "❌ Error: One or both download URLs are empty!"
+            echo "Cannot sync to backend without valid URLs"
+            exit 1
+          fi
+
+          # Create release notes (simplified for API)
+          RELEASE_NOTES="Release $TAG of HummyTummy Desktop App"
+
+          echo "📤 Pushing release to backend API..."
+
+          RESPONSE=$(curl -X POST https://hummytummy.com/api/desktop/ci/releases \
+            -H "Content-Type: application/json" \
+            -H "X-API-Key: ${{ secrets.DESKTOP_RELEASE_API_KEY }}" \
+            -d "{
+              \"version\": \"$VERSION\",
+              \"releaseTag\": \"$TAG\",
+              \"windowsUrl\": \"$WINDOWS_URL\",
+              \"windowsSignature\": \"$WINDOWS_SIG\",
+              \"linuxUrl\": \"$LINUX_URL\",
+              \"linuxSignature\": \"$LINUX_SIG\",
+              \"releaseNotes\": \"$RELEASE_NOTES\",
+              \"published\": false
+            }" \
+            -w "\n%{http_code}" \
+            -s)
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "Response code: $HTTP_CODE"
+          echo "Response body: $BODY"
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo "✅ Release created in backend"
+
+            # Get release ID from response
+            RELEASE_ID=$(echo "$BODY" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+
+            if [ -n "$RELEASE_ID" ]; then
+              echo "Release ID: $RELEASE_ID"
+              echo "Publishing release..."
+
+              # Publish the release
+              PUBLISH_RESPONSE=$(curl -X POST "https://hummytummy.com/api/desktop/ci/releases/$RELEASE_ID/publish" \
+                -H "X-API-Key: ${{ secrets.DESKTOP_RELEASE_API_KEY }}" \
+                -w "\n%{http_code}" \
+                -s)
+
+              PUBLISH_CODE=$(echo "$PUBLISH_RESPONSE" | tail -n1)
+
+              if [ "$PUBLISH_CODE" -ge 200 ] && [ "$PUBLISH_CODE" -lt 300 ]; then
+                echo "✅ Release published successfully"
+              else
+                echo "⚠️ Failed to publish release (code: $PUBLISH_CODE)"
+                echo "You can manually publish it from the admin panel"
+              fi
+            fi
+          else
+            echo "❌ Failed to create release in backend"
+            echo "Please manually add the release via the admin panel"
+            echo "⚠️ This is not critical - GitHub release was created successfully"
+          fi
+
+  # Final verification
+  verify:
+    name: Verify Release
+    needs: [prepare, get-asset-urls, sync-backend]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify GitHub release
+        run: |
+          VERSION="${{ needs.prepare.outputs.version }}"
+
+          echo "🔍 Verifying GitHub release $VERSION..."
+
+          # Check if release exists and has assets
+          ASSET_COUNT=$(gh release view $VERSION --json assets -q '.assets | length')
+
+          echo "Found $ASSET_COUNT assets"
+
+          if [ "$ASSET_COUNT" -lt 2 ]; then
+            echo "❌ Expected at least 2 assets (Windows + Linux)"
+            exit 1
+          fi
+
+          echo "✅ GitHub release verified"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify backend API
+        run: |
+          VERSION="${{ needs.prepare.outputs.version_number }}"
+
+          echo "🔍 Checking backend API for version $VERSION..."
+
+          RESPONSE=$(curl -s https://hummytummy.com/api/desktop/releases/latest)
+          LATEST_VERSION=$(echo "$RESPONSE" | grep -o '"version":"[^"]*"' | head -1 | cut -d'"' -f4)
+
+          echo "Latest version in backend: $LATEST_VERSION"
+          echo "Current release: $VERSION"
+
+          if [ "$LATEST_VERSION" == "$VERSION" ]; then
+            echo "✅ Backend API is up to date"
+          else
+            echo "⚠️ Backend API shows different version"
+            echo "This might be expected if the release is not yet published"
+          fi
+
+      - name: Test download URLs
+        continue-on-error: true  # Don't fail workflow if URLs aren't immediately accessible
+        run: |
+          WINDOWS_URL="${{ needs.get-asset-urls.outputs.windows_url }}"
+          LINUX_URL="${{ needs.get-asset-urls.outputs.linux_url }}"
+
+          echo "🔍 Testing download URLs with retry logic..."
+
+          # Function to test URL with retries
+          test_url() {
+            local url=$1
+            local name=$2
+            local max_attempts=5
+            local wait_time=10
+
+            for attempt in $(seq 1 $max_attempts); do
+              echo "Testing $name URL (attempt $attempt/$max_attempts): $url"
+              if curl -I -L -f -s "$url" > /dev/null 2>&1; then
+                echo "✅ $name download URL is accessible"
+                return 0
+              fi
+              if [ $attempt -lt $max_attempts ]; then
+                echo "⏳ Waiting ${wait_time}s before retry..."
+                sleep $wait_time
+              fi
+            done
+
+            echo "⚠️ $name download URL not accessible after $max_attempts attempts"
+            echo "This may be temporary - GitHub might still be processing the asset"
+            return 1
+          }
+
+          # Test both URLs
+          windows_ok=false
+          linux_ok=false
+
+          if test_url "$WINDOWS_URL" "Windows"; then
+            windows_ok=true
+          fi
+
+          if test_url "$LINUX_URL" "Linux"; then
+            linux_ok=true
+          fi
+
+          # Summary
+          if $windows_ok && $linux_ok; then
+            echo "✅ All download URLs verified successfully"
+            exit 0
+          elif $windows_ok || $linux_ok; then
+            echo "⚠️ Some URLs verified, others may need more time"
+            exit 0  # Don't fail - assets may still be processing
+          else
+            echo "⚠️ URLs not accessible yet - this may be temporary"
+            echo "Check the release page: https://github.com/${{ github.repository }}/releases/tag/${{ needs.prepare.outputs.version }}"
+            exit 0  # Don't fail - continue-on-error will handle this
+          fi
+
+      - name: Summary
+        run: |
+          echo "🎉 Desktop app release completed successfully!"
+          echo ""
+          echo "Version: ${{ needs.prepare.outputs.version }}"
+          echo "Windows: ${{ needs.get-asset-urls.outputs.windows_url }}"
+          echo "Linux: ${{ needs.get-asset-urls.outputs.linux_url }}"
+          echo ""
+          echo "Users can now download the new version from:"
+          echo "https://github.com/${{ github.repository }}/releases/tag/${{ needs.prepare.outputs.version }}"

@@ -83,7 +83,7 @@ export class EmailService {
 
       // Send email
       const info = await this.transporter.sendMail({
-        from: `"${this.configService.get<string>('APP_NAME', 'Restaurant POS')}" <${from}>`,
+        from: `"${this.configService.get<string>('APP_NAME', 'HummyTummy')}" <${from}>`,
         to,
         subject,
         html,
@@ -133,22 +133,22 @@ export class EmailService {
   }
 
   /**
-   * Send email verification email
+   * Send email verification code
+   * Sends a 6-digit code for email verification
    */
-  async sendEmailVerificationEmail(
+  async sendEmailVerificationCode(
     email: string,
-    verificationToken: string,
+    code: string,
     userName: string,
   ): Promise<boolean> {
-    const verificationLink = `${this.configService.get<string>('FRONTEND_URL', 'http://localhost:5173')}/verify-email?token=${verificationToken}`;
-
     return this.sendEmail({
       to: email,
-      subject: 'Verify Your Email Address',
-      template: 'email-verification',
+      subject: 'Email Doğrulama Kodu - HummyTummy',
+      template: 'email-verification-code',
       context: {
         userName,
-        verificationLink,
+        code,
+        expiresIn: '1 saat',
       },
     });
   }
@@ -163,7 +163,7 @@ export class EmailService {
   ): Promise<boolean> {
     return this.sendEmail({
       to: email,
-      subject: 'Welcome to Restaurant POS!',
+      subject: 'Welcome to HummyTummy!',
       template: 'welcome',
       context: {
         userName,

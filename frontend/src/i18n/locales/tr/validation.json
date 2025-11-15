@@ -1,0 +1,37 @@
+{
+  "validation": {
+    "required": "Bu alan gereklidir",
+    "email": "Lütfen geçerli bir e-posta adresi girin",
+    "minLength": "En az {{count}} karakter olmalıdır",
+    "maxLength": "{{count}} karakteri geçmemelidir",
+    "min": "En az {{count}} olmalıdır",
+    "max": "{{count}} geçmemelidir",
+    "pattern": "Geçersiz format",
+    "passwordMismatch": "Şifreler eşleşmiyor",
+    "passwordTooWeak": "Şifre çok zayıf",
+    "passwordRequirements": "Şifre en az 8 karakter içermeli, büyük harf, küçük harf ve sayı içermelidir",
+    "invalidPhone": "Lütfen geçerli bir telefon numarası girin",
+    "invalidUrl": "Lütfen geçerli bir URL girin",
+    "invalidZipCode": "Lütfen geçerli bir posta kodu girin",
+    "fileSize": "Dosya boyutu {{size}}MB'ı geçmemelidir",
+    "fileType": "Dosya türüne izin verilmiyor",
+    "invalidDate": "Lütfen geçerli bir tarih girin",
+    "dateMustBeFuture": "Tarih gelecekte olmalıdır",
+    "dateMustBePast": "Tarih geçmişte olmalıdır",
+    "numberOnly": "Sadece sayılara izin verilir",
+    "alphanumericOnly": "Sadece harflere ve sayılara izin verilir",
+    "noSpecialCharacters": "Özel karakterlere izin verilmiyor",
+    "fieldAlreadyExists": "Bu {{field}} zaten mevcut",
+    "invalidCredentials": "Geçersiz e-posta veya şifre",
+    "accountNotFound": "Hesap bulunamadı",
+    "accountAlreadyExists": "Hesap zaten mevcut",
+    "firstNameMin": "Adı en az 2 karakter olmalıdır",
+    "lastNameMin": "Soyadı en az 2 karakter olmalıdır",
+    "passwordMin": "Şifre en az 8 karakter olmalıdır",
+    "passwordsMatch": "Şifreler eşleşmiyor",
+    "nameMin": "Ad en az 2 karakter olmalıdır",
+    "invalidEmail": "Geçersiz e-posta adresi",
+    "messageMin": "Mesaj en az 10 karakter olmalıdır"
+  }
+}
+

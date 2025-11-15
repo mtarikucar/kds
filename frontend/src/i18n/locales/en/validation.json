@@ -1,0 +1,37 @@
+{
+  "validation": {
+    "required": "This field is required",
+    "email": "Please enter a valid email address",
+    "minLength": "Must be at least {{count}} characters",
+    "maxLength": "Must not exceed {{count}} characters",
+    "min": "Must be at least {{count}}",
+    "max": "Must not exceed {{count}}",
+    "pattern": "Invalid format",
+    "passwordMismatch": "Passwords do not match",
+    "passwordTooWeak": "Password is too weak",
+    "passwordRequirements": "Password must contain at least 8 characters, including uppercase, lowercase, and numbers",
+    "invalidPhone": "Please enter a valid phone number",
+    "invalidUrl": "Please enter a valid URL",
+    "invalidZipCode": "Please enter a valid zip code",
+    "fileSize": "File size must not exceed {{size}}MB",
+    "fileType": "File type not allowed",
+    "invalidDate": "Please enter a valid date",
+    "dateMustBeFuture": "Date must be in the future",
+    "dateMustBePast": "Date must be in the past",
+    "numberOnly": "Only numbers are allowed",
+    "alphanumericOnly": "Only letters and numbers are allowed",
+    "noSpecialCharacters": "Special characters are not allowed",
+    "fieldAlreadyExists": "This {{field}} already exists",
+    "invalidCredentials": "Invalid email or password",
+    "accountNotFound": "Account not found",
+    "accountAlreadyExists": "Account already exists",
+    "firstNameMin": "First name must be at least 2 characters",
+    "lastNameMin": "Last name must be at least 2 characters",
+    "passwordMin": "Password must be at least 8 characters",
+    "passwordsMatch": "Passwords don't match",
+    "nameMin": "Name must be at least 2 characters",
+    "invalidEmail": "Invalid email address",
+    "messageMin": "Message must be at least 10 characters"
+  }
+}
+

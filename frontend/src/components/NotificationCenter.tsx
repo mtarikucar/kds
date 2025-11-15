@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNotifications, useMarkAsRead, useMarkAllAsRead } from '../features/notifications/notificationsApi';
 import Button from './ui/Button';
 
 const NotificationCenter = () => {
+  const { t } = useTranslation('common');
   const [isOpen, setIsOpen] = useState(false);
   const { data: notifications = [], isLoading } = useNotifications();
   const { mutate: markAsRead } = useMarkAsRead();
@@ -67,10 +69,10 @@ const NotificationCenter = () => {
 
           <div className="max-h-96 overflow-y-auto">
             {isLoading ? (
-              <div className="p-4 text-center text-gray-500">Loading...</div>
+              <div className="p-4 text-center text-gray-500">{t('app.loading')}</div>
             ) : notifications.length === 0 ? (
               <div className="p-8 text-center text-gray-500">
-                <p>No notifications</p>
+                <p>{t('header.noNotifications')}</p>
               </div>
             ) : (
               notifications.map((notification: any) => {
@@ -107,7 +109,7 @@ const NotificationCenter = () => {
               onClick={() => setIsOpen(false)}
               className="text-sm text-gray-600 hover:text-gray-900"
             >
-              Close
+              {t('app.close')}
             </button>
           </div>
         </div>

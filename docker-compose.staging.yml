@@ -11,16 +11,16 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - '5432:5432'
+      - '5433:5432'
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data_staging:/var/lib/postgresql/data
     healthcheck:
       test: ['CMD-SHELL', 'pg_isready -U postgres']
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - kds_network
+      - kds_staging_network
 
   # Redis Cache (Shared - uses DB 1 for staging)
   redis:
@@ -28,16 +28,16 @@ services:
     container_name: kds_redis_staging
     restart: always
     ports:
-      - '6379:6379'
+      - '6380:6379'
     volumes:
-      - redis_data:/data
+      - redis_data_staging:/data
     healthcheck:
       test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 5s
       retries: 5
     networks:
-      - kds_network
+      - kds_staging_network
 
   # Backend API (NestJS) - Staging
   backend:
@@ -91,17 +91,25 @@ services:
       retries: 3
       start_period: 40s
     networks:
-      - kds_network
+      - kds_staging_network
 
   # Frontend (React) - Staging
   frontend:
+    env_file:
+      - .env.test
     build:
       context: ./frontend
       dockerfile: Dockerfile
       target: production
       args:
-        VITE_API_URL: ${VITE_STAGING_API_URL}
-        VITE_STRIPE_PUBLISHABLE_KEY: ${STRIPE_TEST_PUBLISHABLE_KEY}
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL}
+        VITE_WS_URL: ${VITE_WS_URL}
+        VITE_STRIPE_PUBLISHABLE_KEY: ${VITE_STRIPE_PUBLISHABLE_KEY}
+        VITE_APP_VERSION: ${VITE_APP_VERSION:-test-dev}
+        VITE_BUILD_TIME: ${VITE_BUILD_TIME}
+        VITE_COMMIT_SHA: ${VITE_COMMIT_SHA}
     container_name: kds_frontend_staging
     restart: always
     depends_on:
@@ -115,13 +123,13 @@ services:
       retries: 3
       start_period: 20s
     networks:
-      - kds_network
+      - kds_staging_network
 
 volumes:
-  postgres_data:
-  redis_data:
+  postgres_data_staging:
+  redis_data_staging:
   invoice_storage_staging:
 
 networks:
-  kds_network:
+  kds_staging_network:
     driver: bridge
