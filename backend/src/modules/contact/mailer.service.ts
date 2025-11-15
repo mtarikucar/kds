@@ -72,8 +72,8 @@ export class MailerService {
       });
 
       const mailOptions = {
-        from: process.env.EMAIL_FROM || 'admin@hummytummy.com',
-        to: process.env.ADMIN_EMAIL || 'admin@hummytummy.com',
+        from: process.env.EMAIL_FROM || 'noreply@hummytummy.com',
+        to: process.env.ADMIN_EMAIL || 'contact@hummytummy.com',
         subject: `New Contact Form Submission from ${data.name}`,
         html,
       };
@@ -101,7 +101,7 @@ export class MailerService {
       const html = await this.loadTemplate('user-confirmation', data);
 
       const mailOptions = {
-        from: process.env.EMAIL_FROM || 'admin@hummytummy.com',
+        from: process.env.EMAIL_FROM || 'noreply@hummytummy.com',
         to: data.email,
         subject: 'Thank You for Contacting HummyTummy',
         html,

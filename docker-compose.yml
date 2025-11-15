@@ -67,13 +67,14 @@ services:
       IYZICO_SECRET_KEY: ${IYZICO_SECRET_KEY:-placeholder}
       IYZICO_BASE_URL: ${IYZICO_BASE_URL:-https://sandbox-api.iyzipay.com}
       # Email Configuration (GoDaddy SMTP)
+      # Auth: admin@, From: noreply@, To: contact@
       EMAIL_HOST: ${EMAIL_HOST:-smtpout.secureserver.net}
       EMAIL_PORT: ${EMAIL_PORT:-587}
       EMAIL_SECURE: ${EMAIL_SECURE:-false}
       EMAIL_USER: ${EMAIL_USER:-admin@hummytummy.com}
       EMAIL_PASSWORD: ${EMAIL_PASSWORD:-}
-      EMAIL_FROM: ${EMAIL_FROM:-admin@hummytummy.com}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@hummytummy.com}
+      EMAIL_FROM: ${EMAIL_FROM:-noreply@hummytummy.com}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-contact@hummytummy.com}
       # Subscription Settings
       DEFAULT_TRIAL_DAYS: ${DEFAULT_TRIAL_DAYS:-14}
       TRIAL_REMINDER_DAYS: ${TRIAL_REMINDER_DAYS:-3}
