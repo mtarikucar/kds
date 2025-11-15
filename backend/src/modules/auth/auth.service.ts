@@ -168,6 +168,14 @@ export class AuthService {
       },
     });
 
+    // Send email verification code automatically after registration
+    try {
+      await this.sendEmailVerification(user.id);
+    } catch (error) {
+      // Log error but don't fail registration if email sending fails
+      console.error('Failed to send verification email:', error);
+    }
+
     return this.generateTokens(user);
   }
 
@@ -409,10 +417,40 @@ export class AuthService {
   }
 
   /**
-   * Send email verification
-   * Generates a verification token and sends it via email
+   * Generate a 6-digit verification code
+   * Ensures uniqueness across active codes
    */
-  async sendEmailVerification(userId: string): Promise<{ message: string }> {
+  private async generateVerificationCode(): Promise<string> {
+    let code: string;
+    let isUnique = false;
+
+    while (!isUnique) {
+      // Generate 6-digit random number
+      code = Math.floor(100000 + Math.random() * 900000).toString();
+
+      // Check if code is already in use (not expired)
+      const existingUser = await this.prisma.user.findFirst({
+        where: {
+          emailVerificationCode: code,
+          emailVerificationCodeExpires: {
+            gt: new Date(),
+          },
+        },
+      });
+
+      if (!existingUser) {
+        isUnique = true;
+      }
+    }
+
+    return code;
+  }
+
+  /**
+   * Send email verification code
+   * Generates a 6-digit code and sends it via email
+   */
+  async sendEmailVerification(userId: string): Promise<{ message: string; codeExpiry: Date }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
@@ -424,65 +462,68 @@ export class AuthService {
     if (user.emailVerified) {
       return {
         message: 'Email is already verified',
+        codeExpiry: null,
       };
     }
 
-    // Generate verification token
-    const verificationToken = uuidv4();
-    const verificationExpires = new Date();
-    verificationExpires.setHours(verificationExpires.getHours() + 24); // Token valid for 24 hours
+    // Generate 6-digit verification code
+    const verificationCode = await this.generateVerificationCode();
+    const codeExpires = new Date();
+    codeExpires.setHours(codeExpires.getHours() + 1); // Code valid for 1 hour
 
-    // Store token in database
+    // Store code in database
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
-        emailVerificationToken: verificationToken,
-        emailVerificationExpires: verificationExpires,
+        emailVerificationCode: verificationCode,
+        emailVerificationCodeExpires: codeExpires,
       },
     });
 
-    // Send verification email
-    await this.emailService.sendEmailVerificationEmail(
+    // Send verification email with code
+    await this.emailService.sendEmailVerificationCode(
       user.email,
-      verificationToken,
+      verificationCode,
       `${user.firstName} ${user.lastName}`,
     );
 
     return {
-      message: 'Verification email sent successfully',
+      message: 'Verification code sent successfully to your email',
+      codeExpiry: codeExpires,
     };
   }
 
   /**
-   * Verify email using token
+   * Verify email using 6-digit code
    */
-  async verifyEmail(token: string): Promise<{ message: string }> {
-    // Find user by verification token
+  async verifyEmailWithCode(code: string): Promise<{ message: string; verified: boolean }> {
+    // Find user by verification code
     const user = await this.prisma.user.findFirst({
       where: {
-        emailVerificationToken: token,
-        emailVerificationExpires: {
-          gt: new Date(), // Token not expired
+        emailVerificationCode: code,
+        emailVerificationCodeExpires: {
+          gt: new Date(), // Code not expired
         },
       },
     });
 
     if (!user) {
-      throw new BadRequestException('Invalid or expired verification token');
+      throw new BadRequestException('Invalid or expired verification code');
     }
 
-    // Mark email as verified and clear token
+    // Mark email as verified and clear code
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
         emailVerified: true,
-        emailVerificationToken: null,
-        emailVerificationExpires: null,
+        emailVerificationCode: null,
+        emailVerificationCodeExpires: null,
       },
     });
 
     return {
       message: 'Email verified successfully',
+      verified: true,
     };
   }
 }

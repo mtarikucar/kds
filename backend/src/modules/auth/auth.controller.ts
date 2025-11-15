@@ -5,6 +5,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto } from './dto/password-reset.dto';
+import { VerifyEmailCodeDto } from './dto/verify-email-code.dto';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
@@ -93,11 +94,11 @@ export class AuthController {
 
   @Public()
   @Post('verify-email')
-  @ApiOperation({ summary: 'Verify email with token' })
+  @ApiOperation({ summary: 'Verify email with 6-digit code' })
   @ApiResponse({ status: 200, description: 'Email successfully verified' })
-  @ApiResponse({ status: 400, description: 'Invalid or expired verification token' })
-  async verifyEmail(@Body('token') token: string) {
-    return this.authService.verifyEmail(token);
+  @ApiResponse({ status: 400, description: 'Invalid or expired verification code' })
+  async verifyEmail(@Body() dto: VerifyEmailCodeDto) {
+    return this.authService.verifyEmailWithCode(dto.code);
   }
 
   @UseGuards(JwtAuthGuard)

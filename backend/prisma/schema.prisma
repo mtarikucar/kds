@@ -63,10 +63,10 @@ model User {
   role      String   // ADMIN, MANAGER, WAITER, KITCHEN, COURIER
   status    String   @default("ACTIVE") // ACTIVE, INACTIVE
 
-  // Email verification
-  emailVerified              Boolean   @default(false)
-  emailVerificationToken     String?   @unique
-  emailVerificationExpires   DateTime?
+  // Email verification (code-based)
+  emailVerified                 Boolean   @default(false)
+  emailVerificationCode         String?   @db.VarChar(6)
+  emailVerificationCodeExpires  DateTime?
 
   // Password reset
   resetToken       String?   @unique

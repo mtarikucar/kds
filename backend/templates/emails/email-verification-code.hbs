@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Email Doğrulama Kodu</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f4f4f7;">
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="background-color: #f4f4f7; padding: 40px 0;">
+    <tr>
+      <td align="center">
+        <!-- Main Container -->
+        <table role="presentation" cellpadding="0" cellspacing="0" width="600" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: bold;">HummyTummy</h1>
+              <p style="margin: 10px 0 0 0; color: #ffffff; font-size: 16px; opacity: 0.9;">Restaurant Management System</p>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding: 40px 30px;">
+              <h2 style="margin: 0 0 20px 0; color: #333333; font-size: 24px; font-weight: 600;">Email Doğrulama</h2>
+
+              <p style="margin: 0 0 20px 0; color: #666666; font-size: 16px; line-height: 1.6;">
+                Merhaba <strong>{{userName}}</strong>,
+              </p>
+
+              <p style="margin: 0 0 30px 0; color: #666666; font-size: 16px; line-height: 1.6;">
+                HummyTummy hesabınızı oluşturduğunuz için teşekkür ederiz. Email adresinizi doğrulamak için aşağıdaki <strong>6 haneli kodu</strong> kullanın:
+              </p>
+
+              <!-- Verification Code Box -->
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td align="center" style="padding: 30px 0;">
+                    <table role="presentation" cellpadding="0" cellspacing="0" style="background: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 12px; padding: 30px 40px; display: inline-block;">
+                      <tr>
+                        <td align="center">
+                          <div style="font-size: 52px; font-weight: bold; color: #667eea; letter-spacing: 12px; font-family: 'Courier New', monospace; user-select: all;">
+                            {{code}}
+                          </div>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Expiry Warning -->
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 16px 20px; border-radius: 4px;">
+                    <p style="margin: 0; color: #856404; font-size: 14px; line-height: 1.5;">
+                      <strong>⏰ Önemli:</strong> Bu kod <strong>{{expiresIn}}</strong> içinde geçersiz olacaktır. Lütfen en kısa sürede kullanın.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <div style="margin-top: 30px; padding: 20px; background-color: #f8f9fa; border-radius: 6px;">
+                <h3 style="margin: 0 0 10px 0; color: #333333; font-size: 16px; font-weight: 600;">📌 Neden Email Doğrulama Gerekli?</h3>
+                <ul style="margin: 0; padding-left: 20px; color: #666666; font-size: 14px; line-height: 1.6;">
+                  <li>Hesabınızın güvenliğini sağlamak için</li>
+                  <li>Abonelik işlemlerini tamamlayabilmek için</li>
+                  <li>Önemli bildirimleri alabilmek için</li>
+                </ul>
+              </div>
+
+              <!-- Security Notice -->
+              <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin-top: 30px;">
+                <tr>
+                  <td style="background-color: #f8d7da; border-left: 4px solid #dc3545; padding: 16px 20px; border-radius: 4px;">
+                    <p style="margin: 0; color: #721c24; font-size: 13px; line-height: 1.5;">
+                      <strong>🔒 Güvenlik Uyarısı:</strong> Bu kodu kimseyle paylaşmayın. HummyTummy ekibi asla bu kodu sizden istemez. Şüpheli bir durum fark ederseniz hemen bizimle iletişime geçin.
+                    </p>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 30px 0 0 0; color: #999999; font-size: 13px; line-height: 1.5;">
+                Bu email'i siz talep etmediyseniz lütfen görmezden gelin ve hesabınızın güvenliği için şifrenizi değiştirmeyi düşünün.
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f8f9fa; padding: 30px; text-align: center; border-top: 1px solid #dee2e6;">
+              <p style="margin: 0 0 10px 0; color: #666666; font-size: 14px;">
+                <strong>HummyTummy</strong> - Restaurant Management System
+              </p>
+              <p style="margin: 0; color: #999999; font-size: 12px;">
+                © {{currentYear}} HummyTummy. Tüm hakları saklıdır.
+              </p>
+              <p style="margin: 15px 0 0 0; color: #999999; font-size: 12px;">
+                <a href="mailto:admin@hummytummy.com" style="color: #667eea; text-decoration: none;">admin@hummytummy.com</a>
+                 |
+                <a href="https://hummytummy.com" style="color: #667eea; text-decoration: none;">hummytummy.com</a>
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

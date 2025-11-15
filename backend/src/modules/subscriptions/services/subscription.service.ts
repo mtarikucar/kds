@@ -91,6 +91,25 @@ export class SubscriptionService {
       throw new NotFoundException('Tenant not found');
     }
 
+    // Check if admin user's email is verified
+    const adminUser = await this.prisma.user.findFirst({
+      where: {
+        tenantId,
+        role: 'ADMIN',
+      },
+    });
+
+    if (!adminUser) {
+      throw new NotFoundException('Admin user not found for this tenant');
+    }
+
+    if (!adminUser.emailVerified) {
+      throw new BadRequestException(
+        'Email must be verified before creating a subscription. ' +
+        'Please check your email for the 6-digit verification code.'
+      );
+    }
+
     // Check if tenant already has an active subscription
     const existingSubscription = await this.getCurrentSubscription(tenantId);
     if (existingSubscription) {
