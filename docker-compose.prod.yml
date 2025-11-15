@@ -1,8 +1,12 @@
 version: '3.8'
 
+name: kds-prod
+
 services:
   # PostgreSQL Database (Shared - uses production database)
   postgres:
+    env_file:
+      - .env.production
     image: postgres:15-alpine
     container_name: kds_postgres_prod
     restart: always
@@ -24,6 +28,8 @@ services:
 
   # Redis Cache (Shared - uses DB 2 for production)
   redis:
+    env_file:
+      - .env.production
     image: redis:7-alpine
     container_name: kds_redis_prod
     restart: always
@@ -41,6 +47,8 @@ services:
 
   # Backend API (NestJS) - Production Blue Environment
   backend-blue:
+    env_file:
+      - .env.production
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -99,6 +107,8 @@ services:
 
   # Backend API (NestJS) - Production Green Environment
   backend-green:
+    env_file:
+      - .env.production
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -159,6 +169,8 @@ services:
 
   # Frontend (React) - Production Blue Environment
   frontend-blue:
+    env_file:
+      - .env.production
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -183,6 +195,8 @@ services:
 
   # Frontend (React) - Production Green Environment
   frontend-green:
+    env_file:
+      - .env.production
     build:
       context: ./frontend
       dockerfile: Dockerfile

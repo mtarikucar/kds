@@ -1,8 +1,12 @@
 version: '3.8'
 
+name: kds-staging
+
 services:
   # PostgreSQL Database (Shared - uses staging database)
   postgres:
+    env_file:
+      - .env.test
     image: postgres:15-alpine
     container_name: kds_postgres_staging
     restart: always
@@ -24,6 +28,8 @@ services:
 
   # Redis Cache (Shared - uses DB 1 for staging)
   redis:
+    env_file:
+      - .env.test
     image: redis:7-alpine
     container_name: kds_redis_staging
     restart: always
@@ -41,6 +47,8 @@ services:
 
   # Backend API (NestJS) - Staging
   backend:
+    env_file:
+      - .env.test
     build:
       context: ./backend
       dockerfile: Dockerfile
