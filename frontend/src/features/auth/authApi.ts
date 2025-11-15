@@ -115,31 +115,35 @@ export const useChangePassword = () => {
 };
 
 export const useVerifyEmail = () => {
+  const queryClient = useQueryClient();
+
   return useMutation({
-    mutationFn: async (token: string): Promise<{ message: string }> => {
-      const response = await api.post('/auth/verify-email', { token });
+    mutationFn: async (code: string): Promise<{ message: string; verified: boolean }> => {
+      const response = await api.post('/auth/verify-email', { code });
       return response.data;
     },
     onSuccess: () => {
-      toast.success('Email verified successfully');
+      toast.success('Email başarıyla doğrulandı!');
+      // Invalidate profile query to refresh email verified status
+      queryClient.invalidateQueries({ queryKey: ['profile'] });
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Email verification failed');
+      toast.error(error.response?.data?.message || 'Doğrulama kodu geçersiz veya süresi dolmuş');
     },
   });
 };
 
 export const useResendVerificationEmail = () => {
   return useMutation({
-    mutationFn: async (): Promise<{ message: string }> => {
+    mutationFn: async (): Promise<{ message: string; codeExpiry: Date }> => {
       const response = await api.post('/auth/resend-verification');
       return response.data;
     },
     onSuccess: () => {
-      toast.success('Verification email sent');
+      toast.success('Doğrulama kodu email\'inize gönderildi');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to send verification email');
+      toast.error(error.response?.data?.message || 'Doğrulama kodu gönderilemedi');
     },
   });
 };

@@ -4,6 +4,8 @@ import {
   ConflictException,
   BadRequestException,
   NotFoundException,
+  Inject,
+  forwardRef,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -16,6 +18,8 @@ import { AuthResponseDto, UserResponseDto } from './dto/auth-response.dto';
 import { ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto } from './dto/password-reset.dto';
 import { UserRole } from '../../common/constants/roles.enum';
 import { EmailService } from '../../common/services/email.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../notifications/dto/create-notification.dto';
 
 @Injectable()
 export class AuthService {
@@ -24,6 +28,8 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private emailService: EmailService,
+    @Inject(forwardRef(() => NotificationsService))
+    private notificationsService: NotificationsService,
   ) {}
 
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
@@ -487,6 +493,25 @@ export class AuthService {
       `${user.firstName} ${user.lastName}`,
     );
 
+    // Send in-app notification with verification code
+    try {
+      await this.notificationsService.createAndSend({
+        title: 'Email Doğrulama Kodu Gönderildi',
+        message: `Email doğrulama kodunuz: ${verificationCode}\n\nBu kod 1 saat içinde geçerlidir.`,
+        type: NotificationType.INFO,
+        userId: user.id,
+        tenantId: user.tenantId,
+        data: {
+          code: verificationCode,
+          expiresAt: codeExpires.toISOString(),
+        },
+        expiresAt: codeExpires.toISOString(),
+      });
+    } catch (error) {
+      // Log error but don't fail if notification sending fails
+      console.error('Failed to send verification code notification:', error);
+    }
+
     return {
       message: 'Verification code sent successfully to your email',
       codeExpiry: codeExpires,
@@ -520,6 +545,20 @@ export class AuthService {
         emailVerificationCodeExpires: null,
       },
     });
+
+    // Send success notification
+    try {
+      await this.notificationsService.createAndSend({
+        title: 'Email Başarıyla Doğrulandı',
+        message: 'Email adresiniz başarıyla doğrulandı. Artık tüm özelliklere erişebilirsiniz.',
+        type: NotificationType.SUCCESS,
+        userId: user.id,
+        tenantId: user.tenantId,
+      });
+    } catch (error) {
+      // Log error but don't fail if notification sending fails
+      console.error('Failed to send verification success notification:', error);
+    }
 
     return {
       message: 'Email verified successfully',

@@ -31,12 +31,20 @@ import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { UpdateDialog } from './components/UpdateDialog';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
+import { useNotificationSocket } from './features/notifications/notificationsApi';
+import { useAuthStore } from './store/authStore';
 
 function App() {
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
+  const isAuthenticated = useAuthStore((state) => !!state.accessToken);
 
   // Auto-update hook - check for updates on app startup
   const updateState = useAutoUpdate(true);
+
+  // Initialize WebSocket for real-time notifications (only when authenticated)
+  if (isAuthenticated) {
+    useNotificationSocket();
+  }
 
   // Show update dialog when update is available
   if (updateState.available && !showUpdateDialog) {

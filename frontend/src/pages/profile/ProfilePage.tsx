@@ -7,6 +7,7 @@ import { useChangePassword } from '../../features/auth/authApi';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
+import { EmailVerificationCard } from '../../components/EmailVerificationCard';
 
 const ProfilePage = () => {
   const { t } = useTranslation('auth');
@@ -138,6 +139,14 @@ const ProfilePage = () => {
             </form>
           </CardContent>
         </Card>
+
+        {/* Email Verification */}
+        {profile && (
+          <EmailVerificationCard
+            emailVerified={profile.emailVerified}
+            userEmail={profile.email}
+          />
+        )}
 
         {/* Change Password */}
         <Card>
