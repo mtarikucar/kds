@@ -26,7 +26,7 @@ export class NotificationService {
 
   private initializeTransporter() {
     const emailConfig = {
-      host: this.configService.get('EMAIL_HOST', 'smtp.gmail.com'),
+      host: this.configService.get('EMAIL_HOST', 'smtp.titan.email'),
       port: this.configService.get('EMAIL_PORT', 587),
       secure: this.configService.get('EMAIL_SECURE', false),
       auth: {
