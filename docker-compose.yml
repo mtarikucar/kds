@@ -72,8 +72,8 @@ services:
       EMAIL_SECURE: ${EMAIL_SECURE:-false}
       EMAIL_USER: ${EMAIL_USER:-admin@hummytummy.com}
       EMAIL_PASSWORD: ${EMAIL_PASSWORD:-}
-      EMAIL_FROM: ${EMAIL_FROM:-noreply@hummytummy.com}
-      ADMIN_EMAIL: ${ADMIN_EMAIL:-contact@hummytummy.com}
+      EMAIL_FROM: ${EMAIL_FROM:-admin@hummytummy.com}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@hummytummy.com}
       # Subscription Settings
       DEFAULT_TRIAL_DAYS: ${DEFAULT_TRIAL_DAYS:-14}
       TRIAL_REMINDER_DAYS: ${TRIAL_REMINDER_DAYS:-3}
