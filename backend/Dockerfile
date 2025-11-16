@@ -58,6 +58,7 @@ COPY --from=development /app/dist ./dist
 COPY --from=development /app/prisma ./prisma
 COPY --from=development /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=development /app/src/modules/subscriptions/templates ./src/modules/subscriptions/templates
+COPY --from=development /app/templates ./templates
 
 # Create storage and logs directories
 RUN mkdir -p storage/invoices

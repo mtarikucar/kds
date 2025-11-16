@@ -493,23 +493,23 @@ export class AuthService {
       `${user.firstName} ${user.lastName}`,
     );
 
-    // Send in-app notification with verification code
+    // Send in-app notification (without code - code is only in email)
     try {
       await this.notificationsService.createAndSend({
-        title: 'Email Doğrulama Kodu Gönderildi',
-        message: `Email doğrulama kodunuz: ${verificationCode}\n\nBu kod 1 saat içinde geçerlidir.`,
-        type: NotificationType.INFO,
+        title: 'E-posta Doğrulaması Gereklidir',
+        message: 'E-posta adresinize gönderilen 6 haneli doğrulama kodunu kullanarak hesabınızı doğrulamanız gerekmektedir. Lütfen e-posta kutunuzu kontrol ediniz.',
+        type: NotificationType.WARNING,
         userId: user.id,
         tenantId: user.tenantId,
         data: {
-          code: verificationCode,
+          action: 'EMAIL_VERIFICATION_REQUIRED',
           expiresAt: codeExpires.toISOString(),
         },
         expiresAt: codeExpires.toISOString(),
       });
     } catch (error) {
       // Log error but don't fail if notification sending fails
-      console.error('Failed to send verification code notification:', error);
+      console.error('Failed to send verification notification:', error);
     }
 
     return {

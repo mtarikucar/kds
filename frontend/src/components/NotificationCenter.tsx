@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useNotifications, useMarkAsRead, useMarkAllAsRead } from '../features/notifications/notificationsApi';
 import Button from './ui/Button';
 
 const NotificationCenter = () => {
   const { t } = useTranslation('common');
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const { data: notifications = [], isLoading } = useNotifications();
   const { mutate: markAsRead } = useMarkAsRead();
@@ -15,6 +17,19 @@ const NotificationCenter = () => {
   const handleNotificationClick = (notification: any) => {
     if (!notification.readBy || notification.readBy.length === 0) {
       markAsRead(notification.id);
+    }
+
+    // Handle notification actions
+    if (notification.data?.action) {
+      switch (notification.data.action) {
+        case 'EMAIL_VERIFICATION_REQUIRED':
+          setIsOpen(false);
+          navigate('/profile');
+          break;
+        // Add more action handlers as needed
+        default:
+          break;
+      }
     }
   };
 

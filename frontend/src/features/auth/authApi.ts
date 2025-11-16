@@ -38,10 +38,14 @@ export const useRegister = () => {
 };
 
 export const useProfile = () => {
+  const setUser = useAuthStore((state) => state.setUser);
+
   return useQuery({
     queryKey: ['profile'],
     queryFn: async (): Promise<User> => {
       const response = await api.get('/auth/profile');
+      // Update auth store with fresh user data (including emailVerified status)
+      setUser(response.data);
       return response.data;
     },
     enabled: !!useAuthStore.getState().accessToken,

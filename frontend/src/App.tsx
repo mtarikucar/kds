@@ -41,10 +41,8 @@ function App() {
   // Auto-update hook - check for updates on app startup
   const updateState = useAutoUpdate(true);
 
-  // Initialize WebSocket for real-time notifications (only when authenticated)
-  if (isAuthenticated) {
-    useNotificationSocket();
-  }
+  // Initialize WebSocket for real-time notifications (hook must be called unconditionally)
+  useNotificationSocket();
 
   // Show update dialog when update is available
   if (updateState.available && !showUpdateDialog) {

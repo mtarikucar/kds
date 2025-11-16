@@ -23,7 +23,8 @@ export class EmailService {
   private readonly templatesPath: string;
 
   constructor(private configService: ConfigService) {
-    this.templatesPath = path.join(__dirname, '../../../templates/emails');
+    // Use process.cwd() instead of __dirname for bundled production builds
+    this.templatesPath = path.join(process.cwd(), 'templates/emails');
     this.initializeTransporter();
   }
 

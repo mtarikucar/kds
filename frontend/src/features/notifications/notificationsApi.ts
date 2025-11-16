@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { useEffect } from 'react';
 import api from '../../lib/api';
 import { initializeNotificationSocket, disconnectNotificationSocket } from '../../lib/socket';
+import { useAuthStore } from '../../store/authStore';
 
 export const useNotifications = () => {
   return useQuery({
@@ -23,8 +24,14 @@ export const useNotifications = () => {
  */
 export const useNotificationSocket = () => {
   const queryClient = useQueryClient();
+  const isAuthenticated = useAuthStore((state) => !!state.accessToken);
 
   useEffect(() => {
+    // Only initialize socket if user is authenticated
+    if (!isAuthenticated) {
+      return;
+    }
+
     // Initialize notification socket with callback
     const socket = initializeNotificationSocket((notification) => {
       console.log('Received notification:', notification);
@@ -59,11 +66,11 @@ export const useNotificationSocket = () => {
       });
     });
 
-    // Cleanup on unmount
+    // Cleanup on unmount or when authentication changes
     return () => {
       disconnectNotificationSocket();
     };
-  }, [queryClient]);
+  }, [queryClient, isAuthenticated]);
 };
 
 export const useMarkAsRead = () => {
