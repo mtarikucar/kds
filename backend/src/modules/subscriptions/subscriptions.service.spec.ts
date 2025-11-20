@@ -84,7 +84,7 @@ describe('SubscriptionsService', () => {
 
   describe('getCurrentSubscription', () => {
     it('should return current subscription for tenant', async () => {
-      prisma.subscription.findFirst.mockResolvedValue(mockSubscription);
+      prisma.subscription.findFirst.mockResolvedValue(mockSubscription as any);
 
       const result = await service.getCurrentSubscription('tenant-1');
 
@@ -108,7 +108,7 @@ describe('SubscriptionsService', () => {
   describe('getPlans', () => {
     it('should return all active plans', async () => {
       const mockPlans = [mockPlan];
-      prisma.subscriptionPlan.findMany.mockResolvedValue(mockPlans);
+      prisma.subscriptionPlan.findMany.mockResolvedValue(mockPlans as any);
 
       const result = await service.getPlans();
 
@@ -122,11 +122,11 @@ describe('SubscriptionsService', () => {
 
   describe('cancelSubscription', () => {
     it('should cancel subscription at period end', async () => {
-      prisma.subscription.findFirst.mockResolvedValue(mockSubscription);
+      prisma.subscription.findFirst.mockResolvedValue(mockSubscription as any);
       prisma.subscription.update.mockResolvedValue({
         ...mockSubscription,
         cancelAtPeriodEnd: true,
-      });
+      } as any);
 
       const result = await service.cancelSubscription('tenant-1');
 
@@ -145,7 +145,7 @@ describe('SubscriptionsService', () => {
 
   describe('changePlan', () => {
     it('should throw BadRequestException when downgrading with active features', async () => {
-      prisma.subscription.findFirst.mockResolvedValue(mockSubscription);
+      prisma.subscription.findFirst.mockResolvedValue(mockSubscription as any);
       prisma.subscriptionPlan.findUnique.mockResolvedValue({
         ...mockPlan,
         name: 'BASIC',
@@ -155,7 +155,7 @@ describe('SubscriptionsService', () => {
       prisma.tenant.findUnique.mockResolvedValue({
         ...mockTenant,
         // Simulate usage that requires PRO tier
-      });
+      } as any);
 
       // This test verifies the service checks feature compatibility
       await expect(

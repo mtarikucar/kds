@@ -3,7 +3,6 @@ import { NotFoundException, BadRequestException } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { mockPrismaClient, mockOrder, mockProduct } from '../../common/test/prisma-mock.service';
-import { OrderStatus, OrderType } from '@prisma/client';
 
 describe('OrdersService', () => {
   let service: OrdersService;
@@ -32,7 +31,7 @@ describe('OrdersService', () => {
   describe('create', () => {
     it('should create a new order with items', async () => {
       const createDto = {
-        type: OrderType.DINE_IN,
+        type: 'DINE_IN',
         tableId: 'table-1',
         items: [
           { productId: 'product-1', quantity: 2, price: 10.99 },
@@ -47,9 +46,9 @@ describe('OrdersService', () => {
       };
 
       prisma.product.findMany.mockResolvedValue([mockProduct]);
-      prisma.order.create.mockResolvedValue(createdOrder);
+      prisma.order.create.mockResolvedValue(createdOrder as any);
 
-      const result = await service.create('tenant-1', createDto);
+      const result = await service.create('tenant-1', createDto as any);
 
       expect(result).toEqual(createdOrder);
       expect(prisma.order.create).toHaveBeenCalled();
@@ -57,7 +56,7 @@ describe('OrdersService', () => {
 
     it('should apply discount to order total', async () => {
       const createDto = {
-        type: OrderType.TAKEAWAY,
+        type: 'TAKEAWAY',
         items: [
           { productId: 'product-1', quantity: 1, price: 100 },
         ],
@@ -70,9 +69,9 @@ describe('OrdersService', () => {
         totalAmount: 100,
         discount: 10,
         finalAmount: 90,
-      });
+      } as any);
 
-      const result = await service.create('tenant-1', createDto);
+      const result = await service.create('tenant-1', createDto as any);
 
       expect(result.finalAmount).toBe(90);
     });
@@ -82,19 +81,19 @@ describe('OrdersService', () => {
     it('should update order status', async () => {
       const updatedOrder = {
         ...mockOrder,
-        status: OrderStatus.PREPARING,
+        status: 'PREPARING',
       };
 
-      prisma.order.findUnique.mockResolvedValue(mockOrder);
-      prisma.order.update.mockResolvedValue(updatedOrder);
+      prisma.order.findUnique.mockResolvedValue(mockOrder as any);
+      prisma.order.update.mockResolvedValue(updatedOrder as any);
 
       const result = await service.updateStatus(
         'order-1',
         'tenant-1',
-        OrderStatus.PREPARING,
+        'PREPARING' as any,
       );
 
-      expect(result.status).toBe(OrderStatus.PREPARING);
+      expect(result.status).toBe('PREPARING');
       expect(prisma.order.update).toHaveBeenCalled();
     });
 
@@ -102,7 +101,7 @@ describe('OrdersService', () => {
       prisma.order.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.updateStatus('invalid-id', 'tenant-1', OrderStatus.PREPARING),
+        service.updateStatus('invalid-id', 'tenant-1', 'PREPARING' as any),
       ).rejects.toThrow(NotFoundException);
     });
   });
@@ -110,7 +109,7 @@ describe('OrdersService', () => {
   describe('findAll', () => {
     it('should return paginated orders for tenant', async () => {
       const mockOrders = [mockOrder];
-      prisma.order.findMany.mockResolvedValue(mockOrders);
+      prisma.order.findMany.mockResolvedValue(mockOrders as any);
       prisma.order.count.mockResolvedValue(1);
 
       const result = await service.findAll('tenant-1', {
@@ -124,19 +123,19 @@ describe('OrdersService', () => {
 
     it('should filter orders by status', async () => {
       const mockOrders = [mockOrder];
-      prisma.order.findMany.mockResolvedValue(mockOrders);
+      prisma.order.findMany.mockResolvedValue(mockOrders as any);
       prisma.order.count.mockResolvedValue(1);
 
       await service.findAll('tenant-1', {
         page: 1,
         limit: 20,
-        status: OrderStatus.PENDING,
+        status: 'PENDING' as any,
       });
 
       expect(prisma.order.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            status: OrderStatus.PENDING,
+            status: 'PENDING',
           }),
         }),
       );
@@ -147,24 +146,24 @@ describe('OrdersService', () => {
     it('should cancel an order', async () => {
       const cancelledOrder = {
         ...mockOrder,
-        status: OrderStatus.CANCELLED,
+        status: 'CANCELLED',
       };
 
-      prisma.order.findUnique.mockResolvedValue(mockOrder);
-      prisma.order.update.mockResolvedValue(cancelledOrder);
+      prisma.order.findUnique.mockResolvedValue(mockOrder as any);
+      prisma.order.update.mockResolvedValue(cancelledOrder as any);
 
       const result = await service.cancel('order-1', 'tenant-1');
 
-      expect(result.status).toBe(OrderStatus.CANCELLED);
+      expect(result.status).toBe('CANCELLED');
     });
 
     it('should throw BadRequestException when order already paid', async () => {
       const paidOrder = {
         ...mockOrder,
-        status: OrderStatus.PAID,
+        status: 'PAID',
       };
 
-      prisma.order.findUnique.mockResolvedValue(paidOrder);
+      prisma.order.findUnique.mockResolvedValue(paidOrder as any);
 
       await expect(
         service.cancel('order-1', 'tenant-1'),

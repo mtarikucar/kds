@@ -170,15 +170,16 @@ export async function createTestOrder(
         create: products.map((product) => ({
           productId: product.id,
           quantity: 1,
-          price: Number(product.price),
+          unitPrice: Number(product.price),
           subtotal: Number(product.price),
-        })),
+          modifierTotal: 0,
+        })) as any,
       },
     },
     include: {
       orderItems: true,
     },
-  });
+  } as any);
 
   return order;
 }
@@ -213,9 +214,11 @@ export function mockDate(date: string | Date) {
   global.Date = class extends originalDate {
     constructor(...args: any[]) {
       if (args.length === 0) {
-        return mockDate;
+        super();
+        Object.setPrototypeOf(mockDate, new.target.prototype);
+        return mockDate as any;
       }
-      return new originalDate(...args);
+      super(...(args as []));
     }
 
     static now() {
