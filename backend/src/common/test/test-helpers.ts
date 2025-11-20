@@ -31,7 +31,7 @@ export async function cleanDatabase(prisma: PrismaService) {
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
   await prisma.productImage.deleteMany();
-  await prisma.productModifier.deleteMany();
+  await prisma.productModifierGroup.deleteMany();
   await prisma.product.deleteMany();
   await prisma.category.deleteMany();
   await prisma.table.deleteMany();
@@ -48,7 +48,7 @@ export async function getAuthToken(
   email: string = 'test@example.com',
   password: string = 'password123',
 ): Promise<string> {
-  const response = await request(app.getHttpServer())
+  const response = await request.default(app.getHttpServer())
     .post('/api/auth/login')
     .send({ email, password })
     .expect(200);
@@ -65,12 +65,9 @@ export async function createTestTenant(prisma: PrismaService) {
   const tenant = await prisma.tenant.create({
     data: {
       name: 'Test Restaurant',
-      slug: 'test-restaurant',
-      email: 'test@restaurant.com',
-      phone: '+1234567890',
-      address: '123 Test Street',
-      subscriptionTier: 'PRO',
-      subscriptionStatus: 'ACTIVE',
+      subdomain: 'test-restaurant',
+      paymentRegion: 'INTERNATIONAL',
+      status: 'ACTIVE',
     },
   });
 
@@ -80,7 +77,8 @@ export async function createTestTenant(prisma: PrismaService) {
     data: {
       email: 'test@example.com',
       password: hashedPassword,
-      name: 'Test User',
+      firstName: 'Test',
+      lastName: 'User',
       role: 'ADMIN',
       tenantId: tenant.id,
       emailVerified: true,
@@ -106,7 +104,6 @@ export async function createTestCategories(
         name: `Category ${i}`,
         description: `Test category ${i}`,
         tenantId,
-        sortOrder: i,
       },
     });
     categories.push(category);
@@ -134,9 +131,9 @@ export async function createTestProducts(
         price: 10 + i,
         categoryId,
         tenantId,
-        available: true,
-        stockQuantity: 100,
-        lowStockThreshold: 10,
+        isAvailable: true,
+        stockTracked: true,
+        currentStock: 100,
       },
     });
     products.push(product);
@@ -158,7 +155,7 @@ export async function createTestOrder(
     where: { id: { in: productIds } },
   });
 
-  const totalAmount = products.reduce((sum, p) => sum + p.price, 0);
+  const totalAmount = products.reduce((sum, p) => sum + Number(p.price), 0);
 
   const order = await prisma.order.create({
     data: {
@@ -169,17 +166,17 @@ export async function createTestOrder(
       totalAmount,
       discount: 0,
       finalAmount: totalAmount,
-      items: {
+      orderItems: {
         create: products.map((product) => ({
           productId: product.id,
           quantity: 1,
-          price: product.price,
-          subtotal: product.price,
+          price: Number(product.price),
+          subtotal: Number(product.price),
         })),
       },
     },
     include: {
-      items: true,
+      orderItems: true,
     },
   });
 
