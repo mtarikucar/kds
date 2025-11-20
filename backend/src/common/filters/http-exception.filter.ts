@@ -10,6 +10,7 @@ import { ErrorResponse } from '../interfaces/error-response.interface';
 import { BusinessException } from '../exceptions/business.exception';
 import { LoggerService } from '../services/logger.service';
 import { Prisma } from '@prisma/client';
+import { captureException, setContext } from '../../sentry.config';
 
 /**
  * Global exception filter
@@ -92,6 +93,30 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     // Log the error
     this.logError(exception, request, statusCode, requestId);
+
+    // Send 5xx errors to Sentry (server errors, not client errors)
+    if (statusCode >= 500 && exception instanceof Error) {
+      setContext('http', {
+        url: request.url,
+        method: request.method,
+        headers: {
+          'user-agent': request.headers['user-agent'],
+          'content-type': request.headers['content-type'],
+        },
+        statusCode,
+        requestId,
+      });
+      setContext('user', {
+        id: (request as any).user?.id,
+        email: (request as any).user?.email,
+        tenantId: (request as any).user?.tenantId,
+      });
+      captureException(exception, {
+        requestId,
+        path: request.url,
+        method: request.method,
+      });
+    }
 
     // Send response
     response.status(statusCode).json(errorResponse);

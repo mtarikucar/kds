@@ -72,6 +72,102 @@ export const mockAuthTokens = {
   refreshToken: 'mock-refresh-token',
 };
 
+/**
+ * Mock localStorage
+ */
+export function mockLocalStorage() {
+  const store: Record<string, string> = {};
+
+  return {
+    getItem: (key: string) => store[key] || null,
+    setItem: (key: string, value: string) => {
+      store[key] = value;
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      Object.keys(store).forEach((key) => delete store[key]);
+    },
+    get length() {
+      return Object.keys(store).length;
+    },
+    key: (index: number) => Object.keys(store)[index] || null,
+  };
+}
+
+/**
+ * Mock API response helper
+ */
+export function mockApiResponse<T>(data: T, delay: number = 0): Promise<T> {
+  return new Promise((resolve) => {
+    setTimeout(() => resolve(data), delay);
+  });
+}
+
+/**
+ * Mock API error helper
+ */
+export function mockApiError(
+  message: string = 'API Error',
+  status: number = 500,
+  delay: number = 0,
+): Promise<never> {
+  return new Promise((_, reject) => {
+    setTimeout(() => {
+      reject({
+        response: {
+          data: { message, statusCode: status },
+          status,
+        },
+      });
+    }, delay);
+  });
+}
+
+/**
+ * Mock product data
+ */
+export const mockProduct = {
+  id: 'product-1',
+  name: 'Test Product',
+  description: 'Test description',
+  price: 10.99,
+  categoryId: 'category-1',
+  category: {
+    id: 'category-1',
+    name: 'Test Category',
+  },
+  available: true,
+  stockQuantity: 100,
+};
+
+/**
+ * Mock order data
+ */
+export const mockOrder = {
+  id: 'order-1',
+  orderNumber: 'ORD-001',
+  type: 'DINE_IN',
+  status: 'PENDING',
+  totalAmount: 50.0,
+  items: [],
+  createdAt: new Date().toISOString(),
+};
+
+/**
+ * Create mock file for file upload testing
+ */
+export function createMockFile(
+  name: string = 'test.png',
+  size: number = 1024,
+  type: string = 'image/png',
+): File {
+  const file = new File(['test'], name, { type });
+  Object.defineProperty(file, 'size', { value: size });
+  return file;
+}
+
 // Re-export everything from testing library
 export * from '@testing-library/react';
 export { default as userEvent } from '@testing-library/user-event';

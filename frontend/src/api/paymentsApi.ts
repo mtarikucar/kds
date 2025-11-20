@@ -5,11 +5,16 @@ export interface CreatePaymentIntentRequest {
   subscriptionId: string;
 }
 
+export interface CreatePlanChangeIntentRequest {
+  pendingChangeId: string;
+}
+
 export interface CreatePaymentIntentResponse {
   clientSecret: string;
   paymentIntentId: string;
   amount: number;
   currency: string;
+  paymentProvider?: 'stripe' | 'iyzico';
 }
 
 export interface ConfirmPaymentRequest {
@@ -58,6 +63,20 @@ export function useCreatePaymentIntent() {
       data: CreatePaymentIntentRequest
     ): Promise<CreatePaymentIntentResponse> => {
       const response = await api.post('/payments/create-intent', data);
+      return response.data;
+    },
+  });
+}
+
+/**
+ * Create payment intent for plan change
+ */
+export function useCreatePlanChangeIntent() {
+  return useMutation({
+    mutationFn: async (
+      data: CreatePlanChangeIntentRequest
+    ): Promise<CreatePaymentIntentResponse> => {
+      const response = await api.post('/payments/create-plan-change-intent', data);
       return response.data;
     },
   });

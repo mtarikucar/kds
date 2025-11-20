@@ -48,6 +48,7 @@ model Tenant {
   apiKeys             ApiKey[]
   customers           Customer[]
   notifications       Notification[]
+  zReports            ZReport[]
   currentPlan         SubscriptionPlan?  @relation("CurrentPlan", fields: [currentPlanId], references: [id], onDelete: SetNull)
 
   @@index([currentPlanId])
@@ -91,6 +92,8 @@ model User {
   stockMovements                 StockMovement[]
   notifications                  Notification[]
   readNotifications              UserNotificationRead[]
+  zReports                       ZReport[]
+  cashDrawerMovements            CashDrawerMovement[]
 
   @@index([tenantId])
   @@index([email])
@@ -1149,4 +1152,131 @@ model DesktopRelease {
   @@index([version])
   @@index([published, pubDate])
   @@map("desktop_releases")
+}
+
+// ========================================
+// Z REPORT (END OF DAY) SYSTEM
+// ========================================
+
+model ZReport {
+  id            String   @id @default(uuid())
+  reportNumber  String   // Auto-generated report number (e.g., "Z-20250117-001")
+  reportDate    DateTime // End of day date
+  closingTime   DateTime @default(now())
+
+  // Closing details
+  closingType   String   @default("MANUAL") // MANUAL, AUTOMATIC
+
+  // Staff who performed the closing
+  closedById    String
+  closedBy      User     @relation(fields: [closedById], references: [id], onDelete: Restrict)
+
+  // Branch/Terminal information (optional for multi-location)
+  branchName    String?
+  terminalId    String?
+
+  // Sales Summary
+  totalSales              Decimal @db.Decimal(10, 2)
+  totalOrders             Int
+  totalDiscount           Decimal @default(0) @db.Decimal(10, 2)
+  totalRefunds            Decimal @default(0) @db.Decimal(10, 2)
+  netSales                Decimal @db.Decimal(10, 2) // totalSales - totalRefunds
+
+  // Order Type Breakdown
+  dineInSales             Decimal @default(0) @db.Decimal(10, 2)
+  dineInOrders            Int     @default(0)
+  takeawaySales           Decimal @default(0) @db.Decimal(10, 2)
+  takeawayOrders          Int     @default(0)
+  deliverySales           Decimal @default(0) @db.Decimal(10, 2)
+  deliveryOrders          Int     @default(0)
+
+  // Payment Method Summary
+  cashPayments            Decimal @default(0) @db.Decimal(10, 2)
+  cashPaymentCount        Int     @default(0)
+  cardPayments            Decimal @default(0) @db.Decimal(10, 2)
+  cardPaymentCount        Int     @default(0)
+  digitalPayments         Decimal @default(0) @db.Decimal(10, 2)
+  digitalPaymentCount     Int     @default(0)
+
+  // Cash Drawer Summary
+  openingCash             Decimal @db.Decimal(10, 2)
+  expectedCash            Decimal @db.Decimal(10, 2)
+  countedCash             Decimal @db.Decimal(10, 2)
+  cashDifference          Decimal @db.Decimal(10, 2) // countedCash - expectedCash
+  cashInOut               Decimal @default(0) @db.Decimal(10, 2) // Non-sales movements
+
+  // Refunds & Cancellations
+  cancelledOrders         Int     @default(0)
+  cancelledOrdersAmount   Decimal @default(0) @db.Decimal(10, 2)
+  refundedPayments        Int     @default(0)
+  refundedAmount          Decimal @default(0) @db.Decimal(10, 2)
+
+  // Staff Performance (stored as JSON for flexibility)
+  staffPerformance        Json?   // Array of {staffId, staffName, sales, orders, refunds}
+
+  // Product Group Sales (stored as JSON)
+  categoryBreakdown       Json?   // Array of {categoryId, categoryName, sales, quantity}
+
+  // Top Products (stored as JSON)
+  topProducts             Json?   // Array of {productId, productName, quantity, revenue}
+
+  // System Status
+  openChecks              Int     @default(0) // Should be 0 for successful closing
+  openChecksAmount        Decimal @default(0) @db.Decimal(10, 2)
+
+  // Metadata
+  notes                   String? @db.Text
+  systemGenerated         Boolean @default(false)
+
+  // Report export tracking
+  pdfExported             Boolean  @default(false)
+  pdfUrl                  String?
+  excelExported           Boolean  @default(false)
+  excelUrl                String?
+  emailSent               Boolean  @default(false)
+  emailSentAt             DateTime?
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  cashDrawerMovements CashDrawerMovement[]
+
+  @@unique([tenantId, reportNumber])
+  @@index([tenantId])
+  @@index([reportDate])
+  @@index([closedById])
+  @@map("z_reports")
+}
+
+model CashDrawerMovement {
+  id          String   @id @default(uuid())
+  type        String   // OPENING, CLOSING, CASH_IN, CASH_OUT, ADJUSTMENT
+  amount      Decimal  @db.Decimal(10, 2)
+  reason      String?
+  notes       String?  @db.Text
+
+  // Cash counting details (for CLOSING type)
+  denominationBreakdown Json? // {100: 5, 50: 10, 20: 15, etc.}
+
+  // Z Report reference (optional, null for daily movements)
+  zReportId String?
+  zReport   ZReport? @relation(fields: [zReportId], references: [id], onDelete: Cascade)
+
+  // Staff who performed the movement
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  tenantId String
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([zReportId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("cash_drawer_movements")
 }

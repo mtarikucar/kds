@@ -7,7 +7,11 @@ import { I18nextProvider } from 'react-i18next';
 import ErrorBoundary from './components/ErrorBoundary';
 import App from './App';
 import i18n from './i18n/config';
+import { initSentry } from './sentry.config';
 import './index.css';
+
+// Initialize Sentry as early as possible
+initSentry();
 
 const queryClient = new QueryClient({
   defaultOptions: {

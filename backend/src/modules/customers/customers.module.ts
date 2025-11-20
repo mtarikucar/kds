@@ -6,6 +6,7 @@ import { LoyaltyService } from './loyalty.service';
 import { CustomerSessionService } from './customer-session.service';
 import { PhoneVerificationService } from './phone-verification.service';
 import { ReferralService } from './referral.service';
+import { SmsService } from './sms.service';
 
 @Module({
   controllers: [CustomersController, CustomerPublicController],
@@ -15,6 +16,7 @@ import { ReferralService } from './referral.service';
     CustomerSessionService,
     PhoneVerificationService,
     ReferralService,
+    SmsService,
   ],
   exports: [
     CustomersService,

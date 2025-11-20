@@ -1,10 +1,12 @@
 import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SmsService } from './sms.service';
 
 @Injectable()
 export class PhoneVerificationService {
   constructor(
     private prisma: PrismaService,
+    private smsService: SmsService,
   ) {}
 
   /**
@@ -62,10 +64,19 @@ export class PhoneVerificationService {
       },
     });
 
-    // TODO: In production, integrate with SMS provider here
-    // Example: await this.smsService.send(phone, `Your verification code: ${code}`);
+    // Send SMS via Twilio with retry logic
+    const smsSent = await this.smsService.sendVerificationCode(phone, code);
 
-    console.log(`[PhoneVerification] OTP for ${phone}: ${code} (expires: ${expiresAt})`);
+    if (!smsSent && this.smsService.isServiceEnabled()) {
+      // If SMS fails in production and service is enabled, log error but don't fail
+      // (verification record is still created for testing/backup)
+      console.error(`[PhoneVerification] Failed to send SMS to ${phone}`);
+    }
+
+    // Log to console in development
+    if (!this.smsService.isServiceEnabled()) {
+      console.log(`[PhoneVerification] OTP for ${phone}: ${code} (expires: ${expiresAt})`);
+    }
 
     return {
       verificationId: verification.id,

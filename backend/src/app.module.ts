@@ -22,6 +22,7 @@ import { PosSettingsModule } from './modules/pos-settings/pos-settings.module';
 import { SettingsModule } from './modules/settings/settings.module';
 import { ContactModule } from './modules/contact/contact.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
+import { ZReportsModule } from './modules/z-reports/z-reports.module';
 import { CustomersModule } from './modules/customers/customers.module';
 import { ModifiersModule } from './modules/modifiers/modifiers.module';
 import { CustomerOrdersModule } from './modules/customer-orders/customer-orders.module';
@@ -71,6 +72,7 @@ import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './co
     SettingsModule,
     ContactModule,
     NotificationsModule,
+    ZReportsModule,
     CustomersModule,
     ModifiersModule,
     CustomerOrdersModule,

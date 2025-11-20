@@ -53,8 +53,10 @@ export default defineConfig({
     target: process.env.TAURI_PLATFORM == 'windows' ? 'chrome105' : 'safari13',
     // Don't minify for debug builds
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
-    // Produce sourcemaps for debug builds
-    sourcemap: !!process.env.TAURI_DEBUG,
+    // Always produce sourcemaps for Sentry error tracking
+    // 'hidden' means source maps are generated but not referenced in the bundle
+    // This keeps them available for error reporting tools while hiding them from users
+    sourcemap: process.env.NODE_ENV === 'production' ? 'hidden' : true,
     rollupOptions: {
       // Mark Tauri plugins as external for web builds
       // These are only available in Tauri desktop environment

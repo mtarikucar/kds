@@ -8,6 +8,7 @@ import { StripePaymentForm } from '../../components/subscriptions/StripePaymentF
 import { IyzicoPaymentForm } from '../../components/subscriptions/IyzicoPaymentForm';
 import {
   useCreatePaymentIntent,
+  useCreatePlanChangeIntent,
   useConfirmPayment,
 } from '../../api/paymentsApi';
 import { useGetCurrentSubscription, subscriptionKeys } from '../../features/subscriptions/subscriptionsApi';
@@ -39,6 +40,7 @@ export default function SubscriptionPaymentPage() {
 
   const { data: subscription } = useGetCurrentSubscription();
   const createPaymentIntent = useCreatePaymentIntent();
+  const createPlanChangeIntent = useCreatePlanChangeIntent();
   const confirmPayment = useConfirmPayment();
 
   // Create payment intent on mount
@@ -47,24 +49,23 @@ export default function SubscriptionPaymentPage() {
       // Handle plan change payment
       setIsPlanChange(true);
 
-      // TODO: Create API hook for plan change payment intent
-      fetch('/api/payments/create-plan-change-intent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pendingChangeId }),
-      })
-        .then(res => res.json())
-        .then(data => {
-          setClientSecret(data.clientSecret);
-          setPaymentIntentId(data.paymentIntentId);
-          setAmount(data.amount);
-          setCurrency(data.currency);
-          setPaymentProvider(data.provider === 'IYZICO' ? 'iyzico' : 'stripe');
-        })
-        .catch(error => {
-          toast.error('Failed to create payment intent');
-          navigate('/subscription');
-        });
+      // Use API hook for plan change payment intent
+      createPlanChangeIntent.mutate(
+        { pendingChangeId },
+        {
+          onSuccess: (data) => {
+            setClientSecret(data.clientSecret);
+            setPaymentIntentId(data.paymentIntentId);
+            setAmount(data.amount);
+            setCurrency(data.currency);
+            setPaymentProvider(data.paymentProvider || 'stripe');
+          },
+          onError: (error) => {
+            toast.error('Failed to create payment intent');
+            navigate('/subscription');
+          },
+        }
+      );
     } else if (subscriptionId) {
       // Handle new subscription payment
       setIsPlanChange(false);
