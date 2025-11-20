@@ -11,6 +11,10 @@ on:
         required: false
         default: 'Manual deployment'
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   deploy-test:
     name: Deploy to Test Environment
@@ -70,31 +74,99 @@ jobs:
           echo "build_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_OUTPUT
           echo "commit_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          target: production
+          push: true
+          tags: ghcr.io/${{ github.repository }}/backend-staging:latest,ghcr.io/${{ github.repository }}/backend-staging:${{ steps.commit_info.outputs.commit_sha }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/backend-staging:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/backend-staging:buildcache,mode=max
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          target: production
+          push: true
+          tags: ghcr.io/${{ github.repository }}/frontend-staging:latest,ghcr.io/${{ github.repository }}/frontend-staging:${{ steps.commit_info.outputs.commit_sha }}
+          build-args: |
+            VITE_API_URL=https://staging.hummytummy.com/api
+            VITE_API_BASE_URL=https://staging.hummytummy.com/api
+            VITE_SOCKET_URL=https://staging.hummytummy.com
+            VITE_WS_URL=wss://staging.hummytummy.com
+            VITE_STRIPE_PUBLISHABLE_KEY=${{ secrets.VITE_STRIPE_TEST_PUBLISHABLE_KEY }}
+            VITE_APP_VERSION=${{ steps.version_info.outputs.version }}
+            VITE_BUILD_TIME=${{ steps.version_info.outputs.build_time }}
+            VITE_COMMIT_SHA=${{ steps.commit_info.outputs.commit_sha }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/frontend-staging:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/frontend-staging:buildcache,mode=max
+
       - name: Deploy to test environment
         run: |
+          echo "=========================================="
+          echo "Test Environment Deployment Started"
+          echo "=========================================="
+          echo ""
+          echo "Version: ${{ steps.version_info.outputs.version }}"
+          echo "Commit: ${{ steps.commit_info.outputs.commit_sha }}"
+          echo "Author: ${{ steps.commit_info.outputs.author }}"
+          echo "Message: ${{ steps.commit_info.outputs.commit_message }}"
+          echo "Trigger: ${{ github.event_name }}"
+          echo ""
+
           ssh root@${{ env.SERVER_HOST }} << 'EOF'
             set -e
-
-            echo "=========================================="
-            echo "Test Environment Deployment Started"
-            echo "=========================================="
-            echo ""
-            echo "Version: ${{ steps.version_info.outputs.version }}"
-            echo "Commit: ${{ steps.commit_info.outputs.commit_sha }}"
-            echo "Author: ${{ steps.commit_info.outputs.author }}"
-            echo "Message: ${{ steps.commit_info.outputs.commit_message }}"
-            echo "Trigger: ${{ github.event_name }}"
-            echo ""
-
             cd ${{ env.PROJECT_PATH }}
 
-            # Export version information for deployment script
-            export VERSION="${{ steps.version_info.outputs.version }}"
-            export BUILD_TIME="${{ steps.version_info.outputs.build_time }}"
-            export COMMIT_SHA="${{ steps.version_info.outputs.commit_sha }}"
+            # Create database backup
+            echo "Creating database backup..."
+            mkdir -p backups/database
+            BACKUP_FILE="backups/database/backup_test_$(date +%Y%m%d_%H%M%S).sql.gz"
+            docker exec kds_postgres_staging pg_dump -U postgres -d restaurant_pos_staging | gzip > "$BACKUP_FILE" || echo "Backup failed, continuing..."
 
-            # Run deployment script
-            bash scripts/test-deploy.sh deploy
+            # Keep only last 3 test backups
+            ls -t backups/database/backup_test_*.sql.gz 2>/dev/null | tail -n +4 | xargs -r rm || true
+
+            # Login to GitHub Container Registry
+            echo "Logging in to GitHub Container Registry..."
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Update docker-compose to use new images
+            echo "Updating image references..."
+            export BACKEND_IMAGE="ghcr.io/${{ github.repository }}/backend-staging:latest"
+            export FRONTEND_IMAGE="ghcr.io/${{ github.repository }}/frontend-staging:latest"
+
+            # Pull new images
+            echo "Pulling new images..."
+            docker pull "$BACKEND_IMAGE"
+            docker pull "$FRONTEND_IMAGE"
+
+            # Stop existing containers
+            echo "Stopping existing containers..."
+            docker-compose -f docker-compose.staging.yml down || true
+
+            # Start new containers with updated images
+            echo "Starting new containers..."
+            BACKEND_IMAGE="$BACKEND_IMAGE" FRONTEND_IMAGE="$FRONTEND_IMAGE" docker-compose -f docker-compose.staging.yml up -d
+
+            # Run database migrations
+            echo "Running database migrations..."
+            sleep 10
+            docker exec kds_backend_staging npx prisma migrate deploy || echo "Migration failed or no new migrations"
 
             echo ""
             echo "=========================================="
@@ -109,7 +181,32 @@ jobs:
 
           ssh root@${{ env.SERVER_HOST }} << 'EOF'
             cd ${{ env.PROJECT_PATH }}
-            bash scripts/test-deploy.sh health
+
+            # Health check
+            echo "Performing health check..."
+            HEALTH_URL="http://localhost:3002/api/health"
+            MAX_RETRIES=30
+            RETRY_INTERVAL=2
+
+            for i in $(seq 1 $MAX_RETRIES); do
+              if curl -sf "$HEALTH_URL" > /dev/null 2>&1; then
+                echo "✅ Health check passed! Backend is healthy"
+
+                # Show container status
+                echo ""
+                echo "Container Status:"
+                docker ps --filter 'name=kds_.*_staging' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+
+                exit 0
+              fi
+              echo "Health check attempt $i/$MAX_RETRIES failed, retrying in ${RETRY_INTERVAL}s..."
+              sleep $RETRY_INTERVAL
+            done
+
+            echo "❌ Health check failed after $MAX_RETRIES attempts"
+            echo "Container logs:"
+            docker logs kds_backend_staging --tail 50
+            exit 1
           EOF
 
       - name: Send success notification

@@ -65,6 +65,7 @@ services:
   backend:
     env_file:
       - .env.test
+    image: ${BACKEND_IMAGE:-kds-staging-backend}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -129,6 +130,7 @@ services:
   frontend:
     env_file:
       - .env.test
+    image: ${FRONTEND_IMAGE:-kds-staging-frontend}
     build:
       context: ./frontend
       dockerfile: Dockerfile
