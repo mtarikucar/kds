@@ -1,11 +1,9 @@
 import {
   Injectable,
-  UnauthorizedException,
-  ConflictException,
-  BadRequestException,
-  NotFoundException,
   Inject,
   forwardRef,
+  UnauthorizedException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -20,6 +18,12 @@ import { UserRole } from '../../common/constants/roles.enum';
 import { EmailService } from '../../common/services/email.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/dto/create-notification.dto';
+import {
+  ResourceAlreadyExistsException,
+  ResourceNotFoundException,
+  InvalidCredentialsException,
+  ValidationException,
+} from '../../common/exceptions';
 
 @Injectable()
 export class AuthService {
@@ -39,7 +43,7 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new ConflictException('Email already in use');
+      throw new ResourceAlreadyExistsException('User', 'email', registerDto.email);
     }
 
     // Validate registration data
@@ -48,12 +52,12 @@ export class AuthService {
 
     // Mutual exclusion: cannot provide both
     if (hasRestaurantName && hasTenantId) {
-      throw new BadRequestException('Cannot provide both restaurantName and tenantId');
+      throw new ValidationException('Cannot provide both restaurantName and tenantId');
     }
 
     // One of them must be provided
     if (!hasRestaurantName && !hasTenantId) {
-      throw new BadRequestException('Either restaurantName or tenantId must be provided');
+      throw new ValidationException('Either restaurantName or tenantId must be provided');
     }
 
     let tenantId: string;
@@ -63,7 +67,7 @@ export class AuthService {
     if (hasRestaurantName) {
       // If creating a restaurant, role must be ADMIN (or default to ADMIN)
       if (userRole && userRole !== UserRole.ADMIN) {
-        throw new BadRequestException('Only ADMIN role is allowed when creating a new restaurant');
+        throw new ValidationException('Only ADMIN role is allowed when creating a new restaurant');
       }
       userRole = UserRole.ADMIN;
 
@@ -89,7 +93,7 @@ export class AuthService {
       });
 
       if (!freePlan) {
-        throw new BadRequestException('FREE plan not found. Please seed the database.');
+        throw new ResourceNotFoundException('FREE subscription plan');
       }
 
       // Create new tenant with FREE subscription
@@ -135,12 +139,12 @@ export class AuthService {
       });
 
       if (!tenant) {
-        throw new BadRequestException('Invalid tenant');
+        throw new ResourceNotFoundException('Tenant', registerDto.tenantId);
       }
 
       // Cannot join as ADMIN (ADMIN creates their own restaurant)
       if (userRole === UserRole.ADMIN) {
-        throw new BadRequestException('Cannot join existing restaurant as ADMIN. ADMIN must create their own restaurant.');
+        throw new ValidationException('Cannot join existing restaurant as ADMIN. ADMIN must create their own restaurant.');
       }
 
       // Default to WAITER if no role provided
@@ -189,7 +193,7 @@ export class AuthService {
     const user = await this.validateUser(loginDto.email, loginDto.password);
 
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new InvalidCredentialsException();
     }
 
     return this.generateTokens(user);
