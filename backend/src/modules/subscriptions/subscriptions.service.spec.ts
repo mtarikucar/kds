@@ -11,12 +11,27 @@ describe('SubscriptionsService', () => {
   const mockPlan = {
     id: 'plan-1',
     name: 'PRO',
-    tier: 'PRO',
+    displayName: 'Pro Plan',
+    description: 'Professional tier plan',
     monthlyPrice: 29.99,
     yearlyPrice: 299.99,
     currency: 'USD',
-    features: {},
+    trialDays: 14,
+    maxUsers: 10,
+    maxTables: 50,
+    maxProducts: 500,
+    maxCategories: 50,
+    maxMonthlyOrders: 10000,
+    advancedReports: true,
+    multiLocation: false,
+    customBranding: true,
+    apiAccess: true,
+    prioritySupport: true,
+    inventoryTracking: true,
+    kdsIntegration: true,
     isActive: true,
+    createdAt: new Date('2024-01-01'),
+    updatedAt: new Date('2024-01-01'),
   };
 
   const mockSubscription = {
@@ -116,8 +131,8 @@ describe('SubscriptionsService', () => {
       prisma.subscription.findFirst.mockResolvedValue(mockSubscription);
       prisma.subscriptionPlan.findUnique.mockResolvedValue({
         ...mockPlan,
-        tier: 'BASIC',
-      });
+        name: 'BASIC',
+      } as any);
 
       // Mock tenant using features only available in higher tiers
       prisma.tenant.findUnique.mockResolvedValue({

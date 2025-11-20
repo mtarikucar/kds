@@ -1,7 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateZReportDto } from './dto/create-z-report.dto';
-import { ZReportStatus } from '@prisma/client';
 import PDFDocument from 'pdfkit';
 
 @Injectable()
@@ -44,7 +43,7 @@ export class ZReportsService {
       },
       include: {
         payments: true,
-        items: {
+        orderItems: {
           include: {
             product: true,
           },
@@ -54,25 +53,25 @@ export class ZReportsService {
 
     // Calculate totals
     const totalOrders = orders.length;
-    const grossSales = orders.reduce((sum, order) => sum + order.totalAmount, 0);
-    const discounts = orders.reduce((sum, order) => sum + order.discount, 0);
-    const netSales = orders.reduce((sum, order) => sum + order.finalAmount, 0);
+    const grossSales = orders.reduce((sum, order) => sum + Number(order.totalAmount), 0);
+    const discounts = orders.reduce((sum, order) => sum + Number(order.discount), 0);
+    const netSales = orders.reduce((sum, order) => sum + Number(order.finalAmount), 0);
 
     // Calculate payment method breakdown
     const cashPayments = orders
       .flatMap((o) => o.payments)
       .filter((p) => p.method === 'CASH')
-      .reduce((sum, p) => sum + p.amount, 0);
+      .reduce((sum, p) => sum + Number(p.amount), 0);
 
     const cardPayments = orders
       .flatMap((o) => o.payments)
       .filter((p) => p.method === 'CARD')
-      .reduce((sum, p) => sum + p.amount, 0);
+      .reduce((sum, p) => sum + Number(p.amount), 0);
 
     const digitalPayments = orders
       .flatMap((o) => o.payments)
       .filter((p) => p.method === 'DIGITAL')
-      .reduce((sum, p) => sum + p.amount, 0);
+      .reduce((sum, p) => sum + Number(p.amount), 0);
 
     // Calculate tax (assuming 10% for simplicity - should be configurable)
     const taxRate = 0.10;
@@ -85,14 +84,14 @@ export class ZReportsService {
     // Get top selling products
     const productSales = new Map<string, { name: string; quantity: number; revenue: number }>();
     orders.forEach((order) => {
-      order.items.forEach((item) => {
+      order.orderItems.forEach((item) => {
         const existing = productSales.get(item.productId) || {
           name: item.product.name,
           quantity: 0,
           revenue: 0,
         };
         existing.quantity += item.quantity;
-        existing.revenue += item.subtotal;
+        existing.revenue += Number(item.subtotal);
         productSales.set(item.productId, existing);
       });
     });
@@ -113,7 +112,8 @@ export class ZReportsService {
       include: {
         user: {
           select: {
-            name: true,
+            firstName: true,
+            lastName: true,
             email: true,
           },
         },
@@ -151,7 +151,7 @@ export class ZReportsService {
           type: m.type,
           amount: m.amount,
           reason: m.reason,
-          performedBy: m.user.name,
+          performedBy: `${m.user.firstName} ${m.user.lastName}`,
           timestamp: m.createdAt,
         })) as any,
 
@@ -272,9 +272,10 @@ export class ZReportsService {
         continued: true,
       });
 
-      if (report.cashDifference !== 0) {
-        doc.fillColor(report.cashDifference > 0 ? 'green' : 'red')
-          .text(` (${report.cashDifference > 0 ? 'Over' : 'Short'})`)
+      const cashDiff = Number(report.cashDifference);
+      if (cashDiff !== 0) {
+        doc.fillColor(cashDiff > 0 ? 'green' : 'red')
+          .text(` (${cashDiff > 0 ? 'Over' : 'Short'})`)
           .fillColor('black');
       }
       doc.moveDown();
