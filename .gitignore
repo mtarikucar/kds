@@ -61,3 +61,7 @@ frontend/src-tauri/target/
 **/target/
 **/*.rs.bk
 Cargo.lock
+
+
+
+examples/

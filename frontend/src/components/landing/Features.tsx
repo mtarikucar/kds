@@ -1,81 +1,85 @@
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
+import {
+  QrCode,
+  LayoutDashboard,
+  ChefHat,
+  BarChart3,
+  CreditCard,
+  Users
+} from 'lucide-react';
 
 export const Features = () => {
   const { t } = useTranslation('common');
 
   const features = [
     {
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-        </svg>
-      ),
+      icon: <QrCode className="w-8 h-8" />,
       title: t('landing.feature1Title'),
       description: t('landing.feature1Desc'),
+      color: "bg-warm-orange/20 text-warm-brown",
+      gradient: "from-warm-orange/10 to-primary-200/10",
     },
     {
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-        </svg>
-      ),
+      icon: <LayoutDashboard className="w-8 h-8" />,
       title: t('landing.feature2Title'),
       description: t('landing.feature2Desc'),
+      color: "bg-primary-300/20 text-warm-dark",
+      gradient: "from-primary-200/10 to-warm-tan/20",
     },
     {
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-        </svg>
-      ),
+      icon: <ChefHat className="w-8 h-8" />,
       title: t('landing.feature3Title'),
       description: t('landing.feature3Desc'),
+      color: "bg-warm-brown/20 text-warm-dark",
+      gradient: "from-warm-brown/10 to-warm-orange/10",
     },
     {
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-        </svg>
-      ),
+      icon: <BarChart3 className="w-8 h-8" />,
       title: t('landing.feature4Title'),
       description: t('landing.feature4Desc'),
+      color: "bg-primary-400/20 text-warm-brown",
+      gradient: "from-primary-300/10 to-warm-beige/20",
     },
     {
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-        </svg>
-      ),
+      icon: <CreditCard className="w-8 h-8" />,
       title: t('landing.feature5Title'),
       description: t('landing.feature5Desc'),
+      color: "bg-warm-sand/30 text-warm-dark",
+      gradient: "from-warm-sand/20 to-primary-100/20",
     },
     {
-      icon: (
-        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-        </svg>
-      ),
+      icon: <Users className="w-8 h-8" />,
       title: t('landing.feature6Title'),
       description: t('landing.feature6Desc'),
+      color: "bg-warm-orange/15 text-warm-brown",
+      gradient: "from-warm-cream/30 to-warm-orange/10",
     },
   ];
 
   return (
-    <section id="features" className="py-20 px-4 sm:px-6 lg:px-8 bg-white">
-      <div className="max-w-7xl mx-auto">
+    <section id="features" className="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-white via-warm-cream/30 to-white relative overflow-hidden">
+      {/* Decorative background elements */}
+      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-warm-orange/30 to-transparent" />
+      <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-warm-orange/30 to-transparent" />
+
+      {/* Decorative blob shapes */}
+      <div className="absolute top-1/4 left-0 w-96 h-96 bg-warm-orange/10 rounded-full blur-[120px]" />
+      <div className="absolute bottom-1/4 right-0 w-96 h-96 bg-primary-200/20 rounded-full blur-[120px]" />
+
+      <div className="max-w-7xl mx-auto relative z-10">
         {/* Section Header */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5 }}
-          className="text-center mb-16"
+          className="text-center mb-20"
         >
-          <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+          <h2 className="text-4xl md:text-5xl font-heading font-bold text-warm-dark mb-6">
             {t('landing.everythingYouNeed')}
           </h2>
-          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+          <p className="text-xl text-warm-brown/70 max-w-2xl mx-auto">
             {t('landing.featuresDescription')}
           </p>
         </motion.div>
@@ -90,21 +94,22 @@ export const Features = () => {
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
               whileHover={{ y: -8 }}
-              className="bg-gradient-to-br from-white to-gray-50 p-8 rounded-xl border border-gray-200 hover:border-primary-300 hover:shadow-xl transition-all duration-300 group cursor-pointer"
+              className="bg-white/80 p-8 rounded-3xl border-2 border-warm-orange/20 hover:border-warm-orange/50 hover:shadow-2xl hover:shadow-warm-orange/10 transition-all duration-300 group cursor-pointer relative overflow-hidden backdrop-blur-sm"
             >
-              <motion.div
-                whileHover={{ scale: 1.1, rotate: 5 }}
-                transition={{ duration: 0.3 }}
-                className="w-16 h-16 bg-primary-100 text-primary-600 rounded-lg flex items-center justify-center mb-6 group-hover:bg-primary-600 group-hover:text-white transition-colors"
-              >
+              <div className={`w-16 h-16 ${feature.color} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300 shadow-md`}>
                 {feature.icon}
-              </motion.div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">
+              </div>
+
+              <h3 className="text-xl font-bold text-warm-dark mb-3 group-hover:text-warm-orange transition-colors">
                 {feature.title}
               </h3>
-              <p className="text-gray-600 leading-relaxed">
+
+              <p className="text-warm-brown/70 leading-relaxed">
                 {feature.description}
               </p>
+
+              {/* Hover gradient overlay */}
+              <div className={`absolute inset-0 bg-gradient-to-br ${feature.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none rounded-3xl`} />
             </motion.div>
           ))}
         </div>

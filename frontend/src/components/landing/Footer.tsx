@@ -11,33 +11,47 @@ export const Footer = () => {
   };
 
   return (
-    <footer className="bg-gray-900 text-gray-300 py-12 px-4 sm:px-6 lg:px-8">
+    <footer className="bg-gradient-to-br from-warm-tan via-warm-beige to-warm-cream pt-20 pb-12 px-4 sm:px-6 lg:px-8 border-t-2 border-warm-orange/30">
       <div className="max-w-7xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
           {/* Company Info */}
-          <div>
-            <div className="text-2xl font-bold text-white mb-4">HummyTummy</div>
-            <p className="text-sm text-gray-400 mb-4">
+          <div className="col-span-1 md:col-span-1">
+            <Link to="/" className="flex items-center space-x-2 mb-6 group">
+              <div className="relative w-10 h-10 overflow-hidden rounded-xl transition-transform duration-300 group-hover:scale-105 shadow-md">
+                <img
+                  src="/logo.png"
+                  alt="HummyTummy Logo"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <span className="text-xl font-heading font-bold text-warm-dark">
+                HummyTummy
+              </span>
+            </Link>
+            <p className="text-sm text-warm-brown/70 leading-relaxed mb-6">
               {t('landing.footerDescription')}
             </p>
+            <div className="flex space-x-4">
+              {/* Social Media Icons could go here */}
+            </div>
           </div>
 
           {/* Product */}
           <div>
-            <h4 className="text-white font-semibold mb-4">{t('landing.product')}</h4>
-            <ul className="space-y-2 text-sm">
+            <h4 className="text-warm-dark font-bold mb-6">{t('landing.product')}</h4>
+            <ul className="space-y-4 text-sm">
               <li>
-                <button onClick={() => scrollToSection('features')} className="hover:text-white transition-colors">
+                <button onClick={() => scrollToSection('features')} className="text-warm-brown/70 hover:text-warm-orange font-medium transition-colors">
                   {t('landing.features')}
                 </button>
               </li>
               <li>
-                <button onClick={() => scrollToSection('pricing')} className="hover:text-white transition-colors">
+                <button onClick={() => scrollToSection('pricing')} className="text-warm-brown/70 hover:text-warm-orange font-medium transition-colors">
                   {t('landing.pricing')}
                 </button>
               </li>
               <li>
-                <Link to="/register" className="hover:text-white transition-colors">
+                <Link to="/register" className="text-warm-brown/70 hover:text-warm-orange font-medium transition-colors">
                   {t('landing.freeTrial')}
                 </Link>
               </li>
@@ -46,20 +60,20 @@ export const Footer = () => {
 
           {/* Company */}
           <div>
-            <h4 className="text-white font-semibold mb-4">{t('landing.company')}</h4>
-            <ul className="space-y-2 text-sm">
+            <h4 className="text-warm-dark font-bold mb-6">{t('landing.company')}</h4>
+            <ul className="space-y-4 text-sm">
               <li>
-                <button onClick={() => scrollToSection('contact')} className="hover:text-white transition-colors">
+                <button onClick={() => scrollToSection('contact')} className="text-warm-brown/70 hover:text-warm-orange font-medium transition-colors">
                   {t('landing.contactUs')}
                 </button>
               </li>
               <li>
-                <button onClick={() => scrollToSection('features')} className="hover:text-white transition-colors text-left">
+                <button onClick={() => scrollToSection('features')} className="text-warm-brown/70 hover:text-warm-orange font-medium transition-colors text-left">
                   {t('landing.features')}
                 </button>
               </li>
               <li>
-                <button onClick={() => scrollToSection('pricing')} className="hover:text-white transition-colors text-left">
+                <button onClick={() => scrollToSection('pricing')} className="text-warm-brown/70 hover:text-warm-orange font-medium transition-colors text-left">
                   {t('landing.pricing')}
                 </button>
               </li>
@@ -68,20 +82,20 @@ export const Footer = () => {
 
           {/* Legal */}
           <div>
-            <h4 className="text-white font-semibold mb-4">{t('landing.legal')}</h4>
-            <ul className="space-y-2 text-sm">
+            <h4 className="text-warm-dark font-bold mb-6">{t('landing.legal')}</h4>
+            <ul className="space-y-4 text-sm">
               <li>
-                <a href="mailto:contact@hummytummy.com" className="hover:text-white transition-colors">
+                <a href="mailto:contact@hummytummy.com" className="text-warm-brown/70 hover:text-warm-orange font-medium transition-colors">
                   {t('landing.support')}
                 </a>
               </li>
               <li>
-                <a href="https://hummytummy.com" className="hover:text-white transition-colors" target="_blank" rel="noopener noreferrer">
+                <a href="https://hummytummy.com" className="text-warm-brown/70 hover:text-warm-orange font-medium transition-colors" target="_blank" rel="noopener noreferrer">
                   {t('landing.documentation')}
                 </a>
               </li>
               <li>
-                <button onClick={() => scrollToSection('testimonials')} className="hover:text-white transition-colors text-left">
+                <button onClick={() => scrollToSection('testimonials')} className="text-warm-brown/70 hover:text-warm-orange font-medium transition-colors text-left">
                   {t('landing.testimonials')}
                 </button>
               </li>
@@ -90,24 +104,24 @@ export const Footer = () => {
         </div>
 
         {/* Bottom Bar */}
-        <div className="border-t border-gray-800 pt-8 flex flex-col md:flex-row justify-between items-center">
-          <div className="flex flex-col md:flex-row items-center gap-3 mb-4 md:mb-0">
-            <p className="text-sm text-gray-400">
+        <div className="border-t-2 border-warm-orange/20 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex flex-col md:flex-row items-center gap-4">
+            <p className="text-sm text-warm-brown/70 font-medium">
               © {new Date().getFullYear()} HummyTummy. {t('landing.allRightsReserved')}
             </p>
             {import.meta.env.VITE_APP_VERSION && (
-              <span className="text-xs text-gray-500 px-2 py-1 bg-gray-800 rounded border border-gray-700">
+              <span className="text-xs text-warm-dark px-3 py-1 bg-white/60 rounded-full border-2 border-warm-orange/20 font-semibold shadow-sm">
                 v{import.meta.env.VITE_APP_VERSION.replace('v', '')}
               </span>
             )}
           </div>
 
           {/* Contact Email */}
-          <div className="flex items-center gap-2 text-sm text-gray-400">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex items-center gap-2 text-sm text-warm-brown/70 hover:text-warm-orange transition-colors font-medium">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
             </svg>
-            <a href="mailto:contact@hummytummy.com" className="hover:text-white transition-colors">
+            <a href="mailto:contact@hummytummy.com">
               contact@hummytummy.com
             </a>
           </div>

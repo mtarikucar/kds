@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import Button from '../ui/Button';
+import { UtensilsCrossed, ChefHat, Coffee } from 'lucide-react';
 
 export const Hero = () => {
   const { t } = useTranslation('common');
@@ -13,50 +14,71 @@ export const Hero = () => {
   };
 
   return (
-    <section className="relative pt-32 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden">
-      {/* Enhanced Gradient Background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary-50 via-blue-50 to-white" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-blue-100 via-transparent to-transparent opacity-50" />
-
-      {/* Animated Background Shapes */}
+    <section className="relative pt-32 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden min-h-[90vh] flex items-center bg-gradient-to-br from-warm-cream via-warm-beige to-warm-tan">
+      {/* Decorative food icons floating in background */}
       <motion.div
-        className="absolute top-20 right-10 w-72 h-72 bg-primary-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30"
+        className="absolute top-32 right-20 text-warm-orange/20"
         animate={{
-          scale: [1, 1.2, 1],
-          x: [0, 30, 0],
-          y: [0, -30, 0],
+          y: [0, -20, 0],
+          rotate: [0, 10, 0],
         }}
         transition={{
-          duration: 8,
+          duration: 6,
           repeat: Infinity,
           ease: "easeInOut",
         }}
-      />
+      >
+        <UtensilsCrossed size={80} strokeWidth={1.5} />
+      </motion.div>
+
       <motion.div
-        className="absolute bottom-20 left-10 w-72 h-72 bg-blue-200 rounded-full mix-blend-multiply filter blur-3xl opacity-30"
+        className="absolute bottom-32 left-20 text-warm-brown/20"
         animate={{
-          scale: [1, 1.3, 1],
-          x: [0, -30, 0],
-          y: [0, 30, 0],
+          y: [0, 20, 0],
+          rotate: [0, -10, 0],
         }}
         transition={{
-          duration: 10,
+          duration: 7,
           repeat: Infinity,
           ease: "easeInOut",
         }}
-      />
+      >
+        <ChefHat size={100} strokeWidth={1.5} />
+      </motion.div>
 
-      <div className="relative max-w-7xl mx-auto">
-        <div className="text-center">
+      <motion.div
+        className="absolute top-1/2 right-1/4 text-primary-300/30"
+        animate={{
+          y: [0, -15, 0],
+          scale: [1, 1.1, 1],
+        }}
+        transition={{
+          duration: 5,
+          repeat: Infinity,
+          ease: "easeInOut",
+        }}
+      >
+        <Coffee size={60} strokeWidth={1.5} />
+      </motion.div>
+
+      {/* Soft rounded shapes */}
+      <div className="absolute top-20 right-10 w-96 h-96 bg-primary-200/40 rounded-full blur-[120px]" />
+      <div className="absolute bottom-20 left-10 w-80 h-80 bg-warm-orange/30 rounded-full blur-[100px]" />
+
+      <div className="relative max-w-7xl mx-auto w-full">
+        <div className="text-center max-w-4xl mx-auto">
           {/* Badge */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="inline-block"
+            className="inline-block mb-8"
           >
-            <div className="inline-flex items-center px-5 py-2.5 bg-white/80 backdrop-blur-sm border border-primary-200 text-primary-700 rounded-full text-sm font-semibold mb-8 shadow-sm hover:shadow-md transition-shadow">
-              <span className="w-2 h-2 bg-primary-500 rounded-full mr-2 animate-pulse"></span>
+            <div className="inline-flex items-center px-5 py-2.5 bg-white/80 border-2 border-warm-orange/30 text-warm-dark rounded-full text-sm font-semibold shadow-lg hover:shadow-xl hover:border-warm-orange/50 transition-all cursor-default">
+              <span className="relative flex h-2.5 w-2.5 mr-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-warm-orange opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-warm-orange"></span>
+              </span>
               {t('landing.badge')}
             </div>
           </motion.div>
@@ -66,11 +88,11 @@ export const Hero = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
-            className="text-5xl md:text-6xl lg:text-7xl font-extrabold text-gray-900 mb-6 leading-tight tracking-tight"
+            className="text-5xl md:text-7xl font-heading font-bold text-warm-dark mb-8 leading-tight tracking-tight"
           >
             {t('landing.headline')}
             <br />
-            <span className="bg-gradient-to-r from-primary-600 via-blue-600 to-primary-700 bg-clip-text text-transparent animate-gradient">
+            <span className="bg-gradient-to-r from-warm-orange via-primary-400 to-warm-orange bg-clip-text text-transparent bg-[length:200%_auto]">
               {t('landing.headlineHighlight')}
             </span>
           </motion.h1>
@@ -80,7 +102,7 @@ export const Hero = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="text-xl md:text-2xl text-gray-600 mb-12 max-w-3xl mx-auto leading-relaxed font-light"
+            className="text-xl md:text-2xl text-warm-brown/80 mb-12 max-w-2xl mx-auto leading-relaxed"
           >
             {t('landing.subtitle')}
           </motion.p>
@@ -100,7 +122,7 @@ export const Hero = () => {
                 <Button
                   variant="primary"
                   size="lg"
-                  className="text-lg px-10 py-5 shadow-lg hover:shadow-2xl transition-all duration-300 bg-gradient-to-r from-primary-600 to-blue-600 hover:from-primary-700 hover:to-blue-700"
+                  className="text-lg px-10 py-6 shadow-xl shadow-warm-orange/30 hover:shadow-2xl hover:shadow-warm-orange/40 transition-all duration-300 bg-warm-orange hover:bg-warm-orange/90 text-white font-bold rounded-2xl border-2 border-white/20"
                 >
                   {t('landing.startFreeTrial')}
                   <svg className="w-5 h-5 ml-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -116,7 +138,7 @@ export const Hero = () => {
               <Button
                 variant="outline"
                 size="lg"
-                className="text-lg px-10 py-5 border-2 border-gray-300 hover:border-primary-500 hover:text-primary-600 transition-all duration-300"
+                className="text-lg px-10 py-6 border-2 border-warm-brown/40 hover:border-warm-brown hover:bg-white/60 text-warm-dark font-semibold transition-all duration-300 rounded-2xl bg-white/40 backdrop-blur-sm"
                 onClick={() => scrollToSection('features')}
               >
                 {t('landing.learnMore')}
@@ -129,26 +151,20 @@ export const Hero = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.5 }}
-            className="flex flex-wrap justify-center items-center gap-8 text-sm text-gray-500"
+            className="flex flex-wrap justify-center items-center gap-6 text-sm"
           >
-            <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              <span className="font-medium">{t('landing.freeTrialNoCreditCard')}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              <span className="font-medium">{t('landing.setupIn5Minutes')}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-              </svg>
-              <span className="font-medium">{t('landing.cancelAnytime')}</span>
-            </div>
+            {[
+              { text: 'landing.freeTrialNoCreditCard', icon: 'M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z' },
+              { text: 'landing.setupIn5Minutes', icon: 'M13 10V3L4 14h7v7l9-11h-7z' },
+              { text: 'landing.cancelAnytime', icon: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z' }
+            ].map((item, index) => (
+              <div key={index} className="flex items-center gap-2 px-5 py-3 bg-white/70 rounded-full backdrop-blur-sm border-2 border-warm-orange/20 shadow-md hover:shadow-lg hover:border-warm-orange/30 transition-all">
+                <svg className="w-5 h-5 text-warm-orange" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d={item.icon} clipRule="evenodd" />
+                </svg>
+                <span className="font-semibold text-warm-dark">{t(item.text)}</span>
+              </div>
+            ))}
           </motion.div>
         </div>
       </div>

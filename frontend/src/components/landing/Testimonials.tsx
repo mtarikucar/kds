@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
+import { Star, Quote, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface Testimonial {
   id: number;
@@ -73,70 +74,74 @@ export const Testimonials = () => {
   };
 
   return (
-    <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-gray-50 to-white" id="testimonials">
-      <div className="max-w-7xl mx-auto">
+    <section className="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-white via-warm-cream/40 to-white relative overflow-hidden" id="testimonials">
+      {/* Decorative blob shapes */}
+      <div className="absolute top-1/3 right-0 w-96 h-96 bg-warm-orange/10 rounded-full blur-[120px]" />
+      <div className="absolute bottom-1/3 left-0 w-96 h-96 bg-primary-200/20 rounded-full blur-[120px]" />
+
+      <div className="max-w-7xl mx-auto relative z-10">
         {/* Section Header */}
-        <div className="text-center mb-16">
+        <div className="text-center mb-20">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.5 }}
           >
-            <div className="inline-flex items-center px-4 py-2 bg-primary-100 text-primary-700 rounded-full text-sm font-medium mb-4">
-              <span className="mr-2">⭐</span>
+            <div className="inline-flex items-center px-5 py-2.5 bg-white/80 border-2 border-warm-orange/30 text-warm-dark rounded-full text-sm font-semibold shadow-lg mb-6">
+              <Star className="w-4 h-4 mr-2 fill-current text-warm-orange" />
               {t('landing.testimonials')}
             </div>
-            <h2 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+            <h2 className="text-4xl md:text-5xl font-heading font-bold text-warm-dark mb-6">
               {t('landing.whatClientsSay')}
             </h2>
-            <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            <p className="text-xl text-warm-brown/70 max-w-2xl mx-auto">
               {t('landing.testimonialSubtitle')}
             </p>
           </motion.div>
         </div>
 
         {/* Testimonials Carousel */}
-        <div className="relative max-w-4xl mx-auto">
-          <div className="relative h-96 overflow-hidden">
+        <div className="relative max-w-5xl mx-auto">
+          <div className="relative min-h-[400px]">
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentIndex}
-                initial={{ opacity: 0, x: 100 }}
+                initial={{ opacity: 0, x: 50 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -100 }}
+                exit={{ opacity: 0, x: -50 }}
                 transition={{ duration: 0.5, ease: 'easeInOut' }}
-                className="absolute inset-0"
+                className="w-full"
               >
-                <div className="bg-white rounded-2xl shadow-xl p-8 md:p-12 h-full flex flex-col justify-between">
-                  {/* Stars */}
-                  <div className="flex gap-1 mb-6">
-                    {[...Array(testimonials[currentIndex].rating)].map((_, i) => (
-                      <svg
-                        key={i}
-                        className="w-6 h-6 text-yellow-400 fill-current"
-                        viewBox="0 0 24 24"
-                      >
-                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                      </svg>
-                    ))}
+                <div className="bg-white/80 rounded-3xl shadow-2xl shadow-warm-orange/10 p-8 md:p-12 border-2 border-warm-orange/20 relative overflow-hidden backdrop-blur-sm">
+                  <div className="absolute top-0 right-0 p-8 opacity-5">
+                    <Quote className="w-32 h-32 text-warm-orange transform rotate-180" />
                   </div>
 
-                  {/* Comment */}
-                  <p className="text-xl md:text-2xl text-gray-700 leading-relaxed mb-8 flex-grow italic">
-                    "{testimonials[currentIndex].comment}"
-                  </p>
-
-                  {/* Author */}
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 bg-gradient-to-br from-primary-500 to-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xl shadow-lg">
-                      {testimonials[currentIndex].avatar}
+                  <div className="flex flex-col md:flex-row gap-10 items-center relative z-10">
+                    <div className="flex-shrink-0">
+                      <div className="w-32 h-32 bg-gradient-to-br from-warm-orange to-warm-brown rounded-full flex items-center justify-center text-white font-heading font-bold text-3xl shadow-xl ring-4 ring-white/80">
+                        {testimonials[currentIndex].avatar}
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-bold text-gray-900 text-lg">
-                        {testimonials[currentIndex].name}
-                      </h4>
-                      <p className="text-gray-600">{testimonials[currentIndex].restaurant}</p>
+
+                    <div className="flex-grow text-center md:text-left">
+                      <div className="flex gap-1 mb-6 justify-center md:justify-start">
+                        {[...Array(testimonials[currentIndex].rating)].map((_, i) => (
+                          <Star key={i} className="w-6 h-6 text-warm-orange fill-current" />
+                        ))}
+                      </div>
+
+                      <p className="text-xl md:text-2xl text-warm-dark leading-relaxed mb-8 italic font-light">
+                        "{testimonials[currentIndex].comment}"
+                      </p>
+
+                      <div>
+                        <h4 className="font-bold text-warm-dark text-lg">
+                          {testimonials[currentIndex].name}
+                        </h4>
+                        <p className="text-warm-orange font-semibold">{testimonials[currentIndex].restaurant}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -145,39 +150,34 @@ export const Testimonials = () => {
           </div>
 
           {/* Navigation Arrows */}
-          <button
-            onClick={handlePrev}
-            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 md:-translate-x-12 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500"
-            aria-label="Previous testimonial"
-          >
-            <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <button
-            onClick={handleNext}
-            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 md:translate-x-12 w-12 h-12 bg-white rounded-full shadow-lg flex items-center justify-center hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500"
-            aria-label="Next testimonial"
-          >
-            <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-            </svg>
-          </button>
-
-          {/* Dots Indicator */}
-          <div className="flex justify-center gap-2 mt-8">
-            {testimonials.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => handleDotClick(index)}
-                className={`w-3 h-3 rounded-full transition-all duration-300 focus:outline-none ${
-                  index === currentIndex
-                    ? 'bg-primary-600 w-8'
-                    : 'bg-gray-300 hover:bg-gray-400'
-                }`}
-                aria-label={`Go to testimonial ${index + 1}`}
-              />
-            ))}
+          <div className="flex justify-center gap-4 mt-10">
+            <button
+              onClick={handlePrev}
+              className="w-12 h-12 bg-white/80 rounded-full shadow-lg border-2 border-warm-orange/20 hover:border-warm-orange hover:bg-warm-orange/10 transition-all flex items-center justify-center group"
+              aria-label="Previous testimonial"
+            >
+              <ChevronLeft className="w-6 h-6 text-warm-brown/60 group-hover:text-warm-orange transition-colors" />
+            </button>
+            <div className="flex gap-2 items-center px-4">
+              {testimonials.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => handleDotClick(index)}
+                  className={`h-2.5 rounded-full transition-all duration-300 focus:outline-none ${index === currentIndex
+                      ? 'bg-warm-orange w-8 shadow-md'
+                      : 'bg-warm-orange/30 w-2.5 hover:bg-warm-orange/50'
+                    }`}
+                  aria-label={`Go to testimonial ${index + 1}`}
+                />
+              ))}
+            </div>
+            <button
+              onClick={handleNext}
+              className="w-12 h-12 bg-white/80 rounded-full shadow-lg border-2 border-warm-orange/20 hover:border-warm-orange hover:bg-warm-orange/10 transition-all flex items-center justify-center group"
+              aria-label="Next testimonial"
+            >
+              <ChevronRight className="w-6 h-6 text-warm-brown/60 group-hover:text-warm-orange transition-colors" />
+            </button>
           </div>
         </div>
 
@@ -187,24 +187,19 @@ export const Testimonials = () => {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-8 max-w-3xl mx-auto"
+          className="mt-24 grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto"
         >
-          <div className="text-center">
-            <div className="text-4xl font-bold text-primary-600 mb-2">100+</div>
-            <div className="text-gray-600 text-sm">{t('landing.happyClients')}</div>
-          </div>
-          <div className="text-center">
-            <div className="text-4xl font-bold text-primary-600 mb-2">4.9/5</div>
-            <div className="text-gray-600 text-sm">{t('landing.avgRating')}</div>
-          </div>
-          <div className="text-center">
-            <div className="text-4xl font-bold text-primary-600 mb-2">24/7</div>
-            <div className="text-gray-600 text-sm">{t('landing.support')}</div>
-          </div>
-          <div className="text-center">
-            <div className="text-4xl font-bold text-primary-600 mb-2">99%</div>
-            <div className="text-gray-600 text-sm">{t('landing.satisfaction')}</div>
-          </div>
+          {[
+            { value: '100+', label: 'landing.happyClients' },
+            { value: '4.9/5', label: 'landing.avgRating' },
+            { value: '24/7', label: 'landing.support' },
+            { value: '99%', label: 'landing.satisfaction' },
+          ].map((stat, index) => (
+            <div key={index} className="text-center p-6 bg-white/70 rounded-3xl border-2 border-warm-orange/20 hover:border-warm-orange/40 hover:shadow-lg transition-all backdrop-blur-sm">
+              <div className="text-4xl font-heading font-bold text-warm-orange mb-2">{stat.value}</div>
+              <div className="text-warm-brown/70 text-sm font-semibold">{t(stat.label)}</div>
+            </div>
+          ))}
         </motion.div>
       </div>
     </section>
