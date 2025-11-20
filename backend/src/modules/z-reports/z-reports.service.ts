@@ -2,7 +2,7 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateZReportDto } from './dto/create-z-report.dto';
 import { ZReportStatus } from '@prisma/client';
-import * as PDFDocument from 'pdfkit';
+import PDFDocument from 'pdfkit';
 
 @Injectable()
 export class ZReportsService {
@@ -126,14 +126,13 @@ export class ZReportsService {
         tenantId,
         reportDate: new Date(reportDate),
         reportNumber: `Z-${new Date(reportDate).toISOString().slice(0, 10).replace(/-/g, '')}`,
-        status: ZReportStatus.GENERATED,
+        closedById: 'system', // TODO: Get from authenticated user context
 
         // Sales data
         totalOrders,
-        grossSales,
-        discounts,
+        totalSales: grossSales,
+        totalDiscount: discounts,
         netSales,
-        taxAmount,
 
         // Payment breakdown
         cashPayments,
@@ -141,14 +140,14 @@ export class ZReportsService {
         digitalPayments,
 
         // Cash drawer
-        cashDrawerOpening,
-        cashDrawerClosing,
+        openingCash: cashDrawerOpening,
+        countedCash: cashDrawerClosing,
         expectedCash,
         cashDifference,
 
         // Additional data
         topProducts: topProducts as any,
-        cashMovements: cashMovements.map((m) => ({
+        staffPerformance: cashMovements.map((m) => ({
           type: m.type,
           amount: m.amount,
           reason: m.reason,
@@ -238,7 +237,6 @@ export class ZReportsService {
       // Header
       doc.fontSize(20).text('Z-REPORT', { align: 'center' });
       doc.fontSize(12).text(tenant.name, { align: 'center' });
-      doc.fontSize(10).text(tenant.address || '', { align: 'center' });
       doc.moveDown();
 
       doc.fontSize(12).text(`Report Number: ${report.reportNumber}`);
@@ -250,10 +248,9 @@ export class ZReportsService {
       doc.fontSize(14).text('Sales Summary', { underline: true });
       doc.fontSize(10);
       doc.text(`Total Orders: ${report.totalOrders}`);
-      doc.text(`Gross Sales: $${report.grossSales.toFixed(2)}`);
-      doc.text(`Discounts: $${report.discounts.toFixed(2)}`);
+      doc.text(`Total Sales: $${report.totalSales.toFixed(2)}`);
+      doc.text(`Discounts: $${report.totalDiscount.toFixed(2)}`);
       doc.text(`Net Sales: $${report.netSales.toFixed(2)}`);
-      doc.text(`Tax: $${report.taxAmount.toFixed(2)}`);
       doc.moveDown();
 
       // Payment Methods
@@ -267,10 +264,10 @@ export class ZReportsService {
       // Cash Drawer
       doc.fontSize(14).text('Cash Drawer Reconciliation', { underline: true });
       doc.fontSize(10);
-      doc.text(`Opening Balance: $${report.cashDrawerOpening.toFixed(2)}`);
+      doc.text(`Opening Balance: $${report.openingCash.toFixed(2)}`);
       doc.text(`Cash Sales: $${report.cashPayments.toFixed(2)}`);
       doc.text(`Expected Cash: $${report.expectedCash.toFixed(2)}`);
-      doc.text(`Actual Cash: $${report.cashDrawerClosing.toFixed(2)}`);
+      doc.text(`Actual Cash: $${report.countedCash.toFixed(2)}`);
       doc.text(`Difference: $${report.cashDifference.toFixed(2)}`, {
         continued: true,
       });
@@ -304,15 +301,17 @@ export class ZReportsService {
   async closeReport(id: string, tenantId: string) {
     const report = await this.findOne(id, tenantId);
 
-    if (report.status === ZReportStatus.CLOSED) {
-      throw new BadRequestException('Report is already closed');
+    // Check if report is already exported (indicates it's finalized)
+    if (report.pdfExported) {
+      throw new BadRequestException('Report is already finalized');
     }
 
+    // Mark report as exported/finalized
     return this.prisma.zReport.update({
       where: { id },
       data: {
-        status: ZReportStatus.CLOSED,
-        closedAt: new Date(),
+        pdfExported: true,
+        excelExported: true,
       },
     });
   }

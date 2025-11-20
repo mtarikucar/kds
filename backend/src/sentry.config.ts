@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/node';
-import { ProfilingIntegration } from '@sentry/profiling-node';
+import { nodeProfilingIntegration } from '@sentry/profiling-node';
 
 /**
  * Initialize Sentry error tracking and performance monitoring
@@ -24,7 +24,7 @@ export function initSentry() {
     // Profiling
     profilesSampleRate: parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE || '0.1'),
     integrations: [
-      new ProfilingIntegration(),
+      nodeProfilingIntegration(),
     ],
 
     // Release tracking
@@ -53,10 +53,10 @@ export function initSentry() {
           event.request.query_string = event.request.query_string.map(([key, value]) => {
             const lowerKey = key.toLowerCase();
             if (lowerKey === 'password' || lowerKey === 'token' || lowerKey === 'api_key') {
-              return [key, '[REDACTED]'];
+              return [key, '[REDACTED]'] as [string, string];
             }
-            return [key, value];
-          });
+            return [key, value] as [string, string];
+          }) as [string, string][];
         }
       }
 
