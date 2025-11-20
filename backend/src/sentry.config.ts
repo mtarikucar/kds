@@ -41,11 +41,23 @@ export function initSentry() {
 
       // Remove sensitive query params
       if (event.request?.query_string) {
-        const sanitized = event.request.query_string
-          .replace(/password=[^&]*/gi, 'password=[REDACTED]')
-          .replace(/token=[^&]*/gi, 'token=[REDACTED]')
-          .replace(/api_key=[^&]*/gi, 'api_key=[REDACTED]');
-        event.request.query_string = sanitized;
+        // Handle both string and array formats
+        if (typeof event.request.query_string === 'string') {
+          const sanitized = event.request.query_string
+            .replace(/password=[^&]*/gi, 'password=[REDACTED]')
+            .replace(/token=[^&]*/gi, 'token=[REDACTED]')
+            .replace(/api_key=[^&]*/gi, 'api_key=[REDACTED]');
+          event.request.query_string = sanitized;
+        } else if (Array.isArray(event.request.query_string)) {
+          // Sanitize array format [key, value][]
+          event.request.query_string = event.request.query_string.map(([key, value]) => {
+            const lowerKey = key.toLowerCase();
+            if (lowerKey === 'password' || lowerKey === 'token' || lowerKey === 'api_key') {
+              return [key, '[REDACTED]'];
+            }
+            return [key, value];
+          });
+        }
       }
 
       return event;
