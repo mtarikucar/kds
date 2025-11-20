@@ -50,7 +50,12 @@ export default defineConfig({
 
   build: {
     // Tauri uses Chromium on Windows and WebKit on macOS and Linux
-    target: process.env.TAURI_PLATFORM == 'windows' ? 'chrome105' : 'safari13',
+    // For web builds (non-Tauri), use modern target that supports BigInt
+    target: process.env.TAURI_PLATFORM == 'windows'
+      ? 'chrome105'
+      : process.env.TAURI_PLATFORM
+        ? 'safari13'
+        : 'es2020',
     // Don't minify for debug builds
     minify: !process.env.TAURI_DEBUG ? 'esbuild' : false,
     // Always produce sourcemaps for Sentry error tracking
