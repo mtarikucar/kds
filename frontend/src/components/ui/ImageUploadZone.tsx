@@ -17,6 +17,8 @@ interface ImageUploadZoneProps {
   disabled?: boolean;
   className?: string;
   showBackgroundRemovalToggle?: boolean;
+  requireConfirmation?: boolean;
+  onUploadConfirm?: (files: File[]) => void;
 }
 
 interface ProcessingState {
@@ -32,6 +34,8 @@ const ImageUploadZone: React.FC<ImageUploadZoneProps> = ({
   disabled = false,
   className,
   showBackgroundRemovalToggle = true,
+  requireConfirmation = false,
+  onUploadConfirm,
 }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -170,10 +174,14 @@ const ImageUploadZone: React.FC<ImageUploadZoneProps> = ({
 
         const newFiles = [...selectedFiles, ...filesToAdd];
         setSelectedFiles(newFiles);
-        onFilesSelected(newFiles);
+
+        // Only call onFilesSelected immediately if NOT in confirmation mode
+        if (!requireConfirmation) {
+          onFilesSelected(newFiles);
+        }
       }
     },
-    [disabled, validateFiles, selectedFiles, onFilesSelected, removeBackgroundEnabled, bgRemovalSupported, processFilesWithBackgroundRemoval]
+    [disabled, validateFiles, selectedFiles, onFilesSelected, removeBackgroundEnabled, bgRemovalSupported, processFilesWithBackgroundRemoval, requireConfirmation]
   );
 
   const handleFileInput = useCallback(
@@ -193,13 +201,17 @@ const ImageUploadZone: React.FC<ImageUploadZoneProps> = ({
 
         const newFiles = [...selectedFiles, ...filesToAdd];
         setSelectedFiles(newFiles);
-        onFilesSelected(newFiles);
+
+        // Only call onFilesSelected immediately if NOT in confirmation mode
+        if (!requireConfirmation) {
+          onFilesSelected(newFiles);
+        }
       }
 
       // Reset input
       e.target.value = '';
     },
-    [disabled, validateFiles, selectedFiles, onFilesSelected, removeBackgroundEnabled, bgRemovalSupported, processFilesWithBackgroundRemoval]
+    [disabled, validateFiles, selectedFiles, onFilesSelected, removeBackgroundEnabled, bgRemovalSupported, processFilesWithBackgroundRemoval, requireConfirmation]
   );
 
   const removeFile = useCallback(
@@ -216,6 +228,22 @@ const ImageUploadZone: React.FC<ImageUploadZoneProps> = ({
     setErrors([]);
     onFilesSelected([]);
   }, [onFilesSelected]);
+
+  const handleConfirmUpload = useCallback(() => {
+    if (requireConfirmation && onUploadConfirm) {
+      onUploadConfirm(selectedFiles);
+    } else {
+      onFilesSelected(selectedFiles);
+    }
+    // Clear files after upload confirmation
+    setSelectedFiles([]);
+    setErrors([]);
+  }, [selectedFiles, requireConfirmation, onUploadConfirm, onFilesSelected]);
+
+  const handleCancelUpload = useCallback(() => {
+    setSelectedFiles([]);
+    setErrors([]);
+  }, []);
 
   return (
     <div className={cn('space-y-4', className)}>
@@ -411,6 +439,28 @@ const ImageUploadZone: React.FC<ImageUploadZoneProps> = ({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Upload Confirmation Buttons */}
+      {requireConfirmation && selectedFiles.length > 0 && (
+        <div className="flex items-center justify-end gap-3 pt-4 border-t-2 border-warm-orange/20">
+          <button
+            type="button"
+            onClick={handleCancelUpload}
+            disabled={disabled || isProcessing}
+            className="px-4 py-2 text-sm font-semibold text-warm-dark bg-white border-2 border-warm-orange/30 rounded-xl hover:border-warm-orange/50 hover:bg-warm-cream/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirmUpload}
+            disabled={disabled || isProcessing}
+            className="px-4 py-2 text-sm font-semibold text-white bg-gradient-to-br from-warm-orange to-warm-brown rounded-xl hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          >
+            Upload {selectedFiles.length} Image{selectedFiles.length > 1 ? 's' : ''}
+          </button>
         </div>
       )}
     </div>

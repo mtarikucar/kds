@@ -190,7 +190,7 @@ const MenuManagementPage = () => {
     setProductImages(images);
   };
 
-  const handleUploadImagesToLibrary = async (files: File[]) => {
+  const handleConfirmUploadToLibrary = async (files: File[]) => {
     if (files.length === 0) return;
     try {
       await uploadImagesMutation.mutateAsync(files);
@@ -390,7 +390,9 @@ const MenuManagementPage = () => {
             {/* Upload Zone */}
             <div className="mb-6">
               <ImageUploadZone
-                onFilesSelected={handleUploadImagesToLibrary}
+                onFilesSelected={() => {}}
+                onUploadConfirm={handleConfirmUploadToLibrary}
+                requireConfirmation={true}
                 disabled={uploadImagesMutation.isPending}
                 maxFiles={20}
               />
