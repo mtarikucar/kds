@@ -374,6 +374,20 @@ const OrderTrackingPage = () => {
                       </span>
                     </div>
 
+                    {/* Pay Now Button - Show for READY or SERVED orders that aren't paid */}
+                    {(order.status === 'READY' || order.status === 'SERVED') && order.status !== 'PAID' && (
+                      <div className="mt-4">
+                        <button
+                          onClick={() => navigate(`/qr-menu/${tenantId}/payment?orderId=${order.id}&sessionId=${sessionId}`)}
+                          className="w-full py-3 px-6 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105 active:scale-95 flex items-center justify-center gap-2"
+                          style={{ backgroundColor: settings.primaryColor }}
+                        >
+                          <Receipt className="h-5 w-5" />
+                          {t('payment.payNow', 'Pay Now')}
+                        </button>
+                      </div>
+                    )}
+
                     {/* Order Notes */}
                     {order.notes && (
                       <div className="mt-3 p-3 bg-gray-50 rounded-lg">
