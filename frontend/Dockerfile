@@ -37,7 +37,7 @@ ENV VITE_BUILD_TIME=$VITE_BUILD_TIME
 ENV VITE_COMMIT_SHA=$VITE_COMMIT_SHA
 
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --legacy-peer-deps
 
 COPY . .
 RUN npm run build
