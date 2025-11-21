@@ -3,27 +3,112 @@ import { Cloud, Float, PerspectiveCamera, Environment, ContactShadows } from '@r
 import { useRef, useMemo } from 'react';
 import * as THREE from 'three';
 
-function FloatingVoxel({ position, textureUrl, scale = 1, rotationSpeed = 0.5 }: { position: [number, number, number], textureUrl: string, scale?: number, rotationSpeed?: number }) {
-    const meshRef = useRef<THREE.Mesh>(null);
-    const texture = useMemo(() => new THREE.TextureLoader().load(textureUrl), [textureUrl]);
-
-    // Fix texture encoding/color space if needed
-    texture.colorSpace = THREE.SRGBColorSpace;
+function VoxelChef({ position, scale = 1 }: { position: [number, number, number], scale?: number }) {
+    const groupRef = useRef<THREE.Group>(null);
 
     useFrame((state) => {
-        if (meshRef.current) {
-            meshRef.current.rotation.y = Math.sin(state.clock.elapsedTime * rotationSpeed) * 0.2;
-            meshRef.current.position.y = position[1] + Math.sin(state.clock.elapsedTime) * 0.1;
+        if (groupRef.current) {
+            // Idle animation: bobbing and slight rotation
+            groupRef.current.position.y = position[1] + Math.sin(state.clock.elapsedTime * 2) * 0.1;
+            groupRef.current.rotation.y = Math.sin(state.clock.elapsedTime * 0.5) * 0.1 - 0.2; // Slight look around
         }
     });
 
+    const skinColor = "#ffdbac";
+    const white = "#ffffff";
+    const dark = "#333333";
+
     return (
-        <Float speed={2} rotationIntensity={0.2} floatIntensity={0.5}>
-            <mesh ref={meshRef} position={position} scale={scale}>
-                <planeGeometry args={[3, 3]} />
-                <meshStandardMaterial map={texture} transparent alphaTest={0.5} />
+        <group ref={groupRef} position={position} scale={scale}>
+            {/* Head Group */}
+            <group position={[0, 1.4, 0]}>
+                {/* Face */}
+                <mesh position={[0, 0, 0]}>
+                    <boxGeometry args={[0.8, 0.8, 0.8]} />
+                    <meshStandardMaterial color={skinColor} />
+                </mesh>
+                {/* Eyes */}
+                <mesh position={[-0.2, 0.1, 0.41]}>
+                    <boxGeometry args={[0.1, 0.1, 0.05]} />
+                    <meshStandardMaterial color={dark} />
+                </mesh>
+                <mesh position={[0.2, 0.1, 0.41]}>
+                    <boxGeometry args={[0.1, 0.1, 0.05]} />
+                    <meshStandardMaterial color={dark} />
+                </mesh>
+                {/* Smile */}
+                <mesh position={[0, -0.2, 0.41]}>
+                    <boxGeometry args={[0.3, 0.05, 0.05]} />
+                    <meshStandardMaterial color="#d65a5a" />
+                </mesh>
+                <mesh position={[-0.15, -0.15, 0.41]}>
+                    <boxGeometry args={[0.05, 0.05, 0.05]} />
+                    <meshStandardMaterial color="#d65a5a" />
+                </mesh>
+                <mesh position={[0.15, -0.15, 0.41]}>
+                    <boxGeometry args={[0.05, 0.05, 0.05]} />
+                    <meshStandardMaterial color="#d65a5a" />
+                </mesh>
+
+                {/* Chef Hat */}
+                <group position={[0, 0.5, 0]}>
+                    {/* Hat Base */}
+                    <mesh position={[0, 0, 0]}>
+                        <cylinderGeometry args={[0.45, 0.45, 0.2, 32]} />
+                        <meshStandardMaterial color={white} />
+                    </mesh>
+                    {/* Hat Top (Puffy part) */}
+                    <mesh position={[0, 0.3, 0]}>
+                        <sphereGeometry args={[0.5, 32, 32]} />
+                        <meshStandardMaterial color={white} />
+                    </mesh>
+                </group>
+            </group>
+
+            {/* Body */}
+            <mesh position={[0, 0.4, 0]}>
+                <boxGeometry args={[0.9, 1.2, 0.5]} />
+                <meshStandardMaterial color={white} />
             </mesh>
-        </Float>
+            {/* Buttons */}
+            <mesh position={[0, 0.6, 0.26]}>
+                <cylinderGeometry args={[0.05, 0.05, 0.05, 8]} rotation={[Math.PI / 2, 0, 0]} />
+                <meshStandardMaterial color={dark} />
+            </mesh>
+            <mesh position={[0, 0.3, 0.26]}>
+                <cylinderGeometry args={[0.05, 0.05, 0.05, 8]} rotation={[Math.PI / 2, 0, 0]} />
+                <meshStandardMaterial color={dark} />
+            </mesh>
+
+            {/* Arms */}
+            <mesh position={[-0.6, 0.6, 0]}>
+                <boxGeometry args={[0.3, 0.8, 0.3]} />
+                <meshStandardMaterial color={white} />
+            </mesh>
+            <mesh position={[0.6, 0.6, 0]}>
+                <boxGeometry args={[0.3, 0.8, 0.3]} />
+                <meshStandardMaterial color={white} />
+            </mesh>
+            {/* Hands */}
+            <mesh position={[-0.6, 0.1, 0]}>
+                <sphereGeometry args={[0.18]} />
+                <meshStandardMaterial color={skinColor} />
+            </mesh>
+            <mesh position={[0.6, 0.1, 0]}>
+                <sphereGeometry args={[0.18]} />
+                <meshStandardMaterial color={skinColor} />
+            </mesh>
+
+            {/* Legs */}
+            <mesh position={[-0.25, -0.5, 0]}>
+                <boxGeometry args={[0.35, 0.8, 0.35]} />
+                <meshStandardMaterial color={dark} />
+            </mesh>
+            <mesh position={[0.25, -0.5, 0]}>
+                <boxGeometry args={[0.35, 0.8, 0.35]} />
+                <meshStandardMaterial color={dark} />
+            </mesh>
+        </group>
     );
 }
 
@@ -77,15 +162,12 @@ export const Scene3D = () => {
                 <Cloud position={[-4, 2, -5]} opacity={0.5} speed={0.2} width={10} depth={1.5} segments={20} color="#fff0e6" />
                 <Cloud position={[4, -2, -5]} opacity={0.5} speed={0.2} width={10} depth={1.5} segments={20} color="#fff0e6" />
 
-                {/* Voxel Chef */}
-                <FloatingVoxel position={[3, 0, 0]} textureUrl="/voxel-chef.png" scale={1.5} />
-
-                {/* Voxel Logo */}
-                <FloatingVoxel position={[-3, 1, -2]} textureUrl="/voxel-logo.png" scale={1.2} rotationSpeed={0.3} />
+                {/* 3D Voxel Chef - Positioned in corner */}
+                <VoxelChef position={[5, -2, 0]} scale={1.8} />
 
                 {/* Cooking Animation */}
                 <Float speed={1.5} rotationIntensity={0.5} floatIntensity={0.5}>
-                    <CookingPan position={[-2.5, -1.5, 0]} />
+                    <CookingPan position={[-3.5, -1, 0]} />
                 </Float>
 
                 <ContactShadows position={[0, -4, 0]} opacity={0.4} scale={20} blur={2} far={4.5} />
