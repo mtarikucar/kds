@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import Button from '../ui/Button';
-import { UtensilsCrossed, ChefHat, Coffee } from 'lucide-react';
+import { Scene3D } from './Scene3D';
 
 export const Hero = () => {
   const { t } = useTranslation('common');
@@ -15,55 +15,12 @@ export const Hero = () => {
 
   return (
     <section className="relative pt-32 pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden min-h-[90vh] flex items-center bg-gradient-to-br from-warm-cream via-warm-beige to-warm-tan">
-      {/* Decorative food icons floating in background */}
-      <motion.div
-        className="absolute top-32 right-20 text-warm-orange/20"
-        animate={{
-          y: [0, -20, 0],
-          rotate: [0, 10, 0],
-        }}
-        transition={{
-          duration: 6,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-      >
-        <UtensilsCrossed size={80} strokeWidth={1.5} />
-      </motion.div>
+      {/* 3D Scene Background */}
+      <Scene3D />
 
-      <motion.div
-        className="absolute bottom-32 left-20 text-warm-brown/20"
-        animate={{
-          y: [0, 20, 0],
-          rotate: [0, -10, 0],
-        }}
-        transition={{
-          duration: 7,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-      >
-        <ChefHat size={100} strokeWidth={1.5} />
-      </motion.div>
-
-      <motion.div
-        className="absolute top-1/2 right-1/4 text-primary-300/30"
-        animate={{
-          y: [0, -15, 0],
-          scale: [1, 1.1, 1],
-        }}
-        transition={{
-          duration: 5,
-          repeat: Infinity,
-          ease: "easeInOut",
-        }}
-      >
-        <Coffee size={60} strokeWidth={1.5} />
-      </motion.div>
-
-      {/* Soft rounded shapes */}
-      <div className="absolute top-20 right-10 w-96 h-96 bg-primary-200/40 rounded-full blur-[120px]" />
-      <div className="absolute bottom-20 left-10 w-80 h-80 bg-warm-orange/30 rounded-full blur-[100px]" />
+      {/* Soft rounded shapes - kept for subtle color blending */}
+      <div className="absolute top-20 right-10 w-96 h-96 bg-primary-200/40 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-20 left-10 w-80 h-80 bg-warm-orange/30 rounded-full blur-[100px] pointer-events-none" />
 
       <div className="relative max-w-7xl mx-auto w-full">
         <div className="text-center max-w-4xl mx-auto">
