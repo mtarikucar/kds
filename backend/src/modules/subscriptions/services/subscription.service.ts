@@ -3,7 +3,6 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { PaymentProviderFactory } from './payment-provider.factory';
 import { BillingService } from './billing.service';
 import { StripeService } from './stripe.service';
-import { IyzicoService } from './iyzico.service';
 import { NotificationService } from './notification.service';
 import {
   SubscriptionStatus,
@@ -26,7 +25,6 @@ export class SubscriptionService {
     private paymentProviderFactory: PaymentProviderFactory,
     private billingService: BillingService,
     private stripeService: StripeService,
-    private iyzicoService: IyzicoService,
     private notificationService: NotificationService,
   ) {}
 
@@ -210,9 +208,9 @@ export class SubscriptionService {
     dto: CreateSubscriptionDto,
   ) {
     if (tenant.paymentRegion === PaymentRegion.TURKEY) {
-      // For Iyzico, we don't create subscription upfront
-      // Payment will be handled when user provides card details
-      this.logger.log('Iyzico subscription setup deferred to payment confirmation');
+      // For PayTR, we don't create subscription upfront
+      // Payment will be handled when user provides card details via iframe
+      this.logger.log('PayTR subscription setup deferred to payment confirmation');
     } else {
       // For Stripe, create customer and subscription
       try {
@@ -505,9 +503,8 @@ export class SubscriptionService {
       // Cancel with payment provider
       if (subscription.stripeSubscriptionId) {
         await this.stripeService.cancelSubscription(subscription.stripeSubscriptionId, true);
-      } else if (subscription.iyzicoSubscriptionId) {
-        await this.iyzicoService.cancelSubscription(subscription.iyzicoSubscriptionId, true);
       }
+      // PayTR uses one-time payments, no subscription to cancel
 
       this.logger.log(`Subscription ${subscriptionId} cancelled immediately. Reason: ${reason || 'Not provided'}`);
       return updated;
@@ -527,9 +524,8 @@ export class SubscriptionService {
       // Update payment provider
       if (subscription.stripeSubscriptionId) {
         await this.stripeService.cancelSubscription(subscription.stripeSubscriptionId, false);
-      } else if (subscription.iyzicoSubscriptionId) {
-        await this.iyzicoService.cancelSubscription(subscription.iyzicoSubscriptionId, false);
       }
+      // PayTR uses one-time payments, no subscription to cancel
 
       this.logger.log(`Subscription ${subscriptionId} will cancel at period end. Reason: ${reason || 'Not provided'}`);
       return updated;
@@ -701,7 +697,7 @@ export class SubscriptionService {
 
     for (const subscription of expiredTrials) {
       // Check if payment method is on file
-      const hasPaymentMethod = subscription.stripeCustomerId || subscription.iyzicoCustomerId;
+      const hasPaymentMethod = subscription.stripeCustomerId || subscription.paytrMerchantOid;
 
       if (hasPaymentMethod && subscription.autoRenew) {
         // Attempt to convert to paid subscription

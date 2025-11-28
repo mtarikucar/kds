@@ -1,7 +1,6 @@
 import {
   Controller,
   Post,
-  Body,
   Headers,
   RawBodyRequest,
   Req,
@@ -11,7 +10,6 @@ import {
 import { Request } from 'express';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { StripeService } from '../services/stripe.service';
-import { IyzicoService } from '../services/iyzico.service';
 import { BillingService } from '../services/billing.service';
 import { PaymentStatus, SubscriptionStatus } from '../../../common/constants/subscription.enum';
 
@@ -22,7 +20,6 @@ export class WebhookController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly stripeService: StripeService,
-    private readonly iyzicoService: IyzicoService,
     private readonly billingService: BillingService,
   ) {}
 
@@ -93,35 +90,6 @@ export class WebhookController {
     }
   }
 
-  /**
-   * Handle Iyzico callbacks
-   */
-  @Post('iyzico')
-  async handleIyzicoWebhook(@Body() payload: any) {
-    this.logger.log(`Iyzico webhook received: ${JSON.stringify(payload)}`);
-
-    // Verify callback (basic validation)
-    const isValid = this.iyzicoService.verifyCallback(payload);
-
-    if (!isValid) {
-      throw new BadRequestException('Invalid callback payload');
-    }
-
-    try {
-      const result = await this.iyzicoService.handlePaymentCallback(payload);
-
-      if (result.status === 'success') {
-        await this.handleIyzicoPaymentSuccess(result);
-      } else {
-        await this.handleIyzicoPaymentFailure(result);
-      }
-
-      return { received: true };
-    } catch (error) {
-      this.logger.error(`Error processing Iyzico webhook: ${error.message}`);
-      throw error;
-    }
-  }
 
   // ========================================
   // Stripe Event Handlers
@@ -206,32 +174,6 @@ export class WebhookController {
 
   private async handleStripeInvoicePaymentFailed(invoice: any) {
     this.logger.log(`Invoice payment failed: ${invoice.id}`);
-  }
-
-  // ========================================
-  // Iyzico Event Handlers
-  // ========================================
-
-  private async handleIyzicoPaymentSuccess(result: any) {
-    const payment = await this.prisma.subscriptionPayment.findUnique({
-      where: { iyzicoPaymentId: result.paymentId },
-    });
-
-    if (payment) {
-      await this.prisma.subscriptionPayment.update({
-        where: { id: payment.id },
-        data: {
-          status: PaymentStatus.SUCCEEDED,
-          paidAt: new Date(),
-        },
-      });
-
-      this.logger.log(`Iyzico payment succeeded: ${result.paymentId}`);
-    }
-  }
-
-  private async handleIyzicoPaymentFailure(result: any) {
-    this.logger.log(`Iyzico payment failed: ${result.paymentId} - ${result.errorMessage}`);
   }
 
   // ========================================
