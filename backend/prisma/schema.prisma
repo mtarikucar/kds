@@ -511,7 +511,7 @@ model Subscription {
   // Subscription details
   status          String   @default("ACTIVE") // ACTIVE, CANCELLED, EXPIRED, PAST_DUE, TRIALING
   billingCycle    String   // MONTHLY, YEARLY
-  paymentProvider String   // STRIPE, IYZICO
+  paymentProvider String   // STRIPE, PAYTR
 
   // Dates
   startDate       DateTime @default(now())
@@ -527,9 +527,16 @@ model Subscription {
 
   // Payment provider IDs
   stripeSubscriptionId String? @unique
-  iyzicoSubscriptionId String? @unique
   stripeCustomerId     String?
-  iyzicoCustomerId     String?
+
+  // PayTR fields
+  paytrMerchantOid    String? @unique
+  paytrPaymentToken   String?
+
+  // Renewal tracking for one-time payments
+  renewalLinkSentAt   DateTime?
+  renewalLinkToken    String?
+  graceEndDate        DateTime?
 
   // Pricing at time of subscription
   amount   Decimal @db.Decimal(10, 2)
@@ -567,11 +574,14 @@ model SubscriptionPayment {
   amount          Decimal @db.Decimal(10, 2)
   currency        String  @default("USD")
   status          String  @default("PENDING") // PENDING, SUCCEEDED, FAILED, REFUNDED
-  paymentProvider String  // STRIPE, IYZICO
+  paymentProvider String  // STRIPE, PAYTR
 
   // Provider-specific IDs
   stripePaymentIntentId String? @unique
-  iyzicoPaymentId       String? @unique
+
+  // PayTR fields
+  paytrMerchantOid      String? @unique
+  paytrPaymentToken     String?
 
   // Payment metadata
   paymentMethod String? // card, bank_transfer, etc.

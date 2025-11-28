@@ -2,7 +2,8 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 
 export interface CreatePaymentIntentRequest {
-  subscriptionId: string;
+  planId: string;
+  billingCycle: 'MONTHLY' | 'YEARLY';
 }
 
 export interface CreatePlanChangeIntentRequest {
@@ -10,23 +11,18 @@ export interface CreatePlanChangeIntentRequest {
 }
 
 export interface CreatePaymentIntentResponse {
-  clientSecret: string;
-  paymentIntentId: string;
+  provider: 'STRIPE' | 'PAYTR';
+  clientSecret?: string;       // Stripe
+  paymentIntentId?: string;    // Stripe
+  paymentLink?: string;        // PayTR
+  merchantOid?: string;        // PayTR
   amount: number;
   currency: string;
-  paymentProvider?: 'stripe' | 'iyzico';
 }
 
 export interface ConfirmPaymentRequest {
   paymentIntentId: string;
   paymentMethodId?: string;
-  iyzicoPaymentDetails?: {
-    cardHolderName: string;
-    cardNumber: string;
-    expireMonth: string;
-    expireYear: string;
-    cvc: string;
-  };
 }
 
 export interface ConfirmPaymentResponse {
@@ -83,7 +79,8 @@ export function useCreatePlanChangeIntent() {
 }
 
 /**
- * Confirm payment after user enters payment details
+ * Confirm payment after user enters payment details (Stripe only)
+ * PayTR uses redirect flow and webhook for confirmation
  */
 export function useConfirmPayment() {
   return useMutation({

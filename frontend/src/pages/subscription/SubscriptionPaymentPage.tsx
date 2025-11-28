@@ -5,7 +5,7 @@ import { Elements } from '@stripe/react-stripe-js';
 import { toast } from 'sonner';
 import { ArrowLeft, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
 import { StripePaymentForm } from '../../components/subscriptions/StripePaymentForm';
-import { IyzicoPaymentForm } from '../../components/subscriptions/IyzicoPaymentForm';
+import { PaytrRedirect } from '../../components/subscriptions/PaytrRedirect';
 import {
   useCreatePaymentIntent,
   useCreatePlanChangeIntent,
@@ -22,17 +22,18 @@ const stripePromise = loadStripe(
 export default function SubscriptionPaymentPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const subscriptionId = searchParams.get('subscriptionId');
+  const planId = searchParams.get('planId');
+  const billingCycle = searchParams.get('billingCycle');
   const pendingChangeId = searchParams.get('pendingChangeId');
   const queryClient = useQueryClient();
 
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
+  const [paytrPaymentLink, setPaytrPaymentLink] = useState<string | null>(null);
   const [amount, setAmount] = useState<number>(0);
-  const [currency, setCurrency] = useState<string>('USD');
-  const [paymentProvider, setPaymentProvider] = useState<'stripe' | 'iyzico'>(
-    'stripe'
-  );
+  const [currency, setCurrency] = useState<string>('TRY');
+  const [planName, setPlanName] = useState<string>('');
+  const [paymentProvider, setPaymentProvider] = useState<'STRIPE' | 'PAYTR'>('PAYTR');
   const [paymentStatus, setPaymentStatus] = useState<
     'idle' | 'processing' | 'success' | 'error'
   >('idle');
@@ -49,68 +50,69 @@ export default function SubscriptionPaymentPage() {
       // Handle plan change payment
       setIsPlanChange(true);
 
-      // Use API hook for plan change payment intent
       createPlanChangeIntent.mutate(
         { pendingChangeId },
         {
           onSuccess: (data) => {
-            setClientSecret(data.clientSecret);
-            setPaymentIntentId(data.paymentIntentId);
             setAmount(data.amount);
             setCurrency(data.currency);
-            setPaymentProvider(data.paymentProvider || 'stripe');
+            setPaymentProvider(data.provider);
+
+            if (data.provider === 'PAYTR') {
+              setPaytrPaymentLink(data.paymentLink);
+            } else {
+              setClientSecret(data.clientSecret);
+              setPaymentIntentId(data.paymentIntentId);
+            }
           },
-          onError: (error) => {
-            toast.error('Failed to create payment intent');
+          onError: (error: any) => {
+            toast.error(error.response?.data?.message || 'Odeme olusturulamadi');
             navigate('/subscription');
           },
         }
       );
-    } else if (subscriptionId) {
+    } else if (planId && billingCycle) {
       // Handle new subscription payment
       setIsPlanChange(false);
 
       createPaymentIntent.mutate(
-        { subscriptionId },
+        { planId, billingCycle: billingCycle as 'MONTHLY' | 'YEARLY' },
         {
           onSuccess: (data) => {
-            setClientSecret(data.clientSecret);
-            setPaymentIntentId(data.paymentIntentId);
             setAmount(data.amount);
             setCurrency(data.currency);
+            setPaymentProvider(data.provider);
 
-            // Determine payment provider based on currency
-            if (data.currency === 'TRY') {
-              setPaymentProvider('iyzico');
+            if (data.provider === 'PAYTR') {
+              setPaytrPaymentLink(data.paymentLink);
             } else {
-              setPaymentProvider('stripe');
+              setClientSecret(data.clientSecret);
+              setPaymentIntentId(data.paymentIntentId);
             }
           },
           onError: (error: any) => {
-            toast.error(error.response?.data?.message || 'Failed to create payment intent');
+            toast.error(error.response?.data?.message || 'Odeme olusturulamadi');
             navigate('/subscription/plans');
           },
         }
       );
     } else {
-      toast.error('No payment information provided');
+      toast.error('Eksik odeme bilgisi');
       navigate('/subscription/plans');
     }
-  }, [subscriptionId, pendingChangeId]);
+  }, [planId, billingCycle, pendingChangeId]);
 
   const handleStripeSuccess = async () => {
     setPaymentStatus('processing');
 
     if (isPlanChange && pendingChangeId) {
-      toast.success('Payment confirmed! Applying plan change...');
+      toast.success('Odeme onaylandi! Plan degisikligi uygulaniyor...');
 
-      // Apply the plan change
       try {
         await fetch(`/api/subscriptions/apply-plan-change/${pendingChangeId}`, {
           method: 'POST',
         });
 
-        // Invalidate subscription cache to refresh the UI
         queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
         queryClient.invalidateQueries({ queryKey: subscriptionKeys.all });
 
@@ -120,16 +122,14 @@ export default function SubscriptionPaymentPage() {
         }, 2000);
       } catch (error) {
         setPaymentStatus('error');
-        toast.error('Failed to apply plan change');
+        toast.error('Plan degisikligi uygulanamadi');
       }
     } else {
-      toast.success('Payment confirmed! Activating subscription...');
+      toast.success('Odeme onaylandi! Abonelik aktif ediliyor...');
 
-      // Invalidate subscription cache
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.all });
 
-      // Wait a moment for webhook to process
       setTimeout(() => {
         setPaymentStatus('success');
         setTimeout(() => {
@@ -144,94 +144,12 @@ export default function SubscriptionPaymentPage() {
     toast.error(error);
   };
 
-  const handleIyzicoSubmit = async (data: any) => {
-    if (!paymentIntentId && !pendingChangeId) return;
-
-    setPaymentStatus('processing');
-
-    if (isPlanChange && pendingChangeId) {
-      // Handle plan change payment with iyzico
-      try {
-        const response = await fetch('/api/payments/confirm-plan-change-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            pendingChangeId,
-            iyzicoDetails: {
-              cardHolderName: data.cardHolderName,
-              cardNumber: data.cardNumber.replace(/\s/g, ''),
-              expireMonth: data.expireMonth,
-              expireYear: data.expireYear,
-              cvc: data.cvc,
-            },
-          }),
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          // Apply the plan change
-          await fetch(`/api/subscriptions/apply-plan-change/${pendingChangeId}`, {
-            method: 'POST',
-          });
-
-          // Invalidate subscription cache to refresh the UI
-          queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
-          queryClient.invalidateQueries({ queryKey: subscriptionKeys.all });
-
-          setPaymentStatus('success');
-          toast.success('Ödeme başarılı! Plan değişikliği uygulanıyor...');
-          setTimeout(() => {
-            navigate('/subscription');
-          }, 2000);
-        } else {
-          throw new Error('Payment failed');
-        }
-      } catch (error) {
-        setPaymentStatus('error');
-        toast.error('Ödeme başarısız oldu');
-      }
-    } else {
-      // Handle new subscription payment with iyzico
-      confirmPayment.mutate(
-        {
-          paymentIntentId,
-          iyzicoPaymentDetails: {
-            cardHolderName: data.cardHolderName,
-            cardNumber: data.cardNumber.replace(/\s/g, ''),
-            expireMonth: data.expireMonth,
-            expireYear: data.expireYear,
-            cvc: data.cvc,
-          },
-        },
-        {
-          onSuccess: () => {
-            // Invalidate subscription cache
-            queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
-            queryClient.invalidateQueries({ queryKey: subscriptionKeys.all });
-
-            setPaymentStatus('success');
-            toast.success('Ödeme başarılı! Aboneliğiniz aktif ediliyor...');
-            setTimeout(() => {
-              navigate('/subscription');
-            }, 2000);
-          },
-          onError: (error: any) => {
-            setPaymentStatus('error');
-            toast.error(
-              error.response?.data?.message || 'Ödeme başarısız oldu'
-            );
-          },
-        }
-      );
-    }
-  };
-
-  if (createPaymentIntent.isPending) {
+  if (createPaymentIntent.isPending || createPlanChangeIntent.isPending) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mx-auto mb-4" />
-          <p className="text-gray-600">Preparing payment...</p>
+          <p className="text-gray-600">Odeme hazirlaniyor...</p>
         </div>
       </div>
     );
@@ -243,16 +161,16 @@ export default function SubscriptionPaymentPage() {
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
           <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Payment Successful!
+            Odeme Basarili!
           </h2>
           <p className="text-gray-600 mb-6">
-            Your subscription has been activated successfully.
+            Aboneliginiz basariyla aktif edildi.
           </p>
           <button
             onClick={() => navigate('/subscription')}
             className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
           >
-            Go to Subscription
+            Abonelige Git
           </button>
         </div>
       </div>
@@ -269,20 +187,20 @@ export default function SubscriptionPaymentPage() {
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to Plans
+            Planlara Don
           </button>
           <h1 className="text-3xl font-bold text-gray-900">
-            Complete Your Payment
+            Odemenizi Tamamlayin
           </h1>
           <p className="text-gray-600 mt-2">
-            {paymentProvider === 'stripe'
-              ? 'Securely process your payment with Stripe'
-              : 'İyzico ile güvenli ödeme yapın'}
+            {paymentProvider === 'STRIPE'
+              ? 'Stripe ile guvenli odeme yapin'
+              : 'PayTR ile guvenli odeme yapin'}
           </p>
         </div>
 
         {/* Payment Form */}
-        {paymentProvider === 'stripe' && clientSecret ? (
+        {paymentProvider === 'STRIPE' && clientSecret ? (
           <Elements
             stripe={stripePromise}
             options={{
@@ -302,17 +220,17 @@ export default function SubscriptionPaymentPage() {
               currency={currency}
             />
           </Elements>
-        ) : paymentProvider === 'iyzico' ? (
-          <IyzicoPaymentForm
-            onSubmit={handleIyzicoSubmit}
+        ) : paymentProvider === 'PAYTR' && paytrPaymentLink ? (
+          <PaytrRedirect
+            paymentLink={paytrPaymentLink}
             amount={amount}
             currency={currency}
-            isProcessing={paymentStatus === 'processing'}
+            planName={planName}
           />
         ) : (
           <div className="bg-white rounded-lg p-8 text-center">
             <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-4" />
-            <p className="text-gray-600">Loading payment form...</p>
+            <p className="text-gray-600">Odeme formu yukleniyor...</p>
           </div>
         )}
 
@@ -322,12 +240,12 @@ export default function SubscriptionPaymentPage() {
             <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
             <div>
               <h3 className="font-semibold text-blue-900 mb-1">
-                Secure Payment
+                Guvenli Odeme
               </h3>
               <p className="text-sm text-blue-800">
-                {paymentProvider === 'stripe'
-                  ? 'Your payment information is encrypted and processed securely by Stripe. We never store your card details.'
-                  : 'Ödeme bilgileriniz İyzico tarafından güvenli bir şekilde işlenir. Kart bilgileriniz saklanmaz.'}
+                {paymentProvider === 'STRIPE'
+                  ? 'Odeme bilgileriniz Stripe tarafindan guvenli bir sekilde islenir. Kart bilgileriniz bizde saklanmaz.'
+                  : 'Odeme bilgileriniz PayTR tarafindan guvenli bir sekilde islenir. Kart bilgileriniz bizde saklanmaz.'}
               </p>
             </div>
           </div>

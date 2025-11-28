@@ -6,15 +6,15 @@ import {
   Request,
   BadRequestException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { PaymentProviderFactory } from '../services/payment-provider.factory';
 import { StripeService } from '../services/stripe.service';
-import { IyzicoService } from '../services/iyzico.service';
+import { PaytrService } from '../services/paytr.service';
 import { BillingService } from '../services/billing.service';
 import { CreatePaymentIntentDto, ConfirmPaymentDto } from '../dto/payment-intent.dto';
-import { PaymentProvider, PaymentStatus, PaymentRegion } from '../../../common/constants/subscription.enum';
-import { getProductionSafeIp } from '../../../common/utils/ip-detection.util';
+import { PaymentProvider, PaymentStatus, PaymentRegion, BillingCycle } from '../../../common/constants/subscription.enum';
 
 @Controller('payments')
 @UseGuards(JwtAuthGuard)
@@ -23,8 +23,9 @@ export class PaymentController {
     private readonly prisma: PrismaService,
     private readonly paymentProviderFactory: PaymentProviderFactory,
     private readonly stripeService: StripeService,
-    private readonly iyzicoService: IyzicoService,
+    private readonly paytrService: PaytrService,
     private readonly billingService: BillingService,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -52,7 +53,32 @@ export class PaymentController {
 
     const amount = dto.billingCycle === 'MONTHLY' ? plan.monthlyPrice : plan.yearlyPrice;
 
-    if (dto.paymentProvider === PaymentProvider.STRIPE) {
+    // Determine payment provider based on tenant's payment region
+    const paymentRegion = tenant.paymentRegion as PaymentRegion || PaymentRegion.TURKEY;
+    const paymentProvider = this.paymentProviderFactory.getProviderType(paymentRegion);
+
+    // Get or create subscription
+    let subscription = await this.prisma.subscription.findFirst({
+      where: { tenantId, status: { in: ['ACTIVE', 'TRIALING', 'PENDING'] } },
+    });
+
+    if (!subscription) {
+      subscription = await this.prisma.subscription.create({
+        data: {
+          tenantId,
+          planId: dto.planId,
+          status: 'PENDING',
+          billingCycle: dto.billingCycle,
+          paymentProvider: paymentProvider,
+          amount: Number(amount),
+          currency: plan.currency,
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(), // Will be updated on payment success
+        },
+      });
+    }
+
+    if (paymentProvider === PaymentProvider.STRIPE) {
       // Create or get Stripe customer
       let customerId: string;
 
@@ -86,20 +112,68 @@ export class PaymentController {
         currency: plan.currency,
       };
     } else {
-      // For Iyzico, return setup information
-      // Actual payment will be made in confirm-payment
+      // PayTR Link API flow
+      const frontendUrl = this.configService.get<string>('FRONTEND_URL');
+      const backendUrl = this.configService.get<string>('BACKEND_URL');
+      const merchantOid = `SUB-${subscription.id}-${Date.now()}`;
+
+      const adminUser = await this.prisma.user.findFirst({
+        where: { tenantId, role: 'ADMIN' },
+      });
+
+      const paymentLinkResult = await this.paytrService.createPaymentLink({
+        merchantOid,
+        email: adminUser?.email || req.user.email,
+        amount: Number(amount),
+        userName: tenant.name,
+        userPhone: adminUser?.phone || '',
+        description: `${plan.displayName} - ${dto.billingCycle === 'MONTHLY' ? 'Aylik' : 'Yillik'}`,
+        successUrl: `${frontendUrl}/subscription/payment/success?oid=${merchantOid}`,
+        failUrl: `${frontendUrl}/subscription/payment/failed?oid=${merchantOid}`,
+        maxInstallment: 1,
+        expiryDuration: 30,
+      });
+
+      if (paymentLinkResult.status !== 'success') {
+        throw new BadRequestException(paymentLinkResult.reason || 'Failed to create payment link');
+      }
+
+      // Create pending payment record
+      await this.prisma.subscriptionPayment.create({
+        data: {
+          subscriptionId: subscription.id,
+          amount: Number(amount),
+          currency: plan.currency,
+          status: PaymentStatus.PENDING,
+          paymentProvider: PaymentProvider.PAYTR,
+          paytrMerchantOid: merchantOid,
+        },
+      });
+
+      // Update subscription with PayTR info
+      await this.prisma.subscription.update({
+        where: { id: subscription.id },
+        data: {
+          planId: dto.planId,
+          billingCycle: dto.billingCycle,
+          amount: Number(amount),
+          currency: plan.currency,
+        },
+      });
+
       return {
-        provider: PaymentProvider.IYZICO,
+        provider: PaymentProvider.PAYTR,
+        paymentLink: paymentLinkResult.link,
+        merchantOid,
         amount: Number(amount),
         currency: plan.currency,
-        planId: dto.planId,
-        billingCycle: dto.billingCycle,
       };
     }
   }
 
   /**
-   * Confirm payment with card details
+   * Confirm payment with card details (for Stripe only)
+   * PayTR uses redirect flow and webhook for confirmation
    */
   @Post('confirm-payment')
   async confirmPayment(@Request() req, @Body() dto: ConfirmPaymentDto) {
@@ -126,95 +200,71 @@ export class PaymentController {
       throw new BadRequestException('No subscription found');
     }
 
-    if (subscription.paymentProvider === PaymentProvider.STRIPE) {
-      // Confirm Stripe payment
-      if (!dto.paymentMethodId) {
-        throw new BadRequestException('Payment method ID required for Stripe');
-      }
-
-      const confirmedPayment = await this.stripeService.confirmPaymentIntent(
-        dto.paymentIntentId,
-        dto.paymentMethodId,
-      );
-
-      // Create payment record
-      const payment = await this.prisma.subscriptionPayment.create({
-        data: {
-          subscriptionId: subscription.id,
-          amount: Number(subscription.amount),
-          currency: subscription.currency,
-          status: PaymentStatus.SUCCEEDED,
-          paymentProvider: PaymentProvider.STRIPE,
-          stripePaymentIntentId: confirmedPayment.id,
-          paidAt: new Date(),
-        },
-      });
-
-      // Create invoice
-      await this.billingService.createInvoice(
-        subscription.id,
-        payment.id,
-        Number(subscription.amount),
-        subscription.currency,
-        subscription.currentPeriodStart,
-        subscription.currentPeriodEnd,
-      );
-
-      return { success: true, payment };
-    } else {
-      // Process Iyzico payment
-      if (!dto.iyzicoDetails) {
-        throw new BadRequestException('Iyzico payment details required');
-      }
-
-      const customer = this.iyzicoService.formatCustomerData(
-        tenantId,
-        req.user.email,
-        tenant.name,
-      );
-
-      // Get client IP for fraud detection
-      const clientIp = getProductionSafeIp(req);
-
-      const result = await this.iyzicoService.createPayment(
-        Number(subscription.amount),
-        subscription.currency,
-        customer,
-        dto.iyzicoDetails,
-        `SUB-${subscription.id}`,
-        `Subscription payment for ${subscription.plan?.displayName}`,
-        clientIp,
-      );
-
-      if (result.status !== 'success') {
-        throw new BadRequestException(result.errorMessage || 'Payment failed');
-      }
-
-      // Create payment record
-      const payment = await this.prisma.subscriptionPayment.create({
-        data: {
-          subscriptionId: subscription.id,
-          amount: Number(subscription.amount),
-          currency: subscription.currency,
-          status: PaymentStatus.SUCCEEDED,
-          paymentProvider: PaymentProvider.IYZICO,
-          iyzicoPaymentId: result.paymentId,
-          paidAt: new Date(),
-        },
-      });
-
-      // Create invoice
-      await this.billingService.createInvoice(
-        subscription.id,
-        payment.id,
-        Number(subscription.amount),
-        subscription.currency,
-        subscription.currentPeriodStart,
-        subscription.currentPeriodEnd,
-      );
-
-      return { success: true, payment };
+    // Only for Stripe - PayTR uses webhook
+    if (subscription.paymentProvider !== PaymentProvider.STRIPE) {
+      throw new BadRequestException('PayTR payments are confirmed via redirect. Please use the payment link.');
     }
+
+    if (!dto.paymentMethodId) {
+      throw new BadRequestException('Payment method ID required for Stripe');
+    }
+
+    const confirmedPayment = await this.stripeService.confirmPaymentIntent(
+      dto.paymentIntentId,
+      dto.paymentMethodId,
+    );
+
+    // Calculate period dates
+    const now = new Date();
+    let periodEnd: Date;
+    if (subscription.billingCycle === BillingCycle.MONTHLY) {
+      periodEnd = new Date(now);
+      periodEnd.setMonth(periodEnd.getMonth() + 1);
+    } else {
+      periodEnd = new Date(now);
+      periodEnd.setFullYear(periodEnd.getFullYear() + 1);
+    }
+
+    // Create payment record
+    const payment = await this.prisma.subscriptionPayment.create({
+      data: {
+        subscriptionId: subscription.id,
+        amount: Number(subscription.amount),
+        currency: subscription.currency,
+        status: PaymentStatus.SUCCEEDED,
+        paymentProvider: PaymentProvider.STRIPE,
+        stripePaymentIntentId: confirmedPayment.id,
+        paidAt: new Date(),
+      },
+    });
+
+    // Update subscription
+    await this.prisma.subscription.update({
+      where: { id: subscription.id },
+      data: {
+        status: 'ACTIVE',
+        currentPeriodStart: now,
+        currentPeriodEnd: periodEnd,
+      },
+    });
+
+    // Update tenant's current plan
+    await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: { currentPlanId: subscription.planId },
+    });
+
+    // Create invoice
+    await this.billingService.createInvoice(
+      subscription.id,
+      payment.id,
+      Number(subscription.amount),
+      subscription.currency,
+      now,
+      periodEnd,
+    );
+
+    return { success: true, payment };
   }
 
   /**
@@ -293,25 +343,68 @@ export class PaymentController {
         currency: pendingChange.currency,
       };
     } else {
-      // For Iyzico, return setup information
+      // PayTR Link API flow for plan change
+      const frontendUrl = this.configService.get<string>('FRONTEND_URL');
+      const merchantOid = `PLAN-${dto.pendingChangeId}-${Date.now()}`;
+
+      const adminUser = await this.prisma.user.findFirst({
+        where: { tenantId, role: 'ADMIN' },
+      });
+
+      const paymentLinkResult = await this.paytrService.createPaymentLink({
+        merchantOid,
+        email: adminUser?.email || req.user.email,
+        amount,
+        userName: tenant.name,
+        userPhone: adminUser?.phone || '',
+        description: `Plan Degisikligi: ${pendingChange.newPlan.displayName}`,
+        successUrl: `${frontendUrl}/subscription/payment/success?oid=${merchantOid}&type=plan_change`,
+        failUrl: `${frontendUrl}/subscription/payment/failed?oid=${merchantOid}&type=plan_change`,
+        maxInstallment: 1,
+        expiryDuration: 30,
+      });
+
+      if (paymentLinkResult.status !== 'success') {
+        throw new BadRequestException(paymentLinkResult.reason || 'Failed to create payment link');
+      }
+
+      // Create pending payment record
+      await this.prisma.subscriptionPayment.create({
+        data: {
+          subscriptionId: pendingChange.subscriptionId,
+          amount: pendingChange.prorationAmount,
+          currency: pendingChange.currency,
+          status: PaymentStatus.PENDING,
+          paymentProvider: PaymentProvider.PAYTR,
+          paytrMerchantOid: merchantOid,
+        },
+      });
+
+      // Update pending change with PayTR info
+      await this.prisma.pendingPlanChange.update({
+        where: { id: dto.pendingChangeId },
+        data: { paymentIntentId: merchantOid },
+      });
+
       return {
-        provider: PaymentProvider.IYZICO,
+        provider: PaymentProvider.PAYTR,
+        paymentLink: paymentLinkResult.link,
+        merchantOid,
         amount,
         currency: pendingChange.currency,
-        pendingChangeId: dto.pendingChangeId,
       };
     }
   }
 
   /**
-   * Confirm plan change payment
+   * Confirm plan change payment (for Stripe only)
+   * PayTR uses redirect flow and webhook for confirmation
    */
   @Post('confirm-plan-change-payment')
   async confirmPlanChangePayment(@Request() req, @Body() dto: {
     pendingChangeId: string;
     paymentIntentId?: string;
     paymentMethodId?: string;
-    iyzicoDetails?: any;
   }) {
     const tenantId = req.user.tenantId;
 
@@ -331,113 +424,54 @@ export class PaymentController {
       throw new BadRequestException('Unauthorized');
     }
 
+    // Only for Stripe - PayTR uses webhook
+    if (pendingChange.paymentProvider !== PaymentProvider.STRIPE) {
+      throw new BadRequestException('PayTR payments are confirmed via redirect. Please use the payment link.');
+    }
+
     const { subscription } = pendingChange;
 
-    if (pendingChange.paymentProvider === PaymentProvider.STRIPE) {
-      if (!dto.paymentMethodId || !dto.paymentIntentId) {
-        throw new BadRequestException('Payment method ID and payment intent ID required');
-      }
-
-      const confirmedPayment = await this.stripeService.confirmPaymentIntent(
-        dto.paymentIntentId,
-        dto.paymentMethodId,
-      );
-
-      // Create payment record
-      const payment = await this.prisma.subscriptionPayment.create({
-        data: {
-          subscriptionId: subscription.id,
-          amount: pendingChange.prorationAmount,
-          currency: pendingChange.currency,
-          status: PaymentStatus.SUCCEEDED,
-          paymentProvider: PaymentProvider.STRIPE,
-          stripePaymentIntentId: confirmedPayment.id,
-          paidAt: new Date(),
-        },
-      });
-
-      // Mark pending change as completed
-      await this.prisma.pendingPlanChange.update({
-        where: { id: dto.pendingChangeId },
-        data: {
-          paymentStatus: 'COMPLETED',
-        },
-      });
-
-      // Create invoice
-      await this.billingService.createInvoice(
-        subscription.id,
-        payment.id,
-        Number(pendingChange.prorationAmount),
-        pendingChange.currency,
-        subscription.currentPeriodStart,
-        subscription.currentPeriodEnd,
-      );
-
-      return { success: true, payment, pendingChangeId: dto.pendingChangeId };
-    } else {
-      // Process Iyzico payment
-      if (!dto.iyzicoDetails) {
-        throw new BadRequestException('Iyzico payment details required');
-      }
-
-      const customer = this.iyzicoService.formatCustomerData(
-        tenantId,
-        req.user.email,
-        subscription.tenant.name,
-      );
-
-      // Get client IP for fraud detection
-      const clientIp = getProductionSafeIp(req);
-
-      const result = await this.iyzicoService.createPayment(
-        Number(pendingChange.prorationAmount),
-        pendingChange.currency,
-        customer,
-        dto.iyzicoDetails,
-        `PLAN-CHANGE-${dto.pendingChangeId}`,
-        `Plan change to ${pendingChange.newPlan.displayName}`,
-        clientIp,
-      );
-
-      if (result.status !== 'success') {
-        throw new BadRequestException(result.errorMessage || 'Payment failed');
-      }
-
-      // Create payment record
-      const payment = await this.prisma.subscriptionPayment.create({
-        data: {
-          subscriptionId: subscription.id,
-          amount: pendingChange.prorationAmount,
-          currency: pendingChange.currency,
-          status: PaymentStatus.SUCCEEDED,
-          paymentProvider: PaymentProvider.IYZICO,
-          iyzicoPaymentId: result.paymentId,
-          paidAt: new Date(),
-        },
-      });
-
-      // Mark pending change as completed
-      await this.prisma.pendingPlanChange.update({
-        where: { id: dto.pendingChangeId },
-        data: {
-          paymentStatus: 'COMPLETED',
-          paymentIntentId: result.paymentId,
-        },
-      });
-
-      // Create invoice
-      await this.billingService.createInvoice(
-        subscription.id,
-        payment.id,
-        Number(pendingChange.prorationAmount),
-        pendingChange.currency,
-        subscription.currentPeriodStart,
-        subscription.currentPeriodEnd,
-      );
-
-      return { success: true, payment, pendingChangeId: dto.pendingChangeId };
+    if (!dto.paymentMethodId || !dto.paymentIntentId) {
+      throw new BadRequestException('Payment method ID and payment intent ID required');
     }
+
+    const confirmedPayment = await this.stripeService.confirmPaymentIntent(
+      dto.paymentIntentId,
+      dto.paymentMethodId,
+    );
+
+    // Create payment record
+    const payment = await this.prisma.subscriptionPayment.create({
+      data: {
+        subscriptionId: subscription.id,
+        amount: pendingChange.prorationAmount,
+        currency: pendingChange.currency,
+        status: PaymentStatus.SUCCEEDED,
+        paymentProvider: PaymentProvider.STRIPE,
+        stripePaymentIntentId: confirmedPayment.id,
+        paidAt: new Date(),
+      },
+    });
+
+    // Mark pending change as completed
+    await this.prisma.pendingPlanChange.update({
+      where: { id: dto.pendingChangeId },
+      data: {
+        paymentStatus: 'COMPLETED',
+      },
+    });
+
+    // Create invoice
+    await this.billingService.createInvoice(
+      subscription.id,
+      payment.id,
+      Number(pendingChange.prorationAmount),
+      pendingChange.currency,
+      subscription.currentPeriodStart,
+      subscription.currentPeriodEnd,
+    );
+
+    return { success: true, payment, pendingChangeId: dto.pendingChangeId };
   }
 
   /**

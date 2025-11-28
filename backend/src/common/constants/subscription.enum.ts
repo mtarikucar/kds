@@ -20,7 +20,7 @@ export enum BillingCycle {
 
 export enum PaymentProvider {
   STRIPE = 'STRIPE',
-  IYZICO = 'IYZICO',
+  PAYTR = 'PAYTR',
 }
 
 export enum PaymentRegion {

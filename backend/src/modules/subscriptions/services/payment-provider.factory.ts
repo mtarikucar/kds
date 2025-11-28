@@ -1,20 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { PaymentProvider, PaymentRegion } from '../../../common/constants/subscription.enum';
 import { StripeService } from './stripe.service';
-import { IyzicoService } from './iyzico.service';
+import { PaytrService } from './paytr.service';
 
 export interface IPaymentProvider {
-  createPayment(...args: any[]): Promise<any>;
-  createSubscription?(...args: any[]): Promise<any>;
-  cancelSubscription?(...args: any[]): Promise<any>;
-  refundPayment?(...args: any[]): Promise<any>;
+  createPaymentLink?(...args: any[]): Promise<any>;
+  createPayment?(...args: any[]): Promise<any>;
+  verifyCallback?(...args: any[]): boolean;
 }
 
 @Injectable()
 export class PaymentProviderFactory {
   constructor(
     private readonly stripeService: StripeService,
-    private readonly iyzicoService: IyzicoService,
+    private readonly paytrService: PaytrService,
   ) {}
 
   /**
@@ -22,7 +21,7 @@ export class PaymentProviderFactory {
    */
   getProvider(region: PaymentRegion): IPaymentProvider {
     if (region === PaymentRegion.TURKEY) {
-      return this.iyzicoService;
+      return this.paytrService;
     }
     return this.stripeService;
   }
@@ -32,7 +31,7 @@ export class PaymentProviderFactory {
    */
   getProviderType(region: PaymentRegion): PaymentProvider {
     if (region === PaymentRegion.TURKEY) {
-      return PaymentProvider.IYZICO;
+      return PaymentProvider.PAYTR;
     }
     return PaymentProvider.STRIPE;
   }
@@ -56,9 +55,9 @@ export class PaymentProviderFactory {
   }
 
   /**
-   * Get Iyzico service directly (for Iyzico-specific operations)
+   * Get PayTR service directly (for PayTR-specific operations)
    */
-  getIyzicoService(): IyzicoService {
-    return this.iyzicoService;
+  getPaytrService(): PaytrService {
+    return this.paytrService;
   }
 }
