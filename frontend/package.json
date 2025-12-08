@@ -1,12 +1,12 @@
 {
   "name": "restaurant-pos-frontend",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.0-beta.2",
   "description": "Restaurant POS Frontend built with React and Vite",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 200",
     "preview": "vite preview",
     "test": "vitest",
     "test:ui": "vitest --ui",

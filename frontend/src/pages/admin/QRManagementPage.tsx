@@ -26,7 +26,7 @@ const QRManagementPage = () => {
     allQRs.forEach((qr, index) => {
       setTimeout(() => {
         // Try multiple possible QR element IDs
-        let svg = document.getElementById(`qr-${qr.id}-small`) || 
+        const svg = document.getElementById(`qr-${qr.id}-small`) || 
                   document.getElementById(`qr-${qr.id}-medium`) || 
                   document.getElementById(`qr-${qr.id}`);
         

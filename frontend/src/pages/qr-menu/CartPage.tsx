@@ -89,10 +89,15 @@ const CartPage = () => {
       return;
     }
 
-    // If tableId is missing, show table selection modal
+    // If tableId is missing, check tableless mode
     if (!effectiveTableId) {
-      setShowTableSelection(true);
-      return;
+      // If tableless mode is enabled, proceed without table
+      if (!enableTablelessMode) {
+        // Show table selection modal only if tableless mode is disabled
+        setShowTableSelection(true);
+        return;
+      }
+      // In tableless mode, proceed without tableId (COUNTER order)
     }
 
     // Final validation before submission
@@ -119,14 +124,28 @@ const CartPage = () => {
         })),
       }));
 
-      const orderData = {
+      const orderData: {
+        tenantId: string;
+        tableId?: string;
+        sessionId: string;
+        customerPhone?: string;
+        items: typeof orderItems;
+        notes?: string;
+        type?: string;
+      } = {
         tenantId,
-        tableId: effectiveTableId,
         sessionId,
         customerPhone: customerPhone || undefined,
         items: orderItems,
         notes: orderNotes || undefined,
       };
+
+      // Add tableId only if available (DINE_IN), otherwise COUNTER order
+      if (effectiveTableId) {
+        orderData.tableId = effectiveTableId;
+      } else {
+        orderData.type = 'COUNTER';
+      }
 
       await axios.post(`${API_URL}/customer-orders`, orderData);
 
@@ -135,7 +154,10 @@ const CartPage = () => {
 
       // Redirect to order tracking after 2 seconds
       setTimeout(() => {
-        navigate(`/qr-menu/${tenantId}/orders?tableId=${effectiveTableId}&sessionId=${sessionId}`);
+        const redirectUrl = effectiveTableId
+          ? `/qr-menu/${tenantId}/orders?tableId=${effectiveTableId}&sessionId=${sessionId}`
+          : `/qr-menu/${tenantId}/orders?sessionId=${sessionId}`;
+        navigate(redirectUrl);
       }, 2000);
     } catch (err: any) {
       console.error('Error submitting order:', err);

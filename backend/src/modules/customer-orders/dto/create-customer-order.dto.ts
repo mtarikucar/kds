@@ -7,10 +7,11 @@ import {
   IsInt,
   Min,
   IsNumber,
-  IsDefined,
+  IsEnum,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { OrderType } from '../../../common/constants/order-status.enum';
 
 export class OrderItemModifierDto {
   @ApiProperty({ example: 'uuid-of-modifier' })
@@ -58,11 +59,15 @@ export class CreateCustomerOrderDto {
   @IsNotEmpty()
   tenantId: string;
 
-  @ApiProperty({ example: 'uuid-of-table' })
-  @IsDefined()
+  @ApiPropertyOptional({ example: 'uuid-of-table', description: 'Optional for COUNTER orders (tableless mode)' })
   @IsString()
-  @IsNotEmpty()
-  tableId: string;
+  @IsOptional()
+  tableId?: string;
+
+  @ApiPropertyOptional({ enum: OrderType, example: OrderType.DINE_IN, description: 'Order type - defaults to DINE_IN if tableId provided, COUNTER if tableless' })
+  @IsEnum(OrderType)
+  @IsOptional()
+  type?: OrderType;
 
   @ApiProperty({ example: 'uuid-session-id' })
   @IsString()

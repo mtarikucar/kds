@@ -304,7 +304,7 @@ model Table {
 model Order {
   id          String   @id @default(uuid())
   orderNumber String
-  type        String   // DINE_IN, TAKEAWAY, DELIVERY
+  type        String   // DINE_IN, TAKEAWAY, DELIVERY, COUNTER
   status      String   @default("PENDING") // PENDING_APPROVAL, PENDING, PREPARING, READY, SERVED, PAID, CANCELLED
 
   totalAmount  Decimal @db.Decimal(10, 2)

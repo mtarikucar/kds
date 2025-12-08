@@ -9,6 +9,7 @@ import {
 import * as bcrypt from 'bcryptjs';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EmailService } from '../../common/services/email.service';
 import { mockPrismaClient, MockPrismaClient } from '../../common/test/prisma-mock.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -54,6 +55,14 @@ describe('AuthService', () => {
         {
           provide: ConfigService,
           useValue: mockConfigService,
+        },
+        {
+          provide: EmailService,
+          useValue: {
+            sendVerificationEmail: jest.fn(),
+            sendPasswordResetEmail: jest.fn(),
+            sendWelcomeEmail: jest.fn(),
+          },
         },
       ],
     }).compile();

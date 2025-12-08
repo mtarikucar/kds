@@ -1,0 +1,231 @@
+name: Environment Health Check
+
+on:
+  schedule:
+    # Run every 30 minutes
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to check (beta, staging, production)'
+        required: true
+        type: choice
+        options:
+          - beta
+          - staging
+          - production
+
+env:
+  TIMEOUT: 10
+
+jobs:
+  health-check:
+    name: Check ${{ github.event.inputs.environment || 'all' }} Environment(s)
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        environment:
+          - ${{ github.event.inputs.environment || 'beta' }}
+          - ${{ github.event.inputs.environment == '' && 'staging' || '' }}
+          - ${{ github.event.inputs.environment == '' && 'production' || '' }}
+      fail-fast: false
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set environment URL
+        id: env
+        run: |
+          case "${{ matrix.environment }}" in
+            beta)
+              echo "url=https://beta.yourapp.com" >> $GITHUB_OUTPUT
+              ;;
+            staging)
+              echo "url=https://staging.yourapp.com" >> $GITHUB_OUTPUT
+              ;;
+            production)
+              echo "url=https://yourapp.com" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "url=" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
+      - name: Skip empty environments
+        if: steps.env.outputs.url == ''
+        run: echo "Skipping empty environment"
+
+      - name: Check API Health
+        if: steps.env.outputs.url != ''
+        id: health
+        run: |
+          URL="${{ steps.env.outputs.url }}/api/health"
+          echo "Checking health endpoint: $URL"
+
+          response=$(curl -s -w "\n%{http_code}" --connect-timeout ${{ env.TIMEOUT }} "$URL" || echo "000")
+          http_code=$(echo "$response" | tail -n1)
+          body=$(echo "$response" | head -n-1)
+
+          echo "http_code=$http_code" >> $GITHUB_OUTPUT
+          echo "body=$body" >> $GITHUB_OUTPUT
+
+          if [ "$http_code" == "200" ]; then
+            echo "status=healthy" >> $GITHUB_OUTPUT
+            echo "✅ Health check passed"
+          else
+            echo "status=unhealthy" >> $GITHUB_OUTPUT
+            echo "❌ Health check failed with code: $http_code"
+            exit 1
+          fi
+
+      - name: Check API Version
+        if: steps.env.outputs.url != '' && steps.health.outputs.status == 'healthy'
+        id: version
+        run: |
+          URL="${{ steps.env.outputs.url }}/api"
+
+          response=$(curl -s --connect-timeout ${{ env.TIMEOUT }} "$URL" || echo "{}")
+          version=$(echo "$response" | jq -r '.version // "unknown"')
+
+          echo "version=$version" >> $GITHUB_OUTPUT
+          echo "API Version: $version"
+
+      - name: Check Database Connection
+        if: steps.env.outputs.url != '' && steps.health.outputs.status == 'healthy'
+        run: |
+          db_status=$(echo '${{ steps.health.outputs.body }}' | jq -r '.database // "unknown"')
+          echo "Database Status: $db_status"
+
+          if [ "$db_status" == "healthy" ] || [ "$db_status" == "connected" ]; then
+            echo "✅ Database is healthy"
+          else
+            echo "⚠️  Database status: $db_status"
+          fi
+
+      - name: Check Response Time
+        if: steps.env.outputs.url != ''
+        run: |
+          URL="${{ steps.env.outputs.url }}/api/health"
+
+          response_time=$(curl -o /dev/null -s -w '%{time_total}' --connect-timeout ${{ env.TIMEOUT }} "$URL")
+          response_ms=$(echo "$response_time * 1000" | bc)
+
+          echo "Response Time: ${response_ms}ms"
+
+          if (( $(echo "$response_time < 0.5" | bc -l) )); then
+            echo "✅ Excellent response time (< 500ms)"
+          elif (( $(echo "$response_time < 1.0" | bc -l) )); then
+            echo "✅ Good response time (< 1s)"
+          elif (( $(echo "$response_time < 2.0" | bc -l) )); then
+            echo "⚠️  Acceptable response time (< 2s)"
+          else
+            echo "❌ Slow response time (> 2s)"
+          fi
+
+      - name: Check Critical Endpoints
+        if: steps.env.outputs.url != ''
+        run: |
+          BASE_URL="${{ steps.env.outputs.url }}"
+          endpoints=(
+            "/api"
+            "/api/health"
+            "/api/auth/login"
+          )
+
+          failed=0
+          for endpoint in "${endpoints[@]}"; do
+            http_code=$(curl -o /dev/null -s -w "%{http_code}" --connect-timeout ${{ env.TIMEOUT }} "$BASE_URL$endpoint" || echo "000")
+
+            # 200 or 401 (unauthorized) are both acceptable
+            if [ "$http_code" == "200" ] || [ "$http_code" == "401" ]; then
+              echo "✅ $endpoint - OK ($http_code)"
+            else
+              echo "❌ $endpoint - Failed ($http_code)"
+              failed=$((failed + 1))
+            fi
+          done
+
+          if [ $failed -gt 0 ]; then
+            echo "⚠️  $failed endpoint(s) failed"
+          fi
+
+      - name: Create status badge
+        if: always() && steps.env.outputs.url != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const status = '${{ steps.health.outputs.status }}';
+            const environment = '${{ matrix.environment }}';
+            const version = '${{ steps.version.outputs.version }}';
+            const emoji = status === 'healthy' ? '✅' : '❌';
+            const color = status === 'healthy' ? 'success' : 'critical';
+
+            const badge = {
+              schemaVersion: 1,
+              label: `${environment} health`,
+              message: status,
+              color: color
+            };
+
+            console.log(`${emoji} ${environment}: ${status} (v${version})`);
+
+      - name: Send notification on failure
+        if: failure() && steps.env.outputs.url != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const environment = '${{ matrix.environment }}';
+            const url = '${{ steps.env.outputs.url }}';
+
+            // Create an issue if health check fails
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 Health Check Failed: ${environment}`,
+              body: `Health check failed for **${environment}** environment.\n\n` +
+                    `**URL:** ${url}\n` +
+                    `**Time:** ${new Date().toISOString()}\n` +
+                    `**Status:** Unhealthy\n\n` +
+                    `Please investigate immediately.\n\n` +
+                    `[View workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`,
+              labels: ['bug', 'health-check', 'urgent', environment]
+            });
+
+  summary:
+    name: Health Check Summary
+    runs-on: ubuntu-latest
+    needs: health-check
+    if: always()
+
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## Health Check Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Time:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.health-check.result }}" == "success" ]; then
+            echo "✅ All environments are healthy" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Some environments have issues" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Post to commit (scheduled runs only)
+        if: github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const result = '${{ needs.health-check.result }}';
+            const emoji = result === 'success' ? '✅' : '❌';
+
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: context.sha,
+              body: `${emoji} Scheduled health check: ${result}\n\n` +
+                    `Time: ${new Date().toISOString()}\n` +
+                    `[View details](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`
+            });
