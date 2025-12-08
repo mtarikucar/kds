@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrderStatus } from '../../common/constants/order-status.enum';
+import { validateTransition } from '../../common/utils/order-state-machine';
 import { UpdateOrderItemStatusDto, OrderItemStatus } from './dto/update-order-item-status.dto';
 import { KdsGateway } from './kds.gateway';
 
@@ -75,6 +76,9 @@ export class KdsService {
         'Order requires approval before status can be changed. Please approve the order first.'
       );
     }
+
+    // Validate state transition using state machine (STRICT mode)
+    validateTransition(order.status as OrderStatus, status);
 
     // Update order status
     const updatedOrder = await this.prisma.order.update({
@@ -164,10 +168,9 @@ export class KdsService {
       throw new NotFoundException(`Order with ID ${id} not found`);
     }
 
-    // Don't allow cancelling already paid orders
-    if (order.status === OrderStatus.PAID) {
-      throw new BadRequestException('Cannot cancel paid orders');
-    }
+    // Validate state transition using state machine (STRICT mode)
+    // This handles PAID and CANCELLED terminal states
+    validateTransition(order.status as OrderStatus, OrderStatus.CANCELLED);
 
     // Update order status to CANCELLED
     const updatedOrder = await this.prisma.order.update({

@@ -30,6 +30,13 @@ export class PaymentsService {
       throw new BadRequestException('Cannot pay for a cancelled order');
     }
 
+    // Prevent payment for orders awaiting approval (check BEFORE creating payment)
+    if (order.requiresApproval && order.status === OrderStatus.PENDING_APPROVAL) {
+      throw new BadRequestException(
+        'Order requires approval before payment can be processed. Please approve the order first.'
+      );
+    }
+
     // Validate payment amount
     if (createPaymentDto.amount > Number(order.finalAmount)) {
       throw new BadRequestException('Payment amount exceeds order total');
@@ -76,13 +83,6 @@ export class PaymentsService {
 
       // If fully paid, update order status and deduct stock
       if (totalPaidAmount >= orderAmount) {
-        // Prevent payment for orders awaiting approval
-        if (order.requiresApproval && order.status === OrderStatus.PENDING_APPROVAL) {
-          throw new BadRequestException(
-            'Order requires approval before payment can be processed. Please approve the order first.'
-          );
-        }
-
         await tx.order.update({
           where: { id: orderId },
           data: {

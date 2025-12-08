@@ -10,6 +10,7 @@ import { CreateOrderDto } from '../dto/create-order.dto';
 import { UpdateOrderDto } from '../dto/update-order.dto';
 import { UpdateOrderStatusDto } from '../dto/update-order-status.dto';
 import { OrderStatus, StockMovementType } from '../../../common/constants/order-status.enum';
+import { validateTransition } from '../../../common/utils/order-state-machine';
 import { TableStatus } from '../../tables/dto/create-table.dto';
 import { KdsGateway } from '../../kds/kds.gateway';
 
@@ -377,12 +378,15 @@ export class OrdersService {
     // Check if order exists and belongs to tenant
     const order = await this.findOne(id, tenantId);
 
-    // Prevent status updates for orders awaiting approval
+    // Prevent status updates for orders awaiting approval (must use approve endpoint)
     if (order.requiresApproval && order.status === OrderStatus.PENDING_APPROVAL) {
       throw new BadRequestException(
         'Order requires approval before status can be changed. Please approve the order first.'
       );
     }
+
+    // Validate state transition using state machine (STRICT mode)
+    validateTransition(order.status as OrderStatus, updateStatusDto.status);
 
     const updatedOrder = await this.prisma.order.update({
       where: { id },

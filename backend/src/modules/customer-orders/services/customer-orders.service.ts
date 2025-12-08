@@ -12,7 +12,7 @@ import { LoyaltyService } from '../../customers/loyalty.service';
 import { CustomerSessionService } from '../../customers/customer-session.service';
 import { CreateCustomerOrderDto } from '../dto/create-customer-order.dto';
 import { CreateWaiterRequestDto, CreateBillRequestDto } from '../dto/waiter-request.dto';
-import { OrderStatus } from '../../../common/constants/order-status.enum';
+import { OrderStatus, OrderType } from '../../../common/constants/order-status.enum';
 
 @Injectable()
 export class CustomerOrdersService {
@@ -47,16 +47,33 @@ export class CustomerOrdersService {
       );
     }
 
-    // Verify table exists and belongs to tenant
-    const table = await this.prisma.table.findFirst({
-      where: {
-        id: dto.tableId,
-        tenantId: dto.tenantId,
-      },
-    });
+    // Determine order type based on tableId and settings
+    let table = null;
+    let orderType: OrderType;
 
-    if (!table) {
-      throw new NotFoundException('Table not found');
+    if (dto.tableId) {
+      // Table-based order (DINE_IN)
+      table = await this.prisma.table.findFirst({
+        where: {
+          id: dto.tableId,
+          tenantId: dto.tenantId,
+        },
+      });
+
+      if (!table) {
+        throw new NotFoundException('Table not found');
+      }
+
+      orderType = dto.type || OrderType.DINE_IN;
+    } else {
+      // Tableless order (COUNTER) - check if enabled
+      if (!posSettings.enableTablelessMode) {
+        throw new BadRequestException(
+          'Tableless ordering is not enabled. Please scan a table QR code to place your order.'
+        );
+      }
+
+      orderType = dto.type || OrderType.COUNTER;
     }
 
     // Validate products and modifiers, calculate totals
@@ -80,12 +97,12 @@ export class CustomerOrdersService {
       data: {
         orderNumber,
         tenantId: dto.tenantId,
-        tableId: dto.tableId,
+        tableId: dto.tableId || null,
         sessionId: dto.sessionId,
         customerPhone: dto.customerPhone,
         status: OrderStatus.PENDING_APPROVAL,
         requiresApproval: true,
-        type: 'DINE_IN',
+        type: orderType,
         totalAmount,
         discount,
         finalAmount,

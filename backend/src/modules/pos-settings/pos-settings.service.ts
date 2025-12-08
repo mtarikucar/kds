@@ -32,38 +32,12 @@ export class PosSettingsService {
       where: { tenantId },
     });
 
-    // Validation: Tableless mode and customer ordering are mutually exclusive
-    if (updateDto.enableTablelessMode === true) {
-      const willHaveCustomerOrdering =
-        updateDto.enableCustomerOrdering !== undefined
-          ? updateDto.enableCustomerOrdering
-          : settings?.enableCustomerOrdering ?? true;
+    // Note: Tableless mode and customer ordering can now work together
+    // - With tableId: DINE_IN order (customer scans table QR)
+    // - Without tableId (tableless mode): COUNTER order (customer orders without table)
 
-      if (willHaveCustomerOrdering) {
-        throw new BadRequestException(
-          'Masasız mod etkinleştirildiğinde QR menüden müşteri sipariş oluşturma kullanılamaz. ' +
-          'Müşteriler masa QR kodlarını tarayarak sipariş verirler. ' +
-          'Lütfen önce QR menüden müşteri sipariş oluşturmayı kapatın.'
-        );
-      }
-    }
-
-    // Validation: Cannot enable customer ordering if tableless mode is active
+    // Validation: Customer ordering requires two-step checkout
     if (updateDto.enableCustomerOrdering === true) {
-      const willHaveTablelessMode =
-        updateDto.enableTablelessMode !== undefined
-          ? updateDto.enableTablelessMode
-          : settings?.enableTablelessMode ?? false;
-
-      if (willHaveTablelessMode) {
-        throw new BadRequestException(
-          'QR menüden müşteri sipariş oluşturma etkinleştirildiğinde masasız mod kullanılamaz. ' +
-          'Müşteriler masa QR kodlarını tarayarak sipariş verirler. ' +
-          'Lütfen önce masasız modu kapatın.'
-        );
-      }
-
-      // Also check if two-stage payment is enabled
       const willHaveTwoStepCheckout =
         updateDto.enableTwoStepCheckout !== undefined
           ? updateDto.enableTwoStepCheckout
