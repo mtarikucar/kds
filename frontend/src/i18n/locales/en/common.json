@@ -120,7 +120,6 @@
     "lastMonth": "Last Month",
     "lastYear": "Last Year"
   },
-  
   "dashboard": {
     "title": "Dashboard",
     "welcome": "Welcome back! Here's your overview for today.",
@@ -219,7 +218,7 @@
     "qrStyle": "QR Style",
     "designTemplates": "Design Templates",
     "choosePreDesignedTemplate": "Choose a pre-designed template that matches your restaurant style. All settings will be applied automatically.",
-  "scanToViewMenu": "Scan to view our menu",
+    "scanToViewMenu": "Scan to view our menu",
     "generatedOn": "Generated on",
     "tableSpecificQRCodes": "Table-Specific QR Codes",
     "tableSpecificQRDesc": "Each table has its own QR code. Customers scanning these will see which table they're at.",
@@ -311,8 +310,7 @@
         "name": "Minimalist",
         "description": "Simple black and white"
       }
-    }
-,
+    },
     "logoPreview": "Logo preview",
     "sampleCategories": {
       "appetizers": "Appetizers",
@@ -333,7 +331,6 @@
       "lavaCakeName": "Chocolate Lava Cake",
       "lavaCakeDesc": "Warm chocolate cake with molten center"
     }
-
   },
   "pricing": {
     "title": "Simple, Transparent Pricing",
@@ -398,7 +395,7 @@
     "product": "Product",
     "features": "Features",
     "pricing": "Pricing",
-  "contact": "Contact",
+    "contact": "Contact",
     "freeTrial": "Free Trial",
     "company": "Company",
     "contactUs": "Contact Us",
@@ -427,8 +424,7 @@
     "chatWithUs": "Chat with our team",
     "documentation": "Documentation",
     "support": "Support"
-  }
-  ,
+  },
   "qrMenu": {
     "tableLabel": "Table",
     "searchPlaceholder": "Search menu...",
@@ -530,6 +526,37 @@
     "noTablesAvailable": "No tables available",
     "selectDropdown": "Choose a table...",
     "cancel": "Cancel"
+  },
+  "loyalty": {
+    "title": "Loyalty & Rewards",
+    "subtitle": "Track points and rewards",
+    "rewards": "Rewards",
+    "haveReferralCode": "Have a Referral Code?",
+    "enterCode": "Enter code",
+    "transactionHistory": "Transaction History",
+    "invalidReferralCode": "Please enter a valid referral code",
+    "mustIdentify": "Please identify yourself first",
+    "referralApplied": "Referral code applied! Bonus points awarded!",
+    "referralFailed": "Failed to apply referral code",
+    "applying": "Applying...",
+    "apply": "Apply",
+    "error": "Failed to load data",
+    "codeCopied": "Referral code copied!",
+    "notIdentified": "Identify yourself to see your loyalty rewards",
+    "yourPoints": "Your Points",
+    "redeemable": "Redeemable Amount",
+    "canRedeem": "You can redeem your points!",
+    "minimumPoints": "Minimum {{min}} points to redeem",
+    "tierStatus": "Tier Status",
+    "member": "Member",
+    "progressToNextTier": "Progress to {{tier}}",
+    "pointsToNextTier": "{{points}} more points to reach {{tier}}",
+    "lifetimePoints": "{{points}} lifetime points earned",
+    "referralProgram": "Referral Program",
+    "shareAndEarn": "Share and earn bonus points",
+    "yourReferralCode": "Your Referral Code",
+    "referrals": "Referrals",
+    "pointsEarned": "Points Earned",
+    "noReferralCode": "Contact support to get your referral code"
   }
 }
-

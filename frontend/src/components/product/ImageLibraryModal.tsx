@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Check, Trash2, Image as ImageIcon, Loader2, Search } from 'lucide-react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
@@ -21,6 +22,7 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
   selectedImageIds = [],
   maxSelection,
 }) => {
+  const { t } = useTranslation('menu');
   const [localSelection, setLocalSelection] = useState<Set<string>>(
     new Set(selectedImageIds)
   );
@@ -63,7 +65,7 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
 
   const handleDelete = async (imageId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm('Are you sure you want to delete this image permanently?')) {
+    if (window.confirm(t('menu.confirmDeleteImage'))) {
       await deleteMutation.mutateAsync(imageId);
       // Remove from local selection if it was selected
       const newSelection = new Set(localSelection);
@@ -82,14 +84,14 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
   );
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Image Library" size="xl">
+    <Modal isOpen={isOpen} onClose={onClose} title={t('menu.imageLibraryTitle')} size="xl">
       <div className="space-y-4">
         {/* Search Bar */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search images..."
+            placeholder={t('menu.searchImages')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -99,15 +101,15 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
         {/* Selection Counter */}
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-600">
-            {localSelection.size} selected
-            {maxSelection && ` (max ${maxSelection})`}
+            {localSelection.size} {t('menu.selected')}
+            {maxSelection && ` (${t('menu.max')} ${maxSelection})`}
           </span>
           {localSelection.size > 0 && (
             <button
               onClick={handleReset}
               className="text-blue-600 hover:text-blue-700 font-medium"
             >
-              Clear Selection
+              {t('menu.clearSelection')}
             </button>
           )}
         </div>
@@ -117,18 +119,18 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-12">
               <Loader2 className="h-12 w-12 text-gray-400 animate-spin" />
-              <p className="mt-4 text-sm text-gray-500">Loading images...</p>
+              <p className="mt-4 text-sm text-gray-500">{t('menu.loadingImages')}</p>
             </div>
           ) : filteredImages.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
               <ImageIcon className="h-12 w-12 text-gray-400" />
               <p className="mt-4 text-sm font-medium text-gray-900">
-                {searchTerm ? 'No images found' : 'No images in library'}
+                {searchTerm ? t('menu.noImagesFoundSearch') : t('menu.noImagesInLibrary')}
               </p>
               <p className="mt-1 text-xs text-gray-500">
                 {searchTerm
-                  ? 'Try a different search term'
-                  : 'Upload some images to get started'}
+                  ? t('menu.tryDifferentSearch')
+                  : t('menu.uploadSomeImages')}
               </p>
             </div>
           ) : (
@@ -195,7 +197,7 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
         {/* Actions */}
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
           <Button type="button" variant="secondary" onClick={onClose}>
-            Cancel
+            {t('menu.cancel')}
           </Button>
           <Button
             type="button"
@@ -203,7 +205,7 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
             onClick={handleConfirm}
             disabled={localSelection.size === 0}
           >
-            Add Selected ({localSelection.size})
+            {t('menu.addSelected')} ({localSelection.size})
           </Button>
         </div>
       </div>

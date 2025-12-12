@@ -31,7 +31,7 @@ const DesktopAppSettingsPage = () => {
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
             <Loader2 className="h-12 w-12 text-blue-600 animate-spin mx-auto mb-4" />
-            <p className="text-gray-600">Loading desktop app information...</p>
+            <p className="text-gray-600">{t('loadingDesktopAppInfo')}</p>
           </div>
         </div>
       </div>
@@ -45,9 +45,9 @@ const DesktopAppSettingsPage = () => {
           <div className="flex items-start gap-3">
             <AlertCircle className="h-6 w-6 text-yellow-600 flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-semibold text-yellow-900 mb-1">No Desktop Releases Available</h3>
+              <h3 className="font-semibold text-yellow-900 mb-1">{t('noDesktopReleasesTitle')}</h3>
               <p className="text-yellow-800 text-sm">
-                Desktop app releases haven't been published yet. Please check back later or contact support.
+                {t('noDesktopReleasesDesc')}
               </p>
             </div>
           </div>
@@ -74,11 +74,11 @@ const DesktopAppSettingsPage = () => {
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <CheckCircle className="h-5 w-5" />
-                <span className="text-sm font-medium opacity-90">Latest Version</span>
+                <span className="text-sm font-medium opacity-90">{t('latestVersion')}</span>
               </div>
               <h2 className="text-4xl font-bold mb-1">v{latestRelease.version}</h2>
               <p className="text-blue-100 text-sm">
-                Released {new Date(latestRelease.pubDate).toLocaleDateString()}
+                {t('releasedOn')} {new Date(latestRelease.pubDate).toLocaleDateString()}
               </p>
             </div>
             <Download className="h-16 w-16 opacity-20" />
@@ -94,11 +94,10 @@ const DesktopAppSettingsPage = () => {
             <button
               key={platform.id}
               onClick={() => setSelectedPlatform(platform.id)}
-              className={`text-left p-6 rounded-xl border-2 transition-all hover:shadow-lg ${
-                selectedPlatform === platform.id
+              className={`text-left p-6 rounded-xl border-2 transition-all hover:shadow-lg ${selectedPlatform === platform.id
                   ? 'border-blue-500 bg-blue-50 shadow-md'
                   : 'border-gray-200 bg-white hover:border-gray-300'
-              }`}
+                }`}
             >
               <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
@@ -122,7 +121,7 @@ const DesktopAppSettingsPage = () => {
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
                 >
                   <Download className="h-4 w-4" />
-                  Download
+                  {t('downloadBtn')}
                 </button>
               </div>
             </button>
@@ -139,18 +138,18 @@ const DesktopAppSettingsPage = () => {
         <div className="space-y-4">
           {selectedPlatform === 'windows' && (
             <ol className="list-decimal list-inside space-y-2 text-gray-700">
-              <li>Download the Windows installer (.msi or .exe)</li>
-              <li>Run the installer and follow the setup wizard</li>
-              <li>Launch HummyTummy KDS from the Start menu or desktop shortcut</li>
-              <li>The app will automatically check for updates on startup</li>
+              <li>{t('windowsInstallStep1')}</li>
+              <li>{t('windowsInstallStep2')}</li>
+              <li>{t('windowsInstallStep3')}</li>
+              <li>{t('windowsInstallStep4')}</li>
             </ol>
           )}
           {selectedPlatform === 'linux' && (
             <ol className="list-decimal list-inside space-y-2 text-gray-700">
-              <li>Download the Linux package (.AppImage)</li>
-              <li>Make it executable with `chmod +x filename.AppImage` and run it</li>
-              <li>Launch HummyTummy KDS from your applications menu</li>
-              <li>The app will automatically check for updates on startup</li>
+              <li>{t('linuxInstallStep1')}</li>
+              <li>{t('linuxInstallStep2')}</li>
+              <li>{t('linuxInstallStep3')}</li>
+              <li>{t('linuxInstallStep4')}</li>
             </ol>
           )}
         </div>

@@ -92,7 +92,7 @@ const PendingOrdersPanel = ({ isOpen, onClose }: PendingOrdersPanelProps) => {
                         {order.table && (
                           <div className="flex items-center gap-1 text-sm text-gray-600 bg-white px-2 py-1 rounded">
                             <MapPin className="h-3 w-3" />
-                            <span>Table {order.table.number}</span>
+                            <span>{t('tableLabel')} {order.table.number}</span>
                             {order.table.section && (
                               <span className="text-gray-400">({order.table.section})</span>
                             )}
@@ -119,7 +119,7 @@ const PendingOrdersPanel = ({ isOpen, onClose }: PendingOrdersPanelProps) => {
                         <div key={item.id} className="flex justify-between items-start">
                           <div className="flex-1">
                             <div className="font-medium text-gray-900">
-                              {item.quantity}x {item.product?.name || 'Unknown Product'}
+                              {item.quantity}x {item.product?.name || t('billRequests.unknownProduct')}
                             </div>
                             {item.modifiers && item.modifiers.length > 0 && (
                               <div className="ml-4 mt-1 space-y-0.5">
@@ -132,7 +132,7 @@ const PendingOrdersPanel = ({ isOpen, onClose }: PendingOrdersPanelProps) => {
                             )}
                             {item.notes && (
                               <div className="ml-4 mt-1 text-xs text-gray-500 italic">
-                                Note: {item.notes}
+                                {t('notes')}: {item.notes}
                               </div>
                             )}
                           </div>
@@ -146,7 +146,7 @@ const PendingOrdersPanel = ({ isOpen, onClose }: PendingOrdersPanelProps) => {
                     {/* Order Notes */}
                     {order.notes && (
                       <div className="mb-3 p-2 bg-gray-50 rounded text-xs text-gray-600">
-                        <strong>Order Note:</strong> {order.notes}
+                        <strong>{t('billRequests.customerRequestedNote')}:</strong> {order.notes}
                       </div>
                     )}
 

@@ -19,6 +19,20 @@
   "autoUpdatesDesc": "Automatically receive the latest features and security updates",
   "betterPerformance": "Better Performance",
   "betterPerformanceDesc": "Native desktop app provides faster load times and smoother experience",
+  "loadingDesktopAppInfo": "Loading desktop app information...",
+  "noDesktopReleasesTitle": "No Desktop Releases Available",
+  "noDesktopReleasesDesc": "Desktop app releases haven't been published yet. Please check back later or contact support.",
+  "latestVersion": "Latest Version",
+  "releasedOn": "Released",
+  "downloadBtn": "Download",
+  "windowsInstallStep1": "Download the Windows installer (.msi or .exe)",
+  "windowsInstallStep2": "Run the installer and follow the setup wizard",
+  "windowsInstallStep3": "Launch HummyTummy KDS from the Start menu or desktop shortcut",
+  "windowsInstallStep4": "The app will automatically check for updates on startup",
+  "linuxInstallStep1": "Download the Linux package (.AppImage)",
+  "linuxInstallStep2": "Make it executable with `chmod +x filename.AppImage` and run it",
+  "linuxInstallStep3": "Launch HummyTummy KDS from your applications menu",
+  "linuxInstallStep4": "The app will automatically check for updates on startup",
   "releaseNotes": "Release Notes",
   "restaurantName": "Restaurant Name",
   "address": "Address",
@@ -233,4 +247,3 @@
     "supportedDesc": "This application supports ESC/POS compatible thermal printers including: Epson TM series, Star TSP series, and generic ESC/POS printers."
   }
 }
-

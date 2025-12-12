@@ -31,7 +31,14 @@
     "insufficientPermissions": "Bu işlemi gerçekleştirmek için yetkiniz yok",
     "sessionExpired": "Oturumunuzun süresi dolmuş. Lütfen tekrar giriş yapın",
     "maintenanceMode": "Sistem bakım altında. Lütfen daha sonra tekrar deneyin",
-    "rateLimitExceeded": "Çok fazla istek. Lütfen daha sonra tekrar deneyin"
+    "rateLimitExceeded": "Çok fazla istek. Lütfen daha sonra tekrar deneyin",
+    "somethingWentWrong": "Bir şeyler yanlış gitti",
+    "unexpectedError": "Uygulamada beklenmeyen bir hata oluştu.",
+    "tryAgainBtn": "Tekrar Dene",
+    "reloadPage": "Sayfayı Yenile",
+    "goToHomepage": "Ana Sayfaya Git",
+    "errorDetails": "Hata Detayları",
+    "stack": "Yığın İzi"
   },
   "pages": {
     "notFound": {
@@ -82,4 +89,3 @@
     }
   }
 }
-

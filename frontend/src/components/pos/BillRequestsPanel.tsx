@@ -96,20 +96,18 @@ const BillRequestsPanel = ({ isOpen, onClose }: BillRequestsPanelProps) => {
               {billRequests.map((request: BillRequest) => (
                 <div
                   key={request.id}
-                  className={`bg-white border-2 rounded-xl shadow-md overflow-hidden ${
-                    request.status === 'PENDING' ? 'border-yellow-200' : 'border-blue-200'
-                  }`}
+                  className={`bg-white border-2 rounded-xl shadow-md overflow-hidden ${request.status === 'PENDING' ? 'border-yellow-200' : 'border-blue-200'
+                    }`}
                 >
                   {/* Request Header */}
-                  <div className={`px-4 py-3 border-b ${
-                    request.status === 'PENDING' ? 'bg-yellow-50 border-yellow-200' : 'bg-blue-50 border-blue-200'
-                  }`}>
+                  <div className={`px-4 py-3 border-b ${request.status === 'PENDING' ? 'bg-yellow-50 border-yellow-200' : 'bg-blue-50 border-blue-200'
+                    }`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
                         {request.table && (
                           <div className="flex items-center gap-1 font-bold text-gray-900">
                             <MapPin className="h-4 w-4" />
-                            <span>Table {request.table.number}</span>
+                            <span>{t('tableLabel')} {request.table.number}</span>
                             {request.table.section && (
                               <span className="text-sm text-gray-500">({request.table.section})</span>
                             )}

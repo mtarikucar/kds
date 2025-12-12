@@ -35,8 +35,7 @@
     "cancelSubscription": "Cancel Subscription",
     "reactivateSubscription": "Reactivate Subscription",
     "manageSubscription": "Manage your subscription plan and billing",
-    "viewAllPlans": "View All Plans"
-    ,
+    "viewAllPlans": "View All Plans",
     "status": {
       "active": "Active",
       "trial": "Trial",
@@ -89,7 +88,69 @@
     "selectNewPlan": "Select a new plan:",
     "perMonthShort": "mo",
     "perYearShort": "yr",
-    "keepSubscription": "Keep Subscription"
+    "keepSubscription": "Keep Subscription",
+    "management": "Subscription Management",
+    "viewAllPlansBtn": "View All Plans",
+    "unknownPlan": "Unknown Plan",
+    "nextBilling": "Next billing",
+    "plansPage": {
+      "title": "Choose Your Plan",
+      "subtitle": "Select the perfect plan for your restaurant business",
+      "noPlans": "No subscription plans available at the moment.",
+      "saveUpTo": "Save up to 20%",
+      "readyToStart": "Ready to get started?",
+      "redirectToPayment": "You'll be redirected to payment after confirming",
+      "proceedToPayment": "Proceed to Payment",
+      "haveActiveSubscription": "You have an active subscription",
+      "toChangePlan": "To change your plan, visit the subscription management page",
+      "manageSubscription": "Manage Subscription",
+      "faqTitle": "Frequently Asked Questions",
+      "faqChangePlans": "Can I change plans later?",
+      "faqChangePlansAnswer": "Yes, you can upgrade or downgrade your plan at any time from the subscription management page.",
+      "faqPaymentMethods": "What payment methods do you accept?",
+      "faqPaymentMethodsAnswer": "We accept all major credit cards through Stripe and also support local payment methods via Iyzico.",
+      "faqCancelAnytime": "Can I cancel anytime?",
+      "faqCancelAnytimeAnswer": "Yes, you can cancel your subscription at any time. You'll continue to have access until the end of your billing period.",
+      "faqFreeTrial": "Is there a free trial?",
+      "faqFreeTrialAnswer": "Yes, most paid plans include a 14-day free trial. You won't be charged until the trial period ends."
+    },
+    "payment": {
+      "preparing": "Preparing payment...",
+      "loadingForm": "Loading payment form...",
+      "verifying": "Verifying your payment...",
+      "orderReference": "Order Reference",
+      "completePayment": "Complete Your Payment",
+      "backToPlans": "Back to Plans",
+      "securePaymentWith": "Make secure payment with",
+      "securePaymentTitle": "Secure Payment",
+      "securePaymentDescStripe": "Your payment information is securely processed by Stripe. Your card details are not stored by us.",
+      "securePaymentDescPaytr": "Your payment information is securely processed by PayTR. Your card details are not stored by us.",
+      "paymentApproved": "Payment approved!",
+      "activatingSubscription": "Payment approved! Activating subscription...",
+      "applyingPlanChange": "Payment approved! Applying plan change...",
+      "planChangeFailed": "Failed to apply plan change",
+      "paymentCreationFailed": "Failed to create payment",
+      "missingPaymentInfo": "Missing payment information",
+      "goToSubscription": "Go to Subscription",
+      "subscriptionActivated": "Your subscription has been successfully activated.",
+      "failed": {
+        "title": "Payment Failed",
+        "description": "The payment could not be completed. This may have been caused by the following reasons:",
+        "incorrectCard": "Card information may be incorrect",
+        "insufficientBalance": "Your card may have insufficient balance",
+        "bankRejected": "Your bank may have rejected the transaction",
+        "3dSecureFailed": "3D Secure verification may have failed",
+        "tryAgain": "Try Again",
+        "goBack": "Go Back",
+        "contactSupport": "If the problem persists, contact support"
+      },
+      "success": {
+        "title": "Payment Successful!",
+        "planChangeComplete": "Your plan change was completed successfully. Your new plan is now active.",
+        "subscriptionActive": "Your subscription has been successfully activated. You now have access to all features.",
+        "thankYou": "Thank you for your purchase",
+        "goToDashboard": "Go to Dashboard"
+      }
+    }
   }
 }
-

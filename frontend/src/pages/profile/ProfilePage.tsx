@@ -94,14 +94,14 @@ const ProfilePage = () => {
               <div className="grid md:grid-cols-2 gap-4">
                 <Input
                   label={t('profile.firstName')}
-                  placeholder="John"
+                  placeholder={t('profile.firstNamePlaceholder')}
                   error={profileErrors.firstName?.message}
                   {...registerProfile('firstName')}
                 />
 
                 <Input
                   label={t('profile.lastName')}
-                  placeholder="Doe"
+                  placeholder={t('profile.lastNamePlaceholder')}
                   error={profileErrors.lastName?.message}
                   {...registerProfile('lastName')}
                 />
@@ -117,7 +117,7 @@ const ProfilePage = () => {
 
               <Input
                 label={t('profile.phone')}
-                placeholder="+1234567890"
+                placeholder={t('profile.phonePlaceholder')}
                 error={profileErrors.phone?.message}
                 {...registerProfile('phone')}
               />

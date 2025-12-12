@@ -31,7 +31,14 @@
     "insufficientPermissions": "You don't have permission to perform this action",
     "sessionExpired": "Your session has expired. Please login again",
     "maintenanceMode": "The system is under maintenance. Please try again later",
-    "rateLimitExceeded": "Too many requests. Please try again later"
+    "rateLimitExceeded": "Too many requests. Please try again later",
+    "somethingWentWrong": "Something went wrong",
+    "unexpectedError": "An unexpected error occurred in the application.",
+    "tryAgainBtn": "Try Again",
+    "reloadPage": "Reload Page",
+    "goToHomepage": "Go to Homepage",
+    "errorDetails": "Error Details",
+    "stack": "Stack Trace"
   },
   "pages": {
     "notFound": {
@@ -82,4 +89,3 @@
     }
   }
 }
-

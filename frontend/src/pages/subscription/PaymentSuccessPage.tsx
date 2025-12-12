@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, Loader2, ArrowRight } from 'lucide-react';
 import { subscriptionKeys } from '../../features/subscriptions/subscriptionsApi';
 
 export default function PaymentSuccessPage() {
+  const { t } = useTranslation('subscriptions');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
@@ -31,7 +33,7 @@ export default function PaymentSuccessPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mx-auto mb-4" />
-          <p className="text-gray-600">Odemeniz dogrulaniyor...</p>
+          <p className="text-gray-600">{t('subscriptions.payment.verifying')}</p>
         </div>
       </div>
     );
@@ -47,20 +49,20 @@ export default function PaymentSuccessPage() {
 
         {/* Title */}
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Odeme Basarili!
+          {t('subscriptions.payment.success.title')}
         </h2>
 
         {/* Description */}
         <p className="text-gray-600 mb-6">
           {type === 'plan_change'
-            ? 'Plan degisikliginiz basariyla tamamlandi. Yeni planiniz aktif edildi.'
-            : 'Aboneliginiz basariyla aktif edildi. Artik tum ozelliklere erisebilirsiniz.'}
+            ? t('subscriptions.payment.success.planChangeComplete')
+            : t('subscriptions.payment.success.subscriptionActive')}
         </p>
 
         {/* Order Reference */}
         {merchantOid && (
           <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <p className="text-sm text-gray-500 mb-1">Siparis Referansi</p>
+            <p className="text-sm text-gray-500 mb-1">{t('subscriptions.payment.orderReference')}</p>
             <p className="text-sm font-mono text-gray-700">{merchantOid}</p>
           </div>
         )}
@@ -70,7 +72,7 @@ export default function PaymentSuccessPage() {
           onClick={() => navigate('/subscription')}
           className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
         >
-          Abonelige Git
+          {t('subscriptions.payment.goToSubscription')}
           <ArrowRight className="w-5 h-5" />
         </button>
 
@@ -79,7 +81,7 @@ export default function PaymentSuccessPage() {
           onClick={() => navigate('/dashboard')}
           className="w-full mt-3 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
         >
-          Panele Don
+          {t('subscriptions.payment.success.goToDashboard')}
         </button>
       </div>
     </div>

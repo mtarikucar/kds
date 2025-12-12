@@ -39,7 +39,22 @@
     "noImagesSelected": "Resim seçilmedi",
     "chooseImagesFromLibrary": "Kütüphaneden Resim Seç",
     "confirmDeleteCategory": "Bu kategoriyi silmek istiyor musunuz?",
-    "confirmDeleteItem": "Bu ürünü silmek istiyor musunuz?"
+    "confirmDeleteItem": "Bu ürünü silmek istiyor musunuz?",
+    "imageLibraryTitle": "Resim Kütüphanesi",
+    "imageLibraryDesc": "Tüm ürün resimlerini tek bir yerden yönetin. Yeni resimler yükleyin veya kullanılmayan resimleri silin.",
+    "noImagesInLibrary": "Kütüphanede resim yok",
+    "uploadImagesToStart": "Başlamak için yukarıdan resim yükleyin",
+    "stock": "Stok",
+    "confirmDeleteImage": "Bu resmi silmek istediğinizden emin misiniz? Bu, resmi tüm ürünlerden kaldıracaktır.",
+    "searchImages": "Resim ara...",
+    "loadingImages": "Resimler yükleniyor...",
+    "noImagesFoundSearch": "Resim bulunamadı",
+    "tryDifferentSearch": "Farklı bir arama terimi deneyin",
+    "uploadSomeImages": "Başlamak için resim yükleyin",
+    "selected": "seçili",
+    "max": "maksimum",
+    "clearSelection": "Seçimi Temizle",
+    "cancel": "İptal",
+    "addSelected": "Seçilenleri Ekle"
   }
 }
-

@@ -158,7 +158,7 @@ const DashboardPage = () => {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm md:text-base font-semibold truncate">#{order.orderNumber}</p>
                       <p className="text-xs md:text-sm text-gray-600 truncate">
-                        Table {order.table?.number} • {formatTimeAgo(order.createdAt)}
+                        {t('pos:tableLabel')} {order.table?.number} • {formatTimeAgo(order.createdAt)}
                       </p>
                       <p className="text-xs md:text-sm text-gray-600">
                         {order.items?.length || 0} {t('dashboard.items')}

@@ -35,8 +35,7 @@
     "cancelSubscription": "Aboneliği İptal Et",
     "reactivateSubscription": "Aboneliği Yeniden Etkinleştir",
     "manageSubscription": "Abonelik planınızı ve faturalandırmayı yönetin",
-    "viewAllPlans": "Tüm Planları Görüntüle"
-    ,
+    "viewAllPlans": "Tüm Planları Görüntüle",
     "status": {
       "active": "Aktif",
       "trial": "Deneme",
@@ -89,8 +88,69 @@
     "selectNewPlan": "Yeni bir plan seçin:",
     "perMonthShort": "ay",
     "perYearShort": "yıl",
-    "keepSubscription": "Aboneliği Koru"
+    "keepSubscription": "Aboneliği Koru",
+    "management": "Abonelik Yönetimi",
+    "viewAllPlansBtn": "Tüm Planları Görüntüle",
+    "unknownPlan": "Bilinmeyen Plan",
+    "nextBilling": "Sonraki fatura",
+    "plansPage": {
+      "title": "Planınızı Seçin",
+      "subtitle": "Restoranınız için mükemmel planı seçin",
+      "noPlans": "Şu anda mevcut abonelik planı bulunmamaktadır.",
+      "saveUpTo": "%20'ye kadar tasarruf edin",
+      "readyToStart": "Başlamaya hazır mısınız?",
+      "redirectToPayment": "Onayladıktan sonra ödeme sayfasına yönlendirileceksiniz",
+      "proceedToPayment": "Ödemeye Devam Et",
+      "haveActiveSubscription": "Aktif bir aboneliğiniz var",
+      "toChangePlan": "Planınızı değiştirmek için abonelik yönetimi sayfasını ziyaret edin",
+      "manageSubscription": "Aboneliği Yönet",
+      "faqTitle": "Sıkça Sorulan Sorular",
+      "faqChangePlans": "Daha sonra plan değiştirebilir miyim?",
+      "faqChangePlansAnswer": "Evet, abonelik yönetimi sayfasından istediğiniz zaman planınızı yükseltebilir veya düşürebilirsiniz.",
+      "faqPaymentMethods": "Hangi ödeme yöntemlerini kabul ediyorsunuz?",
+      "faqPaymentMethodsAnswer": "Stripe üzerinden tüm büyük kredi kartlarını kabul ediyoruz ve Iyzico ile yerel ödeme yöntemlerini de destekliyoruz.",
+      "faqCancelAnytime": "İstediğim zaman iptal edebilir miyim?",
+      "faqCancelAnytimeAnswer": "Evet, aboneliğinizi istediğiniz zaman iptal edebilirsiniz. Fatura döneminizin sonuna kadar erişiminiz devam eder.",
+      "faqFreeTrial": "Ücretsiz deneme var mı?",
+      "faqFreeTrialAnswer": "Evet, çoğu ücretli plan 14 günlük ücretsiz deneme içerir. Deneme süresi bitene kadar ücret alınmaz."
+    },
+    "payment": {
+      "preparing": "Ödeme hazırlanıyor...",
+      "loadingForm": "Ödeme formu yükleniyor...",
+      "verifying": "Ödemeniz doğrulanıyor...",
+      "orderReference": "Sipariş Referansı",
+      "completePayment": "Ödemenizi Tamamlayın",
+      "backToPlans": "Planlara Dön",
+      "securePaymentWith": "ile güvenli ödeme yapın",
+      "securePaymentTitle": "Güvenli Ödeme",
+      "securePaymentDescStripe": "Ödeme bilgileriniz Stripe tarafından güvenli bir şekilde işlenir. Kart bilgileriniz bizde saklanmaz.",
+      "securePaymentDescPaytr": "Ödeme bilgileriniz PayTR tarafından güvenli bir şekilde işlenir. Kart bilgileriniz bizde saklanmaz.",
+      "paymentApproved": "Ödeme onaylandı!",
+      "activatingSubscription": "Ödeme onaylandı! Abonelik aktif ediliyor...",
+      "applyingPlanChange": "Ödeme onaylandı! Plan değişikliği uygulanıyor...",
+      "planChangeFailed": "Plan değişikliği uygulanamadı",
+      "paymentCreationFailed": "Ödeme oluşturulamadı",
+      "missingPaymentInfo": "Eksik ödeme bilgisi",
+      "goToSubscription": "Aboneliğe Git",
+      "subscriptionActivated": "Aboneliğiniz başarıyla aktif edildi.",
+      "failed": {
+        "title": "Ödeme Başarısız",
+        "description": "Ödeme işlemi tamamlanamadı. Bu aşağıdaki nedenlerden kaynaklanmış olabilir:",
+        "incorrectCard": "Kart bilgileri hatalı girilmiş olabilir",
+        "insufficientBalance": "Kartınızda yeterli bakiye olmayabilir",
+        "bankRejected": "Bankanız işlemi reddetmiş olabilir",
+        "3dSecureFailed": "3D Secure doğrulama başarısız olabilir",
+        "tryAgain": "Tekrar Dene",
+        "goBack": "Geri Dön",
+        "contactSupport": "Sorun devam ederse destek ile iletişime geçin"
+      },
+      "success": {
+        "title": "Ödeme Başarılı!",
+        "planChangeComplete": "Plan değişikliğiniz başarıyla tamamlandı. Yeni planınız aktif edildi.",
+        "subscriptionActive": "Aboneliğiniz başarıyla aktif edildi. Artık tüm özelliklere erişebilirsiniz.",
+        "thankYou": "Satın aldığınız için teşekkür ederiz",
+        "goToDashboard": "Panele Dön"
+      }
+    }
   }
 }
-
-

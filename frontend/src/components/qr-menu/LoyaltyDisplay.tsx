@@ -72,7 +72,7 @@ const LoyaltyDisplay = ({
     if (referralData?.referralCode) {
       navigator.clipboard.writeText(referralData.referralCode);
       setCopied(true);
-      toast.success(t('loyalty.codeCopied', 'Referral code copied!'));
+      toast.success(t('loyalty.codeCopied'));
       setTimeout(() => setCopied(false), 2000);
     }
   };
@@ -116,7 +116,7 @@ const LoyaltyDisplay = ({
       <div className="bg-white rounded-2xl shadow-md p-6 text-center">
         <Gift className="h-12 w-12 text-gray-300 mx-auto mb-3" />
         <p className="text-gray-600">
-          {t('loyalty.notIdentified', 'Identify yourself to see your loyalty rewards')}
+          {t('loyalty.notIdentified')}
         </p>
       </div>
     );
@@ -138,7 +138,7 @@ const LoyaltyDisplay = ({
             </div>
             <div>
               <p className="text-white/80 text-sm">
-                {t('loyalty.yourPoints', 'Your Points')}
+                {t('loyalty.yourPoints')}
               </p>
               <p className="text-3xl font-bold">{loyaltyData.points || 0}</p>
             </div>
@@ -149,7 +149,7 @@ const LoyaltyDisplay = ({
         <div className="bg-white/20 rounded-lg p-3">
           <div className="flex justify-between items-center mb-1">
             <span className="text-white/90 text-sm">
-              {t('loyalty.redeemable', 'Redeemable Amount')}
+              {t('loyalty.redeemable')}
             </span>
             <span className="text-lg font-bold">
               ${loyaltyData.redeemableAmount?.toFixed(2) || '0.00'}
@@ -157,11 +157,11 @@ const LoyaltyDisplay = ({
           </div>
           {loyaltyData.canRedeem ? (
             <p className="text-white/70 text-xs">
-              {t('loyalty.canRedeem', 'You can redeem your points!')}
+              {t('loyalty.canRedeem')}
             </p>
           ) : (
             <p className="text-white/70 text-xs">
-              {t('loyalty.minimumPoints', `Minimum ${loyaltyData.minRedeemPoints} points to redeem`)}
+              {t('loyalty.minimumPoints', { min: loyaltyData.minRedeemPoints })}
             </p>
           )}
         </div>
@@ -173,10 +173,10 @@ const LoyaltyDisplay = ({
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-lg font-bold text-gray-900">
-                {t('loyalty.tierStatus', 'Tier Status')}
+                {t('loyalty.tierStatus')}
               </h3>
               <p className="text-sm text-gray-600">
-                {tierData.currentTierInfo?.name} Member
+                {tierData.currentTierInfo?.name} {t('loyalty.member')}
               </p>
             </div>
             <div
@@ -193,7 +193,7 @@ const LoyaltyDisplay = ({
               <div className="mb-2">
                 <div className="flex justify-between text-sm mb-1">
                   <span className="text-gray-600">
-                    {t('loyalty.progressToNextTier', `Progress to ${tierData.nextTierInfo?.name}`)}
+                    {t('loyalty.progressToNextTier', { tier: tierData.nextTierInfo?.name })}
                   </span>
                   <span className="font-semibold" style={{ color: primaryColor }}>
                     {Math.round(tierData.progressPercentage)}%
@@ -210,10 +210,7 @@ const LoyaltyDisplay = ({
                 </div>
               </div>
               <p className="text-xs text-gray-500">
-                {t(
-                  'loyalty.pointsToNextTier',
-                  `${tierData.pointsToNextTier} more points to reach ${tierData.nextTierInfo?.name}`
-                )}
+                {t('loyalty.pointsToNextTier', { points: tierData.pointsToNextTier, tier: tierData.nextTierInfo?.name })}
               </p>
             </>
           )}
@@ -222,7 +219,7 @@ const LoyaltyDisplay = ({
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <TrendingUp className="h-4 w-4" />
               <span>
-                {t('loyalty.lifetimePoints', `${tierData.lifetimePoints} lifetime points earned`)}
+                {t('loyalty.lifetimePoints', { points: tierData.lifetimePoints })}
               </span>
             </div>
           </div>
@@ -241,10 +238,10 @@ const LoyaltyDisplay = ({
             </div>
             <div>
               <h3 className="text-lg font-bold text-gray-900">
-                {t('loyalty.referralProgram', 'Referral Program')}
+                {t('loyalty.referralProgram')}
               </h3>
               <p className="text-sm text-gray-600">
-                {t('loyalty.shareAndEarn', 'Share and earn bonus points')}
+                {t('loyalty.shareAndEarn')}
               </p>
             </div>
           </div>
@@ -253,7 +250,7 @@ const LoyaltyDisplay = ({
             <>
               <div className="bg-gray-50 rounded-lg p-4 mb-4">
                 <p className="text-xs text-gray-600 mb-2">
-                  {t('loyalty.yourReferralCode', 'Your Referral Code')}
+                  {t('loyalty.yourReferralCode')}
                 </p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 text-2xl font-bold tracking-wider text-center py-2 bg-white rounded border-2 border-gray-300">
@@ -279,7 +276,7 @@ const LoyaltyDisplay = ({
                     {referralData.totalReferrals || 0}
                   </p>
                   <p className="text-xs text-gray-600">
-                    {t('loyalty.referrals', 'Referrals')}
+                    {t('loyalty.referrals')}
                   </p>
                 </div>
                 <div className="bg-gray-50 rounded-lg p-3 text-center">
@@ -287,14 +284,14 @@ const LoyaltyDisplay = ({
                     {referralData.totalPointsEarned || 0}
                   </p>
                   <p className="text-xs text-gray-600">
-                    {t('loyalty.pointsEarned', 'Points Earned')}
+                    {t('loyalty.pointsEarned')}
                   </p>
                 </div>
               </div>
             </>
           ) : (
             <p className="text-sm text-gray-600 text-center py-4">
-              {t('loyalty.noReferralCode', 'Contact support to get your referral code')}
+              {t('loyalty.noReferralCode')}
             </p>
           )}
         </div>

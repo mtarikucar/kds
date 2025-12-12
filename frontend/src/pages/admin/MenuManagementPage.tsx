@@ -200,7 +200,7 @@ const MenuManagementPage = () => {
   };
 
   const handleDeleteImage = (imageId: string) => {
-    if (confirm('Are you sure you want to delete this image? This will remove it from all products.')) {
+    if (confirm(t('menu.confirmDeleteImage'))) {
       deleteImage(imageId);
     }
   };
@@ -311,65 +311,65 @@ const MenuManagementPage = () => {
                   const primaryImage = product.images?.[0] || null;
                   const imageUrl = primaryImage
                     ? (primaryImage.url.startsWith('http://') || primaryImage.url.startsWith('https://')
-                        ? primaryImage.url
-                        : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${primaryImage.url}`)
+                      ? primaryImage.url
+                      : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${primaryImage.url}`)
                     : product.image || null;
 
                   return (
-                  <div key={product.id} className="border rounded-lg p-4">
-                    {imageUrl && (
-                      <img
-                        src={imageUrl}
-                        alt={product.name}
-                        className="w-full h-32 object-cover rounded-md mb-3"
-                      />
-                    )}
-                    <div className="mb-3">
-                      <div className="flex items-start justify-between mb-2">
-                        <h3 className="font-semibold">{product.name}</h3>
-                        <Badge variant={product.isAvailable ? 'success' : 'danger'}>
-                          {product.isAvailable ? 'Available' : 'Unavailable'}
-                        </Badge>
-                      </div>
-                      {product.description && (
-                        <p className="text-sm text-gray-600 mb-2">
-                          {product.description}
-                        </p>
+                    <div key={product.id} className="border rounded-lg p-4">
+                      {imageUrl && (
+                        <img
+                          src={imageUrl}
+                          alt={product.name}
+                          className="w-full h-32 object-cover rounded-md mb-3"
+                        />
                       )}
-                      <p className="text-lg font-bold text-blue-600">
-                        {formatCurrency(product.price)}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Stock: {product.currentStock}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Category: {product.category?.name}
-                      </p>
+                      <div className="mb-3">
+                        <div className="flex items-start justify-between mb-2">
+                          <h3 className="font-semibold">{product.name}</h3>
+                          <Badge variant={product.isAvailable ? 'success' : 'danger'}>
+                            {product.isAvailable ? t('menu.available') : t('menu.unavailable')}
+                          </Badge>
+                        </div>
+                        {product.description && (
+                          <p className="text-sm text-gray-600 mb-2">
+                            {product.description}
+                          </p>
+                        )}
+                        <p className="text-lg font-bold text-blue-600">
+                          {formatCurrency(product.price)}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {t('menu.stock')}: {product.currentStock}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          {t('menu.category')}: {product.category?.name}
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                          onClick={() => handleOpenProductModal(product)}
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          {t('app.edit')}
+                        </Button>
+                        <Button
+                          variant="danger"
+                          size="sm"
+                          onClick={() => {
+                            if (confirm(t('menu.confirmDeleteItem'))) {
+                              deleteProduct(product.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex-1"
-                        onClick={() => handleOpenProductModal(product)}
-                      >
-                        <Edit className="h-4 w-4 mr-1" />
-                        {t('app.edit')}
-                      </Button>
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={() => {
-                          if (confirm(t('menu.confirmDeleteItem'))) {
-                            deleteProduct(product.id);
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                );
+                  );
                 })}
               </div>
             )}
@@ -381,16 +381,16 @@ const MenuManagementPage = () => {
       {activeTab === 'images' && (
         <Card>
           <CardHeader>
-            <CardTitle>Image Library</CardTitle>
+            <CardTitle>{t('menu.imageLibraryTitle')}</CardTitle>
             <p className="text-sm text-gray-600 mt-1">
-              Manage all product images in one place. Upload new images or delete unused ones.
+              {t('menu.imageLibraryDesc')}
             </p>
           </CardHeader>
           <CardContent>
             {/* Upload Zone */}
             <div className="mb-6">
               <ImageUploadZone
-                onFilesSelected={() => {}}
+                onFilesSelected={() => { }}
                 onUploadConfirm={handleConfirmUploadToLibrary}
                 requireConfirmation={true}
                 disabled={uploadImagesMutation.isPending}
@@ -443,9 +443,9 @@ const MenuManagementPage = () => {
             ) : (
               <div className="text-center py-12 px-4 border-2 border-dashed border-gray-300 rounded-lg">
                 <ImageIcon className="mx-auto h-12 w-12 text-gray-400" />
-                <p className="mt-2 text-sm font-medium text-gray-900">No images in library</p>
+                <p className="mt-2 text-sm font-medium text-gray-900">{t('menu.noImagesInLibrary')}</p>
                 <p className="mt-1 text-xs text-gray-500">
-                  Upload images above to get started
+                  {t('menu.uploadImagesToStart')}
                 </p>
               </div>
             )}

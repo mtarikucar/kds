@@ -72,7 +72,7 @@ const LoyaltyPage = () => {
       }
     } catch (error) {
       console.error('Failed to fetch data:', error);
-      toast.error(t('common.error', 'Failed to load data'));
+      toast.error(t('loyalty.error'));
     } finally {
       setIsLoading(false);
     }
@@ -82,7 +82,7 @@ const LoyaltyPage = () => {
     e.preventDefault();
 
     if (!referralCode || referralCode.length < 4) {
-      toast.error(t('loyalty.invalidReferralCode', 'Please enter a valid referral code'));
+      toast.error(t('loyalty.invalidReferralCode'));
       return;
     }
 
@@ -93,7 +93,7 @@ const LoyaltyPage = () => {
       const customerId = sessionRes.data.customerId;
 
       if (!customerId) {
-        toast.error(t('loyalty.mustIdentify', 'Please identify yourself first'));
+        toast.error(t('loyalty.mustIdentify'));
         return;
       }
 
@@ -104,7 +104,7 @@ const LoyaltyPage = () => {
         tenantId,
       });
 
-      toast.success(t('loyalty.referralApplied', 'Referral code applied! Bonus points awarded!'));
+      toast.success(t('loyalty.referralApplied'));
       setReferralCode('');
       // Refresh data
       fetchData();
@@ -112,7 +112,7 @@ const LoyaltyPage = () => {
       console.error('Failed to apply referral code:', error);
       toast.error(
         error.response?.data?.message ||
-          t('loyalty.referralFailed', 'Failed to apply referral code')
+        t('loyalty.referralFailed')
       );
     } finally {
       setIsApplyingReferral(false);
@@ -160,10 +160,10 @@ const LoyaltyPage = () => {
           </button>
           <div className="flex-1">
             <h1 className="text-2xl font-bold text-white">
-              {t('loyalty.title', 'Loyalty & Rewards')}
+              {t('loyalty.title')}
             </h1>
             <p className="text-white/80 text-sm mt-0.5">
-              {t('loyalty.subtitle', 'Track points and rewards')}
+              {t('loyalty.subtitle')}
             </p>
           </div>
         </div>
@@ -184,14 +184,14 @@ const LoyaltyPage = () => {
         <div className="bg-white rounded-2xl shadow-md p-6 mt-4 animate-in fade-in slide-in-from-bottom delay-300">
           <h3 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
             <Gift className="h-5 w-5" style={{ color: settings.primaryColor }} />
-            {t('loyalty.haveReferralCode', 'Have a Referral Code?')}
+            {t('loyalty.haveReferralCode')}
           </h3>
           <form onSubmit={handleApplyReferralCode} className="flex gap-2">
             <input
               type="text"
               value={referralCode}
               onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-              placeholder={t('loyalty.enterCode', 'Enter code')}
+              placeholder={t('loyalty.enterCode')}
               className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 uppercase"
               disabled={isApplyingReferral}
               maxLength={12}
@@ -202,7 +202,7 @@ const LoyaltyPage = () => {
               className="px-6 py-2 rounded-lg font-semibold text-white transition-all duration-200 transform hover:scale-105 active:scale-95"
               style={{ backgroundColor: settings.primaryColor }}
             >
-              {isApplyingReferral ? t('common.applying', 'Applying...') : t('common.apply', 'Apply')}
+              {isApplyingReferral ? t('loyalty.applying') : t('loyalty.apply')}
             </button>
           </form>
         </div>
@@ -216,7 +216,7 @@ const LoyaltyPage = () => {
             >
               <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <History className="h-5 w-5" style={{ color: settings.secondaryColor }} />
-                {t('loyalty.transactionHistory', 'Transaction History')}
+                {t('loyalty.transactionHistory')}
               </h3>
               <span className="text-gray-500">
                 {showTransactions ? '▲' : '▼'}
@@ -244,9 +244,8 @@ const LoyaltyPage = () => {
                       </div>
                     </div>
                     <span
-                      className={`text-lg font-bold ${
-                        transaction.points > 0 ? 'text-green-600' : 'text-red-600'
-                      }`}
+                      className={`text-lg font-bold ${transaction.points > 0 ? 'text-green-600' : 'text-red-600'
+                        }`}
                     >
                       {transaction.points > 0 ? '+' : ''}
                       {transaction.points}

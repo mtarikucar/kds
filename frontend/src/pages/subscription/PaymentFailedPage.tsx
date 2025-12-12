@@ -1,7 +1,9 @@
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { XCircle, RefreshCw, ArrowLeft, HelpCircle } from 'lucide-react';
 
 export default function PaymentFailedPage() {
+  const { t } = useTranslation('subscriptions');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -18,12 +20,12 @@ export default function PaymentFailedPage() {
 
         {/* Title */}
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Odeme Basarisiz
+          {t('subscriptions.payment.failed.title')}
         </h2>
 
         {/* Description */}
         <p className="text-gray-600 mb-6">
-          Odeme islemi tamamlanamadi. Bu asagidaki nedenlerden kaynaklanmis olabilir:
+          {t('subscriptions.payment.failed.description')}
         </p>
 
         {/* Possible Reasons */}
@@ -31,19 +33,19 @@ export default function PaymentFailedPage() {
           <ul className="text-sm text-gray-600 space-y-2">
             <li className="flex items-start gap-2">
               <span className="text-red-500 mt-0.5">-</span>
-              <span>Kart bilgileri hatali girilmis olabilir</span>
+              <span>{t('subscriptions.payment.failed.incorrectCard')}</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-red-500 mt-0.5">-</span>
-              <span>Kartinizda yeterli bakiye olmayabilir</span>
+              <span>{t('subscriptions.payment.failed.insufficientBalance')}</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-red-500 mt-0.5">-</span>
-              <span>Bankaniz islemi reddetmis olabilir</span>
+              <span>{t('subscriptions.payment.failed.bankRejected')}</span>
             </li>
             <li className="flex items-start gap-2">
               <span className="text-red-500 mt-0.5">-</span>
-              <span>3D Secure dogrulama basarisiz olabilir</span>
+              <span>{t('subscriptions.payment.failed.3dSecureFailed')}</span>
             </li>
           </ul>
         </div>
@@ -51,7 +53,7 @@ export default function PaymentFailedPage() {
         {/* Order Reference */}
         {merchantOid && (
           <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <p className="text-sm text-gray-500 mb-1">Siparis Referansi</p>
+            <p className="text-sm text-gray-500 mb-1">{t('subscriptions.payment.orderReference')}</p>
             <p className="text-sm font-mono text-gray-700">{merchantOid}</p>
           </div>
         )}
@@ -63,7 +65,7 @@ export default function PaymentFailedPage() {
             className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
           >
             <RefreshCw className="w-5 h-5" />
-            Tekrar Dene
+            {t('subscriptions.payment.failed.tryAgain')}
           </button>
 
           <button
@@ -71,7 +73,7 @@ export default function PaymentFailedPage() {
             className="w-full px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
           >
             <ArrowLeft className="w-5 h-5" />
-            Abonelige Don
+            {t('subscriptions.payment.failed.goBack')}
           </button>
         </div>
 
@@ -82,7 +84,7 @@ export default function PaymentFailedPage() {
             className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-700"
           >
             <HelpCircle className="w-4 h-4" />
-            Sorun devam ederse destek ile iletisime gecin
+            {t('subscriptions.payment.failed.contactSupport')}
           </a>
         </div>
       </div>

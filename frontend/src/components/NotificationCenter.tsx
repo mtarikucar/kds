@@ -71,13 +71,13 @@ const NotificationCenter = () => {
       {isOpen && (
         <div className="absolute right-0 mt-2 w-screen max-w-md md:w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
           <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-            <h3 className="font-semibold text-gray-900">Notifications</h3>
+            <h3 className="font-semibold text-gray-900">{t('header.notifications')}</h3>
             {unreadCount > 0 && (
               <button
                 onClick={() => markAllAsRead()}
                 className="text-sm text-blue-600 hover:text-blue-700"
               >
-                Mark all as read
+                {t('header.markAllAsRead')}
               </button>
             )}
           </div>
@@ -96,9 +96,8 @@ const NotificationCenter = () => {
                   <div
                     key={notification.id}
                     onClick={() => handleNotificationClick(notification)}
-                    className={`p-3 md:p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${
-                      !isRead ? 'bg-blue-50' : ''
-                    }`}
+                    className={`p-3 md:p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer ${!isRead ? 'bg-blue-50' : ''
+                      }`}
                   >
                     <div className="flex items-start gap-2 md:gap-3">
                       <span className="text-xl md:text-2xl">{getNotificationIcon(notification.type)}</span>
