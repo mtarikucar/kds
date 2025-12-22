@@ -10,6 +10,7 @@ interface MobileBottomMenuProps {
   primaryColor: string;
   secondaryColor: string;
   currentPage: 'menu' | 'cart' | 'orders' | 'loyalty';
+  enableCustomerOrdering: boolean;
 }
 
 const MobileBottomMenu: React.FC<MobileBottomMenuProps> = ({
@@ -18,6 +19,7 @@ const MobileBottomMenu: React.FC<MobileBottomMenuProps> = ({
   primaryColor,
   secondaryColor,
   currentPage,
+  enableCustomerOrdering,
 }) => {
   const navigate = useNavigate();
   const { t } = useTranslation('common');
@@ -51,6 +53,7 @@ const MobileBottomMenu: React.FC<MobileBottomMenuProps> = ({
     }
   };
 
+  // Build menu items based on enableCustomerOrdering
   const menuItems = [
     {
       id: 'menu',
@@ -59,22 +62,25 @@ const MobileBottomMenu: React.FC<MobileBottomMenuProps> = ({
       onClick: handleMenuClick,
       active: currentPage === 'menu',
     },
-    {
-      id: 'cart',
-      label: t('cart.title', 'Cart'),
-      icon: ShoppingCart,
-      onClick: handleCartClick,
-      active: currentPage === 'cart',
-      badge: itemCount > 0 ? itemCount : null,
-    },
-    {
-      id: 'orders',
-      label: t('orders.title', 'Orders'),
-      icon: ClipboardList,
-      onClick: handleOrdersClick,
-      active: currentPage === 'orders',
-      disabled: !sessionId,
-    },
+    // Only show Cart and Orders if customer ordering is enabled
+    ...(enableCustomerOrdering ? [
+      {
+        id: 'cart',
+        label: t('cart.title', 'Cart'),
+        icon: ShoppingCart,
+        onClick: handleCartClick,
+        active: currentPage === 'cart',
+        badge: itemCount > 0 ? itemCount : null,
+      },
+      {
+        id: 'orders',
+        label: t('orders.title', 'Orders'),
+        icon: ClipboardList,
+        onClick: handleOrdersClick,
+        active: currentPage === 'orders',
+        disabled: !sessionId,
+      },
+    ] : []),
     {
       id: 'loyalty',
       label: t('loyalty.rewards', 'Rewards'),
