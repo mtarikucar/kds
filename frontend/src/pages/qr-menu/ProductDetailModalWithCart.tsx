@@ -278,8 +278,8 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
                         {group.selectionType === SelectionType.SINGLE
                           ? t('qrMenu.selectOne', 'Select one')
                           : group.maxSelections
-                          ? t('qrMenu.selectUpTo', `Select up to ${group.maxSelections}`, { max: group.maxSelections })
-                          : t('qrMenu.selectMultiple', 'Select multiple')}
+                            ? t('qrMenu.selectUpTo', `Select up to ${group.maxSelections}`, { max: group.maxSelections })
+                            : t('qrMenu.selectMultiple', 'Select multiple')}
                       </p>
                     </div>
 
@@ -331,72 +331,78 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
               </div>
             )}
 
-            {/* Notes */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {t('qrMenu.specialInstructions', 'Special Instructions')}
-              </label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder={t('qrMenu.notesPlaceholder', 'E.g., No onions, extra sauce...')}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50 resize-none"
-                style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
-                rows={3}
-              />
-            </div>
-
-            {/* Quantity and Add to Cart */}
-            <div className="flex items-center justify-between gap-4">
-              {/* Quantity */}
-              <div className="flex items-center gap-2 border-2 border-gray-200 rounded-lg p-1">
-                <button
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="p-2 rounded hover:bg-gray-100 transition-colors"
-                  disabled={quantity <= 1}
-                >
-                  <Minus className="w-5 h-5 text-gray-600" />
-                </button>
-                <span className="w-12 text-center font-semibold text-lg">{quantity}</span>
-                <button
-                  onClick={() => setQuantity(quantity + 1)}
-                  className="p-2 rounded hover:bg-gray-100 transition-colors"
-                >
-                  <Plus className="w-5 h-5 text-gray-600" />
-                </button>
+            {/* Notes - Only show when ordering is enabled */}
+            {enableCustomerOrdering && (
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  {t('qrMenu.specialInstructions', 'Special Instructions')}
+                </label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder={t('qrMenu.notesPlaceholder', 'E.g., No onions, extra sauce...')}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-opacity-50 resize-none"
+                  style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
+                  rows={3}
+                />
               </div>
+            )}
 
-              {/* Add to Cart Button - Icon Only */}
-              <button
-                onClick={handleAddToCart}
-                disabled={!enableCustomerOrdering || !canAddToCart() || showSuccess}
-                className={cn(
-                  'py-4 px-4 rounded-xl font-semibold text-white transition-all duration-300 flex items-center justify-center transform',
-                  enableCustomerOrdering && canAddToCart() && !showSuccess
-                    ? 'hover:shadow-lg active:scale-95 hover:scale-110'
-                    : 'opacity-50 cursor-not-allowed',
-                  showSuccess ? 'scale-95' : ''
-                )}
-                style={{
-                  backgroundColor: showSuccess ? '#10b981' : (enableCustomerOrdering && canAddToCart() ? primaryColor : '#9ca3af'),
-                }}
-                title={showSuccess ? t('qrMenu.added', 'Added!') : t('qrMenu.addToCart', 'Add to Cart')}
-              >
-                {showSuccess ? (
-                  <Check className="w-6 h-6 animate-pulse" />
-                ) : (
-                  <ShoppingCart className="w-6 h-6" />
-                )}
-              </button>
-            </div>
+            {/* Quantity and Add to Cart - Only show when ordering is enabled */}
+            {enableCustomerOrdering ? (
+              <>
+                <div className="flex items-center justify-between gap-4">
+                  {/* Quantity */}
+                  <div className="flex items-center gap-2 border-2 border-gray-200 rounded-lg p-1">
+                    <button
+                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                      className="p-2 rounded hover:bg-gray-100 transition-colors"
+                      disabled={quantity <= 1}
+                    >
+                      <Minus className="w-5 h-5 text-gray-600" />
+                    </button>
+                    <span className="w-12 text-center font-semibold text-lg">{quantity}</span>
+                    <button
+                      onClick={() => setQuantity(quantity + 1)}
+                      className="p-2 rounded hover:bg-gray-100 transition-colors"
+                    >
+                      <Plus className="w-5 h-5 text-gray-600" />
+                    </button>
+                  </div>
 
-            {!enableCustomerOrdering ? (
-              <p className="text-sm text-yellow-600 mt-2 text-center">
+                  {/* Add to Cart Button - Icon Only */}
+                  <button
+                    onClick={handleAddToCart}
+                    disabled={!canAddToCart() || showSuccess}
+                    className={cn(
+                      'py-4 px-4 rounded-xl font-semibold text-white transition-all duration-300 flex items-center justify-center transform',
+                      canAddToCart() && !showSuccess
+                        ? 'hover:shadow-lg active:scale-95 hover:scale-110'
+                        : 'opacity-50 cursor-not-allowed',
+                      showSuccess ? 'scale-95' : ''
+                    )}
+                    style={{
+                      backgroundColor: showSuccess ? '#10b981' : (canAddToCart() ? primaryColor : '#9ca3af'),
+                    }}
+                    title={showSuccess ? t('qrMenu.added', 'Added!') : t('qrMenu.addToCart', 'Add to Cart')}
+                  >
+                    {showSuccess ? (
+                      <Check className="w-6 h-6 animate-pulse" />
+                    ) : (
+                      <ShoppingCart className="w-6 h-6" />
+                    )}
+                  </button>
+                </div>
+
+                {!canAddToCart() && (
+                  <p className="text-sm text-red-500 mt-2 text-center">
+                    {t('qrMenu.requiredModifiers', 'Please select required options')}
+                  </p>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-yellow-600 mt-4 text-center">
                 {t('qrMenu.viewOnlyMode', 'Menu viewing only - please order with staff assistance')}
-              </p>
-            ) : !canAddToCart() && (
-              <p className="text-sm text-red-500 mt-2 text-center">
-                {t('qrMenu.requiredModifiers', 'Please select required options')}
               </p>
             )}
           </div>

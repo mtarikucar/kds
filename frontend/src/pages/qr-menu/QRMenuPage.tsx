@@ -74,8 +74,8 @@ const QRMenuPage = () => {
         setMenuData(response.data);
         setIsLoading(false);
       } catch (err: any) {
-  console.error('Error fetching menu data:', err);
-  setError(err.response?.data?.message || t('messages.operationFailed'));
+        console.error('Error fetching menu data:', err);
+        setError(err.response?.data?.message || t('messages.operationFailed'));
         setIsLoading(false);
       }
     };
@@ -155,9 +155,6 @@ const QRMenuPage = () => {
   };
 
   const handleProductClick = (product: Product) => {
-    // Only allow product clicks if customer ordering is enabled
-    if (!enableCustomerOrdering) return;
-
     setSelectedProduct(product);
     setIsModalOpen(true);
   };
@@ -228,7 +225,7 @@ const QRMenuPage = () => {
                 )}
               </div>
 
-              
+
               {/* Language Toggle */}
               <button
                 onClick={toggleLanguage}
@@ -255,35 +252,14 @@ const QRMenuPage = () => {
         </div>
       </div>
 
-      {/* Warning Banner for Disabled Ordering */}
-      {!enableCustomerOrdering && (
-        <div className="fixed top-0 left-0 right-0 z-10 mx-4 sm:mx-6 mt-40 sm:mt-44 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg shadow-md">
-          <div className="flex items-start gap-3">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-yellow-600" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="flex-1">
-              <p className="text-sm font-semibold text-yellow-800">
-                {t('qrMenu.orderingDisabledShort')}
-              </p>
-              <p className="text-xs text-yellow-700 mt-1">
-                {t('qrMenu.viewOnlyMode')}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="flex-1 px-4 sm:px-6 py-6">
         {/* Categories - Horizontal Scroll */}
         <div className="mb-8 flex gap-2 overflow-x-auto pb-3 -mx-4 px-4 sm:mx-0 sm:px-0">
           <button
             onClick={() => setSelectedCategory('')}
-            className={`px-4 py-2.5 rounded-full whitespace-nowrap font-medium transition-all duration-200 transform hover:scale-105 flex-shrink-0 ${
-              !selectedCategory ? 'shadow-lg' : 'shadow'
-            }`}
+            className={`px-4 py-2.5 rounded-full whitespace-nowrap font-medium transition-all duration-200 transform hover:scale-105 flex-shrink-0 ${!selectedCategory ? 'shadow-lg' : 'shadow'
+              }`}
             style={{
               backgroundColor: !selectedCategory ? settings.primaryColor : 'white',
               color: !selectedCategory ? 'white' : settings.secondaryColor,
@@ -297,9 +273,8 @@ const QRMenuPage = () => {
             <button
               key={category.id}
               onClick={() => setSelectedCategory(category.id)}
-              className={`px-4 py-2.5 rounded-full whitespace-nowrap font-medium transition-all duration-200 transform hover:scale-105 flex-shrink-0 ${
-                selectedCategory === category.id ? 'shadow-lg' : 'shadow'
-              }`}
+              className={`px-4 py-2.5 rounded-full whitespace-nowrap font-medium transition-all duration-200 transform hover:scale-105 flex-shrink-0 ${selectedCategory === category.id ? 'shadow-lg' : 'shadow'
+                }`}
               style={{
                 backgroundColor: selectedCategory === category.id ? settings.primaryColor : 'white',
                 color: selectedCategory === category.id ? 'white' : settings.secondaryColor,
@@ -330,12 +305,7 @@ const QRMenuPage = () => {
                       <button
                         key={product.id}
                         onClick={() => handleProductClick(product)}
-                        disabled={!enableCustomerOrdering}
-                        className={`w-full text-left transition-all duration-300 transform animate-in fade-in slide-in-from-left ${
-                          enableCustomerOrdering
-                            ? 'hover:shadow-xl active:scale-98 cursor-pointer'
-                            : 'cursor-default opacity-75'
-                        }`}
+                        className="w-full text-left transition-all duration-300 transform animate-in fade-in slide-in-from-left hover:shadow-xl active:scale-98 cursor-pointer"
                         style={{ animationDelay: `${index * 20}ms` }}
                       >
                         <Card className="overflow-hidden bg-white shadow-lg hover:shadow-2xl transition-all duration-300 border-2 border-transparent hover:border-opacity-20" style={{ '--tw-border-opacity': '0.2', borderColor: settings.primaryColor } as React.CSSProperties}>
@@ -358,7 +328,7 @@ const QRMenuPage = () => {
                                       <UtensilsCrossed className="h-10 w-10" style={{ color: settings.primaryColor, opacity: 0.4 }} />
                                     </div>
                                   )}
-                                  
+
                                   {/* Unavailable Badge */}
                                   {product.isAvailable && (
                                     <div className="absolute top-1 right-1">
@@ -383,7 +353,7 @@ const QRMenuPage = () => {
                                     </p>
                                   )}
                                   {settings.showPrices && (
-                                    <p className="text-2xl font-black" style={{ 
+                                    <p className="text-2xl font-black" style={{
                                       background: `linear-gradient(135deg, ${settings.primaryColor} 0%, ${settings.secondaryColor} 100%)`,
                                       WebkitBackgroundClip: 'text',
                                       WebkitTextFillColor: 'transparent',
@@ -409,11 +379,10 @@ const QRMenuPage = () => {
                                         setTimeout(() => setAddedProductId(null), 1500);
                                       }
                                     }}
-                                    className={`font-bold px-5 py-3 rounded-lg transition-all flex items-center justify-center gap-2 flex-shrink-0 min-w-[110px] shadow-md ${
-                                      addedProductId === product.id
+                                    className={`font-bold px-5 py-3 rounded-lg transition-all flex items-center justify-center gap-2 flex-shrink-0 min-w-[110px] shadow-md ${addedProductId === product.id
                                         ? 'bg-green-500 scale-105 animate-pulse'
                                         : 'hover:scale-105 active:scale-95'
-                                    }`}
+                                      }`}
                                     style={{
                                       background: addedProductId === product.id ? '#10b981' : `linear-gradient(135deg, ${settings.primaryColor} 0%, ${settings.secondaryColor} 100%)`,
                                       color: 'white'
@@ -451,12 +420,7 @@ const QRMenuPage = () => {
                       <button
                         key={product.id}
                         onClick={() => handleProductClick(product)}
-                        disabled={!enableCustomerOrdering}
-                        className={`group text-left transition-all duration-300 transform animate-in fade-in zoom-in-95 ${
-                          enableCustomerOrdering
-                            ? 'hover:-translate-y-1 active:scale-95 cursor-pointer'
-                            : 'cursor-default opacity-75'
-                        }`}
+                        className="group text-left transition-all duration-300 transform animate-in fade-in zoom-in-95 hover:-translate-y-1 active:scale-95 cursor-pointer"
                         style={{ animationDelay: `${index * 30}ms` }}
                       >
                         <Card className="overflow-hidden bg-white shadow-lg hover:shadow-2xl transition-all duration-300 h-56 relative">
@@ -477,7 +441,7 @@ const QRMenuPage = () => {
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                               </div>
                             )}
-                            
+
                             {/* Unavailable Badge */}
                             {product.isAvailable && (
                               <div className="absolute top-2 right-2">
@@ -524,11 +488,10 @@ const QRMenuPage = () => {
                                       setTimeout(() => setAddedProductId(null), 1500);
                                     }
                                   }}
-                                  className={`w-full font-bold py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 backdrop-blur-sm shadow-lg ${
-                                    addedProductId === product.id
+                                  className={`w-full font-bold py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 backdrop-blur-sm shadow-lg ${addedProductId === product.id
                                       ? 'bg-green-500/95 scale-105 animate-pulse'
                                       : 'bg-white/95 hover:bg-white hover:scale-105 active:scale-95'
-                                  }`}
+                                    }`}
                                   style={{
                                     color: addedProductId === product.id ? 'white' : settings.primaryColor,
                                   }}
@@ -562,12 +525,7 @@ const QRMenuPage = () => {
                     <button
                       key={product.id}
                       onClick={() => handleProductClick(product)}
-                      disabled={!enableCustomerOrdering}
-                      className={`w-full text-left transition-all duration-300 transform animate-in fade-in slide-in-from-left ${
-                        enableCustomerOrdering
-                          ? 'hover:shadow-lg active:scale-98 cursor-pointer'
-                          : 'cursor-default opacity-75'
-                      }`}
+                      className="w-full text-left transition-all duration-300 transform animate-in fade-in slide-in-from-left hover:shadow-lg active:scale-98 cursor-pointer"
                       style={{ animationDelay: `${index * 20}ms` }}
                     >
                       <Card className="bg-white shadow-md hover:shadow-xl transition-all duration-300 border-l-4" style={{ borderLeftColor: settings.primaryColor }}>
@@ -585,7 +543,7 @@ const QRMenuPage = () => {
                                 )}
                               </div>
                               {settings.showPrices && (
-                                <p className="text-lg font-black" style={{ 
+                                <p className="text-lg font-black" style={{
                                   background: `linear-gradient(135deg, ${settings.primaryColor} 0%, ${settings.secondaryColor} 100%)`,
                                   WebkitBackgroundClip: 'text',
                                   WebkitTextFillColor: 'transparent',
@@ -610,11 +568,10 @@ const QRMenuPage = () => {
                                       setTimeout(() => setAddedProductId(null), 1500);
                                     }
                                   }}
-                                  className={`p-3 rounded-lg transition-all duration-300 shadow-md ${
-                                    addedProductId === product.id
+                                  className={`p-3 rounded-lg transition-all duration-300 shadow-md ${addedProductId === product.id
                                       ? 'scale-110 animate-pulse bg-green-500'
                                       : 'hover:scale-110 active:scale-95'
-                                  }`}
+                                    }`}
                                   style={{
                                     background: addedProductId === product.id ? '#10b981' : `linear-gradient(135deg, ${settings.primaryColor} 0%, ${settings.secondaryColor} 100%)`,
                                   }}

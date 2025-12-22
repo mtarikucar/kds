@@ -354,7 +354,7 @@ const MenuManagementPage = () => {
                           onClick={() => handleOpenProductModal(product)}
                         >
                           <Edit className="h-4 w-4 mr-1" />
-                          {t('app.edit')}
+                          {t('common:app.edit')}
                         </Button>
                         <Button
                           variant="danger"

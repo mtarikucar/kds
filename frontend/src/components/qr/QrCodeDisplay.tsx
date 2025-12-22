@@ -28,17 +28,25 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
   };
 
   const currentSize = sizePresets[selectedSize];
-  const downloadQR = () => {
-    const svg = document.getElementById(`qr-${qrCode.id}-${selectedSize}`);
-    if (!svg) return;
+
+  const downloadQR = (forceSize?: 'small' | 'medium' | 'large') => {
+    const sizeToUse = forceSize || selectedSize;
+    const sizeConfig = sizePresets[sizeToUse];
+    const elementId = `qr-${qrCode.id}-${sizeToUse}`;
+    const svg = document.getElementById(elementId);
+
+    if (!svg) {
+      console.warn(`QR element not found: ${elementId}`);
+      return;
+    }
 
     const svgData = new XMLSerializer().serializeToString(svg);
-    const fileName = `${tenant?.name || 'restaurant'}-${qrCode.label.replace(/\s/g, '-')}-${selectedSize}`;
+    const fileName = `${tenant?.name || 'restaurant'}-${qrCode.label.replace(/\s/g, '-')}-${sizeToUse}`;
 
     if (downloadFormat === 'svg') {
       const blob = new Blob([svgData], { type: 'image/svg+xml' });
       const url = URL.createObjectURL(blob);
-  const downloadLink = document.createElement('a');
+      const downloadLink = document.createElement('a');
       downloadLink.download = `${fileName}.svg`;
       downloadLink.href = url;
       downloadLink.click();
@@ -50,12 +58,13 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
     const ctx = canvas.getContext('2d');
     const img = new Image();
 
-    canvas.width = currentSize.size * 2;
-    canvas.height = currentSize.size * 2;
+    // Use the size based on forceSize, not selectedSize
+    canvas.width = sizeConfig.size * 2;
+    canvas.height = sizeConfig.size * 2;
 
     img.onload = () => {
       ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-      
+
       if (downloadFormat === 'png') {
         const pngFile = canvas.toDataURL('image/png');
         const downloadLink = document.createElement('a');
@@ -71,6 +80,10 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
           }
         });
       }
+    };
+
+    img.onerror = (e) => {
+      console.error('Failed to load SVG as image:', e);
     };
 
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
@@ -92,15 +105,24 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
     }
   };
 
-  const printQR = () => {
+  const printQR = (forceSize?: 'small' | 'medium' | 'large') => {
+    const sizeToUse = forceSize || selectedSize;
+    const elementId = `qr-${qrCode.id}-${sizeToUse}`;
     const printWindow = window.open('', '', 'width=600,height=600');
-    if (!printWindow) return;
+    if (!printWindow) {
+      console.warn('Could not open print window');
+      return;
+    }
 
-    const svg = document.getElementById(`qr-${qrCode.id}-${selectedSize}`);
-    if (!svg) return;
+    const svg = document.getElementById(elementId);
+    if (!svg) {
+      console.warn(`QR element not found for print: ${elementId}`);
+      printWindow.close();
+      return;
+    }
 
     const svgData = new XMLSerializer().serializeToString(svg);
-    
+
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
@@ -132,7 +154,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
         </body>
       </html>
     `);
-    
+
     printWindow.document.close();
     printWindow.focus();
     setTimeout(() => {
@@ -162,7 +184,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
         <p className="text-xs text-gray-500 mb-3">{t('admin.clickToViewOptions')}</p>
         <div className="flex gap-2 w-full">
           <button
-            onClick={downloadQR}
+            onClick={() => downloadQR('small')}
             className="flex-1 px-3 py-2 text-sm border border-gray-200 bg-white hover:bg-gray-50 rounded-lg flex items-center justify-center gap-1 transition-colors"
             title={t('qr.downloadQrCode')}
           >
@@ -176,7 +198,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
             <Search className="h-3.5 w-3.5" />
           </button>
           <button
-            onClick={printQR}
+            onClick={() => printQR('small')}
             className="flex-1 px-3 py-2 text-sm border border-gray-200 bg-white hover:bg-gray-50 rounded-lg flex items-center justify-center gap-1 transition-colors"
             title={t('qr.printQrCode')}
           >
@@ -205,11 +227,10 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
                 <button
                   key={key}
                   onClick={() => setSelectedSize(key as any)}
-                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                    selectedSize === key
-                      ? 'bg-blue-600 text-white shadow-sm'
-                      : 'bg-white text-gray-700 border border-gray-200 hover:border-blue-300'
-                  }`}
+                  className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${selectedSize === key
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'bg-white text-gray-700 border border-gray-200 hover:border-blue-300'
+                    }`}
                 >
                   <div className="text-xs">{preset.label}</div>
                   <div className="text-xs opacity-75">{preset.description}</div>
@@ -246,7 +267,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
                 {copied ? (
                   <><Check className="h-3 w-3" /> {t('qr.copied')}</>
                 ) : (
-                  <><Copy className="h-3 w-3" /> {t('buttons.copy')}</>                )}
+                  <><Copy className="h-3 w-3" /> {t('buttons.copy')}</>)}
               </button>
             </div>
             <p className="text-sm text-gray-900 font-mono break-all bg-white rounded p-2 border border-gray-200">
@@ -260,33 +281,30 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
             <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={() => setDownloadFormat('png')}
-                className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all ${
-                  downloadFormat === 'png'
-                    ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
-                    : 'bg-white text-gray-700 border border-gray-200 hover:border-gray-300'
-                }`}
+                className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all ${downloadFormat === 'png'
+                  ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
+                  : 'bg-white text-gray-700 border border-gray-200 hover:border-gray-300'
+                  }`}
               >
                 <FileImage className="h-4 w-4" />
                 {t('qr.png')}
               </button>
               <button
                 onClick={() => setDownloadFormat('svg')}
-                className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all ${
-                  downloadFormat === 'svg'
-                    ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
-                    : 'bg-white text-gray-700 border border-gray-200 hover:border-gray-300'
-                }`}
+                className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all ${downloadFormat === 'svg'
+                  ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
+                  : 'bg-white text-gray-700 border border-gray-200 hover:border-gray-300'
+                  }`}
               >
                 <FileImage className="h-4 w-4" />
                 {t('qr.svg')}
               </button>
               <button
                 onClick={() => setDownloadFormat('pdf')}
-                className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all ${
-                  downloadFormat === 'pdf'
-                    ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
-                    : 'bg-white text-gray-700 border border-gray-200 hover:border-gray-300'
-                }`}
+                className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all ${downloadFormat === 'pdf'
+                  ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
+                  : 'bg-white text-gray-700 border border-gray-200 hover:border-gray-300'
+                  }`}
               >
                 <FileText className="h-4 w-4" />
                 {t('qr.pdf')}
@@ -297,17 +315,17 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
           {/* Action Buttons */}
           <div className="space-y-3 pt-4">
             <Button
-              onClick={downloadQR}
+              onClick={() => downloadQR()}
               variant="primary"
               className="w-full flex items-center justify-center gap-2"
             >
               <Download className="h-5 w-5" />
               {t('qr.downloadFile', { format: downloadFormat.toUpperCase(), size: currentSize.label })}
             </Button>
-            
+
             <div className="grid grid-cols-2 gap-3">
               <Button
-                onClick={printQR}
+                onClick={() => printQR()}
                 variant="outline"
                 className="flex items-center justify-center gap-2"
               >

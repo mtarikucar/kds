@@ -21,15 +21,20 @@ const QRManagementPage = () => {
   };
 
   const downloadAllQRs = () => {
-    const allQRs = qrCodes;
-    
+    const allQRs = qrCodesData?.qrCodes || [];
+
+    if (allQRs.length === 0) {
+      alert('No QR codes found to download');
+      return;
+    }
+
     allQRs.forEach((qr, index) => {
       setTimeout(() => {
-        // Try multiple possible QR element IDs
-        const svg = document.getElementById(`qr-${qr.id}-small`) || 
-                  document.getElementById(`qr-${qr.id}-medium`) || 
-                  document.getElementById(`qr-${qr.id}`);
-        
+        // Compact mode renders with '-small' suffix
+        const svg = document.getElementById(`qr-${qr.id}-small`) ||
+          document.getElementById(`qr-${qr.id}-medium`) ||
+          document.getElementById(`qr-${qr.id}`);
+
         if (!svg) {
           console.warn(`QR element not found for ${qr.id}`);
           return;
@@ -39,12 +44,12 @@ const QRManagementPage = () => {
           const svgData = new XMLSerializer().serializeToString(svg);
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
-          
+
           if (!ctx) {
             console.error('Canvas context not available');
             return;
           }
-          
+
           const img = new Image();
           canvas.width = 600;
           canvas.height = 600;
@@ -54,7 +59,7 @@ const QRManagementPage = () => {
               ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
               const pngFile = canvas.toDataURL('image/png');
               const downloadLink = document.createElement('a');
-              downloadLink.download = `${tenant?.name || 'restaurant'}-${qr.label.replace(/\\s/g, '-').replace(/[^a-zA-Z0-9-]/g, '')}.png`;
+              downloadLink.download = `${qrCodesData?.tenant?.name || 'restaurant'}-${qr.label.replace(/\\s/g, '-').replace(/[^a-zA-Z0-9-]/g, '')}.png`;
               downloadLink.href = pngFile;
               downloadLink.click();
             } catch (error) {
@@ -75,8 +80,9 @@ const QRManagementPage = () => {
   };
 
   const printAllTableQRs = () => {
-    const tableQRs = qrCodes.filter(qr => qr.type === 'TABLE');
-    
+    const tableQRs = (qrCodesData?.qrCodes || []).filter(qr => qr.type === 'TABLE');
+    const tenantName = qrCodesData?.tenant?.name;
+
     if (tableQRs.length === 0) {
       alert(t('admin.noTableQRCodesToPrint'));
       return;
@@ -89,9 +95,9 @@ const QRManagementPage = () => {
     }
 
     const qrElements = tableQRs.map((qr) => {
-      const svg = document.getElementById(`qr-${qr.id}-small`) || 
-                  document.getElementById(`qr-${qr.id}-medium`) || 
-                  document.getElementById(`qr-${qr.id}`);
+      const svg = document.getElementById(`qr-${qr.id}-small`) ||
+        document.getElementById(`qr-${qr.id}-medium`) ||
+        document.getElementById(`qr-${qr.id}`);
       return {
         qr,
         svgElement: svg ? new XMLSerializer().serializeToString(svg) : null
@@ -110,7 +116,7 @@ const QRManagementPage = () => {
       <!DOCTYPE html>
       <html>
         <head>
-          <title>${tenant?.name || 'Restaurant'} - Table QR Codes</title>
+          <title>${tenantName || 'Restaurant'} - Table QR Codes</title>
           <style>
             body { 
               font-family: Arial, sans-serif; 
@@ -160,7 +166,7 @@ const QRManagementPage = () => {
           </style>
         </head>
         <body>
-          <h1>${tenant?.name || 'Restaurant'} - ${t('admin.tableQRCodes')}</h1>
+          <h1>${tenantName || 'Restaurant'} - ${t('admin.tableQRCodes')}</h1>
           <div class="qr-grid">
             ${validQRs.map(({ qr, svgElement }) => `
               <div class="qr-item">
@@ -176,15 +182,68 @@ const QRManagementPage = () => {
         </body>
       </html>
     `);
-    
+
     printWindow.document.close();
     printWindow.focus();
-    
+
     // Wait for content to load before printing
     setTimeout(() => {
       printWindow.print();
       setTimeout(() => printWindow.close(), 1000);
     }, 750);
+  };
+
+  // Download only table QR codes
+  const downloadTableQRs = () => {
+    const tableQRs = (qrCodesData?.qrCodes || []).filter(qr => qr.type === 'TABLE');
+    const tenantName = qrCodesData?.tenant?.name;
+
+    if (tableQRs.length === 0) {
+      alert(t('admin.noTableQRCodesToPrint'));
+      return;
+    }
+
+    tableQRs.forEach((qr, index) => {
+      setTimeout(() => {
+        const svg = document.getElementById(`qr-${qr.id}-small`) ||
+          document.getElementById(`qr-${qr.id}-medium`) ||
+          document.getElementById(`qr-${qr.id}`);
+
+        if (!svg) {
+          console.warn(`QR element not found for ${qr.id}`);
+          return;
+        }
+
+        try {
+          const svgData = new XMLSerializer().serializeToString(svg);
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+
+          if (!ctx) return;
+
+          const img = new Image();
+          canvas.width = 600;
+          canvas.height = 600;
+
+          img.onload = () => {
+            try {
+              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              const pngFile = canvas.toDataURL('image/png');
+              const downloadLink = document.createElement('a');
+              downloadLink.download = `${tenantName || 'restaurant'}-${qr.label.replace(/\\s/g, '-').replace(/[^a-zA-Z0-9-]/g, '')}.png`;
+              downloadLink.href = pngFile;
+              downloadLink.click();
+            } catch (error) {
+              console.error('Error generating download:', error);
+            }
+          };
+
+          img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgData)));
+        } catch (error) {
+          console.error('Error processing QR code:', error);
+        }
+      }, index * 500);
+    });
   };
 
   if (settingsLoading || codesLoading) {
@@ -293,10 +352,10 @@ const QRManagementPage = () => {
                 {t('admin.restaurantQRDesc')}
               </p>
               {qrCodes.filter(qr => qr.type === 'TENANT').map(qr => (
-                <QrCodeDisplay 
-                  key={qr.id} 
-                  qrCode={qr} 
-                  tenant={tenant} 
+                <QrCodeDisplay
+                  key={qr.id}
+                  qrCode={qr}
+                  tenant={tenant}
                   settings={{
                     primaryColor: settings?.primaryColor,
                     backgroundColor: settings?.backgroundColor
@@ -308,8 +367,30 @@ const QRManagementPage = () => {
 
           {settings?.enableTableQR && (
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>{t('admin.tableSpecificQRCodes')}</CardTitle>
+                {qrCodes.filter(qr => qr.type === 'TABLE').length > 0 && (
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={downloadTableQRs}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-1"
+                    >
+                      <Download className="h-4 w-4" />
+                      {t('admin.downloadAllQR')}
+                    </Button>
+                    <Button
+                      onClick={printAllTableQRs}
+                      variant="outline"
+                      size="sm"
+                      className="flex items-center gap-1"
+                    >
+                      <Eye className="h-4 w-4" />
+                      {t('admin.printTableQRSheet')}
+                    </Button>
+                  </div>
+                )}
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-600 mb-4">
@@ -317,10 +398,10 @@ const QRManagementPage = () => {
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {qrCodes.filter(qr => qr.type === 'TABLE').map(qr => (
-                    <QrCodeDisplay 
-                      key={qr.id} 
-                      qrCode={qr} 
-                      tenant={tenant} 
+                    <QrCodeDisplay
+                      key={qr.id}
+                      qrCode={qr}
+                      tenant={tenant}
                       compact
                       settings={{
                         primaryColor: settings?.primaryColor,
