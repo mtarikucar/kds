@@ -592,7 +592,10 @@
     "approvalNote": "Siparişiniz personele onay için gönderilecektir",
     "orderSuccess": "Sipariş Gönderildi!",
     "orderSuccessMessage": "Siparişiniz mutfağa gönderildi ve onay bekleniyor",
-    "redirecting": "Sipariş takibine yönlendiriliyorsunuz..."
+    "redirecting": "Sipariş takibine yönlendiriliyorsunuz...",
+    "sessionExpired": "Oturum süresi doldu. Lütfen sayfayı yenileyin.",
+    "orderSubmitted": "Sipariş başarıyla gönderildi!",
+    "specialNotes": "Özel Notlar"
   },
   "orders": {
     "title": "Siparişlerim",

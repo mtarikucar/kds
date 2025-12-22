@@ -124,13 +124,14 @@ export class QrMenuController {
     });
 
     // Transform categories to include images array instead of productImages
+    // Also convert Prisma Decimal to number for JSON serialization
     const transformedCategories = categories.map(category => ({
       ...category,
       products: category.products.map(product => ({
         id: product.id,
         name: product.name,
         description: product.description,
-        price: product.price,
+        price: Number(product.price),
         image: product.image,
         categoryId: product.categoryId,
         images: product.productImages.map(pi => ({
@@ -139,7 +140,13 @@ export class QrMenuController {
           filename: pi.image.filename,
           order: pi.order,
         })),
-        modifierGroups: product.modifierGroups.map(pmg => pmg.group),
+        modifierGroups: product.modifierGroups.map(pmg => ({
+          ...pmg.group,
+          modifiers: pmg.group.modifiers.map(mod => ({
+            ...mod,
+            priceAdjustment: Number(mod.priceAdjustment),
+          })),
+        })),
       })),
     }));
 

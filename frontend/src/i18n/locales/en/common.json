@@ -487,7 +487,10 @@
     "approvalNote": "Your order will be sent to staff for approval",
     "orderSuccess": "Order Submitted!",
     "orderSuccessMessage": "Your order has been sent to the kitchen and is awaiting approval",
-    "redirecting": "Redirecting to order tracking..."
+    "redirecting": "Redirecting to order tracking...",
+    "sessionExpired": "Session expired. Please refresh the page.",
+    "orderSubmitted": "Order submitted successfully!",
+    "specialNotes": "Special Notes"
   },
   "orders": {
     "title": "My Orders",
