@@ -59,10 +59,10 @@ const POSSettingsPage = () => {
   }
 
   return (
-    <div className="h-full p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">{t('posSettings.title')}</h1>
-        <p className="text-gray-600 mt-1">
+    <div className="h-full p-4 md:p-6">
+      <div className="mb-4 md:mb-6">
+        <h1 className="text-xl md:text-2xl font-bold text-gray-900">{t('posSettings.title')}</h1>
+        <p className="text-sm md:text-base text-gray-600 mt-1">
           {t('posSettings.description')}
         </p>
       </div>
@@ -108,10 +108,7 @@ const POSSettingsPage = () => {
 
                         // Prevent disabling two-step checkout if customer ordering is active
                         if (!newValue && enableCustomerOrdering) {
-                          toast.error(
-                            'QR menü sipariş aktifken iki aşamalı ödeme kapatılamaz. ' +
-                            'Lütfen önce QR menüden müşteri sipariş oluşturmayı kapatın.'
-                          );
+                          toast.error(t('twoStepCheckout.cannotDisableWithCustomerOrdering'));
                           return;
                         }
 
@@ -128,7 +125,7 @@ const POSSettingsPage = () => {
                       </p>
                       {enableCustomerOrdering && (
                         <p className="text-xs text-orange-600 mt-1">
-                          ⚠️ QR menü sipariş için gereklidir
+                          ⚠️ {t('twoStepCheckout.requiredForQRMenu')}
                         </p>
                       )}
                     </div>
@@ -178,7 +175,7 @@ const POSSettingsPage = () => {
                         // Auto-enable two-stage payment when enabling customer ordering
                         if (newValue && !enableTwoStepCheckout) {
                           setEnableTwoStepCheckout(true);
-                          toast.info('İki aşamalı ödeme otomatik olarak etkinleştirildi');
+                          toast.info(t('twoStepCheckout.autoEnabled'));
                         }
 
                         setEnableCustomerOrdering(newValue);

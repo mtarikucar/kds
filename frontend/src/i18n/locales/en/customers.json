@@ -4,7 +4,7 @@
     "addCustomer": "Add Customer",
     "editCustomer": "Edit Customer",
     "deleteCustomer": "Delete Customer",
-    "firstName": "First Name",
+    "firstName": "Name",
     "lastName": "Last Name",
     "email": "Email",
     "phone": "Phone",
@@ -25,9 +25,26 @@
     "customerAdded": "Customer added successfully",
     "customerUpdated": "Customer updated successfully",
     "customerDeleted": "Customer deleted successfully",
-    "viewHistory": "View Order History",
+    "viewHistory": "Order History",
     "sendEmail": "Send Email",
-    "sendSMS": "Send SMS"
+    "sendSMS": "Send SMS",
+    "loyaltyPoints": "Loyalty Points",
+    "birthday": "Birthday",
+    "summary": "Summary",
+    "contactInfo": "Contact Information",
+    "statistics": "Statistics",
+    "tagsNotes": "Tags & Notes",
+    "verified": "Verified",
+    "noContactInfo": "No contact information",
+    "noTagsNotes": "No tags or notes",
+    "noOrders": "No orders yet",
+    "orderNumber": "Order #",
+    "date": "Date",
+    "status": "Status",
+    "amount": "Amount",
+    "avgOrder": "Avg Order",
+    "lastVisit": "Last Visit",
+    "referralCode": "Referral Code"
   }
 }
 

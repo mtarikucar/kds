@@ -72,7 +72,7 @@ export const getPlatformInfo = (release: DesktopRelease | undefined): PlatformIn
         name: 'Windows',
         icon: '🪟',
         description: 'Windows 10/11 (64-bit)',
-        fileSize: '-',
+        fileSize: '',
         downloadUrl: undefined,
       },
       {
@@ -80,7 +80,7 @@ export const getPlatformInfo = (release: DesktopRelease | undefined): PlatformIn
         name: 'Linux',
         icon: '🐧',
         description: 'Ubuntu/Debian (64-bit)',
-        fileSize: '-',
+        fileSize: '',
         downloadUrl: undefined,
       },
     ];
@@ -92,7 +92,7 @@ export const getPlatformInfo = (release: DesktopRelease | undefined): PlatformIn
       name: 'Windows',
       icon: '🪟',
       description: 'Windows 10/11 (64-bit)',
-      fileSize: release.windowsUrl ? '85 MB' : '-',
+      fileSize: '',
       downloadUrl: release.windowsUrl,
     },
     {
@@ -100,7 +100,7 @@ export const getPlatformInfo = (release: DesktopRelease | undefined): PlatformIn
       name: 'Linux',
       icon: '🐧',
       description: 'Ubuntu/Debian (64-bit)',
-      fileSize: release.linuxUrl ? '90 MB' : '-',
+      fileSize: '',
       downloadUrl: release.linuxUrl,
     },
   ];

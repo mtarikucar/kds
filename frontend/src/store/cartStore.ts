@@ -7,10 +7,12 @@ interface CartState {
   sessionId: string | null;
   tenantId: string | null;
   tableId: string | null;
+  currency: string | null;
 
   // Actions
-  initializeSession: (tenantId: string, tableId: string | null) => void;
+  initializeSession: (tenantId: string, tableId: string | null, currency?: string) => void;
   setTableId: (tableId: string) => void;
+  setCurrency: (currency: string) => void;
   addItem: (product: Product, quantity: number, modifiers: CartModifier[], notes?: string) => void;
   updateItemQuantity: (itemId: string, quantity: number) => void;
   updateItemNotes: (itemId: string, notes: string) => void;
@@ -46,8 +48,9 @@ export const useCartStore = create<CartState>()(
       sessionId: null,
       tenantId: null,
       tableId: null,
+      currency: null,
 
-      initializeSession: (tenantId: string, tableId: string | null) => {
+      initializeSession: (tenantId: string, tableId: string | null, currency?: string) => {
         const currentSession = get().sessionId;
         const currentTenantId = get().tenantId;
         const currentTableId = get().tableId;
@@ -58,6 +61,7 @@ export const useCartStore = create<CartState>()(
             sessionId: generateSessionId(),
             tenantId,
             tableId,
+            currency: currency || null,
             items: [],
           });
         } else if (!currentSession) {
@@ -66,6 +70,7 @@ export const useCartStore = create<CartState>()(
             sessionId: generateSessionId(),
             tenantId,
             tableId,
+            currency: currency || null,
           });
         } else if (tableId && currentTableId !== tableId) {
           // Update tableId if provided and different (but keep cart items)
@@ -75,10 +80,18 @@ export const useCartStore = create<CartState>()(
           // This ensures table selection modal appears for general QR codes
           set({ tableId: null });
         }
+        // Update currency if provided
+        if (currency) {
+          set({ currency });
+        }
       },
 
       setTableId: (tableId: string) => {
         set({ tableId });
+      },
+
+      setCurrency: (currency: string) => {
+        set({ currency });
       },
 
       addItem: (product: Product, quantity: number, modifiers: CartModifier[], notes?: string) => {
@@ -191,6 +204,7 @@ export const useCartStore = create<CartState>()(
         sessionId: state.sessionId,
         tenantId: state.tenantId,
         tableId: state.tableId,
+        currency: state.currency,
       }),
     }
   )

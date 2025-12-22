@@ -25,9 +25,26 @@
     "customerAdded": "Müşteri başarıyla eklendi",
     "customerUpdated": "Müşteri başarıyla güncellendi",
     "customerDeleted": "Müşteri başarıyla silindi",
-    "viewHistory": "Sipariş Geçmişini Görüntüle",
+    "viewHistory": "Sipariş Geçmişi",
     "sendEmail": "E-posta Gönder",
-    "sendSMS": "SMS Gönder"
+    "sendSMS": "SMS Gönder",
+    "loyaltyPoints": "Sadakat Puanı",
+    "birthday": "Doğum Günü",
+    "summary": "Özet",
+    "contactInfo": "İletişim Bilgileri",
+    "statistics": "İstatistikler",
+    "tagsNotes": "Etiketler & Notlar",
+    "verified": "Doğrulandı",
+    "noContactInfo": "İletişim bilgisi yok",
+    "noTagsNotes": "Etiket veya not yok",
+    "noOrders": "Henüz sipariş yok",
+    "orderNumber": "Sipariş #",
+    "date": "Tarih",
+    "status": "Durum",
+    "amount": "Tutar",
+    "avgOrder": "Ort. Sipariş",
+    "lastVisit": "Son Ziyaret",
+    "referralCode": "Referans Kodu"
   }
 }
 

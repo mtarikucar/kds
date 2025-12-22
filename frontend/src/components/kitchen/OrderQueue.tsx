@@ -36,9 +36,9 @@ const OrderQueue = ({
   };
 
   return (
-    <div className={`rounded-lg border-2 ${getColumnColor(status)} p-4 h-full`}>
-      <div className="mb-4">
-        <h2 className="text-xl font-bold text-gray-900">
+    <div className={`rounded-lg border-2 ${getColumnColor(status)} p-3 md:p-4 h-full flex flex-col min-h-0`}>
+      <div className="mb-3 md:mb-4 flex-shrink-0">
+        <h2 className="text-lg md:text-xl font-bold text-gray-900">
           {title}
           <span className="ml-2 text-sm font-normal text-gray-600">
             ({filteredOrders.length})
@@ -46,7 +46,7 @@ const OrderQueue = ({
         </h2>
       </div>
 
-      <div className="overflow-y-auto h-[calc(100vh-250px)] pr-2">
+      <div className="overflow-y-auto flex-1 min-h-0 pr-2 space-y-3">
         {filteredOrders.length === 0 ? (
           <div className="flex items-center justify-center h-32 text-gray-400">
             <p>{t('kitchen.noOrders')}</p>

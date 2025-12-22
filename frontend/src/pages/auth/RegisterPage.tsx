@@ -1,26 +1,34 @@
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { useRegister } from '../../features/auth/authApi';
+import { motion } from 'framer-motion';
+import { useGoogleLogin } from '@react-oauth/google';
+import { useRegister, useGoogleAuth } from '../../features/auth/authApi';
 import { useGetPublicTenants } from '../../api/tenantsApi';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
-import Select from '../../components/ui/Select';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
-import { UserRole } from '../../types';
-import { useMemo } from 'react';
+import PasswordInput from '../../components/ui/PasswordInput';
+import PasswordStrength from '../../components/ui/PasswordStrength';
+import Checkbox from '../../components/ui/Checkbox';
+import FormSelect from '../../components/ui/FormSelect';
+import SocialLoginButtons from '../../components/ui/SocialLoginButtons';
+import AuthLayout from '../../components/auth/AuthLayout';
+import { UserRole, RegisterRequest } from '../../types';
 
 const RegisterPage = () => {
   const { t } = useTranslation(['auth', 'validation']);
   const navigate = useNavigate();
-  const { mutate: register, isPending } = useRegister();
+  const { mutate: registerUser, isPending } = useRegister();
+  const { mutate: googleAuth, isPending: isGooglePending } = useGoogleAuth();
   const { data: tenants, isLoading: tenantsLoading } = useGetPublicTenants();
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const registerSchema = z.object({
     email: z.string().email(t('validation:email')),
-    password: z.string().min(6, t('validation:minLength', { count: 6 })),
+    password: z.string().min(8, t('validation:minLength', { count: 8 })),
     firstName: z.string().min(1, t('validation:required')),
     lastName: z.string().min(1, t('validation:required')),
     role: z.nativeEnum(UserRole),
@@ -28,11 +36,9 @@ const RegisterPage = () => {
     tenantId: z.string().optional(),
   }).refine(
     (data) => {
-      // If role is ADMIN, restaurantName is required
       if (data.role === UserRole.ADMIN) {
         return !!data.restaurantName;
       }
-      // If role is not ADMIN, tenantId is required
       return !!data.tenantId;
     },
     {
@@ -44,7 +50,7 @@ const RegisterPage = () => {
   type RegisterFormData = z.infer<typeof registerSchema>;
 
   const {
-    register: registerField,
+    register,
     handleSubmit,
     watch,
     formState: { errors },
@@ -56,11 +62,15 @@ const RegisterPage = () => {
   });
 
   const selectedRole = watch('role');
+  const password = watch('password') || '';
   const isAdmin = selectedRole === UserRole.ADMIN;
 
   const onSubmit = (data: RegisterFormData) => {
-    // Clean up: only send the relevant field based on role
-    const payload: any = {
+    if (!acceptedTerms) {
+      return;
+    }
+
+    const payload: RegisterRequest = {
       email: data.email,
       password: data.password,
       firstName: data.firstName,
@@ -68,13 +78,11 @@ const RegisterPage = () => {
       role: data.role,
     };
 
-    if (isAdmin) {
+    if (isAdmin && data.restaurantName) {
       payload.restaurantName = data.restaurantName;
-    } else {
-      payload.tenantId = data.tenantId;
     }
 
-    register(payload, {
+    registerUser(payload, {
       onSuccess: () => {
         navigate('/login');
       },
@@ -97,93 +105,197 @@ const RegisterPage = () => {
     }));
   }, [tenants]);
 
+  // Google OAuth handler - uses popup flow with access token
+  const handleGoogleLogin = useGoogleLogin({
+    onSuccess: (tokenResponse) => {
+      googleAuth(tokenResponse.access_token, {
+        onSuccess: () => {
+          navigate('/dashboard');
+        },
+      });
+    },
+    onError: (error) => {
+      console.error('Google signup error:', error);
+    },
+    flow: 'implicit',
+  });
+
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.08,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: {
+        duration: 0.4,
+      },
+    },
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-center text-2xl">
-            {t('auth:register.title')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <AuthLayout variant="register">
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="w-full"
+      >
+        {/* Header */}
+        <motion.div variants={itemVariants} className="text-center mb-6">
+          <h1 className="text-3xl font-heading font-bold text-gray-900 mb-2">
+            {t('auth:register.createAccount', 'Create Account')}
+          </h1>
+          <p className="text-gray-600">
+            {t('auth:register.subtitle', 'Start managing your restaurant smarter')}
+          </p>
+        </motion.div>
+
+        {/* Form */}
+        <motion.form
+          variants={containerVariants}
+          onSubmit={handleSubmit(onSubmit)}
+          className="space-y-4"
+        >
+          <motion.div variants={itemVariants}>
             <Input
               label={t('auth:register.email')}
               type="email"
-              placeholder={t('auth:register.email')}
+              placeholder="you@example.com"
               error={errors.email?.message}
-              {...registerField('email')}
+              autoComplete="email"
+              {...register('email')}
+            />
+          </motion.div>
+
+          <motion.div variants={itemVariants}>
+            <PasswordInput
+              label={t('auth:register.password')}
+              placeholder="••••••••"
+              error={errors.password?.message}
+              autoComplete="new-password"
+              {...register('password')}
+            />
+            <PasswordStrength password={password} showRequirements={true} />
+          </motion.div>
+
+          <motion.div variants={itemVariants} className="grid grid-cols-2 gap-4">
+            <Input
+              label={t('auth:register.firstName')}
+              placeholder={t('auth:profile.firstNamePlaceholder', 'John')}
+              error={errors.firstName?.message}
+              autoComplete="given-name"
+              {...register('firstName')}
             />
 
             <Input
-              label={t('auth:register.password')}
-              type="password"
-              placeholder={t('auth:register.password')}
-              error={errors.password?.message}
-              {...registerField('password')}
+              label={t('auth:register.lastName')}
+              placeholder={t('auth:profile.lastNamePlaceholder', 'Doe')}
+              error={errors.lastName?.message}
+              autoComplete="family-name"
+              {...register('lastName')}
             />
+          </motion.div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <Input
-                label={t('auth:register.firstName')}
-                placeholder={t('auth:register.firstName')}
-                error={errors.firstName?.message}
-                {...registerField('firstName')}
-              />
-
-              <Input
-                label={t('auth:register.lastName')}
-                placeholder={t('auth:register.lastName')}
-                error={errors.lastName?.message}
-                {...registerField('lastName')}
-              />
-            </div>
-
-            <Select
+          <motion.div variants={itemVariants}>
+            <FormSelect
               label={t('auth:register.role')}
               options={roleOptions}
               error={errors.role?.message}
-              {...registerField('role')}
+              {...register('role')}
             />
+          </motion.div>
 
+          <motion.div variants={itemVariants}>
             {isAdmin ? (
               <Input
                 label={t('auth:register.restaurantName')}
-                placeholder={t('auth:register.restaurantName')}
+                placeholder={t('auth:register.restaurantNamePlaceholder', 'My Restaurant')}
                 error={errors.restaurantName?.message}
-                {...registerField('restaurantName')}
+                {...register('restaurantName')}
               />
             ) : (
-              <Select
+              <FormSelect
                 label={t('auth:register.selectRestaurant')}
                 options={tenantOptions}
                 error={errors.tenantId?.message}
                 disabled={tenantsLoading || tenantOptions.length === 0}
-                {...registerField('tenantId')}
+                placeholder={tenantsLoading ? 'Loading...' : 'Select a restaurant'}
+                {...register('tenantId')}
               />
             )}
+          </motion.div>
 
+          <motion.div variants={itemVariants}>
+            <Checkbox
+              label={
+                <span>
+                  {t('auth:register.termsAgree', 'I agree to the')}{' '}
+                  <Link
+                    to="/terms"
+                    className="text-primary-600 hover:text-primary-700 font-medium"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {t('auth:register.termsOfService', 'Terms of Service')}
+                  </Link>{' '}
+                  {t('auth:register.and', 'and')}{' '}
+                  <Link
+                    to="/privacy"
+                    className="text-primary-600 hover:text-primary-700 font-medium"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    {t('auth:register.privacyPolicy', 'Privacy Policy')}
+                  </Link>
+                </span>
+              }
+              checked={acceptedTerms}
+              onChange={(e) => setAcceptedTerms(e.target.checked)}
+            />
+          </motion.div>
+
+          <motion.div variants={itemVariants}>
             <Button
               type="submit"
-              className="w-full"
+              className="w-full py-2.5"
               isLoading={isPending}
+              disabled={!acceptedTerms || isGooglePending}
             >
               {t('auth:register.submit')}
             </Button>
+          </motion.div>
 
-            <div className="text-center text-sm text-gray-600">
-              {t('auth:register.haveAccount')}{' '}
-              <Link
-                to="/login"
-                className="text-blue-600 hover:text-blue-700 font-medium"
-              >
-                {t('auth:register.login')}
-              </Link>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+          <motion.div variants={itemVariants}>
+            <SocialLoginButtons
+              variant="register"
+              onGoogleClick={() => handleGoogleLogin()}
+              disabled={isPending}
+              isLoading={isGooglePending}
+            />
+          </motion.div>
+
+          <motion.div
+            variants={itemVariants}
+            className="text-center text-sm text-gray-600 pt-2"
+          >
+            {t('auth:register.haveAccount')}{' '}
+            <Link
+              to="/login"
+              className="text-primary-600 hover:text-primary-700 font-semibold transition-colors"
+            >
+              {t('auth:register.login')}
+            </Link>
+          </motion.div>
+        </motion.form>
+      </motion.div>
+    </AuthLayout>
   );
 };
 

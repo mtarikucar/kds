@@ -150,14 +150,14 @@ const UserManagementPage = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">{t('admin.userManagement')}</h1>
-          <p className="text-gray-600 mt-1">{t('admin.manageStaff')}</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">{t('admin.userManagement')}</h1>
+          <p className="text-gray-600 mt-1 text-sm sm:text-base">{t('admin.manageStaff')}</p>
         </div>
         <button
           onClick={() => handleOpenModal()}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 w-full sm:w-auto justify-center"
         >
           <UserPlus className="h-5 w-5" />
           {t('admin.addUser')}
@@ -177,6 +177,7 @@ const UserManagementPage = () => {
 
       {/* Users Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
@@ -253,6 +254,7 @@ const UserManagementPage = () => {
             ))}
           </tbody>
         </table>
+        </div>
 
         {users.length === 0 && (
           <div className="text-center py-12 text-gray-500">
@@ -263,8 +265,8 @@ const UserManagementPage = () => {
 
       {/* Create/Edit User Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-[95vw] sm:max-w-md">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold">
                 {editingUser ? t('admin.editUser') : t('admin.addNewUser')}
@@ -302,7 +304,7 @@ const UserManagementPage = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     {t('admin.firstName')}
@@ -369,8 +371,8 @@ const UserManagementPage = () => {
 
       {/* Delete Confirmation Dialog */}
       {showDeleteDialog && userToDelete && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 sm:p-6 w-full max-w-[95vw] sm:max-w-md">
             <div className="flex items-center gap-3 mb-4">
               <div className="h-12 w-12 rounded-full bg-red-100 flex items-center justify-center">
                 <AlertTriangle className="h-6 w-6 text-red-600" />

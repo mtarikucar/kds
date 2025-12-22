@@ -111,8 +111,8 @@ const DesktopAppSettingsPage = () => {
                   <CheckCircle className="h-6 w-6 text-blue-600" />
                 )}
               </div>
-              <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
-                <span className="text-sm text-gray-500">{platform.fileSize}</span>
+              <div className={`flex items-center mt-4 pt-4 border-t border-gray-200 ${platform.fileSize ? 'justify-between' : 'justify-end'}`}>
+                {platform.fileSize && <span className="text-sm text-gray-500">{platform.fileSize}</span>}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();

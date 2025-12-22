@@ -29,6 +29,7 @@ interface MenuData {
   tenant: {
     id: string;
     name: string;
+    currency?: string;
   };
   table?: {
     id: string;
@@ -88,7 +89,7 @@ const QRMenuPage = () => {
   // Initialize cart session when menu data is loaded
   useEffect(() => {
     if (menuData && tenantId) {
-      initializeSession(tenantId, tableId || null);
+      initializeSession(tenantId, tableId || null, menuData.tenant.currency);
     }
   }, [menuData, tenantId, tableId, initializeSession]);
 
@@ -359,7 +360,7 @@ const QRMenuPage = () => {
                                       WebkitTextFillColor: 'transparent',
                                       backgroundClip: 'text'
                                     }}>
-                                      {formatCurrency(product.price, 'USD')}
+                                      {formatCurrency(product.price, tenant?.currency || 'TRY')}
                                     </p>
                                   )}
                                 </div>
@@ -470,7 +471,7 @@ const QRMenuPage = () => {
                             <div className="space-y-2.5">
                               {settings.showPrices && (
                                 <p className="text-white font-black text-2xl drop-shadow-lg">
-                                  {formatCurrency(product.price, 'USD')}
+                                  {formatCurrency(product.price, tenant?.currency || 'TRY')}
                                 </p>
                               )}
 
@@ -549,7 +550,7 @@ const QRMenuPage = () => {
                                   WebkitTextFillColor: 'transparent',
                                   backgroundClip: 'text'
                                 }}>
-                                  {formatCurrency(product.price, 'USD')}
+                                  {formatCurrency(product.price, tenant?.currency || 'TRY')}
                                 </p>
                               )}
                             </div>
@@ -654,6 +655,7 @@ const QRMenuPage = () => {
         showDescription={settings.showDescription}
         showPrices={settings.showPrices}
         enableCustomerOrdering={enableCustomerOrdering}
+        currency={tenant?.currency || 'TRY'}
       />
 
       {/* Mobile Bottom Menu */}

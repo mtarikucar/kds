@@ -78,6 +78,11 @@ model User {
   phone     String?
   lastLogin DateTime?
 
+  // Social Authentication
+  googleId     String?  @unique
+  appleId      String?  @unique
+  authProvider String   @default("local") // local, google, apple
+
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 

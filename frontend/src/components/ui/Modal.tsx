@@ -56,17 +56,17 @@ const Modal: React.FC<ModalProps> = ({
         {/* Modal */}
         <div
           className={cn(
-            'relative w-full bg-white rounded-lg shadow-xl',
+            'relative w-full bg-white rounded-lg shadow-xl max-w-[95vw] sm:max-w-none',
             sizes[size]
           )}
         >
           {/* Header */}
           {title && (
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
+            <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-gray-200">
+              <h2 className="text-lg md:text-xl font-semibold text-gray-900">{title}</h2>
               <button
                 onClick={onClose}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -74,7 +74,7 @@ const Modal: React.FC<ModalProps> = ({
           )}
 
           {/* Content */}
-          <div className="px-6 py-4">{children}</div>
+          <div className="px-4 md:px-6 py-4">{children}</div>
         </div>
       </div>
     </div>

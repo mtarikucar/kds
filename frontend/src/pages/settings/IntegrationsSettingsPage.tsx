@@ -356,7 +356,10 @@ const IntegrationsSettingsPage = () => {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>{t('integrations.otherTitle')}</CardTitle>
-            <Button variant="outline">
+            <Button
+              variant="outline"
+              onClick={() => toast.info(t('integrations.comingSoon'))}
+            >
               <Plus className="h-4 w-4 mr-2" />
               {t('integrations.addIntegration')}
             </Button>

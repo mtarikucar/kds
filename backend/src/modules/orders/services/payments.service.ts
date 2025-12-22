@@ -8,12 +8,14 @@ import { CreatePaymentDto } from '../dto/create-payment.dto';
 import { PaymentStatus, OrderStatus, StockMovementType } from '../../../common/constants/order-status.enum';
 import { TableStatus } from '../../tables/dto/create-table.dto';
 import { OrdersService } from './orders.service';
+import { CustomersService } from '../../customers/customers.service';
 
 @Injectable()
 export class PaymentsService {
   constructor(
     private prisma: PrismaService,
     private ordersService: OrdersService,
+    private customersService: CustomersService,
   ) {}
 
   async create(orderId: string, createPaymentDto: CreatePaymentDto, tenantId: string) {
@@ -83,11 +85,33 @@ export class PaymentsService {
 
       // If fully paid, update order status and deduct stock
       if (totalPaidAmount >= orderAmount) {
+        // Link customer if phone provided (use tx for transaction consistency)
+        let customerId: string | null = null;
+        if (createPaymentDto.customerPhone) {
+          // Find or create customer within transaction
+          let customer = await tx.customer.findFirst({
+            where: { phone: createPaymentDto.customerPhone, tenantId },
+          });
+
+          if (!customer) {
+            customer = await tx.customer.create({
+              data: {
+                phone: createPaymentDto.customerPhone,
+                name: `Customer ${createPaymentDto.customerPhone}`,
+                tenantId,
+              },
+            });
+          }
+          customerId = customer.id;
+        }
+
         await tx.order.update({
           where: { id: orderId },
           data: {
             status: OrderStatus.PAID,
             paidAt: new Date(),
+            ...(customerId && { customerId }),
+            ...(createPaymentDto.customerPhone && { customerPhone: createPaymentDto.customerPhone }),
           },
         });
 
@@ -134,6 +158,29 @@ export class PaymentsService {
             where: { id: order.tableId },
             data: { status: TableStatus.AVAILABLE },
           });
+        }
+
+        // Update customer statistics if customer is linked (within transaction)
+        if (customerId) {
+          const customer = await tx.customer.findUnique({
+            where: { id: customerId },
+          });
+
+          if (customer) {
+            const newTotalOrders = customer.totalOrders + 1;
+            const newTotalSpent = Number(customer.totalSpent) + orderAmount;
+            const newAverageOrder = newTotalSpent / newTotalOrders;
+
+            await tx.customer.update({
+              where: { id: customerId },
+              data: {
+                totalOrders: newTotalOrders,
+                totalSpent: newTotalSpent,
+                averageOrder: newAverageOrder,
+                lastVisit: new Date(),
+              },
+            });
+          }
         }
       }
 

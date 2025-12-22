@@ -86,17 +86,19 @@
     "clearSearch": "Aramayı Temizle"
   },
   "payment": {
-    "title": "\u00d6deme",
+    "title": "Ödeme",
     "totalAmount": "Toplam Tutar",
-    "method": "\u00d6deme Y\u00f6ntemi",
+    "method": "Ödeme Yöntemi",
     "methods": {
       "cash": "Nakit",
       "card": "Kart",
-      "digital": "Dijital \u00d6deme"
+      "digital": "Dijital Ödeme"
     },
-    "transactionIdLabel": "\u0130\u015flem No (Opsiyonel)",
-    "transactionIdPlaceholder": "\u0130\u015flem numaras\u0131 girin",
-    "confirmPayment": "\u00d6demeyi Onayla"
+    "transactionIdLabel": "İşlem No (Opsiyonel)",
+    "transactionIdPlaceholder": "İşlem numarası girin",
+    "confirmPayment": "Ödemeyi Onayla",
+    "customerPhone": "Müşteri Telefonu (İsteğe Bağlı)",
+    "customerPhonePlaceholder": "+90 555 123 4567"
   },
   "checkout": "\u00d6deme",
   "notifications": {

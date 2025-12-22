@@ -22,6 +22,7 @@ import { useCustomerSocket } from '../../features/qr-menu/useCustomerSocket';
 interface MenuSettings {
   primaryColor: string;
   secondaryColor: string;
+  currency?: string;
 }
 
 const OrderTrackingPage = () => {
@@ -38,6 +39,7 @@ const OrderTrackingPage = () => {
   const [settings, setSettings] = useState<MenuSettings>({
     primaryColor: '#FF6B6B',
     secondaryColor: '#4ECDC4',
+    currency: 'TRY',
   });
 
   // Fetch data function
@@ -57,6 +59,7 @@ const OrderTrackingPage = () => {
       setSettings({
         primaryColor: settingsResponse.data.settings.primaryColor,
         secondaryColor: settingsResponse.data.settings.secondaryColor,
+        currency: settingsResponse.data.tenant?.currency || 'TRY',
       });
 
       // Fetch session orders
@@ -357,7 +360,7 @@ const OrderTrackingPage = () => {
                             )}
                           </div>
                           <span className="text-sm font-semibold text-gray-700">
-                            {formatCurrency(Number(item.subtotal), 'USD')}
+                            {formatCurrency(Number(item.subtotal), settings.currency || 'TRY')}
                           </span>
                         </div>
                       </div>
@@ -370,7 +373,7 @@ const OrderTrackingPage = () => {
                         className="text-xl font-bold"
                         style={{ color: settings.primaryColor }}
                       >
-                        {formatCurrency(Number(order.finalAmount), 'USD')}
+                        {formatCurrency(Number(order.finalAmount), settings.currency || 'TRY')}
                       </span>
                     </div>
 

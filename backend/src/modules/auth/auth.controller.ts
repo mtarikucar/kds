@@ -3,6 +3,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagg
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { GoogleAuthDto, AppleAuthDto } from './dto/social-auth.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto } from './dto/password-reset.dto';
 import { VerifyEmailCodeDto } from './dto/verify-email-code.dto';
@@ -108,5 +109,31 @@ export class AuthController {
   @ApiResponse({ status: 200, description: 'Verification email sent' })
   async resendVerification(@CurrentUser('id') userId: string) {
     return this.authService.sendEmailVerification(userId);
+  }
+
+  @Public()
+  @Post('google')
+  @ApiOperation({ summary: 'Authenticate with Google OAuth' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully authenticated with Google',
+    type: AuthResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Invalid Google token' })
+  async googleAuth(@Body() googleAuthDto: GoogleAuthDto): Promise<AuthResponseDto> {
+    return this.authService.googleAuth(googleAuthDto);
+  }
+
+  @Public()
+  @Post('apple')
+  @ApiOperation({ summary: 'Authenticate with Apple Sign-In' })
+  @ApiResponse({
+    status: 200,
+    description: 'Successfully authenticated with Apple',
+    type: AuthResponseDto,
+  })
+  @ApiResponse({ status: 401, description: 'Invalid Apple token' })
+  async appleAuth(@Body() appleAuthDto: AppleAuthDto): Promise<AuthResponseDto> {
+    return this.authService.appleAuth(appleAuthDto);
   }
 }

@@ -34,6 +34,7 @@ const POSPage = () => {
   const [orderNotes, setOrderNotes] = useState('');
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
+  const [currentOrderAmount, setCurrentOrderAmount] = useState<number | null>(null);
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
   const [isPendingOrdersPanelOpen, setIsPendingOrdersPanelOpen] = useState(false);
   const [isWaiterRequestsPanelOpen, setIsWaiterRequestsPanelOpen] = useState(false);
@@ -84,6 +85,7 @@ const POSPage = () => {
 
       if (activeOrder) {
         setCurrentOrderId(activeOrder.id);
+        setCurrentOrderAmount(Number(activeOrder.finalAmount));
 
         // Populate cart with existing order items
         const items = activeOrder.orderItems || activeOrder.items || [];
@@ -116,6 +118,7 @@ const POSPage = () => {
       setCustomerName('');
       setOrderNotes('');
       setCurrentOrderId(null);
+      setCurrentOrderAmount(null);
     } else if (table.status === TableStatus.OCCUPIED) {
       setSelectedTable(table);
       // Clear cart first - useEffect will load existing orders
@@ -206,6 +209,7 @@ const POSPage = () => {
         },
         {
           onSuccess: (order) => {
+            setCurrentOrderAmount(Number(order.finalAmount));
             toast.success(t('orderUpdated'));
           },
         }
@@ -217,6 +221,7 @@ const POSPage = () => {
         {
           onSuccess: (order) => {
             setCurrentOrderId(order.id);
+            setCurrentOrderAmount(Number(order.finalAmount));
             toast.success(t('orderCreatedSuccess', { orderNumber: order.orderNumber }));
 
             // Mark table as occupied after successful order creation (if table mode)
@@ -277,6 +282,7 @@ const POSPage = () => {
         },
         {
           onSuccess: (order) => {
+            setCurrentOrderAmount(Number(order.finalAmount));
             setIsPaymentModalOpen(true);
             toast.success(t('orderUpdated'));
           },
@@ -289,6 +295,7 @@ const POSPage = () => {
         {
           onSuccess: (order) => {
             setCurrentOrderId(order.id);
+            setCurrentOrderAmount(Number(order.finalAmount));
             setIsPaymentModalOpen(true);
 
             // Mark table as occupied after successful order creation (if table mode)
@@ -304,21 +311,19 @@ const POSPage = () => {
     }
   };
 
-  const handlePaymentConfirm = (data: any) => {
-    if (!currentOrderId) return;
+  const handlePaymentConfirm = (data: { method: string; transactionId?: string; customerPhone?: string }) => {
+    if (!currentOrderId || currentOrderAmount === null) return;
 
-    const subtotal = cartItems.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0
-    );
-    const total = subtotal - discount;
+    // Use the order's actual finalAmount, not recalculated from cart
+    const total = currentOrderAmount;
 
     createPayment(
       {
         orderId: currentOrderId,
         amount: total,
-        method: data.method,
+        method: data.method as any,
         transactionId: data.transactionId,
+        customerPhone: data.customerPhone || undefined,
       },
       {
         onSuccess: () => {
@@ -333,6 +338,7 @@ const POSPage = () => {
           // Reset state
           setIsPaymentModalOpen(false);
           setCurrentOrderId(null);
+          setCurrentOrderAmount(null);
           setSelectedTable(null);
           setCartItems([]);
           setDiscount(0);
@@ -513,7 +519,7 @@ const POSPage = () => {
       <PaymentModal
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
-        total={total}
+        total={currentOrderAmount ?? total}
         onConfirm={handlePaymentConfirm}
         isLoading={isCreatingPayment}
       />

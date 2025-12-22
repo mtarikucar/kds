@@ -15,6 +15,7 @@ interface ProductDetailModalWithCartProps {
   showDescription: boolean;
   showPrices: boolean;
   enableCustomerOrdering: boolean;
+  currency?: string;
 }
 
 const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
@@ -27,6 +28,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
   showDescription,
   showPrices,
   enableCustomerOrdering,
+  currency = 'TRY',
 }) => {
   const { t } = useTranslation('common');
   const addItem = useCartStore(state => state.addItem);
@@ -245,7 +247,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
                   className="text-3xl font-black"
                   style={{ color: primaryColor }}
                 >
-                  {formatCurrency(product.price, 'USD')}
+                  {formatCurrency(product.price, currency)}
                 </p>
               </div>
             )}
@@ -319,7 +321,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
                             </div>
                             {modifier.priceAdjustment > 0 && (
                               <span className="text-sm font-semibold text-green-600">
-                                +{formatCurrency(modifier.priceAdjustment, 'USD')}
+                                +{formatCurrency(modifier.priceAdjustment, currency)}
                               </span>
                             )}
                           </button>

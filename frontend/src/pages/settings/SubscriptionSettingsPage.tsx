@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import {
   CreditCard,
   Calendar,
@@ -106,6 +107,7 @@ const SubscriptionManagementPage = () => {
       setCancellationReason('');
     } catch (error) {
       console.error('Failed to cancel subscription:', error);
+      toast.error(t('cancelFailed'));
     }
   };
 
@@ -115,6 +117,7 @@ const SubscriptionManagementPage = () => {
       await reactivateSubscription.mutateAsync(currentSubscription.id);
     } catch (error) {
       console.error('Failed to reactivate subscription:', error);
+      toast.error(t('reactivateFailed'));
     }
   };
 
@@ -141,6 +144,7 @@ const SubscriptionManagementPage = () => {
       }
     } catch (error) {
       console.error('Failed to change plan:', error);
+      toast.error(t('changePlanFailed'));
     }
   };
 

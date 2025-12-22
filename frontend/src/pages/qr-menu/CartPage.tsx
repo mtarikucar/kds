@@ -30,6 +30,7 @@ const CartPage = () => {
     items,
     sessionId,
     tableId: cartTableId,
+    currency: cartCurrency,
     updateItemQuantity,
     removeItem,
     clearCart,
@@ -73,9 +74,9 @@ const CartPage = () => {
     }
   }, [tenantId]);
 
-  const handleSubmitOrder = async () => {
-    // Determine effective tableId (from URL or cart store)
-    const effectiveTableId = tableId || cartTableId;
+  const handleSubmitOrder = async (overrideTableId?: string) => {
+    // Determine effective tableId (from override, URL, or cart store)
+    const effectiveTableId = overrideTableId || tableId || cartTableId;
 
     // Check basic tenant requirement
     if (!tenantId) {
@@ -267,7 +268,7 @@ const CartPage = () => {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto p-4 pt-28 pb-40">
+      <div className="max-w-2xl mx-auto p-4 pt-28 pb-44">
         {/* Cart Items - Enhanced Design */}
         <div className="space-y-3 mb-6">
           {items.map((item, index) => (
@@ -285,7 +286,7 @@ const CartPage = () => {
                     {item.product.name}
                   </h3>
                   <p className="text-sm font-semibold mb-2" style={{ color: settings.primaryColor }}>
-                    {formatCurrency(item.product.price, 'USD')}
+                    {formatCurrency(item.product.price, cartCurrency || 'TRY')}
                   </p>
 
                   {/* Modifiers */}
@@ -299,7 +300,7 @@ const CartPage = () => {
                           </span>
                           {mod.priceAdjustment > 0 && (
                             <span className="font-semibold text-green-600">
-                              +{formatCurrency(mod.priceAdjustment, 'USD')}
+                              +{formatCurrency(mod.priceAdjustment, cartCurrency || 'TRY')}
                             </span>
                           )}
                         </div>
@@ -316,29 +317,29 @@ const CartPage = () => {
                   )}
 
                   {/* Quantity Controls - Enhanced */}
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <button
                       onClick={() => updateItemQuantity(item.id, item.quantity - 1)}
-                      className="p-2 rounded-lg border-2 transition-all hover:scale-110 active:scale-95"
-                      style={{ 
+                      className="p-3 rounded-lg border-2 transition-all hover:scale-110 active:scale-95 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                      style={{
                         borderColor: settings.primaryColor,
                         color: settings.primaryColor
                       }}
                     >
-                      <Minus className="h-4 w-4" />
+                      <Minus className="h-5 w-5" />
                     </button>
                     <span className="w-10 text-center font-bold text-lg" style={{ color: settings.secondaryColor }}>
                       {item.quantity}
                     </span>
                     <button
                       onClick={() => updateItemQuantity(item.id, item.quantity + 1)}
-                      className="p-2 rounded-lg border-2 transition-all hover:scale-110 active:scale-95"
-                      style={{ 
+                      className="p-3 rounded-lg border-2 transition-all hover:scale-110 active:scale-95 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                      style={{
                         borderColor: settings.primaryColor,
                         color: settings.primaryColor
                       }}
                     >
-                      <Plus className="h-4 w-4" />
+                      <Plus className="h-5 w-5" />
                     </button>
                   </div>
                 </div>
@@ -346,7 +347,7 @@ const CartPage = () => {
                 <div className="flex flex-col items-end justify-between">
                   <button
                     onClick={() => removeItem(item.id)}
-                    className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-all hover:scale-110 active:scale-95"
+                    className="p-2.5 text-red-500 hover:bg-red-50 rounded-lg transition-all hover:scale-110 active:scale-95 min-w-[44px] min-h-[44px] flex items-center justify-center"
                   >
                     <Trash2 className="h-5 w-5" />
                   </button>
@@ -355,7 +356,7 @@ const CartPage = () => {
                     <div className="font-black text-xl" style={{ 
                       color: settings.primaryColor
                     }}>
-                      {formatCurrency(item.itemTotal, 'USD')}
+                      {formatCurrency(item.itemTotal, cartCurrency || 'TRY')}
                     </div>
                   </div>
                 </div>
@@ -439,7 +440,7 @@ const CartPage = () => {
           <div className="space-y-3 mb-6">
             <div className="flex justify-between text-base">
               <span className="text-gray-600 font-medium">{t('cart.subtotal', 'Subtotal')}</span>
-              <span className="font-bold text-gray-900">{formatCurrency(getSubtotal(), 'USD')}</span>
+              <span className="font-bold text-gray-900">{formatCurrency(getSubtotal(), cartCurrency || 'TRY')}</span>
             </div>
             <div className="h-px bg-gradient-to-r opacity-30"
               style={{ 
@@ -451,14 +452,14 @@ const CartPage = () => {
               <span style={{ 
                 color: settings.primaryColor
               }}>
-                {formatCurrency(getTotal(), 'USD')}
+                {formatCurrency(getTotal(), cartCurrency || 'TRY')}
               </span>
             </div>
           </div>
 
           {/* Checkout Button - Enhanced */}
           <button
-            onClick={handleSubmitOrder}
+            onClick={() => handleSubmitOrder()}
             disabled={isSubmitting || !enableCustomerOrdering}
             className="w-full py-4 rounded-xl font-black text-white text-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105 active:scale-95 shadow-lg hover:shadow-xl"
             style={{
@@ -501,8 +502,10 @@ const CartPage = () => {
           onSelectTable={(selectedTableId) => {
             setTableId(selectedTableId);
             setShowTableSelection(false);
-            // Auto-retry order submission after table selection
-            setTimeout(() => handleSubmitOrder(), 300);
+            // Update URL to include tableId
+            window.history.replaceState(null, '', `/qr-menu/${tenantId}/cart?tableId=${selectedTableId}`);
+            // Pass tableId directly to avoid race condition
+            handleSubmitOrder(selectedTableId);
           }}
           tenantId={tenantId}
           primaryColor={settings.primaryColor}

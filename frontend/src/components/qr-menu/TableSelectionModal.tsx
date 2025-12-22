@@ -143,7 +143,7 @@ export default function TableSelectionModal({
 
               {/* Grid Layout (<12 tables) */}
               {useGridLayout && (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4">
                   {filteredTables.map((table) => (
                     <button
                       key={table.id}

@@ -100,7 +100,7 @@ const DashboardPage = () => {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6 mb-4 md:mb-6">
         <StatCard
           title={t('dashboard.todaysSales')}
           value={formatCurrency(todaySales)}
@@ -131,7 +131,7 @@ const DashboardPage = () => {
         />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Recent Orders */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -220,12 +220,12 @@ const DashboardPage = () => {
 
       {/* Active Orders Summary */}
       {activeOrders.length > 0 && (
-        <Card className="mt-6">
+        <Card className="mt-4 md:mt-6">
           <CardHeader>
             <CardTitle>{t('dashboard.activeOrdersSummary')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-3 gap-2 md:gap-4">
               <div className="p-4 bg-yellow-50 rounded-lg">
                 <p className="text-sm text-gray-600 mb-1">{t('dashboard.pending')}</p>
                 <p className="text-2xl font-bold text-yellow-600">

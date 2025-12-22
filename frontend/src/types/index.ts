@@ -312,6 +312,7 @@ export interface CreatePaymentDto {
   amount: number;
   method: PaymentMethod;
   transactionId?: string;
+  customerPhone?: string;
 }
 
 export interface UpdatePaymentDto {
@@ -674,6 +675,41 @@ export interface OrderItemModifier {
   priceAdjustment: number;
   createdAt: string;
 }
+
+// Customer Types
+export interface Customer {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  phoneVerified: boolean;
+  loyaltyPoints: number;
+  loyaltyTier: string;
+  tags: string[];
+  notes?: string;
+  referralCode?: string;
+  referredBy?: string;
+  totalOrders: number;
+  totalSpent: number;
+  averageOrder: number;
+  birthday?: string;
+  preferences?: Record<string, any>;
+  lastVisit?: string;
+  createdAt: string;
+  updatedAt: string;
+  orders?: Order[]; // Included when fetching single customer with orders
+}
+
+export interface CreateCustomerDto {
+  name: string;
+  email?: string;
+  phone?: string;
+  birthday?: string;
+  tags?: string[];
+  notes?: string;
+}
+
+export interface UpdateCustomerDto extends Partial<CreateCustomerDto> {}
 
 // Customer Ordering Types
 export interface CustomerOrderItemModifier {

@@ -97,7 +97,9 @@
     },
     "transactionIdLabel": "Transaction ID (Optional)",
     "transactionIdPlaceholder": "Enter transaction ID",
-    "confirmPayment": "Confirm Payment"
+    "confirmPayment": "Confirm Payment",
+    "customerPhone": "Customer Phone (Optional)",
+    "customerPhonePlaceholder": "+90 555 123 4567"
   },
   "notifications": {
     "pending": "Pending",

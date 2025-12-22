@@ -66,7 +66,10 @@
   },
   "twoStepCheckout": {
     "title": "İki Aşamalı Ödemeyi Etkinleştir",
-    "description": "Sipariş oluşturma ve ödeme adımlarını ayırın. İki düğme gösterir: \"Sipariş Oluştur\" ve \"Ödemeye Devam Et\". Siparişleri ödeme toplamadan önce mutfağa göndermek istediğinizde kullanışlıdır."
+    "description": "Sipariş oluşturma ve ödeme adımlarını ayırın. İki düğme gösterir: \"Sipariş Oluştur\" ve \"Ödemeye Devam Et\". Siparişleri ödeme toplamadan önce mutfağa göndermek istediğinizde kullanışlıdır.",
+    "cannotDisableWithCustomerOrdering": "QR menü sipariş aktifken iki aşamalı ödeme kapatılamaz. Lütfen önce müşteri siparişini devre dışı bırakın.",
+    "requiredForQRMenu": "QR menü siparişi için gereklidir",
+    "autoEnabled": "İki aşamalı ödeme otomatik olarak etkinleştirildi"
   },
   "info": {
     "noteLabel": "Not:",
@@ -215,7 +218,8 @@
     "addIntegration": "Entegrasyon Ekle",
     "loading": "Entegrasyonlar yükleniyor...",
     "none": "Henüz yapılandırılmış entegrasyon yok",
-    "lastSynced": "Son senkronizasyon: {{date}}"
+    "lastSynced": "Son senkronizasyon: {{date}}",
+    "comingSoon": "Özel entegrasyonlar yakında"
   },
   "noCashDrawersConfigured": "Yapılandırılmış kasa çekmecesi yok",
   "noPagersConfigured": "Yapılandırılmış çağrı cihazı yok",

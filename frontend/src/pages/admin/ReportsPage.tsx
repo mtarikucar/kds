@@ -67,26 +67,30 @@ const ReportsPage = () => {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">{t('reports.title')}</h1>
-        <p className="text-gray-600">{t('reports.viewReports')}</p>
+      <div className="mb-4 md:mb-6">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t('reports.title')}</h1>
+        <p className="text-sm md:text-base text-gray-600">{t('reports.viewReports')}</p>
       </div>
 
       {/* Date Range Filter */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <form onSubmit={handleSubmit(onSubmit)} className="flex gap-4 items-end">
-            <Input
-              label={t('reports.from')}
-              type="date"
-              {...register('startDate')}
-            />
-            <Input
-              label={t('reports.to')}
-              type="date"
-              {...register('endDate')}
-            />
-            <Button type="submit">{t('common:buttons.apply')}</Button>
+      <Card className="mb-4 md:mb-6">
+        <CardContent className="pt-4 md:pt-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col sm:flex-row gap-3 sm:gap-4 sm:items-end">
+            <div className="flex-1">
+              <Input
+                label={t('reports.from')}
+                type="date"
+                {...register('startDate')}
+              />
+            </div>
+            <div className="flex-1">
+              <Input
+                label={t('reports.to')}
+                type="date"
+                {...register('endDate')}
+              />
+            </div>
+            <Button type="submit" className="w-full sm:w-auto">{t('common:buttons.apply')}</Button>
           </form>
         </CardContent>
       </Card>
@@ -96,7 +100,7 @@ const ReportsPage = () => {
       ) : (
         <>
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 lg:gap-6 mb-4 md:mb-6">
             <StatCard
               title={t('reports.totalSales')}
               value={formatCurrency(salesReport?.totalSales || 0)}
@@ -124,7 +128,7 @@ const ReportsPage = () => {
           </div>
 
           {/* Payment Methods Breakdown */}
-          <Card className="mb-6">
+          <Card className="mb-4 md:mb-6">
             <CardHeader>
               <CardTitle>Payment Methods Breakdown</CardTitle>
             </CardHeader>
@@ -162,7 +166,7 @@ const ReportsPage = () => {
           </Card>
 
           {/* Daily Sales Chart */}
-          <Card className="mb-6">
+          <Card className="mb-4 md:mb-6">
             <CardHeader>
               <CardTitle>{t('reports.dailyBreakdown')}</CardTitle>
             </CardHeader>
@@ -171,21 +175,21 @@ const ReportsPage = () => {
                 {salesReport?.dailySales?.map((day) => (
                   <div
                     key={day.date}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-gray-50 rounded gap-2"
                   >
                     <div>
-                      <p className="font-medium">
+                      <p className="font-medium text-sm sm:text-base">
                         {format(new Date(day.date), 'MMM dd, yyyy')}
                       </p>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-xs sm:text-sm text-gray-600">
                         {day.orders} {t('orders')}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="sm:text-right">
                       <p className="font-bold text-blue-600">
                         {formatCurrency(day.sales)}
                       </p>
-                      <div className="w-48 bg-gray-200 rounded-full h-2 mt-1">
+                      <div className="w-full sm:w-32 md:w-48 bg-gray-200 rounded-full h-2 mt-1">
                         <div
                           className="bg-blue-600 h-2 rounded-full"
                           style={{

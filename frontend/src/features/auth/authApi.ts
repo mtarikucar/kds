@@ -151,3 +151,41 @@ export const useResendVerificationEmail = () => {
     },
   });
 };
+
+// Google OAuth Hook
+export const useGoogleAuth = () => {
+  const login = useAuthStore((state) => state.login);
+
+  return useMutation({
+    mutationFn: async (credential: string): Promise<AuthResponse> => {
+      const response = await api.post('/auth/google', { credential });
+      return response.data;
+    },
+    onSuccess: (data) => {
+      login(data.user, data.accessToken, data.refreshToken);
+      toast.success('Google login successful');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Google login failed');
+    },
+  });
+};
+
+// Apple Sign-In Hook
+export const useAppleAuth = () => {
+  const login = useAuthStore((state) => state.login);
+
+  return useMutation({
+    mutationFn: async (data: { identityToken: string; firstName?: string; lastName?: string }): Promise<AuthResponse> => {
+      const response = await api.post('/auth/apple', data);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      login(data.user, data.accessToken, data.refreshToken);
+      toast.success('Apple login successful');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Apple login failed');
+    },
+  });
+};

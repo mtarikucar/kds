@@ -7,6 +7,7 @@ import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 import ProfilePage from './pages/profile/ProfilePage';
 import CustomersPage from './pages/customers/CustomersPage';
+import CustomerDetailPage from './pages/customers/CustomerDetailPage';
 import QRMenuPage from './pages/qr-menu/QRMenuPage';
 import CartPage from './pages/qr-menu/CartPage';
 import OrderTrackingPage from './pages/qr-menu/OrderTrackingPage';
@@ -103,6 +104,7 @@ function App() {
         {/* Profile & Customers */}
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/customers" element={<CustomersPage />} />
+        <Route path="/customers/:id" element={<CustomerDetailPage />} />
       </Route>
     </Routes>
 

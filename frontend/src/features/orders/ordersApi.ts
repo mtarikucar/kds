@@ -175,12 +175,15 @@ export const useCreatePayment = () => {
     },
     onSuccess: () => {
       // Invalidate all order queries (including filtered ones)
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ['orders'],
-        refetchType: 'all' 
+        refetchType: 'all'
       });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
+      // Invalidate customer queries since payment may link to customer
+      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['customer'] });
       toast.success(i18n.t('pos:paymentRecorded'));
     },
     onError: (error: any) => {

@@ -92,6 +92,16 @@ export class CustomerOrdersService {
     // Generate order number
     const orderNumber = await this.generateOrderNumber(dto.tenantId);
 
+    // Link customer if phone provided
+    let customerId: string | null = null;
+    if (dto.customerPhone) {
+      const customer = await this.customersService.findOrCreateByPhone(
+        dto.customerPhone,
+        dto.tenantId,
+      );
+      customerId = customer.id;
+    }
+
     // Create order with items and modifiers
     const order = await this.prisma.order.create({
       data: {
@@ -100,6 +110,7 @@ export class CustomerOrdersService {
         tableId: dto.tableId || null,
         sessionId: dto.sessionId,
         customerPhone: dto.customerPhone,
+        customerId,
         status: OrderStatus.PENDING_APPROVAL,
         requiresApproval: true,
         type: orderType,

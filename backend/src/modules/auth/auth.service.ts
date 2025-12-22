@@ -10,9 +10,12 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
+import { OAuth2Client } from 'google-auth-library';
+import * as appleSignin from 'apple-signin-auth';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { GoogleAuthDto, AppleAuthDto } from './dto/social-auth.dto';
 import { AuthResponseDto, UserResponseDto } from './dto/auth-response.dto';
 import { ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto } from './dto/password-reset.dto';
 import { UserRole } from '../../common/constants/roles.enum';
@@ -28,6 +31,8 @@ import {
 
 @Injectable()
 export class AuthService {
+  private googleClient: OAuth2Client;
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
@@ -35,7 +40,12 @@ export class AuthService {
     private emailService: EmailService,
     @Inject(forwardRef(() => NotificationsService))
     private notificationsService: NotificationsService,
-  ) {}
+  ) {
+    // Initialize Google OAuth client
+    this.googleClient = new OAuth2Client(
+      this.configService.get<string>('GOOGLE_CLIENT_ID'),
+    );
+  }
 
   async register(registerDto: RegisterDto): Promise<AuthResponseDto> {
     // Check if user already exists
@@ -569,5 +579,342 @@ export class AuthService {
       message: 'Email verified successfully',
       verified: true,
     };
+  }
+
+  /**
+   * Authenticate with Google OAuth
+   * Verifies the Google token (ID token or access token) and creates/links user account
+   */
+  async googleAuth(googleAuthDto: GoogleAuthDto): Promise<AuthResponseDto> {
+    const { credential } = googleAuthDto;
+
+    let googleId: string;
+    let email: string;
+    let firstName: string;
+    let lastName: string;
+
+    try {
+      // Try to verify as ID token first
+      try {
+        const ticket = await this.googleClient.verifyIdToken({
+          idToken: credential,
+          audience: this.configService.get<string>('GOOGLE_CLIENT_ID'),
+        });
+
+        const payload = ticket.getPayload();
+        if (payload) {
+          googleId = payload.sub;
+          email = payload.email;
+          firstName = payload.given_name || 'User';
+          lastName = payload.family_name || '';
+        }
+      } catch (idTokenError) {
+        // If ID token verification fails, try as access token
+        const response = await fetch(
+          `https://www.googleapis.com/oauth2/v3/userinfo`,
+          {
+            headers: { Authorization: `Bearer ${credential}` },
+          },
+        );
+
+        if (!response.ok) {
+          throw new UnauthorizedException('Invalid Google token');
+        }
+
+        const userInfo = await response.json();
+        googleId = userInfo.sub;
+        email = userInfo.email;
+        firstName = userInfo.given_name || 'User';
+        lastName = userInfo.family_name || '';
+      }
+
+      if (!email) {
+        throw new BadRequestException('Email not provided by Google');
+      }
+
+      // Check if user exists by googleId
+      let user = await this.prisma.user.findUnique({
+        where: { googleId },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          status: true,
+          tenantId: true,
+        },
+      });
+
+      if (user) {
+        // User found by googleId - login
+        if (user.status !== 'ACTIVE') {
+          throw new UnauthorizedException('User account is inactive');
+        }
+        return this.generateTokens(user);
+      }
+
+      // Check if user exists by email (account linking)
+      const existingUserByEmail = await this.prisma.user.findUnique({
+        where: { email },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          status: true,
+          tenantId: true,
+          googleId: true,
+        },
+      });
+
+      if (existingUserByEmail) {
+        // Link Google account to existing user
+        if (existingUserByEmail.status !== 'ACTIVE') {
+          throw new UnauthorizedException('User account is inactive');
+        }
+
+        user = await this.prisma.user.update({
+          where: { id: existingUserByEmail.id },
+          data: {
+            googleId,
+            authProvider: existingUserByEmail.googleId ? undefined : 'google',
+            emailVerified: true, // Email is verified by Google
+          },
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            status: true,
+            tenantId: true,
+          },
+        });
+
+        return this.generateTokens(user);
+      }
+
+      // New user - create tenant and user
+      return this.createSocialAuthUser({
+        email,
+        firstName: firstName || 'User',
+        lastName: lastName || '',
+        googleId,
+        authProvider: 'google',
+      });
+    } catch (error) {
+      if (error instanceof UnauthorizedException || error instanceof BadRequestException) {
+        throw error;
+      }
+      console.error('Google auth error:', error);
+      throw new UnauthorizedException('Failed to authenticate with Google');
+    }
+  }
+
+  /**
+   * Authenticate with Apple Sign-In
+   * Verifies the Apple identity token and creates/links user account
+   */
+  async appleAuth(appleAuthDto: AppleAuthDto): Promise<AuthResponseDto> {
+    const { identityToken, firstName, lastName } = appleAuthDto;
+
+    try {
+      // Verify Apple identity token
+      const applePayload = await appleSignin.verifyIdToken(identityToken, {
+        audience: this.configService.get<string>('APPLE_CLIENT_ID'),
+        ignoreExpiration: false,
+      });
+
+      const { sub: appleId, email } = applePayload;
+
+      if (!email) {
+        throw new BadRequestException('Email not provided by Apple');
+      }
+
+      // Check if user exists by appleId
+      let user = await this.prisma.user.findUnique({
+        where: { appleId },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          status: true,
+          tenantId: true,
+        },
+      });
+
+      if (user) {
+        // User found by appleId - login
+        if (user.status !== 'ACTIVE') {
+          throw new UnauthorizedException('User account is inactive');
+        }
+        return this.generateTokens(user);
+      }
+
+      // Check if user exists by email (account linking)
+      const existingUserByEmail = await this.prisma.user.findUnique({
+        where: { email },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          status: true,
+          tenantId: true,
+          appleId: true,
+        },
+      });
+
+      if (existingUserByEmail) {
+        // Link Apple account to existing user
+        if (existingUserByEmail.status !== 'ACTIVE') {
+          throw new UnauthorizedException('User account is inactive');
+        }
+
+        user = await this.prisma.user.update({
+          where: { id: existingUserByEmail.id },
+          data: {
+            appleId,
+            authProvider: existingUserByEmail.appleId ? undefined : 'apple',
+            emailVerified: true, // Email is verified by Apple
+          },
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            status: true,
+            tenantId: true,
+          },
+        });
+
+        return this.generateTokens(user);
+      }
+
+      // New user - create tenant and user
+      // Note: Apple only sends name on first sign-in
+      return this.createSocialAuthUser({
+        email,
+        firstName: firstName || 'User',
+        lastName: lastName || '',
+        appleId,
+        authProvider: 'apple',
+      });
+    } catch (error) {
+      if (error instanceof UnauthorizedException || error instanceof BadRequestException) {
+        throw error;
+      }
+      console.error('Apple auth error:', error);
+      throw new UnauthorizedException('Failed to authenticate with Apple');
+    }
+  }
+
+  /**
+   * Create a new user from social auth (Google/Apple)
+   * Auto-creates tenant and subscribes to FREE plan
+   */
+  private async createSocialAuthUser(data: {
+    email: string;
+    firstName: string;
+    lastName: string;
+    googleId?: string;
+    appleId?: string;
+    authProvider: string;
+  }): Promise<AuthResponseDto> {
+    const { email, firstName, lastName, googleId, appleId, authProvider } = data;
+
+    // Generate restaurant name from email or name
+    const restaurantName = firstName && firstName !== 'User'
+      ? `${firstName}'s Restaurant`
+      : `Restaurant ${email.split('@')[0]}`;
+
+    // Generate subdomain
+    const baseSubdomain = restaurantName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+
+    let subdomain = baseSubdomain;
+    const existingTenant = await this.prisma.tenant.findUnique({
+      where: { subdomain },
+    });
+
+    if (existingTenant) {
+      subdomain = `${baseSubdomain}-${Math.random().toString(36).substring(2, 8)}`;
+    }
+
+    // Get FREE plan
+    const freePlan = await this.prisma.subscriptionPlan.findUnique({
+      where: { name: 'FREE' },
+    });
+
+    if (!freePlan) {
+      throw new ResourceNotFoundException('FREE subscription plan');
+    }
+
+    // Create tenant
+    const tenant = await this.prisma.tenant.create({
+      data: {
+        name: restaurantName,
+        subdomain,
+        paymentRegion: 'INTERNATIONAL',
+        currentPlanId: freePlan.id,
+      },
+    });
+
+    // Create FREE subscription
+    const now = new Date();
+    const currentPeriodEnd = new Date(now);
+    currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 10);
+
+    await this.prisma.subscription.create({
+      data: {
+        tenantId: tenant.id,
+        planId: freePlan.id,
+        status: 'ACTIVE',
+        billingCycle: 'MONTHLY',
+        paymentProvider: 'STRIPE',
+        startDate: now,
+        currentPeriodStart: now,
+        currentPeriodEnd,
+        isTrialPeriod: false,
+        amount: 0,
+        currency: freePlan.currency,
+        autoRenew: true,
+        cancelAtPeriodEnd: false,
+      },
+    });
+
+    // Create user as ADMIN
+    const user = await this.prisma.user.create({
+      data: {
+        email,
+        password: '', // No password for social auth users
+        firstName,
+        lastName,
+        role: UserRole.ADMIN,
+        tenantId: tenant.id,
+        googleId,
+        appleId,
+        authProvider,
+        emailVerified: true, // Email is verified by OAuth provider
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        tenantId: true,
+      },
+    });
+
+    return this.generateTokens(user);
   }
 }

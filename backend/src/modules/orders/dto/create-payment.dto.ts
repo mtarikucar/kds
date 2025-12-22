@@ -16,4 +16,9 @@ export class CreatePaymentDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @ApiPropertyOptional({ description: 'Customer phone for linking to customer record' })
+  @IsString()
+  @IsOptional()
+  customerPhone?: string;
 }

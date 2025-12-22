@@ -12,9 +12,12 @@ import { useTranslation } from 'react-i18next';
 const paymentSchema = z.object({
   method: z.nativeEnum(PaymentMethod),
   transactionId: z.string().optional(),
+  customerPhone: z.string().optional(),
 });
 
 type PaymentFormData = z.infer<typeof paymentSchema>;
+
+export type { PaymentFormData };
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -65,6 +68,14 @@ const PaymentModal = ({
             {formatCurrency(total)}
           </p>
         </div>
+
+        <Input
+          label={t('payment.customerPhone')}
+          placeholder={t('payment.customerPhonePlaceholder')}
+          type="tel"
+          error={errors.customerPhone?.message}
+          {...register('customerPhone')}
+        />
 
         <Select
           label={t('payment.method')}

@@ -47,8 +47,8 @@ const KitchenDisplayPage = () => {
   };
 
   return (
-    <div className="h-full">
-      <div className="mb-4 md:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+    <div className="h-full flex flex-col">
+      <div className="mb-4 md:mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 flex-shrink-0">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t('kitchen.title')}</h1>
           <p className="text-sm md:text-base text-gray-600">{t('kitchen.realtimeTracking')}</p>
@@ -74,7 +74,7 @@ const KitchenDisplayPage = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 h-[calc(100vh-250px)] md:h-[calc(100vh-200px)]">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6 flex-1 min-h-0">
         <OrderQueue
           title={t('kitchen.pending')}
           status={OrderStatus.PENDING}

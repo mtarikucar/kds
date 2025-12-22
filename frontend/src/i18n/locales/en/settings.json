@@ -66,7 +66,10 @@
   },
   "twoStepCheckout": {
     "title": "Enable Two-Step Checkout",
-    "description": "Separate order creation and payment steps. Shows two buttons: \"Create Order\" and \"Proceed to Payment\". Useful when you want to send orders to kitchen before collecting payment."
+    "description": "Separate order creation and payment steps. Shows two buttons: \"Create Order\" and \"Proceed to Payment\". Useful when you want to send orders to kitchen before collecting payment.",
+    "cannotDisableWithCustomerOrdering": "Cannot disable two-step checkout while QR menu customer ordering is active. Please disable customer ordering first.",
+    "requiredForQRMenu": "Required for QR menu ordering",
+    "autoEnabled": "Two-step checkout has been automatically enabled"
   },
   "info": {
     "noteLabel": "Note:",
@@ -215,7 +218,8 @@
     "addIntegration": "Add Integration",
     "loading": "Loading integrations...",
     "none": "No integrations configured yet",
-    "lastSynced": "Last synced: {{date}}"
+    "lastSynced": "Last synced: {{date}}",
+    "comingSoon": "Custom integrations coming soon"
   },
   "noCashDrawersConfigured": "No cash drawers configured",
   "noPagersConfigured": "No pagers configured",
