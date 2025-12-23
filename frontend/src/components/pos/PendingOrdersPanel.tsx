@@ -1,6 +1,6 @@
 import { X, Check, Clock, Phone, MapPin } from 'lucide-react';
 import { usePendingOrders, useApproveOrder, useCancelOrder } from '../../features/orders/ordersApi';
-import { formatCurrency } from '../../lib/utils';
+import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import { Order } from '../../types';
 import Spinner from '../ui/Spinner';
 import { useTranslation } from 'react-i18next';
@@ -12,6 +12,7 @@ interface PendingOrdersPanelProps {
 
 const PendingOrdersPanel = ({ isOpen, onClose }: PendingOrdersPanelProps) => {
   const { t } = useTranslation('pos');
+  const formatPrice = useFormatCurrency();
   const { data: pendingOrders = [], isLoading } = usePendingOrders();
   const approveOrder = useApproveOrder();
   const cancelOrder = useCancelOrder();
@@ -137,7 +138,7 @@ const PendingOrdersPanel = ({ isOpen, onClose }: PendingOrdersPanelProps) => {
                             )}
                           </div>
                           <span className="text-sm font-semibold text-gray-700 ml-2">
-                            {formatCurrency(Number(item.subtotal), 'USD')}
+                            {formatPrice(Number(item.subtotal))}
                           </span>
                         </div>
                       ))}
@@ -154,7 +155,7 @@ const PendingOrdersPanel = ({ isOpen, onClose }: PendingOrdersPanelProps) => {
                     <div className="border-t pt-3 flex justify-between items-center">
                       <span className="font-bold text-gray-900">{t('pendingOrders.totalAmount')}</span>
                       <span className="text-xl font-bold text-orange-600">
-                        {formatCurrency(Number(order.finalAmount), 'USD')}
+                        {formatPrice(Number(order.finalAmount))}
                       </span>
                     </div>
                   </div>

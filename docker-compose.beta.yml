@@ -73,6 +73,9 @@ services:
       IYZICO_API_KEY: ${IYZICO_SANDBOX_API_KEY}
       IYZICO_SECRET_KEY: ${IYZICO_SANDBOX_SECRET_KEY}
       IYZICO_BASE_URL: https://sandbox-api.iyzipay.com
+      # Google OAuth 2.0
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
     volumes:
       - backend_logs:/app/logs
       - uploads_beta:/app/uploads
@@ -101,6 +104,7 @@ services:
       VITE_API_URL: https://beta-api.yourapp.com
       VITE_WS_URL: wss://beta-api.yourapp.com
       VITE_STRIPE_PUBLISHABLE_KEY: ${STRIPE_TEST_PUBLISHABLE_KEY}
+      VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
       VITE_ENVIRONMENT: beta
     ports:
       - "5174:80"  # Beta frontend port

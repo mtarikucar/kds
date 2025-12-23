@@ -102,3 +102,21 @@ export function useCloseZReport() {
 export function downloadZReportPdf(id: string, reportNumber: string) {
   window.open(`${api.defaults.baseURL}/z-reports/${id}/pdf`, '_blank');
 }
+
+/**
+ * Send Z-Report via email
+ */
+export function useSendZReportEmail() {
+  return useMutation({
+    mutationFn: async ({
+      id,
+      emails,
+    }: {
+      id: string;
+      emails?: string[];
+    }): Promise<{ success: boolean; message: string }> => {
+      const response = await api.post(`/z-reports/${id}/send-email`, { emails });
+      return response.data;
+    },
+  });
+}

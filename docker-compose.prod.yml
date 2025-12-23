@@ -91,6 +91,9 @@ services:
       # Subscription Settings
       DEFAULT_TRIAL_DAYS: ${DEFAULT_TRIAL_DAYS:-14}
       TRIAL_REMINDER_DAYS: ${TRIAL_REMINDER_DAYS:-3}
+      # Google OAuth 2.0
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
     ports:
       - '3000:3000'
     volumes:
@@ -151,6 +154,9 @@ services:
       # Subscription Settings
       DEFAULT_TRIAL_DAYS: ${DEFAULT_TRIAL_DAYS:-14}
       TRIAL_REMINDER_DAYS: ${TRIAL_REMINDER_DAYS:-3}
+      # Google OAuth 2.0
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
     ports:
       - '3001:3000'
     volumes:
@@ -178,6 +184,7 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
         VITE_STRIPE_PUBLISHABLE_KEY: ${VITE_STRIPE_PUBLISHABLE_KEY}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
     container_name: kds_frontend_blue
     restart: always
     depends_on:
@@ -204,6 +211,7 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
         VITE_STRIPE_PUBLISHABLE_KEY: ${VITE_STRIPE_PUBLISHABLE_KEY}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
     container_name: kds_frontend_green
     restart: always
     depends_on:

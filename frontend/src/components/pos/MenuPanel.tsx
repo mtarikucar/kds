@@ -3,11 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { useCategories } from '../../features/menu/menuApi';
 import { useProducts } from '../../features/menu/menuApi';
 import { useGetPosSettings } from '../../features/pos/posApi';
+import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import { Product } from '../../types';
 import { Card } from '../ui/Card';
 import Button from '../ui/Button';
 import Spinner from '../ui/Spinner';
-import { formatCurrency } from '../../lib/utils';
 import { Plus, Grid3x3, List, Search, Package, AlertCircle, Sparkles } from 'lucide-react';
 
 interface MenuPanelProps {
@@ -27,6 +27,7 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
     isAvailable: true,
   });
   const { data: posSettings } = useGetPosSettings();
+  const formatPrice = useFormatCurrency();
 
   const showImages = posSettings?.showProductImages ?? true;
 
@@ -219,7 +220,7 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
                     <div className="space-y-2.5">
                       <div className="flex items-center justify-between">
                         <p className="text-white font-black text-2xl drop-shadow-lg">
-                          {formatCurrency(product.price)}
+                          {formatPrice(product.price)}
                         </p>
                       </div>
 
@@ -302,7 +303,7 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
                         )}
                         <div className="flex items-center gap-2">
                           <p className="text-2xl font-black bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">
-                            {formatCurrency(product.price)}
+                            {formatPrice(product.price)}
                           </p>
                           {product.currentStock !== null && product.currentStock <= 5 && product.currentStock > 0 && (
                             <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">

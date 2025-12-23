@@ -76,4 +76,15 @@ export class ZReportsController {
   async close(@Req() req, @Param('id') id: string) {
     return this.zReportsService.closeReport(id, req.user.tenantId);
   }
+
+  @Post(':id/send-email')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Send Z-Report via email' })
+  async sendEmail(
+    @Req() req,
+    @Param('id') id: string,
+    @Body() body: { emails?: string[] },
+  ) {
+    return this.zReportsService.sendReportEmail(id, req.user.tenantId, body.emails);
+  }
 }

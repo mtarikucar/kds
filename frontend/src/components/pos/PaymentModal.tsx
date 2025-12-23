@@ -6,7 +6,7 @@ import Button from '../ui/Button';
 import Select from '../ui/Select';
 import Input from '../ui/Input';
 import { PaymentMethod } from '../../types';
-import { formatCurrency } from '../../lib/utils';
+import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import { useTranslation } from 'react-i18next';
 
 const paymentSchema = z.object({
@@ -35,6 +35,7 @@ const PaymentModal = ({
   isLoading = false,
 }: PaymentModalProps) => {
   const { t } = useTranslation('pos');
+  const formatPrice = useFormatCurrency();
   const {
     register,
     handleSubmit,
@@ -65,7 +66,7 @@ const PaymentModal = ({
         <div className="bg-blue-50 p-4 rounded-lg text-center">
           <p className="text-sm text-gray-600 mb-1">{t('payment.totalAmount')}</p>
           <p className="text-3xl font-bold text-blue-600">
-            {formatCurrency(total)}
+            {formatPrice(total)}
           </p>
         </div>
 

@@ -89,4 +89,47 @@ export class ReportsController {
     const targetDate = date ? new Date(date) : undefined;
     return this.reportsService.getOrdersByHour(req.tenantId, targetDate);
   }
+
+  @Get('customers')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Get customer analytics report (ADMIN, MANAGER)' })
+  @ApiQuery({ name: 'startDate', required: false, description: 'Start date (ISO format)' })
+  @ApiQuery({ name: 'endDate', required: false, description: 'End date (ISO format)' })
+  @ApiResponse({ status: 200, description: 'Customer analytics report' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  async getCustomerAnalytics(
+    @Request() req,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const start = startDate ? new Date(startDate) : undefined;
+    const end = endDate ? new Date(endDate) : undefined;
+    return this.reportsService.getCustomerAnalytics(req.tenantId, start, end);
+  }
+
+  @Get('inventory')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Get inventory report (ADMIN, MANAGER)' })
+  @ApiResponse({ status: 200, description: 'Inventory report' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  async getInventoryReport(@Request() req) {
+    return this.reportsService.getInventoryReport(req.tenantId);
+  }
+
+  @Get('staff-performance')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Get staff performance report (ADMIN, MANAGER)' })
+  @ApiQuery({ name: 'startDate', required: false, description: 'Start date (ISO format)' })
+  @ApiQuery({ name: 'endDate', required: false, description: 'End date (ISO format)' })
+  @ApiResponse({ status: 200, description: 'Staff performance report' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  async getStaffPerformance(
+    @Request() req,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+  ) {
+    const start = startDate ? new Date(startDate) : undefined;
+    const end = endDate ? new Date(endDate) : undefined;
+    return this.reportsService.getStaffPerformance(req.tenantId, start, end);
+  }
 }

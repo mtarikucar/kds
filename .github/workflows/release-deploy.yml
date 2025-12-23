@@ -134,6 +134,7 @@ jobs:
             --build-arg VITE_API_URL=https://hummytummy.com/api \
             --build-arg VITE_SOCKET_URL=https://hummytummy.com \
             --build-arg VITE_WS_URL=wss://hummytummy.com \
+            --build-arg VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }} \
             --build-arg VITE_APP_VERSION=${{ steps.version.outputs.VERSION }} \
             --build-arg VITE_BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
             --build-arg VITE_COMMIT_SHA=$(git rev-parse --short HEAD) \

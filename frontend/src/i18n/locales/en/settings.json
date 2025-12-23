@@ -84,12 +84,38 @@
     "title": "Enable Customer Ordering from QR Menu",
     "description": "Allow customers to place orders directly from the QR menu. When disabled, customers can view the menu but must contact staff to place orders. They can still call the waiter or request the bill."
   },
+  "currencySettings": {
+    "title": "Currency Settings",
+    "selectCurrency": "Select Currency",
+    "description": "Choose the currency for displaying prices in your restaurant"
+  },
+  "reportSettings": {
+    "title": "Report Settings",
+    "description": "Configure automated end-of-day report emails",
+    "closingTime": "Store Closing Time",
+    "closingTimeDescription": "The time when your store closes (HH:mm format)",
+    "timezone": "Timezone",
+    "timezoneDescription": "Your store's timezone for accurate report scheduling",
+    "enableEmailReports": "Enable Automated Email Reports",
+    "enableEmailReportsDescription": "Automatically send Z-Report summaries at closing time",
+    "emailRecipients": "Email Recipients",
+    "emailRecipientsDescription": "Email addresses to receive daily reports",
+    "addEmail": "Add Email",
+    "removeEmail": "Remove",
+    "noEmails": "No email recipients configured",
+    "invalidEmail": "Please enter a valid email address",
+    "emailAdded": "Email added successfully",
+    "emailRemoved": "Email removed",
+    "settingsSaved": "Report settings saved successfully",
+    "settingsFailed": "Failed to save report settings"
+  },
   "preview": {
     "currentConfiguration": "Current Configuration",
     "tablelessMode": "Tableless Mode",
     "twoStepCheckout": "Two-Step Checkout",
     "productImages": "Product Images",
     "customerOrdering": "Customer Ordering (QR Menu)",
+    "currency": "Currency",
     "enabled": "Enabled",
     "disabled": "Disabled",
     "orderTypeTableless": "Order Type (tableless)"

@@ -4,7 +4,7 @@ import { Product } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
-import { formatCurrency } from '../../lib/utils';
+import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 
 interface CartItem extends Product {
   quantity: number;
@@ -47,6 +47,7 @@ const OrderCart = ({
   hasActiveOrder = false,
 }: OrderCartProps) => {
   const { t } = useTranslation('pos');
+  const formatPrice = useFormatCurrency();
   const subtotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
   const total = subtotal - discount;
 
@@ -77,7 +78,7 @@ const OrderCart = ({
                   <div className="flex-1">
                     <h4 className="font-medium text-sm">{item.name}</h4>
                     <p className="text-sm text-gray-600">
-                      {formatCurrency(item.price)} x {item.quantity}
+                      {formatPrice(item.price)} x {item.quantity}
                     </p>
                   </div>
 
@@ -140,7 +141,7 @@ const OrderCart = ({
 
               <div className="flex justify-between text-sm">
                 <span>{t('subtotal')}:</span>
-                <span className="font-medium">{formatCurrency(subtotal)}</span>
+                <span className="font-medium">{formatPrice(subtotal)}</span>
               </div>
 
               <Input
@@ -155,7 +156,7 @@ const OrderCart = ({
 
               <div className="flex justify-between text-lg font-bold border-t pt-2">
                 <span>{t('total')}:</span>
-                <span>{formatCurrency(total)}</span>
+                <span>{formatPrice(total)}</span>
               </div>
 
               {/* Conditional button rendering based on checkout mode */}

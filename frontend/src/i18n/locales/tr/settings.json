@@ -84,12 +84,18 @@
     "title": "QR Menüden Müşteri Siparişlerini Etkinleştir",
     "description": "Müşterilerin QR menüden direkt sipariş vermesine izin verin. Devre dışı bırakıldığında, müşteriler menüyü görüntüleyebilir ancak sipariş vermek için personelle iletişime geçmeleri gerekir. Garson çağırma ve hesap isteme özellikleri kullanılabilir kalır."
   },
+  "currencySettings": {
+    "title": "Para Birimi Ayarları",
+    "selectCurrency": "Para Birimi Seçin",
+    "description": "Restoranınızda fiyatları göstermek için para birimini seçin"
+  },
   "preview": {
     "currentConfiguration": "Geçerli Yapılandırma",
     "tablelessMode": "Masasız Mod",
     "twoStepCheckout": "İki Aşamalı Ödeme",
     "productImages": "Ürün Görselleri",
     "customerOrdering": "Müşteri Siparişi (QR Menü)",
+    "currency": "Para Birimi",
     "enabled": "Etkin",
     "disabled": "Devre Dışı",
     "orderTypeTableless": "Sipariş Türü (masasız)"

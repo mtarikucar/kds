@@ -2,17 +2,27 @@ import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useGetPosSettings, useUpdatePosSettings } from '../../features/pos/posApi';
+import {
+  useGetTenantSettings,
+  useUpdateTenantSettings,
+  SUPPORTED_CURRENCIES,
+} from '../../hooks/useCurrency';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
+import ReportSettings from '../../components/settings/ReportSettings';
 const POSSettingsPage = () => {
   const { t } = useTranslation('settings');
   const { data: posSettings, isLoading } = useGetPosSettings();
   const { mutate: updateSettings, isPending: isUpdating } = useUpdatePosSettings();
+  const { data: tenantSettings, isLoading: isLoadingTenant } = useGetTenantSettings();
+  const { mutate: updateTenantSettings, isPending: isUpdatingTenant } =
+    useUpdateTenantSettings();
 
   const [enableTablelessMode, setEnableTablelessMode] = useState(false);
   const [enableTwoStepCheckout, setEnableTwoStepCheckout] = useState(false);
   const [showProductImages, setShowProductImages] = useState(true);
   const [enableCustomerOrdering, setEnableCustomerOrdering] = useState(true);
+  const [currency, setCurrency] = useState('TRY');
 
   // Load settings when data arrives
   useEffect(() => {
@@ -23,6 +33,13 @@ const POSSettingsPage = () => {
       setEnableCustomerOrdering(posSettings.enableCustomerOrdering);
     }
   }, [posSettings]);
+
+  // Load tenant settings when data arrives
+  useEffect(() => {
+    if (tenantSettings) {
+      setCurrency(tenantSettings.currency || 'TRY');
+    }
+  }, [tenantSettings]);
 
   const handleSave = () => {
     updateSettings(
@@ -43,6 +60,20 @@ const POSSettingsPage = () => {
     );
   };
 
+  const handleSaveCurrency = () => {
+    updateTenantSettings(
+      { currency },
+      {
+        onSuccess: () => {
+          toast.success(t('settingsSaved'));
+        },
+        onError: (error: any) => {
+          toast.error(error.response?.data?.message || t('settingsFailed'));
+        },
+      }
+    );
+  };
+
   const hasChanges =
     posSettings &&
     (enableTablelessMode !== posSettings.enableTablelessMode ||
@@ -50,7 +81,10 @@ const POSSettingsPage = () => {
       showProductImages !== posSettings.showProductImages ||
       enableCustomerOrdering !== posSettings.enableCustomerOrdering);
 
-  if (isLoading) {
+  const hasCurrencyChanges =
+    tenantSettings && currency !== tenantSettings.currency;
+
+  if (isLoading || isLoadingTenant) {
     return (
       <div className="h-full flex items-center justify-center">
         <p className="text-gray-500">{t('posSettings.loading')}</p>
@@ -217,6 +251,43 @@ const POSSettingsPage = () => {
           </CardContent>
         </Card>
 
+        {/* Currency Settings */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>{t('currencySettings.title')}</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-gray-600">{t('currencySettings.description')}</p>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                {t('currencySettings.selectCurrency')}
+              </label>
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                {SUPPORTED_CURRENCIES.map((curr) => (
+                  <option key={curr.code} value={curr.code}>
+                    {curr.symbol} - {curr.name} ({curr.code})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex justify-end pt-2">
+              <Button
+                variant="primary"
+                size="lg"
+                onClick={handleSaveCurrency}
+                isLoading={isUpdatingTenant}
+                disabled={!hasCurrencyChanges}
+              >
+                {t('saveChanges')}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Settings Preview */}
         <Card className="mt-6">
           <CardHeader>
@@ -270,9 +341,21 @@ const POSSettingsPage = () => {
                   )}
                 </dd>
               </div>
+              <div className="flex justify-between">
+                <dt className="text-gray-600">{t('preview.currency')}:</dt>
+                <dd className="font-semibold">
+                  {SUPPORTED_CURRENCIES.find((c) => c.code === currency)?.symbol || currency} (
+                  {currency})
+                </dd>
+              </div>
             </dl>
           </CardContent>
         </Card>
+
+        {/* Report Settings */}
+        <div className="mt-6">
+          <ReportSettings />
+        </div>
       </div>
     </div>
   );
