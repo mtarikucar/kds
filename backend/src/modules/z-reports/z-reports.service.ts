@@ -1,11 +1,28 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EmailService } from '../../common/services/email.service';
 import { CreateZReportDto } from './dto/create-z-report.dto';
 import PDFDocument from 'pdfkit';
+import { format } from 'date-fns';
+
+// Currency symbol mapping
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  TRY: '₺',
+  USD: '$',
+  EUR: '€',
+  GBP: '£',
+  CAD: 'C$',
+  AUD: 'A$',
+};
 
 @Injectable()
 export class ZReportsService {
-  constructor(private prisma: PrismaService) {}
+  private readonly logger = new Logger(ZReportsService.name);
+
+  constructor(
+    private prisma: PrismaService,
+    private emailService: EmailService,
+  ) {}
 
   /**
    * Generate a Z-Report for end-of-day reconciliation
@@ -315,5 +332,192 @@ export class ZReportsService {
         excelExported: true,
       },
     });
+  }
+
+  /**
+   * Send Z-Report via email
+   */
+  async sendReportEmail(
+    id: string,
+    tenantId: string,
+    toEmails?: string[],
+  ): Promise<{ success: boolean; message: string }> {
+    const report = await this.findOne(id, tenantId);
+
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+
+    // Get user who closed the report
+    const closedBy = await this.prisma.user.findUnique({
+      where: { id: report.closedById },
+      select: { firstName: true, lastName: true },
+    });
+
+    // Determine recipients
+    const recipients = toEmails?.length ? toEmails : tenant.reportEmails || [];
+
+    if (recipients.length === 0) {
+      throw new BadRequestException(
+        'No email recipients configured. Please add email addresses in tenant settings or provide them explicitly.',
+      );
+    }
+
+    // Get currency symbol
+    const currencySymbol = CURRENCY_SYMBOLS[tenant.currency] || '$';
+
+    // Parse top products from JSON
+    const topProducts = (report.topProducts as any[]) || [];
+
+    // Calculate cash difference details
+    const cashDiff = Number(report.cashDifference);
+    const isNegativeDifference = cashDiff < 0;
+    const isPositiveDifference = cashDiff > 0;
+    const cashDifferenceClass = isNegativeDifference ? 'danger' : isPositiveDifference ? 'warning' : '';
+
+    // Format the email context
+    const emailContext = {
+      restaurantName: tenant.name,
+      reportNumber: report.reportNumber,
+      reportDate: format(new Date(report.reportDate), 'MMMM dd, yyyy'),
+      closingTime: format(new Date(report.closingTime), 'HH:mm'),
+      closedByName: closedBy ? `${closedBy.firstName} ${closedBy.lastName}` : 'System',
+      currencySymbol,
+
+      // Sales summary
+      totalSales: Number(report.totalSales).toFixed(2),
+      totalDiscount: Number(report.totalDiscount).toFixed(2),
+      totalRefunds: Number(report.totalRefunds).toFixed(2),
+      netSales: Number(report.netSales).toFixed(2),
+      totalOrders: report.totalOrders,
+
+      // Order types
+      dineInSales: Number(report.dineInSales).toFixed(2),
+      dineInOrders: report.dineInOrders,
+      takeawaySales: Number(report.takeawaySales).toFixed(2),
+      takeawayOrders: report.takeawayOrders,
+      deliverySales: Number(report.deliverySales).toFixed(2),
+      deliveryOrders: report.deliveryOrders,
+
+      // Payment methods
+      cashPayments: Number(report.cashPayments).toFixed(2),
+      cashPaymentCount: report.cashPaymentCount,
+      cardPayments: Number(report.cardPayments).toFixed(2),
+      cardPaymentCount: report.cardPaymentCount,
+      digitalPayments: Number(report.digitalPayments).toFixed(2),
+      digitalPaymentCount: report.digitalPaymentCount,
+
+      // Cash drawer
+      openingCash: Number(report.openingCash).toFixed(2),
+      expectedCash: Number(report.expectedCash).toFixed(2),
+      countedCash: Number(report.countedCash).toFixed(2),
+      cashInOut: Number(report.cashInOut).toFixed(2),
+      cashDifference: cashDiff.toFixed(2),
+      cashDifferenceAbs: Math.abs(cashDiff).toFixed(2),
+      cashDifferenceClass,
+      isNegativeDifference,
+      isPositiveDifference,
+
+      // Cancelled orders
+      cancelledOrders: report.cancelledOrders,
+      cancelledOrdersAmount: Number(report.cancelledOrdersAmount).toFixed(2),
+
+      // Top products
+      topProducts: topProducts.slice(0, 5).map((p: any) => ({
+        name: p.name || p.productName,
+        quantity: p.quantity,
+        revenue: Number(p.revenue).toFixed(2),
+      })),
+
+      currentYear: new Date().getFullYear(),
+    };
+
+    try {
+      // Send email to all recipients
+      const success = await this.emailService.sendEmail({
+        to: recipients.join(', '),
+        subject: `Z-Report Summary - ${format(new Date(report.reportDate), 'MMM dd, yyyy')} - ${tenant.name}`,
+        template: 'z-report-summary',
+        context: emailContext,
+      });
+
+      // Update report with email status
+      await this.prisma.zReport.update({
+        where: { id },
+        data: {
+          emailSent: success,
+          emailSentAt: success ? new Date() : null,
+          emailRecipients: recipients,
+          emailError: success ? null : 'Failed to send email',
+        },
+      });
+
+      if (success) {
+        this.logger.log(`Z-Report email sent successfully to ${recipients.join(', ')}`);
+        return { success: true, message: `Email sent successfully to ${recipients.length} recipient(s)` };
+      } else {
+        return { success: false, message: 'Failed to send email. Please check email configuration.' };
+      }
+    } catch (error) {
+      this.logger.error(`Failed to send Z-Report email: ${error.message}`);
+
+      // Update report with error
+      await this.prisma.zReport.update({
+        where: { id },
+        data: {
+          emailError: error.message,
+        },
+      });
+
+      return { success: false, message: `Failed to send email: ${error.message}` };
+    }
+  }
+
+  /**
+   * Generate and send Z-Report for a tenant (used by scheduler)
+   */
+  async generateAndSendReport(tenantId: string, userId: string): Promise<{ reportId: string; emailSent: boolean }> {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Check if report already exists for today
+    const existing = await this.prisma.zReport.findFirst({
+      where: {
+        tenantId,
+        reportDate: today,
+      },
+    });
+
+    let report;
+
+    if (existing) {
+      report = existing;
+    } else {
+      // Generate report for today with default values
+      report = await this.generateReport(tenantId, {
+        reportDate: today.toISOString(),
+        cashDrawerOpening: 0,
+        cashDrawerClosing: 0,
+        notes: 'Auto-generated end-of-day report',
+      });
+    }
+
+    // Send email if configured
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    let emailSent = false;
+
+    if (tenant?.reportEmailEnabled && tenant.reportEmails?.length > 0) {
+      const result = await this.sendReportEmail(report.id, tenantId);
+      emailSent = result.success;
+    }
+
+    return { reportId: report.id, emailSent };
   }
 }

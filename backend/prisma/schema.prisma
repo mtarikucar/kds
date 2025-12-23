@@ -28,6 +28,15 @@ model Tenant {
   trialStartedAt  DateTime?
   trialEndsAt     DateTime?
 
+  // Currency settings
+  currency        String   @default("TRY") // USD, EUR, GBP, TRY, CAD, AUD
+
+  // Report settings
+  closingTime         String?   @default("23:00")  // Store closing time in HH:mm format
+  timezone            String    @default("UTC")    // Timezone for the tenant
+  reportEmailEnabled  Boolean   @default(false)    // Enable automated email reports
+  reportEmails        String[]  @default([])       // Array of email addresses to send reports
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1250,6 +1259,8 @@ model ZReport {
   excelUrl                String?
   emailSent               Boolean  @default(false)
   emailSentAt             DateTime?
+  emailRecipients         String[] @default([])    // Who received the email
+  emailError              String?                  // Last email error if any
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)

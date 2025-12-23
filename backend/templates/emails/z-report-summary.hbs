@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Z-Report Summary</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f3f4f6;
+        }
+        .container {
+            background-color: #ffffff;
+            border-radius: 8px;
+            padding: 40px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        .brand {
+            font-size: 24px;
+            font-weight: bold;
+            color: #3b82f6;
+        }
+        .report-date {
+            font-size: 14px;
+            color: #6b7280;
+            margin-top: 8px;
+        }
+        h1 {
+            color: #1f2937;
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        h2 {
+            color: #374151;
+            font-size: 18px;
+            margin: 25px 0 15px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .summary-grid {
+            display: table;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .summary-row {
+            display: table-row;
+        }
+        .summary-cell {
+            display: table-cell;
+            width: 50%;
+            padding: 10px;
+            text-align: center;
+        }
+        .metric-box {
+            background-color: #f9fafb;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        .metric-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #1f2937;
+        }
+        .metric-value.success {
+            color: #059669;
+        }
+        .metric-value.warning {
+            color: #d97706;
+        }
+        .metric-value.danger {
+            color: #dc2626;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #6b7280;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        th {
+            background-color: #f9fafb;
+            font-weight: 600;
+            color: #374151;
+            font-size: 13px;
+            text-transform: uppercase;
+        }
+        td {
+            color: #4b5563;
+        }
+        .text-right {
+            text-align: right;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .amount-positive {
+            color: #059669;
+            font-weight: 600;
+        }
+        .amount-negative {
+            color: #dc2626;
+            font-weight: 600;
+        }
+        .cash-reconciliation {
+            background-color: #f0fdf4;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .cash-reconciliation.warning {
+            background-color: #fef3c7;
+        }
+        .cash-reconciliation.danger {
+            background-color: #fef2f2;
+        }
+        .top-products {
+            background-color: #f9fafb;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+        .product-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .product-row:last-child {
+            border-bottom: none;
+        }
+        .product-name {
+            font-weight: 500;
+            color: #374151;
+        }
+        .product-stats {
+            color: #6b7280;
+            font-size: 14px;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e5e7eb;
+            color: #6b7280;
+            font-size: 14px;
+        }
+        .report-number {
+            background-color: #dbeafe;
+            color: #1d4ed8;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="brand">{{restaurantName}}</div>
+            <div class="report-date">{{reportDate}}</div>
+            <div style="margin-top: 10px;">
+                <span class="report-number">{{reportNumber}}</span>
+            </div>
+        </div>
+
+        <h1>Daily Z-Report Summary</h1>
+
+        <!-- Key Metrics -->
+        <div class="summary-grid">
+            <div class="summary-row">
+                <div class="summary-cell">
+                    <div class="metric-box">
+                        <div class="metric-value success">{{currencySymbol}}{{netSales}}</div>
+                        <div class="metric-label">Net Sales</div>
+                    </div>
+                </div>
+                <div class="summary-cell">
+                    <div class="metric-box">
+                        <div class="metric-value">{{totalOrders}}</div>
+                        <div class="metric-label">Total Orders</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sales Summary -->
+        <h2>Sales Summary</h2>
+        <table>
+            <tr>
+                <td>Gross Sales</td>
+                <td class="text-right">{{currencySymbol}}{{totalSales}}</td>
+            </tr>
+            <tr>
+                <td>Discounts</td>
+                <td class="text-right amount-negative">-{{currencySymbol}}{{totalDiscount}}</td>
+            </tr>
+            <tr>
+                <td>Refunds</td>
+                <td class="text-right amount-negative">-{{currencySymbol}}{{totalRefunds}}</td>
+            </tr>
+            <tr style="font-weight: bold; background-color: #f9fafb;">
+                <td>Net Sales</td>
+                <td class="text-right amount-positive">{{currencySymbol}}{{netSales}}</td>
+            </tr>
+        </table>
+
+        <!-- Order Types -->
+        <h2>Order Types</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Type</th>
+                    <th class="text-center">Orders</th>
+                    <th class="text-right">Sales</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Dine In</td>
+                    <td class="text-center">{{dineInOrders}}</td>
+                    <td class="text-right">{{currencySymbol}}{{dineInSales}}</td>
+                </tr>
+                <tr>
+                    <td>Takeaway</td>
+                    <td class="text-center">{{takeawayOrders}}</td>
+                    <td class="text-right">{{currencySymbol}}{{takeawaySales}}</td>
+                </tr>
+                <tr>
+                    <td>Delivery</td>
+                    <td class="text-center">{{deliveryOrders}}</td>
+                    <td class="text-right">{{currencySymbol}}{{deliverySales}}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Payment Methods -->
+        <h2>Payment Methods</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Method</th>
+                    <th class="text-center">Count</th>
+                    <th class="text-right">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Cash</td>
+                    <td class="text-center">{{cashPaymentCount}}</td>
+                    <td class="text-right">{{currencySymbol}}{{cashPayments}}</td>
+                </tr>
+                <tr>
+                    <td>Card</td>
+                    <td class="text-center">{{cardPaymentCount}}</td>
+                    <td class="text-right">{{currencySymbol}}{{cardPayments}}</td>
+                </tr>
+                <tr>
+                    <td>Digital</td>
+                    <td class="text-center">{{digitalPaymentCount}}</td>
+                    <td class="text-right">{{currencySymbol}}{{digitalPayments}}</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <!-- Cash Reconciliation -->
+        <h2>Cash Drawer</h2>
+        <div class="cash-reconciliation {{cashDifferenceClass}}">
+            <table style="margin-bottom: 0;">
+                <tr>
+                    <td>Opening Balance</td>
+                    <td class="text-right">{{currencySymbol}}{{openingCash}}</td>
+                </tr>
+                <tr>
+                    <td>Cash Sales</td>
+                    <td class="text-right amount-positive">+{{currencySymbol}}{{cashPayments}}</td>
+                </tr>
+                <tr>
+                    <td>Cash In/Out</td>
+                    <td class="text-right">{{currencySymbol}}{{cashInOut}}</td>
+                </tr>
+                <tr>
+                    <td><strong>Expected Cash</strong></td>
+                    <td class="text-right"><strong>{{currencySymbol}}{{expectedCash}}</strong></td>
+                </tr>
+                <tr>
+                    <td><strong>Counted Cash</strong></td>
+                    <td class="text-right"><strong>{{currencySymbol}}{{countedCash}}</strong></td>
+                </tr>
+                <tr style="font-size: 18px; font-weight: bold;">
+                    <td>Difference</td>
+                    <td class="text-right {{#if isNegativeDifference}}amount-negative{{else}}{{#if isPositiveDifference}}amount-positive{{/if}}{{/if}}">
+                        {{#if isNegativeDifference}}-{{/if}}{{currencySymbol}}{{cashDifferenceAbs}}
+                    </td>
+                </tr>
+            </table>
+        </div>
+
+        {{#if topProducts.length}}
+        <!-- Top Products -->
+        <h2>Top Selling Products</h2>
+        <div class="top-products">
+            {{#each topProducts}}
+            <div class="product-row">
+                <div>
+                    <span class="product-name">{{this.name}}</span>
+                </div>
+                <div class="product-stats">
+                    {{this.quantity}} sold - {{../currencySymbol}}{{this.revenue}}
+                </div>
+            </div>
+            {{/each}}
+        </div>
+        {{/if}}
+
+        {{#if cancelledOrders}}
+        <!-- Cancelled Orders -->
+        <h2>Cancelled Orders</h2>
+        <table>
+            <tr>
+                <td>Cancelled Orders</td>
+                <td class="text-right">{{cancelledOrders}}</td>
+            </tr>
+            <tr>
+                <td>Cancelled Amount</td>
+                <td class="text-right amount-negative">{{currencySymbol}}{{cancelledOrdersAmount}}</td>
+            </tr>
+        </table>
+        {{/if}}
+
+        <div class="footer">
+            <p>Report closed by: <strong>{{closedByName}}</strong></p>
+            <p>Closing time: {{closingTime}}</p>
+            <p style="margin-top: 20px; font-size: 12px; color: #9ca3af;">
+                This is an automated report generated by {{restaurantName}} POS System.
+            </p>
+            <p style="font-size: 12px; color: #9ca3af;">
+                &copy; {{currentYear}} Restaurant POS. All rights reserved.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

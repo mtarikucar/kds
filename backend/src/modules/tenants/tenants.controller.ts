@@ -7,13 +7,16 @@ import {
   Param,
   Delete,
   UseGuards,
+  Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { TenantsService } from './tenants.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
+import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
+import { TenantGuard } from '../auth/guards/tenant.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
@@ -52,6 +55,27 @@ export class TenantsController {
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   findAll() {
     return this.tenantsService.findAll();
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Get('settings')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Get current tenant settings (ADMIN, MANAGER)' })
+  @ApiResponse({ status: 200, description: 'Tenant settings retrieved successfully' })
+  findSettings(@Request() req) {
+    return this.tenantsService.findSettings(req.tenantId);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+  @Patch('settings')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Update current tenant settings (ADMIN, MANAGER)' })
+  @ApiResponse({ status: 200, description: 'Tenant settings updated successfully' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  updateSettings(@Request() req, @Body() updateDto: UpdateTenantSettingsDto) {
+    return this.tenantsService.updateSettings(req.tenantId, updateDto);
   }
 
   @ApiBearerAuth()

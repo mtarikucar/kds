@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
+import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import { TenantStatus } from '../../common/constants/subscription.enum';
 
 @Injectable()
@@ -112,6 +113,51 @@ export class TenantsService {
 
     return this.prisma.tenant.delete({
       where: { id },
+    });
+  }
+
+  async findSettings(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        id: true,
+        name: true,
+        currency: true,
+        closingTime: true,
+        timezone: true,
+        reportEmailEnabled: true,
+        reportEmails: true,
+      },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
+    }
+
+    return tenant;
+  }
+
+  async updateSettings(tenantId: string, updateDto: UpdateTenantSettingsDto) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
+    }
+
+    return this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: updateDto,
+      select: {
+        id: true,
+        name: true,
+        currency: true,
+        closingTime: true,
+        timezone: true,
+        reportEmailEnabled: true,
+        reportEmails: true,
+      },
     });
   }
 }
