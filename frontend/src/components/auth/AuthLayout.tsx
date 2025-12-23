@@ -39,7 +39,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, variant = 'login' }) 
               <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
                 <ChefHat className="w-8 h-8" />
               </div>
-              <span className="text-2xl font-heading font-bold">RestaurantPOS</span>
+              <span className="text-2xl font-heading font-bold">HummyTummy</span>
             </Link>
           </div>
 
@@ -126,7 +126,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, variant = 'login' }) 
 
           {/* Footer */}
           <div className="text-white/60 text-sm">
-            © {new Date().getFullYear()} RestaurantPOS. All rights reserved.
+            © {new Date().getFullYear()} HummyTummy. All rights reserved.
           </div>
         </div>
       </div>
@@ -137,7 +137,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, variant = 'login' }) 
         <div className="lg:hidden flex items-center justify-between p-4 bg-gradient-to-r from-warm-orange to-warm-brown">
           <Link to="/" className="flex items-center gap-2 text-white">
             <ChefHat className="w-6 h-6" />
-            <span className="text-lg font-heading font-bold">RestaurantPOS</span>
+            <span className="text-lg font-heading font-bold">HummyTummy</span>
           </Link>
           <LanguageSwitcher />
         </div>

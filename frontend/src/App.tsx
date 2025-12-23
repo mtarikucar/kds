@@ -13,6 +13,8 @@ import CartPage from './pages/qr-menu/CartPage';
 import OrderTrackingPage from './pages/qr-menu/OrderTrackingPage';
 import LoyaltyPage from './pages/qr-menu/LoyaltyPage';
 import { LandingPage } from './pages/LandingPage';
+import TermsOfServicePage from './pages/legal/TermsOfServicePage';
+import PrivacyPolicyPage from './pages/legal/PrivacyPolicyPage';
 import DashboardPage from './pages/DashboardPage';
 import POSPage from './pages/pos/POSPage';
 import KitchenDisplayPage from './pages/kitchen/KitchenDisplayPage';
@@ -69,6 +71,8 @@ function App() {
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/verify-email" element={<VerifyEmailPage />} />
+      <Route path="/terms" element={<TermsOfServicePage />} />
+      <Route path="/privacy" element={<PrivacyPolicyPage />} />
       <Route path="/qr-menu/:tenantId" element={<QRMenuPage />} />
       <Route path="/qr-menu/:tenantId/cart" element={<CartPage />} />
       <Route path="/qr-menu/:tenantId/orders" element={<OrderTrackingPage />} />

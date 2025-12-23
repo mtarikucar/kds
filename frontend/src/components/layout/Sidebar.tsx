@@ -132,7 +132,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
       } ${isSidebarCollapsed ? 'md:w-16' : 'md:w-64'} w-64`}
     >
       <div className="p-6 flex items-center justify-between">
-        {!isSidebarCollapsed && <h2 className="text-xl font-bold">Restaurant POS</h2>}
+        {!isSidebarCollapsed && <h2 className="text-xl font-bold">HummyTummy</h2>}
         {isSidebarCollapsed && <div className="w-full" />}
         {/* Mobile close button */}
         <button
