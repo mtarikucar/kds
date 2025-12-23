@@ -55,6 +55,26 @@
     "max": "max",
     "clearSelection": "Clear Selection",
     "cancel": "Cancel",
-    "addSelected": "Add Selected"
+    "addSelected": "Add Selected",
+    "validation": {
+      "nameRequired": "Name is required",
+      "pricePositive": "Price must be positive",
+      "categoryRequired": "Category is required",
+      "stockPositive": "Stock must be positive",
+      "invalidUrl": "Invalid URL"
+    },
+    "imageLibraryUI": {
+      "uploading": "Uploading...",
+      "dropOrClick": "Drop or click",
+      "uploadHint": "PNG, JPG up to 5MB",
+      "removeBg": "Remove BG",
+      "aiPowered": "AI-powered",
+      "loadingModel": "Loading model...",
+      "deleteConfirm": "Delete {{count}} image(s)?",
+      "noImagesFound": "No images found",
+      "noImagesYet": "No images yet",
+      "tryDifferentSearch": "Try different search",
+      "uploadToStart": "Upload to get started"
+    }
   }
 }

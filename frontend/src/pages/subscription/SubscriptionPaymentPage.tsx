@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements } from '@stripe/react-stripe-js';
 import { toast } from 'sonner';
@@ -20,6 +21,7 @@ const stripePromise = loadStripe(
 );
 
 export default function SubscriptionPaymentPage() {
+  const { t } = useTranslation('subscriptions');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const planId = searchParams.get('planId');
@@ -66,7 +68,7 @@ export default function SubscriptionPaymentPage() {
             }
           },
           onError: (error: any) => {
-            toast.error(error.response?.data?.message || 'Odeme olusturulamadi');
+            toast.error(error.response?.data?.message || t('subscriptions.payment.paymentCreationFailed'));
             navigate('/subscription');
           },
         }
@@ -91,13 +93,13 @@ export default function SubscriptionPaymentPage() {
             }
           },
           onError: (error: any) => {
-            toast.error(error.response?.data?.message || 'Odeme olusturulamadi');
+            toast.error(error.response?.data?.message || t('subscriptions.payment.paymentCreationFailed'));
             navigate('/subscription/plans');
           },
         }
       );
     } else {
-      toast.error('Eksik odeme bilgisi');
+      toast.error(t('subscriptions.payment.missingPaymentInfo'));
       navigate('/subscription/plans');
     }
   }, [planId, billingCycle, pendingChangeId]);
@@ -106,7 +108,7 @@ export default function SubscriptionPaymentPage() {
     setPaymentStatus('processing');
 
     if (isPlanChange && pendingChangeId) {
-      toast.success('Odeme onaylandi! Plan degisikligi uygulaniyor...');
+      toast.success(t('subscriptions.payment.applyingPlanChange'));
 
       try {
         await fetch(`/api/subscriptions/apply-plan-change/${pendingChangeId}`, {
@@ -122,10 +124,10 @@ export default function SubscriptionPaymentPage() {
         }, 2000);
       } catch (error) {
         setPaymentStatus('error');
-        toast.error('Plan degisikligi uygulanamadi');
+        toast.error(t('subscriptions.payment.planChangeFailed'));
       }
     } else {
-      toast.success('Odeme onaylandi! Abonelik aktif ediliyor...');
+      toast.success(t('subscriptions.payment.activatingSubscription'));
 
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.all });
@@ -149,7 +151,7 @@ export default function SubscriptionPaymentPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mx-auto mb-4" />
-          <p className="text-gray-600">Odeme hazirlaniyor...</p>
+          <p className="text-gray-600">{t('subscriptions.payment.preparing')}</p>
         </div>
       </div>
     );
@@ -161,16 +163,16 @@ export default function SubscriptionPaymentPage() {
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
           <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Odeme Basarili!
+            {t('subscriptions.payment.success.title')}
           </h2>
           <p className="text-gray-600 mb-6">
-            Aboneliginiz basariyla aktif edildi.
+            {t('subscriptions.payment.success.subscriptionActive')}
           </p>
           <button
             onClick={() => navigate('/subscription')}
             className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
           >
-            Abonelige Git
+            {t('subscriptions.payment.goToSubscription')}
           </button>
         </div>
       </div>
@@ -187,15 +189,13 @@ export default function SubscriptionPaymentPage() {
             className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
-            Planlara Don
+            {t('subscriptions.payment.backToPlans')}
           </button>
           <h1 className="text-3xl font-bold text-gray-900">
-            Odemenizi Tamamlayin
+            {t('subscriptions.payment.completePayment')}
           </h1>
           <p className="text-gray-600 mt-2">
-            {paymentProvider === 'STRIPE'
-              ? 'Stripe ile guvenli odeme yapin'
-              : 'PayTR ile guvenli odeme yapin'}
+            {t('subscriptions.payment.securePaymentWith')} {paymentProvider === 'STRIPE' ? 'Stripe' : 'PayTR'}
           </p>
         </div>
 
@@ -230,7 +230,7 @@ export default function SubscriptionPaymentPage() {
         ) : (
           <div className="bg-white rounded-lg p-8 text-center">
             <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-4" />
-            <p className="text-gray-600">Odeme formu yukleniyor...</p>
+            <p className="text-gray-600">{t('subscriptions.payment.loadingForm')}</p>
           </div>
         )}
 
@@ -240,12 +240,12 @@ export default function SubscriptionPaymentPage() {
             <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
             <div>
               <h3 className="font-semibold text-blue-900 mb-1">
-                Guvenli Odeme
+                {t('subscriptions.payment.securePaymentTitle')}
               </h3>
               <p className="text-sm text-blue-800">
                 {paymentProvider === 'STRIPE'
-                  ? 'Odeme bilgileriniz Stripe tarafindan guvenli bir sekilde islenir. Kart bilgileriniz bizde saklanmaz.'
-                  : 'Odeme bilgileriniz PayTR tarafindan guvenli bir sekilde islenir. Kart bilgileriniz bizde saklanmaz.'}
+                  ? t('subscriptions.payment.securePaymentDescStripe')
+                  : t('subscriptions.payment.securePaymentDescPaytr')}
               </p>
             </div>
           </div>

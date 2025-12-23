@@ -9,6 +9,7 @@
     "save": "Kaydet",
     "delete": "Sil",
     "edit": "Düzenle",
+    "view": "Görüntüle",
     "add": "Ekle",
     "back": "Geri",
     "submit": "Gönder",
@@ -28,7 +29,8 @@
     "about": "Hakkında",
     "login": "Giriş Yap",
     "update": "Güncelle",
-    "create": "Oluştur"
+    "create": "Oluştur",
+    "changeLanguage": "Dili Değiştir"
   },
   "common": {
     "browseMenu": "Menüyü Gözat",
@@ -143,6 +145,9 @@
     "subscriptionCreatedSuccessfully": "Abonelik başarıyla oluşturuldu",
     "subscriptionCancelledSuccessfully": "Abonelik başarıyla iptal edildi",
     "planChangedSuccessfully": "Plan başarıyla değiştirildi",
+    "redirectingToPayment": "Ödeme sayfasına yönlendiriliyor...",
+    "downgradeScheduled": "Plan düşürme {{date}} tarihine planlandı",
+    "subscriptionReactivatedSuccessfully": "Abonelik başarıyla yeniden etkinleştirildi",
     "userCreatedSuccessfully": "Kullanıcı başarıyla oluşturuldu",
     "userUpdatedSuccessfully": "Kullanıcı başarıyla güncellendi",
     "userDeletedSuccessfully": "Kullanıcı başarıyla silindi",
@@ -158,7 +163,28 @@
     "deleteFailed": "Silme başarısız",
     "saveFailed": "Kaydetme başarısız",
     "changePlanFailed": "Plan değiştirme başarısız",
-    "cancelSubscriptionFailed": "Abonelik iptal edilemedi"
+    "cancelSubscriptionFailed": "Abonelik iptal edilemedi",
+    "reactivateSubscriptionFailed": "Abonelik yeniden etkinleştirilemedi",
+    "qrSettingsResetSuccessfully": "QR ayarları varsayılanlara sıfırlandı",
+    "qrSettingsCreateFailed": "QR ayarları oluşturulamadı",
+    "qrSettingsUpdateFailed": "QR ayarları güncellenemedi",
+    "qrSettingsResetFailed": "QR ayarları sıfırlanamadı",
+    "orderApprovedSuccessfully": "Sipariş başarıyla onaylandı",
+    "orderApproveFailed": "Sipariş onaylanamadı",
+    "waiterRequestAcknowledged": "Garson isteği alındı",
+    "requestAcknowledgeFailed": "İstek alınamadı",
+    "waiterRequestCompleted": "Garson isteği tamamlandı",
+    "requestCompleteFailed": "İstek tamamlanamadı",
+    "billRequestAcknowledged": "Hesap isteği alındı",
+    "billRequestCompleted": "Hesap isteği tamamlandı",
+    "imagesUploadedSuccessfully": "{{count}} görsel başarıyla yüklendi",
+    "imageUploadFailed": "Görsel yüklenemedi",
+    "imagesUploadFailed": "Görseller yüklenemedi",
+    "imagesReorderedSuccessfully": "Görseller başarıyla yeniden sıralandı",
+    "imagesReorderFailed": "Görseller yeniden sıralanamadı",
+    "imageRemovedFromProduct": "Görsel üründen kaldırıldı",
+    "imageRemoveFailed": "Görsel kaldırılamadı",
+    "allMarkedAsRead": "Tüm bildirimler okundu olarak işaretlendi"
   },
   "time": {
     "today": "Bugün",
@@ -216,6 +242,13 @@
     "manager": "Müdür",
     "admin": "Yönetici",
     "courier": "Kurye",
+    "roles": {
+      "admin": "Yönetici",
+      "manager": "Müdür",
+      "waiter": "Garson",
+      "kitchen": "Mutfak",
+      "courier": "Kurye"
+    },
     "deleteUser": "Kullanıcıyı Sil",
     "actionCannotBeUndone": "Bu işlem geri alınamaz",
     "confirmDeleteUser": "Silmek istediğinizden emin misiniz",
@@ -272,116 +305,12 @@
     "scanToViewMenu": "Menüyü görmek için tarayın",
     "generatedOn": "Oluşturuldu",
     "tableSpecificQRCodes": "Masa Bazlı QR Kodları",
-    "qrDesigner": {
-      "quickColorThemes": "H\u0131zl\u0131 Renk Temalar\u0131",
-      "customColors": "\u00d6zel Renkler",
-      "primaryColor": "Ana Renk",
-      "secondaryColor": "\u0130kincil Renk",
-      "backgroundColor": "Arka Plan Rengi",
-      "typographySettings": "Yaz\u0131 Tipi Ayarlar\u0131",
-      "fontFamily": "Yaz\u0131 Tipi",
-      "logoUpload": "Logo Y\u00fckleme",
-      "chooseFile": "Dosya Se\u00e7",
-      "sampleText": "Aa Bb Cc",
-      "uploadLogo": "Restoran logonuzu y\u00fckleyin",
-      "layoutDisplayOptions": "Yerle\u015fim ve G\u00f6r\u00fcn\u00fcm Se\u00e7enekleri",
-      "layoutStyle": "Yerle\u015fim Stili",
-      "gridView": "Izgara G\u00f6r\u00fcn\u00fcm\u00fc",
-      "gridDesc": "\u00dcr\u00fcnler \u0131zgarada g\u00f6r\u00fcl\u00fcr",
-      "listView": "Liste G\u00f6r\u00fcn\u00fcm\u00fc",
-      "listDesc": "Geleneksel liste stili",
-      "compact": "Kompakt",
-      "compactDesc": "Alan verimli g\u00f6r\u00fcn\u00fcm",
-      "itemsPerRow": "Sat\u0131r Ba\u015f\u0131na \u00d6\u011fe",
-      "displayOptions": "G\u00f6r\u00fcnt\u00fcleme Se\u00e7enekleri",
-      "showRestaurantInfo": "Restoran Bilgilerini G\u00f6ster",
-      "showPrices": "Fiyatlar\u0131 G\u00f6ster",
-      "showDescriptions": "\u00dcr\u00fcn A\u00e7\u0131klamalar\u0131n\u0131 G\u00f6ster",
-      "showImages": "\u00dcr\u00fcn G\u00f6rsellerini G\u00f6ster",
-      "tableQRMessage": "Masa QR Mesaj\u0131",
-      "proTip": "\u0130pucu:",
-      "proTipText": "Sipari\u015fleri masaya g\u00f6re takip etmek i\u00e7in URL'ye masa numaras\u0131 ekleyebilirsiniz",
-      "qrCodePreview": "QR Kod \u00d6nizleme",
-      "qrWillUseColors": "QR kodlar\u0131n\u0131z bu renkleri kullan\u0131r:",
-      "qrPattern": "QR Deseni",
-      "background": "Arka Plan",
-      "saveAllChanges": "T\u00fcm De\u011fi\u015fiklikleri Kaydet",
-      "resetToDefaults": "Varsay\u0131lanlara D\u00f6nd\u00fcr",
-      "mainQRCode": "Ana QR Kodu",
-      "liveQRCodePreview": "Canl\u0131 QR kod \u00f6nizlemesi",
-      "updatesAutomatically": "Otomatik g\u00fcncellenir",
-      "menuPreview": "Men\u00fc \u00d6nizleme",
-      "mobile": "Mobil",
-      "tablet": "Tablet",
-      "livePreview": "Canl\u0131 \u00d6nizleme",
-      "restaurantLogo": "Restoran Logosu",
-      "restaurantName": "Restoran Ad\u0131",
-      "all": "T\u00fcm\u00fc",
-      "liveMenuPreview": "Canl\u0131 men\u00fc \u00f6nizlemesi",
-      "updatesAutomaticallyWithChanges": "Yapt\u0131\u011f\u0131n\u0131z de\u011fi\u015fikliklerle otomatik g\u00fcncellenir",
-      "currentColors": "Ge\u00e7erli Renkler",
-      "primary": "Ana Renk",
-      "secondary": "\u0130kincil Renk",
-      "themes": {
-        "modernBlue": "Modern Mavi",
-        "elegantDark": "\u015e\u0131k Koyu",
-        "warmOrange": "S\u0131cak Turuncu",
-        "freshGreen": "Taze Ye\u015fil",
-        "royalPurple": "Asil Mor",
-        "classicRed": "Klasik K\u0131rm\u0131z\u0131"
-      },
-      "templates": {
-        "fineDining": {
-          "name": "Zarif Restoran",
-          "description": "Zarif ve sofistike tasar\u0131m"
-        },
-        "modernCafe": {
-          "name": "Modern Kafe",
-          "description": "Temiz ve minimal tasar\u0131m"
-        },
-        "fastFood": {
-          "name": "H\u0131zl\u0131 Servis",
-          "description": "Canl\u0131 ve enerjik tasar\u0131m"
-        },
-        "healthyFresh": {
-          "name": "Sa\u011fl\u0131kl\u0131 & Taze",
-          "description": "Do\u011fal ve organik hissiyat"
-        },
-        "pizzaPlace": {
-          "name": "Pizza Restoran\u0131",
-          "description": "S\u0131cak ve davetk\u00e2r tasar\u0131m"
-        },
-        "minimalist": {
-          "name": "Minimalist",
-          "description": "Siyah beyaz sade tasar\u0131m"
-        }
-      },
-      "logoPreview": "Logo \u00f6nizleme",
-      "sampleCategories": {
-        "appetizers": "Ba\u015flang\u0131\u00e7lar",
-        "mainCourses": "Ana Yemekler",
-        "desserts": "Tat\u0131lar"
-      },
-      "sampleProducts": {
-        "caesarSaladName": "Sezar Salatas\u0131",
-        "caesarSaladDesc": "Taze romana marul ve parmesan",
-        "bruschettaName": "Bruschetta",
-        "bruschettaDesc": "Domates ve fesle\u011fenli k\u0131zarm\u0131\u015f ekmek",
-        "grilledSalmonName": "Izgara Somon",
-        "grilledSalmonDesc": "Mevsim sebzeleriyle Atlantik somonu",
-        "ribeyeSteakName": "Ribeye Biftek",
-        "ribeyeSteakDesc": "Tereya\u011fl\u0131 ot soslu dana biftek",
-        "tiramisuName": "Tiramisu",
-        "tiramisuDesc": "Klasik \u0130talyan kahveli tatl\u0131",
-        "lavaCakeName": "\u00c7ikolatal\u0131 Sufle",
-        "lavaCakeDesc": "S\u0131cak, ak\u0131\u015fkan merkezli \u00e7ikolatal\u0131 kek"
-      }
-    },
     "tableSpecificQRDesc": "Her masanın kendi QR kodu vardır. Bu kodu tarayan müşteriler hangi masada olduklarını görür.",
     "noTableQRCodesToPrint": "Yazdırılacak masa QR kodu bulunamadı.",
     "popupBlocked": "Açılır pencere engellendi. QR kodlarını yazdırmak için bu site için açılır pencerelere izin verin.",
     "noQRCodesForPrinting": "Yazdırma için QR kodları bulunamadı. Lütfen QR kodlarının yüklendiğinden emin olun.",
-    "noTablesFound": "Masa bulunamadı. Lütfen önce masaları ekleyin."
+    "noTablesFound": "Masa bulunamadı. Lütfen önce masaları ekleyin.",
+    "noQRCodesToDownload": "İndirilecek QR kod bulunamadı"
   },
   "qrDesigner": {
     "quickColorThemes": "Hızlı Renk Temaları",

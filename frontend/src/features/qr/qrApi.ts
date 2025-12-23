@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import i18n from '../../i18n/config';
 import api from '../../lib/api';
 import {
   QrMenuSettings,
@@ -28,10 +29,10 @@ export const useCreateQrSettings = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['qr-settings'] });
-      toast.success('QR settings created successfully');
+      toast.success(i18n.t('common:notifications.qrSettingsCreatedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to create QR settings');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.qrSettingsCreateFailed'));
     },
   });
 };
@@ -46,10 +47,10 @@ export const useUpdateQrSettings = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['qr-settings'] });
-      toast.success('QR settings updated successfully');
+      toast.success(i18n.t('common:notifications.qrSettingsUpdatedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to update QR settings');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.qrSettingsUpdateFailed'));
     },
   });
 };
@@ -63,10 +64,10 @@ export const useDeleteQrSettings = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['qr-settings'] });
-      toast.success('QR settings reset to defaults');
+      toast.success(i18n.t('common:notifications.qrSettingsResetSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to reset QR settings');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.qrSettingsResetFailed'));
     },
   });
 };

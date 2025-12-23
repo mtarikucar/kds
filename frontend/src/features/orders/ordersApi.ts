@@ -224,10 +224,10 @@ export const useApproveOrder = () => {
         refetchType: 'all' 
       });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
-      toast.success('Order approved successfully');
+      toast.success(i18n.t('common:notifications.orderApprovedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to approve order');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.orderApproveFailed'));
     },
   });
 };
@@ -256,14 +256,14 @@ export const useAcknowledgeWaiterRequest = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ['waiterRequests'],
-        refetchType: 'all' 
+        refetchType: 'all'
       });
-      toast.success('Waiter request acknowledged');
+      toast.success(i18n.t('common:notifications.waiterRequestAcknowledged'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to acknowledge request');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.requestAcknowledgeFailed'));
     },
   });
 };
@@ -277,14 +277,14 @@ export const useCompleteWaiterRequest = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ['waiterRequests'],
-        refetchType: 'all' 
+        refetchType: 'all'
       });
-      toast.success('Waiter request completed');
+      toast.success(i18n.t('common:notifications.waiterRequestCompleted'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to complete request');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.requestCompleteFailed'));
     },
   });
 };
@@ -313,14 +313,14 @@ export const useAcknowledgeBillRequest = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ['billRequests'],
-        refetchType: 'all' 
+        refetchType: 'all'
       });
-      toast.success('Bill request acknowledged');
+      toast.success(i18n.t('common:notifications.billRequestAcknowledged'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to acknowledge request');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.requestAcknowledgeFailed'));
     },
   });
 };
@@ -334,14 +334,14 @@ export const useCompleteBillRequest = () => {
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ['billRequests'],
-        refetchType: 'all' 
+        refetchType: 'all'
       });
-      toast.success('Bill request completed');
+      toast.success(i18n.t('common:notifications.billRequestCompleted'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to complete request');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.requestCompleteFailed'));
     },
   });
 };

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import i18n from '../../i18n/config';
 import api from '../../lib/api';
 import { useAuthStore } from '../../store/authStore';
 import { LoginRequest, RegisterRequest, AuthResponse, User } from '../../types';
@@ -14,10 +15,10 @@ export const useLogin = () => {
     },
     onSuccess: (data) => {
       login(data.user, data.accessToken, data.refreshToken);
-      toast.success('Login successful');
+      toast.success(i18n.t('common:notifications.loginSuccessful'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Login failed');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.loginFailed'));
     },
   });
 };
@@ -29,10 +30,10 @@ export const useRegister = () => {
       return response.data;
     },
     onSuccess: () => {
-      toast.success('Registration successful. Please login.');
+      toast.success(i18n.t('common:notifications.registrationSuccessful'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Registration failed');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.registrationFailed'));
     },
   });
 };
@@ -63,7 +64,7 @@ export const useLogout = () => {
     onSuccess: () => {
       logout();
       queryClient.clear();
-      toast.success('Logged out successfully');
+      toast.success(i18n.t('common:notifications.logoutSuccessful'));
     },
     onError: () => {
       // Logout anyway even if API call fails
@@ -80,10 +81,10 @@ export const useForgotPassword = () => {
       return response.data;
     },
     onSuccess: () => {
-      toast.success('Password reset link sent to your email');
+      toast.success(i18n.t('common:notifications.passwordResetLinkSent'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to send reset email');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
   });
 };
@@ -95,10 +96,10 @@ export const useResetPassword = () => {
       return response.data;
     },
     onSuccess: () => {
-      toast.success('Password reset successful. Please login with your new password.');
+      toast.success(i18n.t('common:notifications.passwordResetSuccessful'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to reset password');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
   });
 };
@@ -110,10 +111,10 @@ export const useChangePassword = () => {
       return response.data;
     },
     onSuccess: () => {
-      toast.success('Password changed successfully');
+      toast.success(i18n.t('common:notifications.passwordChangedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to change password');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
   });
 };
@@ -127,12 +128,12 @@ export const useVerifyEmail = () => {
       return response.data;
     },
     onSuccess: () => {
-      toast.success('Email başarıyla doğrulandı!');
+      toast.success(i18n.t('common:notifications.emailVerifiedSuccessfully'));
       // Invalidate profile query to refresh email verified status
       queryClient.invalidateQueries({ queryKey: ['profile'] });
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Doğrulama kodu geçersiz veya süresi dolmuş');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
   });
 };
@@ -144,10 +145,10 @@ export const useResendVerificationEmail = () => {
       return response.data;
     },
     onSuccess: () => {
-      toast.success('Doğrulama kodu email\'inize gönderildi');
+      toast.success(i18n.t('common:notifications.verificationCodeSent'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Doğrulama kodu gönderilemedi');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
   });
 };
@@ -163,10 +164,10 @@ export const useGoogleAuth = () => {
     },
     onSuccess: (data) => {
       login(data.user, data.accessToken, data.refreshToken);
-      toast.success('Google login successful');
+      toast.success(i18n.t('common:notifications.googleLoginSuccessful'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Google login failed');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.loginFailed'));
     },
   });
 };
@@ -182,10 +183,10 @@ export const useAppleAuth = () => {
     },
     onSuccess: (data) => {
       login(data.user, data.accessToken, data.refreshToken);
-      toast.success('Apple login successful');
+      toast.success(i18n.t('common:notifications.appleLoginSuccessful'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Apple login failed');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.loginFailed'));
     },
   });
 };

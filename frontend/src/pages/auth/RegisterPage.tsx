@@ -228,7 +228,7 @@ const RegisterPage = () => {
                 options={tenantOptions}
                 error={errors.tenantId?.message}
                 disabled={tenantsLoading || tenantOptions.length === 0}
-                placeholder={tenantsLoading ? 'Loading...' : 'Select a restaurant'}
+                placeholder={tenantsLoading ? t('common:app.loading') : t('auth:register.selectRestaurantPlaceholder')}
                 {...register('tenantId')}
               />
             )}

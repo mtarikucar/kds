@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import i18n from '../../i18n/config';
 import api from '../../lib/api';
 
 export const useMyProfile = () => {
@@ -22,10 +23,10 @@ export const useUpdateProfile = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-profile'] });
-      toast.success('Profile updated successfully');
+      toast.success(i18n.t('common:notifications.profileUpdatedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to update profile');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
   });
 };
@@ -40,10 +41,10 @@ export const useUpdateEmail = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['my-profile'] });
-      toast.success('Email updated successfully. Please verify your new email.');
+      toast.success(i18n.t('common:notifications.updatedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to update email');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
   });
 };

@@ -224,12 +224,12 @@ const UserManagementPage = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadgeColor(user.role)}`}>
-                    {user.role}
+                    {t(`admin.roles.${user.role.toLowerCase()}`)}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadgeColor(user.status)}`}>
-                    {user.status}
+                    {t(`statuses.${user.status.toLowerCase()}`)}
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -361,7 +361,7 @@ const UserManagementPage = () => {
                   type="submit"
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
-                  {editingUser ? t('app:app.update') : t('app:app.create')} {t('admin.user')}
+                  {editingUser ? t('admin.editUser') : t('admin.addNewUser')}
                 </button>
               </div>
             </form>

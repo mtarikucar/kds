@@ -107,8 +107,11 @@
     "emailAdded": "Email added successfully",
     "emailRemoved": "Email removed",
     "settingsSaved": "Report settings saved successfully",
-    "settingsFailed": "Failed to save report settings"
+    "settingsFailed": "Failed to save report settings",
+    "emailAlreadyAdded": "Email already added",
+    "emailReportInfo": "When enabled, Z-Report summaries will be automatically generated and emailed to the configured recipients at the closing time each day."
   },
+  "downloadNotAvailable": "Download not available for this platform yet.",
   "preview": {
     "currentConfiguration": "Current Configuration",
     "tablelessMode": "Tableless Mode",

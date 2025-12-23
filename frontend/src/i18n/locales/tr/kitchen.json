@@ -33,7 +33,9 @@
     "orderNoteLabel": "Sipariş Notu",
     "noteLabel": "Not",
     "markAs": "{{status}} olarak işaretle",
-    "cancelOrder": "Siparişi İptal Et"
+    "cancelOrder": "Siparişi İptal Et",
+    "newOrderNotification": "Yeni Sipariş: #{{orderNumber}}",
+    "orderUpdatedNotification": "Sipariş Güncellendi: #{{orderNumber}}"
   }
 }
 

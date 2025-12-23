@@ -24,7 +24,7 @@ const QRManagementPage = () => {
     const allQRs = qrCodesData?.qrCodes || [];
 
     if (allQRs.length === 0) {
-      alert('No QR codes found to download');
+      alert(t('admin.noQRCodesToDownload'));
       return;
     }
 

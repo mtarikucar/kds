@@ -60,7 +60,7 @@ const ReportSettings = () => {
     }
 
     if (reportEmails.includes(trimmedEmail)) {
-      setEmailError('Email already added');
+      setEmailError(t('reportSettings.emailAlreadyAdded'));
       return;
     }
 
@@ -105,7 +105,7 @@ const ReportSettings = () => {
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-gray-500 text-center">Loading...</p>
+          <p className="text-gray-500 text-center">{t('common:app.loading')}</p>
         </CardContent>
       </Card>
     );
@@ -250,7 +250,7 @@ const ReportSettings = () => {
         {/* Info box */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <p className="text-sm text-blue-800">
-            <strong>{t('info.noteLabel')}</strong> When enabled, Z-Report summaries will be automatically generated and emailed to the configured recipients at the closing time each day.
+            <strong>{t('info.noteLabel')}</strong> {t('reportSettings.emailReportInfo')}
           </p>
         </div>
 

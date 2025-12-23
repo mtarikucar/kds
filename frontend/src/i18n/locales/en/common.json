@@ -9,6 +9,7 @@
     "save": "Save",
     "delete": "Delete",
     "edit": "Edit",
+    "view": "View",
     "add": "Add",
     "back": "Back",
     "submit": "Submit",
@@ -28,7 +29,8 @@
     "about": "About",
     "login": "Login",
     "update": "Update",
-    "create": "Create"
+    "create": "Create",
+    "changeLanguage": "Change Language"
   },
   "common": {
     "browseMenu": "Browse Menu",
@@ -143,6 +145,9 @@
     "subscriptionCreatedSuccessfully": "Subscription created successfully",
     "subscriptionCancelledSuccessfully": "Subscription cancelled successfully",
     "planChangedSuccessfully": "Plan changed successfully",
+    "redirectingToPayment": "Redirecting to payment...",
+    "downgradeScheduled": "Downgrade scheduled for {{date}}",
+    "subscriptionReactivatedSuccessfully": "Subscription reactivated successfully",
     "userCreatedSuccessfully": "User created successfully",
     "userUpdatedSuccessfully": "User updated successfully",
     "userDeletedSuccessfully": "User deleted successfully",
@@ -158,7 +163,28 @@
     "deleteFailed": "Delete failed",
     "saveFailed": "Save failed",
     "changePlanFailed": "Failed to change plan",
-    "cancelSubscriptionFailed": "Failed to cancel subscription"
+    "cancelSubscriptionFailed": "Failed to cancel subscription",
+    "reactivateSubscriptionFailed": "Failed to reactivate subscription",
+    "qrSettingsResetSuccessfully": "QR settings reset to defaults",
+    "qrSettingsCreateFailed": "Failed to create QR settings",
+    "qrSettingsUpdateFailed": "Failed to update QR settings",
+    "qrSettingsResetFailed": "Failed to reset QR settings",
+    "orderApprovedSuccessfully": "Order approved successfully",
+    "orderApproveFailed": "Failed to approve order",
+    "waiterRequestAcknowledged": "Waiter request acknowledged",
+    "requestAcknowledgeFailed": "Failed to acknowledge request",
+    "waiterRequestCompleted": "Waiter request completed",
+    "requestCompleteFailed": "Failed to complete request",
+    "billRequestAcknowledged": "Bill request acknowledged",
+    "billRequestCompleted": "Bill request completed",
+    "imagesUploadedSuccessfully": "{{count}} image(s) uploaded successfully",
+    "imageUploadFailed": "Failed to upload image",
+    "imagesUploadFailed": "Failed to upload images",
+    "imagesReorderedSuccessfully": "Images reordered successfully",
+    "imagesReorderFailed": "Failed to reorder images",
+    "imageRemovedFromProduct": "Image removed from product",
+    "imageRemoveFailed": "Failed to remove image",
+    "allMarkedAsRead": "All notifications marked as read"
   },
   "time": {
     "today": "Today",
@@ -216,6 +242,13 @@
     "manager": "Manager",
     "admin": "Admin",
     "courier": "Courier",
+    "roles": {
+      "admin": "Admin",
+      "manager": "Manager",
+      "waiter": "Waiter",
+      "kitchen": "Kitchen",
+      "courier": "Courier"
+    },
     "deleteUser": "Delete User",
     "actionCannotBeUndone": "This action cannot be undone",
     "confirmDeleteUser": "Are you sure you want to delete",
@@ -276,7 +309,8 @@
     "noTableQRCodesToPrint": "No table QR codes found to print.",
     "popupBlocked": "Popup blocked. Please allow popups for this site to print QR codes.",
     "noQRCodesForPrinting": "No QR codes could be found for printing. Please ensure QR codes are loaded.",
-    "noTablesFound": "No tables found. Please add tables first."
+    "noTablesFound": "No tables found. Please add tables first.",
+    "noQRCodesToDownload": "No QR codes found to download"
   },
   "qrDesigner": {
     "quickColorThemes": "Quick Color Themes",

@@ -170,5 +170,6 @@
     "update": "Güncelle",
     "create": "Oluştur",
     "payment": "Ödeme"
-  }
+  },
+  "newCustomerOrder": "Yeni Müşteri Siparişi: #{{orderNumber}}"
 }

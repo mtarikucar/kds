@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import i18n from '../../i18n/config';
 import api from '../../lib/api';
 import { Table, CreateTableDto, UpdateTableDto } from '../../types';
 
@@ -34,10 +35,10 @@ export const useCreateTable = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tables'] });
-      toast.success('Table created successfully');
+      toast.success(i18n.t('common:notifications.tableCreatedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to create table');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
   });
 };
@@ -58,10 +59,10 @@ export const useUpdateTable = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tables'] });
-      toast.success('Table updated successfully');
+      toast.success(i18n.t('common:notifications.tableUpdatedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to update table');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
   });
 };
@@ -75,10 +76,10 @@ export const useDeleteTable = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tables'] });
-      toast.success('Table deleted successfully');
+      toast.success(i18n.t('common:notifications.tableDeletedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to delete table');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
   });
 };
@@ -101,7 +102,7 @@ export const useUpdateTableStatus = () => {
       queryClient.invalidateQueries({ queryKey: ['tables'] });
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to update table status');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
   });
 };

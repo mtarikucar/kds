@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import i18n from '../../i18n/config';
 import api from '../../lib/api';
 import {
   Plan,
@@ -72,10 +73,10 @@ export const useCreateSubscription = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
-      toast.success('Subscription created successfully');
+      toast.success(i18n.t('common:notifications.subscriptionCreatedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to create subscription');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
   });
 };
@@ -98,10 +99,10 @@ export const useUpdateSubscription = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.detail(variables.id) });
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
-      toast.success('Subscription updated successfully');
+      toast.success(i18n.t('common:notifications.updatedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to update subscription');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
   });
 };
@@ -128,10 +129,10 @@ export const useChangePlan = () => {
       // Show appropriate message based on response
       if (result.pendingChange) {
         if (result.pendingChange.requiresPayment) {
-          toast.info('Redirecting to payment...');
+          toast.info(i18n.t('common:notifications.redirectingToPayment'));
         } else if (result.pendingChange.scheduledFor) {
           const date = new Date(result.pendingChange.scheduledFor).toLocaleDateString();
-          toast.success(`Downgrade scheduled for ${date}`);
+          toast.success(i18n.t('common:notifications.downgradeScheduled', { date }));
           // For scheduled downgrade, invalidate to show the pending status
           queryClient.invalidateQueries({ queryKey: subscriptionKeys.detail(variables.id) });
           queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
@@ -139,7 +140,7 @@ export const useChangePlan = () => {
       }
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to change plan');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.changePlanFailed'));
     },
   });
 };
@@ -164,10 +165,10 @@ export const useCancelSubscription = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.detail(variables.id) });
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
-      toast.success('Subscription cancelled successfully');
+      toast.success(i18n.t('common:notifications.subscriptionCancelledSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to cancel subscription');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.cancelSubscriptionFailed'));
     },
   });
 };
@@ -184,10 +185,10 @@ export const useReactivateSubscription = () => {
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
-      toast.success('Subscription reactivated successfully');
+      toast.success(i18n.t('common:notifications.subscriptionReactivatedSuccessfully'));
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to reactivate subscription');
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.reactivateSubscriptionFailed'));
     },
   });
 };

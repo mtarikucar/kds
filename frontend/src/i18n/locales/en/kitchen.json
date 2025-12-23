@@ -33,7 +33,9 @@
     "orderNoteLabel": "Order Note",
     "noteLabel": "Note",
     "markAs": "Mark as {{status}}",
-    "cancelOrder": "Cancel Order"
+    "cancelOrder": "Cancel Order",
+    "newOrderNotification": "New Order: #{{orderNumber}}",
+    "orderUpdatedNotification": "Order Updated: #{{orderNumber}}"
   }
 }
 

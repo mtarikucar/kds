@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { initializeSocket, disconnectSocket } from '../../lib/socket';
 import { toast } from 'sonner';
+import i18n from '../../i18n/config';
 
 export const usePosSocket = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -78,8 +79,8 @@ export const usePosSocket = () => {
 
       // Show toast notification for customer orders requiring approval
       if (event.requiresApproval) {
-        toast.warning(`New Customer Order: #${event.orderNumber}`, {
-          description: event.table ? `Table ${event.table.number} - Awaiting approval` : 'Awaiting approval',
+        toast.warning(i18n.t('pos:newCustomerOrder', { orderNumber: event.orderNumber }), {
+          description: event.table ? `${i18n.t('pos:table')} ${event.table.number} - ${i18n.t('pos:pendingOrders.awaitingApproval')}` : i18n.t('pos:pendingOrders.awaitingApproval'),
           duration: 8000,
           position: 'top-right',
         });

@@ -189,7 +189,7 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Tags
+            {t('customers.tags')}
           </label>
           <div className="flex gap-2 mb-2">
             <input
@@ -198,7 +198,7 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
               onChange={(e) => setTagInput(e.target.value)}
               onKeyDown={handleKeyDown}
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="VIP, Regular, etc."
+              placeholder={t('customers.tagsPlaceholder')}
             />
             <Button type="button" size="sm" onClick={handleAddTag}>
               +

@@ -170,5 +170,6 @@
     "update": "Update",
     "create": "Create",
     "payment": "Payment"
-  }
+  },
+  "newCustomerOrder": "New Customer Order: #{{orderNumber}}"
 }

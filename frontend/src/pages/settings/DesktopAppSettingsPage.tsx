@@ -12,7 +12,7 @@ const DesktopAppSettingsPage = () => {
 
   const handleDownload = async (platform: typeof platforms[0]) => {
     if (!platform.downloadUrl) {
-      alert('Download not available for this platform yet.');
+      alert(t('downloadNotAvailable'));
       return;
     }
 

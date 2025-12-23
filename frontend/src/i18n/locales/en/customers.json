@@ -44,7 +44,9 @@
     "amount": "Amount",
     "avgOrder": "Avg Order",
     "lastVisit": "Last Visit",
-    "referralCode": "Referral Code"
+    "referralCode": "Referral Code",
+    "tags": "Tags",
+    "tagsPlaceholder": "VIP, Regular, etc."
   }
 }
 

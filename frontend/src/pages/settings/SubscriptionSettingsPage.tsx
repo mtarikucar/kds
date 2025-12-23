@@ -107,7 +107,7 @@ const SubscriptionManagementPage = () => {
       setCancellationReason('');
     } catch (error) {
       console.error('Failed to cancel subscription:', error);
-      toast.error(t('cancelFailed'));
+      toast.error(t('common:notifications.cancelSubscriptionFailed'));
     }
   };
 
@@ -117,7 +117,7 @@ const SubscriptionManagementPage = () => {
       await reactivateSubscription.mutateAsync(currentSubscription.id);
     } catch (error) {
       console.error('Failed to reactivate subscription:', error);
-      toast.error(t('reactivateFailed'));
+      toast.error(t('common:notifications.reactivateSubscriptionFailed'));
     }
   };
 
@@ -144,7 +144,7 @@ const SubscriptionManagementPage = () => {
       }
     } catch (error) {
       console.error('Failed to change plan:', error);
-      toast.error(t('changePlanFailed'));
+      toast.error(t('subscriptions.payment.planChangeFailed'));
     }
   };
 
@@ -230,7 +230,7 @@ const SubscriptionManagementPage = () => {
                     onClick={() => setShowChangePlanModal(true)}
                   >
                     <RefreshCw className="h-4 w-4 mr-2" />
-                    {t('changePlan')}
+                    {t('subscriptions.changePlan')}
                   </Button>
                   {!currentSubscription.cancelAtPeriodEnd && (
                     <Button
@@ -239,7 +239,7 @@ const SubscriptionManagementPage = () => {
                       onClick={() => setShowCancelModal(true)}
                     >
                       <XCircle className="h-4 w-4 mr-2" />
-                      {t('cancelSubscription')}
+                      {t('subscriptions.cancelSubscription')}
                     </Button>
                   )}
                 </>
@@ -252,7 +252,7 @@ const SubscriptionManagementPage = () => {
                   isLoading={reactivateSubscription.isPending}
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
-                  {t('reactivateSubscription')}
+                  {t('subscriptions.reactivateSubscription')}
                 </Button>
               )}
             </div>

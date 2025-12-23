@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useEffect } from 'react';
+import i18n from '../../i18n/config';
 import api from '../../lib/api';
 import { initializeNotificationSocket, disconnectNotificationSocket } from '../../lib/socket';
 import { useAuthStore } from '../../store/authStore';
@@ -97,7 +98,7 @@ export const useMarkAllAsRead = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
-      toast.success('All notifications marked as read');
+      toast.success(i18n.t('common:notifications.allMarkedAsRead'));
     },
   });
 };

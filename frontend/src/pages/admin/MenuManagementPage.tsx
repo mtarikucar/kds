@@ -49,28 +49,34 @@ import ImageLibraryModal from '../../components/product/ImageLibraryModal';
 import ImageUploadZone from '../../components/ui/ImageUploadZone';
 import { formatCurrency } from '../../lib/utils';
 
-const categorySchema = z.object({
-  name: z.string().min(1, 'Name is required'),
+// Schema factories for i18n support
+const createCategorySchema = (t: (key: string) => string) => z.object({
+  name: z.string().min(1, t('menu.validation.nameRequired')),
   description: z.string().optional(),
   displayOrder: z.number().optional(),
 });
 
-const productSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
+const createProductSchema = (t: (key: string) => string) => z.object({
+  name: z.string().min(1, t('menu.validation.nameRequired')),
   description: z.string().optional(),
-  price: z.number().min(0, 'Price must be positive'),
-  categoryId: z.string().min(1, 'Category is required'),
-  currentStock: z.number().min(0, 'Stock must be positive').optional(),
-  image: z.string().url('Invalid URL').optional().or(z.literal('')), // Legacy field
+  price: z.number().min(0, t('menu.validation.pricePositive')),
+  categoryId: z.string().min(1, t('menu.validation.categoryRequired')),
+  currentStock: z.number().min(0, t('menu.validation.stockPositive')).optional(),
+  image: z.string().url(t('menu.validation.invalidUrl')).optional().or(z.literal('')), // Legacy field
   imageIds: z.array(z.string()).optional(), // New multi-image support
   isAvailable: z.boolean().optional(),
 });
 
-type CategoryFormData = z.infer<typeof categorySchema>;
-type ProductFormData = z.infer<typeof productSchema>;
+type CategoryFormData = z.infer<ReturnType<typeof createCategorySchema>>;
+type ProductFormData = z.infer<ReturnType<typeof createProductSchema>>;
 
 const MenuManagementPage = () => {
   const { t } = useTranslation(['menu', 'common']);
+
+  // Create translated schemas
+  const categorySchema = createCategorySchema(t);
+  const productSchema = createProductSchema(t);
+
   const [activeTab, setActiveTab] = useState<'categories' | 'products' | 'images'>('categories');
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
@@ -257,7 +263,7 @@ const MenuManagementPage = () => {
 
   const handleDeleteSelectedImages = async () => {
     if (selectedImages.size === 0) return;
-    if (!window.confirm(`Delete ${selectedImages.size} image(s)?`)) return;
+    if (!window.confirm(t('menu.imageLibraryUI.deleteConfirm', { count: selectedImages.size }))) return;
     for (const id of selectedImages) {
       await deleteImage(id);
     }
@@ -522,9 +528,9 @@ const MenuManagementPage = () => {
                     <Upload className="w-8 h-8 mx-auto text-gray-400" />
                   )}
                   <p className="mt-2 text-sm text-gray-600">
-                    {uploadImagesMutation.isPending ? 'Uploading...' : 'Drop or click'}
+                    {uploadImagesMutation.isPending ? t('menu.imageLibraryUI.uploading') : t('menu.imageLibraryUI.dropOrClick')}
                   </p>
-                  <p className="mt-1 text-xs text-gray-400">PNG, JPG up to 5MB</p>
+                  <p className="mt-1 text-xs text-gray-400">{t('menu.imageLibraryUI.uploadHint')}</p>
                 </label>
               </div>
             </div>
@@ -544,8 +550,8 @@ const MenuManagementPage = () => {
                       )} />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">Remove BG</p>
-                      <p className="text-xs text-gray-500">AI-powered</p>
+                      <p className="text-sm font-medium text-gray-900">{t('menu.imageLibraryUI.removeBg')}</p>
+                      <p className="text-xs text-gray-500">{t('menu.imageLibraryUI.aiPowered')}</p>
                     </div>
                   </div>
                   <button
@@ -567,7 +573,7 @@ const MenuManagementPage = () => {
                     <div className="flex items-center gap-2">
                       <Loader2 className="w-3 h-3 text-violet-600 animate-spin" />
                       <span className="text-xs text-violet-700">
-                        {isModelLoading ? 'Loading model...' : processingFile}
+                        {isModelLoading ? t('menu.imageLibraryUI.loadingModel') : processingFile}
                       </span>
                     </div>
                   </div>
@@ -643,10 +649,10 @@ const MenuManagementPage = () => {
                     <ImageIcon className="w-7 h-7 text-gray-400" />
                   </div>
                   <h3 className="text-base font-medium text-gray-900">
-                    {imageSearchTerm ? 'No images found' : 'No images yet'}
+                    {imageSearchTerm ? t('menu.imageLibraryUI.noImagesFound') : t('menu.imageLibraryUI.noImagesYet')}
                   </h3>
                   <p className="mt-1 text-sm text-gray-500">
-                    {imageSearchTerm ? 'Try different search' : 'Upload to get started'}
+                    {imageSearchTerm ? t('menu.imageLibraryUI.tryDifferentSearch') : t('menu.imageLibraryUI.uploadToStart')}
                   </p>
                 </div>
               ) : imageViewMode === 'grid' ? (

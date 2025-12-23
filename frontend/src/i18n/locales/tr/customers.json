@@ -44,7 +44,9 @@
     "amount": "Tutar",
     "avgOrder": "Ort. Sipariş",
     "lastVisit": "Son Ziyaret",
-    "referralCode": "Referans Kodu"
+    "referralCode": "Referans Kodu",
+    "tags": "Etiketler",
+    "tagsPlaceholder": "VIP, Düzenli vb."
   }
 }
 

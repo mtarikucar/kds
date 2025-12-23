@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { initializeSocket, disconnectSocket } from '../../lib/socket';
 import { OrderStatusChangedEvent, NewOrderEvent } from '../../types';
 import { toast } from 'sonner';
+import i18n from '../../i18n/config';
 
 export const useKitchenSocket = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -52,7 +53,7 @@ export const useKitchenSocket = () => {
       playNotificationSound();
 
       // Show toast notification
-      toast.success(`New Order: #${event.orderNumber}`, {
+      toast.success(i18n.t('kitchen:kitchen.newOrderNotification', { orderNumber: event.orderNumber }), {
         duration: 5000,
         position: 'top-center',
       });
@@ -67,7 +68,7 @@ export const useKitchenSocket = () => {
       playNotificationSound();
 
       // Show toast notification
-      toast.info(`Order Updated: #${event.orderNumber}`, {
+      toast.info(i18n.t('kitchen:kitchen.orderUpdatedNotification', { orderNumber: event.orderNumber }), {
         duration: 5000,
         position: 'top-center',
       });

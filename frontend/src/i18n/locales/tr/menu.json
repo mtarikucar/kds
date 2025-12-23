@@ -55,6 +55,26 @@
     "max": "maksimum",
     "clearSelection": "Seçimi Temizle",
     "cancel": "İptal",
-    "addSelected": "Seçilenleri Ekle"
+    "addSelected": "Seçilenleri Ekle",
+    "validation": {
+      "nameRequired": "İsim gereklidir",
+      "pricePositive": "Fiyat pozitif olmalıdır",
+      "categoryRequired": "Kategori gereklidir",
+      "stockPositive": "Stok pozitif olmalıdır",
+      "invalidUrl": "Geçersiz URL"
+    },
+    "imageLibraryUI": {
+      "uploading": "Yükleniyor...",
+      "dropOrClick": "Sürükle veya tıkla",
+      "uploadHint": "PNG, JPG 5MB'a kadar",
+      "removeBg": "Arkaplan Kaldır",
+      "aiPowered": "AI destekli",
+      "loadingModel": "Model yükleniyor...",
+      "deleteConfirm": "{{count}} görsel silinsin mi?",
+      "noImagesFound": "Görsel bulunamadı",
+      "noImagesYet": "Henüz görsel yok",
+      "tryDifferentSearch": "Farklı arama deneyin",
+      "uploadToStart": "Başlamak için yükleyin"
+    }
   }
 }
