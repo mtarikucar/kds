@@ -27,7 +27,7 @@ export class ZReportsService {
   /**
    * Generate a Z-Report for end-of-day reconciliation
    */
-  async generateReport(tenantId: string, createDto: CreateZReportDto) {
+  async generateReport(tenantId: string, userId: string, createDto: CreateZReportDto) {
     const { reportDate, cashDrawerOpening, cashDrawerClosing, notes } = createDto;
 
     // Check if report already exists for this date
@@ -143,7 +143,7 @@ export class ZReportsService {
         tenantId,
         reportDate: new Date(reportDate),
         reportNumber: `Z-${new Date(reportDate).toISOString().slice(0, 10).replace(/-/g, '')}`,
-        closedById: 'system', // TODO: Get from authenticated user context
+        closedById: userId,
 
         // Sales data
         totalOrders,
@@ -498,7 +498,7 @@ export class ZReportsService {
       report = existing;
     } else {
       // Generate report for today with default values
-      report = await this.generateReport(tenantId, {
+      report = await this.generateReport(tenantId, userId, {
         reportDate: today.toISOString(),
         cashDrawerOpening: 0,
         cashDrawerClosing: 0,

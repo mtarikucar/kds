@@ -8,7 +8,6 @@ import {
   UtensilsCrossed,
   Table,
   BarChart3,
-  FileText,
   Settings,
   Users,
   QrCode,
@@ -96,12 +95,6 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
       to: '/admin/reports',
       icon: BarChart3,
       label: t('navigation.reports'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-    },
-    {
-      to: '/admin/z-reports',
-      icon: FileText,
-      label: t('navigation.zReports', 'Z-Reports'),
       roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
   ];

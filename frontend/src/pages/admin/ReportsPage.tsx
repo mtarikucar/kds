@@ -11,6 +11,7 @@ import HourlyOrdersChart from '../../components/reports/HourlyOrdersChart';
 import CustomerAnalyticsSection from '../../components/reports/CustomerAnalyticsSection';
 import InventorySection from '../../components/reports/InventorySection';
 import StaffPerformanceSection from '../../components/reports/StaffPerformanceSection';
+import ZReportsSection from '../../components/reports/ZReportsSection';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import {
   DollarSign,
@@ -22,6 +23,7 @@ import {
   Users,
   Package,
   UserCog,
+  FileText,
 } from 'lucide-react';
 
 interface DateRangeForm {
@@ -29,7 +31,7 @@ interface DateRangeForm {
   endDate: string;
 }
 
-type TabType = 'sales' | 'hourly' | 'customers' | 'inventory' | 'staff';
+type TabType = 'sales' | 'hourly' | 'customers' | 'inventory' | 'staff' | 'zreports';
 
 const ReportsPage = () => {
   const { t } = useTranslation('reports');
@@ -63,6 +65,7 @@ const ReportsPage = () => {
     { id: 'customers' as TabType, label: t('customerAnalytics.title'), icon: Users },
     { id: 'inventory' as TabType, label: t('inventoryReport.title'), icon: Package },
     { id: 'staff' as TabType, label: t('staffPerformance.title'), icon: UserCog },
+    { id: 'zreports' as TabType, label: t('zReports.title', 'Z-Reports'), icon: FileText },
   ];
 
   const StatCard = ({
@@ -335,6 +338,10 @@ const ReportsPage = () => {
           startDate={dateRange.startDate}
           endDate={dateRange.endDate}
         />
+      )}
+
+      {activeTab === 'zreports' && (
+        <ZReportsSection />
       )}
     </div>
   );

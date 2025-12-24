@@ -23,7 +23,6 @@ import TableManagementPage from './pages/admin/TableManagementPage';
 import UserManagementPage from './pages/admin/UserManagementPage';
 import QRManagementPage from './pages/admin/QRManagementPage';
 import ReportsPage from './pages/admin/ReportsPage';
-import ZReportsPage from './pages/admin/ZReportsPage';
 import SubscriptionPlansPage from './pages/subscription/SubscriptionPlansPage';
 import SubscriptionPaymentPage from './pages/subscription/SubscriptionPaymentPage';
 import SettingsLayout from './pages/settings/SettingsLayout';
@@ -88,7 +87,6 @@ function App() {
         <Route path="/admin/users" element={<UserManagementPage />} />
         <Route path="/admin/qr-codes" element={<QRManagementPage />} />
         <Route path="/admin/reports" element={<ReportsPage />} />
-        <Route path="/admin/z-reports" element={<ZReportsPage />} />
 
         {/* Settings Routes - Nested */}
         <Route path="/admin/settings" element={<SettingsLayout />}>

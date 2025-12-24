@@ -31,7 +31,7 @@ export class ZReportsController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Generate a new Z-Report' })
   async generate(@Req() req, @Body() createDto: CreateZReportDto) {
-    return this.zReportsService.generateReport(req.user.tenantId, createDto);
+    return this.zReportsService.generateReport(req.user.tenantId, req.user.id, createDto);
   }
 
   @Get()
