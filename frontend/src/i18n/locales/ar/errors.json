@@ -1,0 +1,91 @@
+{
+  "errors": {
+    "title": "خطأ",
+    "generic": "حدث خطأ",
+    "tryAgain": "يرجى المحاولة مرة أخرى",
+    "contactSupport": "يرجى التواصل مع الدعم الفني",
+    "notFound": "غير موجود",
+    "unauthorized": "غير مصرح",
+    "forbidden": "محظور",
+    "badRequest": "طلب غير صالح",
+    "serverError": "خطأ في الخادم",
+    "networkError": "خطأ في الشبكة",
+    "timeoutError": "انتهت مهلة الطلب",
+    "connectionError": "خطأ في الاتصال",
+    "loadingError": "فشل تحميل البيانات",
+    "savingError": "فشل حفظ البيانات",
+    "deletingError": "فشل حذف العنصر",
+    "updatingError": "فشل تحديث العنصر",
+    "uploadError": "فشل رفع الملف",
+    "downloadError": "فشل تحميل الملف",
+    "loginError": "فشل تسجيل الدخول",
+    "logoutError": "فشل تسجيل الخروج",
+    "registrationError": "فشل التسجيل",
+    "passwordResetError": "فشل إعادة تعيين كلمة المرور",
+    "emailVerificationError": "فشل التحقق من البريد الإلكتروني",
+    "paymentError": "فشل الدفع",
+    "subscriptionError": "خطأ في الاشتراك",
+    "invalidInput": "إدخال غير صالح",
+    "missingField": "حقل مطلوب مفقود",
+    "duplicateEntry": "هذا العنصر موجود بالفعل",
+    "insufficientPermissions": "ليس لديك صلاحية لتنفيذ هذا الإجراء",
+    "sessionExpired": "انتهت جلستك. يرجى تسجيل الدخول مرة أخرى",
+    "maintenanceMode": "النظام تحت الصيانة. يرجى المحاولة لاحقاً",
+    "rateLimitExceeded": "طلبات كثيرة جداً. يرجى المحاولة لاحقاً",
+    "somethingWentWrong": "حدث خطأ ما",
+    "unexpectedError": "حدث خطأ غير متوقع في التطبيق.",
+    "tryAgainBtn": "حاول مرة أخرى",
+    "reloadPage": "إعادة تحميل الصفحة",
+    "goToHomepage": "الذهاب للصفحة الرئيسية",
+    "errorDetails": "تفاصيل الخطأ",
+    "stack": "تتبع المكدس"
+  },
+  "pages": {
+    "notFound": {
+      "title": "الصفحة غير موجودة",
+      "description": "عذراً، لم نتمكن من العثور على الصفحة التي تبحث عنها. ربما تم نقلها أو حذفها.",
+      "goBack": "العودة",
+      "goHome": "الذهاب للصفحة الرئيسية",
+      "contactSupport": "إذا كنت تعتقد أن هذا خطأ، يرجى التواصل مع الدعم."
+    },
+    "serverError": {
+      "title": "خطأ في الخادم",
+      "description": "حدث خطأ من جانبنا. يرجى المحاولة لاحقاً.",
+      "goBack": "العودة",
+      "goHome": "الذهاب للصفحة الرئيسية",
+      "contactSupport": "إذا استمرت المشكلة، يرجى التواصل مع الدعم."
+    },
+    "networkError": {
+      "title": "خطأ في الشبكة",
+      "description": "تعذر الاتصال بالخادم. يرجى التحقق من اتصالك بالإنترنت والمحاولة مرة أخرى.",
+      "retry": "إعادة المحاولة",
+      "goHome": "الذهاب للصفحة الرئيسية",
+      "contactSupport": "إذا استمرت المشكلة، يرجى التواصل مع الدعم."
+    },
+    "maintenance": {
+      "title": "تحت الصيانة",
+      "description": "نجري حالياً صيانة مجدولة لتحسين تجربتك.",
+      "estimatedTime": "الوقت المقدر: {{time}} دقيقة",
+      "goHome": "الذهاب للصفحة الرئيسية",
+      "contactSupport": "لمزيد من المعلومات، يرجى التواصل مع الدعم.",
+      "expectedCompletion": "الانتهاء المتوقع",
+      "soon": "قريباً",
+      "apology": "نعتذر عن أي إزعاج. سنعود للعمل قريباً.",
+      "whatsHappening": "ما يحدث:",
+      "upgrade1": "ترقيات النظام",
+      "upgrade2": "تحسينات الأداء",
+      "upgrade3": "تعزيزات الأمان",
+      "needHelp": "هل تحتاج مساعدة عاجلة؟",
+      "contactSupportLink": "التواصل مع الدعم"
+    }
+  },
+  "troubleshooting": {
+    "networkError": {
+      "troubleshootingTips": "نصائح لحل المشكلة:",
+      "tip1": "تحقق من اتصال Wi-Fi أو بيانات الجوال",
+      "tip2": "جرب تعطيل VPN إذا كنت تستخدمه",
+      "tip3": "امسح ذاكرة التخزين المؤقت وملفات تعريف الارتباط للمتصفح",
+      "tip4": "تواصل مع الدعم إذا استمرت المشكلة"
+    }
+  }
+}

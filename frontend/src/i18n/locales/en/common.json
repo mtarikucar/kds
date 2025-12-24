@@ -216,7 +216,13 @@
     "pending": "Pending",
     "preparing": "Preparing",
     "ready": "Ready",
-    "items": "items"
+    "items": "items",
+    "item_one": "{{count}} item",
+    "item_other": "{{count}} items",
+    "order_one": "{{count}} order",
+    "order_other": "{{count}} orders",
+    "table_one": "{{count}} table",
+    "table_other": "{{count}} tables"
   },
   "admin": {
     "userManagement": "User Management",
@@ -266,6 +272,10 @@
     "reserved": "Reserved",
     "capacity": "Capacity",
     "people": "people",
+    "person_one": "{{count}} person",
+    "person_other": "{{count}} people",
+    "user_one": "{{count}} user",
+    "user_other": "{{count}} users",
     "deleteTableConfirm": "Delete this table?",
     "editTable": "Edit Table",
     "tableNumber": "Table Number",
@@ -558,6 +568,8 @@
   "cart": {
     "title": "Your Cart",
     "items": "Items",
+    "item_one": "{{count}} Item",
+    "item_other": "{{count}} Items",
     "empty": "Your cart is empty",
     "emptyDescription": "Add some delicious items to get started",
     "backToMenu": "Back to Menu",

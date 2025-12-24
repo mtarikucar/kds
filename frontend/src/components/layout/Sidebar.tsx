@@ -20,6 +20,7 @@ import {
 import { UserRole } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import { useUiStore } from '../../store/uiStore';
+import { RTL_LANGUAGES } from '../../i18n/config';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -27,13 +28,14 @@ interface SidebarProps {
 }
 
 const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
   const user = useAuthStore((state) => state.user);
   const location = useLocation();
   const { isSidebarCollapsed, toggleSidebar } = useUiStore();
   const [settingsOpen, setSettingsOpen] = useState(
     location.pathname.startsWith('/admin/settings')
   );
+  const isRTL = RTL_LANGUAGES.includes(i18n.language);
 
   const handleNavClick = () => {
     // Close sidebar on mobile when navigating
@@ -142,7 +144,10 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
           aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           title={isSidebarCollapsed ? t('navigation.expandSidebar') : t('navigation.collapseSidebar')}
         >
-          {isSidebarCollapsed ? <ChevronRight className="h-6 w-6" /> : <ChevronLeft className="h-6 w-6" />}
+          {isSidebarCollapsed
+            ? (isRTL ? <ChevronLeft className="h-6 w-6" /> : <ChevronRight className="h-6 w-6" />)
+            : (isRTL ? <ChevronRight className="h-6 w-6" /> : <ChevronLeft className="h-6 w-6" />)
+          }
         </button>
       </div>
 
@@ -181,18 +186,18 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
               <Settings className="h-5 w-5" />
               {!isSidebarCollapsed && (
                 <>
-                  <span className="font-medium flex-1 text-left">{t('navigation.settings')}</span>
+                  <span className={`font-medium flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>{t('navigation.settings')}</span>
                   {settingsOpen ? (
                     <ChevronDown className="h-4 w-4" />
                   ) : (
-                    <ChevronRight className="h-4 w-4" />
+                    isRTL ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
                   )}
                 </>
               )}
             </button>
 
             {!isSidebarCollapsed && settingsOpen && (
-              <div className="ml-4 mt-1 space-y-1">
+              <div className={`${isRTL ? 'mr-4' : 'ml-4'} mt-1 space-y-1`}>
                 {settingsItems.map((item) => (
                   <NavLink
                     key={item.to}

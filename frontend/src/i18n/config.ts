@@ -1,6 +1,7 @@
 import i18next from 'i18next';
 import { initReactI18next } from 'react-i18next';
 import LanguageDetector from 'i18next-browser-languagedetector';
+import { rtlLanguages, supportedLanguages } from './localeMap';
 
 // Import translation files
 import enCommon from './locales/en/common.json';
@@ -54,6 +55,19 @@ import uzSubscriptions from './locales/uz/subscriptions.json';
 import uzReports from './locales/uz/reports.json';
 import uzValidation from './locales/uz/validation.json';
 import uzErrors from './locales/uz/errors.json';
+
+import arCommon from './locales/ar/common.json';
+import arAuth from './locales/ar/auth.json';
+import arPos from './locales/ar/pos.json';
+import arKitchen from './locales/ar/kitchen.json';
+import arMenu from './locales/ar/menu.json';
+import arOrders from './locales/ar/orders.json';
+import arCustomers from './locales/ar/customers.json';
+import arSettings from './locales/ar/settings.json';
+import arSubscriptions from './locales/ar/subscriptions.json';
+import arReports from './locales/ar/reports.json';
+import arValidation from './locales/ar/validation.json';
+import arErrors from './locales/ar/errors.json';
 
 // Define resources
 const resources = {
@@ -113,13 +127,33 @@ const resources = {
     validation: uzValidation,
     errors: uzErrors,
   },
+  ar: {
+    common: arCommon,
+    auth: arAuth,
+    pos: arPos,
+    kitchen: arKitchen,
+    menu: arMenu,
+    orders: arOrders,
+    customers: arCustomers,
+    settings: arSettings,
+    subscriptions: arSubscriptions,
+    reports: arReports,
+    validation: arValidation,
+    errors: arErrors,
+  },
 };
+
+// RTL languages (re-exported from localeMap for backwards compatibility)
+export const RTL_LANGUAGES = rtlLanguages;
+
+// All supported language codes (re-exported from localeMap)
+export const SUPPORTED_LANGUAGES = supportedLanguages;
 
 // Detect user's preferred language based on browser and location
 const getInitialLanguage = (): string => {
   // First check if user has manually selected a language before
   const saved = localStorage.getItem('i18n_language');
-  if (saved && ['en', 'tr', 'ru', 'uz'].includes(saved)) {
+  if (saved && ['en', 'tr', 'ru', 'uz', 'ar'].includes(saved)) {
     return saved;
   }
 
@@ -142,6 +176,11 @@ const getInitialLanguage = (): string => {
     return 'uz';
   }
 
+  // Check for Arabic
+  if (langCode.startsWith('ar')) {
+    return 'ar';
+  }
+
   // Check if browser languages array includes any supported language
   if (navigator.languages) {
     for (const lang of navigator.languages) {
@@ -149,11 +188,31 @@ const getInitialLanguage = (): string => {
       if (code.startsWith('tr')) return 'tr';
       if (code.startsWith('ru')) return 'ru';
       if (code.startsWith('uz')) return 'uz';
+      if (code.startsWith('ar')) return 'ar';
     }
   }
 
   // Default to English for all other cases
   return 'en';
+};
+
+// Missing key tracking for development
+const missingKeys = new Set<string>();
+
+const saveMissingHandler = (
+  lng: readonly string[],
+  ns: string,
+  key: string,
+  fallbackValue: string
+) => {
+  const keyPath = `${lng[0]}:${ns}:${key}`;
+  if (!missingKeys.has(keyPath)) {
+    missingKeys.add(keyPath);
+    console.warn(
+      `[i18n] Missing translation key: "${key}" in namespace "${ns}" for language "${lng[0]}"`,
+      { fallbackValue }
+    );
+  }
 };
 
 // Initialize i18next
@@ -173,13 +232,24 @@ i18next
       order: ['localStorage', 'navigator'],
       caches: ['localStorage'],
     },
+    // Missing key detection (development only)
+    saveMissing: import.meta.env.DEV,
+    missingKeyHandler: import.meta.env.DEV ? saveMissingHandler : undefined,
+    // Return empty string for missing keys in production (shows fallback)
+    returnEmptyString: false,
   });
+
+// Set initial direction based on the initial language
+const initialLang = getInitialLanguage();
+document.documentElement.dir = RTL_LANGUAGES.includes(initialLang) ? 'rtl' : 'ltr';
 
 // Save language preference to localStorage when it changes
 i18next.on('languageChanged', (lng) => {
   localStorage.setItem('i18n_language', lng);
   // Update HTML lang attribute for accessibility and SEO
   document.documentElement.lang = lng;
+  // Update HTML dir attribute for RTL languages
+  document.documentElement.dir = RTL_LANGUAGES.includes(lng) ? 'rtl' : 'ltr';
 });
 
 export default i18next;

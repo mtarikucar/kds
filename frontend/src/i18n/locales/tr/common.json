@@ -216,7 +216,13 @@
     "pending": "Beklemede",
     "preparing": "Hazırlanıyor",
     "ready": "Hazır",
-    "items": "ürün"
+    "items": "ürün",
+    "item_one": "{{count}} ürün",
+    "item_other": "{{count}} ürün",
+    "order_one": "{{count}} sipariş",
+    "order_other": "{{count}} sipariş",
+    "table_one": "{{count}} masa",
+    "table_other": "{{count}} masa"
   },
   "admin": {
     "userManagement": "Kullanıcı Yönetimi",
@@ -266,6 +272,10 @@
     "reserved": "Rezerve",
     "capacity": "Kapasite",
     "people": "kişi",
+    "person_one": "{{count}} kişi",
+    "person_other": "{{count}} kişi",
+    "user_one": "{{count}} kullanıcı",
+    "user_other": "{{count}} kullanıcı",
     "deleteTableConfirm": "Bu masayı silmek istiyor musunuz?",
     "editTable": "Masayı Düzenle",
     "tableNumber": "Masa Numarası",

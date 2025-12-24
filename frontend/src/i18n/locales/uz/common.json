@@ -216,7 +216,13 @@
     "pending": "Kutilmoqda",
     "preparing": "Tayyorlanmoqda",
     "ready": "Tayyor",
-    "items": "ta"
+    "items": "ta",
+    "item_one": "{{count}} ta element",
+    "item_other": "{{count}} ta element",
+    "order_one": "{{count}} ta buyurtma",
+    "order_other": "{{count}} ta buyurtma",
+    "table_one": "{{count}} ta stol",
+    "table_other": "{{count}} ta stol"
   },
   "admin": {
     "userManagement": "Foydalanuvchilarni boshqarish",
@@ -266,6 +272,10 @@
     "reserved": "Band qilingan",
     "capacity": "Sig'im",
     "people": "kishi",
+    "person_one": "{{count}} kishi",
+    "person_other": "{{count}} kishi",
+    "user_one": "{{count}} foydalanuvchi",
+    "user_other": "{{count}} foydalanuvchi",
     "deleteTableConfirm": "Ushbu stolni o'chirishni xohlaysizmi?",
     "editTable": "Stolni tahrirlash",
     "tableNumber": "Stol raqami",
