@@ -1,0 +1,91 @@
+{
+  "errors": {
+    "title": "Xatolik",
+    "generic": "Xatolik yuz berdi",
+    "tryAgain": "Iltimos, qayta urinib ko'ring",
+    "contactSupport": "Iltimos, qo'llab-quvvatlash xizmatiga murojaat qiling",
+    "notFound": "Topilmadi",
+    "unauthorized": "Ruxsatsiz",
+    "forbidden": "Taqiqlangan",
+    "badRequest": "Noto'g'ri so'rov",
+    "serverError": "Server xatosi",
+    "networkError": "Tarmoq xatosi",
+    "timeoutError": "So'rov vaqti tugadi",
+    "connectionError": "Ulanish xatosi",
+    "loadingError": "Ma'lumotlarni yuklab bo'lmadi",
+    "savingError": "Ma'lumotlarni saqlab bo'lmadi",
+    "deletingError": "Elementni o'chirib bo'lmadi",
+    "updatingError": "Elementni yangilab bo'lmadi",
+    "uploadError": "Faylni yuklab bo'lmadi",
+    "downloadError": "Faylni yuklab olib bo'lmadi",
+    "loginError": "Kirish xatosi",
+    "logoutError": "Chiqish xatosi",
+    "registrationError": "Ro'yxatdan o'tish xatosi",
+    "passwordResetError": "Parolni tiklash xatosi",
+    "emailVerificationError": "Email tasdiqlash xatosi",
+    "paymentError": "To'lov xatosi",
+    "subscriptionError": "Obuna xatosi",
+    "invalidInput": "Noto'g'ri kiritish",
+    "missingField": "Majburiy maydon yo'q",
+    "duplicateEntry": "Bu yozuv allaqachon mavjud",
+    "insufficientPermissions": "Bu amalni bajarishga ruxsatingiz yo'q",
+    "sessionExpired": "Sessiyangiz muddati tugadi. Iltimos, qayta kiring",
+    "maintenanceMode": "Tizim texnik xizmat ko'rsatishda. Keyinroq urinib ko'ring",
+    "rateLimitExceeded": "So'rovlar ko'p. Keyinroq urinib ko'ring",
+    "somethingWentWrong": "Nimadir noto'g'ri ketdi",
+    "unexpectedError": "Ilovada kutilmagan xatolik yuz berdi.",
+    "tryAgainBtn": "Qayta urinib ko'rish",
+    "reloadPage": "Sahifani qayta yuklash",
+    "goToHomepage": "Bosh sahifaga o'tish",
+    "errorDetails": "Xatolik tafsilotlari",
+    "stack": "Stek izi"
+  },
+  "pages": {
+    "notFound": {
+      "title": "Sahifa topilmadi",
+      "description": "Kechirasiz, siz qidirgan sahifani topa olmadik. U ko'chirilgan yoki o'chirilgan bo'lishi mumkin.",
+      "goBack": "Orqaga",
+      "goHome": "Bosh sahifaga o'tish",
+      "contactSupport": "Agar bu xato deb hisoblasangiz, qo'llab-quvvatlash bilan bog'laning."
+    },
+    "serverError": {
+      "title": "Server xatosi",
+      "description": "Bizning tomonimizda nimadir noto'g'ri ketdi. Iltimos, keyinroq urinib ko'ring.",
+      "goBack": "Orqaga",
+      "goHome": "Bosh sahifaga o'tish",
+      "contactSupport": "Agar muammo davom etsa, qo'llab-quvvatlash bilan bog'laning."
+    },
+    "networkError": {
+      "title": "Tarmoq xatosi",
+      "description": "Serverga ulanib bo'lmadi. Internet ulanishingizni tekshiring va qayta urinib ko'ring.",
+      "retry": "Qayta urinish",
+      "goHome": "Bosh sahifaga o'tish",
+      "contactSupport": "Agar muammo davom etsa, qo'llab-quvvatlash bilan bog'laning."
+    },
+    "maintenance": {
+      "title": "Texnik xizmat",
+      "description": "Tajribangizni yaxshilash uchun rejalashtirilgan texnik xizmat o'tkazmoqdamiz.",
+      "estimatedTime": "Taxminiy vaqt: {{time}} daqiqa",
+      "goHome": "Bosh sahifaga o'tish",
+      "contactSupport": "Qo'shimcha ma'lumot uchun qo'llab-quvvatlash bilan bog'laning.",
+      "expectedCompletion": "Kutilgan tugash",
+      "soon": "Tez orada",
+      "apology": "Noqulaylik uchun uzr so'raymiz. Tez orada qaytamiz.",
+      "whatsHappening": "Nima bo'lyapti:",
+      "upgrade1": "Tizim yangilanishi",
+      "upgrade2": "Ishlash yaxshilanishi",
+      "upgrade3": "Xavfsizlik yaxshilanishi",
+      "needHelp": "Shoshilinch yordam kerakmi?",
+      "contactSupportLink": "Qo'llab-quvvatlash bilan bog'laning"
+    }
+  },
+  "troubleshooting": {
+    "networkError": {
+      "troubleshootingTips": "Muammo hal qilish maslahatlari:",
+      "tip1": "Wi-Fi yoki mobil internet ulanishingizni tekshiring",
+      "tip2": "Agar foydalanayotgan bo'lsangiz, VPN ni o'chirib ko'ring",
+      "tip3": "Brauzer kesh va cookie fayllarini tozalang",
+      "tip4": "Muammo davom etsa, qo'llab-quvvatlash bilan bog'laning"
+    }
+  }
+}
