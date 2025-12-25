@@ -60,13 +60,57 @@ ssh-keyscan -H 38.242.233.166 2>/dev/null | grep -v '^#'
 |1|hash|hash ecdsa-sha2-nistp256 AAAA...
 ```
 
-### 3. STAGING_SERVER_HOST (Optional)
+### 3. PayTR Payment Provider Secrets
+
+These secrets are required for PayTR payment integration (Turkey).
+
+#### PAYTR_MERCHANT_ID
+Your PayTR Merchant ID from the Merchant Panel.
+
+**How to get it:**
+1. Log in to https://www.paytr.com/magaza/merchant-panel
+2. Go to "Ayarlar" (Settings)
+3. Copy your Merchant ID
+
+#### PAYTR_MERCHANT_KEY
+Your PayTR Merchant Key (API Key).
+
+**How to get it:**
+1. Log in to PayTR Merchant Panel
+2. Go to "Ayarlar" → "API Ayarları"
+3. Copy the Merchant Key
+
+#### PAYTR_MERCHANT_SALT
+Your PayTR Merchant Salt for hash verification.
+
+**How to get it:**
+1. Log in to PayTR Merchant Panel
+2. Go to "Ayarlar" → "API Ayarları"
+3. Copy the Merchant Salt
+
+**Important:**
+- For **test environment**: Use the same credentials with `PAYTR_TEST_MODE=true`
+- For **production environment**: Use the same credentials with `PAYTR_TEST_MODE=false`
+- Never share these credentials publicly
+
+### 4. Stripe Payment Provider Secrets
+
+#### STRIPE_SECRET_KEY / STRIPE_TEST_SECRET_KEY
+Your Stripe Secret Key.
+
+#### VITE_STRIPE_PUBLISHABLE_KEY / VITE_STRIPE_TEST_PUBLISHABLE_KEY
+Your Stripe Publishable Key (for frontend).
+
+#### STRIPE_WEBHOOK_SECRET / STRIPE_TEST_WEBHOOK_SECRET
+Your Stripe Webhook Secret.
+
+### 5. STAGING_SERVER_HOST (Optional)
 
 The hostname or IP address of the staging server.
 
 Example: `staging.example.com` or `192.168.1.100`
 
-### 4. STAGING_SERVER_USER (Optional)
+### 6. STAGING_SERVER_USER (Optional)
 
 The SSH user for the staging server.
 

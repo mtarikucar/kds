@@ -79,6 +79,13 @@ services:
       IYZICO_API_KEY: ${IYZICO_API_KEY}
       IYZICO_SECRET_KEY: ${IYZICO_SECRET_KEY}
       IYZICO_BASE_URL: ${IYZICO_BASE_URL:-https://api.iyzipay.com}
+      # PayTR Configuration (Production)
+      PAYTR_MERCHANT_ID: ${PAYTR_MERCHANT_ID}
+      PAYTR_MERCHANT_KEY: ${PAYTR_MERCHANT_KEY}
+      PAYTR_MERCHANT_SALT: ${PAYTR_MERCHANT_SALT}
+      PAYTR_BASE_URL: ${PAYTR_BASE_URL:-https://www.paytr.com}
+      PAYTR_TEST_MODE: ${PAYTR_TEST_MODE:-false}
+      BACKEND_URL: ${BACKEND_URL:-https://hummytummy.com}
       # Email Configuration (Production)
       EMAIL_HOST: ${EMAIL_HOST}
       EMAIL_PORT: ${EMAIL_PORT:-587}
@@ -142,6 +149,13 @@ services:
       IYZICO_API_KEY: ${IYZICO_API_KEY}
       IYZICO_SECRET_KEY: ${IYZICO_SECRET_KEY}
       IYZICO_BASE_URL: ${IYZICO_BASE_URL:-https://api.iyzipay.com}
+      # PayTR Configuration (Production)
+      PAYTR_MERCHANT_ID: ${PAYTR_MERCHANT_ID}
+      PAYTR_MERCHANT_KEY: ${PAYTR_MERCHANT_KEY}
+      PAYTR_MERCHANT_SALT: ${PAYTR_MERCHANT_SALT}
+      PAYTR_BASE_URL: ${PAYTR_BASE_URL:-https://www.paytr.com}
+      PAYTR_TEST_MODE: ${PAYTR_TEST_MODE:-false}
+      BACKEND_URL: ${BACKEND_URL:-https://hummytummy.com}
       # Email Configuration (Production)
       EMAIL_HOST: ${EMAIL_HOST}
       EMAIL_PORT: ${EMAIL_PORT:-587}
