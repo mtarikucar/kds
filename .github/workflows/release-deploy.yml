@@ -180,18 +180,25 @@ jobs:
 
       - name: Deploy with Blue-Green strategy
         id: deploy
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
-          ssh root@${{ env.SERVER_HOST }} << 'EOF'
+          ssh root@${{ env.SERVER_HOST }} << EOF
             cd /root/kds
 
             # Pull latest code
             git fetch --all --tags
             git checkout ${{ steps.version.outputs.VERSION }}
 
+            # Set Google OAuth environment variables for backend
+            export GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID}"
+            export GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET}"
+
             # Run Blue-Green deployment
             ./scripts/blue-green-deploy.sh deploy
 
-            if [ $? -ne 0 ]; then
+            if [ \$? -ne 0 ]; then
               echo "Deployment failed!"
               exit 1
             fi

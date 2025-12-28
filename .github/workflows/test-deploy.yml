@@ -117,6 +117,9 @@ jobs:
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/frontend-staging:buildcache,mode=max
 
       - name: Deploy to test environment
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
           echo "=========================================="
           echo "Test Environment Deployment Started"
@@ -129,15 +132,15 @@ jobs:
           echo "Trigger: ${{ github.event_name }}"
           echo ""
 
-          ssh root@${{ env.SERVER_HOST }} << 'EOF'
+          ssh root@${{ env.SERVER_HOST }} << EOF
             set -e
             cd ${{ env.PROJECT_PATH }}
 
             # Create database backup
             echo "Creating database backup..."
             mkdir -p backups/database
-            BACKUP_FILE="backups/database/backup_test_$(date +%Y%m%d_%H%M%S).sql.gz"
-            docker exec kds_postgres_staging pg_dump -U postgres -d restaurant_pos_staging | gzip > "$BACKUP_FILE" || echo "Backup failed, continuing..."
+            BACKUP_FILE="backups/database/backup_test_\$(date +%Y%m%d_%H%M%S).sql.gz"
+            docker exec kds_postgres_staging pg_dump -U postgres -d restaurant_pos_staging | gzip > "\$BACKUP_FILE" || echo "Backup failed, continuing..."
 
             # Keep only last 3 test backups
             ls -t backups/database/backup_test_*.sql.gz 2>/dev/null | tail -n +4 | xargs -r rm || true
@@ -151,10 +154,14 @@ jobs:
             export BACKEND_IMAGE="ghcr.io/${{ github.repository }}/backend-staging:latest"
             export FRONTEND_IMAGE="ghcr.io/${{ github.repository }}/frontend-staging:latest"
 
+            # Set Google OAuth environment variables
+            export GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID}"
+            export GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET}"
+
             # Pull new images
             echo "Pulling new images..."
-            docker pull "$BACKEND_IMAGE"
-            docker pull "$FRONTEND_IMAGE"
+            docker pull "\$BACKEND_IMAGE"
+            docker pull "\$FRONTEND_IMAGE"
 
             # Stop existing containers
             echo "Stopping existing containers..."
@@ -162,7 +169,7 @@ jobs:
 
             # Start new containers with updated images
             echo "Starting new containers..."
-            BACKEND_IMAGE="$BACKEND_IMAGE" FRONTEND_IMAGE="$FRONTEND_IMAGE" docker-compose -f docker-compose.staging.yml up -d
+            BACKEND_IMAGE="\$BACKEND_IMAGE" FRONTEND_IMAGE="\$FRONTEND_IMAGE" docker-compose -f docker-compose.staging.yml up -d
 
             # Run database migrations
             echo "Running database migrations..."
