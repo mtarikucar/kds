@@ -442,7 +442,17 @@
     "faqQ3": "Hangi ödeme yöntemlerini kabul ediyorsunuz?",
     "faqA3": "Tüm ana kredi kartlarını, banka kartlarını kabul ediyoruz ve hem uluslararası (Stripe) hem de Türk (Iyzico) ödeme yöntemlerini destekliyoruz.",
     "faqQ4": "Verilerim güvende mi?",
-    "faqA4": "Kesinlikle. Verilerinizi güvende tutmak için endüstri standardı şifreleme ve güvenlik uygulamaları kullanıyoruz. Bilgileriniz asla üçüncü taraflarla paylaşılmaz."
+    "faqA4": "Kesinlikle. Verilerinizi güvende tutmak için endüstri standardı şifreleme ve güvenlik uygulamaları kullanıyoruz. Bilgileriniz asla üçüncü taraflarla paylaşılmaz.",
+    "off": "İNDİRİM",
+    "mostPopular": "En Popüler",
+    "currentPlan": "Mevcut Plan",
+    "selectPlan": "Plan Seç",
+    "month": "ay",
+    "year": "yıl",
+    "save": "Tasarruf",
+    "youSave": "Tasarruf",
+    "endsOn": "Bitiş",
+    "dayFreeTrial": " gün ücretsiz deneme"
   },
   "landing": {
     "badge": "🚀 Şimdi Canlı",
@@ -518,7 +528,12 @@
     "liveChat": "Canlı Sohbet",
     "chatWithUs": "Ekibimizle sohbet edin",
     "documentation": "Dokümantasyon",
-    "support": "Destek"
+    "support": "Destek",
+    "newYearOffer": "Yeni Yıl Özel Teklifi",
+    "upTo30Off": "%30'a varan indirim",
+    "verifiedCustomer": "Doğrulanmış Müşteri",
+    "trustedIn": "{{count}}+ ülkede güvenilir",
+    "reviewSubmitted": "Yorumunuz gönderildi! Teşekkürler."
   },
   "qrMenu": {
     "tableLabel": "Masa",

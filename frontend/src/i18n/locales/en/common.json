@@ -442,7 +442,17 @@
     "faqQ3": "What payment methods do you accept?",
     "faqA3": "We accept all major credit cards, debit cards, and support both international (Stripe) and Turkish (Iyzico) payment methods.",
     "faqQ4": "Is my data secure?",
-    "faqA4": "Absolutely. We use industry-standard encryption and security practices to keep your data safe. Your information is never shared with third parties."
+    "faqA4": "Absolutely. We use industry-standard encryption and security practices to keep your data safe. Your information is never shared with third parties.",
+    "off": "OFF",
+    "mostPopular": "Most Popular",
+    "currentPlan": "Current Plan",
+    "selectPlan": "Select Plan",
+    "month": "month",
+    "year": "year",
+    "save": "Save",
+    "youSave": "You save",
+    "endsOn": "Ends",
+    "dayFreeTrial": "-day free trial"
   },
   "landing": {
     "badge": "🚀 Now Live",
@@ -518,7 +528,12 @@
     "liveChat": "Live Chat",
     "chatWithUs": "Chat with our team",
     "documentation": "Documentation",
-    "support": "Support"
+    "support": "Support",
+    "newYearOffer": "New Year Special",
+    "upTo30Off": "Up to 30% OFF",
+    "verifiedCustomer": "Verified Customer",
+    "trustedIn": "Trusted in",
+    "reviewSubmitted": "Thank you! Your review will be published after approval."
   },
   "qrMenu": {
     "tableLabel": "Table",

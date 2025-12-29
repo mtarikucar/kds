@@ -638,36 +638,64 @@ export class SubscriptionService {
       orderBy: { monthlyPrice: 'asc' },
     });
 
+    const now = new Date();
+
     // Transform flat schema to nested structure expected by frontend
-    return plans.map(plan => ({
-      id: plan.id,
-      name: plan.name,
-      displayName: plan.displayName,
-      description: plan.description,
-      monthlyPrice: plan.monthlyPrice,
-      yearlyPrice: plan.yearlyPrice,
-      currency: plan.currency,
-      trialDays: plan.trialDays,
-      limits: {
-        maxUsers: plan.maxUsers,
-        maxTables: plan.maxTables,
-        maxProducts: plan.maxProducts,
-        maxCategories: plan.maxCategories,
-        maxMonthlyOrders: plan.maxMonthlyOrders,
-      },
-      features: {
-        advancedReports: plan.advancedReports,
-        multiLocation: plan.multiLocation,
-        customBranding: plan.customBranding,
-        apiAccess: plan.apiAccess,
-        prioritySupport: plan.prioritySupport,
-        inventoryTracking: plan.inventoryTracking,
-        kdsIntegration: plan.kdsIntegration,
-      },
-      isActive: plan.isActive,
-      createdAt: plan.createdAt.toISOString(),
-      updatedAt: plan.updatedAt.toISOString(),
-    }));
+    return plans.map(plan => {
+      // Check if discount is currently active
+      const isDiscountActive = plan.isDiscountActive &&
+        plan.discountPercentage &&
+        plan.discountStartDate &&
+        plan.discountEndDate &&
+        plan.discountStartDate <= now &&
+        plan.discountEndDate >= now;
+
+      // Calculate discounted prices if discount is active
+      const discountMultiplier = isDiscountActive
+        ? (100 - plan.discountPercentage!) / 100
+        : 1;
+
+      const discountedMonthlyPrice = Number(plan.monthlyPrice) * discountMultiplier;
+      const discountedYearlyPrice = Number(plan.yearlyPrice) * discountMultiplier;
+
+      return {
+        id: plan.id,
+        name: plan.name,
+        displayName: plan.displayName,
+        description: plan.description,
+        monthlyPrice: plan.monthlyPrice,
+        yearlyPrice: plan.yearlyPrice,
+        currency: plan.currency,
+        trialDays: plan.trialDays,
+        limits: {
+          maxUsers: plan.maxUsers,
+          maxTables: plan.maxTables,
+          maxProducts: plan.maxProducts,
+          maxCategories: plan.maxCategories,
+          maxMonthlyOrders: plan.maxMonthlyOrders,
+        },
+        features: {
+          advancedReports: plan.advancedReports,
+          multiLocation: plan.multiLocation,
+          customBranding: plan.customBranding,
+          apiAccess: plan.apiAccess,
+          prioritySupport: plan.prioritySupport,
+          inventoryTracking: plan.inventoryTracking,
+          kdsIntegration: plan.kdsIntegration,
+        },
+        // Discount information
+        discount: isDiscountActive ? {
+          percentage: plan.discountPercentage,
+          label: plan.discountLabel,
+          endDate: plan.discountEndDate?.toISOString(),
+          discountedMonthlyPrice: Number(discountedMonthlyPrice.toFixed(2)),
+          discountedYearlyPrice: Number(discountedYearlyPrice.toFixed(2)),
+        } : null,
+        isActive: plan.isActive,
+        createdAt: plan.createdAt.toISOString(),
+        updatedAt: plan.updatedAt.toISOString(),
+      };
+    });
   }
 
   /**

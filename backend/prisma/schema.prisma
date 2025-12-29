@@ -499,6 +499,13 @@ model SubscriptionPlan {
   inventoryTracking  Boolean @default(false)
   kdsIntegration     Boolean @default(true)
 
+  // Discount settings
+  discountPercentage   Int?       // Discount percentage (e.g., 25 for 25%)
+  discountLabel        String?    // "New Year Special", "Holiday Offer"
+  discountStartDate    DateTime?  // When discount becomes active
+  discountEndDate      DateTime?  // When discount expires
+  isDiscountActive     Boolean    @default(false)
+
   isActive Boolean @default(true)
 
   createdAt DateTime @default(now())
@@ -1305,4 +1312,96 @@ model CashDrawerMovement {
   @@index([userId])
   @@index([createdAt])
   @@map("cash_drawer_movements")
+}
+
+// ========================================
+// PUBLIC STATISTICS & ANALYTICS
+// ========================================
+
+model PageView {
+  id        String   @id @default(uuid())
+
+  // Page tracking
+  page      String   // "landing", "pricing", "features", etc.
+  path      String   // Full URL path
+  referrer  String?  // Where visitor came from
+
+  // Geographic data (from IP geolocation)
+  country      String?
+  countryCode  String?
+  city         String?
+  region       String?
+
+  // Session info
+  sessionId    String?   // Anonymous session tracking
+  userAgent    String?
+  ipHash       String?   // Hashed IP for privacy (don't store raw IP)
+
+  // Device info
+  deviceType   String?   // "desktop", "mobile", "tablet"
+  browser      String?
+
+  createdAt DateTime @default(now())
+
+  @@index([page, createdAt])
+  @@index([country])
+  @@index([city])
+  @@index([sessionId])
+  @@map("page_views")
+}
+
+model PublicReview {
+  id        String   @id @default(uuid())
+
+  // Reviewer info
+  name         String
+  email        String
+  restaurant   String?    // Restaurant name (optional)
+  avatar       String?    // Initials or image URL
+
+  // Review content
+  rating       Int        // 1-5 stars
+  comment      String     @db.Text
+
+  // Moderation
+  status       String     @default("PENDING") // PENDING, APPROVED, REJECTED
+  approvedAt   DateTime?
+
+  // Geographic context
+  country      String?
+  city         String?
+
+  // Verification
+  isVerified   Boolean    @default(false)  // Verified customer
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([rating])
+  @@map("public_reviews")
+}
+
+model PublicStatsCache {
+  id          String   @id @default("main")
+
+  // Cached statistics (updated periodically)
+  totalViews         Int      @default(0)
+  uniqueVisitors     Int      @default(0)
+  totalReviews       Int      @default(0)
+  averageRating      Float    @default(0)
+  totalTenants       Int      @default(0)    // Active restaurants
+
+  // Geographic breakdown (JSON)
+  countryDistribution Json?   // {country: count}
+  cityDistribution    Json?   // {city: count}
+
+  // Time-based stats
+  viewsToday         Int      @default(0)
+  viewsThisWeek      Int      @default(0)
+  viewsThisMonth     Int      @default(0)
+
+  lastUpdated DateTime @default(now())
+
+  @@map("public_stats_cache")
 }

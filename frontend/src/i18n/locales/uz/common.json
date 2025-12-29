@@ -442,7 +442,17 @@
     "faqQ3": "Qaysi to'lov usullarini qabul qilasiz?",
     "faqA3": "Biz barcha asosiy kredit va debet kartalarni qabul qilamiz, shuningdek xalqaro (Stripe) va turkiya (Iyzico) to'lov usullarini qo'llab-quvvatlaymiz.",
     "faqQ4": "Ma'lumotlarim xavfsizmi?",
-    "faqA4": "Albatta. Ma'lumotlaringizni xavfsiz saqlash uchun sanoat standartidagi shifrlash va xavfsizlik amaliyotlaridan foydalanamiz."
+    "faqA4": "Albatta. Ma'lumotlaringizni xavfsiz saqlash uchun sanoat standartidagi shifrlash va xavfsizlik amaliyotlaridan foydalanamiz.",
+    "off": "CHEGIRMA",
+    "mostPopular": "Eng mashhur",
+    "currentPlan": "Joriy tarif",
+    "selectPlan": "Tarifni tanlash",
+    "month": "oy",
+    "year": "yil",
+    "save": "Tejash",
+    "youSave": "Tejash",
+    "endsOn": "gacha",
+    "dayFreeTrial": " kun bepul"
   },
   "landing": {
     "badge": "Ishga tushirildi",
@@ -518,7 +528,12 @@
     "liveChat": "Jonli chat",
     "chatWithUs": "Jamoamiz bilan suhbatlashing",
     "documentation": "Hujjatlar",
-    "support": "Qo'llab-quvvatlash"
+    "support": "Qo'llab-quvvatlash",
+    "newYearOffer": "Yangi yil maxsus taklifi",
+    "upTo30Off": "30% gacha chegirma",
+    "verifiedCustomer": "Tasdiqlangan mijoz",
+    "trustedIn": "{{count}}+ mamlakatda ishonchli",
+    "reviewSubmitted": "Sharhingiz yuborildi! Rahmat."
   },
   "qrMenu": {
     "tableLabel": "Stol",

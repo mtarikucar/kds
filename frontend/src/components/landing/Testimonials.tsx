@@ -1,23 +1,29 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
-import { Star, Quote, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Star, Quote, ChevronLeft, ChevronRight, MapPin, BadgeCheck } from 'lucide-react';
+import { usePublicStats, usePublicReviews, PublicReview } from '../../features/landing/publicStatsApi';
 
 interface Testimonial {
-  id: number;
+  id: string | number;
   name: string;
-  restaurant: string;
+  restaurant?: string;
   rating: number;
   comment: string;
   avatar: string;
+  isVerified?: boolean;
 }
 
 export const Testimonials = () => {
   const { t } = useTranslation('common');
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Testimonials data - will be moved to translations later
-  const testimonials: Testimonial[] = [
+  // Fetch real data
+  const { data: stats } = usePublicStats();
+  const { data: reviews } = usePublicReviews(10);
+
+  // Fallback testimonials for when no real reviews exist
+  const fallbackTestimonials: Testimonial[] = [
     {
       id: 1,
       name: 'Mehmet Yılmaz',
@@ -51,6 +57,46 @@ export const Testimonials = () => {
       avatar: 'ZK',
     },
   ];
+
+  // Use real reviews if available, fallback to hardcoded
+  const testimonials: Testimonial[] = useMemo(() => {
+    if (reviews && reviews.length > 0) {
+      return reviews.map((review: PublicReview) => ({
+        id: review.id,
+        name: review.name,
+        restaurant: review.restaurant,
+        rating: review.rating,
+        comment: review.comment,
+        avatar: review.avatar || review.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase(),
+        isVerified: review.isVerified,
+      }));
+    }
+    return fallbackTestimonials;
+  }, [reviews, t]);
+
+  // Trust badges with real stats (fallback to marketing values)
+  const trustBadges = useMemo(() => [
+    {
+      value: stats?.totalTenants ? `${stats.totalTenants}+` : '100+',
+      label: 'landing.happyClients',
+    },
+    {
+      value: stats?.averageRating ? `${stats.averageRating.toFixed(1)}/5` : '4.9/5',
+      label: 'landing.avgRating',
+    },
+    { value: '24/7', label: 'landing.support' },
+    { value: '99%', label: 'landing.satisfaction' },
+  ], [stats]);
+
+  // Country stats for display
+  const topCountries = useMemo(() => {
+    if (stats?.countryDistribution) {
+      return Object.entries(stats.countryDistribution)
+        .sort(([, a], [, b]) => (b as number) - (a as number))
+        .slice(0, 3);
+    }
+    return [];
+  }, [stats]);
 
   // Auto-advance carousel every 5 seconds
   useEffect(() => {
@@ -98,6 +144,16 @@ export const Testimonials = () => {
             <p className="text-xl text-warm-brown/70 max-w-2xl mx-auto">
               {t('landing.testimonialSubtitle')}
             </p>
+
+            {/* Country badges */}
+            {topCountries.length > 0 && (
+              <div className="flex items-center justify-center gap-3 mt-6">
+                <MapPin className="w-4 h-4 text-warm-orange" />
+                <span className="text-sm text-warm-brown/60">
+                  {t('landing.trustedIn')}: {topCountries.map(([country]) => country).join(', ')}
+                </span>
+              </div>
+            )}
           </motion.div>
         </div>
 
@@ -119,10 +175,15 @@ export const Testimonials = () => {
                   </div>
 
                   <div className="flex flex-col md:flex-row gap-10 items-center relative z-10">
-                    <div className="flex-shrink-0">
+                    <div className="flex-shrink-0 relative">
                       <div className="w-32 h-32 bg-gradient-to-br from-warm-orange to-warm-brown rounded-full flex items-center justify-center text-white font-heading font-bold text-3xl shadow-xl ring-4 ring-white/80">
                         {testimonials[currentIndex].avatar}
                       </div>
+                      {testimonials[currentIndex].isVerified && (
+                        <div className="absolute -bottom-1 -right-1 bg-green-500 rounded-full p-1.5 shadow-lg">
+                          <BadgeCheck className="w-4 h-4 text-white" />
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex-grow text-center md:text-left">
@@ -137,10 +198,19 @@ export const Testimonials = () => {
                       </p>
 
                       <div>
-                        <h4 className="font-bold text-warm-dark text-lg">
-                          {testimonials[currentIndex].name}
-                        </h4>
-                        <p className="text-warm-orange font-semibold">{testimonials[currentIndex].restaurant}</p>
+                        <div className="flex items-center gap-2 justify-center md:justify-start">
+                          <h4 className="font-bold text-warm-dark text-lg">
+                            {testimonials[currentIndex].name}
+                          </h4>
+                          {testimonials[currentIndex].isVerified && (
+                            <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                              {t('landing.verifiedCustomer')}
+                            </span>
+                          )}
+                        </div>
+                        {testimonials[currentIndex].restaurant && (
+                          <p className="text-warm-orange font-semibold">{testimonials[currentIndex].restaurant}</p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -189,12 +259,7 @@ export const Testimonials = () => {
           transition={{ duration: 0.5, delay: 0.2 }}
           className="mt-24 grid grid-cols-2 md:grid-cols-4 gap-8 max-w-4xl mx-auto"
         >
-          {[
-            { value: '100+', label: 'landing.happyClients' },
-            { value: '4.9/5', label: 'landing.avgRating' },
-            { value: '24/7', label: 'landing.support' },
-            { value: '99%', label: 'landing.satisfaction' },
-          ].map((stat, index) => (
+          {trustBadges.map((stat, index) => (
             <div key={index} className="text-center p-6 bg-white/70 rounded-3xl border-2 border-warm-orange/20 hover:border-warm-orange/40 hover:shadow-lg transition-all backdrop-blur-sm">
               <div className="text-4xl font-heading font-bold text-warm-orange mb-2">{stat.value}</div>
               <div className="text-warm-brown/70 text-sm font-semibold">{t(stat.label)}</div>
