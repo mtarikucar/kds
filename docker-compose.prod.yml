@@ -196,7 +196,10 @@ services:
       dockerfile: Dockerfile
       target: production
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+        VITE_API_URL: ${VITE_API_URL:-https://hummytummy.com/api}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://hummytummy.com}
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-https://hummytummy.com}
+        VITE_WS_URL: ${VITE_WS_URL:-wss://hummytummy.com}
         VITE_STRIPE_PUBLISHABLE_KEY: ${VITE_STRIPE_PUBLISHABLE_KEY}
         VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
     container_name: kds_frontend_blue
@@ -223,7 +226,10 @@ services:
       dockerfile: Dockerfile
       target: production
       args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+        VITE_API_URL: ${VITE_API_URL:-https://hummytummy.com/api}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://hummytummy.com}
+        VITE_SOCKET_URL: ${VITE_SOCKET_URL:-https://hummytummy.com}
+        VITE_WS_URL: ${VITE_WS_URL:-wss://hummytummy.com}
         VITE_STRIPE_PUBLISHABLE_KEY: ${VITE_STRIPE_PUBLISHABLE_KEY}
         VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
     container_name: kds_frontend_green
