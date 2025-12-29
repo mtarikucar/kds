@@ -127,7 +127,7 @@ export class PublicStatsService {
   }
 
   // Update cache every 5 minutes
-  @Cron(CronExpression.EVERY_5_MINUTES)
+  @Cron(CronExpression.EVERY_5_MINUTES, { name: 'public-stats-cache-update' })
   async updateStatsCache(): Promise<void> {
     this.logger.debug('Updating public stats cache...');
     await this.calculateAndCacheStats();
