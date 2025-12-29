@@ -18,10 +18,11 @@ import { PublicStatsService } from './public-stats.service';
 import { TrackViewDto } from './dto/track-view.dto';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { PublicStatsResponseDto, PublicReviewResponseDto } from './dto/public-stats-response.dto';
-import { Public } from '../../common/decorators/public.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../../common/constants/roles.enum';
 
 @ApiTags('public-stats')
 @Controller('public-stats')
@@ -47,8 +48,13 @@ export class PublicStatsController {
   @Get('stats')
   @ApiOperation({ summary: 'Get public statistics (Public)' })
   @ApiResponse({ status: 200, description: 'Public statistics', type: PublicStatsResponseDto })
-  async getStats(): Promise<PublicStatsResponseDto> {
-    return this.statsService.getPublicStats();
+  async getStats() {
+    const stats = await this.statsService.getPublicStats();
+    return {
+      ...stats,
+      countryDistribution: stats.countryDistribution as Record<string, number> || {},
+      cityDistribution: stats.cityDistribution as Record<string, number> || {},
+    };
   }
 
   @Public()
@@ -80,7 +86,7 @@ export class PublicStatsController {
 
   // Admin endpoints for review moderation
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles(UserRole.ADMIN)
   @Get('admin/reviews/pending')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get pending reviews (Admin only)' })
@@ -89,7 +95,7 @@ export class PublicStatsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles(UserRole.ADMIN)
   @Post('admin/reviews/:id/approve')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Approve a review (Admin only)' })
@@ -98,7 +104,7 @@ export class PublicStatsController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN')
+  @Roles(UserRole.ADMIN)
   @Post('admin/reviews/:id/reject')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Reject a review (Admin only)' })
