@@ -69,17 +69,39 @@ export class PublicStatsService {
   }
 
   async getPublicStats() {
-    // Return from cache (updated every 5 minutes)
-    const cache = await this.prisma.publicStatsCache.findFirst({
-      where: { id: 'main' },
-    });
+    try {
+      // Return from cache (updated every 5 minutes)
+      const cache = await this.prisma.publicStatsCache.findFirst({
+        where: { id: 'main' },
+      });
 
-    if (cache) {
-      return cache;
+      if (cache) {
+        return cache;
+      }
+
+      // Fallback: Calculate live stats
+      return await this.calculateAndCacheStats();
+    } catch (error) {
+      this.logger.error(`Failed to get public stats: ${error.message}`);
+      // Return default stats if tables don't exist or error occurs
+      return this.getDefaultStats();
     }
+  }
 
-    // Fallback: Calculate live stats
-    return this.calculateAndCacheStats();
+  private getDefaultStats() {
+    return {
+      totalViews: 0,
+      uniqueVisitors: 0,
+      totalReviews: 0,
+      averageRating: 4.8,
+      totalTenants: 0,
+      countryDistribution: {},
+      cityDistribution: {},
+      viewsToday: 0,
+      viewsThisWeek: 0,
+      viewsThisMonth: 0,
+      lastUpdated: new Date(),
+    };
   }
 
   async submitReview(dto: CreateReviewDto, ip: string) {
@@ -109,29 +131,39 @@ export class PublicStatsService {
   }
 
   async getApprovedReviews(limit = 10) {
-    return this.prisma.publicReview.findMany({
-      where: { status: 'APPROVED' },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      select: {
-        id: true,
-        name: true,
-        restaurant: true,
-        rating: true,
-        comment: true,
-        avatar: true,
-        isVerified: true,
-        createdAt: true,
-      },
-    });
+    try {
+      return await this.prisma.publicReview.findMany({
+        where: { status: 'APPROVED' },
+        orderBy: { createdAt: 'desc' },
+        take: limit,
+        select: {
+          id: true,
+          name: true,
+          restaurant: true,
+          rating: true,
+          comment: true,
+          avatar: true,
+          isVerified: true,
+          createdAt: true,
+        },
+      });
+    } catch (error) {
+      this.logger.error(`Failed to get approved reviews: ${error.message}`);
+      // Return empty array if table doesn't exist
+      return [];
+    }
   }
 
   // Update cache every 5 minutes
   @Cron(CronExpression.EVERY_5_MINUTES, { name: 'public-stats-cache-update' })
   async updateStatsCache(): Promise<void> {
-    this.logger.debug('Updating public stats cache...');
-    await this.calculateAndCacheStats();
-    this.geolocationService.cleanCache();
+    try {
+      this.logger.debug('Updating public stats cache...');
+      await this.calculateAndCacheStats();
+      this.geolocationService.cleanCache();
+    } catch (error) {
+      this.logger.error(`Failed to update stats cache: ${error.message}`);
+    }
   }
 
   private async calculateAndCacheStats() {
