@@ -39,9 +39,6 @@ Thumbs.db
 *.sqlite3
 pgdata/
 
-# Prisma
-backend/prisma/migrations/
-
 # Logs
 logs/
 *.log
