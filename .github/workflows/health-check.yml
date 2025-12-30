@@ -40,13 +40,13 @@ jobs:
         run: |
           case "${{ matrix.environment }}" in
             beta)
-              echo "url=https://beta.yourapp.com" >> $GITHUB_OUTPUT
+              echo "url=https://staging.hummytummy.com" >> $GITHUB_OUTPUT
               ;;
             staging)
-              echo "url=https://staging.yourapp.com" >> $GITHUB_OUTPUT
+              echo "url=https://staging.hummytummy.com" >> $GITHUB_OUTPUT
               ;;
             production)
-              echo "url=https://yourapp.com" >> $GITHUB_OUTPUT
+              echo "url=https://hummytummy.com" >> $GITHUB_OUTPUT
               ;;
             *)
               echo "url=" >> $GITHUB_OUTPUT
