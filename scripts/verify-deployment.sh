@@ -79,7 +79,13 @@ check_json_endpoint() {
     fi
 
     if command -v jq &> /dev/null; then
-        echo "$response" | jq -r "$jq_filter"
+        # Validate JSON before parsing
+        if echo "$response" | jq -e . >/dev/null 2>&1; then
+            echo "$response" | jq -r "$jq_filter"
+        else
+            echo "Invalid JSON response"
+            return 1
+        fi
     else
         echo "$response"
     fi

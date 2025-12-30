@@ -87,7 +87,14 @@ jobs:
           URL="${{ steps.env.outputs.url }}/api"
 
           response=$(curl -s --connect-timeout ${{ env.TIMEOUT }} "$URL" || echo "{}")
-          version=$(echo "$response" | jq -r '.version // "unknown"')
+
+          # Validate JSON before parsing
+          if echo "$response" | jq -e . >/dev/null 2>&1; then
+            version=$(echo "$response" | jq -r '.version // "unknown"')
+          else
+            version="unknown"
+            echo "⚠️  API returned invalid JSON response"
+          fi
 
           echo "version=$version" >> $GITHUB_OUTPUT
           echo "API Version: $version"
@@ -95,7 +102,16 @@ jobs:
       - name: Check Database Connection
         if: steps.env.outputs.url != '' && steps.health.outputs.status == 'healthy'
         run: |
-          db_status=$(echo '${{ steps.health.outputs.body }}' | jq -r '.database // "unknown"')
+          body='${{ steps.health.outputs.body }}'
+
+          # Validate JSON before parsing
+          if echo "$body" | jq -e . >/dev/null 2>&1; then
+            db_status=$(echo "$body" | jq -r '.database // "unknown"')
+          else
+            db_status="unknown"
+            echo "⚠️  Health response is not valid JSON"
+          fi
+
           echo "Database Status: $db_status"
 
           if [ "$db_status" == "healthy" ] || [ "$db_status" == "connected" ]; then

@@ -154,11 +154,29 @@ deploy() {
     log "Waiting for $inactive_env environment to be ready..."
     sleep 10
 
-    # Run database migrations on inactive environment
+    # Run database migrations on inactive environment with baseline support
     log "Running database migrations..."
-    docker compose -f "$PROJECT_ROOT/docker-compose.prod.yml" exec -T backend-$inactive_env npx prisma migrate deploy || {
-        error "Database migration failed"
-        return 1
+    MIGRATION_OUTPUT=$(docker compose -f "$PROJECT_ROOT/docker-compose.prod.yml" exec -T backend-$inactive_env npx prisma migrate deploy 2>&1) && {
+        log "Migrations applied successfully"
+    } || {
+        if echo "$MIGRATION_OUTPUT" | grep -q "P3005"; then
+            log "Baseline required - marking existing migrations as applied..."
+            # Get list of migrations and mark them as applied
+            for migration in $(ls -1 "$PROJECT_ROOT/backend/prisma/migrations" | grep -E '^[0-9]+' | sort); do
+                log "Marking migration $migration as applied..."
+                docker compose -f "$PROJECT_ROOT/docker-compose.prod.yml" exec -T backend-$inactive_env npx prisma migrate resolve --applied "$migration" || true
+            done
+            # Retry migration deploy
+            log "Retrying migration deploy..."
+            docker compose -f "$PROJECT_ROOT/docker-compose.prod.yml" exec -T backend-$inactive_env npx prisma migrate deploy || {
+                error "Database migration failed after baseline: $MIGRATION_OUTPUT"
+                return 1
+            }
+            log "Migrations applied successfully after baseline"
+        else
+            error "Database migration failed: $MIGRATION_OUTPUT"
+            return 1
+        fi
     }
 
     # Health check

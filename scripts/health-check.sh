@@ -71,8 +71,14 @@ check_database() {
 
     local response=$(curl -s "$API_URL/health" --max-time $TIMEOUT 2>&1)
 
-    if echo "$response" | grep -q "database"; then
-        local db_status=$(echo "$response" | jq -r '.database' 2>/dev/null || echo "unknown")
+    # Validate JSON response before parsing
+    if ! echo "$response" | jq -e . >/dev/null 2>&1; then
+        warning "Health endpoint returned invalid JSON response"
+        return 0
+    fi
+
+    if echo "$response" | jq -e '.database' >/dev/null 2>&1; then
+        local db_status=$(echo "$response" | jq -r '.database // "unknown"')
 
         if [ "$db_status" == "connected" ] || [ "$db_status" == "ok" ]; then
             success "Database is connected"
@@ -91,8 +97,14 @@ check_redis() {
 
     local response=$(curl -s "$API_URL/health" --max-time $TIMEOUT 2>&1)
 
-    if echo "$response" | grep -q "redis"; then
-        local redis_status=$(echo "$response" | jq -r '.redis' 2>/dev/null || echo "unknown")
+    # Validate JSON response before parsing
+    if ! echo "$response" | jq -e . >/dev/null 2>&1; then
+        warning "Health endpoint returned invalid JSON response"
+        return 0
+    fi
+
+    if echo "$response" | jq -e '.redis' >/dev/null 2>&1; then
+        local redis_status=$(echo "$response" | jq -r '.redis // "unknown"')
 
         if [ "$redis_status" == "connected" ] || [ "$redis_status" == "ok" ]; then
             success "Redis is connected"
