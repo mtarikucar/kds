@@ -7,11 +7,10 @@ on:
   workflow_dispatch:
     inputs:
       environment:
-        description: 'Environment to check (beta, staging, production)'
+        description: 'Environment to check (staging, production)'
         required: true
         type: choice
         options:
-          - beta
           - staging
           - production
 
@@ -26,8 +25,7 @@ jobs:
     strategy:
       matrix:
         environment:
-          - ${{ github.event.inputs.environment || 'beta' }}
-          - ${{ github.event.inputs.environment == '' && 'staging' || '' }}
+          - ${{ github.event.inputs.environment || 'staging' }}
           - ${{ github.event.inputs.environment == '' && 'production' || '' }}
       fail-fast: false
 
@@ -39,9 +37,6 @@ jobs:
         id: env
         run: |
           case "${{ matrix.environment }}" in
-            beta)
-              echo "url=https://staging.hummytummy.com" >> $GITHUB_OUTPUT
-              ;;
             staging)
               echo "url=https://staging.hummytummy.com" >> $GITHUB_OUTPUT
               ;;

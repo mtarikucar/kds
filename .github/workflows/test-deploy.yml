@@ -105,7 +105,7 @@ jobs:
           tags: ghcr.io/${{ github.repository }}/frontend-staging:latest,ghcr.io/${{ github.repository }}/frontend-staging:${{ steps.commit_info.outputs.commit_sha }}
           build-args: |
             VITE_API_URL=https://staging.hummytummy.com/api
-            VITE_API_BASE_URL=https://staging.hummytummy.com/api
+            VITE_API_BASE_URL=https://staging.hummytummy.com
             VITE_SOCKET_URL=https://staging.hummytummy.com
             VITE_WS_URL=wss://staging.hummytummy.com
             VITE_STRIPE_PUBLISHABLE_KEY=${{ secrets.VITE_STRIPE_TEST_PUBLISHABLE_KEY }}
