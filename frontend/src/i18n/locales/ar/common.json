@@ -474,6 +474,44 @@
     "endsOn": "ينتهي في",
     "dayFreeTrial": " يوم مجاناً"
   },
+  "subscriptions": {
+    "plans": {
+      "FREE": {
+        "displayName": "خطة مجانية",
+        "description": "مثالية للمطاعم الصغيرة التي بدأت للتو"
+      },
+      "BASIC": {
+        "displayName": "خطة أساسية",
+        "description": "رائعة للمطاعم النامية"
+      },
+      "PRO": {
+        "displayName": "خطة احترافية",
+        "description": "للمطاعم الراسخة ذات المواقع المتعددة"
+      },
+      "BUSINESS": {
+        "displayName": "خطة الأعمال",
+        "description": "حل مؤسسي لسلاسل المطاعم الكبيرة"
+      }
+    },
+    "unlimited": "غير محدود",
+    "usageLimits": "حدود الاستخدام",
+    "user": "مستخدم",
+    "users": "مستخدمين",
+    "table": "طاولة",
+    "tables": "طاولات",
+    "product": "منتج",
+    "products": "منتجات",
+    "order": "طلب",
+    "orders": "طلبات",
+    "features": "الميزات",
+    "featureAdvancedReports": "تقارير متقدمة",
+    "featureMultiLocation": "دعم مواقع متعددة",
+    "featureCustomBranding": "علامة تجارية مخصصة",
+    "featureApiAccess": "وصول API",
+    "featurePrioritySupport": "دعم ذو أولوية",
+    "featureInventoryTracking": "تتبع المخزون",
+    "featureKdsIntegration": "تكامل KDS"
+  },
   "landing": {
     "badge": "متاح الآن",
     "headline": "بسّط عمليات",

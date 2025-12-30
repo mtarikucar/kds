@@ -36,6 +36,10 @@ const PlanCard = ({
 }: PlanCardProps) => {
   const { t } = useTranslation('common');
 
+  // Get localized plan name and description
+  const planDisplayName = t(`subscriptions.plans.${plan.name}.displayName`, { defaultValue: plan.displayName });
+  const planDescription = t(`subscriptions.plans.${plan.name}.description`, { defaultValue: plan.description });
+
   // Check if discount is active
   const hasDiscount = plan.discount !== null && plan.discount !== undefined;
 
@@ -107,8 +111,8 @@ const PlanCard = ({
       )}
 
       <div className="mb-6">
-        <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.displayName}</h3>
-        <p className="text-gray-600 text-sm min-h-[40px]">{plan.description}</p>
+        <h3 className="text-2xl font-bold text-gray-900 mb-2">{planDisplayName}</h3>
+        <p className="text-gray-600 text-sm min-h-[40px]">{planDescription}</p>
       </div>
 
       <div className="mb-6">
@@ -164,25 +168,25 @@ const PlanCard = ({
           <li className="flex items-center text-sm text-gray-700">
             <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
             <span>
-              {formatLimit(plan.limits.maxUsers)} {t('subscriptions.user')}{isUnlimited(plan.limits.maxUsers) || plan.limits.maxUsers > 1 ? 's' : ''}
+              {formatLimit(plan.limits.maxUsers)} {isUnlimited(plan.limits.maxUsers) || plan.limits.maxUsers > 1 ? t('subscriptions.users') : t('subscriptions.user')}
             </span>
           </li>
           <li className="flex items-center text-sm text-gray-700">
             <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
             <span>
-              {formatLimit(plan.limits.maxTables)} {t('subscriptions.table')}{isUnlimited(plan.limits.maxTables) || plan.limits.maxTables > 1 ? 's' : ''}
+              {formatLimit(plan.limits.maxTables)} {isUnlimited(plan.limits.maxTables) || plan.limits.maxTables > 1 ? t('subscriptions.tables') : t('subscriptions.table')}
             </span>
           </li>
           <li className="flex items-center text-sm text-gray-700">
             <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
             <span>
-              {formatLimit(plan.limits.maxProducts)} {t('subscriptions.product')}{isUnlimited(plan.limits.maxProducts) || plan.limits.maxProducts > 1 ? 's' : ''}
+              {formatLimit(plan.limits.maxProducts)} {isUnlimited(plan.limits.maxProducts) || plan.limits.maxProducts > 1 ? t('subscriptions.products') : t('subscriptions.product')}
             </span>
           </li>
           <li className="flex items-center text-sm text-gray-700">
             <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
             <span>
-              {formatLimit(plan.limits.maxMonthlyOrders)} {t('subscriptions.order')}{isUnlimited(plan.limits.maxMonthlyOrders) || plan.limits.maxMonthlyOrders > 1 ? 's' : ''}/{t('pricing.month')}
+              {formatLimit(plan.limits.maxMonthlyOrders)} {isUnlimited(plan.limits.maxMonthlyOrders) || plan.limits.maxMonthlyOrders > 1 ? t('subscriptions.orders') : t('subscriptions.order')}/{t('pricing.month')}
             </span>
           </li>
         </ul>

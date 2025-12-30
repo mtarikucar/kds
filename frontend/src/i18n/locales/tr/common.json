@@ -454,6 +454,44 @@
     "endsOn": "Bitiş",
     "dayFreeTrial": " gün ücretsiz deneme"
   },
+  "subscriptions": {
+    "plans": {
+      "FREE": {
+        "displayName": "Ücretsiz Plan",
+        "description": "Yeni başlayan küçük restoranlar için ideal"
+      },
+      "BASIC": {
+        "displayName": "Temel Plan",
+        "description": "Büyüyen restoranlar için harika"
+      },
+      "PRO": {
+        "displayName": "Profesyonel Plan",
+        "description": "Birden fazla şubesi olan köklü restoranlar için"
+      },
+      "BUSINESS": {
+        "displayName": "Kurumsal Plan",
+        "description": "Büyük restoran zincirleri için kurumsal çözüm"
+      }
+    },
+    "unlimited": "Sınırsız",
+    "usageLimits": "Kullanım Limitleri",
+    "user": "kullanıcı",
+    "users": "kullanıcı",
+    "table": "masa",
+    "tables": "masa",
+    "product": "ürün",
+    "products": "ürün",
+    "order": "sipariş",
+    "orders": "sipariş",
+    "features": "Özellikler",
+    "featureAdvancedReports": "Gelişmiş Raporlar",
+    "featureMultiLocation": "Çoklu Şube Desteği",
+    "featureCustomBranding": "Özel Marka",
+    "featureApiAccess": "API Erişimi",
+    "featurePrioritySupport": "Öncelikli Destek",
+    "featureInventoryTracking": "Stok Takibi",
+    "featureKdsIntegration": "KDS Entegrasyonu"
+  },
   "landing": {
     "badge": "🚀 Şimdi Canlı",
     "headline": "Restoranınızın İşlemlerini",

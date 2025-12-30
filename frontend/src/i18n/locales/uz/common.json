@@ -454,6 +454,44 @@
     "endsOn": "gacha",
     "dayFreeTrial": " kun bepul"
   },
+  "subscriptions": {
+    "plans": {
+      "FREE": {
+        "displayName": "Bepul tarif",
+        "description": "Endigina boshlayotgan kichik restoranlar uchun ideal"
+      },
+      "BASIC": {
+        "displayName": "Asosiy tarif",
+        "description": "O'sib borayotgan restoranlar uchun ajoyib"
+      },
+      "PRO": {
+        "displayName": "Professional tarif",
+        "description": "Bir nechta filiallari bo'lgan barqaror restoranlar uchun"
+      },
+      "BUSINESS": {
+        "displayName": "Biznes tarif",
+        "description": "Yirik restoran tarmoqlari uchun korporativ yechim"
+      }
+    },
+    "unlimited": "Cheksiz",
+    "usageLimits": "Foydalanish limitleri",
+    "user": "foydalanuvchi",
+    "users": "foydalanuvchi",
+    "table": "stol",
+    "tables": "stol",
+    "product": "mahsulot",
+    "products": "mahsulot",
+    "order": "buyurtma",
+    "orders": "buyurtma",
+    "features": "Xususiyatlar",
+    "featureAdvancedReports": "Kengaytirilgan hisobotlar",
+    "featureMultiLocation": "Ko'p filial qo'llab-quvvatlash",
+    "featureCustomBranding": "Shaxsiy brending",
+    "featureApiAccess": "API kirish",
+    "featurePrioritySupport": "Ustuvor qo'llab-quvvatlash",
+    "featureInventoryTracking": "Inventar nazorati",
+    "featureKdsIntegration": "KDS integratsiyasi"
+  },
   "landing": {
     "badge": "Ishga tushirildi",
     "headline": "Restoran operatsiyalarini",

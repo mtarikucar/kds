@@ -454,6 +454,44 @@
     "endsOn": "Ends",
     "dayFreeTrial": "-day free trial"
   },
+  "subscriptions": {
+    "plans": {
+      "FREE": {
+        "displayName": "Free Plan",
+        "description": "Perfect for small restaurants getting started"
+      },
+      "BASIC": {
+        "displayName": "Basic Plan",
+        "description": "Great for growing restaurants"
+      },
+      "PRO": {
+        "displayName": "Pro Plan",
+        "description": "For established restaurants with multiple locations"
+      },
+      "BUSINESS": {
+        "displayName": "Business Plan",
+        "description": "Enterprise solution for large restaurant chains"
+      }
+    },
+    "unlimited": "Unlimited",
+    "usageLimits": "Usage Limits",
+    "user": "user",
+    "users": "users",
+    "table": "table",
+    "tables": "tables",
+    "product": "product",
+    "products": "products",
+    "order": "order",
+    "orders": "orders",
+    "features": "Features",
+    "featureAdvancedReports": "Advanced Reports",
+    "featureMultiLocation": "Multi-Location Support",
+    "featureCustomBranding": "Custom Branding",
+    "featureApiAccess": "API Access",
+    "featurePrioritySupport": "Priority Support",
+    "featureInventoryTracking": "Inventory Tracking",
+    "featureKdsIntegration": "KDS Integration"
+  },
   "landing": {
     "badge": "🚀 Now Live",
     "headline": "Streamline Your Restaurant",

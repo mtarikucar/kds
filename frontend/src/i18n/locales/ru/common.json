@@ -459,6 +459,44 @@
     "endsOn": "до",
     "dayFreeTrial": " дней бесплатно"
   },
+  "subscriptions": {
+    "plans": {
+      "FREE": {
+        "displayName": "Бесплатный тариф",
+        "description": "Идеально для небольших ресторанов, которые только начинают"
+      },
+      "BASIC": {
+        "displayName": "Базовый тариф",
+        "description": "Отлично подходит для растущих ресторанов"
+      },
+      "PRO": {
+        "displayName": "Профессиональный тариф",
+        "description": "Для устоявшихся ресторанов с несколькими локациями"
+      },
+      "BUSINESS": {
+        "displayName": "Бизнес тариф",
+        "description": "Корпоративное решение для крупных сетей ресторанов"
+      }
+    },
+    "unlimited": "Безлимитно",
+    "usageLimits": "Лимиты использования",
+    "user": "пользователь",
+    "users": "пользователей",
+    "table": "стол",
+    "tables": "столов",
+    "product": "продукт",
+    "products": "продуктов",
+    "order": "заказ",
+    "orders": "заказов",
+    "features": "Функции",
+    "featureAdvancedReports": "Расширенные отчеты",
+    "featureMultiLocation": "Поддержка нескольких локаций",
+    "featureCustomBranding": "Собственный брендинг",
+    "featureApiAccess": "Доступ к API",
+    "featurePrioritySupport": "Приоритетная поддержка",
+    "featureInventoryTracking": "Учет инвентаря",
+    "featureKdsIntegration": "Интеграция с KDS"
+  },
   "landing": {
     "badge": "Уже работает",
     "headline": "Оптимизируйте работу",
