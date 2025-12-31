@@ -60,6 +60,11 @@ model Tenant {
   zReports            ZReport[]
   currentPlan         SubscriptionPlan?  @relation("CurrentPlan", fields: [currentPlanId], references: [id], onDelete: SetNull)
 
+  // Platform integration relations
+  platformOrders           PlatformOrder[]
+  platformProductMappings  PlatformProductMapping[]
+  platformModifierMappings PlatformModifierMapping[]
+
   @@index([currentPlanId])
   @@map("tenants")
 }
@@ -159,10 +164,11 @@ model Product {
   updatedAt DateTime @updatedAt
 
   // Relations
-  productImages      ProductToImage[]      // Many-to-many through junction table
-  orderItems         OrderItem[]
-  stockMovements     StockMovement[]
-  modifierGroups     ProductModifierGroup[] // Many-to-many for modifiers
+  productImages            ProductToImage[]      // Many-to-many through junction table
+  orderItems               OrderItem[]
+  stockMovements           StockMovement[]
+  modifierGroups           ProductModifierGroup[] // Many-to-many for modifiers
+  platformProductMappings  PlatformProductMapping[] // Platform integration mappings
 
   @@index([tenantId])
   @@index([categoryId])
@@ -257,7 +263,8 @@ model Modifier {
   updatedAt DateTime @updatedAt
 
   // Relations
-  orderItemModifiers OrderItemModifier[]
+  orderItemModifiers        OrderItemModifier[]
+  platformModifierMappings  PlatformModifierMapping[] // Platform integration mappings
 
   @@index([groupId])
   @@index([tenantId])
@@ -321,6 +328,9 @@ model Order {
   type        String   // DINE_IN, TAKEAWAY, DELIVERY, COUNTER
   status      String   @default("PENDING") // PENDING_APPROVAL, PENDING, PREPARING, READY, SERVED, PAID, CANCELLED
 
+  // Order source tracking for platform integrations
+  source      String   @default("POS") // POS, QR_MENU, TRENDYOL, YEMEKSEPETI, GETIR, MIGROS, FUUDY
+
   totalAmount  Decimal @db.Decimal(10, 2)
   discount     Decimal @default(0) @db.Decimal(10, 2)
   finalAmount  Decimal @db.Decimal(10, 2)
@@ -354,8 +364,9 @@ model Order {
   paidAt    DateTime?
 
   // Relations
-  orderItems OrderItem[]
-  payments   Payment[]
+  orderItems    OrderItem[]
+  payments      Payment[]
+  platformOrder PlatformOrder? // Link to platform order if from external platform
 
   @@unique([tenantId, orderNumber])
   @@index([tenantId])
@@ -365,6 +376,7 @@ model Order {
   @@index([status])
   @@index([sessionId])
   @@index([approvedById])
+  @@index([source])
   @@map("orders")
 }
 
@@ -1404,4 +1416,186 @@ model PublicStatsCache {
   lastUpdated DateTime @default(now())
 
   @@map("public_stats_cache")
+}
+
+// ========================================
+// DELIVERY PLATFORM INTEGRATIONS
+// ========================================
+
+// Platform order tracking - stores orders received from delivery platforms
+model PlatformOrder {
+  id                  String    @id @default(uuid())
+
+  // Platform identification
+  platformType        String    // TRENDYOL, YEMEKSEPETI, GETIR, MIGROS, FUUDY
+  platformOrderId     String    // Order ID from the platform
+  platformOrderNumber String?   // Human-readable order number from platform
+
+  // Reference to internal order (created after acceptance)
+  orderId             String?   @unique
+  order               Order?    @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  // Order status tracking
+  platformStatus      String    // Platform-specific status
+  internalStatus      String    // Mapped internal status
+
+  // Order details (stored as JSON for platform-specific data)
+  rawOrderData        Json      // Complete order payload from platform
+  customerInfo        Json?     // Customer name, address, phone
+  deliveryInfo        Json?     // Delivery instructions, estimated time
+  paymentInfo         Json?     // Payment method, pre-paid status
+
+  // Timestamps
+  platformCreatedAt   DateTime  // When platform received the order
+  acceptedAt          DateTime?
+  preparedAt          DateTime?
+  readyAt             DateTime?
+  deliveredAt         DateTime?
+  cancelledAt         DateTime?
+  cancellationReason  String?
+
+  // Financial
+  platformTotal       Decimal   @db.Decimal(10, 2)
+  platformCommission  Decimal?  @db.Decimal(10, 2)
+
+  tenantId            String
+  tenant              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, platformType, platformOrderId])
+  @@index([tenantId])
+  @@index([platformType])
+  @@index([platformStatus])
+  @@index([createdAt])
+  @@map("platform_orders")
+}
+
+// Menu mapping - maps local products to platform products
+model PlatformProductMapping {
+  id                  String    @id @default(uuid())
+
+  // Platform identification
+  platformType        String    // TRENDYOL, YEMEKSEPETI, GETIR, MIGROS, FUUDY
+  platformProductId   String    // Product ID on the platform
+  platformCategoryId  String?   // Category ID on the platform
+
+  // Local product reference
+  productId           String
+  product             Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  // Sync configuration
+  syncPrice           Boolean   @default(true)  // Auto-sync price changes
+  syncAvailability    Boolean   @default(true)  // Auto-sync availability
+  priceMultiplier     Decimal   @default(1.0) @db.Decimal(5, 2) // Platform price = local * multiplier
+  isEnabled           Boolean   @default(true)
+
+  // Last sync tracking
+  lastSyncedAt        DateTime?
+  lastSyncError       String?
+
+  tenantId            String
+  tenant              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, platformType, productId])
+  @@unique([tenantId, platformType, platformProductId])
+  @@index([tenantId])
+  @@index([platformType])
+  @@index([productId])
+  @@map("platform_product_mappings")
+}
+
+// Modifier mapping - maps local modifiers to platform modifiers
+model PlatformModifierMapping {
+  id                  String    @id @default(uuid())
+
+  platformType        String
+  platformModifierId  String
+  platformGroupId     String?
+
+  modifierId          String
+  modifier            Modifier  @relation(fields: [modifierId], references: [id], onDelete: Cascade)
+
+  syncPrice           Boolean   @default(true)
+  priceMultiplier     Decimal   @default(1.0) @db.Decimal(5, 2)
+  isEnabled           Boolean   @default(true)
+
+  lastSyncedAt        DateTime?
+
+  tenantId            String
+  tenant              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, platformType, modifierId])
+  @@unique([tenantId, platformType, platformModifierId])
+  @@index([tenantId])
+  @@map("platform_modifier_mappings")
+}
+
+// Integration sync logs - audit trail for all sync operations
+model IntegrationSyncLog {
+  id              String    @id @default(uuid())
+
+  platformType    String
+  operationType   String    // ORDER_RECEIVED, ORDER_STATUS_PUSH, MENU_SYNC, AVAILABILITY_SYNC
+  direction       String    // INBOUND, OUTBOUND
+
+  // Request/Response data
+  requestData     Json?
+  responseData    Json?
+
+  // Status
+  status          String    // SUCCESS, FAILED, PARTIAL
+  errorMessage    String?
+  errorCode       String?
+
+  // Related entities
+  platformOrderId String?
+  productId       String?
+
+  // Performance
+  durationMs      Int?
+  retryCount      Int       @default(0)
+
+  tenantId        String
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, platformType])
+  @@index([createdAt])
+  @@index([status])
+  @@map("integration_sync_logs")
+}
+
+// Failed webhook queue for retry (Dead Letter Queue)
+model WebhookDeadLetter {
+  id              String    @id @default(uuid())
+
+  platformType    String
+  webhookType     String    // ORDER_CREATED, ORDER_CANCELLED, etc.
+  payload         Json
+  headers         Json?
+
+  errorMessage    String
+  retryCount      Int       @default(0)
+  maxRetries      Int       @default(5)
+  nextRetryAt     DateTime?
+
+  status          String    @default("PENDING") // PENDING, PROCESSING, RESOLVED, ABANDONED
+  resolvedAt      DateTime?
+
+  tenantId        String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([nextRetryAt])
+  @@map("webhook_dead_letters")
 }
