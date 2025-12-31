@@ -198,7 +198,7 @@ export class FuudyProvider extends BasePlatformProvider {
     }
   }
 
-  async fetchNewOrders(): Promise<PlatformOrderData[]> {
+  async fetchNewOrders(since?: Date): Promise<PlatformOrderData[]> {
     // Fuudy may require polling since webhooks are limited
     try {
       const response = await this.makeRequest<{ orders: FuudyOrder[] }>(
@@ -208,6 +208,19 @@ export class FuudyProvider extends BasePlatformProvider {
       return response.orders.map((order) => this.transformOrder(order));
     } catch {
       return [];
+    }
+  }
+
+  async getOrderStatus(platformOrderId: string): Promise<string> {
+    try {
+      const response = await this.makeRequest<{ order: FuudyOrder }>(
+        'GET',
+        `/orders/${platformOrderId}`,
+      );
+      return response.order.status;
+    } catch (error: any) {
+      this.logger.error(`Failed to get order status: ${error.message}`);
+      throw error;
     }
   }
 

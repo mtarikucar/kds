@@ -229,6 +229,7 @@ export interface Order {
   userId: string;
   user?: User;
   type?: OrderType; // Order type: DINE_IN, TAKEAWAY, DELIVERY
+  source?: string; // Order source: POS, QR_MENU, TRENDYOL, YEMEKSEPETI, GETIR, MIGROS, FUUDY
   customerName?: string; // Customer name (for non-QR orders)
   customerPhone?: string; // Customer phone (for QR menu orders)
   sessionId?: string; // Customer session ID (for QR menu orders)
@@ -257,6 +258,17 @@ export enum OrderType {
   DINE_IN = 'DINE_IN',
   TAKEAWAY = 'TAKEAWAY',
   DELIVERY = 'DELIVERY',
+}
+
+// Order source (where the order came from)
+export enum OrderSource {
+  POS = 'POS',
+  QR_MENU = 'QR_MENU',
+  TRENDYOL = 'TRENDYOL',
+  YEMEKSEPETI = 'YEMEKSEPETI',
+  GETIR = 'GETIR',
+  MIGROS = 'MIGROS',
+  FUUDY = 'FUUDY',
 }
 
 export interface CreateOrderItemDto {

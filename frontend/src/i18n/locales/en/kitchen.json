@@ -35,7 +35,10 @@
     "markAs": "Mark as {{status}}",
     "cancelOrder": "Cancel Order",
     "newOrderNotification": "New Order: #{{orderNumber}}",
-    "orderUpdatedNotification": "Order Updated: #{{orderNumber}}"
+    "orderUpdatedNotification": "Order Updated: #{{orderNumber}}",
+    "delivery": "Delivery",
+    "takeaway": "Takeaway",
+    "platformOrder": "Platform Order"
   }
 }
 

@@ -241,7 +241,9 @@ export abstract class BasePlatformProvider implements IPlatformProvider {
 
   abstract getRestaurantStatus(): Promise<RestaurantStatus>;
 
-  abstract fetchNewOrders(): Promise<PlatformOrderData[]>;
+  abstract fetchNewOrders(since?: Date): Promise<PlatformOrderData[]>;
+
+  abstract getOrderStatus(platformOrderId: string): Promise<string>;
 
   abstract verifyWebhook(
     payload: unknown,

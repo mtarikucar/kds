@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Settings, CreditCard, Monitor, Plug, Download, Menu, X } from 'lucide-react';
+import { Settings, CreditCard, Monitor, Plug, Download, Menu, X, Truck } from 'lucide-react';
 
 const SettingsLayout = () => {
   const { t } = useTranslation('settings');
@@ -32,6 +32,12 @@ const SettingsLayout = () => {
       icon: Plug,
       label: t('integrationsLabel'),
       description: t('integrationsDesc'),
+    },
+    {
+      to: '/admin/settings/delivery',
+      icon: Truck,
+      label: t('deliveryLabel'),
+      description: t('deliveryDesc'),
     },
   ];
 

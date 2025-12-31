@@ -253,7 +253,7 @@ export class GetirProvider extends BasePlatformProvider {
     }
   }
 
-  async fetchNewOrders(): Promise<PlatformOrderData[]> {
+  async fetchNewOrders(since?: Date): Promise<PlatformOrderData[]> {
     try {
       const response = await this.makeRequest<{ orders: GetirOrder[] }>(
         'GET',
@@ -262,6 +262,19 @@ export class GetirProvider extends BasePlatformProvider {
       return response.orders.map((order) => this.transformOrder(order));
     } catch {
       return [];
+    }
+  }
+
+  async getOrderStatus(platformOrderId: string): Promise<string> {
+    try {
+      const response = await this.makeRequest<{ order: GetirOrder }>(
+        'GET',
+        `/orders/${platformOrderId}`,
+      );
+      return response.order.status;
+    } catch (error: any) {
+      this.logger.error(`Failed to get order status: ${error.message}`);
+      throw error;
     }
   }
 

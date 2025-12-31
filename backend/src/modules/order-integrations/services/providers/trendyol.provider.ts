@@ -514,17 +514,37 @@ export class TrendyolProvider extends BasePlatformProvider {
   /**
    * Fetch new orders from Trendyol (polling)
    */
-  async fetchNewOrders(): Promise<PlatformOrderData[]> {
+  async fetchNewOrders(since?: Date): Promise<PlatformOrderData[]> {
     try {
+      let endpoint = '/orders?status=NEW';
+      if (since) {
+        endpoint += `&startDate=${since.toISOString()}`;
+      }
       const response = await this.makeRequest<{ orders: TrendyolOrder[] }>(
         'GET',
-        '/orders?status=NEW',
+        endpoint,
       );
 
       return response.orders.map((order) => this.transformOrder(order));
     } catch (error: any) {
       this.logger.error('Failed to fetch new orders', error.message);
       return [];
+    }
+  }
+
+  /**
+   * Get order status from Trendyol
+   */
+  async getOrderStatus(platformOrderId: string): Promise<string> {
+    try {
+      const response = await this.makeRequest<{ order: TrendyolOrder }>(
+        'GET',
+        `/orders/${platformOrderId}`,
+      );
+      return response.order.status;
+    } catch (error: any) {
+      this.logger.error(`Failed to get order status: ${error.message}`);
+      throw error;
     }
   }
 

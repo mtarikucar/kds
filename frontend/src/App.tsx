@@ -30,6 +30,7 @@ import POSSettingsPage from './pages/settings/POSSettingsPage';
 import SubscriptionSettingsPage from './pages/settings/SubscriptionSettingsPage';
 import IntegrationsSettingsPage from './pages/settings/IntegrationsSettingsPage';
 import DesktopAppSettingsPage from './pages/settings/DesktopAppSettingsPage';
+import DeliveryIntegrationsPage from './pages/settings/DeliveryIntegrationsPage';
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { UpdateDialog } from './components/UpdateDialog';
@@ -95,6 +96,7 @@ function App() {
           <Route path="pos" element={<POSSettingsPage />} />
           <Route path="desktop" element={<DesktopAppSettingsPage />} />
           <Route path="integrations" element={<IntegrationsSettingsPage />} />
+          <Route path="delivery" element={<DeliveryIntegrationsPage />} />
         </Route>
 
         {/* Legacy redirects */}

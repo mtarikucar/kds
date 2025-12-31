@@ -226,7 +226,10 @@ export interface IPlatformProvider {
   getRestaurantStatus(): Promise<RestaurantStatus>;
 
   // Polling (for platforms without webhooks or as fallback)
-  fetchNewOrders(): Promise<PlatformOrderData[]>;
+  fetchNewOrders(since?: Date): Promise<PlatformOrderData[]>;
+
+  // Get order status from platform
+  getOrderStatus(platformOrderId: string): Promise<string>;
 
   // Webhook verification
   verifyWebhook(payload: unknown, headers: Record<string, string>): boolean;

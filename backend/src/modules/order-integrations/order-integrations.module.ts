@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { HttpModule } from '@nestjs/axios';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 
 // Prisma
 import { PrismaModule } from '../../prisma/prisma.module';
@@ -32,6 +33,10 @@ import { GetirWebhookController } from './webhooks/getir-webhook.controller';
 import { MigrosWebhookController } from './webhooks/migros-webhook.controller';
 import { FuudyWebhookController } from './webhooks/fuudy-webhook.controller';
 
+// Schedulers
+import { DeadLetterQueueScheduler } from './schedulers/dead-letter-queue.scheduler';
+import { OrderPollingScheduler } from './schedulers/order-polling.scheduler';
+
 @Module({
   imports: [
     PrismaModule,
@@ -40,6 +45,7 @@ import { FuudyWebhookController } from './webhooks/fuudy-webhook.controller';
       maxRedirects: 5,
     }),
     ConfigModule,
+    ScheduleModule.forRoot(),
     forwardRef(() => OrdersModule),
     forwardRef(() => KdsModule),
   ],
@@ -67,6 +73,10 @@ import { FuudyWebhookController } from './webhooks/fuudy-webhook.controller';
     GetirProvider,
     MigrosProvider,
     FuudyProvider,
+
+    // Schedulers
+    DeadLetterQueueScheduler,
+    OrderPollingScheduler,
   ],
   exports: [
     OrderIntegrationService,
