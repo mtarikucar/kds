@@ -8,14 +8,21 @@ import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import { EmailVerificationCard } from '../../components/EmailVerificationCard';
+import { isValidPhone } from '../../utils/validation';
 
 const ProfilePage = () => {
-  const { t } = useTranslation('auth');
+  const { t } = useTranslation(['auth', 'validation']);
 
   const profileSchema = z.object({
     firstName: z.string().min(2, t('validation.firstNameMin')),
     lastName: z.string().min(2, t('validation.lastNameMin')),
-    phone: z.string().optional(),
+    phone: z.string()
+      .optional()
+      .refine(
+        (val) => !val || isValidPhone(val),
+        { message: t('validation:invalidPhone') }
+      )
+      .or(z.literal('')),
   });
 
   type ProfileFormData = z.infer<typeof profileSchema>;

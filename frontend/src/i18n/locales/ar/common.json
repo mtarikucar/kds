@@ -30,7 +30,9 @@
     "login": "تسجيل الدخول",
     "update": "تحديث",
     "create": "إنشاء",
-    "changeLanguage": "تغيير اللغة"
+    "changeLanguage": "تغيير اللغة",
+    "active": "نشط",
+    "inactive": "غير نشط"
   },
   "common": {
     "browseMenu": "تصفح القائمة",
@@ -184,7 +186,15 @@
     "imagesReorderFailed": "فشل إعادة ترتيب الصور",
     "imageRemovedFromProduct": "تم إزالة الصورة من المنتج",
     "imageRemoveFailed": "فشل إزالة الصورة",
-    "allMarkedAsRead": "تم تحديد جميع الإشعارات كمقروءة"
+    "allMarkedAsRead": "تم تحديد جميع الإشعارات كمقروءة",
+    "modifierGroupCreatedSuccessfully": "تم إنشاء مجموعة الخيارات بنجاح",
+    "modifierGroupUpdatedSuccessfully": "تم تحديث مجموعة الخيارات بنجاح",
+    "modifierGroupDeletedSuccessfully": "تم حذف مجموعة الخيارات بنجاح",
+    "modifierCreatedSuccessfully": "تم إنشاء الخيار بنجاح",
+    "modifierUpdatedSuccessfully": "تم تحديث الخيار بنجاح",
+    "modifierDeletedSuccessfully": "تم حذف الخيار بنجاح",
+    "productModifiersUpdatedSuccessfully": "تم تحديث خيارات المنتج بنجاح",
+    "modifierGroupRemovedFromProduct": "تم إزالة مجموعة الخيارات من المنتج"
   },
   "time": {
     "today": "اليوم",

@@ -76,11 +76,12 @@ const POSPage = () => {
   // Load existing orders when an occupied table is selected
   useEffect(() => {
     if (selectedTable?.status === TableStatus.OCCUPIED && tableOrders) {
-      // Find the most recent active order (not PAID or CANCELLED)
+      // Find the most recent editable order (only PENDING or PREPARING)
+      // READY and SERVED orders should not be continued - new order should be created
       const activeOrder = tableOrders.find(
         (order) =>
-          order.status !== OrderStatus.PAID &&
-          order.status !== OrderStatus.CANCELLED
+          order.status === OrderStatus.PENDING ||
+          order.status === OrderStatus.PREPARING
       );
 
       if (activeOrder) {

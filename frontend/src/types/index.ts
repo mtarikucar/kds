@@ -662,8 +662,47 @@ export interface ModifierGroup {
   isActive: boolean;
   tenantId: string;
   modifiers: Modifier[];
+  _count?: {
+    productMappings: number;
+  };
   createdAt: string;
   updatedAt: string;
+}
+
+// Modifier DTOs
+export interface CreateModifierGroupDto {
+  name: string;
+  displayName: string;
+  description?: string;
+  selectionType?: SelectionType;
+  minSelections?: number;
+  maxSelections?: number;
+  isRequired?: boolean;
+  displayOrder?: number;
+  isActive?: boolean;
+}
+
+export interface UpdateModifierGroupDto extends Partial<CreateModifierGroupDto> {}
+
+export interface CreateModifierDto {
+  name: string;
+  displayName: string;
+  description?: string;
+  priceAdjustment?: number;
+  isAvailable?: boolean;
+  displayOrder?: number;
+  groupId: string;
+}
+
+export interface UpdateModifierDto extends Partial<Omit<CreateModifierDto, 'groupId'>> {}
+
+export interface AssignModifierGroupDto {
+  groupId: string;
+  displayOrder?: number;
+}
+
+export interface AssignModifiersToProductDto {
+  modifierGroups: AssignModifierGroupDto[];
 }
 
 export interface OrderItemModifier {

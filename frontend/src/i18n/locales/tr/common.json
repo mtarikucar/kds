@@ -30,7 +30,9 @@
     "login": "Giriş Yap",
     "update": "Güncelle",
     "create": "Oluştur",
-    "changeLanguage": "Dili Değiştir"
+    "changeLanguage": "Dili Değiştir",
+    "active": "Aktif",
+    "inactive": "Pasif"
   },
   "common": {
     "browseMenu": "Menüyü Gözat",
@@ -184,7 +186,15 @@
     "imagesReorderFailed": "Görseller yeniden sıralanamadı",
     "imageRemovedFromProduct": "Görsel üründen kaldırıldı",
     "imageRemoveFailed": "Görsel kaldırılamadı",
-    "allMarkedAsRead": "Tüm bildirimler okundu olarak işaretlendi"
+    "allMarkedAsRead": "Tüm bildirimler okundu olarak işaretlendi",
+    "modifierGroupCreatedSuccessfully": "Seçenek grubu başarıyla oluşturuldu",
+    "modifierGroupUpdatedSuccessfully": "Seçenek grubu başarıyla güncellendi",
+    "modifierGroupDeletedSuccessfully": "Seçenek grubu başarıyla silindi",
+    "modifierCreatedSuccessfully": "Seçenek başarıyla oluşturuldu",
+    "modifierUpdatedSuccessfully": "Seçenek başarıyla güncellendi",
+    "modifierDeletedSuccessfully": "Seçenek başarıyla silindi",
+    "productModifiersUpdatedSuccessfully": "Ürün seçenekleri başarıyla güncellendi",
+    "modifierGroupRemovedFromProduct": "Seçenek grubu üründen kaldırıldı"
   },
   "time": {
     "today": "Bugün",

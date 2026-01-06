@@ -16,6 +16,7 @@ import {
   Check,
   Grid3X3,
   LayoutList,
+  Settings2,
 } from 'lucide-react';
 import {
   initializeModel,
@@ -38,7 +39,24 @@ import {
   useDeleteProductImage,
   useUploadProductImages,
 } from '../../features/upload/uploadApi';
-import { Category, Product, ProductImage } from '../../types';
+import { Category, Product, ProductImage, ModifierGroup, Modifier, CreateModifierGroupDto, CreateModifierDto } from '../../types';
+import {
+  useModifierGroups,
+  useCreateModifierGroup,
+  useUpdateModifierGroup,
+  useDeleteModifierGroup,
+  useCreateModifier,
+  useUpdateModifier,
+  useDeleteModifier,
+  useAssignModifiersToProduct,
+  useProductModifiers,
+} from '../../features/modifiers/modifiersApi';
+import {
+  ModifierGroupCard,
+  ModifierGroupModal,
+  ModifierItemModal,
+  ProductModifierSelector,
+} from '../../components/modifiers';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
@@ -77,13 +95,21 @@ const MenuManagementPage = () => {
   const categorySchema = createCategorySchema(t);
   const productSchema = createProductSchema(t);
 
-  const [activeTab, setActiveTab] = useState<'categories' | 'products' | 'images'>('categories');
+  const [activeTab, setActiveTab] = useState<'categories' | 'products' | 'images' | 'modifiers'>('categories');
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [imageLibraryModalOpen, setImageLibraryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productImages, setProductImages] = useState<ProductImage[]>([]);
+
+  // Modifier states
+  const [modifierGroupModalOpen, setModifierGroupModalOpen] = useState(false);
+  const [modifierItemModalOpen, setModifierItemModalOpen] = useState(false);
+  const [editingModifierGroup, setEditingModifierGroup] = useState<ModifierGroup | null>(null);
+  const [editingModifier, setEditingModifier] = useState<Modifier | null>(null);
+  const [selectedGroupIdForModifier, setSelectedGroupIdForModifier] = useState<string>('');
+  const [selectedModifierGroupIds, setSelectedModifierGroupIds] = useState<string[]>([]);
 
   // Image library state
   const [imageSearchTerm, setImageSearchTerm] = useState('');
@@ -107,6 +133,16 @@ const MenuManagementPage = () => {
   const { mutate: deleteProduct } = useDeleteProduct();
   const { mutate: deleteImage } = useDeleteProductImage();
   const uploadImagesMutation = useUploadProductImages();
+
+  // Modifier hooks
+  const { data: modifierGroups, isLoading: modifierGroupsLoading } = useModifierGroups(true);
+  const { mutate: createModifierGroup, isPending: isCreatingModifierGroup } = useCreateModifierGroup();
+  const { mutate: updateModifierGroup, isPending: isUpdatingModifierGroup } = useUpdateModifierGroup();
+  const { mutate: deleteModifierGroup } = useDeleteModifierGroup();
+  const { mutate: createModifier, isPending: isCreatingModifier } = useCreateModifier();
+  const { mutate: updateModifier, isPending: isUpdatingModifier } = useUpdateModifier();
+  const { mutate: deleteModifier } = useDeleteModifier();
+  const { mutate: assignModifiersToProduct } = useAssignModifiersToProduct();
 
   const categoryForm = useForm<CategoryFormData>({
     resolver: zodResolver(categorySchema),
@@ -137,6 +173,11 @@ const MenuManagementPage = () => {
       // Safely handle images array
       const productImagesList = Array.isArray(product.images) ? product.images : [];
       setProductImages(productImagesList);
+      // Safely handle modifier groups array
+      const productModifierGroupIds = Array.isArray(product.modifierGroups)
+        ? product.modifierGroups.map((mg) => mg.id)
+        : [];
+      setSelectedModifierGroupIds(productModifierGroupIds);
       productForm.reset({
         name: product.name,
         description: product.description || '',
@@ -150,6 +191,7 @@ const MenuManagementPage = () => {
     } else {
       setEditingProduct(null);
       setProductImages([]);
+      setSelectedModifierGroupIds([]);
       productForm.reset({
         isAvailable: true,
       });
@@ -197,8 +239,21 @@ const MenuManagementPage = () => {
         {
           onSuccess: () => {
             console.log('Product updated successfully');
+            // Assign modifier groups
+            if (selectedModifierGroupIds.length > 0) {
+              assignModifiersToProduct({
+                productId: editingProduct.id,
+                data: {
+                  modifierGroups: selectedModifierGroupIds.map((groupId, index) => ({
+                    groupId,
+                    displayOrder: index,
+                  })),
+                },
+              });
+            }
             setProductModalOpen(false);
             setProductImages([]);
+            setSelectedModifierGroupIds([]);
             productForm.reset();
           },
           onError: (error: any) => {
@@ -208,10 +263,23 @@ const MenuManagementPage = () => {
       );
     } else {
       createProduct(submitData, {
-        onSuccess: () => {
+        onSuccess: (newProduct) => {
           console.log('Product created successfully');
+          // Assign modifier groups to newly created product
+          if (selectedModifierGroupIds.length > 0 && newProduct?.id) {
+            assignModifiersToProduct({
+              productId: newProduct.id,
+              data: {
+                modifierGroups: selectedModifierGroupIds.map((groupId, index) => ({
+                  groupId,
+                  displayOrder: index,
+                })),
+              },
+            });
+          }
           setProductModalOpen(false);
           setProductImages([]);
+          setSelectedModifierGroupIds([]);
           productForm.reset();
         },
         onError: (error: any) => {
@@ -224,6 +292,80 @@ const MenuManagementPage = () => {
   const handleSelectImagesFromLibrary = (images: ProductImage[]) => {
     // Replace with selected images from library (not append, to avoid duplicates)
     setProductImages(images);
+  };
+
+  // Modifier Handlers
+  const handleOpenModifierGroupModal = (group?: ModifierGroup) => {
+    if (group) {
+      setEditingModifierGroup(group);
+    } else {
+      setEditingModifierGroup(null);
+    }
+    setModifierGroupModalOpen(true);
+  };
+
+  const handleModifierGroupSubmit = (data: CreateModifierGroupDto) => {
+    if (editingModifierGroup) {
+      updateModifierGroup(
+        { id: editingModifierGroup.id, data },
+        {
+          onSuccess: () => {
+            setModifierGroupModalOpen(false);
+            setEditingModifierGroup(null);
+          },
+        }
+      );
+    } else {
+      createModifierGroup(data, {
+        onSuccess: () => {
+          setModifierGroupModalOpen(false);
+        },
+      });
+    }
+  };
+
+  const handleDeleteModifierGroup = (group: ModifierGroup) => {
+    if (confirm(t('menu.confirmDeleteModifierGroup'))) {
+      deleteModifierGroup(group.id);
+    }
+  };
+
+  const handleOpenModifierItemModal = (groupId: string, modifier?: Modifier) => {
+    setSelectedGroupIdForModifier(groupId);
+    if (modifier) {
+      setEditingModifier(modifier);
+    } else {
+      setEditingModifier(null);
+    }
+    setModifierItemModalOpen(true);
+  };
+
+  const handleModifierItemSubmit = (data: CreateModifierDto) => {
+    if (editingModifier) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { groupId, ...updateData } = data;
+      updateModifier(
+        { id: editingModifier.id, data: updateData },
+        {
+          onSuccess: () => {
+            setModifierItemModalOpen(false);
+            setEditingModifier(null);
+          },
+        }
+      );
+    } else {
+      createModifier(data, {
+        onSuccess: () => {
+          setModifierItemModalOpen(false);
+        },
+      });
+    }
+  };
+
+  const handleDeleteModifier = (modifier: Modifier) => {
+    if (confirm(t('menu.confirmDeleteModifier'))) {
+      deleteModifier(modifier.id);
+    }
   };
 
   const handleConfirmUploadToLibrary = async (files: File[]) => {
@@ -350,6 +492,15 @@ const MenuManagementPage = () => {
           className="md:text-base"
         >
           {t('menu.imageLibrary')}
+        </Button>
+        <Button
+          variant={activeTab === 'modifiers' ? 'primary' : 'outline'}
+          onClick={() => setActiveTab('modifiers')}
+          size="sm"
+          className="md:text-base"
+        >
+          <Settings2 className="h-4 w-4 mr-1 md:mr-2" />
+          {t('menu.modifiers')}
         </Button>
       </div>
 
@@ -745,6 +896,57 @@ const MenuManagementPage = () => {
         </div>
       )}
 
+      {/* Modifiers Tab */}
+      {activeTab === 'modifiers' && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>{t('menu.modifierGroups')}</CardTitle>
+            <Button onClick={() => handleOpenModifierGroupModal()}>
+              <Plus className="h-4 w-4 mr-2" />
+              {t('menu.addModifierGroup')}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {modifierGroupsLoading ? (
+              <Spinner />
+            ) : !modifierGroups || modifierGroups.length === 0 ? (
+              <div className="text-center py-12">
+                <Settings2 className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-4 text-lg font-medium text-gray-900">
+                  {t('menu.noModifierGroups')}
+                </h3>
+                <p className="mt-2 text-sm text-gray-500">
+                  {t('menu.noModifierGroupsDesc')}
+                </p>
+                <Button
+                  className="mt-4"
+                  onClick={() => handleOpenModifierGroupModal()}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  {t('menu.addModifierGroup')}
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {modifierGroups
+                  .sort((a, b) => a.displayOrder - b.displayOrder)
+                  .map((group) => (
+                    <ModifierGroupCard
+                      key={group.id}
+                      group={group}
+                      onEditGroup={handleOpenModifierGroupModal}
+                      onDeleteGroup={handleDeleteModifierGroup}
+                      onAddModifier={(groupId) => handleOpenModifierItemModal(groupId)}
+                      onEditModifier={(modifier) => handleOpenModifierItemModal(modifier.groupId, modifier)}
+                      onDeleteModifier={handleDeleteModifier}
+                    />
+                  ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Category Modal */}
       <Modal
         isOpen={categoryModalOpen}
@@ -902,6 +1104,18 @@ const MenuManagementPage = () => {
             </Button>
           </div>
 
+          {/* Modifier Groups */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {t('menu.modifierGroups')}
+            </label>
+            <ProductModifierSelector
+              productId={editingProduct?.id}
+              selectedGroupIds={selectedModifierGroupIds}
+              onSelectionChange={setSelectedModifierGroupIds}
+            />
+          </div>
+
           <div className="flex items-center gap-2">
             <input
               type="checkbox"
@@ -942,6 +1156,31 @@ const MenuManagementPage = () => {
         onSelectImages={handleSelectImagesFromLibrary}
         selectedImageIds={productImages.map((img) => img.id)}
         maxSelection={10}
+      />
+
+      {/* Modifier Group Modal */}
+      <ModifierGroupModal
+        isOpen={modifierGroupModalOpen}
+        onClose={() => {
+          setModifierGroupModalOpen(false);
+          setEditingModifierGroup(null);
+        }}
+        onSubmit={handleModifierGroupSubmit}
+        editingGroup={editingModifierGroup}
+        isLoading={isCreatingModifierGroup || isUpdatingModifierGroup}
+      />
+
+      {/* Modifier Item Modal */}
+      <ModifierItemModal
+        isOpen={modifierItemModalOpen}
+        onClose={() => {
+          setModifierItemModalOpen(false);
+          setEditingModifier(null);
+        }}
+        onSubmit={handleModifierItemSubmit}
+        editingModifier={editingModifier}
+        groupId={selectedGroupIdForModifier}
+        isLoading={isCreatingModifier || isUpdatingModifier}
       />
     </div>
   );

@@ -30,8 +30,14 @@ export class StripeService {
         metadata,
       });
     } catch (error) {
-      this.logger.error(`Failed to create Stripe customer: ${error.message}`);
-      throw new BadRequestException('Failed to create payment customer');
+      this.logger.error(`Failed to create Stripe customer: ${error.message}`, {
+        email,
+        name,
+        errorType: error.type,
+        errorCode: error.code,
+        rawError: error.raw,
+      });
+      throw new BadRequestException(`Failed to create payment customer: ${error.message}`);
     }
   }
 

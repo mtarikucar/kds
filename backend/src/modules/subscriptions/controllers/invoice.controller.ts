@@ -9,11 +9,15 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { TenantGuard } from '../../auth/guards/tenant.guard';
+import { RolesGuard } from '../../auth/guards/roles.guard';
+import { Roles } from '../../auth/decorators/roles.decorator';
+import { UserRole } from '../../../common/constants/roles.enum';
 import { BillingService } from '../services/billing.service';
 import { InvoicePdfService } from '../services/invoice-pdf.service';
 
 @Controller('invoices')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 export class InvoiceController {
   constructor(
     private readonly billingService: BillingService,
@@ -24,6 +28,7 @@ export class InvoiceController {
    * Get invoice by ID
    */
   @Get(':id')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getInvoice(@Param('id') id: string) {
     const invoice = await this.billingService.getInvoiceByNumber(id);
     if (!invoice) {
@@ -36,6 +41,7 @@ export class InvoiceController {
    * Download invoice PDF/HTML
    */
   @Get(':id/download')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async downloadInvoice(@Param('id') id: string, @Res() res: Response) {
     const invoice = await this.billingService.getInvoiceByNumber(id);
 
@@ -60,6 +66,7 @@ export class InvoiceController {
    * Generate PDF for invoice
    */
   @Post(':id/generate-pdf')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async generatePdf(@Param('id') id: string) {
     const pdfUrl = await this.invoicePdfService.generateInvoicePdf(id);
     return { success: true, pdfUrl };

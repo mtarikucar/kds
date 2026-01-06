@@ -1,0 +1,1 @@
+-- CreateTable for subscription system

@@ -1,9 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
+import Input from '../ui/Input';
 import { Customer, CreateCustomerDto } from '../../types';
 import { useCreateCustomer, useUpdateCustomer } from '../../features/customers/customersApi';
+import { isValidPhone } from '../../utils/validation';
 
 interface CustomerFormModalProps {
   isOpen: boolean;
@@ -16,62 +21,79 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
   onClose,
   customer,
 }) => {
-  const { t } = useTranslation('customers');
+  const { t } = useTranslation(['customers', 'validation']);
   const { mutate: createCustomer, isPending: isCreating } = useCreateCustomer();
   const { mutate: updateCustomer, isPending: isUpdating } = useUpdateCustomer();
 
-  const [formData, setFormData] = useState<CreateCustomerDto>({
-    name: '',
-    email: '',
-    phone: '',
-    birthday: '',
-    tags: [],
-    notes: '',
+  const [tagInput, setTagInput] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
+
+  // Zod validation schema
+  const customerSchema = z.object({
+    name: z.string().min(2, t('validation:nameMin')),
+    email: z.string().email(t('validation:email')).optional().or(z.literal('')),
+    phone: z.string()
+      .optional()
+      .refine(
+        (val) => !val || isValidPhone(val),
+        { message: t('validation:invalidPhone') }
+      )
+      .or(z.literal('')),
+    birthday: z.string().optional().or(z.literal('')),
+    notes: z.string().optional().or(z.literal('')),
   });
 
-  const [tagInput, setTagInput] = useState('');
+  type CustomerFormData = z.infer<typeof customerSchema>;
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<CustomerFormData>({
+    resolver: zodResolver(customerSchema),
+    defaultValues: {
+      name: '',
+      email: '',
+      phone: '',
+      birthday: '',
+      notes: '',
+    },
+  });
 
   useEffect(() => {
     if (customer) {
-      setFormData({
+      reset({
         name: customer.name || '',
         email: customer.email || '',
         phone: customer.phone || '',
         birthday: customer.birthday ? customer.birthday.split('T')[0] : '',
-        tags: customer.tags || [],
         notes: customer.notes || '',
       });
+      setTags(customer.tags || []);
     } else {
-      setFormData({
+      reset({
         name: '',
         email: '',
         phone: '',
         birthday: '',
-        tags: [],
         notes: '',
       });
+      setTags([]);
     }
     setTagInput('');
-  }, [customer, isOpen]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+  }, [customer, isOpen, reset]);
 
   const handleAddTag = () => {
     const tag = tagInput.trim().toUpperCase();
-    if (tag && !formData.tags?.includes(tag)) {
-      setFormData((prev) => ({ ...prev, tags: [...(prev.tags || []), tag] }));
+    if (tag && !tags.includes(tag)) {
+      setTags((prev) => [...prev, tag]);
       setTagInput('');
     }
   };
 
   const handleRemoveTag = (tagToRemove: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      tags: prev.tags?.filter((tag) => tag !== tagToRemove) || [],
-    }));
+    setTags((prev) => prev.filter((tag) => tag !== tagToRemove));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -81,27 +103,25 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const onSubmit = (data: CustomerFormData) => {
     // Build payload, ensuring we don't send empty strings for unique fields
-    const email = formData.email?.trim();
-    const phone = formData.phone?.trim();
-    const notes = formData.notes?.trim();
+    const email = data.email?.trim();
+    const phone = data.phone?.trim();
+    const notes = data.notes?.trim();
 
     const payload: any = {
-      name: formData.name.trim(),
+      name: data.name.trim(),
     };
 
     // Only include optional fields if they have actual values
     if (email) payload.email = email;
     if (phone) payload.phone = phone;
     if (notes) payload.notes = notes;
-    if (formData.tags && formData.tags.length > 0) payload.tags = formData.tags;
+    if (tags.length > 0) payload.tags = tags;
 
     // Convert birthday string to ISO DateTime if provided
-    if (formData.birthday) {
-      payload.birthday = new Date(formData.birthday).toISOString();
+    if (data.birthday) {
+      payload.birthday = new Date(data.birthday).toISOString();
     }
 
     if (customer) {
@@ -109,7 +129,7 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       if (!email && customer.email) payload.email = null;
       if (!phone && customer.phone) payload.phone = null;
       if (!notes && customer.notes) payload.notes = null;
-      if (!formData.birthday && customer.birthday) payload.birthday = null;
+      if (!data.birthday && customer.birthday) payload.birthday = null;
 
       updateCustomer(
         { id: customer.id, data: payload },
@@ -130,62 +150,36 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       title={isEditMode ? t('customers.editCustomer') : t('customers.addCustomer')}
       size="md"
     >
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            {t('customers.firstName')} *
-          </label>
-          <input
-            type="text"
-            name="name"
-            value={formData.name}
-            onChange={handleChange}
-            required
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder={t('customers.firstName')}
-          />
-        </div>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <Input
+          label={`${t('customers.firstName')} *`}
+          {...register('name')}
+          error={errors.name?.message}
+          placeholder={t('customers.firstName')}
+        />
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            {t('customers.email')}
-          </label>
-          <input
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder={t('customers.email')}
-          />
-        </div>
+        <Input
+          label={t('customers.email')}
+          type="email"
+          {...register('email')}
+          error={errors.email?.message}
+          placeholder={t('customers.email')}
+        />
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            {t('customers.phone')}
-          </label>
-          <input
-            type="tel"
-            name="phone"
-            value={formData.phone}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="+905551234567"
-          />
-        </div>
+        <Input
+          label={t('customers.phone')}
+          type="tel"
+          {...register('phone')}
+          error={errors.phone?.message}
+          placeholder="+905551234567"
+        />
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            {t('customers.birthday', 'Birthday')}
-          </label>
-          <input
-            type="date"
-            name="birthday"
-            value={formData.birthday}
-            onChange={handleChange}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-        </div>
+        <Input
+          label={t('customers.birthday', 'Birthday')}
+          type="date"
+          {...register('birthday')}
+          error={errors.birthday?.message}
+        />
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -204,9 +198,9 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
               +
             </Button>
           </div>
-          {formData.tags && formData.tags.length > 0 && (
+          {tags.length > 0 && (
             <div className="flex flex-wrap gap-2">
-              {formData.tags.map((tag) => (
+              {tags.map((tag) => (
                 <span
                   key={tag}
                   className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded"
@@ -230,9 +224,7 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
             {t('customers.notes')}
           </label>
           <textarea
-            name="notes"
-            value={formData.notes}
-            onChange={handleChange}
+            {...register('notes')}
             rows={3}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             placeholder={t('customers.notes')}
@@ -243,7 +235,7 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
           <Button type="button" variant="outline" onClick={onClose} disabled={isLoading}>
             {t('app:app.cancel')}
           </Button>
-          <Button type="submit" disabled={isLoading || !formData.name.trim()}>
+          <Button type="submit" disabled={isLoading}>
             {isLoading
               ? t('app:app.loading')
               : isEditMode

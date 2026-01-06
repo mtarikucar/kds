@@ -85,7 +85,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
       to: '/customers',
       icon: UserCircle,
       label: t('navigation.customers'),
-      roles: ['ADMIN', 'MANAGER', 'WAITER'],
+      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER],
     },
     {
       to: '/admin/qr-codes',
@@ -122,8 +122,12 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
 
   return (
     <aside
-      className={`fixed md:static inset-y-0 left-0 z-50 bg-gray-900 text-white min-h-screen transform transition-all duration-300 ease-in-out ${
-        isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+      className={`fixed md:static inset-y-0 z-50 ${isRTL ? 'right-0' : 'left-0'} bg-gray-900 text-white min-h-screen transform transition-all duration-300 ease-in-out ${
+        isOpen
+          ? 'translate-x-0'
+          : isRTL
+            ? 'translate-x-full md:translate-x-0'
+            : '-translate-x-full md:translate-x-0'
       } ${isSidebarCollapsed ? 'md:w-16' : 'md:w-64'} w-64`}
     >
       <div className="p-6 flex items-center justify-between">

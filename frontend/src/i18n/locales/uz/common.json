@@ -30,7 +30,9 @@
     "login": "Kirish",
     "update": "Yangilash",
     "create": "Yaratish",
-    "changeLanguage": "Tilni o'zgartirish"
+    "changeLanguage": "Tilni o'zgartirish",
+    "active": "Faol",
+    "inactive": "Nofaol"
   },
   "common": {
     "browseMenu": "Menyuni ko'rish",
@@ -184,7 +186,15 @@
     "imagesReorderFailed": "Rasmlarni qayta tartiblab bo'lmadi",
     "imageRemovedFromProduct": "Rasm mahsulotdan olib tashlandi",
     "imageRemoveFailed": "Rasmni olib tashlab bo'lmadi",
-    "allMarkedAsRead": "Barcha bildirishnomalar o'qilgan deb belgilandi"
+    "allMarkedAsRead": "Barcha bildirishnomalar o'qilgan deb belgilandi",
+    "modifierGroupCreatedSuccessfully": "Modifikator guruhi muvaffaqiyatli yaratildi",
+    "modifierGroupUpdatedSuccessfully": "Modifikator guruhi muvaffaqiyatli yangilandi",
+    "modifierGroupDeletedSuccessfully": "Modifikator guruhi muvaffaqiyatli o'chirildi",
+    "modifierCreatedSuccessfully": "Modifikator muvaffaqiyatli yaratildi",
+    "modifierUpdatedSuccessfully": "Modifikator muvaffaqiyatli yangilandi",
+    "modifierDeletedSuccessfully": "Modifikator muvaffaqiyatli o'chirildi",
+    "productModifiersUpdatedSuccessfully": "Mahsulot modifikatorlari muvaffaqiyatli yangilandi",
+    "modifierGroupRemovedFromProduct": "Modifikator guruhi mahsulotdan olib tashlandi"
   },
   "time": {
     "today": "Bugun",

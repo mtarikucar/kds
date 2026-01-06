@@ -8,6 +8,10 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { TenantGuard } from '../../auth/guards/tenant.guard';
+import { RolesGuard } from '../../auth/guards/roles.guard';
+import { Roles } from '../../auth/decorators/roles.decorator';
+import { UserRole } from '../../../common/constants/roles.enum';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { PaymentProviderFactory } from '../services/payment-provider.factory';
 import { StripeService } from '../services/stripe.service';
@@ -17,7 +21,7 @@ import { CreatePaymentIntentDto, ConfirmPaymentDto } from '../dto/payment-intent
 import { PaymentProvider, PaymentStatus, PaymentRegion, BillingCycle } from '../../../common/constants/subscription.enum';
 
 @Controller('payments')
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 export class PaymentController {
   constructor(
     private readonly prisma: PrismaService,
@@ -32,6 +36,7 @@ export class PaymentController {
    * Create a payment intent for subscription payment
    */
   @Post('create-intent')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async createPaymentIntent(@Request() req, @Body() dto: CreatePaymentIntentDto) {
     const tenantId = req.user.tenantId;
 
@@ -78,6 +83,11 @@ export class PaymentController {
       });
     }
 
+    // Get admin user for email
+    const adminUser = await this.prisma.user.findFirst({
+      where: { tenantId, role: 'ADMIN' },
+    });
+
     if (paymentProvider === PaymentProvider.STRIPE) {
       // Create or get Stripe customer
       let customerId: string;
@@ -90,7 +100,7 @@ export class PaymentController {
         customerId = existingSubscription.stripeCustomerId;
       } else {
         const customer = await this.stripeService.createCustomer(
-          tenant.name,
+          adminUser?.email || req.user.email,
           tenant.name,
           { tenantId },
         );
@@ -116,10 +126,6 @@ export class PaymentController {
       const frontendUrl = this.configService.get<string>('FRONTEND_URL');
       const backendUrl = this.configService.get<string>('BACKEND_URL');
       const merchantOid = `SUB-${subscription.id}-${Date.now()}`;
-
-      const adminUser = await this.prisma.user.findFirst({
-        where: { tenantId, role: 'ADMIN' },
-      });
 
       const paymentLinkResult = await this.paytrService.createPaymentLink({
         merchantOid,
@@ -176,6 +182,7 @@ export class PaymentController {
    * PayTR uses redirect flow and webhook for confirmation
    */
   @Post('confirm-payment')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async confirmPayment(@Request() req, @Body() dto: ConfirmPaymentDto) {
     const tenantId = req.user.tenantId;
 
@@ -271,6 +278,7 @@ export class PaymentController {
    * Create payment intent for plan change
    */
   @Post('create-plan-change-intent')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async createPlanChangeIntent(@Request() req, @Body() dto: { pendingChangeId: string }) {
     const tenantId = req.user.tenantId;
 
@@ -301,6 +309,11 @@ export class PaymentController {
     const tenant = pendingChange.subscription.tenant;
     const amount = Number(pendingChange.prorationAmount);
 
+    // Get admin user for email
+    const adminUser = await this.prisma.user.findFirst({
+      where: { tenantId, role: 'ADMIN' },
+    });
+
     if (pendingChange.paymentProvider === PaymentProvider.STRIPE) {
       // Create or get Stripe customer
       let customerId: string;
@@ -309,7 +322,7 @@ export class PaymentController {
         customerId = pendingChange.subscription.stripeCustomerId;
       } else {
         const customer = await this.stripeService.createCustomer(
-          tenant.name,
+          adminUser?.email || `${tenant.id}@tenant.local`,
           tenant.name,
           { tenantId: tenant.id },
         );
@@ -346,10 +359,6 @@ export class PaymentController {
       // PayTR Link API flow for plan change
       const frontendUrl = this.configService.get<string>('FRONTEND_URL');
       const merchantOid = `PLAN-${dto.pendingChangeId}-${Date.now()}`;
-
-      const adminUser = await this.prisma.user.findFirst({
-        where: { tenantId, role: 'ADMIN' },
-      });
 
       const paymentLinkResult = await this.paytrService.createPaymentLink({
         merchantOid,
@@ -401,6 +410,7 @@ export class PaymentController {
    * PayTR uses redirect flow and webhook for confirmation
    */
   @Post('confirm-plan-change-payment')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async confirmPlanChangePayment(@Request() req, @Body() dto: {
     pendingChangeId: string;
     paymentIntentId?: string;
@@ -478,6 +488,7 @@ export class PaymentController {
    * Get payment history for tenant
    */
   @Post('history')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getPaymentHistory(@Request() req) {
     const tenantId = req.user.tenantId;
 

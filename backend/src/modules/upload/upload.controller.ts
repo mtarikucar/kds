@@ -131,6 +131,7 @@ export class UploadController {
   }
 
   @Get('product-images')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get all product images for tenant' })
   @ApiResponse({
     status: 200,
@@ -146,6 +147,7 @@ export class UploadController {
   }
 
   @Get('product-images/unused')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get unused product images (not attached to any product)' })
   @ApiResponse({
     status: 200,

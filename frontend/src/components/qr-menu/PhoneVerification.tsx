@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import axios from 'axios';
 import { Phone, Check, Loader2 } from 'lucide-react';
+import { isValidPhone } from '../../utils/validation';
 
 interface PhoneVerificationProps {
   tenantId: string;
@@ -29,8 +30,8 @@ const PhoneVerification = ({
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Basic phone validation
-    if (!phone || phone.length < 10) {
+    // Phone validation with E.164 format check
+    if (!phone || !isValidPhone(phone)) {
       toast.error(t('phoneVerification.invalidPhone', 'Please enter a valid phone number'));
       return;
     }

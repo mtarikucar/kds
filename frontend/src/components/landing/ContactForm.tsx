@@ -6,6 +6,7 @@ import { useCreateContactMessage } from '../../features/contact';
 import Input from '../ui/Input';
 import Button from '../ui/Button';
 import { useState } from 'react';
+import { isValidPhone } from '../../utils/validation';
 
 export const ContactForm = () => {
   const { t } = useTranslation('common');
@@ -15,7 +16,13 @@ export const ContactForm = () => {
   const contactSchema = z.object({
     name: z.string().min(2, t('validation.nameMin')).max(100),
     email: z.string().email(t('validation.invalidEmail')),
-    phone: z.string().max(20).optional(),
+    phone: z.string()
+      .optional()
+      .refine(
+        (val) => !val || isValidPhone(val),
+        { message: t('validation.invalidPhone') }
+      )
+      .or(z.literal('')),
     message: z.string().min(10, t('validation.messageMin')).max(5000),
   });
 

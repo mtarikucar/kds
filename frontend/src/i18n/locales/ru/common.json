@@ -30,7 +30,9 @@
     "login": "Войти",
     "update": "Обновить",
     "create": "Создать",
-    "changeLanguage": "Изменить язык"
+    "changeLanguage": "Изменить язык",
+    "active": "Активный",
+    "inactive": "Неактивный"
   },
   "common": {
     "browseMenu": "Просмотр меню",
@@ -184,7 +186,15 @@
     "imagesReorderFailed": "Не удалось переупорядочить изображения",
     "imageRemovedFromProduct": "Изображение удалено из продукта",
     "imageRemoveFailed": "Не удалось удалить изображение",
-    "allMarkedAsRead": "Все уведомления отмечены как прочитанные"
+    "allMarkedAsRead": "Все уведомления отмечены как прочитанные",
+    "modifierGroupCreatedSuccessfully": "Группа модификаторов успешно создана",
+    "modifierGroupUpdatedSuccessfully": "Группа модификаторов успешно обновлена",
+    "modifierGroupDeletedSuccessfully": "Группа модификаторов успешно удалена",
+    "modifierCreatedSuccessfully": "Модификатор успешно создан",
+    "modifierUpdatedSuccessfully": "Модификатор успешно обновлен",
+    "modifierDeletedSuccessfully": "Модификатор успешно удален",
+    "productModifiersUpdatedSuccessfully": "Модификаторы продукта успешно обновлены",
+    "modifierGroupRemovedFromProduct": "Группа модификаторов удалена из продукта"
   },
   "time": {
     "today": "Сегодня",

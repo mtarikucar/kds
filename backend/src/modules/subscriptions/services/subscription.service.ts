@@ -191,7 +191,7 @@ export class SubscriptionService {
 
     // Create payment provider subscription (if not free and not trial)
     if (plan.name !== SubscriptionPlanType.FREE && !isTrialPeriod) {
-      await this.setupPaymentProviderSubscription(subscription.id, tenant, plan, dto);
+      await this.setupPaymentProviderSubscription(subscription.id, tenant, plan, dto, adminUser);
     }
 
     this.logger.log(`Subscription created for tenant ${tenantId}: ${subscription.id}`);
@@ -206,6 +206,7 @@ export class SubscriptionService {
     tenant: any,
     plan: any,
     dto: CreateSubscriptionDto,
+    adminUser: any,
   ) {
     if (tenant.paymentRegion === PaymentRegion.TURKEY) {
       // For PayTR, we don't create subscription upfront
@@ -215,7 +216,7 @@ export class SubscriptionService {
       // For Stripe, create customer and subscription
       try {
         const customer = await this.stripeService.createCustomer(
-          tenant.name,
+          adminUser?.email || `admin@${tenant.id}.tenant`,
           tenant.name,
           { tenantId: tenant.id },
         );
@@ -470,6 +471,30 @@ export class SubscriptionService {
 
     this.logger.log(`Plan change applied for subscription ${subscription.id} - ${newPlan.displayName}`);
     return updatedSubscription;
+  }
+
+  /**
+   * Cancel a pending plan change
+   */
+  async cancelPendingPlanChange(subscriptionId: string) {
+    const pendingChange = await this.prisma.pendingPlanChange.findFirst({
+      where: {
+        subscriptionId,
+        paymentStatus: 'PENDING',
+      },
+    });
+
+    if (!pendingChange) {
+      throw new NotFoundException('No pending plan change found');
+    }
+
+    await this.prisma.pendingPlanChange.delete({
+      where: { id: pendingChange.id },
+    });
+
+    this.logger.log(`Pending plan change ${pendingChange.id} cancelled for subscription ${subscriptionId}`);
+
+    return { success: true, message: 'Pending plan change cancelled' };
   }
 
   /**

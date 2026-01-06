@@ -36,6 +36,7 @@ import { UpdateDialog } from './components/UpdateDialog';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
 import { useNotificationSocket } from './features/notifications/notificationsApi';
 import { useAuthStore } from './store/authStore';
+import { UserRole } from './types';
 
 function App() {
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
@@ -77,11 +78,26 @@ function App() {
       <Route path="/qr-menu/:tenantId/orders" element={<OrderTrackingPage />} />
       <Route path="/qr-menu/:tenantId/loyalty" element={<LoyaltyPage />} />
 
-      {/* Protected Routes */}
+      {/* Protected Routes - All authenticated users */}
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/dashboard" element={<DashboardPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
+      </Route>
+
+      {/* Protected Routes - ADMIN, MANAGER, WAITER */}
+      <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER]}><Layout /></ProtectedRoute>}>
         <Route path="/pos" element={<POSPage />} />
+        <Route path="/customers" element={<CustomersPage />} />
+        <Route path="/customers/:id" element={<CustomerDetailPage />} />
+      </Route>
+
+      {/* Protected Routes - ADMIN, MANAGER, KITCHEN */}
+      <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN]}><Layout /></ProtectedRoute>}>
         <Route path="/kitchen" element={<KitchenDisplayPage />} />
+      </Route>
+
+      {/* Protected Routes - ADMIN, MANAGER only (Admin pages) */}
+      <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.MANAGER]}><Layout /></ProtectedRoute>}>
         <Route path="/admin/menu" element={<MenuManagementPage />} />
         <Route path="/admin/tables" element={<TableManagementPage />} />
         <Route path="/admin/users" element={<UserManagementPage />} />
@@ -104,11 +120,6 @@ function App() {
         {/* Subscription pages */}
         <Route path="/subscription/plans" element={<SubscriptionPlansPage />} />
         <Route path="/subscription/payment" element={<SubscriptionPaymentPage />} />
-
-        {/* Profile & Customers */}
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/customers" element={<CustomersPage />} />
-        <Route path="/customers/:id" element={<CustomerDetailPage />} />
       </Route>
     </Routes>
 

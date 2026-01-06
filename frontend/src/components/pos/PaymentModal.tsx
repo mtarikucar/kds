@@ -8,14 +8,21 @@ import Input from '../ui/Input';
 import { PaymentMethod } from '../../types';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import { useTranslation } from 'react-i18next';
+import { isValidPhone } from '../../utils/validation';
 
-const paymentSchema = z.object({
+const createPaymentSchema = (t: (key: string) => string) => z.object({
   method: z.nativeEnum(PaymentMethod),
   transactionId: z.string().optional(),
-  customerPhone: z.string().optional(),
+  customerPhone: z.string()
+    .optional()
+    .refine(
+      (val) => !val || isValidPhone(val),
+      { message: t('validation:invalidPhone') }
+    )
+    .or(z.literal('')),
 });
 
-type PaymentFormData = z.infer<typeof paymentSchema>;
+type PaymentFormData = z.infer<ReturnType<typeof createPaymentSchema>>;
 
 export type { PaymentFormData };
 
@@ -34,8 +41,9 @@ const PaymentModal = ({
   onConfirm,
   isLoading = false,
 }: PaymentModalProps) => {
-  const { t } = useTranslation('pos');
+  const { t } = useTranslation(['pos', 'validation']);
   const formatPrice = useFormatCurrency();
+  const paymentSchema = createPaymentSchema(t);
   const {
     register,
     handleSubmit,

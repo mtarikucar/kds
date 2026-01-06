@@ -30,7 +30,9 @@
     "login": "Login",
     "update": "Update",
     "create": "Create",
-    "changeLanguage": "Change Language"
+    "changeLanguage": "Change Language",
+    "active": "Active",
+    "inactive": "Inactive"
   },
   "common": {
     "browseMenu": "Browse Menu",
@@ -184,7 +186,15 @@
     "imagesReorderFailed": "Failed to reorder images",
     "imageRemovedFromProduct": "Image removed from product",
     "imageRemoveFailed": "Failed to remove image",
-    "allMarkedAsRead": "All notifications marked as read"
+    "allMarkedAsRead": "All notifications marked as read",
+    "modifierGroupCreatedSuccessfully": "Modifier group created successfully",
+    "modifierGroupUpdatedSuccessfully": "Modifier group updated successfully",
+    "modifierGroupDeletedSuccessfully": "Modifier group deleted successfully",
+    "modifierCreatedSuccessfully": "Modifier created successfully",
+    "modifierUpdatedSuccessfully": "Modifier updated successfully",
+    "modifierDeletedSuccessfully": "Modifier deleted successfully",
+    "productModifiersUpdatedSuccessfully": "Product modifiers updated successfully",
+    "modifierGroupRemovedFromProduct": "Modifier group removed from product"
   },
   "time": {
     "today": "Today",
