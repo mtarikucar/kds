@@ -13,6 +13,10 @@ import { CustomerSessionService } from '../../customers/customer-session.service
 import { CreateCustomerOrderDto } from '../dto/create-customer-order.dto';
 import { CreateWaiterRequestDto, CreateBillRequestDto } from '../dto/waiter-request.dto';
 import { OrderStatus, OrderType } from '../../../common/constants/order-status.enum';
+import {
+  isLocationWithinRange,
+  isValidCoordinates,
+} from '../../../common/utils/geolocation.util';
 
 @Injectable()
 export class CustomerOrdersService {
@@ -45,6 +49,30 @@ export class CustomerOrdersService {
       throw new ForbiddenException(
         'Customer ordering is currently disabled. Please contact staff to place your order.'
       );
+    }
+
+    // SECURITY: Validate customer location if restaurant has location configured
+    if (isValidCoordinates(tenant.latitude, tenant.longitude)) {
+      // Restaurant has location configured - require customer location
+      if (!isValidCoordinates(dto.latitude, dto.longitude)) {
+        throw new BadRequestException(
+          'Konum bilgisi gerekli. Lütfen tarayıcı konum iznini etkinleştirin.'
+        );
+      }
+
+      const locationCheck = isLocationWithinRange(
+        dto.latitude!,
+        dto.longitude!,
+        tenant.latitude!,
+        tenant.longitude!,
+        tenant.locationRadius,
+      );
+
+      if (!locationCheck.isWithinRange) {
+        throw new BadRequestException(
+          `Sipariş vermek için restoran konumunda olmanız gerekiyor. Mevcut mesafe: ${locationCheck.distance}m (maksimum: ${tenant.locationRadius}m)`
+        );
+      }
     }
 
     // Determine order type based on tableId and settings

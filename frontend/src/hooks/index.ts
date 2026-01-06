@@ -14,3 +14,4 @@ export { useFormatCurrency, useFormatCurrencyExtended } from './useFormatCurrenc
 export { useCurrency } from './useCurrency';
 export { useAutoUpdate } from './useAutoUpdate';
 export { useResponsive } from './useResponsive';
+export { useGeolocation } from './useGeolocation';

@@ -31,6 +31,11 @@ model Tenant {
   // Currency settings
   currency        String   @default("TRY") // USD, EUR, GBP, TRY, CAD, AUD
 
+  // Restaurant location (for QR menu geolocation validation)
+  latitude        Float?   // Restaurant latitude coordinate
+  longitude       Float?   // Restaurant longitude coordinate
+  locationRadius  Int      @default(100) // Maximum allowed distance in meters (default 100m)
+
   // Report settings
   closingTime         String?   @default("23:00")  // Store closing time in HH:mm format
   timezone            String    @default("UTC")    // Timezone for the tenant
@@ -943,6 +948,10 @@ model CustomerSession {
   // Session metadata
   userAgent String?
   ipAddress String?
+
+  // Geolocation (for security validation)
+  latitude  Float?
+  longitude Float?
 
   // Expiration
   expiresAt DateTime

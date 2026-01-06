@@ -89,4 +89,14 @@ export class CreateCustomerOrderDto {
   @IsString()
   @IsOptional()
   notes?: string;
+
+  @ApiPropertyOptional({ example: 40.7128, description: 'Customer latitude for location validation' })
+  @IsNumber()
+  @IsOptional()
+  latitude?: number;
+
+  @ApiPropertyOptional({ example: -74.0060, description: 'Customer longitude for location validation' })
+  @IsNumber()
+  @IsOptional()
+  longitude?: number;
 }

@@ -127,6 +127,10 @@ export class TenantsService {
         timezone: true,
         reportEmailEnabled: true,
         reportEmails: true,
+        // Location settings for QR menu security
+        latitude: true,
+        longitude: true,
+        locationRadius: true,
       },
     });
 
@@ -157,6 +161,10 @@ export class TenantsService {
         timezone: true,
         reportEmailEnabled: true,
         reportEmails: true,
+        // Location settings for QR menu security
+        latitude: true,
+        longitude: true,
+        locationRadius: true,
       },
     });
   }

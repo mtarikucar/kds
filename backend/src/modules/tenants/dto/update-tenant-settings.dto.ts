@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsIn, IsBoolean, IsArray, IsEmail, Matches } from 'class-validator';
+import { IsString, IsOptional, IsIn, IsBoolean, IsArray, IsEmail, Matches, IsNumber, Min, Max } from 'class-validator';
 import {
   SUPPORTED_CURRENCIES,
   SupportedCurrency,
@@ -52,4 +52,36 @@ export class UpdateTenantSettingsDto {
   @IsEmail({}, { each: true })
   @IsOptional()
   reportEmails?: string[];
+
+  // Location settings for QR menu security
+  @ApiPropertyOptional({
+    description: 'Restaurant latitude coordinate',
+    example: 40.7128,
+  })
+  @IsNumber()
+  @IsOptional()
+  @Min(-90)
+  @Max(90)
+  latitude?: number;
+
+  @ApiPropertyOptional({
+    description: 'Restaurant longitude coordinate',
+    example: -74.0060,
+  })
+  @IsNumber()
+  @IsOptional()
+  @Min(-180)
+  @Max(180)
+  longitude?: number;
+
+  @ApiPropertyOptional({
+    description: 'Maximum allowed distance in meters for customer orders',
+    example: 100,
+    default: 100,
+  })
+  @IsNumber()
+  @IsOptional()
+  @Min(10)
+  @Max(1000)
+  locationRadius?: number;
 }

@@ -1,4 +1,4 @@
-﻿import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import QRMenuLayout, { MenuData } from './QRMenuLayout';
 import CartContent from '../../components/qr-menu/CartContent';
 import TableSelectionModal from '../../components/qr-menu/TableSelectionModal';
@@ -7,6 +7,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { toast } from 'sonner';
+import { useGeolocation } from '../../hooks';
 
 const CartPage = () => {
   const { t } = useTranslation('common');
@@ -18,8 +19,25 @@ const CartPage = () => {
   const [menuData, setMenuData] = useState<MenuData | null>(null);
   const [isShowingTableSelection, setIsShowingTableSelection] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [locationRequested, setLocationRequested] = useState(false);
 
   const { items, sessionId, tableId: cartTableId, clearCart } = useCartStore();
+  const {
+    latitude,
+    longitude,
+    error: locationError,
+    loading: locationLoading,
+    getCurrentPosition,
+    permissionStatus
+  } = useGeolocation();
+
+  // Request location when page loads
+  useEffect(() => {
+    if (!locationRequested) {
+      setLocationRequested(true);
+      getCurrentPosition();
+    }
+  }, [locationRequested, getCurrentPosition]);
 
   const handleSubmitOrder = async () => {
     if (!sessionId) {
@@ -32,6 +50,18 @@ const CartPage = () => {
       return;
     }
 
+    // Try to get location if not already available
+    let orderLat = latitude;
+    let orderLng = longitude;
+
+    if (!orderLat || !orderLng) {
+      const position = await getCurrentPosition();
+      if (position) {
+        orderLat = position.latitude;
+        orderLng = position.longitude;
+      }
+    }
+
     setIsSubmitting(true);
     try {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
@@ -41,6 +71,8 @@ const CartPage = () => {
         tenantId,
         tableId: tableId || undefined,
         sessionId,
+        latitude: orderLat || undefined,
+        longitude: orderLng || undefined,
         items: items.map(item => ({
           productId: item.product.id,
           quantity: item.quantity,
@@ -51,7 +83,7 @@ const CartPage = () => {
 
       toast.success(t('cart.orderSubmitted'));
       clearCart();
-      
+
       const ordersUrl = '/qr-menu/' + tenantId + '/orders' + (tableId ? '?tableId=' + tableId : '');
       navigate(ordersUrl);
     } catch (error: any) {
