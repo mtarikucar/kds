@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { OrderIntegrationService } from '../services/order-integration.service';
@@ -8,24 +9,38 @@ import { PlatformOrderData } from '../interfaces';
 /**
  * Scheduler for processing failed webhook payloads from the dead letter queue.
  * Uses exponential backoff for retries.
+ *
+ * NOTE: This scheduler is deprecated when Kafka DLQ is enabled (USE_KAFKA_DLQ=true).
+ * In that case, the DLQConsumerService handles retry logic via Kafka topics.
  */
 @Injectable()
 export class DeadLetterQueueScheduler {
   private readonly logger = new Logger(DeadLetterQueueScheduler.name);
+  private readonly useKafkaDLQ: boolean;
 
   // Exponential backoff intervals in minutes
   private readonly RETRY_INTERVALS = [1, 5, 15, 30, 60];
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
     private readonly orderIntegrationService: OrderIntegrationService,
-  ) {}
+  ) {
+    this.useKafkaDLQ = this.configService.get<boolean>('kafka.useKafkaDLQ', false) ||
+                       this.configService.get<string>('USE_KAFKA_DLQ') === 'true';
+  }
 
   /**
    * Process pending dead letter queue items every minute
    */
   @Cron(CronExpression.EVERY_MINUTE)
   async processDeadLetterQueue() {
+    // Skip if Kafka DLQ is enabled
+    if (this.useKafkaDLQ) {
+      this.logger.debug('Database DLQ disabled - using Kafka DLQ');
+      return;
+    }
+
     try {
       // Find items ready for retry
       const pendingItems = await this.prisma.webhookDeadLetter.findMany({

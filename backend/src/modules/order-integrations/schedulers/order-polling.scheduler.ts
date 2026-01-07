@@ -1,9 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { PlatformProviderFactory } from '../services/platform-provider.factory';
 import { OrderIntegrationService } from '../services/order-integration.service';
+import { WebhookProducerService } from '../../kafka/producers/webhook-producer.service';
 import { PlatformType } from '../constants';
+import { PlatformOrderData } from '../interfaces';
 import { IntegrationType } from '../../../common/constants/integration-types.enum';
 
 /**
@@ -13,12 +16,17 @@ import { IntegrationType } from '../../../common/constants/integration-types.enu
 @Injectable()
 export class OrderPollingScheduler {
   private readonly logger = new Logger(OrderPollingScheduler.name);
+  private readonly kafkaEnabled: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
     private readonly providerFactory: PlatformProviderFactory,
     private readonly orderIntegrationService: OrderIntegrationService,
-  ) {}
+    private readonly webhookProducer: WebhookProducerService,
+  ) {
+    this.kafkaEnabled = this.configService.get<boolean>('kafka.enabled', false);
+  }
 
   /**
    * Poll for new orders every 2 minutes
@@ -84,16 +92,22 @@ export class OrderPollingScheduler {
         `Found ${orders.length} new orders from ${platformType} for tenant ${tenantId}`,
       );
 
+      // Batch query to avoid N+1 - fetch all existing orders at once
+      const platformOrderIds = orders.map((o) => o.platformOrderId);
+      const existingOrders = await this.prisma.platformOrder.findMany({
+        where: {
+          tenantId,
+          platformType,
+          platformOrderId: { in: platformOrderIds },
+        },
+      });
+      const existingMap = new Map(
+        existingOrders.map((o) => [o.platformOrderId, o]),
+      );
+
       for (const orderData of orders) {
         try {
-          // Check if order already exists
-          const existing = await this.prisma.platformOrder.findFirst({
-            where: {
-              tenantId,
-              platformType,
-              platformOrderId: orderData.platformOrderId,
-            },
-          });
+          const existing = existingMap.get(orderData.platformOrderId);
 
           if (existing) {
             // Update status if changed
@@ -109,12 +123,8 @@ export class OrderPollingScheduler {
             continue;
           }
 
-          // Process as new order
-          await this.orderIntegrationService.processIncomingOrder(
-            tenantId,
-            platformType,
-            orderData,
-          );
+          // Process as new order - route through Kafka if enabled
+          await this.processNewOrder(tenantId, platformType, orderData);
         } catch (error: any) {
           this.logger.error(
             `Failed to process polled order ${orderData.platformOrderId}: ${error.message}`,
@@ -129,6 +139,36 @@ export class OrderPollingScheduler {
         `Failed to poll ${platformType} for tenant ${tenantId}: ${error.message}`,
       );
     }
+  }
+
+  /**
+   * Process a new order - routes through Kafka if enabled
+   */
+  private async processNewOrder(
+    tenantId: string,
+    platformType: PlatformType,
+    orderData: PlatformOrderData,
+  ) {
+    // Route through Kafka for consistent processing with webhooks
+    if (this.kafkaEnabled && this.webhookProducer.isEnabled()) {
+      await this.webhookProducer.produce({
+        tenantId,
+        platformType,
+        platformOrderId: orderData.platformOrderId,
+        webhookType: 'ORDER_CREATED',
+        rawPayload: orderData.rawData,
+        headers: { 'x-source': 'polling' },
+        correlationId: `poll-${tenantId}-${orderData.platformOrderId}`,
+      });
+      return;
+    }
+
+    // Fallback to direct processing
+    await this.orderIntegrationService.processIncomingOrder(
+      tenantId,
+      platformType,
+      orderData,
+    );
   }
 
   /**

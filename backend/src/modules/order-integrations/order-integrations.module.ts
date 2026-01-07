@@ -9,6 +9,7 @@ import { PrismaModule } from '../../prisma/prisma.module';
 // Related modules
 import { OrdersModule } from '../orders/orders.module';
 import { KdsModule } from '../kds/kds.module';
+import { KafkaModule } from '../kafka/kafka.module';
 
 // Services
 import { OrderIntegrationService } from './services/order-integration.service';
@@ -48,6 +49,7 @@ import { OrderPollingScheduler } from './schedulers/order-polling.scheduler';
     ScheduleModule.forRoot(),
     forwardRef(() => OrdersModule),
     forwardRef(() => KdsModule),
+    forwardRef(() => KafkaModule),
   ],
   controllers: [
     // Admin API Controllers

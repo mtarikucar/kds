@@ -267,6 +267,160 @@ export class OrderIntegrationService {
   }
 
   /**
+   * Handle order cancellation from platform webhook
+   */
+  async handleOrderCancellation(
+    tenantId: string,
+    platformType: PlatformType,
+    platformOrderId: string,
+    reason: string,
+  ) {
+    this.logger.log(
+      `Handling order cancellation: ${platformType}/${platformOrderId}`,
+      { tenantId, reason },
+    );
+
+    const platformOrder = await this.prisma.platformOrder.findFirst({
+      where: {
+        tenantId,
+        platformType,
+        platformOrderId,
+      },
+    });
+
+    if (!platformOrder) {
+      this.logger.warn(`Platform order not found for cancellation: ${platformOrderId}`);
+      return;
+    }
+
+    // Update platform order status
+    await this.prisma.platformOrder.update({
+      where: { id: platformOrder.id },
+      data: {
+        internalStatus: PlatformOrderStatus.CANCELLED,
+        platformStatus: 'CANCELLED',
+        cancelledAt: new Date(),
+        cancellationReason: reason,
+      },
+    });
+
+    // If there's a linked internal order, cancel it too
+    if (platformOrder.orderId) {
+      await this.prisma.order.update({
+        where: { id: platformOrder.orderId },
+        data: { status: 'CANCELLED' },
+      });
+
+      // Emit cancellation event
+      this.kdsGateway.server
+        .to(`kitchen-${tenantId}`)
+        .emit('orderCancelled', {
+          orderId: platformOrder.orderId,
+          platformOrderId: platformOrder.id,
+          reason,
+        });
+    }
+
+    // Log the cancellation
+    await this.logSync({
+      tenantId,
+      platformType,
+      operationType: SyncOperationType.ORDER_CANCELLED,
+      direction: SyncDirection.INBOUND,
+      status: 'SUCCESS',
+      platformOrderId,
+    });
+  }
+
+  /**
+   * Handle status update from platform webhook
+   */
+  async handleStatusUpdate(
+    tenantId: string,
+    platformType: PlatformType,
+    platformOrderId: string,
+    newPlatformStatus: string,
+  ) {
+    this.logger.log(
+      `Handling status update: ${platformType}/${platformOrderId} -> ${newPlatformStatus}`,
+      { tenantId },
+    );
+
+    const platformOrder = await this.prisma.platformOrder.findFirst({
+      where: {
+        tenantId,
+        platformType,
+        platformOrderId,
+      },
+    });
+
+    if (!platformOrder) {
+      this.logger.warn(`Platform order not found for status update: ${platformOrderId}`);
+      return;
+    }
+
+    // Map platform status to internal status
+    const internalStatus =
+      PLATFORM_STATUS_MAP[platformType]?.[newPlatformStatus] ||
+      platformOrder.internalStatus;
+
+    // Update platform order
+    await this.prisma.platformOrder.update({
+      where: { id: platformOrder.id },
+      data: {
+        platformStatus: newPlatformStatus,
+        internalStatus,
+        ...(internalStatus === PlatformOrderStatus.PREPARING && { preparedAt: new Date() }),
+        ...(internalStatus === PlatformOrderStatus.READY && { readyAt: new Date() }),
+        ...(internalStatus === PlatformOrderStatus.DELIVERED && { deliveredAt: new Date() }),
+      },
+    });
+
+    // If there's a linked internal order and status is significant, update it too
+    if (platformOrder.orderId && this.shouldUpdateInternalOrder(internalStatus)) {
+      await this.prisma.order.update({
+        where: { id: platformOrder.orderId },
+        data: { status: this.mapPlatformToInternalOrderStatus(internalStatus) },
+      });
+
+      // Emit status update event
+      this.kdsGateway.emitOrderStatusChange(tenantId, platformOrder.orderId, internalStatus);
+    }
+
+    // Log the status update
+    await this.logSync({
+      tenantId,
+      platformType,
+      operationType: SyncOperationType.STATUS_UPDATE,
+      direction: SyncDirection.INBOUND,
+      status: 'SUCCESS',
+      platformOrderId,
+    });
+  }
+
+  /**
+   * Check if internal order should be updated based on platform status
+   */
+  private shouldUpdateInternalOrder(internalStatus: string): boolean {
+    // Only update for significant status changes that aren't already handled
+    return [
+      PlatformOrderStatus.CANCELLED,
+      PlatformOrderStatus.DELIVERED,
+    ].includes(internalStatus as PlatformOrderStatus);
+  }
+
+  /**
+   * Map platform internal status to order status
+   */
+  private mapPlatformToInternalOrderStatus(platformStatus: string): string {
+    const statusMap: Record<string, string> = {
+      [PlatformOrderStatus.CANCELLED]: 'CANCELLED',
+      [PlatformOrderStatus.DELIVERED]: 'SERVED',
+    };
+    return statusMap[platformStatus] || 'PENDING';
+  }
+
+  /**
    * Push order status update to platform
    */
   async pushStatusUpdate(orderId: string, tenantId: string, newStatus: string) {

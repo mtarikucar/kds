@@ -61,6 +61,73 @@ services:
           cpus: '0.25'
           memory: 256M
 
+  # Apache Kafka (KRaft mode - no Zookeeper)
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: kds_kafka_staging
+    restart: always
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_LISTENERS: 'CONTROLLER://kafka:29093,PLAINTEXT://kafka:9092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_NUM_PARTITIONS: 5
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
+      CLUSTER_ID: 'kds-kafka-staging-001'
+    ports:
+      - '9093:9092'
+    volumes:
+      - kafka_data_staging:/var/lib/kafka/data
+    healthcheck:
+      test: ['CMD-SHELL', '/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list || exit 1']
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    networks:
+      - kds_staging_network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Kafka Topic Initialization
+  kafka-init:
+    image: apache/kafka:3.7.0
+    container_name: kds_kafka_init_staging
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ['/bin/sh', '-c']
+    command: |
+      "
+      echo 'Waiting for Kafka to be ready...'
+      sleep 5
+
+      # Create topics for order integration
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic platform-webhooks --partitions 5 --replication-factor 1
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic platform-webhooks-dlq --partitions 3 --replication-factor 1
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic order-status-sync --partitions 3 --replication-factor 1
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists --topic order-status-sync-dlq --partitions 2 --replication-factor 1
+
+      echo 'Topics created successfully!'
+      /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
+      "
+    networks:
+      - kds_staging_network
+
   # Backend API (NestJS) - Staging
   backend:
     env_file:
@@ -76,6 +143,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      kafka:
         condition: service_healthy
     environment:
       NODE_ENV: staging
@@ -117,6 +186,11 @@ services:
       # Google OAuth 2.0
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      # Kafka Configuration
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_CLIENT_ID: kds-order-integration-staging
+      KAFKA_ENABLED: ${KAFKA_ENABLED:-true}
+      USE_KAFKA_DLQ: ${USE_KAFKA_DLQ:-true}
     ports:
       - '3002:3002'
     volumes:
@@ -183,6 +257,7 @@ services:
 volumes:
   postgres_data_staging:
   redis_data_staging:
+  kafka_data_staging:
   invoice_storage_staging:
 
 networks:

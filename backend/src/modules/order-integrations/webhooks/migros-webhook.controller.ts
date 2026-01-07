@@ -8,21 +8,29 @@ import {
   Logger,
   BadRequestException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { OrderIntegrationService } from '../services/order-integration.service';
 import { MigrosProvider } from '../services/providers/migros.provider';
+import { WebhookProducerService } from '../../kafka/producers/webhook-producer.service';
 import { PlatformType, MigrosWebhookEvent } from '../constants';
 import { DeadLetterStatus } from '../constants/platform-status.enum';
 
 @Controller('webhooks/migros')
 export class MigrosWebhookController {
   private readonly logger = new Logger(MigrosWebhookController.name);
+  private readonly kafkaEnabled: boolean;
 
   constructor(
     private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
     private readonly orderIntegrationService: OrderIntegrationService,
     private readonly migrosProvider: MigrosProvider,
-  ) {}
+    private readonly webhookProducer: WebhookProducerService,
+  ) {
+    this.kafkaEnabled = this.configService.get<boolean>('kafka.enabled', false);
+  }
 
   @Post()
   @HttpCode(HttpStatus.OK)
@@ -30,9 +38,11 @@ export class MigrosWebhookController {
     @Body() payload: any,
     @Headers() headers: Record<string, string>,
   ) {
-    this.logger.log(`Received Migros webhook: ${payload.eventType}`);
+    const correlationId = headers['x-correlation-id'] || randomUUID();
+    this.logger.log(`Received Migros webhook: ${payload.eventType}`, { correlationId });
 
     if (!this.migrosProvider.verifyWebhook(payload, headers)) {
+      this.logger.warn('Invalid webhook signature', { correlationId });
       throw new BadRequestException('Invalid signature');
     }
 
@@ -42,6 +52,54 @@ export class MigrosWebhookController {
       throw new BadRequestException('Missing tenant ID');
     }
 
+    const platformOrderId = payload.orderId || payload.id;
+
+    // If Kafka is enabled, produce to Kafka for async processing
+    if (this.kafkaEnabled && this.webhookProducer.isEnabled()) {
+      return this.handleWithKafka(tenantId, platformOrderId, payload, headers, correlationId);
+    }
+
+    // Fallback to synchronous processing
+    return this.handleSynchronously(tenantId, payload, headers, correlationId);
+  }
+
+  private async handleWithKafka(
+    tenantId: string,
+    platformOrderId: string,
+    payload: any,
+    headers: Record<string, string>,
+    correlationId: string,
+  ) {
+    try {
+      const webhookType = this.mapEventType(payload.eventType);
+
+      await this.webhookProducer.produce({
+        tenantId,
+        platformType: PlatformType.MIGROS,
+        platformOrderId,
+        webhookType,
+        rawPayload: payload,
+        headers,
+        correlationId,
+      });
+
+      return {
+        success: true,
+        correlationId,
+        message: 'Webhook received and queued for processing',
+      };
+    } catch (error: any) {
+      this.logger.error(`Failed to queue webhook to Kafka: ${error.message}`, { correlationId });
+      return this.handleSynchronously(tenantId, payload, headers, correlationId);
+    }
+  }
+
+  private async handleSynchronously(
+    tenantId: string,
+    payload: any,
+    headers: Record<string, string>,
+    correlationId: string,
+  ) {
     try {
       switch (payload.eventType) {
         case MigrosWebhookEvent.ORDER_CREATED:
@@ -53,12 +111,12 @@ export class MigrosWebhookController {
           break;
 
         default:
-          this.logger.warn(`Unknown event: ${payload.eventType}`);
+          this.logger.warn(`Unknown event: ${payload.eventType}`, { correlationId });
       }
 
-      return { success: true };
+      return { success: true, correlationId };
     } catch (error: any) {
-      this.logger.error(`Webhook failed: ${error.message}`);
+      this.logger.error(`Webhook failed: ${error.message}`, { correlationId });
 
       await this.prisma.webhookDeadLetter.create({
         data: {
@@ -73,7 +131,18 @@ export class MigrosWebhookController {
         },
       });
 
-      return { success: true, queued: true };
+      return { success: true, queued: true, correlationId };
+    }
+  }
+
+  private mapEventType(eventType: string): 'ORDER_CREATED' | 'ORDER_CANCELLED' | 'ORDER_UPDATED' | 'STATUS_CHANGED' {
+    switch (eventType) {
+      case MigrosWebhookEvent.ORDER_CREATED:
+        return 'ORDER_CREATED';
+      case MigrosWebhookEvent.ORDER_CANCELLED:
+        return 'ORDER_CANCELLED';
+      default:
+        return 'STATUS_CHANGED';
     }
   }
 
@@ -96,31 +165,11 @@ export class MigrosWebhookController {
   private async handleOrderCancelled(tenantId: string, payload: any) {
     const { orderId, reason } = payload;
 
-    const platformOrder = await this.prisma.platformOrder.findFirst({
-      where: {
-        tenantId,
-        platformType: PlatformType.MIGROS,
-        platformOrderId: orderId,
-      },
-    });
-
-    if (platformOrder) {
-      await this.prisma.platformOrder.update({
-        where: { id: platformOrder.id },
-        data: {
-          internalStatus: 'CANCELLED',
-          platformStatus: 'CANCELLED',
-          cancelledAt: new Date(),
-          cancellationReason: reason,
-        },
-      });
-
-      if (platformOrder.orderId) {
-        await this.prisma.order.update({
-          where: { id: platformOrder.orderId },
-          data: { status: 'CANCELLED' },
-        });
-      }
-    }
+    await this.orderIntegrationService.handleOrderCancellation(
+      tenantId,
+      PlatformType.MIGROS,
+      orderId,
+      reason || 'Cancelled by platform',
+    );
   }
 }

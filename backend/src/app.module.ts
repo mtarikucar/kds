@@ -29,6 +29,7 @@ import { CustomerOrdersModule } from './modules/customer-orders/customer-orders.
 import { DesktopAppModule } from './modules/desktop-app/desktop-app.module';
 import { PublicStatsModule } from './modules/public-stats/public-stats.module';
 import { OrderIntegrationsModule } from './modules/order-integrations/order-integrations.module';
+import { KafkaModule } from './modules/kafka/kafka.module';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './common/middleware/input-sanitizer.middleware';
 
