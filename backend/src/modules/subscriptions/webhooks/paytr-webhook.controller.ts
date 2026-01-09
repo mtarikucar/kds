@@ -10,6 +10,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { PaytrService, PaytrCallbackPayload } from '../services/paytr.service';
 import { BillingService } from '../services/billing.service';
 import { NotificationService } from '../services/notification.service';
+import { SubscriptionService } from '../services/subscription.service';
 import {
   PaymentStatus,
   SubscriptionStatus,
@@ -26,6 +27,7 @@ export class PaytrWebhookController {
     private readonly paytrService: PaytrService,
     private readonly billingService: BillingService,
     private readonly notificationService: NotificationService,
+    private readonly subscriptionService: SubscriptionService,
   ) {}
 
   /**
@@ -64,6 +66,13 @@ export class PaytrWebhookController {
   private async handlePaymentSuccess(payload: PaytrCallbackPayload) {
     this.logger.log(`PayTR payment succeeded: ${payload.merchant_oid}`);
 
+    // Check if this is a plan change payment (PLAN-{pendingChangeId}-{timestamp})
+    if (payload.merchant_oid.startsWith('PLAN-')) {
+      await this.handlePlanChangePaymentSuccess(payload);
+      return;
+    }
+
+    // Otherwise, it's a new subscription payment (SUB-{subscriptionId}-{timestamp})
     // Find payment by merchant_oid
     const payment = await this.prisma.subscriptionPayment.findFirst({
       where: { paytrMerchantOid: payload.merchant_oid },
@@ -185,6 +194,23 @@ export class PaytrWebhookController {
       },
     });
 
+    // If this is a plan change payment, also update PendingPlanChange
+    if (payload.merchant_oid.startsWith('PLAN-')) {
+      const parts = payload.merchant_oid.split('-');
+      if (parts.length >= 2) {
+        const pendingChangeId = parts[1];
+        await this.prisma.pendingPlanChange.update({
+          where: { id: pendingChangeId },
+          data: {
+            paymentStatus: 'FAILED',
+            failureReason: payload.failed_reason_msg || 'Payment failed',
+          },
+        }).catch(err => {
+          this.logger.warn(`Failed to update pending plan change ${pendingChangeId}: ${err.message}`);
+        });
+      }
+    }
+
     // Send failure notification
     const adminEmail = await this.getTenantAdminEmail(payment.subscription.tenantId);
     if (adminEmail) {
@@ -197,6 +223,90 @@ export class PaytrWebhookController {
     }
 
     this.logger.log(`PayTR payment failure processed: ${payment.id}`);
+  }
+
+  /**
+   * Handle successful plan change payment
+   * Format: PLAN-{pendingChangeId}-{timestamp}
+   */
+  private async handlePlanChangePaymentSuccess(payload: PaytrCallbackPayload) {
+    this.logger.log(`Plan change payment succeeded: ${payload.merchant_oid}`);
+
+    // Extract pendingChangeId from merchant_oid format: PLAN-{id}-{timestamp}
+    const parts = payload.merchant_oid.split('-');
+    if (parts.length < 2) {
+      this.logger.error(`Invalid plan change merchant_oid format: ${payload.merchant_oid}`);
+      return;
+    }
+    const pendingChangeId = parts[1];
+
+    // Find and update payment
+    const payment = await this.prisma.subscriptionPayment.findFirst({
+      where: { paytrMerchantOid: payload.merchant_oid },
+      include: {
+        subscription: {
+          include: { tenant: true },
+        },
+      },
+    });
+
+    if (payment) {
+      await this.prisma.subscriptionPayment.update({
+        where: { id: payment.id },
+        data: {
+          status: PaymentStatus.SUCCEEDED,
+          paidAt: new Date(),
+          paytrPaymentToken: payload.merchant_oid,
+        },
+      });
+    }
+
+    // Update PendingPlanChange to COMPLETED
+    const pendingChange = await this.prisma.pendingPlanChange.findUnique({
+      where: { id: pendingChangeId },
+      include: {
+        subscription: { include: { tenant: true } },
+        newPlan: true,
+      },
+    });
+
+    if (!pendingChange) {
+      this.logger.error(`Pending plan change not found: ${pendingChangeId}`);
+      return;
+    }
+
+    await this.prisma.pendingPlanChange.update({
+      where: { id: pendingChangeId },
+      data: { paymentStatus: 'COMPLETED' },
+    });
+
+    // Apply the plan change
+    try {
+      await this.subscriptionService.applyPlanChange(pendingChangeId);
+      this.logger.log(`Plan change applied successfully: ${pendingChangeId}`);
+
+      // Send success notification
+      const adminEmail = await this.getTenantAdminEmail(pendingChange.subscription.tenantId);
+      if (adminEmail) {
+        await this.notificationService.sendPaymentSuccessful(
+          adminEmail,
+          pendingChange.subscription.tenant.name,
+          Number(pendingChange.prorationAmount),
+          pendingChange.currency,
+          `Plan change to ${pendingChange.newPlan.displayName}`,
+        );
+      }
+    } catch (error) {
+      this.logger.error(`Failed to apply plan change: ${error.message}`, error.stack);
+      // Mark as failed if applyPlanChange throws
+      await this.prisma.pendingPlanChange.update({
+        where: { id: pendingChangeId },
+        data: {
+          paymentStatus: 'FAILED',
+          failureReason: `Failed to apply: ${error.message}`,
+        },
+      });
+    }
   }
 
   /**

@@ -94,6 +94,15 @@ export class SubscriptionController {
   }
 
   /**
+   * Get pending plan change for a subscription
+   */
+  @Get(':id/pending-change')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  async getPendingPlanChange(@Param('id') id: string) {
+    return await this.subscriptionService.getPendingPlanChange(id);
+  }
+
+  /**
    * Cancel subscription
    */
   @Post(':id/cancel')

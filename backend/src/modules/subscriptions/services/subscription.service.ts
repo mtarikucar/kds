@@ -249,11 +249,48 @@ export class SubscriptionService {
       where: {
         subscriptionId,
         paymentStatus: 'PENDING',
+        appliedAt: null,
       },
     });
 
     if (existingPendingChange) {
-      throw new BadRequestException('There is already a pending plan change. Please complete or cancel it first.');
+      // Check how old the pending change is
+      const createdAt = new Date(existingPendingChange.createdAt);
+      const hoursOld = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
+
+      // If older than 24 hours, auto-expire it and allow new change
+      if (hoursOld >= 24) {
+        await this.prisma.pendingPlanChange.update({
+          where: { id: existingPendingChange.id },
+          data: {
+            paymentStatus: 'EXPIRED',
+            failureReason: 'Payment not completed within 24 hours',
+          },
+        });
+        // Continue with new plan change
+      } else {
+        // Recent pending change - block
+        throw new BadRequestException(
+          'There is already a pending plan change. Please complete or cancel it first. ' +
+          'You can cancel it from the subscription page.'
+        );
+      }
+    }
+
+    // Also check for FAILED changes and clean them up (allow retry)
+    const failedChange = await this.prisma.pendingPlanChange.findFirst({
+      where: {
+        subscriptionId,
+        paymentStatus: 'FAILED',
+        appliedAt: null,
+      },
+    });
+
+    if (failedChange) {
+      // Delete failed change to allow retry with potentially different plan
+      await this.prisma.pendingPlanChange.delete({
+        where: { id: failedChange.id },
+      });
     }
 
     const billingCycle = dto.billingCycle || subscription.billingCycle;
@@ -456,13 +493,35 @@ export class SubscriptionService {
   }
 
   /**
+   * Get pending plan change for a subscription
+   * Returns null if no active pending change exists
+   */
+  async getPendingPlanChange(subscriptionId: string) {
+    const pendingChange = await this.prisma.pendingPlanChange.findFirst({
+      where: {
+        subscriptionId,
+        appliedAt: null,
+        paymentStatus: { in: ['PENDING', 'FAILED'] },
+      },
+      include: {
+        currentPlan: true,
+        newPlan: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return pendingChange;
+  }
+
+  /**
    * Cancel a pending plan change
    */
   async cancelPendingPlanChange(subscriptionId: string) {
     const pendingChange = await this.prisma.pendingPlanChange.findFirst({
       where: {
         subscriptionId,
-        paymentStatus: 'PENDING',
+        paymentStatus: { in: ['PENDING', 'FAILED'] },
+        appliedAt: null,
       },
     });
 

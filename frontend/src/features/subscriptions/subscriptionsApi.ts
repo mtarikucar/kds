@@ -19,6 +19,7 @@ export const subscriptionKeys = {
   detail: (id: string) => [...subscriptionKeys.all, 'detail', id] as const,
   invoices: (id: string) => [...subscriptionKeys.all, 'invoices', id] as const,
   tenantInvoices: () => [...subscriptionKeys.all, 'tenant-invoices'] as const,
+  pendingChange: (id: string) => [...subscriptionKeys.all, 'pending-change', id] as const,
 };
 
 // Get all available subscription plans
@@ -212,6 +213,62 @@ export const useGetTenantInvoices = () => {
     queryFn: async (): Promise<Invoice[]> => {
       const response = await api.get('/subscriptions/tenant/invoices');
       return response.data;
+    },
+  });
+};
+
+// Pending Plan Change types
+export interface PendingPlanChange {
+  id: string;
+  subscriptionId: string;
+  currentPlanId: string;
+  newPlanId: string;
+  isUpgrade: boolean;
+  prorationAmount: number;
+  currency: string;
+  paymentStatus: 'PENDING' | 'COMPLETED' | 'FAILED' | 'EXPIRED';
+  failureReason?: string;
+  scheduledFor?: string;
+  appliedAt?: string;
+  createdAt: string;
+  currentPlan?: Plan;
+  newPlan?: Plan;
+}
+
+// Get pending plan change for a subscription
+export const useGetPendingPlanChange = (subscriptionId: string) => {
+  return useQuery({
+    queryKey: subscriptionKeys.pendingChange(subscriptionId),
+    queryFn: async (): Promise<PendingPlanChange | null> => {
+      try {
+        const response = await api.get(`/subscriptions/${subscriptionId}/pending-change`);
+        return response.data;
+      } catch (error: any) {
+        if (error.response?.status === 404) {
+          return null;
+        }
+        throw error;
+      }
+    },
+    enabled: !!subscriptionId,
+  });
+};
+
+// Cancel pending plan change
+export const useCancelPendingPlanChange = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (subscriptionId: string): Promise<void> => {
+      await api.delete(`/subscriptions/${subscriptionId}/pending-change`);
+    },
+    onSuccess: (_, subscriptionId) => {
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.pendingChange(subscriptionId) });
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
+      toast.success(i18n.t('common:notifications.pendingChangesCancelled'));
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
   });
 };

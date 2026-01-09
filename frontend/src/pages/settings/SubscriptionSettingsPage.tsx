@@ -18,7 +18,9 @@ import {
   useCancelSubscription,
   useReactivateSubscription,
   useChangePlan,
+  useGetPendingPlanChange,
 } from '../../features/subscriptions/subscriptionsApi';
+import PendingChangeAlert from '../../components/subscriptions/PendingChangeAlert';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/Spinner';
@@ -39,12 +41,17 @@ const SubscriptionManagementPage = () => {
   const [selectedNewPlanId, setSelectedNewPlanId] = useState<string | null>(null);
   const [cancellationReason, setCancellationReason] = useState<string>('');
 
-  const { data: currentSubscription, isLoading: subLoading } = useGetCurrentSubscription();
+  const { data: currentSubscription, isLoading: subLoading, refetch: refetchSubscription } = useGetCurrentSubscription();
   const { data: plans } = useGetPlans();
   const { data: invoices, isLoading: invoicesLoading } = useGetTenantInvoices();
   const cancelSubscription = useCancelSubscription();
   const reactivateSubscription = useReactivateSubscription();
   const changePlan = useChangePlan();
+
+  // Fetch pending plan change
+  const { data: pendingChange, refetch: refetchPendingChange } = useGetPendingPlanChange(
+    currentSubscription?.id || ''
+  );
 
   if (subLoading) {
     return (
@@ -135,6 +142,9 @@ const SubscriptionManagementPage = () => {
       setShowChangePlanModal(false);
       setSelectedNewPlanId(null);
 
+      // Refetch pending change to show the alert
+      refetchPendingChange();
+
       // Check if payment is required
       if (result.pendingChange && result.pendingChange.requiresPayment) {
         // Redirect to payment page with pending change ID
@@ -170,6 +180,18 @@ const SubscriptionManagementPage = () => {
           {t('subscriptions.viewAllPlans')}
         </Button>
       </div>
+
+      {/* Pending Plan Change Alert */}
+      {pendingChange && currentSubscription && (
+        <PendingChangeAlert
+          pendingChange={pendingChange}
+          subscriptionId={currentSubscription.id}
+          onCancelled={() => {
+            refetchPendingChange();
+            refetchSubscription();
+          }}
+        />
+      )}
 
       {/* Current Subscription Card */}
       <Card>
@@ -228,6 +250,8 @@ const SubscriptionManagementPage = () => {
                     variant="primary"
                     className="w-full"
                     onClick={() => setShowChangePlanModal(true)}
+                    disabled={!!pendingChange}
+                    title={pendingChange ? t('pendingChange.description') : undefined}
                   >
                     <RefreshCw className="h-4 w-4 mr-2" />
                     {t('subscriptions.changePlan')}

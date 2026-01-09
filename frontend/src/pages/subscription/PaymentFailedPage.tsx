@@ -9,6 +9,32 @@ export default function PaymentFailedPage() {
 
   const merchantOid = searchParams.get('oid');
   const type = searchParams.get('type');
+  const pendingChangeIdParam = searchParams.get('pendingChangeId');
+
+  // Extract pendingChangeId from merchantOid if it's a plan change (PLAN-{id}-{timestamp})
+  const getPendingChangeId = () => {
+    if (pendingChangeIdParam) return pendingChangeIdParam;
+    if (merchantOid && merchantOid.startsWith('PLAN-')) {
+      const parts = merchantOid.split('-');
+      if (parts.length >= 2) {
+        return parts[1];
+      }
+    }
+    return null;
+  };
+
+  const pendingChangeId = getPendingChangeId();
+  const isPlanChange = type === 'plan-change' || !!pendingChangeId;
+
+  const handleTryAgain = () => {
+    if (isPlanChange && pendingChangeId) {
+      // For plan changes, go to payment with pending change context
+      navigate(`/subscription/payment?pendingChangeId=${pendingChangeId}`);
+    } else {
+      // For new subscriptions, go back to plans
+      navigate('/subscription/plans');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -61,7 +87,7 @@ export default function PaymentFailedPage() {
         {/* CTA Buttons */}
         <div className="space-y-3">
           <button
-            onClick={() => navigate('/subscription/plans')}
+            onClick={handleTryAgain}
             className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
           >
             <RefreshCw className="w-5 h-5" />
@@ -69,7 +95,7 @@ export default function PaymentFailedPage() {
           </button>
 
           <button
-            onClick={() => navigate('/subscription')}
+            onClick={() => navigate('/settings/subscription')}
             className="w-full px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
           >
             <ArrowLeft className="w-5 h-5" />

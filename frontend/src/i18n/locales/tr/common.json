@@ -167,6 +167,8 @@
     "changePlanFailed": "Plan değiştirme başarısız",
     "cancelSubscriptionFailed": "Abonelik iptal edilemedi",
     "reactivateSubscriptionFailed": "Abonelik yeniden etkinleştirilemedi",
+    "pendingChangesCancelled": "Bekleyen plan değişikliği iptal edildi",
+    "pendingChangeCancelFailed": "Bekleyen plan değişikliği iptal edilemedi",
     "qrSettingsResetSuccessfully": "QR ayarları varsayılanlara sıfırlandı",
     "qrSettingsCreateFailed": "QR ayarları oluşturulamadı",
     "qrSettingsUpdateFailed": "QR ayarları güncellenemedi",
