@@ -186,6 +186,9 @@ jobs:
         env:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}
+          PAYTR_MERCHANT_KEY: ${{ secrets.PAYTR_MERCHANT_KEY }}
+          PAYTR_MERCHANT_SALT: ${{ secrets.PAYTR_MERCHANT_SALT }}
         run: |
           ssh root@${{ env.SERVER_HOST }} << EOF
             cd /root/kds
@@ -197,6 +200,12 @@ jobs:
             # Set Google OAuth environment variables for backend
             export GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID}"
             export GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET}"
+
+            # Update PayTR credentials in .env
+            echo "Updating PayTR credentials..."
+            sed -i "s/PAYTR_MERCHANT_ID=.*/PAYTR_MERCHANT_ID=${PAYTR_MERCHANT_ID}/" .env
+            sed -i "s/PAYTR_MERCHANT_KEY=.*/PAYTR_MERCHANT_KEY=${PAYTR_MERCHANT_KEY}/" .env
+            sed -i "s/PAYTR_MERCHANT_SALT=.*/PAYTR_MERCHANT_SALT=${PAYTR_MERCHANT_SALT}/" .env
 
             # Run Blue-Green deployment
             ./scripts/blue-green-deploy.sh deploy
