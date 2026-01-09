@@ -6,8 +6,11 @@ export interface CreatePaymentIntentRequest {
   billingCycle: 'MONTHLY' | 'YEARLY';
 }
 
-export interface CreatePlanChangeIntentRequest {
-  pendingChangeId: string;
+export interface CreateUpgradeIntentRequest {
+  subscriptionId: string;
+  newPlanId: string;
+  billingCycle: string;
+  amount: number;
 }
 
 export interface CreatePaymentIntentResponse {
@@ -64,14 +67,14 @@ export function useCreatePaymentIntent() {
 }
 
 /**
- * Create payment intent for plan change
+ * Create payment intent for upgrade
  */
-export function useCreatePlanChangeIntent() {
+export function useCreateUpgradeIntent() {
   return useMutation({
     mutationFn: async (
-      data: CreatePlanChangeIntentRequest
+      data: CreateUpgradeIntentRequest
     ): Promise<CreatePaymentIntentResponse> => {
-      const response = await api.post('/payments/create-plan-change-intent', data);
+      const response = await api.post('/payments/create-upgrade-intent', data);
       return response.data;
     },
   });

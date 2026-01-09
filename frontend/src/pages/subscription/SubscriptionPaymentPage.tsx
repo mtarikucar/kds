@@ -6,7 +6,7 @@ import { ArrowLeft, CheckCircle2, AlertCircle, Loader2, Mail } from 'lucide-reac
 import { PaytrRedirect } from '../../components/subscriptions/PaytrRedirect';
 import {
   useCreatePaymentIntent,
-  useCreatePlanChangeIntent,
+  useCreateUpgradeIntent,
 } from '../../api/paymentsApi';
 import { useGetCurrentSubscription, subscriptionKeys } from '../../features/subscriptions/subscriptionsApi';
 import { useQueryClient } from '@tanstack/react-query';
@@ -17,7 +17,11 @@ export default function SubscriptionPaymentPage() {
   const [searchParams] = useSearchParams();
   const planId = searchParams.get('planId');
   const billingCycle = searchParams.get('billingCycle');
-  const pendingChangeId = searchParams.get('pendingChangeId');
+  // Upgrade parameters
+  const type = searchParams.get('type');
+  const subscriptionId = searchParams.get('subscriptionId');
+  const newPlanId = searchParams.get('newPlanId');
+  const upgradeAmount = searchParams.get('amount');
   const queryClient = useQueryClient();
 
   const [paytrPaymentLink, setPaytrPaymentLink] = useState<string | null>(null);
@@ -33,16 +37,21 @@ export default function SubscriptionPaymentPage() {
 
   const { data: subscription } = useGetCurrentSubscription();
   const createPaymentIntent = useCreatePaymentIntent();
-  const createPlanChangeIntent = useCreatePlanChangeIntent();
+  const createUpgradeIntent = useCreateUpgradeIntent();
 
   // Create payment intent on mount
   useEffect(() => {
-    if (pendingChangeId) {
-      // Handle plan change payment
+    if (type === 'upgrade' && subscriptionId && newPlanId && billingCycle && upgradeAmount) {
+      // Handle upgrade payment
       setIsPlanChange(true);
 
-      createPlanChangeIntent.mutate(
-        { pendingChangeId },
+      createUpgradeIntent.mutate(
+        {
+          subscriptionId,
+          newPlanId,
+          billingCycle,
+          amount: parseFloat(upgradeAmount),
+        },
         {
           onSuccess: (data) => {
             setAmount(data.amount);
@@ -91,9 +100,9 @@ export default function SubscriptionPaymentPage() {
       toast.error(t('subscriptions.payment.missingPaymentInfo'));
       navigate('/subscription/plans');
     }
-  }, [planId, billingCycle, pendingChangeId]);
+  }, [planId, billingCycle, type, subscriptionId, newPlanId, upgradeAmount]);
 
-  if (createPaymentIntent.isPending || createPlanChangeIntent.isPending) {
+  if (createPaymentIntent.isPending || createUpgradeIntent.isPending) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
