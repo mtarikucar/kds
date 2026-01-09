@@ -1,24 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements } from '@stripe/react-stripe-js';
 import { toast } from 'sonner';
-import { ArrowLeft, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
-import { StripePaymentForm } from '../../components/subscriptions/StripePaymentForm';
+import { ArrowLeft, CheckCircle2, AlertCircle, Loader2, Mail } from 'lucide-react';
 import { PaytrRedirect } from '../../components/subscriptions/PaytrRedirect';
 import {
   useCreatePaymentIntent,
   useCreatePlanChangeIntent,
-  useConfirmPayment,
 } from '../../api/paymentsApi';
 import { useGetCurrentSubscription, subscriptionKeys } from '../../features/subscriptions/subscriptionsApi';
 import { useQueryClient } from '@tanstack/react-query';
-
-// Initialize Stripe with your publishable key
-const stripePromise = loadStripe(
-  import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || 'pk_test_placeholder'
-);
 
 export default function SubscriptionPaymentPage() {
   const { t } = useTranslation('subscriptions');
@@ -29,22 +20,20 @@ export default function SubscriptionPaymentPage() {
   const pendingChangeId = searchParams.get('pendingChangeId');
   const queryClient = useQueryClient();
 
-  const [clientSecret, setClientSecret] = useState<string | null>(null);
-  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [paytrPaymentLink, setPaytrPaymentLink] = useState<string | null>(null);
   const [amount, setAmount] = useState<number>(0);
   const [currency, setCurrency] = useState<string>('TRY');
   const [planName, setPlanName] = useState<string>('');
-  const [paymentProvider, setPaymentProvider] = useState<'STRIPE' | 'PAYTR'>('PAYTR');
+  const [paymentProvider, setPaymentProvider] = useState<'PAYTR' | 'EMAIL'>('PAYTR');
+  const [emailMessage, setEmailMessage] = useState<string>('');
   const [paymentStatus, setPaymentStatus] = useState<
-    'idle' | 'processing' | 'success' | 'error'
+    'idle' | 'processing' | 'success' | 'error' | 'email_sent'
   >('idle');
   const [isPlanChange, setIsPlanChange] = useState(false);
 
   const { data: subscription } = useGetCurrentSubscription();
   const createPaymentIntent = useCreatePaymentIntent();
   const createPlanChangeIntent = useCreatePlanChangeIntent();
-  const confirmPayment = useConfirmPayment();
 
   // Create payment intent on mount
   useEffect(() => {
@@ -60,11 +49,11 @@ export default function SubscriptionPaymentPage() {
             setCurrency(data.currency);
             setPaymentProvider(data.provider);
 
-            if (data.provider === 'PAYTR') {
+            if (data.provider === 'EMAIL') {
+              setEmailMessage(data.message);
+              setPaymentStatus('email_sent');
+            } else if (data.provider === 'PAYTR') {
               setPaytrPaymentLink(data.paymentLink);
-            } else {
-              setClientSecret(data.clientSecret);
-              setPaymentIntentId(data.paymentIntentId);
             }
           },
           onError: (error: any) => {
@@ -85,11 +74,11 @@ export default function SubscriptionPaymentPage() {
             setCurrency(data.currency);
             setPaymentProvider(data.provider);
 
-            if (data.provider === 'PAYTR') {
+            if (data.provider === 'EMAIL') {
+              setEmailMessage(data.message);
+              setPaymentStatus('email_sent');
+            } else if (data.provider === 'PAYTR') {
               setPaytrPaymentLink(data.paymentLink);
-            } else {
-              setClientSecret(data.clientSecret);
-              setPaymentIntentId(data.paymentIntentId);
             }
           },
           onError: (error: any) => {
@@ -104,54 +93,48 @@ export default function SubscriptionPaymentPage() {
     }
   }, [planId, billingCycle, pendingChangeId]);
 
-  const handleStripeSuccess = async () => {
-    setPaymentStatus('processing');
-
-    if (isPlanChange && pendingChangeId) {
-      toast.success(t('subscriptions.payment.applyingPlanChange'));
-
-      try {
-        await fetch(`/api/subscriptions/apply-plan-change/${pendingChangeId}`, {
-          method: 'POST',
-        });
-
-        queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
-        queryClient.invalidateQueries({ queryKey: subscriptionKeys.all });
-
-        setPaymentStatus('success');
-        setTimeout(() => {
-          navigate('/subscription');
-        }, 2000);
-      } catch (error) {
-        setPaymentStatus('error');
-        toast.error(t('subscriptions.payment.planChangeFailed'));
-      }
-    } else {
-      toast.success(t('subscriptions.payment.activatingSubscription'));
-
-      queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
-      queryClient.invalidateQueries({ queryKey: subscriptionKeys.all });
-
-      setTimeout(() => {
-        setPaymentStatus('success');
-        setTimeout(() => {
-          navigate('/subscription');
-        }, 2000);
-      }, 2000);
-    }
-  };
-
-  const handleStripeError = (error: string) => {
-    setPaymentStatus('error');
-    toast.error(error);
-  };
-
   if (createPaymentIntent.isPending || createPlanChangeIntent.isPending) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mx-auto mb-4" />
           <p className="text-gray-600">{t('subscriptions.payment.preparing')}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Email request sent - show confirmation for international customers
+  if (paymentStatus === 'email_sent') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Mail className="w-8 h-8 text-blue-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            {t('subscriptions.payment.requestSubmitted', 'Request Submitted')}
+          </h2>
+          <p className="text-gray-600 mb-6">
+            {emailMessage || t('subscriptions.payment.contactSoon', 'Our team will contact you shortly to complete the payment process.')}
+          </p>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
+            <h3 className="font-semibold text-blue-900 mb-2">
+              {t('subscriptions.payment.whatHappensNext', 'What happens next?')}
+            </h3>
+            <ul className="text-sm text-blue-800 space-y-2">
+              <li>• {t('subscriptions.payment.step1', 'You will receive a confirmation email')}</li>
+              <li>• {t('subscriptions.payment.step2', 'Our team will contact you within 24 hours')}</li>
+              <li>• {t('subscriptions.payment.step3', 'We will arrange payment via bank transfer or other methods')}</li>
+              <li>• {t('subscriptions.payment.step4', 'Your subscription will be activated once payment is confirmed')}</li>
+            </ul>
+          </div>
+          <button
+            onClick={() => navigate('/subscription')}
+            className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            {t('subscriptions.payment.goToSubscription')}
+          </button>
         </div>
       </div>
     );
@@ -195,32 +178,12 @@ export default function SubscriptionPaymentPage() {
             {t('subscriptions.payment.completePayment')}
           </h1>
           <p className="text-gray-600 mt-2">
-            {t('subscriptions.payment.securePaymentWith')} {paymentProvider === 'STRIPE' ? 'Stripe' : 'PayTR'}
+            {t('subscriptions.payment.securePaymentWith')} PayTR
           </p>
         </div>
 
         {/* Payment Form */}
-        {paymentProvider === 'STRIPE' && clientSecret ? (
-          <Elements
-            stripe={stripePromise}
-            options={{
-              clientSecret,
-              appearance: {
-                theme: 'stripe',
-                variables: {
-                  colorPrimary: '#4F46E5',
-                },
-              },
-            }}
-          >
-            <StripePaymentForm
-              onSuccess={handleStripeSuccess}
-              onError={handleStripeError}
-              amount={amount}
-              currency={currency}
-            />
-          </Elements>
-        ) : paymentProvider === 'PAYTR' && paytrPaymentLink ? (
+        {paymentProvider === 'PAYTR' && paytrPaymentLink ? (
           <PaytrRedirect
             paymentLink={paytrPaymentLink}
             amount={amount}
@@ -243,9 +206,7 @@ export default function SubscriptionPaymentPage() {
                 {t('subscriptions.payment.securePaymentTitle')}
               </h3>
               <p className="text-sm text-blue-800">
-                {paymentProvider === 'STRIPE'
-                  ? t('subscriptions.payment.securePaymentDescStripe')
-                  : t('subscriptions.payment.securePaymentDescPaytr')}
+                {t('subscriptions.payment.securePaymentDescPaytr')}
               </p>
             </div>
           </div>

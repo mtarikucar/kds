@@ -19,8 +19,8 @@ export enum BillingCycle {
 }
 
 export enum PaymentProvider {
-  STRIPE = 'STRIPE',
   PAYTR = 'PAYTR',
+  EMAIL = 'EMAIL',
 }
 
 export enum PaymentRegion {

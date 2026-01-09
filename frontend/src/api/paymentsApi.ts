@@ -11,11 +11,10 @@ export interface CreatePlanChangeIntentRequest {
 }
 
 export interface CreatePaymentIntentResponse {
-  provider: 'STRIPE' | 'PAYTR';
-  clientSecret?: string;       // Stripe
-  paymentIntentId?: string;    // Stripe
+  provider: 'PAYTR' | 'EMAIL';
   paymentLink?: string;        // PayTR
   merchantOid?: string;        // PayTR
+  message?: string;            // EMAIL provider
   amount: number;
   currency: string;
 }
@@ -79,8 +78,7 @@ export function useCreatePlanChangeIntent() {
 }
 
 /**
- * Confirm payment after user enters payment details (Stripe only)
- * PayTR uses redirect flow and webhook for confirmation
+ * Confirm payment (PayTR uses redirect flow and webhook for confirmation)
  */
 export function useConfirmPayment() {
   return useMutation({

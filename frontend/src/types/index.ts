@@ -451,8 +451,8 @@ export enum BillingCycle {
 }
 
 export enum PaymentProvider {
-  STRIPE = 'STRIPE',
-  IYZICO = 'IYZICO',
+  PAYTR = 'PAYTR',
+  EMAIL = 'EMAIL',
 }
 
 export enum InvoiceStatus {

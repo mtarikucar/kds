@@ -71,10 +71,6 @@ services:
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-30d}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
-      # Stripe Configuration (Production)
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
-      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
       # Iyzico Configuration (Production)
       IYZICO_API_KEY: ${IYZICO_API_KEY}
       IYZICO_SECRET_KEY: ${IYZICO_SECRET_KEY}
@@ -141,10 +137,6 @@ services:
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-30d}
       CORS_ORIGIN: ${CORS_ORIGIN:-*}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
-      # Stripe Configuration (Production)
-      STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}
-      STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY}
-      STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET}
       # Iyzico Configuration (Production)
       IYZICO_API_KEY: ${IYZICO_API_KEY}
       IYZICO_SECRET_KEY: ${IYZICO_SECRET_KEY}
@@ -200,7 +192,6 @@ services:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://hummytummy.com}
         VITE_SOCKET_URL: ${VITE_SOCKET_URL:-https://hummytummy.com}
         VITE_WS_URL: ${VITE_WS_URL:-wss://hummytummy.com}
-        VITE_STRIPE_PUBLISHABLE_KEY: ${VITE_STRIPE_PUBLISHABLE_KEY}
         VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
     container_name: kds_frontend_blue
     restart: always
@@ -230,7 +221,6 @@ services:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-https://hummytummy.com}
         VITE_SOCKET_URL: ${VITE_SOCKET_URL:-https://hummytummy.com}
         VITE_WS_URL: ${VITE_WS_URL:-wss://hummytummy.com}
-        VITE_STRIPE_PUBLISHABLE_KEY: ${VITE_STRIPE_PUBLISHABLE_KEY}
         VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID}
     container_name: kds_frontend_green
     restart: always

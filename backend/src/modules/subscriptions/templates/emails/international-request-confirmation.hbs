@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #f97316; color: white; padding: 20px; text-align: center; }
+    .content { padding: 20px; background: #f9f9f9; }
+    .footer { padding: 20px; text-align: center; color: #666; font-size: 12px; }
+    .highlight { background: #d4edda; padding: 15px; border-radius: 5px; margin: 15px 0; color: #155724; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Subscription Request Received</h1>
+    </div>
+    <div class="content">
+      <p>Dear {{tenantName}},</p>
+
+      <div class="highlight">
+        Your subscription request for <strong>{{planName}}</strong> has been received successfully!
+      </div>
+
+      <p>Our team will contact you shortly to complete the payment process and activate your subscription.</p>
+
+      <p>If you have any questions, please don't hesitate to contact us at <a href="mailto:admin@hummytummy.com">admin@hummytummy.com</a></p>
+
+      <p>Thank you for choosing HummyTummy!</p>
+
+      <p>Best regards,<br>The HummyTummy Team</p>
+    </div>
+    <div class="footer">
+      <p>Request submitted on: {{requestDate}}</p>
+      <p>HummyTummy Restaurant Management System</p>
+    </div>
+  </div>
+</body>
+</html>

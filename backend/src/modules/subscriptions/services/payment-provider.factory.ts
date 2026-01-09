@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { PaymentProvider, PaymentRegion } from '../../../common/constants/subscription.enum';
-import { StripeService } from './stripe.service';
 import { PaytrService } from './paytr.service';
 
 export interface IPaymentProvider {
@@ -12,28 +11,33 @@ export interface IPaymentProvider {
 @Injectable()
 export class PaymentProviderFactory {
   constructor(
-    private readonly stripeService: StripeService,
     private readonly paytrService: PaytrService,
   ) {}
 
   /**
    * Get the appropriate payment provider based on region
+   * For Turkey: PayTR
+   * For International: Email-based (no payment provider)
    */
-  getProvider(region: PaymentRegion): IPaymentProvider {
+  getProvider(region: PaymentRegion): IPaymentProvider | null {
     if (region === PaymentRegion.TURKEY) {
       return this.paytrService;
     }
-    return this.stripeService;
+    // International customers use email-based flow, no payment provider
+    return null;
   }
 
   /**
    * Get payment provider enum based on region
+   * For Turkey: PayTR
+   * For International: EMAIL (manual process)
    */
   getProviderType(region: PaymentRegion): PaymentProvider {
     if (region === PaymentRegion.TURKEY) {
       return PaymentProvider.PAYTR;
     }
-    return PaymentProvider.STRIPE;
+    // International customers use email-based manual process
+    return PaymentProvider.EMAIL;
   }
 
   /**
@@ -45,13 +49,6 @@ export class PaymentProviderFactory {
       return PaymentRegion.TURKEY;
     }
     return PaymentRegion.INTERNATIONAL;
-  }
-
-  /**
-   * Get Stripe service directly (for Stripe-specific operations)
-   */
-  getStripeService(): StripeService {
-    return this.stripeService;
   }
 
   /**

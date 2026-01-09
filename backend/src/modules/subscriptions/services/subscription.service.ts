@@ -2,7 +2,6 @@ import { Injectable, Logger, BadRequestException, NotFoundException } from '@nes
 import { PrismaService } from '../../../prisma/prisma.service';
 import { PaymentProviderFactory } from './payment-provider.factory';
 import { BillingService } from './billing.service';
-import { StripeService } from './stripe.service';
 import { NotificationService } from './notification.service';
 import {
   SubscriptionStatus,
@@ -24,7 +23,6 @@ export class SubscriptionService {
     private prisma: PrismaService,
     private paymentProviderFactory: PaymentProviderFactory,
     private billingService: BillingService,
-    private stripeService: StripeService,
     private notificationService: NotificationService,
   ) {}
 
@@ -213,25 +211,9 @@ export class SubscriptionService {
       // Payment will be handled when user provides card details via iframe
       this.logger.log('PayTR subscription setup deferred to payment confirmation');
     } else {
-      // For Stripe, create customer and subscription
-      try {
-        const customer = await this.stripeService.createCustomer(
-          adminUser?.email || `admin@${tenant.id}.tenant`,
-          tenant.name,
-          { tenantId: tenant.id },
-        );
-
-        // Update subscription with Stripe customer ID
-        await this.prisma.subscription.update({
-          where: { id: subscriptionId },
-          data: { stripeCustomerId: customer.id },
-        });
-
-        this.logger.log(`Stripe customer created: ${customer.id}`);
-      } catch (error) {
-        this.logger.error(`Failed to create Stripe customer: ${error.message}`);
-        throw new BadRequestException('Failed to setup payment provider');
-      }
+      // For international customers, payment is handled via email-based flow
+      // Admin will manually activate subscription after receiving payment
+      this.logger.log('International subscription - email-based payment flow');
     }
   }
 
@@ -525,10 +507,6 @@ export class SubscriptionService {
         include: { plan: true, tenant: true },
       });
 
-      // Cancel with payment provider
-      if (subscription.stripeSubscriptionId) {
-        await this.stripeService.cancelSubscription(subscription.stripeSubscriptionId, true);
-      }
       // PayTR uses one-time payments, no subscription to cancel
 
       this.logger.log(`Subscription ${subscriptionId} cancelled immediately. Reason: ${reason || 'Not provided'}`);
@@ -546,10 +524,6 @@ export class SubscriptionService {
         include: { plan: true, tenant: true },
       });
 
-      // Update payment provider
-      if (subscription.stripeSubscriptionId) {
-        await this.stripeService.cancelSubscription(subscription.stripeSubscriptionId, false);
-      }
       // PayTR uses one-time payments, no subscription to cancel
 
       this.logger.log(`Subscription ${subscriptionId} will cancel at period end. Reason: ${reason || 'Not provided'}`);

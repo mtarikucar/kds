@@ -355,4 +355,58 @@ export class NotificationService {
       },
     });
   }
+
+  /**
+   * Send international subscription request to admin
+   * For customers outside Turkey who want a subscription
+   */
+  async sendInternationalSubscriptionRequest(
+    customerEmail: string,
+    customerName: string,
+    tenantName: string,
+    tenantId: string,
+    planName: string,
+    planPrice: number,
+    billingCycle: string,
+    currency: string,
+  ) {
+    const adminEmail = this.configService.get('ADMIN_EMAIL', 'admin@hummytummy.com');
+
+    return this.sendEmail({
+      to: adminEmail,
+      subject: `International Subscription Request - ${tenantName}`,
+      template: 'international-subscription-request',
+      context: {
+        customerEmail,
+        customerName,
+        tenantName,
+        tenantId,
+        planName,
+        planPrice,
+        billingCycle,
+        currency,
+        requestDate: new Date().toLocaleString(),
+      },
+    });
+  }
+
+  /**
+   * Send confirmation to customer that their international subscription request was received
+   */
+  async sendInternationalRequestConfirmation(
+    email: string,
+    tenantName: string,
+    planName: string,
+  ) {
+    return this.sendEmail({
+      to: email,
+      subject: 'Subscription Request Received',
+      template: 'international-request-confirmation',
+      context: {
+        tenantName,
+        planName,
+        requestDate: new Date().toLocaleString(),
+      },
+    });
+  }
 }
