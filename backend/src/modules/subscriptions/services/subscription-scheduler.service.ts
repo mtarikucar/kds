@@ -78,7 +78,8 @@ export class SubscriptionSchedulerService {
     try {
       const now = new Date();
 
-      const subscriptionsToCancel = await this.prisma.subscription.findMany({
+      // Batch update - tek query ile tüm subscription'ları güncelle
+      const result = await this.prisma.subscription.updateMany({
         where: {
           cancelAtPeriodEnd: true,
           currentPeriodEnd: {
@@ -88,21 +89,13 @@ export class SubscriptionSchedulerService {
             not: SubscriptionStatus.CANCELLED,
           },
         },
+        data: {
+          status: SubscriptionStatus.CANCELLED,
+          endedAt: now,
+        },
       });
 
-      this.logger.log(`Found ${subscriptionsToCancel.length} subscriptions to cancel`);
-
-      for (const subscription of subscriptionsToCancel) {
-        await this.prisma.subscription.update({
-          where: { id: subscription.id },
-          data: {
-            status: SubscriptionStatus.CANCELLED,
-            endedAt: now,
-          },
-        });
-
-        this.logger.log(`Cancelled subscription: ${subscription.id}`);
-      }
+      this.logger.log(`Cancelled ${result.count} subscriptions`);
     } catch (error) {
       this.logger.error(`Error processing pending cancellations: ${error.message}`);
     }
@@ -119,28 +112,21 @@ export class SubscriptionSchedulerService {
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-      const pastDueSubscriptions = await this.prisma.subscription.findMany({
+      // Batch update - tek query ile tüm subscription'ları güncelle
+      const result = await this.prisma.subscription.updateMany({
         where: {
           status: SubscriptionStatus.PAST_DUE,
           currentPeriodEnd: {
             lte: sevenDaysAgo,
           },
         },
+        data: {
+          status: SubscriptionStatus.EXPIRED,
+          endedAt: new Date(),
+        },
       });
 
-      this.logger.log(`Found ${pastDueSubscriptions.length} past due subscriptions to expire`);
-
-      for (const subscription of pastDueSubscriptions) {
-        await this.prisma.subscription.update({
-          where: { id: subscription.id },
-          data: {
-            status: SubscriptionStatus.EXPIRED,
-            endedAt: new Date(),
-          },
-        });
-
-        this.logger.log(`Expired past due subscription: ${subscription.id}`);
-      }
+      this.logger.log(`Expired ${result.count} past due subscriptions`);
     } catch (error) {
       this.logger.error(`Error processing past due subscriptions: ${error.message}`);
     }
@@ -191,48 +177,6 @@ export class SubscriptionSchedulerService {
   }
 
   /**
-   * Expire stale pending plan changes (older than 24 hours)
-   * Runs every 6 hours
-   */
-  @Cron('0 */6 * * *', { name: 'stale-pending-changes' })
-  async handleStalePendingChanges() {
-    this.logger.log('Running stale pending plan change cleanup...');
-
-    try {
-      const twentyFourHoursAgo = new Date();
-      twentyFourHoursAgo.setHours(twentyFourHoursAgo.getHours() - 24);
-
-      // Find stale pending changes
-      const stalePendingChanges = await this.prisma.pendingPlanChange.findMany({
-        where: {
-          paymentStatus: 'PENDING',
-          appliedAt: null,
-          createdAt: {
-            lte: twentyFourHoursAgo,
-          },
-        },
-      });
-
-      this.logger.log(`Found ${stalePendingChanges.length} stale pending plan changes`);
-
-      // Mark them as expired
-      for (const pendingChange of stalePendingChanges) {
-        await this.prisma.pendingPlanChange.update({
-          where: { id: pendingChange.id },
-          data: {
-            paymentStatus: 'EXPIRED',
-            failureReason: 'Payment not completed within 24 hours',
-          },
-        });
-
-        this.logger.log(`Expired stale pending change: ${pendingChange.id}`);
-      }
-    } catch (error) {
-      this.logger.error(`Error processing stale pending changes: ${error.message}`);
-    }
-  }
-
-  /**
    * Apply scheduled downgrades at period end
    * Runs daily at 1 AM
    */
@@ -243,30 +187,26 @@ export class SubscriptionSchedulerService {
     try {
       const now = new Date();
 
-      // Find downgrades scheduled for today or earlier
-      const scheduledDowngrades = await this.prisma.pendingPlanChange.findMany({
+      // Find subscriptions with scheduled downgrades where period has ended
+      const subscriptionsWithDowngrades = await this.prisma.subscription.findMany({
         where: {
-          paymentStatus: 'COMPLETED',
-          isUpgrade: false,
-          appliedAt: null,
-          scheduledFor: {
-            lte: now,
-          },
+          scheduledDowngradePlanId: { not: null },
+          currentPeriodEnd: { lte: now },
+          status: SubscriptionStatus.ACTIVE,
         },
         include: {
-          subscription: true,
-          newPlan: true,
+          scheduledDowngradePlan: true,
         },
       });
 
-      this.logger.log(`Found ${scheduledDowngrades.length} scheduled downgrades to apply`);
+      this.logger.log(`Found ${subscriptionsWithDowngrades.length} scheduled downgrades to apply`);
 
-      for (const downgrade of scheduledDowngrades) {
+      for (const subscription of subscriptionsWithDowngrades) {
         try {
-          await this.subscriptionService.applyPlanChange(downgrade.id);
-          this.logger.log(`Applied scheduled downgrade: ${downgrade.id}`);
+          await this.subscriptionService.applyScheduledDowngrade(subscription.id);
+          this.logger.log(`Applied scheduled downgrade for subscription: ${subscription.id}`);
         } catch (error) {
-          this.logger.error(`Failed to apply downgrade ${downgrade.id}: ${error.message}`);
+          this.logger.error(`Failed to apply downgrade for ${subscription.id}: ${error.message}`);
         }
       }
     } catch (error) {

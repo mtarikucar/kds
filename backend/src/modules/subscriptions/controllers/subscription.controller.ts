@@ -94,12 +94,12 @@ export class SubscriptionController {
   }
 
   /**
-   * Get pending plan change for a subscription
+   * Get scheduled downgrade for a subscription
    */
-  @Get(':id/pending-change')
+  @Get(':id/scheduled-downgrade')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async getPendingPlanChange(@Param('id') id: string) {
-    return await this.subscriptionService.getPendingPlanChange(id);
+  async getScheduledDowngrade(@Param('id') id: string) {
+    return await this.subscriptionService.getScheduledDowngrade(id);
   }
 
   /**
@@ -137,21 +137,12 @@ export class SubscriptionController {
   }
 
   /**
-   * Apply pending plan change (after payment confirmation)
+   * Cancel scheduled downgrade
    */
-  @Post('apply-plan-change/:pendingChangeId')
+  @Delete(':id/scheduled-downgrade')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async applyPlanChange(@Param('pendingChangeId') pendingChangeId: string) {
-    return await this.subscriptionService.applyPlanChange(pendingChangeId);
-  }
-
-  /**
-   * Cancel pending plan change
-   */
-  @Delete(':id/pending-change')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async cancelPendingPlanChange(@Param('id') id: string) {
-    return await this.subscriptionService.cancelPendingPlanChange(id);
+  async cancelScheduledDowngrade(@Param('id') id: string) {
+    return await this.subscriptionService.cancelScheduledDowngrade(id);
   }
 
   /**

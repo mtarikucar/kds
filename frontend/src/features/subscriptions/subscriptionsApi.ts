@@ -19,7 +19,7 @@ export const subscriptionKeys = {
   detail: (id: string) => [...subscriptionKeys.all, 'detail', id] as const,
   invoices: (id: string) => [...subscriptionKeys.all, 'invoices', id] as const,
   tenantInvoices: () => [...subscriptionKeys.all, 'tenant-invoices'] as const,
-  pendingChange: (id: string) => [...subscriptionKeys.all, 'pending-change', id] as const,
+  scheduledDowngrade: (id: string) => [...subscriptionKeys.all, 'scheduled-downgrade', id] as const,
 };
 
 // Get all available subscription plans
@@ -108,6 +108,26 @@ export const useUpdateSubscription = () => {
   });
 };
 
+// Change plan response types
+export interface ChangePlanResponse {
+  subscription: any;
+  type: 'upgrade' | 'downgrade';
+  requiresPayment: boolean;
+  // For upgrade
+  paymentInfo?: {
+    subscriptionId: string;
+    newPlanId: string;
+    billingCycle: string;
+    prorationAmount: number;
+    newAmount: number;
+    currency: string;
+    newPlan: Plan;
+  };
+  // For downgrade
+  scheduledFor?: string;
+  newPlan?: Plan;
+}
+
 // Change subscription plan (upgrade/downgrade)
 export const useChangePlan = () => {
   const queryClient = useQueryClient();
@@ -119,25 +139,20 @@ export const useChangePlan = () => {
     }: {
       id: string;
       data: ChangePlanDto;
-    }): Promise<any> => {  // Changed to any to handle new response structure
+    }): Promise<ChangePlanResponse> => {
       const response = await api.post(`/subscriptions/${id}/change-plan`, data);
       return response.data;
     },
     onSuccess: (result, variables) => {
-      // Don't invalidate queries yet - plan hasn't actually changed
-      // Only invalidate after payment or scheduled downgrade
-
-      // Show appropriate message based on response
-      if (result.pendingChange) {
-        if (result.pendingChange.requiresPayment) {
-          toast.info(i18n.t('common:notifications.redirectingToPayment'));
-        } else if (result.pendingChange.scheduledFor) {
-          const date = new Date(result.pendingChange.scheduledFor).toLocaleDateString();
-          toast.success(i18n.t('common:notifications.downgradeScheduled', { date }));
-          // For scheduled downgrade, invalidate to show the pending status
-          queryClient.invalidateQueries({ queryKey: subscriptionKeys.detail(variables.id) });
-          queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
-        }
+      if (result.type === 'downgrade') {
+        // Downgrade is scheduled - refresh to show scheduled downgrade alert
+        const date = result.scheduledFor ? new Date(result.scheduledFor).toLocaleDateString() : '';
+        toast.success(i18n.t('common:notifications.downgradeScheduled', { date }));
+        queryClient.invalidateQueries({ queryKey: subscriptionKeys.scheduledDowngrade(variables.id) });
+        queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
+      } else if (result.type === 'upgrade' && result.requiresPayment) {
+        // Upgrade requires payment - will be redirected
+        toast.info(i18n.t('common:notifications.redirectingToPayment'));
       }
     },
     onError: (error: any) => {
@@ -217,31 +232,21 @@ export const useGetTenantInvoices = () => {
   });
 };
 
-// Pending Plan Change types
-export interface PendingPlanChange {
-  id: string;
-  subscriptionId: string;
-  currentPlanId: string;
-  newPlanId: string;
-  isUpgrade: boolean;
-  prorationAmount: number;
-  currency: string;
-  paymentStatus: 'PENDING' | 'COMPLETED' | 'FAILED' | 'EXPIRED';
-  failureReason?: string;
-  scheduledFor?: string;
-  appliedAt?: string;
-  createdAt: string;
-  currentPlan?: Plan;
-  newPlan?: Plan;
+// Scheduled Downgrade types
+export interface ScheduledDowngrade {
+  scheduledPlanId: string;
+  scheduledPlan: Plan | null;
+  scheduledBillingCycle: string | null;
+  scheduledFor: string;
 }
 
-// Get pending plan change for a subscription
-export const useGetPendingPlanChange = (subscriptionId: string) => {
+// Get scheduled downgrade for a subscription
+export const useGetScheduledDowngrade = (subscriptionId: string) => {
   return useQuery({
-    queryKey: subscriptionKeys.pendingChange(subscriptionId),
-    queryFn: async (): Promise<PendingPlanChange | null> => {
+    queryKey: subscriptionKeys.scheduledDowngrade(subscriptionId),
+    queryFn: async (): Promise<ScheduledDowngrade | null> => {
       try {
-        const response = await api.get(`/subscriptions/${subscriptionId}/pending-change`);
+        const response = await api.get(`/subscriptions/${subscriptionId}/scheduled-downgrade`);
         return response.data;
       } catch (error: any) {
         if (error.response?.status === 404) {
@@ -254,18 +259,18 @@ export const useGetPendingPlanChange = (subscriptionId: string) => {
   });
 };
 
-// Cancel pending plan change
-export const useCancelPendingPlanChange = () => {
+// Cancel scheduled downgrade
+export const useCancelScheduledDowngrade = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (subscriptionId: string): Promise<void> => {
-      await api.delete(`/subscriptions/${subscriptionId}/pending-change`);
+      await api.delete(`/subscriptions/${subscriptionId}/scheduled-downgrade`);
     },
     onSuccess: (_, subscriptionId) => {
-      queryClient.invalidateQueries({ queryKey: subscriptionKeys.pendingChange(subscriptionId) });
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.scheduledDowngrade(subscriptionId) });
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
-      toast.success(i18n.t('common:notifications.pendingChangesCancelled'));
+      toast.success(i18n.t('common:notifications.scheduledDowngradeCancelled'));
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));

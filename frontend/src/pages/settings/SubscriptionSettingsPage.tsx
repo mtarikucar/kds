@@ -18,9 +18,9 @@ import {
   useCancelSubscription,
   useReactivateSubscription,
   useChangePlan,
-  useGetPendingPlanChange,
+  useGetScheduledDowngrade,
 } from '../../features/subscriptions/subscriptionsApi';
-import PendingChangeAlert from '../../components/subscriptions/PendingChangeAlert';
+import ScheduledDowngradeAlert from '../../components/subscriptions/ScheduledDowngradeAlert';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/Spinner';
@@ -48,8 +48,8 @@ const SubscriptionManagementPage = () => {
   const reactivateSubscription = useReactivateSubscription();
   const changePlan = useChangePlan();
 
-  // Fetch pending plan change
-  const { data: pendingChange, refetch: refetchPendingChange } = useGetPendingPlanChange(
+  // Fetch scheduled downgrade
+  const { data: scheduledDowngrade, refetch: refetchScheduledDowngrade } = useGetScheduledDowngrade(
     currentSubscription?.id || ''
   );
 
@@ -142,15 +142,13 @@ const SubscriptionManagementPage = () => {
       setShowChangePlanModal(false);
       setSelectedNewPlanId(null);
 
-      // Refetch pending change to show the alert
-      refetchPendingChange();
-
-      // Check if payment is required
-      if (result.pendingChange && result.pendingChange.requiresPayment) {
-        // Redirect to payment page with pending change ID
-        navigate(`/subscription/payment?pendingChangeId=${result.pendingChange.id}`);
-      } else if (result.pendingChange && result.pendingChange.scheduledFor) {
-        // Downgrade scheduled - show success message (already handled by toast in API)
+      if (result.type === 'upgrade' && result.requiresPayment && result.paymentInfo) {
+        // Redirect to payment page with upgrade info
+        const { subscriptionId, newPlanId, billingCycle, prorationAmount, currency } = result.paymentInfo;
+        navigate(`/subscription/payment?type=upgrade&subscriptionId=${subscriptionId}&newPlanId=${newPlanId}&billingCycle=${billingCycle}&amount=${prorationAmount}&currency=${currency}`);
+      } else if (result.type === 'downgrade') {
+        // Downgrade scheduled - refetch to show the alert
+        refetchScheduledDowngrade();
       }
     } catch (error) {
       console.error('Failed to change plan:', error);
@@ -181,13 +179,13 @@ const SubscriptionManagementPage = () => {
         </Button>
       </div>
 
-      {/* Pending Plan Change Alert */}
-      {pendingChange && currentSubscription && (
-        <PendingChangeAlert
-          pendingChange={pendingChange}
+      {/* Scheduled Downgrade Alert */}
+      {scheduledDowngrade && currentSubscription && (
+        <ScheduledDowngradeAlert
+          scheduledDowngrade={scheduledDowngrade}
           subscriptionId={currentSubscription.id}
           onCancelled={() => {
-            refetchPendingChange();
+            refetchScheduledDowngrade();
             refetchSubscription();
           }}
         />
@@ -250,8 +248,8 @@ const SubscriptionManagementPage = () => {
                     variant="primary"
                     className="w-full"
                     onClick={() => setShowChangePlanModal(true)}
-                    disabled={!!pendingChange}
-                    title={pendingChange ? t('pendingChange.description') : undefined}
+                    disabled={!!scheduledDowngrade}
+                    title={scheduledDowngrade ? t('scheduledDowngrade.description') : undefined}
                   >
                     <RefreshCw className="h-4 w-4 mr-2" />
                     {t('subscriptions.changePlan')}

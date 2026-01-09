@@ -219,7 +219,8 @@ export class SubscriptionService {
 
   /**
    * Change subscription plan (upgrade or downgrade)
-   * Creates a pending plan change that requires payment for upgrades
+   * - Upgrade: Returns payment info, plan changes after successful payment
+   * - Downgrade: Schedules plan change for period end
    */
   async changePlan(subscriptionId: string, dto: ChangePlanDto) {
     const subscription = await this.getSubscriptionById(subscriptionId);
@@ -244,53 +245,11 @@ export class SubscriptionService {
       throw new BadRequestException('Already subscribed to this plan');
     }
 
-    // Check if there's already a pending plan change
-    const existingPendingChange = await this.prisma.pendingPlanChange.findFirst({
-      where: {
-        subscriptionId,
-        paymentStatus: 'PENDING',
-        appliedAt: null,
-      },
-    });
-
-    if (existingPendingChange) {
-      // Check how old the pending change is
-      const createdAt = new Date(existingPendingChange.createdAt);
-      const hoursOld = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
-
-      // If older than 24 hours, auto-expire it and allow new change
-      if (hoursOld >= 24) {
-        await this.prisma.pendingPlanChange.update({
-          where: { id: existingPendingChange.id },
-          data: {
-            paymentStatus: 'EXPIRED',
-            failureReason: 'Payment not completed within 24 hours',
-          },
-        });
-        // Continue with new plan change
-      } else {
-        // Recent pending change - block
-        throw new BadRequestException(
-          'There is already a pending plan change. Please complete or cancel it first. ' +
-          'You can cancel it from the subscription page.'
-        );
-      }
-    }
-
-    // Also check for FAILED changes and clean them up (allow retry)
-    const failedChange = await this.prisma.pendingPlanChange.findFirst({
-      where: {
-        subscriptionId,
-        paymentStatus: 'FAILED',
-        appliedAt: null,
-      },
-    });
-
-    if (failedChange) {
-      // Delete failed change to allow retry with potentially different plan
-      await this.prisma.pendingPlanChange.delete({
-        where: { id: failedChange.id },
-      });
+    // Check if there's already a scheduled downgrade
+    if (subscription.scheduledDowngradePlanId) {
+      throw new BadRequestException(
+        'There is already a scheduled plan change. Please cancel it first.'
+      );
     }
 
     const billingCycle = dto.billingCycle || subscription.billingCycle;
@@ -299,7 +258,7 @@ export class SubscriptionService {
 
     const isUpgrade = Number(newAmount) > currentAmount;
 
-    // Calculate proration
+    // Calculate proration for upgrades
     const daysRemaining = this.billingService.getDaysRemaining(subscription.currentPeriodEnd);
     const totalDays = this.billingService.getTotalDaysInPeriod(
       subscription.currentPeriodStart,
@@ -313,39 +272,21 @@ export class SubscriptionService {
     );
 
     if (isUpgrade) {
-      // For upgrades, create pending plan change that requires payment
-      const pendingChange = await this.prisma.pendingPlanChange.create({
-        data: {
-          subscriptionId,
-          currentPlanId: subscription.planId,
-          newPlanId: dto.newPlanId,
-          newBillingCycle: billingCycle,
-          isUpgrade: true,
-          currentAmount: currentAmount,
-          newAmount: Number(newAmount),
-          prorationAmount: prorationAmount,
-          currency: newPlan.currency,
-          paymentRequired: prorationAmount > 0,
-          paymentStatus: 'PENDING',
-          paymentProvider: subscription.paymentProvider,
-        },
-        include: {
-          currentPlan: true,
-          newPlan: true,
-        },
-      });
+      // For upgrades, return payment info - plan will change after successful payment
+      this.logger.log(`Upgrade requested: ${currentPlan.name} -> ${newPlan.name} (proration: ${prorationAmount})`);
 
-      this.logger.log(`Pending plan change created: ${pendingChange.id} (proration: ${prorationAmount})`);
-
-      // Return the pending change info so frontend knows to redirect to payment
       return {
         subscription,
-        pendingChange: {
-          id: pendingChange.id,
-          requiresPayment: prorationAmount > 0,
-          prorationAmount: prorationAmount,
+        type: 'upgrade',
+        requiresPayment: prorationAmount > 0,
+        paymentInfo: {
+          subscriptionId: subscription.id,
+          newPlanId: dto.newPlanId,
+          billingCycle,
+          prorationAmount,
+          newAmount: Number(newAmount),
           currency: newPlan.currency,
-          newPlan: newPlan,
+          newPlan,
         },
       };
     } else {
@@ -372,40 +313,82 @@ export class SubscriptionService {
         );
       }
 
-      // Create pending downgrade scheduled for period end (no payment required)
-      const pendingChange = await this.prisma.pendingPlanChange.create({
+      // Schedule downgrade for period end
+      const updatedSubscription = await this.prisma.subscription.update({
+        where: { id: subscriptionId },
         data: {
-          subscriptionId,
-          currentPlanId: subscription.planId,
-          newPlanId: dto.newPlanId,
-          newBillingCycle: billingCycle,
-          isUpgrade: false,
-          currentAmount: currentAmount,
-          newAmount: Number(newAmount),
-          prorationAmount: 0,
-          currency: newPlan.currency,
-          paymentRequired: false,
-          paymentStatus: 'COMPLETED', // No payment needed
-          scheduledFor: subscription.currentPeriodEnd,
+          scheduledDowngradePlanId: dto.newPlanId,
+          scheduledDowngradeBillingCycle: billingCycle,
         },
-        include: {
-          currentPlan: true,
-          newPlan: true,
-        },
+        include: { plan: true, scheduledDowngradePlan: true },
       });
 
-      this.logger.log(`Downgrade scheduled for ${subscription.currentPeriodEnd}: ${pendingChange.id}`);
+      this.logger.log(`Downgrade scheduled for ${subscription.currentPeriodEnd}: ${currentPlan.name} -> ${newPlan.name}`);
 
       return {
-        subscription,
-        pendingChange: {
-          id: pendingChange.id,
-          requiresPayment: false,
-          scheduledFor: subscription.currentPeriodEnd,
-          newPlan: newPlan,
-        },
+        subscription: updatedSubscription,
+        type: 'downgrade',
+        requiresPayment: false,
+        scheduledFor: subscription.currentPeriodEnd,
+        newPlan,
       };
     }
+  }
+
+  /**
+   * Apply upgrade after successful payment (called by webhook)
+   */
+  async applyUpgrade(
+    subscriptionId: string,
+    newPlanId: string,
+    billingCycle: string,
+  ) {
+    const subscription = await this.getSubscriptionById(subscriptionId);
+
+    const newPlan = await this.prisma.subscriptionPlan.findUnique({
+      where: { id: newPlanId },
+    });
+
+    if (!newPlan) {
+      throw new NotFoundException('New plan not found');
+    }
+
+    const newAmount = billingCycle === BillingCycle.MONTHLY ? newPlan.monthlyPrice : newPlan.yearlyPrice;
+
+    // Apply the upgrade immediately
+    const updatedSubscription = await this.prisma.subscription.update({
+      where: { id: subscriptionId },
+      data: {
+        planId: newPlanId,
+        billingCycle,
+        amount: Number(newAmount),
+        currency: newPlan.currency,
+      },
+      include: { plan: true },
+    });
+
+    // Update tenant's current plan
+    await this.prisma.tenant.update({
+      where: { id: subscription.tenantId },
+      data: { currentPlanId: newPlanId },
+    });
+
+    // Send notification
+    const adminUser = await this.prisma.user.findFirst({
+      where: { tenantId: subscription.tenantId, role: 'ADMIN' },
+      select: { email: true },
+    });
+
+    if (adminUser?.email) {
+      await this.notificationService.sendPlanChangeConfirmation(
+        adminUser.email,
+        subscription.tenant.name,
+        newPlan.displayName,
+      );
+    }
+
+    this.logger.log(`Upgrade applied for subscription ${subscriptionId} - ${newPlan.displayName}`);
+    return updatedSubscription;
   }
 
   /**
@@ -423,39 +406,41 @@ export class SubscriptionService {
   }
 
   /**
-   * Apply a pending plan change after payment is confirmed
+   * Apply scheduled downgrade (called by scheduler at period end)
    */
-  async applyPlanChange(pendingChangeId: string) {
-    const pendingChange = await this.prisma.pendingPlanChange.findUnique({
-      where: { id: pendingChangeId },
+  async applyScheduledDowngrade(subscriptionId: string) {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { id: subscriptionId },
       include: {
-        subscription: { include: { plan: true, tenant: true } },
-        newPlan: true,
+        plan: true,
+        tenant: true,
+        scheduledDowngradePlan: true,
       },
     });
 
-    if (!pendingChange) {
-      throw new NotFoundException('Pending plan change not found');
+    if (!subscription) {
+      throw new NotFoundException('Subscription not found');
     }
 
-    if (pendingChange.paymentStatus !== 'COMPLETED') {
-      throw new BadRequestException('Payment not completed for this plan change');
+    if (!subscription.scheduledDowngradePlanId || !subscription.scheduledDowngradePlan) {
+      throw new BadRequestException('No scheduled downgrade found');
     }
 
-    if (pendingChange.appliedAt) {
-      throw new BadRequestException('Plan change already applied');
-    }
+    const newPlan = subscription.scheduledDowngradePlan;
+    const billingCycle = subscription.scheduledDowngradeBillingCycle || subscription.billingCycle;
+    const newAmount = billingCycle === BillingCycle.MONTHLY ? newPlan.monthlyPrice : newPlan.yearlyPrice;
 
-    const { subscription, newPlan } = pendingChange;
-
-    // Apply the plan change
+    // Apply the downgrade
     const updatedSubscription = await this.prisma.subscription.update({
-      where: { id: subscription.id },
+      where: { id: subscriptionId },
       data: {
-        planId: pendingChange.newPlanId,
-        billingCycle: pendingChange.newBillingCycle,
-        amount: pendingChange.newAmount,
-        currency: pendingChange.currency,
+        planId: subscription.scheduledDowngradePlanId,
+        billingCycle,
+        amount: Number(newAmount),
+        currency: newPlan.currency,
+        // Clear scheduled downgrade
+        scheduledDowngradePlanId: null,
+        scheduledDowngradeBillingCycle: null,
       },
       include: { plan: true },
     });
@@ -463,15 +448,7 @@ export class SubscriptionService {
     // Update tenant's current plan
     await this.prisma.tenant.update({
       where: { id: subscription.tenantId },
-      data: { currentPlanId: pendingChange.newPlanId },
-    });
-
-    // Mark pending change as applied
-    await this.prisma.pendingPlanChange.update({
-      where: { id: pendingChangeId },
-      data: {
-        appliedAt: new Date(),
-      },
+      data: { currentPlanId: subscription.scheduledDowngradePlanId },
     });
 
     // Send notification
@@ -488,54 +465,61 @@ export class SubscriptionService {
       );
     }
 
-    this.logger.log(`Plan change applied for subscription ${subscription.id} - ${newPlan.displayName}`);
+    this.logger.log(`Scheduled downgrade applied for subscription ${subscriptionId} - ${newPlan.displayName}`);
     return updatedSubscription;
   }
 
   /**
-   * Get pending plan change for a subscription
-   * Returns null if no active pending change exists
+   * Get scheduled downgrade for a subscription
+   * Returns null if no scheduled downgrade exists
    */
-  async getPendingPlanChange(subscriptionId: string) {
-    const pendingChange = await this.prisma.pendingPlanChange.findFirst({
-      where: {
-        subscriptionId,
-        appliedAt: null,
-        paymentStatus: { in: ['PENDING', 'FAILED'] },
-      },
+  async getScheduledDowngrade(subscriptionId: string) {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { id: subscriptionId },
       include: {
-        currentPlan: true,
-        newPlan: true,
+        scheduledDowngradePlan: true,
       },
-      orderBy: { createdAt: 'desc' },
     });
 
-    return pendingChange;
+    if (!subscription || !subscription.scheduledDowngradePlanId) {
+      return null;
+    }
+
+    return {
+      scheduledPlanId: subscription.scheduledDowngradePlanId,
+      scheduledPlan: subscription.scheduledDowngradePlan,
+      scheduledBillingCycle: subscription.scheduledDowngradeBillingCycle,
+      scheduledFor: subscription.currentPeriodEnd,
+    };
   }
 
   /**
-   * Cancel a pending plan change
+   * Cancel a scheduled downgrade
    */
-  async cancelPendingPlanChange(subscriptionId: string) {
-    const pendingChange = await this.prisma.pendingPlanChange.findFirst({
-      where: {
-        subscriptionId,
-        paymentStatus: { in: ['PENDING', 'FAILED'] },
-        appliedAt: null,
+  async cancelScheduledDowngrade(subscriptionId: string) {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { id: subscriptionId },
+    });
+
+    if (!subscription) {
+      throw new NotFoundException('Subscription not found');
+    }
+
+    if (!subscription.scheduledDowngradePlanId) {
+      throw new BadRequestException('No scheduled downgrade found');
+    }
+
+    await this.prisma.subscription.update({
+      where: { id: subscriptionId },
+      data: {
+        scheduledDowngradePlanId: null,
+        scheduledDowngradeBillingCycle: null,
       },
     });
 
-    if (!pendingChange) {
-      throw new NotFoundException('No pending plan change found');
-    }
+    this.logger.log(`Scheduled downgrade cancelled for subscription ${subscriptionId}`);
 
-    await this.prisma.pendingPlanChange.delete({
-      where: { id: pendingChange.id },
-    });
-
-    this.logger.log(`Pending plan change ${pendingChange.id} cancelled for subscription ${subscriptionId}`);
-
-    return { success: true, message: 'Pending plan change cancelled' };
+    return { success: true, message: 'Scheduled downgrade cancelled' };
   }
 
   /**

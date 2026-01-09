@@ -114,24 +114,16 @@
       "faqFreeTrial": "Is there a free trial?",
       "faqFreeTrialAnswer": "Yes, most paid plans include a 14-day free trial. You won't be charged until the trial period ends."
     },
-    "pendingChange": {
-      "title": "Pending Plan Change",
-      "description": "You have a pending plan change",
-      "awaitingPayment": "Waiting for payment",
-      "paymentFailed": "Payment failed",
-      "paymentExpired": "Payment expired",
-      "scheduledFor": "Scheduled for",
-      "upgradingTo": "Upgrading to",
+    "scheduledDowngrade": {
+      "title": "Scheduled Plan Change",
+      "description": "You have a scheduled plan downgrade. Cancel it first if you want to make another change.",
+      "scheduled": "Scheduled",
       "downgradingTo": "Downgrading to",
-      "amount": "Amount to pay",
-      "completePayment": "Complete Payment",
-      "cancel": "Cancel Change",
-      "retry": "Try Again",
-      "createdAt": "Created",
-      "failureReason": "Reason",
-      "cancelConfirm": "Are you sure you want to cancel this pending plan change?",
-      "cancelSuccess": "Pending plan change cancelled",
-      "cancelFailed": "Failed to cancel pending plan change"
+      "scheduledFor": "Effective date",
+      "cancelDowngrade": "Cancel Downgrade",
+      "cancelTitle": "Cancel Scheduled Downgrade?",
+      "cancelConfirm": "Are you sure you want to cancel this scheduled downgrade? You will keep your current plan.",
+      "keepCurrentPlan": "Keep Current Plan"
     },
     "payment": {
       "preparing": "Preparing payment...",

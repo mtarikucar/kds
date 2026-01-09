@@ -114,24 +114,16 @@
       "faqFreeTrial": "Ücretsiz deneme var mı?",
       "faqFreeTrialAnswer": "Evet, çoğu ücretli plan 14 günlük ücretsiz deneme içerir. Deneme süresi bitene kadar ücret alınmaz."
     },
-    "pendingChange": {
-      "title": "Bekleyen Plan Değişikliği",
-      "description": "Bekleyen bir plan değişikliğiniz var",
-      "awaitingPayment": "Ödeme bekleniyor",
-      "paymentFailed": "Ödeme başarısız",
-      "paymentExpired": "Ödeme süresi doldu",
-      "scheduledFor": "Planlandı",
-      "upgradingTo": "Yükseltiliyor",
-      "downgradingTo": "Düşürülüyor",
-      "amount": "Ödenecek tutar",
-      "completePayment": "Ödemeyi Tamamla",
-      "cancel": "Değişikliği İptal Et",
-      "retry": "Tekrar Dene",
-      "createdAt": "Oluşturuldu",
-      "failureReason": "Neden",
-      "cancelConfirm": "Bu bekleyen plan değişikliğini iptal etmek istediğinizden emin misiniz?",
-      "cancelSuccess": "Bekleyen plan değişikliği iptal edildi",
-      "cancelFailed": "Bekleyen plan değişikliği iptal edilemedi"
+    "scheduledDowngrade": {
+      "title": "Planlanmış Plan Değişikliği",
+      "description": "Planlanmış bir plan düşürmeniz var. Başka değişiklik yapmak için önce iptal edin.",
+      "scheduled": "Planlandı",
+      "downgradingTo": "Düşürülecek plan",
+      "scheduledFor": "Geçerlilik tarihi",
+      "cancelDowngrade": "Plan Düşürmeyi İptal Et",
+      "cancelTitle": "Planlanmış Düşürmeyi İptal Et?",
+      "cancelConfirm": "Bu planlanmış düşürmeyi iptal etmek istediğinizden emin misiniz? Mevcut planınızı koruyacaksınız.",
+      "keepCurrentPlan": "Mevcut Planı Koru"
     },
     "payment": {
       "preparing": "Ödeme hazırlanıyor...",

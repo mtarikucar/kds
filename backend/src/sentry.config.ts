@@ -24,7 +24,7 @@ export function initSentry() {
     // Profiling
     profilesSampleRate: parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE || '0.1'),
     integrations: [
-      nodeProfilingIntegration(),
+      nodeProfilingIntegration() as any,
     ],
 
     // Release tracking

@@ -29,10 +29,10 @@ services:
       resources:
         limits:
           cpus: '1.0'
-          memory: 1G
+          memory: 2G
         reservations:
           cpus: '0.5'
-          memory: 512M
+          memory: 1G
 
   # Redis Cache (Shared - uses DB 1 for staging)
   redis:
@@ -81,7 +81,7 @@ services:
       NODE_ENV: staging
       PORT: 3002
       POSTGRES_DB: restaurant_pos_staging
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/restaurant_pos_staging
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/restaurant_pos_staging?connection_limit=25&pool_timeout=10
       REDIS_URL: redis://redis:6379/1
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
