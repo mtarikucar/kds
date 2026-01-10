@@ -632,6 +632,20 @@ export class CustomerOrdersService {
         tenantId,
         isAvailable: true,
       },
+      include: {
+        modifierGroups: {
+          include: {
+            group: {
+              include: {
+                modifiers: {
+                  where: { isAvailable: true },
+                  select: { id: true },
+                },
+              },
+            },
+          },
+        },
+      },
     });
 
     if (products.length !== productIds.length) {
@@ -639,6 +653,38 @@ export class CustomerOrdersService {
     }
 
     const productMap = new Map(products.map((p) => [p.id, p]));
+
+    // Validate required modifier groups for each item
+    for (const item of items) {
+      const product = productMap.get(item.productId);
+      if (!product) continue;
+
+      const itemModifierIds = (item.modifiers || []).map((m) => m.modifierId);
+
+      for (const pmg of product.modifierGroups) {
+        const group = pmg.group;
+        if (!group.isActive) continue;
+
+        // Check if this group is required
+        if (group.isRequired || group.minSelections > 0) {
+          // Get modifier IDs that belong to this group
+          const groupModifierIds = group.modifiers.map((m) => m.id);
+
+          // Count how many modifiers from this group are selected
+          const selectedCount = itemModifierIds.filter((id) =>
+            groupModifierIds.includes(id)
+          ).length;
+
+          const minRequired = group.isRequired ? Math.max(1, group.minSelections) : group.minSelections;
+
+          if (selectedCount < minRequired) {
+            throw new BadRequestException(
+              `Product "${product.name}" requires at least ${minRequired} selection(s) from "${group.displayName}"`
+            );
+          }
+        }
+      }
+    }
 
     // Validate modifiers if present
     const allModifierIds = items.flatMap((item) =>

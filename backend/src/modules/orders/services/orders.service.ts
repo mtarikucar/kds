@@ -66,17 +66,57 @@ export class OrdersService {
       );
     }
 
+    // Validate modifiers if present
+    const allModifierIds = createOrderDto.items.flatMap((item) =>
+      (item.modifiers || []).map((m) => m.modifierId)
+    );
+
+    const modifiers = allModifierIds.length > 0
+      ? await this.prisma.modifier.findMany({
+          where: {
+            id: { in: allModifierIds },
+            tenantId,
+            isAvailable: true,
+          },
+        })
+      : [];
+
+    const modifierMap = new Map(modifiers.map((m) => [m.id, m]));
+
+    // Validate all modifiers exist
+    for (const modifierId of allModifierIds) {
+      if (!modifierMap.has(modifierId)) {
+        throw new BadRequestException(`Modifier ${modifierId} not found or unavailable`);
+      }
+    }
+
     // Calculate totals
     let totalAmount = 0;
     const orderItems = createOrderDto.items.map((item) => {
-      const subtotal = item.quantity * item.unitPrice;
+      // Calculate modifier total for this item
+      let modifierTotal = 0;
+      const itemModifiers = (item.modifiers || []).map((mod) => {
+        const modifier = modifierMap.get(mod.modifierId);
+        const priceAdjustment = Number(modifier?.priceAdjustment || 0);
+        modifierTotal += priceAdjustment * mod.quantity;
+        return {
+          modifierId: mod.modifierId,
+          quantity: mod.quantity,
+          priceAdjustment,
+        };
+      });
+
+      const subtotal = item.quantity * (item.unitPrice + modifierTotal);
       totalAmount += subtotal;
+
       return {
         productId: item.productId,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         subtotal,
+        modifierTotal,
         notes: item.notes,
+        modifiers: itemModifiers.length > 0 ? { create: itemModifiers } : undefined,
       };
     });
 
@@ -119,6 +159,17 @@ export class OrdersService {
                 name: true,
                 price: true,
                 image: true,
+              },
+            },
+            modifiers: {
+              include: {
+                modifier: {
+                  select: {
+                    id: true,
+                    name: true,
+                    priceAdjustment: true,
+                  },
+                },
               },
             },
           },

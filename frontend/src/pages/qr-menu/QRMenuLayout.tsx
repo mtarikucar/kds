@@ -238,7 +238,12 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({ currentPage, children, onMe
 
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto">
-          {children}
+          {React.Children.map(children, child => {
+            if (React.isValidElement(child)) {
+              return React.cloneElement(child as React.ReactElement<any>, { searchQuery });
+            }
+            return child;
+          })}
         </main>
       </div>
     </div>

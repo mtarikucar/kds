@@ -73,6 +73,18 @@ const QRMenuContent: React.FC<QRMenuContentProps> = ({
   };
 
   const handleAddToCart = (product: Product) => {
+    // Zorunlu modifier varsa modal aç
+    const hasRequiredModifiers = product.modifierGroups?.some(
+      group => group.isRequired || group.minSelections > 0
+    );
+
+    if (hasRequiredModifiers) {
+      setSelectedProduct(product);
+      setIsModalOpen(true);
+      return;
+    }
+
+    // Zorunlu modifier yoksa direkt ekle
     addItem(product, 1, []);
     setAddedProductId(product.id);
     setTimeout(() => setAddedProductId(null), 2000);

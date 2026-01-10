@@ -21,11 +21,18 @@ export class ProductsService {
       order: pti.order,
     })) || [];
 
-    // Remove productImages and add images
-    const { productImages, ...rest } = product;
+    // Transform modifierGroups from junction table format
+    const modifierGroups = product.modifierGroups?.map((pmg: any) => ({
+      ...pmg.group,
+      displayOrder: pmg.displayOrder,
+    })).sort((a: any, b: any) => a.displayOrder - b.displayOrder) || [];
+
+    // Remove productImages and modifierGroups junction table, add transformed versions
+    const { productImages, modifierGroups: _, ...rest } = product;
     return {
       ...rest,
       images,
+      modifierGroups,
     };
   }
 
@@ -97,6 +104,19 @@ export class ProductsService {
             image: true,
           },
           orderBy: { order: 'asc' },
+        },
+        modifierGroups: {
+          include: {
+            group: {
+              include: {
+                modifiers: {
+                  where: { isAvailable: true },
+                  orderBy: { displayOrder: 'asc' },
+                },
+              },
+            },
+          },
+          orderBy: { displayOrder: 'asc' },
         },
       },
       orderBy: { name: 'asc' },

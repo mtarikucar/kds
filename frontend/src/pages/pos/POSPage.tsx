@@ -5,6 +5,7 @@ import TableGrid from '../../components/pos/TableGrid';
 import MenuPanel from '../../components/pos/MenuPanel';
 import OrderCart from '../../components/pos/OrderCart';
 import PaymentModal from '../../components/pos/PaymentModal';
+import ProductOptionsModal, { SelectedModifier } from '../../components/pos/ProductOptionsModal';
 import StickyCartBar from '../../components/pos/StickyCartBar';
 import CartDrawer from '../../components/pos/CartDrawer';
 import NotificationBar from '../../components/pos/NotificationBar';
@@ -23,6 +24,7 @@ import { useResponsive } from '../../hooks/useResponsive';
 interface CartItem extends Product {
   quantity: number;
   notes?: string;
+  modifiers?: SelectedModifier[];
 }
 
 const POSPage = () => {
@@ -39,6 +41,8 @@ const POSPage = () => {
   const [isPendingOrdersPanelOpen, setIsPendingOrdersPanelOpen] = useState(false);
   const [isWaiterRequestsPanelOpen, setIsWaiterRequestsPanelOpen] = useState(false);
   const [isBillRequestsPanelOpen, setIsBillRequestsPanelOpen] = useState(false);
+  const [isProductOptionsModalOpen, setIsProductOptionsModalOpen] = useState(false);
+  const [productForOptions, setProductForOptions] = useState<Product | null>(null);
 
   // Responsive hook
   const { isDesktop, isMobile, isTablet } = useResponsive();
@@ -140,17 +144,46 @@ const POSPage = () => {
       return;
     }
 
+    // Check if product has required modifiers
+    const hasRequiredModifiers = product.modifierGroups?.some(
+      group => group.isRequired || group.minSelections > 0
+    );
+
+    if (hasRequiredModifiers) {
+      // Open options modal for modifier selection
+      setProductForOptions(product);
+      setIsProductOptionsModalOpen(true);
+      return;
+    }
+
+    // No required modifiers - add directly to cart
+    addItemToCart(product, 1, []);
+  };
+
+  const addItemToCart = (product: Product, quantity: number, modifiers: SelectedModifier[]) => {
     setCartItems((prev) => {
-      const existingItem = prev.find((item) => item.id === product.id);
+      // Create a unique key based on product ID and selected modifiers
+      const modifierKey = modifiers.map(m => m.modifierId).sort().join('-');
+      const existingItem = prev.find(
+        (item) => item.id === product.id &&
+          (item.modifiers?.map(m => m.modifierId).sort().join('-') || '') === modifierKey
+      );
+
       if (existingItem) {
         return prev.map((item) =>
-          item.id === product.id
-            ? { ...item, quantity: item.quantity + 1 }
+          item === existingItem
+            ? { ...item, quantity: item.quantity + quantity }
             : item
         );
       }
-      return [...prev, { ...product, quantity: 1 }];
+      return [...prev, { ...product, quantity, modifiers }];
     });
+  };
+
+  const handleAddItemWithModifiers = (product: Product, quantity: number, modifiers: SelectedModifier[]) => {
+    addItemToCart(product, quantity, modifiers);
+    setIsProductOptionsModalOpen(false);
+    setProductForOptions(null);
   };
 
   const handleUpdateQuantity = (productId: string, quantity: number) => {
@@ -198,6 +231,10 @@ const POSPage = () => {
         quantity: item.quantity,
         unitPrice: item.price,
         notes: item.notes,
+        modifiers: item.modifiers?.map(m => ({
+          modifierId: m.modifierId,
+          quantity: m.quantity,
+        })),
       })),
     };
 
@@ -271,6 +308,10 @@ const POSPage = () => {
         quantity: item.quantity,
         unitPrice: item.price,
         notes: item.notes,
+        modifiers: item.modifiers?.map(m => ({
+          modifierId: m.modifierId,
+          quantity: m.quantity,
+        })),
       })),
     };
 
@@ -352,8 +393,15 @@ const POSPage = () => {
     );
   };
 
-  // Calculate totals
-  const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+  // Calculate totals (including modifier prices)
+  const subtotal = cartItems.reduce((sum, item) => {
+    const itemPrice = Number(item.price);
+    const modifiersTotal = (item.modifiers || []).reduce(
+      (modSum, mod) => modSum + (mod.priceAdjustment * mod.quantity),
+      0
+    );
+    return sum + (itemPrice + modifiersTotal) * item.quantity;
+  }, 0);
   const total = subtotal - discount;
   const hasCartItems = cartItems.length > 0;
 
@@ -524,6 +572,19 @@ const POSPage = () => {
         onConfirm={handlePaymentConfirm}
         isLoading={isCreatingPayment}
       />
+
+      {/* Product Options Modal */}
+      {productForOptions && (
+        <ProductOptionsModal
+          isOpen={isProductOptionsModalOpen}
+          onClose={() => {
+            setIsProductOptionsModalOpen(false);
+            setProductForOptions(null);
+          }}
+          product={productForOptions}
+          onAddToCart={handleAddItemWithModifiers}
+        />
+      )}
 
       {/* Notification Panels */}
       <PendingOrdersPanel

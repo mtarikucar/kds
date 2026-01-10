@@ -3,6 +3,17 @@ import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { OrderType } from '../../../common/constants/order-status.enum';
 
+export class OrderItemModifierDto {
+  @ApiProperty({ description: 'Modifier ID' })
+  @IsString()
+  modifierId: string;
+
+  @ApiProperty({ description: 'Quantity of modifier', minimum: 1, default: 1 })
+  @IsNumber()
+  @Min(1)
+  quantity: number;
+}
+
 export class CreateOrderItemDto {
   @ApiProperty({ description: 'Product ID' })
   @IsString()
@@ -22,6 +33,13 @@ export class CreateOrderItemDto {
   @IsNumber()
   @Min(0)
   unitPrice: number;
+
+  @ApiPropertyOptional({ type: [OrderItemModifierDto], description: 'Selected modifiers for this item' })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => OrderItemModifierDto)
+  @IsOptional()
+  modifiers?: OrderItemModifierDto[];
 }
 
 export class CreateOrderDto {
