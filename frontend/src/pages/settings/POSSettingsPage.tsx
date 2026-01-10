@@ -10,6 +10,7 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import ReportSettings from '../../components/settings/ReportSettings';
+import LocationSettings from '../../components/settings/LocationSettings';
 const POSSettingsPage = () => {
   const { t } = useTranslation('settings');
   const { data: posSettings, isLoading } = useGetPosSettings();
@@ -355,6 +356,11 @@ const POSSettingsPage = () => {
         {/* Report Settings */}
         <div className="mt-6">
           <ReportSettings />
+        </div>
+
+        {/* Location Settings */}
+        <div className="mt-6">
+          <LocationSettings />
         </div>
       </div>
     </div>

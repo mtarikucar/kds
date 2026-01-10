@@ -252,6 +252,22 @@
   },
   "noCashDrawersConfigured": "Yapılandırılmış kasa çekmecesi yok",
   "noPagersConfigured": "Yapılandırılmış çağrı cihazı yok",
+  "locationSettings": {
+    "title": "Restoran Konumu",
+    "description": "QR menü siparişleri için konum doğrulaması ayarlayın",
+    "useMyLocation": "Konumumu Kullan",
+    "latitude": "Enlem",
+    "longitude": "Boylam",
+    "radius": "Sipariş Yarıçapı",
+    "radiusHelp": "Müşterilerin sipariş verebileceği maksimum mesafe",
+    "meters": "metre",
+    "mapInstructions": "Haritaya tıklayarak veya marker'ı sürükleyerek konum seçin",
+    "locationEnabled": "Konum doğrulaması aktif",
+    "locationDisabled": "Konum doğrulaması kapalı (koordinat girilmedi)",
+    "clearLocation": "Konumu Temizle",
+    "saved": "Konum ayarları kaydedildi",
+    "saveError": "Konum ayarları kaydedilemedi"
+  },
   "printer": {
     "loadFailed": "Yazıcılar yüklenemedi",
     "selectPrompt": "Lütfen bir yazıcı seçin",

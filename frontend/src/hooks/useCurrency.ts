@@ -9,6 +9,9 @@ export interface TenantSettings {
   timezone?: string;
   reportEmailEnabled?: boolean;
   reportEmails?: string[];
+  latitude?: number;
+  longitude?: number;
+  locationRadius?: number;
 }
 
 export interface UpdateTenantSettingsDto {
@@ -17,6 +20,9 @@ export interface UpdateTenantSettingsDto {
   timezone?: string;
   reportEmailEnabled?: boolean;
   reportEmails?: string[];
+  latitude?: number | null;
+  longitude?: number | null;
+  locationRadius?: number;
 }
 
 export const SUPPORTED_CURRENCIES = [

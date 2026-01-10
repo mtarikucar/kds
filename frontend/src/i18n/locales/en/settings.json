@@ -252,6 +252,22 @@
   },
   "noCashDrawersConfigured": "No cash drawers configured",
   "noPagersConfigured": "No pagers configured",
+  "locationSettings": {
+    "title": "Restaurant Location",
+    "description": "Set location validation for QR menu orders",
+    "useMyLocation": "Use My Location",
+    "latitude": "Latitude",
+    "longitude": "Longitude",
+    "radius": "Order Radius",
+    "radiusHelp": "Maximum distance from which customers can place orders",
+    "meters": "meters",
+    "mapInstructions": "Click on the map or drag the marker to select a location",
+    "locationEnabled": "Location validation is active",
+    "locationDisabled": "Location validation is off (no coordinates set)",
+    "clearLocation": "Clear Location",
+    "saved": "Location settings saved",
+    "saveError": "Failed to save location settings"
+  },
   "printer": {
     "loadFailed": "Failed to load printers",
     "selectPrompt": "Please select a printer",
