@@ -9,6 +9,7 @@ interface PaytrLinkParams {
   amount: number;
   userName: string;
   userPhone: string;
+  userAddress: string;
   description: string;
   successUrl: string;
   failUrl: string;
@@ -93,6 +94,7 @@ export class PaytrService {
       payment_amount: amountKurus.toString(),
       paytr_token: token,
       user_name: params.userName,
+      user_address: params.userAddress,
       user_phone: params.userPhone,
       user_basket: userBasketBase64,
       debug_on: this.testMode ? '1' : '0',

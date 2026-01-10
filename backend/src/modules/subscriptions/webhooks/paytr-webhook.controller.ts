@@ -4,6 +4,7 @@ import {
   Body,
   Logger,
   Res,
+  SetMetadata,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { PrismaService } from '../../../prisma/prisma.service';
@@ -17,6 +18,9 @@ import {
   BillingCycle,
   SubscriptionPlanType,
 } from '../../../common/constants/subscription.enum';
+
+// Public decorator to bypass authentication for webhooks
+export const Public = () => SetMetadata('isPublic', true);
 
 @Controller('webhooks/paytr')
 export class PaytrWebhookController {
@@ -35,9 +39,21 @@ export class PaytrWebhookController {
    * PayTR sends POST request with payment status
    * Must respond with "OK" for success
    */
+  @Public()
   @Post()
   async handleCallback(@Body() payload: PaytrCallbackPayload, @Res() res: Response) {
     this.logger.log(`Received PayTR callback for order: ${payload.merchant_oid}`);
+
+    // Decode HTML entities in hash (PayTR sends URL/HTML encoded)
+    if (payload.hash) {
+      payload.hash = payload.hash
+        .replace(/&#x2F;/g, '/')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'");
+    }
 
     // Verify hash
     if (!this.paytrService.verifyCallback(payload)) {
@@ -66,8 +82,8 @@ export class PaytrWebhookController {
   private async handlePaymentSuccess(payload: PaytrCallbackPayload) {
     this.logger.log(`PayTR payment succeeded: ${payload.merchant_oid}`);
 
-    // Check if this is an upgrade payment (UPGRADE-{subscriptionId}-{newPlanId}-{billingCycle}-{timestamp})
-    if (payload.merchant_oid.startsWith('UPGRADE-')) {
+    // Check if this is an upgrade payment (UPG{timestamp} or UPGRADE-...)
+    if (payload.merchant_oid.startsWith('UPG') || payload.merchant_oid.startsWith('UPGRADE-')) {
       await this.handleUpgradePaymentSuccess(payload);
       return;
     }
@@ -210,23 +226,11 @@ export class PaytrWebhookController {
 
   /**
    * Handle successful upgrade payment
-   * Format: UPGRADE-{subscriptionId}-{newPlanId}-{billingCycle}-{timestamp}
    */
   private async handleUpgradePaymentSuccess(payload: PaytrCallbackPayload) {
     this.logger.log(`Upgrade payment succeeded: ${payload.merchant_oid}`);
 
-    // Extract data from merchant_oid format: UPGRADE-{subscriptionId}-{newPlanId}-{billingCycle}-{timestamp}
-    const parts = payload.merchant_oid.split('-');
-    if (parts.length < 4) {
-      this.logger.error(`Invalid upgrade merchant_oid format: ${payload.merchant_oid}`);
-      return;
-    }
-
-    const subscriptionId = parts[1];
-    const newPlanId = parts[2];
-    const billingCycle = parts[3];
-
-    // Find and update payment
+    // Find payment by merchant_oid
     const payment = await this.prisma.subscriptionPayment.findFirst({
       where: { paytrMerchantOid: payload.merchant_oid },
       include: {
@@ -236,42 +240,72 @@ export class PaytrWebhookController {
       },
     });
 
-    if (payment) {
-      await this.prisma.subscriptionPayment.update({
-        where: { id: payment.id },
-        data: {
-          status: PaymentStatus.SUCCEEDED,
-          paidAt: new Date(),
-          paytrPaymentToken: payload.merchant_oid,
-        },
-      });
+    if (!payment) {
+      this.logger.error(`Upgrade payment not found for merchant_oid: ${payload.merchant_oid}`);
+      return;
     }
 
-    // Get the new plan info for notification
-    const newPlan = await this.prisma.subscriptionPlan.findUnique({
-      where: { id: newPlanId },
+    const subscription = payment.subscription;
+
+    if (!subscription) {
+      this.logger.error(`Subscription not found for payment: ${payment.id}`);
+      return;
+    }
+
+    // Extract upgrade metadata from failureMessage BEFORE updating
+    this.logger.log(`Payment failureMessage: ${payment.failureMessage}`);
+    let upgradeMetadata: { type: string; newPlanId: string; billingCycle: string } | null = null;
+    if (payment.failureMessage) {
+      try {
+        upgradeMetadata = JSON.parse(payment.failureMessage);
+        this.logger.log(`Parsed upgrade metadata: ${JSON.stringify(upgradeMetadata)}`);
+      } catch (e) {
+        this.logger.warn(`Failed to parse upgrade metadata: ${e.message}`);
+      }
+    } else {
+      this.logger.log('No failureMessage found in payment record');
+    }
+
+    // Update payment status
+    await this.prisma.subscriptionPayment.update({
+      where: { id: payment.id },
+      data: {
+        status: PaymentStatus.SUCCEEDED,
+        paidAt: new Date(),
+        paytrPaymentToken: payload.merchant_oid,
+        failureMessage: null, // Clear metadata on success
+      },
     });
 
-    // Apply the upgrade directly
-    try {
-      await this.subscriptionService.applyUpgrade(subscriptionId, newPlanId, billingCycle);
-      this.logger.log(`Upgrade applied successfully: ${subscriptionId} -> ${newPlanId}`);
-
-      // Send success notification
-      if (payment) {
-        const adminEmail = await this.getTenantAdminEmail(payment.subscription.tenantId);
-        if (adminEmail && newPlan) {
-          await this.notificationService.sendPaymentSuccessful(
-            adminEmail,
-            payment.subscription.tenant.name,
-            Number(payment.amount),
-            payment.currency,
-            `Plan upgraded to ${newPlan.displayName}`,
-          );
-        }
+    // Apply the upgrade if metadata exists
+    if (upgradeMetadata && upgradeMetadata.type === 'upgrade') {
+      this.logger.log(`Applying upgrade to plan: ${upgradeMetadata.newPlanId}`);
+      try {
+        await this.subscriptionService.applyUpgrade(
+          subscription.id,
+          upgradeMetadata.newPlanId,
+          upgradeMetadata.billingCycle,
+        );
+        this.logger.log(
+          `Upgrade applied successfully: ${subscription.id} -> ${upgradeMetadata.newPlanId}`,
+        );
+      } catch (error) {
+        this.logger.error(`Failed to apply upgrade: ${error.message}`, error.stack);
       }
-    } catch (error) {
-      this.logger.error(`Failed to apply upgrade: ${error.message}`, error.stack);
+    } else {
+      this.logger.log(`Upgrade payment ${payment.id} marked as succeeded for subscription ${subscription.id} (no metadata or wrong type)`);
+    }
+    
+    // Send notification
+    const adminEmail = await this.getTenantAdminEmail(subscription.tenantId);
+    if (adminEmail) {
+      await this.notificationService.sendPaymentSuccessful(
+        adminEmail,
+        subscription.tenant.name,
+        Number(payment.amount),
+        payment.currency,
+        payment.id,
+      );
     }
   }
 

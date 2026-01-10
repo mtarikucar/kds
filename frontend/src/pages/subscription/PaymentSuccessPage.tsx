@@ -20,13 +20,21 @@ export default function PaymentSuccessPage() {
     queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
     queryClient.invalidateQueries({ queryKey: subscriptionKeys.all });
 
-    // Small delay to allow webhook to process
-    const timer = setTimeout(() => {
+    // Show success message first, then redirect
+    const verifyTimer = setTimeout(() => {
       setIsVerifying(false);
-    }, 2000);
+    }, 1500);
 
-    return () => clearTimeout(timer);
-  }, [queryClient]);
+    // Auto-redirect after showing success message
+    const redirectTimer = setTimeout(() => {
+      navigate('/admin/settings/subscription');
+    }, 4000); // 4 seconds total (1.5s verify + 2.5s to read)
+
+    return () => {
+      clearTimeout(verifyTimer);
+      clearTimeout(redirectTimer);
+    };
+  }, [queryClient, navigate]);
 
   if (isVerifying) {
     return (
@@ -69,7 +77,7 @@ export default function PaymentSuccessPage() {
 
         {/* CTA Button */}
         <button
-          onClick={() => navigate('/subscription')}
+          onClick={() => navigate('/admin/settings/subscription')}
           className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2"
         >
           {t('subscriptions.payment.goToSubscription')}

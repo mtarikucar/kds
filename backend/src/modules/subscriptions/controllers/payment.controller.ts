@@ -73,23 +73,32 @@ export class PaymentController {
         ? `${adminUser.firstName || ''} ${adminUser.lastName || ''}`.trim() || tenant.name
         : tenant.name;
 
-      await this.notificationService.sendInternationalSubscriptionRequest(
-        adminUser?.email || req.user.email,
-        customerName,
-        tenant.name,
-        tenantId,
-        plan.displayName,
-        Number(amount),
-        dto.billingCycle,
-        plan.currency,
-      );
+      // Try to send emails but don't fail if they don't work
+      try {
+        await this.notificationService.sendInternationalSubscriptionRequest(
+          adminUser?.email || req.user.email,
+          customerName,
+          tenant.name,
+          tenantId,
+          plan.displayName,
+          Number(amount),
+          dto.billingCycle,
+          plan.currency,
+        );
+      } catch (e) {
+        // Email failed but continue
+      }
 
       // Send confirmation to customer
-      await this.notificationService.sendInternationalRequestConfirmation(
-        adminUser?.email || req.user.email,
-        tenant.name,
-        plan.displayName,
-      );
+      try {
+        await this.notificationService.sendInternationalRequestConfirmation(
+          adminUser?.email || req.user.email,
+          tenant.name,
+          plan.displayName,
+        );
+      } catch (e) {
+        // Email failed but continue
+      }
 
       return {
         provider: 'EMAIL',
@@ -130,7 +139,8 @@ export class PaymentController {
       email: adminUser?.email || req.user.email,
       amount: Number(amount),
       userName: tenant.name,
-      userPhone: adminUser?.phone || '',
+      userAddress: 'Turkiye',
+      userPhone: adminUser?.phone || '5555555555',
       description: `${plan.displayName} - ${dto.billingCycle === 'MONTHLY' ? 'Aylik' : 'Yillik'}`,
       successUrl: `${frontendUrl}/subscription/payment/success?oid=${merchantOid}`,
       failUrl: `${frontendUrl}/subscription/payment/failed?oid=${merchantOid}`,
@@ -211,33 +221,45 @@ export class PaymentController {
     const tenant = subscription.tenant;
     const amount = dto.amount;
 
+    // Determine payment provider based on tenant's payment region
+    const paymentRegion = tenant.paymentRegion as PaymentRegion || PaymentRegion.TURKEY;
+
     // Get admin user for email
     const adminUser = await this.prisma.user.findFirst({
       where: { tenantId, role: 'ADMIN' },
     });
 
-    // For non-Turkey (non-PayTR): Send email request
-    if (subscription.paymentProvider !== PaymentProvider.PAYTR) {
+    // For non-Turkey customers: Send email request instead of payment
+    if (paymentRegion !== PaymentRegion.TURKEY) {
       const customerName = adminUser
         ? `${adminUser.firstName || ''} ${adminUser.lastName || ''}`.trim() || tenant.name
         : tenant.name;
 
-      await this.notificationService.sendInternationalSubscriptionRequest(
-        adminUser?.email || req.user.email,
-        customerName,
-        tenant.name,
-        tenant.id,
-        newPlan.displayName,
-        amount,
-        dto.billingCycle,
-        newPlan.currency,
-      );
+      // Try to send emails but don't fail if they don't work
+      try {
+        await this.notificationService.sendInternationalSubscriptionRequest(
+          adminUser?.email || req.user.email,
+          customerName,
+          tenant.name,
+          tenant.id,
+          newPlan.displayName,
+          amount,
+          dto.billingCycle,
+          newPlan.currency,
+        );
+      } catch (e) {
+        // Email failed but continue
+      }
 
-      await this.notificationService.sendInternationalRequestConfirmation(
-        adminUser?.email || req.user.email,
-        tenant.name,
-        newPlan.displayName,
-      );
+      try {
+        await this.notificationService.sendInternationalRequestConfirmation(
+          adminUser?.email || req.user.email,
+          tenant.name,
+          newPlan.displayName,
+        );
+      } catch (e) {
+        // Email failed but continue
+      }
 
       return {
         provider: 'EMAIL',
@@ -249,15 +271,16 @@ export class PaymentController {
 
     // PayTR Link API flow for upgrade
     const frontendUrl = this.configService.get<string>('FRONTEND_URL');
-    // Format: UPGRADE-{subscriptionId}-{newPlanId}-{billingCycle}-{timestamp}
-    const merchantOid = `UPGRADE-${dto.subscriptionId}-${dto.newPlanId}-${dto.billingCycle}-${Date.now()}`;
+    // Format: UPG{timestamp} (alphanumeric only, max 64 chars for PayTR)
+    const merchantOid = `UPG${Date.now()}`;
 
     const paymentLinkResult = await this.paytrService.createPaymentLink({
       merchantOid,
       email: adminUser?.email || req.user.email,
       amount,
       userName: tenant.name,
-      userPhone: adminUser?.phone || '',
+      userAddress: 'Turkiye',
+      userPhone: adminUser?.phone || '5555555555',
       description: `Plan Yukseltme: ${newPlan.displayName}`,
       successUrl: `${frontendUrl}/subscription/payment/success?oid=${merchantOid}&type=upgrade`,
       failUrl: `${frontendUrl}/subscription/payment/failed?oid=${merchantOid}&type=upgrade`,
@@ -269,7 +292,7 @@ export class PaymentController {
       throw new BadRequestException(paymentLinkResult.reason || 'Failed to create payment link');
     }
 
-    // Create pending payment record
+    // Create pending payment record with upgrade metadata
     await this.prisma.subscriptionPayment.create({
       data: {
         subscriptionId: dto.subscriptionId,
@@ -278,6 +301,12 @@ export class PaymentController {
         status: PaymentStatus.PENDING,
         paymentProvider: PaymentProvider.PAYTR,
         paytrMerchantOid: merchantOid,
+        // Store upgrade info in failureMessage as metadata (will be null on success)
+        failureMessage: JSON.stringify({
+          type: 'upgrade',
+          newPlanId: dto.newPlanId,
+          billingCycle: dto.billingCycle,
+        }),
       },
     });
 

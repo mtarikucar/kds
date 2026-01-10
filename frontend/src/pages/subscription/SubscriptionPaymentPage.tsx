@@ -67,7 +67,7 @@ export default function SubscriptionPaymentPage() {
           },
           onError: (error: any) => {
             toast.error(error.response?.data?.message || t('subscriptions.payment.paymentCreationFailed'));
-            navigate('/subscription');
+            navigate('/admin/settings/subscription');
           },
         }
       );
@@ -139,7 +139,7 @@ export default function SubscriptionPaymentPage() {
             </ul>
           </div>
           <button
-            onClick={() => navigate('/subscription')}
+            onClick={() => navigate('/admin/settings/subscription')}
             className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
           >
             {t('subscriptions.payment.goToSubscription')}
@@ -161,7 +161,7 @@ export default function SubscriptionPaymentPage() {
             {t('subscriptions.payment.success.subscriptionActive')}
           </p>
           <button
-            onClick={() => navigate('/subscription')}
+            onClick={() => navigate('/admin/settings/subscription')}
             className="w-full px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
           >
             {t('subscriptions.payment.goToSubscription')}
