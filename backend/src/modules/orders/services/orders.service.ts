@@ -244,6 +244,17 @@ export class OrdersService {
                 image: true,
               },
             },
+            modifiers: {
+              include: {
+                modifier: {
+                  select: {
+                    id: true,
+                    name: true,
+                    priceAdjustment: true,
+                  },
+                },
+              },
+            },
           },
         },
         table: {
@@ -285,6 +296,17 @@ export class OrdersService {
                 name: true,
                 price: true,
                 image: true,
+              },
+            },
+            modifiers: {
+              include: {
+                modifier: {
+                  select: {
+                    id: true,
+                    name: true,
+                    priceAdjustment: true,
+                  },
+                },
               },
             },
           },

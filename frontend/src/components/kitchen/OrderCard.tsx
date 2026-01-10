@@ -90,17 +90,28 @@ const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating }: OrderCa
           {(order.orderItems || order.items || []).map((item) => (
             <div
               key={item.id}
-              className="flex justify-between items-center py-2 border-b border-gray-100 last:border-0"
+              className="flex justify-between items-start py-2 border-b border-gray-100 last:border-0"
             >
-              <div>
+              <div className="flex-1">
                 <p className="font-medium">{item.product?.name}</p>
+                {/* Modifier'ları göster */}
+                {item.modifiers && item.modifiers.length > 0 && (
+                  <div className="mt-1 space-y-0.5">
+                    {item.modifiers.map((mod: any) => (
+                      <p key={mod.id} className="text-sm text-blue-600 pl-2">
+                        + {mod.modifier?.name || mod.name}
+                        {mod.quantity > 1 && ` x${mod.quantity}`}
+                      </p>
+                    ))}
+                  </div>
+                )}
                 {item.notes && (
-                  <p className="text-sm text-gray-600 italic">
+                  <p className="text-sm text-gray-600 italic mt-1">
                     {t('kitchen.noteLabel')}: {item.notes}
                   </p>
                 )}
               </div>
-              <span className="font-bold text-lg">x{item.quantity}</span>
+              <span className="font-bold text-lg ml-2">x{item.quantity}</span>
             </div>
           ))}
         </div>
