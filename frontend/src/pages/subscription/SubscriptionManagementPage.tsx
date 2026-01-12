@@ -37,6 +37,7 @@ const SubscriptionManagementPage = () => {
   const [showChangePlanModal, setShowChangePlanModal] = useState(false);
   const [selectedNewPlanId, setSelectedNewPlanId] = useState<string | null>(null);
   const [cancellationReason, setCancellationReason] = useState<string>('');
+  const [selectedBillingCycle, setSelectedBillingCycle] = useState<BillingCycle>(BillingCycle.MONTHLY);
 
   const { data: currentSubscription, isLoading: subLoading } = useGetCurrentSubscription();
   const { data: plans } = useGetPlans();
@@ -125,7 +126,7 @@ const SubscriptionManagementPage = () => {
         id: currentSubscription.id,
         data: {
           newPlanId: selectedNewPlanId,
-          billingCycle: currentSubscription.billingCycle,
+          billingCycle: selectedBillingCycle,
         },
       });
 
@@ -220,7 +221,10 @@ const SubscriptionManagementPage = () => {
                   <Button
                     variant="primary"
                     className="w-full"
-                    onClick={() => setShowChangePlanModal(true)}
+                    onClick={() => {
+                      setSelectedBillingCycle(currentSubscription.billingCycle);
+                      setShowChangePlanModal(true);
+                    }}
                   >
                     <RefreshCw className="h-4 w-4 mr-2" />
                     {t('subscriptions.changePlan')}
@@ -432,6 +436,36 @@ const SubscriptionManagementPage = () => {
       >
         <div className="space-y-4">
           <p className="text-gray-600">{t('subscriptions.selectNewPlan')}</p>
+
+          {/* Billing Cycle Toggle */}
+          <div className="flex justify-center gap-2 p-1 bg-gray-100 rounded-lg">
+            <button
+              type="button"
+              onClick={() => setSelectedBillingCycle(BillingCycle.MONTHLY)}
+              className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${
+                selectedBillingCycle === BillingCycle.MONTHLY
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              {t('subscriptions.monthly')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedBillingCycle(BillingCycle.YEARLY)}
+              className={`flex-1 py-2 px-4 text-sm font-medium rounded-md transition-colors ${
+                selectedBillingCycle === BillingCycle.YEARLY
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              {t('subscriptions.yearly')}
+              <span className="ml-1 text-xs text-green-600">
+                ({t('subscriptions.savePercent', { percent: 20 })})
+              </span>
+            </button>
+          </div>
+
           <div className="space-y-2">
             {availablePlans.map((plan) => (
               <div
@@ -451,13 +485,18 @@ const SubscriptionManagementPage = () => {
                   <div className="text-right">
                     <p className="font-bold text-gray-900">
                       ₺
-                      {currentSubscription.billingCycle === BillingCycle.MONTHLY
+                      {selectedBillingCycle === BillingCycle.MONTHLY
                         ? Number(plan.monthlyPrice).toFixed(2)
                         : Number(plan.yearlyPrice).toFixed(2)}
                     </p>
                     <p className="text-xs text-gray-500">
-                      /{currentSubscription.billingCycle === BillingCycle.MONTHLY ? t('subscriptions.perMonthShort') : t('subscriptions.perYearShort')}
+                      /{selectedBillingCycle === BillingCycle.MONTHLY ? t('subscriptions.perMonthShort') : t('subscriptions.perYearShort')}
                     </p>
+                    {selectedBillingCycle === BillingCycle.YEARLY && (
+                      <p className="text-xs text-green-600">
+                        ₺{(Number(plan.yearlyPrice) / 12).toFixed(2)}/{t('subscriptions.perMonthShort')}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>

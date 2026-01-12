@@ -11,6 +11,7 @@
     "billingCycle": "Billing Cycle",
     "monthly": "Monthly",
     "yearly": "Yearly",
+    "savePercent": "Save {{percent}}%",
     "nextBillingDate": "Next Billing Date",
     "paymentMethod": "Payment Method",
     "updatePaymentMethod": "Update Payment Method",

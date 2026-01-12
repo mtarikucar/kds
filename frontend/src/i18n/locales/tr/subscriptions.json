@@ -11,6 +11,7 @@
     "billingCycle": "Faturalandırma Döngüsü",
     "monthly": "Aylık",
     "yearly": "Yıllık",
+    "savePercent": "%{{percent}} tasarruf",
     "nextBillingDate": "Sonraki Faturalandırma Tarihi",
     "paymentMethod": "Ödeme Yöntemi",
     "updatePaymentMethod": "Ödeme Yöntemini Güncelle",
