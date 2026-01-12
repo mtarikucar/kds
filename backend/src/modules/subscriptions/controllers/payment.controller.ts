@@ -7,6 +7,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { GeolocationService } from '../../public-stats/geolocation.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
@@ -28,7 +29,38 @@ export class PaymentController {
     private readonly billingService: BillingService,
     private readonly notificationService: NotificationService,
     private readonly configService: ConfigService,
+    private readonly geolocationService: GeolocationService,
   ) {}
+
+  /**
+   * Extract user IP from request
+   */
+  private getUserIp(req: any): string {
+    return req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+      || req.headers['x-real-ip']
+      || req.ip
+      || '127.0.0.1';
+  }
+
+  /**
+   * Check if user is from Turkey based on IP geolocation
+   */
+  private async isTurkeyUser(req: any): Promise<boolean> {
+    const userIp = this.getUserIp(req);
+
+    // Local IPs default to Turkey for development
+    if (userIp === '127.0.0.1' || userIp === '::1' ||
+        userIp.startsWith('192.168.') || userIp.startsWith('10.')) {
+      return true;
+    }
+
+    const geoData = await this.geolocationService.lookup(userIp);
+
+    // If geolocation fails, default to Turkey
+    if (!geoData) return true;
+
+    return geoData.countryCode === 'TR';
+  }
 
   /**
    * Create a payment intent for subscription payment
@@ -58,8 +90,9 @@ export class PaymentController {
 
     const amount = dto.billingCycle === 'MONTHLY' ? plan.monthlyPrice : plan.yearlyPrice;
 
-    // Determine payment provider based on tenant's payment region
-    const paymentRegion = tenant.paymentRegion as PaymentRegion || PaymentRegion.TURKEY;
+    // Determine payment provider based on IP geolocation (overrides tenant setting)
+    const isTurkey = await this.isTurkeyUser(req);
+    const paymentRegion = isTurkey ? PaymentRegion.TURKEY : PaymentRegion.INTERNATIONAL;
 
     // Get admin user for email
     const adminUser = await this.prisma.user.findFirst({
@@ -221,8 +254,9 @@ export class PaymentController {
     const tenant = subscription.tenant;
     const amount = dto.amount;
 
-    // Determine payment provider based on tenant's payment region
-    const paymentRegion = tenant.paymentRegion as PaymentRegion || PaymentRegion.TURKEY;
+    // Determine payment provider based on IP geolocation (overrides tenant setting)
+    const isTurkey = await this.isTurkeyUser(req);
+    const paymentRegion = isTurkey ? PaymentRegion.TURKEY : PaymentRegion.INTERNATIONAL;
 
     // Get admin user for email
     const adminUser = await this.prisma.user.findFirst({

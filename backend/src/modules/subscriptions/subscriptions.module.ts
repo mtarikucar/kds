@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { PublicStatsModule } from '../public-stats/public-stats.module';
 
 // Services
 import { SubscriptionService } from './services/subscription.service';
@@ -25,6 +26,7 @@ import { PlanFeatureGuard } from './guards/plan-feature.guard';
   imports: [
     PrismaModule,
     ScheduleModule.forRoot(),
+    PublicStatsModule,
   ],
   controllers: [
     SubscriptionController,

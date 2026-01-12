@@ -15,6 +15,6 @@ import { GeolocationService } from './geolocation.service';
     PublicStatsService,
     GeolocationService,
   ],
-  exports: [PublicStatsService],
+  exports: [PublicStatsService, GeolocationService],
 })
 export class PublicStatsModule {}
