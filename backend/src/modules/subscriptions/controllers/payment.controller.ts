@@ -165,6 +165,7 @@ export class PaymentController {
 
     // PayTR Link API flow
     const frontendUrl = this.configService.get<string>('FRONTEND_URL');
+    const backendUrl = this.configService.get<string>('BACKEND_URL');
     const merchantOid = `SUB-${subscription.id}-${Date.now()}`;
 
     const paymentLinkResult = await this.paytrService.createPaymentLink({
@@ -177,6 +178,7 @@ export class PaymentController {
       description: `${plan.displayName} - ${dto.billingCycle === 'MONTHLY' ? 'Aylik' : 'Yillik'}`,
       successUrl: `${frontendUrl}/subscription/payment/success?oid=${merchantOid}`,
       failUrl: `${frontendUrl}/subscription/payment/failed?oid=${merchantOid}`,
+      notifyUrl: `${backendUrl}/api/webhooks/paytr`,
       maxInstallment: 1,
       expiryDuration: 30,
     });
@@ -305,6 +307,7 @@ export class PaymentController {
 
     // PayTR Link API flow for upgrade
     const frontendUrl = this.configService.get<string>('FRONTEND_URL');
+    const backendUrl = this.configService.get<string>('BACKEND_URL');
     // Format: UPG{timestamp} (alphanumeric only, max 64 chars for PayTR)
     const merchantOid = `UPG${Date.now()}`;
 
@@ -318,6 +321,7 @@ export class PaymentController {
       description: `Plan Yukseltme: ${newPlan.displayName}`,
       successUrl: `${frontendUrl}/subscription/payment/success?oid=${merchantOid}&type=upgrade`,
       failUrl: `${frontendUrl}/subscription/payment/failed?oid=${merchantOid}&type=upgrade`,
+      notifyUrl: `${backendUrl}/api/webhooks/paytr`,
       maxInstallment: 1,
       expiryDuration: 30,
     });

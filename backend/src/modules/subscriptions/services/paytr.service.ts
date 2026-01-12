@@ -13,6 +13,7 @@ interface PaytrLinkParams {
   description: string;
   successUrl: string;
   failUrl: string;
+  notifyUrl: string;
   maxInstallment?: number;
   expiryDuration?: number;
 }
@@ -105,6 +106,7 @@ export class PaytrService {
       lang: 'tr',
       merchant_ok_url: params.successUrl,
       merchant_fail_url: params.failUrl,
+      merchant_notify_url: params.notifyUrl,
       timeout_limit: expiryDuration.toString(),
     };
 

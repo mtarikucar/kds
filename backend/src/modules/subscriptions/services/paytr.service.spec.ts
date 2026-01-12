@@ -75,6 +75,7 @@ describe('PaytrService', () => {
       description: 'Pro Plan - Aylik',
       successUrl: 'https://example.com/success',
       failUrl: 'https://example.com/fail',
+      notifyUrl: 'https://example.com/api/webhooks/paytr',
       maxInstallment: 1,
       expiryDuration: 30,
     };
