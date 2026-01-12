@@ -182,7 +182,7 @@ const SubscriptionManagementPage = () => {
                 <div className="flex items-center text-sm">
                   <CreditCard className="h-4 w-4 text-gray-400 mr-2" />
                   <span className="text-gray-600">
-                    ${Number(currentSubscription.amount).toFixed(2)} /{' '}
+                    ₺{Number(currentSubscription.amount).toFixed(2)} /{' '}
                     {currentSubscription.billingCycle === BillingCycle.MONTHLY
                       ? t('subscriptions.month')
                       : t('subscriptions.year')}
@@ -338,7 +338,7 @@ const SubscriptionManagementPage = () => {
                         {formatDate(invoice.createdAt)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                        ${Number(invoice.total).toFixed(2)}
+                        ₺{Number(invoice.total).toFixed(2)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         {getInvoiceStatusBadge(invoice.status)}
@@ -450,7 +450,7 @@ const SubscriptionManagementPage = () => {
                   </div>
                   <div className="text-right">
                     <p className="font-bold text-gray-900">
-                      $
+                      ₺
                       {currentSubscription.billingCycle === BillingCycle.MONTHLY
                         ? Number(plan.monthlyPrice).toFixed(2)
                         : Number(plan.yearlyPrice).toFixed(2)}

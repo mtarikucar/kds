@@ -119,7 +119,7 @@ const PlanCard = ({
         {/* Original price with strikethrough if discounted */}
         {hasDiscount && originalPrice > 0 && (
           <div className="text-lg text-gray-400 line-through mb-1">
-            ${originalPrice.toFixed(2)}
+            ₺{originalPrice.toFixed(2)}
           </div>
         )}
 
@@ -128,7 +128,7 @@ const PlanCard = ({
             'text-4xl font-bold',
             hasDiscount ? 'text-red-600' : 'text-gray-900'
           )}>
-            ${price.toFixed(2)}
+            ₺{price.toFixed(2)}
           </span>
           <span className="text-gray-600 ml-2">
             /{billingCycle === BillingCycle.MONTHLY ? t('pricing.month') : t('pricing.year')}
@@ -137,7 +137,7 @@ const PlanCard = ({
 
         {billingCycle === BillingCycle.YEARLY && price > 0 && (
           <p className="text-sm text-green-600 mt-1">
-            ${pricePerMonth.toFixed(2)}/{t('pricing.month')} - {t('pricing.save')}{' '}
+            ₺{pricePerMonth.toFixed(2)}/{t('pricing.month')} - {t('pricing.save')}{' '}
             {Math.round(((Number(plan.monthlyPrice) * 12 - price) / (Number(plan.monthlyPrice) * 12)) * 100)}%
           </p>
         )}
@@ -146,7 +146,7 @@ const PlanCard = ({
         {hasDiscount && totalSavings > 0 && (
           <div className="mt-2 space-y-1">
             <p className="text-sm text-red-600 font-semibold">
-              {t('pricing.youSave')}: ${totalSavings.toFixed(2)}
+              {t('pricing.youSave')}: ₺{totalSavings.toFixed(2)}
             </p>
             <div className="flex items-center gap-1 text-xs text-orange-600">
               <Clock className="w-3 h-3" />
