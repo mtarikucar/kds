@@ -116,12 +116,6 @@ jobs:
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/frontend-staging:buildcache,mode=max
 
       - name: Deploy to test environment
-        env:
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}
-          PAYTR_MERCHANT_KEY: ${{ secrets.PAYTR_MERCHANT_KEY }}
-          PAYTR_MERCHANT_SALT: ${{ secrets.PAYTR_MERCHANT_SALT }}
         run: |
           echo "=========================================="
           echo "Test Environment Deployment Started"
@@ -151,33 +145,18 @@ jobs:
             echo "Logging in to GitHub Container Registry..."
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-            # Update docker-compose to use new images
-            echo "Updating image references..."
-            export BACKEND_IMAGE="ghcr.io/${{ github.repository }}/backend-staging:latest"
-            export FRONTEND_IMAGE="ghcr.io/${{ github.repository }}/frontend-staging:latest"
-
-            # Set Google OAuth environment variables
-            export GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID}"
-            export GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET}"
-
-            # Update PayTR credentials in .env.test
-            echo "Updating PayTR credentials..."
-            sed -i "s/PAYTR_MERCHANT_ID=.*/PAYTR_MERCHANT_ID=${PAYTR_MERCHANT_ID}/" .env.test
-            sed -i "s/PAYTR_MERCHANT_KEY=.*/PAYTR_MERCHANT_KEY=${PAYTR_MERCHANT_KEY}/" .env.test
-            sed -i "s/PAYTR_MERCHANT_SALT=.*/PAYTR_MERCHANT_SALT=${PAYTR_MERCHANT_SALT}/" .env.test
-
-            # Pull new images
+            # Pull latest images from GHCR
             echo "Pulling new images..."
-            docker pull "\$BACKEND_IMAGE"
-            docker pull "\$FRONTEND_IMAGE"
+            docker pull ghcr.io/${{ github.repository }}/backend-staging:latest
+            docker pull ghcr.io/${{ github.repository }}/frontend-staging:latest
 
             # Stop existing containers
             echo "Stopping existing containers..."
             docker-compose -f docker-compose.staging.yml down || true
 
-            # Start new containers with updated images
+            # Start new containers
             echo "Starting new containers..."
-            BACKEND_IMAGE="\$BACKEND_IMAGE" FRONTEND_IMAGE="\$FRONTEND_IMAGE" docker-compose -f docker-compose.staging.yml up -d
+            docker-compose -f docker-compose.staging.yml up -d
 
             # Run database migrations
             echo "Running database migrations..."
