@@ -17,13 +17,17 @@ import { UpdateIntegrationDto } from './dto/update-integration.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
+import { PlanFeatureGuard } from '../../subscriptions/guards/plan-feature.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
+import { RequiresFeature } from '../../subscriptions/decorators/requires-feature.decorator';
 import { UserRole } from '../../../common/constants/roles.enum';
+import { PlanFeature } from '../../../common/constants/subscription.enum';
 
 @ApiTags('settings/integrations')
 @ApiBearerAuth()
 @Controller('admin/settings/integrations')
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@RequiresFeature(PlanFeature.API_ACCESS)
 export class IntegrationsController {
   constructor(private readonly integrationsService: IntegrationsService) {}
 

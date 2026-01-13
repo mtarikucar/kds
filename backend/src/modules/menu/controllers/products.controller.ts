@@ -17,18 +17,21 @@ import { UpdateProductDto } from '../dto/update-product.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
+import { PlanFeatureGuard } from '../../subscriptions/guards/plan-feature.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
+import { CheckLimit, LimitType } from '../../subscriptions/decorators/check-limit.decorator';
 import { UserRole } from '../../../common/constants/roles.enum';
 
 @ApiTags('menu-products')
 @ApiBearerAuth()
 @Controller('menu/products')
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
 export class ProductsController {
   constructor(private readonly productsService: ProductsService) {}
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @CheckLimit(LimitType.PRODUCTS)
   @ApiOperation({ summary: 'Create a new product (ADMIN, MANAGER)' })
   @ApiResponse({ status: 201, description: 'Product successfully created' })
   @ApiResponse({ status: 400, description: 'Invalid category' })

@@ -176,6 +176,19 @@
         "thankYou": "Satın aldığınız için teşekkür ederiz",
         "goToDashboard": "Panele Dön"
       }
-    }
+    },
+    "upgradeRequired": "Yükseltme Gerekli",
+    "featureNotAvailable": "{{feature}} özelliği mevcut planınızda kullanılamıyor.",
+    "upgradeToAccess": "Bu özelliğe erişmek için {{plan}} planına yükseltin.",
+    "featureRequiresPlan": "Bu özellik {{plan}} planı gerektirir.",
+    "limitReached": "Limite ulaşıldı ({{current}}/{{limit}})",
+    "limitReachedDescription": "Mevcut planınızdaki {{resource}} limitine ulaştınız ({{current}}/{{limit}}).",
+    "featureAdvancedReports": "Gelişmiş Raporlar",
+    "featureMultiLocation": "Çoklu Şube Desteği",
+    "featureCustomBranding": "Özel Marka",
+    "featureApiAccess": "API Erişimi",
+    "featurePrioritySupport": "Öncelikli Destek",
+    "featureInventoryTracking": "Stok Takibi",
+    "featureKdsIntegration": "KDS Entegrasyonu"
   }
 }

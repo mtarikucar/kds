@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, Edit2, Trash2, AlertTriangle, X } from 'lucide-react';
+import { UserPlus, Edit2, Trash2, AlertTriangle, X, Lock } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { usersApi, User, CreateUserData, UpdateUserData } from '../../api/usersApi';
 import { UserRole, UserStatus } from '../../types';
 import { toast } from 'sonner';
 import { useAuthStore } from '../../store/authStore';
+import { useSubscription } from '../../contexts/SubscriptionContext';
+import UpgradePrompt from '../../components/subscriptions/UpgradePrompt';
 
 const UserManagementPage = () => {
-  const { t } = useTranslation('common');
+  const { t } = useTranslation(['common', 'subscriptions']);
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -15,6 +17,11 @@ const UserManagementPage = () => {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
   const currentUser = useAuthStore((state) => state.user);
+  const { checkLimit } = useSubscription();
+
+  // Check user limit
+  const userLimit = checkLimit('maxUsers', users.length);
+  const canAddUser = userLimit.allowed;
 
   const [formData, setFormData] = useState({
     email: '',
@@ -157,23 +164,54 @@ const UserManagementPage = () => {
         </div>
         <button
           onClick={() => handleOpenModal()}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 w-full sm:w-auto justify-center"
+          disabled={!canAddUser}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg w-full sm:w-auto justify-center ${
+            canAddUser
+              ? 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          }`}
         >
-          <UserPlus className="h-5 w-5" />
+          {canAddUser ? (
+            <UserPlus className="h-5 w-5" />
+          ) : (
+            <Lock className="h-5 w-5" />
+          )}
           {t('admin.addUser')}
         </button>
       </div>
 
       {/* User Count Alert */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-        <AlertTriangle className="h-5 w-5 text-blue-600 mt-0.5" />
+      <div className={`rounded-lg p-4 flex items-start gap-3 ${
+        canAddUser
+          ? 'bg-blue-50 border border-blue-200'
+          : 'bg-amber-50 border border-amber-200'
+      }`}>
+        <AlertTriangle className={`h-5 w-5 mt-0.5 ${canAddUser ? 'text-blue-600' : 'text-amber-600'}`} />
         <div>
-          <h3 className="font-semibold text-blue-900">{t('admin.currentUsers')}: {users.length}</h3>
-          <p className="text-sm text-blue-700">
-            {t('admin.subscriptionLimitInfo')}
+          <h3 className={`font-semibold ${canAddUser ? 'text-blue-900' : 'text-amber-900'}`}>
+            {t('admin.currentUsers')}: {users.length}
+            {userLimit.limit !== -1 && ` / ${userLimit.limit}`}
+          </h3>
+          <p className={`text-sm ${canAddUser ? 'text-blue-700' : 'text-amber-700'}`}>
+            {canAddUser
+              ? t('admin.subscriptionLimitInfo')
+              : t('subscriptions:subscriptions.limitReachedDescription', {
+                  resource: t('subscriptions:subscriptions.planLimits.users'),
+                  current: users.length,
+                  limit: userLimit.limit,
+                })}
           </p>
         </div>
       </div>
+
+      {/* Upgrade Prompt when limit reached */}
+      {!canAddUser && (
+        <UpgradePrompt
+          limitType="maxUsers"
+          currentCount={users.length}
+          limit={userLimit.limit}
+        />
+      )}
 
       {/* Users Table */}
       <div className="bg-white rounded-lg shadow overflow-hidden">

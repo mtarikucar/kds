@@ -17,6 +17,8 @@ import {
   Grid3X3,
   LayoutList,
   Settings2,
+  Lock,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   initializeModel,
@@ -66,6 +68,8 @@ import Spinner from '../../components/ui/Spinner';
 import ImageLibraryModal from '../../components/product/ImageLibraryModal';
 import ImageUploadZone from '../../components/ui/ImageUploadZone';
 import { formatCurrency } from '../../lib/utils';
+import { useSubscription } from '../../contexts/SubscriptionContext';
+import UpgradePrompt from '../../components/subscriptions/UpgradePrompt';
 
 // Schema factories for i18n support
 const createCategorySchema = (t: (key: string) => string) => z.object({
@@ -89,7 +93,8 @@ type CategoryFormData = z.infer<ReturnType<typeof createCategorySchema>>;
 type ProductFormData = z.infer<ReturnType<typeof createProductSchema>>;
 
 const MenuManagementPage = () => {
-  const { t } = useTranslation(['menu', 'common']);
+  const { t } = useTranslation(['menu', 'common', 'subscriptions']);
+  const { checkLimit } = useSubscription();
 
   // Create translated schemas
   const categorySchema = createCategorySchema(t);
@@ -125,6 +130,12 @@ const MenuManagementPage = () => {
   const { data: categories, isLoading: categoriesLoading } = useCategories();
   const { data: products, isLoading: productsLoading } = useProducts();
   const { data: allImages, isLoading: imagesLoading } = useProductImages();
+
+  // Check limits for categories and products
+  const categoryLimit = checkLimit('maxCategories', categories?.length ?? 0);
+  const productLimit = checkLimit('maxProducts', products?.length ?? 0);
+  const canAddCategory = categoryLimit.allowed;
+  const canAddProduct = productLimit.allowed;
   const { mutate: createCategory } = useCreateCategory();
   const { mutate: updateCategory } = useUpdateCategory();
   const { mutate: deleteCategory } = useDeleteCategory();
@@ -506,15 +517,56 @@ const MenuManagementPage = () => {
 
       {/* Categories Tab */}
       {activeTab === 'categories' && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>{t('menu.categories')}</CardTitle>
-            <Button onClick={() => handleOpenCategoryModal()}>
-              <Plus className="h-4 w-4 mr-2" />
-              {t('menu.addCategory')}
-            </Button>
-          </CardHeader>
-          <CardContent>
+        <>
+          {/* Category Limit Info */}
+          {categoryLimit.limit !== -1 && (
+            <div className={`rounded-lg p-4 flex items-start gap-3 mb-4 ${
+              canAddCategory
+                ? 'bg-blue-50 border border-blue-200'
+                : 'bg-amber-50 border border-amber-200'
+            }`}>
+              <AlertTriangle className={`h-5 w-5 mt-0.5 ${canAddCategory ? 'text-blue-600' : 'text-amber-600'}`} />
+              <div>
+                <h3 className={`font-semibold ${canAddCategory ? 'text-blue-900' : 'text-amber-900'}`}>
+                  {t('menu.categories')}: {categories?.length ?? 0} / {categoryLimit.limit}
+                </h3>
+                <p className={`text-sm ${canAddCategory ? 'text-blue-700' : 'text-amber-700'}`}>
+                  {canAddCategory
+                    ? t('common:admin.subscriptionLimitInfo')
+                    : t('subscriptions:subscriptions.limitReachedDescription', {
+                        resource: t('menu.categories'),
+                        current: categories?.length ?? 0,
+                        limit: categoryLimit.limit,
+                      })}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Upgrade Prompt when category limit reached */}
+          {!canAddCategory && (
+            <div className="mb-4">
+              <UpgradePrompt
+                limitType="maxCategories"
+                currentCount={categories?.length ?? 0}
+                limit={categoryLimit.limit}
+              />
+            </div>
+          )}
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>{t('menu.categories')}</CardTitle>
+              <Button onClick={() => handleOpenCategoryModal()} disabled={!canAddCategory}>
+                {canAddCategory ? (
+                  <Plus className="h-4 w-4 mr-2" />
+                ) : (
+                  <Lock className="h-4 w-4 mr-2" />
+                )}
+                {t('menu.addCategory')}
+              </Button>
+            </CardHeader>
+            <CardContent>
             {categoriesLoading ? (
               <Spinner />
             ) : (
@@ -556,21 +608,63 @@ const MenuManagementPage = () => {
                 ))}
               </div>
             )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </>
       )}
 
       {/* Products Tab */}
       {activeTab === 'products' && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>{t('menu.items')}</CardTitle>
-            <Button onClick={() => handleOpenProductModal()}>
-              <Plus className="h-4 w-4 mr-2" />
-              {t('menu.addItem')}
-            </Button>
-          </CardHeader>
-          <CardContent>
+        <>
+          {/* Product Limit Info */}
+          {productLimit.limit !== -1 && (
+            <div className={`rounded-lg p-4 flex items-start gap-3 mb-4 ${
+              canAddProduct
+                ? 'bg-blue-50 border border-blue-200'
+                : 'bg-amber-50 border border-amber-200'
+            }`}>
+              <AlertTriangle className={`h-5 w-5 mt-0.5 ${canAddProduct ? 'text-blue-600' : 'text-amber-600'}`} />
+              <div>
+                <h3 className={`font-semibold ${canAddProduct ? 'text-blue-900' : 'text-amber-900'}`}>
+                  {t('menu.items')}: {products?.length ?? 0} / {productLimit.limit}
+                </h3>
+                <p className={`text-sm ${canAddProduct ? 'text-blue-700' : 'text-amber-700'}`}>
+                  {canAddProduct
+                    ? t('common:admin.subscriptionLimitInfo')
+                    : t('subscriptions:subscriptions.limitReachedDescription', {
+                        resource: t('subscriptions:subscriptions.planLimits.products'),
+                        current: products?.length ?? 0,
+                        limit: productLimit.limit,
+                      })}
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Upgrade Prompt when product limit reached */}
+          {!canAddProduct && (
+            <div className="mb-4">
+              <UpgradePrompt
+                limitType="maxProducts"
+                currentCount={products?.length ?? 0}
+                limit={productLimit.limit}
+              />
+            </div>
+          )}
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>{t('menu.items')}</CardTitle>
+              <Button onClick={() => handleOpenProductModal()} disabled={!canAddProduct}>
+                {canAddProduct ? (
+                  <Plus className="h-4 w-4 mr-2" />
+                ) : (
+                  <Lock className="h-4 w-4 mr-2" />
+                )}
+                {t('menu.addItem')}
+              </Button>
+            </CardHeader>
+            <CardContent>
             {productsLoading ? (
               <Spinner />
             ) : (
@@ -641,8 +735,9 @@ const MenuManagementPage = () => {
                 })}
               </div>
             )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </>
       )}
 
       {/* Image Library Tab - Minimal Design */}

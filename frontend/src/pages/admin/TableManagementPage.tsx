@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Lock, AlertTriangle } from 'lucide-react';
 import {
   useTables,
   useCreateTable,
@@ -18,10 +18,13 @@ import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
 import Badge from '../../components/ui/Badge';
 import Spinner from '../../components/ui/Spinner';
+import { useSubscription } from '../../contexts/SubscriptionContext';
+import UpgradePrompt from '../../components/subscriptions/UpgradePrompt';
 // import { getStatusColor } from '../../lib/utils';
 
 const TableManagementPage = () => {
-  const { t } = useTranslation('common');
+  const { t } = useTranslation(['common', 'subscriptions']);
+  const { checkLimit } = useSubscription();
 
   const tableSchema = z.object({
     number: z.string().min(1, t('admin.tableNumberRequired')),
@@ -37,6 +40,10 @@ const TableManagementPage = () => {
   const { mutate: createTable } = useCreateTable();
   const { mutate: updateTable } = useUpdateTable();
   const { mutate: deleteTable } = useDeleteTable();
+
+  // Check table limit
+  const tableLimit = checkLimit('maxTables', tables?.length ?? 0);
+  const canAddTable = tableLimit.allowed;
 
   const form = useForm<TableFormData>({
     resolver: zodResolver(tableSchema),
@@ -127,17 +134,55 @@ const TableManagementPage = () => {
   };
 
   return (
-    <div>
-      <div className="mb-6 flex items-center justify-between">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">{t('admin.tableManagement')}</h1>
           <p className="text-gray-600">{t('admin.manageTablesSeating')}</p>
         </div>
-        <Button onClick={() => handleOpenModal()}>
-          <Plus className="h-4 w-4 mr-2" />
+        <Button onClick={() => handleOpenModal()} disabled={!canAddTable}>
+          {canAddTable ? (
+            <Plus className="h-4 w-4 mr-2" />
+          ) : (
+            <Lock className="h-4 w-4 mr-2" />
+          )}
           {t('admin.addTable')}
         </Button>
       </div>
+
+      {/* Limit Info */}
+      {tableLimit.limit !== -1 && (
+        <div className={`rounded-lg p-4 flex items-start gap-3 ${
+          canAddTable
+            ? 'bg-blue-50 border border-blue-200'
+            : 'bg-amber-50 border border-amber-200'
+        }`}>
+          <AlertTriangle className={`h-5 w-5 mt-0.5 ${canAddTable ? 'text-blue-600' : 'text-amber-600'}`} />
+          <div>
+            <h3 className={`font-semibold ${canAddTable ? 'text-blue-900' : 'text-amber-900'}`}>
+              {t('admin.tables')}: {tables?.length ?? 0} / {tableLimit.limit}
+            </h3>
+            <p className={`text-sm ${canAddTable ? 'text-blue-700' : 'text-amber-700'}`}>
+              {canAddTable
+                ? t('admin.subscriptionLimitInfo')
+                : t('subscriptions:subscriptions.limitReachedDescription', {
+                    resource: t('subscriptions:subscriptions.planLimits.tables'),
+                    current: tables?.length ?? 0,
+                    limit: tableLimit.limit,
+                  })}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Upgrade Prompt when limit reached */}
+      {!canAddTable && (
+        <UpgradePrompt
+          limitType="maxTables"
+          currentCount={tables?.length ?? 0}
+          limit={tableLimit.limit}
+        />
+      )}
 
       <Card>
         <CardHeader>

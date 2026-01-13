@@ -176,6 +176,19 @@
         "thankYou": "Thank you for your purchase",
         "goToDashboard": "Go to Dashboard"
       }
-    }
+    },
+    "upgradeRequired": "Upgrade Required",
+    "featureNotAvailable": "The {{feature}} feature is not available in your current plan.",
+    "upgradeToAccess": "Upgrade to {{plan}} plan to access this feature.",
+    "featureRequiresPlan": "This feature requires {{plan}} plan.",
+    "limitReached": "Limit reached ({{current}}/{{limit}})",
+    "limitReachedDescription": "You have reached the {{resource}} limit in your current plan ({{current}}/{{limit}}).",
+    "featureAdvancedReports": "Advanced Reports",
+    "featureMultiLocation": "Multi-Location Support",
+    "featureCustomBranding": "Custom Branding",
+    "featureApiAccess": "API Access",
+    "featurePrioritySupport": "Priority Support",
+    "featureInventoryTracking": "Inventory Tracking",
+    "featureKdsIntegration": "KDS Integration"
   }
 }

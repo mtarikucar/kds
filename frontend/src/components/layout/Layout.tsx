@@ -3,6 +3,7 @@ import { Outlet } from 'react-router-dom';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import { useUiStore } from '../../store/uiStore';
+import { SubscriptionProvider } from '../../contexts/SubscriptionContext';
 
 const Layout = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -17,16 +18,17 @@ const Layout = () => {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Mobile overlay */}
-      {isSidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
-          onClick={closeSidebar}
-        />
-      )}
+    <SubscriptionProvider>
+      <div className="flex h-screen overflow-hidden">
+        {/* Mobile overlay */}
+        {isSidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+            onClick={closeSidebar}
+          />
+        )}
 
-      <Sidebar isOpen={isSidebarOpen} onClose={closeSidebar} />
+        <Sidebar isOpen={isSidebarOpen} onClose={closeSidebar} />
 
       <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300`}>
         <Header onMenuClick={toggleSidebar} />
@@ -48,8 +50,9 @@ const Layout = () => {
             </div>
           )}
         </main>
+        </div>
       </div>
-    </div>
+    </SubscriptionProvider>
   );
 };
 

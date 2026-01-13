@@ -12,18 +12,22 @@ import { TopProductsReportDto } from './dto/top-products.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
+import { PlanFeatureGuard } from '../subscriptions/guards/plan-feature.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { RequiresFeature } from '../subscriptions/decorators/requires-feature.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
+import { PlanFeature } from '../../common/constants/subscription.enum';
 
 @ApiTags('reports')
 @ApiBearerAuth()
 @Controller('reports')
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
 export class ReportsController {
   constructor(private readonly reportsService: ReportsService) {}
 
   @Get('sales')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
   @ApiOperation({ summary: 'Get sales summary report (ADMIN, MANAGER)' })
   @ApiQuery({ name: 'startDate', required: false, description: 'Start date (ISO format)' })
   @ApiQuery({ name: 'endDate', required: false, description: 'End date (ISO format)' })
@@ -41,6 +45,7 @@ export class ReportsController {
 
   @Get('top-products')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
   @ApiOperation({ summary: 'Get top selling products (ADMIN, MANAGER)' })
   @ApiQuery({ name: 'startDate', required: false, description: 'Start date (ISO format)' })
   @ApiQuery({ name: 'endDate', required: false, description: 'End date (ISO format)' })
@@ -61,6 +66,7 @@ export class ReportsController {
 
   @Get('payments')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
   @ApiOperation({ summary: 'Get payment method breakdown (ADMIN, MANAGER)' })
   @ApiQuery({ name: 'startDate', required: false, description: 'Start date (ISO format)' })
   @ApiQuery({ name: 'endDate', required: false, description: 'End date (ISO format)' })
@@ -78,6 +84,7 @@ export class ReportsController {
 
   @Get('orders-by-hour')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
   @ApiOperation({ summary: 'Get orders grouped by hour (ADMIN, MANAGER)' })
   @ApiQuery({ name: 'date', required: false, description: 'Target date (ISO format, defaults to today)' })
   @ApiResponse({ status: 200, description: 'Orders by hour' })
@@ -92,6 +99,7 @@ export class ReportsController {
 
   @Get('customers')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
   @ApiOperation({ summary: 'Get customer analytics report (ADMIN, MANAGER)' })
   @ApiQuery({ name: 'startDate', required: false, description: 'Start date (ISO format)' })
   @ApiQuery({ name: 'endDate', required: false, description: 'End date (ISO format)' })
@@ -109,6 +117,7 @@ export class ReportsController {
 
   @Get('inventory')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @RequiresFeature(PlanFeature.INVENTORY_TRACKING)
   @ApiOperation({ summary: 'Get inventory report (ADMIN, MANAGER)' })
   @ApiResponse({ status: 200, description: 'Inventory report' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
@@ -118,6 +127,7 @@ export class ReportsController {
 
   @Get('staff-performance')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
   @ApiOperation({ summary: 'Get staff performance report (ADMIN, MANAGER)' })
   @ApiQuery({ name: 'startDate', required: false, description: 'Start date (ISO format)' })
   @ApiQuery({ name: 'endDate', required: false, description: 'End date (ISO format)' })

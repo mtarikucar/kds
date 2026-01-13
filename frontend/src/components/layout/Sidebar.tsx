@@ -17,9 +17,10 @@ import {
   ChevronLeft,
   X,
 } from 'lucide-react';
-import { UserRole } from '../../types';
+import { UserRole, PlanFeatures } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import { useUiStore } from '../../store/uiStore';
+import { useSubscription } from '../../contexts/SubscriptionContext';
 import { RTL_LANGUAGES } from '../../i18n/config';
 
 interface SidebarProps {
@@ -32,6 +33,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const user = useAuthStore((state) => state.user);
   const location = useLocation();
   const { isSidebarCollapsed, toggleSidebar } = useUiStore();
+  const { hasFeature } = useSubscription();
   const [settingsOpen, setSettingsOpen] = useState(
     location.pathname.startsWith('/admin/settings')
   );
@@ -98,6 +100,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
       icon: BarChart3,
       label: t('navigation.reports'),
       roles: [UserRole.ADMIN, UserRole.MANAGER],
+      requiredFeature: 'advancedReports' as keyof PlanFeatures,
     },
   ];
 
@@ -113,12 +116,30 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
     {
       to: '/admin/settings/integrations',
       label: t('settings:integrationsLabel'),
+      requiredFeature: 'apiAccess' as keyof PlanFeatures,
     },
   ];
 
-  const filteredNavItems = navItems.filter((item) =>
-    user?.role ? item.roles.includes(user.role) : false
-  );
+  // Filter nav items based on role and subscription features
+  const filteredNavItems = navItems.filter((item) => {
+    // Check role first
+    if (!user?.role || !item.roles.includes(user.role as UserRole)) {
+      return false;
+    }
+    // Check feature requirement if specified
+    if (item.requiredFeature && !hasFeature(item.requiredFeature)) {
+      return false;
+    }
+    return true;
+  });
+
+  // Filter settings items based on subscription features
+  const filteredSettingsItems = settingsItems.filter((item) => {
+    if (item.requiredFeature && !hasFeature(item.requiredFeature)) {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <aside
@@ -202,7 +223,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
 
             {!isSidebarCollapsed && settingsOpen && (
               <div className={`${isRTL ? 'mr-4' : 'ml-4'} mt-1 space-y-1`}>
-                {settingsItems.map((item) => (
+                {filteredSettingsItems.map((item) => (
                   <NavLink
                     key={item.to}
                     to={item.to}
