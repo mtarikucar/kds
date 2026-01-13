@@ -24,6 +24,7 @@ import UserManagementPage from './pages/admin/UserManagementPage';
 import QRManagementPage from './pages/admin/QRManagementPage';
 import ReportsPage from './pages/admin/ReportsPage';
 import SubscriptionPlansPage from './pages/subscription/SubscriptionPlansPage';
+import ChangePlanPage from './pages/subscription/ChangePlanPage';
 import SubscriptionPaymentPage from './pages/subscription/SubscriptionPaymentPage';
 import PaymentSuccessPage from './pages/subscription/PaymentSuccessPage';
 import PaymentFailedPage from './pages/subscription/PaymentFailedPage';
@@ -121,6 +122,7 @@ function App() {
 
         {/* Subscription pages */}
         <Route path="/subscription/plans" element={<SubscriptionPlansPage />} />
+        <Route path="/subscription/change-plan" element={<ChangePlanPage />} />
         <Route path="/subscription/payment" element={<SubscriptionPaymentPage />} />
         <Route path="/subscription/payment/success" element={<PaymentSuccessPage />} />
         <Route path="/subscription/payment/failed" element={<PaymentFailedPage />} />

@@ -17,7 +17,6 @@ import {
   useGetTenantInvoices,
   useCancelSubscription,
   useReactivateSubscription,
-  useChangePlan,
   useGetScheduledDowngrade,
 } from '../../features/subscriptions/subscriptionsApi';
 import ScheduledDowngradeAlert from '../../components/subscriptions/ScheduledDowngradeAlert';
@@ -26,19 +25,13 @@ import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/Spinner';
 import Badge from '../../components/ui/Badge';
 import Modal from '../../components/ui/Modal';
-import {
-  SubscriptionStatus,
-  BillingCycle,
-  InvoiceStatus,
-  SubscriptionPlanType,
-} from '../../types';
+import { SubscriptionStatus, BillingCycle, InvoiceStatus } from '../../types';
+import { formatCurrency } from '../../lib/currency';
 
-const SubscriptionManagementPage = () => {
+const SubscriptionSettingsPage = () => {
   const { t } = useTranslation('subscriptions');
   const navigate = useNavigate();
   const [showCancelModal, setShowCancelModal] = useState(false);
-  const [showChangePlanModal, setShowChangePlanModal] = useState(false);
-  const [selectedNewPlanId, setSelectedNewPlanId] = useState<string | null>(null);
   const [cancellationReason, setCancellationReason] = useState<string>('');
 
   const { data: currentSubscription, isLoading: subLoading, refetch: refetchSubscription } = useGetCurrentSubscription();
@@ -46,7 +39,6 @@ const SubscriptionManagementPage = () => {
   const { data: invoices, isLoading: invoicesLoading } = useGetTenantInvoices();
   const cancelSubscription = useCancelSubscription();
   const reactivateSubscription = useReactivateSubscription();
-  const changePlan = useChangePlan();
 
   // Fetch scheduled downgrade
   const { data: scheduledDowngrade, refetch: refetchScheduledDowngrade } = useGetScheduledDowngrade(
@@ -128,34 +120,6 @@ const SubscriptionManagementPage = () => {
     }
   };
 
-  const handleChangePlan = async () => {
-    if (!currentSubscription || !selectedNewPlanId) return;
-    try {
-      const result = await changePlan.mutateAsync({
-        id: currentSubscription.id,
-        data: {
-          newPlanId: selectedNewPlanId,
-          billingCycle: currentSubscription.billingCycle,
-        },
-      });
-
-      setShowChangePlanModal(false);
-      setSelectedNewPlanId(null);
-
-      if (result.type === 'upgrade' && result.requiresPayment && result.paymentInfo) {
-        // Redirect to payment page with upgrade info
-        const { subscriptionId, newPlanId, billingCycle, prorationAmount, currency } = result.paymentInfo;
-        navigate(`/subscription/payment?type=upgrade&subscriptionId=${subscriptionId}&newPlanId=${newPlanId}&billingCycle=${billingCycle}&amount=${prorationAmount}&currency=${currency}`);
-      } else if (result.type === 'downgrade') {
-        // Downgrade scheduled - refetch to show the alert
-        refetchScheduledDowngrade();
-      }
-    } catch (error) {
-      console.error('Failed to change plan:', error);
-      toast.error(t('subscriptions.payment.planChangeFailed'));
-    }
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
@@ -165,7 +129,6 @@ const SubscriptionManagementPage = () => {
   };
 
   const currentPlan = plans?.find((p) => p.id === currentSubscription.planId);
-  const availablePlans = plans?.filter((p) => p.id !== currentSubscription.planId) || [];
 
   return (
     <div className="p-6 space-y-6">
@@ -209,7 +172,7 @@ const SubscriptionManagementPage = () => {
                 <div className="flex items-center text-sm">
                   <CreditCard className="h-4 w-4 text-gray-400 mr-2" />
                   <span className="text-gray-600">
-                    ${Number(currentSubscription.amount).toFixed(2)} /{' '}
+                    {formatCurrency(Number(currentSubscription.amount), currentSubscription.currency)} /{' '}
                     {currentSubscription.billingCycle === BillingCycle.MONTHLY
                       ? t('subscriptions.month')
                       : t('subscriptions.year')}
@@ -247,7 +210,7 @@ const SubscriptionManagementPage = () => {
                   <Button
                     variant="primary"
                     className="w-full"
-                    onClick={() => setShowChangePlanModal(true)}
+                    onClick={() => navigate('/subscription/change-plan')}
                     disabled={!!scheduledDowngrade}
                     title={scheduledDowngrade ? t('scheduledDowngrade.description') : undefined}
                   >
@@ -367,7 +330,7 @@ const SubscriptionManagementPage = () => {
                         {formatDate(invoice.createdAt)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                        ${Number(invoice.total).toFixed(2)}
+                        {formatCurrency(Number(invoice.total), invoice.currency)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         {getInvoiceStatusBadge(invoice.status)}
@@ -449,72 +412,8 @@ const SubscriptionManagementPage = () => {
           </div>
         </div>
       </Modal>
-
-      {/* Change Plan Modal */}
-      <Modal
-        isOpen={showChangePlanModal}
-        onClose={() => {
-          setShowChangePlanModal(false);
-          setSelectedNewPlanId(null);
-        }}
-        title={t('subscriptions.changePlan')}
-      >
-        <div className="space-y-4">
-          <p className="text-gray-600">{t('subscriptions.selectNewPlan')}</p>
-          <div className="space-y-2">
-            {availablePlans.map((plan) => (
-              <div
-                key={plan.id}
-                onClick={() => setSelectedNewPlanId(plan.id)}
-                className={`p-4 border-2 rounded-lg cursor-pointer transition-colors ${
-                  selectedNewPlanId === plan.id
-                    ? 'border-blue-500 bg-blue-50'
-                    : 'border-gray-200 hover:border-gray-300'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-semibold text-gray-900">{plan.displayName}</h4>
-                    <p className="text-sm text-gray-600">{plan.description}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-bold text-gray-900">
-                      $
-                      {currentSubscription.billingCycle === BillingCycle.MONTHLY
-                        ? Number(plan.monthlyPrice).toFixed(2)
-                        : Number(plan.yearlyPrice).toFixed(2)}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      /{currentSubscription.billingCycle === BillingCycle.MONTHLY ? t('subscriptions.perMonthShort') : t('subscriptions.perYearShort')}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="flex justify-end gap-3 pt-4">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowChangePlanModal(false);
-                setSelectedNewPlanId(null);
-              }}
-            >
-              {t('common:app.cancel')}
-            </Button>
-            <Button
-              variant="primary"
-              onClick={handleChangePlan}
-              disabled={!selectedNewPlanId}
-              isLoading={changePlan.isPending}
-            >
-              {t('subscriptions.changePlan')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
     </div>
   );
 };
 
-export default SubscriptionManagementPage;
+export default SubscriptionSettingsPage;

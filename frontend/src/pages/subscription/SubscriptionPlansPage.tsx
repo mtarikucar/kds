@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { CreditCard } from 'lucide-react';
@@ -10,7 +10,7 @@ import {
 import PlanCard from '../../components/subscriptions/PlanCard';
 import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/Spinner';
-import { BillingCycle, SubscriptionPlanType } from '../../types';
+import { BillingCycle, SubscriptionPlanType, Plan } from '../../types';
 
 const SubscriptionPlansPage = () => {
   const { t } = useTranslation('subscriptions');
@@ -61,6 +61,19 @@ const SubscriptionPlansPage = () => {
   // Sort plans by price
   const sortedPlans = [...plans].sort((a, b) => a.monthlyPrice - b.monthlyPrice);
 
+  // Calculate max savings percentage for yearly billing
+  const maxSavingsPercent = useMemo(() => {
+    if (!plans) return 20;
+    const paidPlans = plans.filter((p: Plan) => Number(p.monthlyPrice) > 0);
+    if (paidPlans.length === 0) return 20;
+    const savings = paidPlans.map((p: Plan) => {
+      const monthlyTotal = Number(p.monthlyPrice) * 12;
+      const yearlyTotal = Number(p.yearlyPrice);
+      return monthlyTotal > 0 ? Math.round(((monthlyTotal - yearlyTotal) / monthlyTotal) * 100) : 0;
+    });
+    return Math.max(...savings);
+  }, [plans]);
+
   return (
     <div className="max-w-7xl mx-auto">
       <div className="text-center mb-12">
@@ -89,7 +102,7 @@ const SubscriptionPlansPage = () => {
           >
             {t('subscriptions.yearly')}
             <span className="ml-2 text-xs bg-green-100 text-green-600 px-2 py-0.5 rounded-full">
-              {t('subscriptions.plansPage.saveUpTo')}
+              {t('subscriptions.savePercent', { percent: maxSavingsPercent })}
             </span>
           </button>
         </div>
