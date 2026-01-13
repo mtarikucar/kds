@@ -17,6 +17,9 @@ initSentry();
 // Google OAuth Client ID
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
+// Router basename - use /app for web builds, empty for Tauri desktop
+const routerBasename = import.meta.env.BASE_URL === '/' ? undefined : import.meta.env.BASE_URL.replace(/\/$/, '');
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -33,7 +36,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <GoogleOAuthProvider clientId={googleClientId}>
         <ErrorBoundary>
           <QueryClientProvider client={queryClient}>
-            <BrowserRouter>
+            <BrowserRouter basename={routerBasename}>
               <App />
               <Toaster position="top-right" richColors />
             </BrowserRouter>
