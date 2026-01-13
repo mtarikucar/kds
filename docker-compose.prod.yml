@@ -239,6 +239,58 @@ services:
     profiles:
       - green  # Only start with specific profile
 
+  # Landing Page (Next.js) - Production Blue Environment
+  landing-blue:
+    env_file:
+      - .env.production
+    build:
+      context: ./landing
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://hummytummy.com/api}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://hummytummy.com}
+    container_name: kds_landing_blue
+    restart: always
+    environment:
+      NODE_ENV: production
+    ports:
+      - '3100:3000'
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:3000/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - kds_network
+
+  # Landing Page (Next.js) - Production Green Environment
+  landing-green:
+    env_file:
+      - .env.production
+    build:
+      context: ./landing
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://hummytummy.com/api}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://hummytummy.com}
+    container_name: kds_landing_green
+    restart: always
+    environment:
+      NODE_ENV: production
+    ports:
+      - '3101:3000'
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:3000/api/health']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - kds_network
+    profiles:
+      - green  # Only start with specific profile
+
 volumes:
   postgres_data:
   redis_data:

@@ -142,10 +142,20 @@ jobs:
             --tag kds-frontend:latest \
             ./frontend
 
+      - name: Build landing image
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_API_URL=https://hummytummy.com/api \
+            --build-arg NEXT_PUBLIC_SITE_URL=https://hummytummy.com \
+            --tag kds-landing:${{ steps.version.outputs.VERSION }} \
+            --tag kds-landing:latest \
+            ./landing
+
       - name: Save Docker images
         run: |
           docker save kds-backend:${{ steps.version.outputs.VERSION }} | gzip > backend-${{ steps.version.outputs.VERSION }}.tar.gz
           docker save kds-frontend:${{ steps.version.outputs.VERSION }} | gzip > frontend-${{ steps.version.outputs.VERSION }}.tar.gz
+          docker save kds-landing:${{ steps.version.outputs.VERSION }} | gzip > landing-${{ steps.version.outputs.VERSION }}.tar.gz
 
       - name: Setup SSH
         env:
@@ -169,6 +179,7 @@ jobs:
         run: |
           scp backend-${{ steps.version.outputs.VERSION }}.tar.gz root@${{ env.SERVER_HOST }}:/root/kds/
           scp frontend-${{ steps.version.outputs.VERSION }}.tar.gz root@${{ env.SERVER_HOST }}:/root/kds/
+          scp landing-${{ steps.version.outputs.VERSION }}.tar.gz root@${{ env.SERVER_HOST }}:/root/kds/
 
       - name: Load Docker images on server
         run: |
@@ -176,7 +187,8 @@ jobs:
             cd /root/kds
             docker load < backend-${{ steps.version.outputs.VERSION }}.tar.gz
             docker load < frontend-${{ steps.version.outputs.VERSION }}.tar.gz
-            rm -f backend-${{ steps.version.outputs.VERSION }}.tar.gz frontend-${{ steps.version.outputs.VERSION }}.tar.gz
+            docker load < landing-${{ steps.version.outputs.VERSION }}.tar.gz
+            rm -f backend-${{ steps.version.outputs.VERSION }}.tar.gz frontend-${{ steps.version.outputs.VERSION }}.tar.gz landing-${{ steps.version.outputs.VERSION }}.tar.gz
           EOF
 
       - name: Deploy with Blue-Green strategy
@@ -282,6 +294,7 @@ jobs:
             cd /root/kds
             rm -f backend-${{ steps.version.outputs.VERSION }}.tar.gz
             rm -f frontend-${{ steps.version.outputs.VERSION }}.tar.gz
+            rm -f landing-${{ steps.version.outputs.VERSION }}.tar.gz
           EOF
 
   # Post-deployment verification
