@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, AlertTriangle, TrendingUp, TrendingDown } from 'lucide-react';
@@ -33,11 +33,11 @@ const ChangePlanPage = () => {
   );
 
   // Initialize billing cycle from current subscription
-  useState(() => {
+  useEffect(() => {
     if (currentSubscription?.billingCycle) {
       setBillingCycle(currentSubscription.billingCycle);
     }
-  });
+  }, [currentSubscription?.billingCycle]);
 
   // Calculate savings percentage for each plan
   const calculateSavingsPercent = (plan: Plan): number => {
@@ -280,7 +280,7 @@ const ChangePlanPage = () => {
               {t('common:app.cancel')}
             </Button>
             <Button
-              variant={changeType === 'upgrade' ? 'primary' : 'warning'}
+              variant={changeType === 'upgrade' ? 'primary' : 'secondary'}
               onClick={handleConfirmChange}
               isLoading={changePlan.isPending}
             >

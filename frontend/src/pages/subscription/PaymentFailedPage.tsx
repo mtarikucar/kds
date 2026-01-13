@@ -95,7 +95,7 @@ export default function PaymentFailedPage() {
           </button>
 
           <button
-            onClick={() => navigate('/settings/subscription')}
+            onClick={() => navigate('/admin/settings/subscription')}
             className="w-full px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
           >
             <ArrowLeft className="w-5 h-5" />

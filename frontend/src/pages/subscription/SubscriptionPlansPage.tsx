@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { CreditCard } from 'lucide-react';
 import {
   useGetPlans,
   useGetCurrentSubscription,
@@ -16,29 +15,28 @@ const SubscriptionPlansPage = () => {
   const { t } = useTranslation('subscriptions');
   const navigate = useNavigate();
   const [billingCycle, setBillingCycle] = useState<BillingCycle>(BillingCycle.MONTHLY);
-  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [processingPlanId, setProcessingPlanId] = useState<string | null>(null);
 
   const { data: plans, isLoading: plansLoading } = useGetPlans();
   const { data: currentSubscription } = useGetCurrentSubscription();
   const createSubscription = useCreateSubscription();
 
-  const handleSelectPlan = (planId: string) => {
-    setSelectedPlanId(planId);
-  };
+  // Handle plan selection - directly create subscription and navigate to payment
+  const handleSelectPlan = async (planId: string) => {
+    // Don't process if already processing or user has active subscription
+    if (processingPlanId || currentSubscription) return;
 
-  const handleCreateSubscription = async () => {
-    if (!selectedPlanId) return;
-
+    setProcessingPlanId(planId);
     try {
       const subscription = await createSubscription.mutateAsync({
-        planId: selectedPlanId,
+        planId,
         billingCycle,
-        // Payment provider is determined automatically by the backend based on tenant's region
       });
       // Redirect to payment page with subscription ID
       navigate(`/subscription/payment?subscriptionId=${subscription.id}`);
     } catch (error) {
       console.error('Failed to create subscription:', error);
+      setProcessingPlanId(null);
     }
   };
 
@@ -118,39 +116,10 @@ const SubscriptionPlansPage = () => {
             isCurrentPlan={currentSubscription?.planId === plan.id}
             isPopular={plan.name === SubscriptionPlanType.PRO}
             onSelectPlan={handleSelectPlan}
-            isLoading={createSubscription.isPending && selectedPlanId === plan.id}
+            isLoading={createSubscription.isPending && processingPlanId === plan.id}
           />
         ))}
       </div>
-
-      {/* Selected Plan Actions */}
-      {selectedPlanId && !currentSubscription && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              <CreditCard className="h-6 w-6 text-blue-600 mr-3" />
-              <div>
-                <h3 className="font-semibold text-gray-900">{t('subscriptions.plansPage.readyToStart')}</h3>
-                <p className="text-sm text-gray-600">
-                  {t('subscriptions.plansPage.redirectToPayment')}
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <Button variant="outline" onClick={() => setSelectedPlanId(null)}>
-                {t('subscriptions.cancel')}
-              </Button>
-              <Button
-                variant="primary"
-                onClick={handleCreateSubscription}
-                isLoading={createSubscription.isPending}
-              >
-                {t('subscriptions.plansPage.proceedToPayment')}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Current Subscription Info */}
       {currentSubscription && (
@@ -162,7 +131,7 @@ const SubscriptionPlansPage = () => {
             <p className="text-sm text-gray-600 mb-4">
               {t('subscriptions.plansPage.toChangePlan')}
             </p>
-            <Button variant="primary" onClick={() => navigate('/subscription/manage')}>
+            <Button variant="primary" onClick={() => navigate('/admin/settings/subscription')}>
               {t('subscriptions.plansPage.manageSubscription')}
             </Button>
           </div>
