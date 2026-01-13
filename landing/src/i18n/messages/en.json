@@ -1,0 +1,150 @@
+{
+  "metadata": {
+    "title": "HummyTummy - Restaurant Management System",
+    "description": "Modern POS system for restaurants. Manage orders, kitchen display, tables, and payments all in one place.",
+    "keywords": "restaurant pos, kitchen display system, restaurant management, qr menu, table management"
+  },
+  "nav": {
+    "features": "Features",
+    "pricing": "Pricing",
+    "contact": "Contact",
+    "login": "Login",
+    "register": "Get Started"
+  },
+  "hero": {
+    "badge": "Now Live",
+    "headline": "Streamline Your Restaurant",
+    "headlineHighlight": "Operations",
+    "subtitle": "Modern POS system designed for restaurants. Manage orders, kitchen display, tables, and payments all in one place.",
+    "cta": "Start Free Trial",
+    "ctaSecondary": "Learn More",
+    "trustBadge1": "No credit card required",
+    "trustBadge2": "Setup in 5 minutes",
+    "trustBadge3": "Cancel anytime"
+  },
+  "features": {
+    "title": "Everything You Need",
+    "subtitle": "Powerful features designed to help your restaurant succeed",
+    "pos": {
+      "title": "Smart POS System",
+      "description": "Fast, intuitive point of sale system with real-time order management"
+    },
+    "kitchen": {
+      "title": "Kitchen Display",
+      "description": "Real-time kitchen display system for efficient order preparation"
+    },
+    "tables": {
+      "title": "Table Management",
+      "description": "Manage tables, reservations, and customer seating efficiently"
+    },
+    "payments": {
+      "title": "Payment Processing",
+      "description": "Secure payment processing with multiple payment methods"
+    },
+    "analytics": {
+      "title": "Analytics & Reports",
+      "description": "Detailed analytics and reports to track your business performance"
+    },
+    "multilang": {
+      "title": "Multi-language Support",
+      "description": "Support for multiple languages and currencies worldwide"
+    }
+  },
+  "pricing": {
+    "title": "Simple, Transparent Pricing",
+    "subtitle": "Choose the perfect plan for your restaurant. All plans include a free trial.",
+    "monthly": "Monthly",
+    "yearly": "Yearly",
+    "save20": "Save 20%",
+    "perMonth": "/month",
+    "perYear": "/year",
+    "getStarted": "Get Started",
+    "currentPlan": "Current Plan",
+    "mostPopular": "Most Popular",
+    "features": "Features",
+    "unlimited": "Unlimited",
+    "users": "users",
+    "tables": "tables",
+    "products": "products",
+    "orders": "orders/month",
+    "faq": {
+      "title": "Frequently Asked Questions",
+      "q1": "How does the free trial work?",
+      "a1": "All plans include a 14-day free trial. No credit card required to start. You can cancel anytime during the trial period.",
+      "q2": "Can I change plans later?",
+      "a2": "Yes! You can upgrade or downgrade your plan at any time. Changes will be reflected in your next billing cycle.",
+      "q3": "What payment methods do you accept?",
+      "a3": "We accept all major credit cards, debit cards, and support both international and local payment methods.",
+      "q4": "Is my data secure?",
+      "a4": "Absolutely. We use industry-standard encryption and security practices to keep your data safe."
+    }
+  },
+  "testimonials": {
+    "title": "What Our Clients Say",
+    "subtitle": "Join hundreds of restaurants that trust HummyTummy for their daily operations",
+    "stats": {
+      "clients": "Happy Clients",
+      "rating": "Average Rating",
+      "support": "24/7 Support",
+      "satisfaction": "Satisfaction"
+    }
+  },
+  "contact": {
+    "title": "Get In Touch",
+    "subtitle": "Have questions? We'd love to hear from you. Send us a message and we'll respond as soon as possible.",
+    "name": "Name",
+    "namePlaceholder": "Your name",
+    "email": "Email",
+    "emailPlaceholder": "your@email.com",
+    "phone": "Phone",
+    "phonePlaceholder": "+1 (555) 123-4567",
+    "phoneOptional": "Optional",
+    "message": "Message",
+    "messagePlaceholder": "Tell us about your restaurant and how we can help...",
+    "submit": "Send Message",
+    "submitting": "Sending...",
+    "success": "Thank you for your message! We'll get back to you soon.",
+    "info": {
+      "email": "Email",
+      "emailValue": "contact@hummytummy.com",
+      "chat": "Live Chat",
+      "chatValue": "Chat with our team",
+      "hours": "Support Hours",
+      "hoursValue": "24/7 Available"
+    }
+  },
+  "footer": {
+    "description": "Modern restaurant management solution designed to streamline your operations and boost efficiency.",
+    "product": "Product",
+    "company": "Company",
+    "legal": "Legal",
+    "features": "Features",
+    "pricing": "Pricing",
+    "freeTrial": "Free Trial",
+    "about": "About",
+    "contact": "Contact",
+    "blog": "Blog",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service",
+    "cookies": "Cookie Policy",
+    "copyright": "All rights reserved."
+  },
+  "plans": {
+    "FREE": {
+      "name": "Free",
+      "description": "Perfect for small restaurants getting started"
+    },
+    "BASIC": {
+      "name": "Basic",
+      "description": "Great for growing restaurants"
+    },
+    "PRO": {
+      "name": "Pro",
+      "description": "For established restaurants with multiple locations"
+    },
+    "BUSINESS": {
+      "name": "Business",
+      "description": "Enterprise solution for large restaurant chains"
+    }
+  }
+}

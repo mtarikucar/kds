@@ -1,0 +1,150 @@
+{
+  "metadata": {
+    "title": "HummyTummy - Restoran boshqaruv tizimi",
+    "description": "Restoranlar uchun zamonaviy POS tizimi. Buyurtmalar, oshxona displeyi, stollar va to'lovlarni bir joyda boshqaring.",
+    "keywords": "restoran pos, oshxona displeyi, restoran boshqaruvi, qr menyu, stollarni boshqarish"
+  },
+  "nav": {
+    "features": "Xususiyatlar",
+    "pricing": "Narxlar",
+    "contact": "Aloqa",
+    "login": "Kirish",
+    "register": "Boshlash"
+  },
+  "hero": {
+    "badge": "Hozir faol",
+    "headline": "Restoran operatsiyalaringizni",
+    "headlineHighlight": "Soddalashtiring",
+    "subtitle": "Restoranlar uchun mo'ljallangan zamonaviy POS tizimi. Buyurtmalar, oshxona displeyi, stollar va to'lovlarni bir joyda boshqaring.",
+    "cta": "Bepul sinovni boshlash",
+    "ctaSecondary": "Ko'proq bilish",
+    "trustBadge1": "Kredit karta talab qilinmaydi",
+    "trustBadge2": "5 daqiqada o'rnatish",
+    "trustBadge3": "Istalgan vaqtda bekor qilish"
+  },
+  "features": {
+    "title": "Kerak bo'lgan hamma narsa",
+    "subtitle": "Restoraningiz muvaffaqiyati uchun mo'ljallangan kuchli xususiyatlar",
+    "pos": {
+      "title": "Aqlli POS tizimi",
+      "description": "Real vaqtda buyurtmalarni boshqarish bilan tez va intuitiv savdo nuqtasi tizimi"
+    },
+    "kitchen": {
+      "title": "Oshxona displeyi",
+      "description": "Samarali buyurtma tayyorlash uchun real vaqtda oshxona displeyi tizimi"
+    },
+    "tables": {
+      "title": "Stollarni boshqarish",
+      "description": "Stollar, band qilish va mijozlarni joylashtirish boshqaruvi"
+    },
+    "payments": {
+      "title": "To'lovlarni qayta ishlash",
+      "description": "Ko'p to'lov usullari bilan xavfsiz to'lovlarni qayta ishlash"
+    },
+    "analytics": {
+      "title": "Analitika va hisobotlar",
+      "description": "Biznes samaradorligini kuzatish uchun batafsil analitika va hisobotlar"
+    },
+    "multilang": {
+      "title": "Ko'p tilli qo'llab-quvvatlash",
+      "description": "Butun dunyo bo'ylab ko'p tillar va valyutalarni qo'llab-quvvatlash"
+    }
+  },
+  "pricing": {
+    "title": "Oddiy, shaffof narxlar",
+    "subtitle": "Restoraningiz uchun eng yaxshi rejani tanlang. Barcha rejalar bepul sinov davri bilan.",
+    "monthly": "Oylik",
+    "yearly": "Yillik",
+    "save20": "20% tejash",
+    "perMonth": "/oy",
+    "perYear": "/yil",
+    "getStarted": "Boshlash",
+    "currentPlan": "Joriy reja",
+    "mostPopular": "Eng mashhur",
+    "features": "Xususiyatlar",
+    "unlimited": "Cheksiz",
+    "users": "foydalanuvchilar",
+    "tables": "stollar",
+    "products": "mahsulotlar",
+    "orders": "buyurtmalar/oy",
+    "faq": {
+      "title": "Ko'p so'raladigan savollar",
+      "q1": "Bepul sinov qanday ishlaydi?",
+      "a1": "Barcha rejalar 14 kunlik bepul sinov davrini o'z ichiga oladi. Boshlash uchun kredit karta talab qilinmaydi.",
+      "q2": "Keyinroq rejani o'zgartirish mumkinmi?",
+      "a2": "Ha! Rejangizni istalgan vaqtda yangilash yoki pasaytirish mumkin.",
+      "q3": "Qanday to'lov usullarini qabul qilasiz?",
+      "a3": "Biz barcha asosiy kredit va debet kartalarini qabul qilamiz.",
+      "q4": "Ma'lumotlarim xavfsizmi?",
+      "a4": "Albatta. Biz ma'lumotlaringizni xavfsiz saqlash uchun sanoat standartidagi shifrlash va xavfsizlik amaliyotlarini qo'llaymiz."
+    }
+  },
+  "testimonials": {
+    "title": "Mijozlarimiz nima deydi",
+    "subtitle": "Kundalik operatsiyalari uchun HummyTummy'ga ishongan yuzlab restoranlar bilan qo'shiling",
+    "stats": {
+      "clients": "Baxtli mijozlar",
+      "rating": "O'rtacha reyting",
+      "support": "24/7 Qo'llab-quvvatlash",
+      "satisfaction": "Qoniqish"
+    }
+  },
+  "contact": {
+    "title": "Biz bilan bog'laning",
+    "subtitle": "Savollaringiz bormi? Sizdan xabar olishdan xursandmiz. Bizga xabar yuboring, tez orada javob beramiz.",
+    "name": "Ism",
+    "namePlaceholder": "Ismingiz",
+    "email": "Email",
+    "emailPlaceholder": "email@manzilingiz.com",
+    "phone": "Telefon",
+    "phonePlaceholder": "+998 (90) 123-4567",
+    "phoneOptional": "Ixtiyoriy",
+    "message": "Xabar",
+    "messagePlaceholder": "Restoraningiz haqida bizga ayting...",
+    "submit": "Xabar yuborish",
+    "submitting": "Yuborilmoqda...",
+    "success": "Xabaringiz uchun rahmat! Tez orada siz bilan bog'lanamiz.",
+    "info": {
+      "email": "Email",
+      "emailValue": "contact@hummytummy.com",
+      "chat": "Jonli chat",
+      "chatValue": "Jamoamiz bilan suhbatlashing",
+      "hours": "Qo'llab-quvvatlash vaqti",
+      "hoursValue": "24/7 Mavjud"
+    }
+  },
+  "footer": {
+    "description": "Operatsiyalaringizni soddalashtirish va samaradorlikni oshirish uchun mo'ljallangan zamonaviy restoran boshqaruv yechimi.",
+    "product": "Mahsulot",
+    "company": "Kompaniya",
+    "legal": "Huquqiy",
+    "features": "Xususiyatlar",
+    "pricing": "Narxlar",
+    "freeTrial": "Bepul sinov",
+    "about": "Haqida",
+    "contact": "Aloqa",
+    "blog": "Blog",
+    "privacy": "Maxfiylik siyosati",
+    "terms": "Xizmat shartlari",
+    "cookies": "Cookie siyosati",
+    "copyright": "Barcha huquqlar himoyalangan."
+  },
+  "plans": {
+    "FREE": {
+      "name": "Bepul",
+      "description": "Yangi boshlayotgan kichik restoranlar uchun mukammal"
+    },
+    "BASIC": {
+      "name": "Asosiy",
+      "description": "O'sib borayotgan restoranlar uchun ajoyib"
+    },
+    "PRO": {
+      "name": "Professional",
+      "description": "Bir nechta joylari bo'lgan restoranlar uchun"
+    },
+    "BUSINESS": {
+      "name": "Biznes",
+      "description": "Katta restoran tarmoqlari uchun korporativ yechim"
+    }
+  }
+}

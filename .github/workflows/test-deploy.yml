@@ -115,6 +115,19 @@ jobs:
           cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/frontend-staging:buildcache
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/frontend-staging:buildcache,mode=max
 
+      - name: Build and push landing image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./landing
+          file: ./landing/Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}/landing-staging:latest,ghcr.io/${{ github.repository }}/landing-staging:${{ steps.commit_info.outputs.commit_sha }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://staging.hummytummy.com/api
+            NEXT_PUBLIC_SITE_URL=https://staging.hummytummy.com
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/landing-staging:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/landing-staging:buildcache,mode=max
+
       - name: Deploy to test environment
         run: |
           echo "=========================================="
@@ -149,6 +162,7 @@ jobs:
             echo "Pulling new images..."
             docker pull ghcr.io/${{ github.repository }}/backend-staging:latest
             docker pull ghcr.io/${{ github.repository }}/frontend-staging:latest
+            docker pull ghcr.io/${{ github.repository }}/landing-staging:latest
 
             # Stop existing containers
             echo "Stopping existing containers..."
