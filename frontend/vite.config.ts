@@ -6,6 +6,8 @@ const host = process.env.TAURI_DEV_HOST;
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  // Use /app/ base path for web builds, but keep root for Tauri desktop
+  base: process.env.TAURI_PLATFORM ? '/' : '/app/',
   plugins: [react()],
   resolve: {
     alias: {
