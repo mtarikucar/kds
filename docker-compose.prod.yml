@@ -103,7 +103,7 @@ services:
       - invoice_storage:/app/storage
       - uploads_storage:/app/uploads
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:3000/api/health']
+      test: ['CMD', 'curl', '-f', 'http://0.0.0.0:3000/api/health']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -169,7 +169,7 @@ services:
       - invoice_storage:/app/storage
       - uploads_storage:/app/uploads
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:3000/api/health']
+      test: ['CMD', 'curl', '-f', 'http://0.0.0.0:3000/api/health']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -256,7 +256,7 @@ services:
     ports:
       - '3100:3000'
     healthcheck:
-      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:3000/api/health']
+      test: ['CMD', 'wget', '--spider', '-q', 'http://0.0.0.0:3000/api/health']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -281,7 +281,7 @@ services:
     ports:
       - '3101:3000'
     healthcheck:
-      test: ['CMD', 'wget', '--spider', '-q', 'http://localhost:3000/api/health']
+      test: ['CMD', 'wget', '--spider', '-q', 'http://0.0.0.0:3000/api/health']
       interval: 30s
       timeout: 10s
       retries: 3
