@@ -1,6 +1,6 @@
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Cloud, Float, PerspectiveCamera, Environment, ContactShadows, ScrollControls, useScroll, RoundedBox, OrthographicCamera } from '@react-three/drei';
-import { useRef, useMemo } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { Cloud, Float, RoundedBox, OrthographicCamera } from '@react-three/drei';
+import { useRef } from 'react';
 import * as THREE from 'three';
 
 // --- Materials ---
@@ -223,14 +223,14 @@ export const Scene3D = () => {
         <OrthographicCamera makeDefault position={[20, 20, 20]} zoom={40} near={-50} far={200} />
         
         {/* Lighting */}
-        <ambientLight intensity={0.7} />
-        <directionalLight 
-            position={[10, 20, 10]} 
-            intensity={1.2} 
-            castShadow 
-            shadow-mapSize={[1024, 1024]} 
+        <ambientLight intensity={0.8} />
+        <directionalLight
+            position={[10, 20, 10]}
+            intensity={1.5}
+            castShadow
+            shadow-mapSize={[1024, 1024]}
         />
-        <Environment preset="city" />
+        <hemisphereLight intensity={0.5} color="#ffffff" groundColor="#444444" />
 
         {/* Floating Animation for the whole diorama */}
         <Float speed={2} rotationIntensity={0.2} floatIntensity={0.5}>
