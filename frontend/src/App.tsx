@@ -12,7 +12,6 @@ import QRMenuPage from './pages/qr-menu/QRMenuPage';
 import CartPage from './pages/qr-menu/CartPage';
 import OrderTrackingPage from './pages/qr-menu/OrderTrackingPage';
 import LoyaltyPage from './pages/qr-menu/LoyaltyPage';
-import { LandingPage } from './pages/LandingPage';
 import TermsOfServicePage from './pages/legal/TermsOfServicePage';
 import PrivacyPolicyPage from './pages/legal/PrivacyPolicyPage';
 import DashboardPage from './pages/DashboardPage';
@@ -68,7 +67,7 @@ function App() {
     <>
       <Routes>
       {/* Public Routes */}
-      <Route path="/" element={<LandingPage />} />
+      <Route path="/" element={<Navigate to="/login" replace />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
