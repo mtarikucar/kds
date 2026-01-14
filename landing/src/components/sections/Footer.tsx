@@ -37,7 +37,7 @@ export default function Footer() {
     <footer className="bg-slate-50 border-t border-slate-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="grid grid-cols-2 md:grid-cols-5 gap-8 lg:gap-12">
-          {/* Brand */}
+          {/* Brand & Contact */}
           <div className="col-span-2 md:col-span-1">
             <Link href="/" className="text-xl font-bold text-slate-900">
               HummyTummy
@@ -45,6 +45,18 @@ export default function Footer() {
             <p className="mt-4 text-sm text-slate-500 max-w-xs">
               {t('description')}
             </p>
+            <div className="mt-6 space-y-2">
+              <h3 className="font-semibold text-slate-900">{t('contact')}</h3>
+              <p className="text-sm text-slate-500">
+                {t('address')}
+              </p>
+              <a
+                href="tel:+905060687100"
+                className="text-sm text-slate-500 hover:text-slate-900 transition-colors block"
+              >
+                {t('phone')}
+              </a>
+            </div>
           </div>
 
           {/* Product Links */}

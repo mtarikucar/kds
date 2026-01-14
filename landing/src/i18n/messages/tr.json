@@ -283,6 +283,9 @@
   },
   "footer": {
     "description": "Modern restoran yönetim platformu. Operasyonları kolaylaştırın, müşterileri memnun edin.",
+    "contact": "İletişim",
+    "address": "Bosna Hersek Mahallesi, Akif Sokak, No.3 Selçuklu, Konya",
+    "phone": "+90 506 068 71 00",
     "product": "Ürün",
     "company": "Şirket",
     "support": "Destek",
