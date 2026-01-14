@@ -207,15 +207,17 @@ jobs:
             git fetch --all --tags
             git checkout ${{ steps.version.outputs.VERSION }}
 
-            # Set Google OAuth environment variables for backend
+            # Update credentials in .env.production (used by docker-compose.prod.yml)
+            echo "Updating credentials in .env.production..."
+            sed -i "s/GOOGLE_CLIENT_ID=.*/GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}/" .env.production
+            sed -i "s/GOOGLE_CLIENT_SECRET=.*/GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}/" .env.production
+            sed -i "s/PAYTR_MERCHANT_ID=.*/PAYTR_MERCHANT_ID=${PAYTR_MERCHANT_ID}/" .env.production
+            sed -i "s/PAYTR_MERCHANT_KEY=.*/PAYTR_MERCHANT_KEY=${PAYTR_MERCHANT_KEY}/" .env.production
+            sed -i "s/PAYTR_MERCHANT_SALT=.*/PAYTR_MERCHANT_SALT=${PAYTR_MERCHANT_SALT}/" .env.production
+
+            # Export for shell access
             export GOOGLE_CLIENT_ID="${GOOGLE_CLIENT_ID}"
             export GOOGLE_CLIENT_SECRET="${GOOGLE_CLIENT_SECRET}"
-
-            # Update PayTR credentials in .env
-            echo "Updating PayTR credentials..."
-            sed -i "s/PAYTR_MERCHANT_ID=.*/PAYTR_MERCHANT_ID=${PAYTR_MERCHANT_ID}/" .env
-            sed -i "s/PAYTR_MERCHANT_KEY=.*/PAYTR_MERCHANT_KEY=${PAYTR_MERCHANT_KEY}/" .env
-            sed -i "s/PAYTR_MERCHANT_SALT=.*/PAYTR_MERCHANT_SALT=${PAYTR_MERCHANT_SALT}/" .env
 
             # Run Blue-Green deployment
             ./scripts/blue-green-deploy.sh deploy
