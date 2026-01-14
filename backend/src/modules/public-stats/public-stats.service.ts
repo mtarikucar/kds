@@ -260,7 +260,7 @@ export class PublicStatsService {
       averageRating: reviews._avg?.rating || 0,
       totalTenants,
       totalOrders: orderStats._count || 0,
-      totalRevenue: orderStats._sum?.finalAmount || 0,
+      totalRevenue: Number(orderStats._sum?.finalAmount || 0),
       countryDistribution,
       cityDistribution,
       viewsToday,
