@@ -95,6 +95,8 @@ export class PublicStatsService {
       totalReviews: 0,
       averageRating: 4.8,
       totalTenants: 0,
+      totalOrders: 0,
+      totalRevenue: 0,
       countryDistribution: {},
       cityDistribution: {},
       viewsToday: 0,
@@ -181,6 +183,7 @@ export class PublicStatsService {
       viewsThisMonth,
       reviews,
       totalTenants,
+      orderStats,
       countryStats,
       cityStats,
     ] = await Promise.all([
@@ -211,6 +214,12 @@ export class PublicStatsService {
       }),
       // Total active tenants
       this.prisma.tenant.count({ where: { status: 'ACTIVE' } }),
+      // Total orders and revenue (completed orders)
+      this.prisma.order.aggregate({
+        where: { status: { in: ['PAID', 'SERVED', 'READY'] } },
+        _count: true,
+        _sum: { finalAmount: true },
+      }),
       // Country distribution
       this.prisma.pageView.groupBy({
         by: ['country'],
@@ -250,6 +259,8 @@ export class PublicStatsService {
       totalReviews: reviews._count || 0,
       averageRating: reviews._avg?.rating || 0,
       totalTenants,
+      totalOrders: orderStats._count || 0,
+      totalRevenue: orderStats._sum?.finalAmount || 0,
       countryDistribution,
       cityDistribution,
       viewsToday,

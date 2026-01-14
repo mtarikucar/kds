@@ -1,10 +1,12 @@
 import { setRequestLocale } from 'next-intl/server';
-import Header from '@/components/layout/Header';
+import Navbar from '@/components/layout/Navbar';
 import Hero from '@/components/sections/Hero';
-import Features from '@/components/sections/Features';
+import ProductOverview from '@/components/sections/ProductOverview';
+import FeatureScroller from '@/components/sections/FeatureScroller';
+import BusinessValue from '@/components/sections/BusinessValue';
+import TrustSecurity from '@/components/sections/TrustSecurity';
 import Pricing from '@/components/sections/Pricing';
-import Testimonials from '@/components/sections/Testimonials';
-import Contact from '@/components/sections/Contact';
+import FinalCTA from '@/components/sections/FinalCTA';
 import Footer from '@/components/sections/Footer';
 
 type Props = {
@@ -16,14 +18,18 @@ export default async function HomePage({ params }: Props) {
   setRequestLocale(locale);
 
   return (
-    <main className="min-h-screen">
-      <Header />
-      <Hero />
-      <Features />
-      <Pricing />
-      <Testimonials />
-      <Contact />
+    <>
+      <Navbar />
+      <main className="min-h-screen">
+        <Hero />
+        <ProductOverview />
+        <FeatureScroller />
+        <BusinessValue />
+        <TrustSecurity />
+        <Pricing />
+        <FinalCTA />
+      </main>
       <Footer />
-    </main>
+    </>
   );
 }

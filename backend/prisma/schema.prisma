@@ -1361,6 +1361,10 @@ model PublicStatsCache {
   averageRating      Float    @default(0)
   totalTenants       Int      @default(0)    // Active restaurants
 
+  // Business metrics for landing page
+  totalOrders        Int      @default(0)    // Total completed orders
+  totalRevenue       Float    @default(0)    // Total revenue in TRY
+
   // Geographic breakdown (JSON)
   countryDistribution Json?   // {country: count}
   cityDistribution    Json?   // {city: count}
