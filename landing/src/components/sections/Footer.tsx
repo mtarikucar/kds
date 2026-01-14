@@ -1,35 +1,38 @@
 'use client';
 
 import { Link } from '@/i18n/routing';
-
-const productLinks = [
-  { label: 'Features', href: '#features' },
-  { label: 'Pricing', href: '#pricing' },
-  { label: 'Security', href: '#security' },
-  { label: 'Integrations', href: '#' },
-];
-
-const companyLinks = [
-  { label: 'About', href: '#' },
-  { label: 'Blog', href: '#' },
-  { label: 'Careers', href: '#' },
-  { label: 'Contact', href: '#' },
-];
-
-const legalLinks = [
-  { label: 'Privacy Policy', href: '#' },
-  { label: 'Terms of Service', href: '#' },
-  { label: 'Cookie Policy', href: '#' },
-];
-
-const supportLinks = [
-  { label: 'Help Center', href: '#' },
-  { label: 'Documentation', href: '#' },
-  { label: 'API Reference', href: '#' },
-  { label: 'Status', href: '#' },
-];
+import { useTranslations } from 'next-intl';
 
 export default function Footer() {
+  const t = useTranslations('footer');
+
+  const productLinks = [
+    { label: t('links.features'), href: '#features' },
+    { label: t('links.pricing'), href: '#pricing' },
+    { label: t('links.security'), href: '#security' },
+    { label: t('links.integrations'), href: '#' },
+  ];
+
+  const companyLinks = [
+    { label: t('links.about'), href: '#' },
+    { label: t('links.blog'), href: '#' },
+    { label: t('links.careers'), href: '#' },
+    { label: t('links.contact'), href: '#' },
+  ];
+
+  const legalLinks = [
+    { label: t('links.privacy'), href: '#' },
+    { label: t('links.terms'), href: '#' },
+    { label: t('links.cookies'), href: '#' },
+  ];
+
+  const supportLinks = [
+    { label: t('links.helpCenter'), href: '#' },
+    { label: t('links.documentation'), href: '#' },
+    { label: t('links.apiReference'), href: '#' },
+    { label: t('links.status'), href: '#' },
+  ];
+
   return (
     <footer className="bg-slate-50 border-t border-slate-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
@@ -40,13 +43,13 @@ export default function Footer() {
               HummyTummy
             </Link>
             <p className="mt-4 text-sm text-slate-500 max-w-xs">
-              The modern restaurant management platform. Streamline operations, delight customers.
+              {t('description')}
             </p>
           </div>
 
           {/* Product Links */}
           <div>
-            <h3 className="font-semibold text-slate-900 mb-4">Product</h3>
+            <h3 className="font-semibold text-slate-900 mb-4">{t('product')}</h3>
             <ul className="space-y-3">
               {productLinks.map((link) => (
                 <li key={link.label}>
@@ -63,7 +66,7 @@ export default function Footer() {
 
           {/* Company Links */}
           <div>
-            <h3 className="font-semibold text-slate-900 mb-4">Company</h3>
+            <h3 className="font-semibold text-slate-900 mb-4">{t('company')}</h3>
             <ul className="space-y-3">
               {companyLinks.map((link) => (
                 <li key={link.label}>
@@ -80,7 +83,7 @@ export default function Footer() {
 
           {/* Support Links */}
           <div>
-            <h3 className="font-semibold text-slate-900 mb-4">Support</h3>
+            <h3 className="font-semibold text-slate-900 mb-4">{t('support')}</h3>
             <ul className="space-y-3">
               {supportLinks.map((link) => (
                 <li key={link.label}>
@@ -97,7 +100,7 @@ export default function Footer() {
 
           {/* Legal Links */}
           <div>
-            <h3 className="font-semibold text-slate-900 mb-4">Legal</h3>
+            <h3 className="font-semibold text-slate-900 mb-4">{t('legal')}</h3>
             <ul className="space-y-3">
               {legalLinks.map((link) => (
                 <li key={link.label}>
@@ -117,7 +120,7 @@ export default function Footer() {
         <div className="mt-12 pt-8 border-t border-slate-200">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-slate-500">
-              &copy; {new Date().getFullYear()} HummyTummy. All rights reserved.
+              &copy; {new Date().getFullYear()} {t('copyright')}
             </p>
             <div className="flex items-center gap-6">
               {/* Social Links */}

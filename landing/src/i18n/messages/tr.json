@@ -1,150 +1,293 @@
 {
   "metadata": {
     "title": "HummyTummy - Restoran Yönetim Sistemi",
-    "description": "Restoranlar için modern POS sistemi. Siparişleri, mutfak ekranını, masaları ve ödemeleri tek bir yerde yönetin.",
-    "keywords": "restoran pos, mutfak ekranı sistemi, restoran yönetimi, qr menü, masa yönetimi"
+    "description": "Restoranlar için modern POS sistemi. Siparişleri, mutfak ekranını, masaları ve ödemeleri tek bir yerden yönetin.",
+    "keywords": "restoran pos, mutfak ekran sistemi, restoran yönetimi, qr menü, masa yönetimi"
   },
   "nav": {
+    "product": "Ürün",
     "features": "Özellikler",
     "pricing": "Fiyatlandırma",
-    "contact": "İletişim",
-    "login": "Giriş",
-    "register": "Başlayın"
+    "security": "Güvenlik",
+    "signIn": "Giriş yap",
+    "startFree": "Ücretsiz başla",
+    "openMenu": "Menüyü aç",
+    "closeMenu": "Menüyü kapat"
   },
   "hero": {
-    "badge": "Şimdi Canlı",
-    "headline": "Restoranınızın İşlemlerini",
-    "headlineHighlight": "Kolaylaştırın",
-    "subtitle": "Restoranlar için tasarlanmış modern POS sistemi. Siparişleri, mutfak ekranını, masaları ve ödemeleri tek bir yerde yönetin.",
-    "cta": "Ücretsiz Denemeye Başla",
-    "ctaSecondary": "Daha Fazla Bilgi",
+    "badge": "Şu anda {count} restorana hizmet veriyoruz",
+    "headline": "Modern restoranlar için",
+    "headlineHighlight": "işletim sistemi",
+    "subtitle": "HummyTummy'nin hepsi bir arada restoran yönetim platformuyla siparişleri kolaylaştırın, salonunuzu yönetin ve işinizi büyütün.",
+    "cta": "Ücretsiz başla",
+    "ctaSecondary": "Demo izle",
     "trustBadge1": "Kredi kartı gerekmez",
     "trustBadge2": "5 dakikada kurulum",
-    "trustBadge3": "İstediğiniz zaman iptal"
+    "trustBadge3": "İstediğiniz zaman iptal",
+    "mockStats": {
+      "activeTables": "Aktif Masalar",
+      "ordersToday": "Bugünkü Siparişler",
+      "revenue": "Gelir"
+    },
+    "notification": {
+      "title": "Sipariş #{number} Hazır",
+      "subtitle": "Masa {table} • Az önce"
+    },
+    "weekGrowth": "Bu hafta"
+  },
+  "product": {
+    "badge": "Neden HummyTummy",
+    "title": "Modern bir restoran işletmek için ihtiyacınız olan her şey",
+    "subtitle": "Sipariş almaktan mutfağınızı yönetmeye kadar, HummyTummy size restoran operasyonlarınız üzerinde tam kontrol sağlar. Artık birden fazla araçla uğraşmak veya siparişleri kaybetmek yok.",
+    "benefits": {
+      "fast": {
+        "title": "Işık Hızında",
+        "description": "Siparişleri dakikalar değil, saniyeler içinde işleyin. Hız için optimize edildi."
+      },
+      "secure": {
+        "title": "Güvenli ve Güvenilir",
+        "description": "Kurumsal düzeyde güvenlikle %99.9 çalışma süresi."
+      },
+      "insights": {
+        "title": "Eyleme Dönüştürülebilir Bilgiler",
+        "description": "İşinizi büyütmek için gerçek zamanlı analitik."
+      },
+      "global": {
+        "title": "Her Yerde Çalışır",
+        "description": "Çoklu dil, çoklu para birimi desteği."
+      }
+    },
+    "panels": {
+      "activeOrders": "Aktif Siparişler",
+      "live": "Canlı",
+      "items": "ürün",
+      "table": "Masa",
+      "preparing": "Hazırlanıyor",
+      "ready": "Hazır",
+      "new": "Yeni",
+      "platformPerformance": "Platform Performansı",
+      "allTime": "tüm zamanlar",
+      "total": "Toplam",
+      "revenue": "Gelir",
+      "processed": "İşlenen",
+      "orders": "Siparişler",
+      "active": "Aktif",
+      "restaurants": "Restoranlar"
+    }
   },
   "features": {
-    "title": "İhtiyacınız Olan Her Şey",
-    "subtitle": "Restoranınızın başarılı olmasına yardımcı olmak için tasarlanmış güçlü özellikler",
-    "pos": {
-      "title": "Akıllı POS Sistemi",
-      "description": "Gerçek zamanlı sipariş yönetimi ile hızlı ve sezgisel satış noktası sistemi"
+    "badge": "Özellikler",
+    "title": "Restoranların gerçekte nasıl çalıştığı için tasarlandı",
+    "subtitle": "Her özellik restoran sahipleri, yöneticileri ve personeli düşünülerek tasarlandı.",
+    "qrMenu": {
+      "title": "QR Menü",
+      "description": "Müşterilerin anında tarayıp göz atabileceği güzel dijital menüler oluşturun. Fiyatları ve ürünleri yeniden basmadan gerçek zamanlı güncelleyin.",
+      "bullets": [
+        "Anında menü güncellemeleri, sıfır baskı maliyeti",
+        "Uluslararası misafirler için çoklu dil desteği",
+        "Alerjen ve diyet bilgisi gösterimi"
+      ],
+      "metrics": {
+        "printingCosts": "Baskı maliyetleri",
+        "updateTime": "Güncelleme süresi",
+        "instant": "Anında"
+      }
     },
-    "kitchen": {
-      "title": "Mutfak Ekranı",
-      "description": "Verimli sipariş hazırlanması için gerçek zamanlı mutfak ekranı sistemi"
+    "orderManagement": {
+      "title": "Sipariş ve Masa Yönetimi",
+      "description": "Tüm salonunuzu gerçek zamanlı kuş bakışı görün. Masa durumunu takip edin, rezervasyonları yönetin ve oturmayı optimize edin.",
+      "bullets": [
+        "Canlı masa durumlu görsel salon planı",
+        "Akıllı rezervasyon yönetimi",
+        "Masa birleştirme ve ayırma işlevselliği"
+      ],
+      "metrics": {
+        "orderProcessing": "Sipariş işleme",
+        "faster": "%40 daha hızlı",
+        "tableTurnover": "Masa devir hızı"
+      }
     },
-    "tables": {
-      "title": "Masa Yönetimi",
-      "description": "Masaları, rezervasyonları ve müşteri oturma düzenini verimli bir şekilde yönetin"
+    "posPayments": {
+      "title": "POS ve Ödemeler",
+      "description": "Tüm ödeme yöntemlerini destekleyen hızlı, güvenilir satış noktası. Faturaları bölün, indirim uygulayın ve hesapları saniyeler içinde kapatın.",
+      "bullets": [
+        "Kart, nakit ve mobil ödemeleri kabul edin",
+        "Kolay fatura bölme ve ürün transferi",
+        "Otomatik bahşiş hesaplama ve dağıtımı"
+      ],
+      "metrics": {
+        "paymentSuccess": "Ödeme başarısı",
+        "checkoutTime": "Ödeme süresi"
+      }
     },
-    "payments": {
-      "title": "Ödeme İşleme",
-      "description": "Birden fazla ödeme yöntemi ile güvenli ödeme işleme"
+    "kitchenFlow": {
+      "title": "Personel ve Mutfak Akışı",
+      "description": "Kağıt fişleri ortadan kaldıran dijital mutfak ekran sistemi. Siparişleri önceliklendirin, pişirme sürelerini takip edin ve ekibinizi koordine edin.",
+      "bullets": [
+        "Gerçek zamanlı mutfak ekranları",
+        "Sipariş önceliklendirme ve zamanlama",
+        "Role dayalı personel görev yönetimi"
+      ],
+      "metrics": {
+        "orderErrors": "Sipariş hataları",
+        "avgPrepTime": "Ort. hazırlık süresi"
+      }
     },
-    "analytics": {
-      "title": "Analitik ve Raporlar",
-      "description": "İşletme performansınızı takip etmek için ayrıntılı analitik ve raporlar"
-    },
-    "multilang": {
-      "title": "Çok Dilli Destek",
-      "description": "Dünya çapında birden fazla dil ve para birimi desteği"
+    "multiBranch": {
+      "title": "Çoklu Şube Kontrolü",
+      "description": "Tüm lokasyonlarınızı tek bir panelden yönetin. Menüleri standartlaştırın, performansı izleyin ve işinizi ölçeklendirin.",
+      "bullets": [
+        "Merkezi menü ve fiyatlandırma kontrolü",
+        "Lokasyonlar arası analitik ve raporlama",
+        "Şubeye özel özelleştirme seçenekleri"
+      ],
+      "metrics": {
+        "branches": "Şubeler",
+        "unlimited": "Sınırsız",
+        "syncTime": "Senkronizasyon",
+        "realTime": "Gerçek zamanlı"
+      }
     }
   },
   "pricing": {
-    "title": "Basit, Şeffaf Fiyatlandırma",
-    "subtitle": "Restoranınız için mükemmel planı seçin. Tüm planlar ücretsiz deneme içerir.",
-    "monthly": "Aylık",
-    "yearly": "Yıllık",
-    "save20": "%20 Tasarruf",
-    "perMonth": "/ay",
-    "perYear": "/yıl",
-    "getStarted": "Başlayın",
-    "currentPlan": "Mevcut Plan",
+    "badge": "Fiyatlandırma",
+    "title": "Basit, şeffaf fiyatlandırma",
+    "subtitle": "Ücretsiz başlayın, hazır olduğunuzda yükseltin. Gizli ücret yok, istediğiniz zaman iptal edin.",
     "mostPopular": "En Popüler",
-    "features": "Özellikler",
-    "unlimited": "Sınırsız",
-    "users": "kullanıcı",
-    "tables": "masa",
-    "products": "ürün",
-    "orders": "sipariş/ay",
-    "faq": {
-      "title": "Sıkça Sorulan Sorular",
-      "q1": "Ücretsiz deneme nasıl çalışır?",
-      "a1": "Tüm planlar 14 günlük ücretsiz deneme içerir. Başlamak için kredi kartı gerekmez. Deneme süresi boyunca istediğiniz zaman iptal edebilirsiniz.",
-      "q2": "Daha sonra plan değiştirebilir miyim?",
-      "a2": "Evet! Planınızı istediğiniz zaman yükseltebilir veya düşürebilirsiniz. Değişiklikler sonraki fatura döneminde yansıtılır.",
-      "q3": "Hangi ödeme yöntemlerini kabul ediyorsunuz?",
-      "a3": "Tüm ana kredi kartlarını, banka kartlarını kabul ediyoruz ve hem uluslararası hem de yerel ödeme yöntemlerini destekliyoruz.",
-      "q4": "Verilerim güvende mi?",
-      "a4": "Kesinlikle. Verilerinizi güvende tutmak için endüstri standardı şifreleme ve güvenlik uygulamaları kullanıyoruz."
+    "perMonth": "/ay",
+    "plans": {
+      "free": {
+        "name": "Ücretsiz",
+        "description": "HummyTummy'yi denemek için mükemmel",
+        "price": "₺0",
+        "cta": "Ücretsiz başla",
+        "features": [
+          "2 personel hesabı",
+          "5 masa",
+          "20 menü öğesi",
+          "Temel analitik",
+          "E-posta desteği"
+        ]
+      },
+      "pro": {
+        "name": "Pro",
+        "description": "Büyüyen restoranlar için",
+        "price": "₺599",
+        "cta": "Ücretsiz denemeye başla",
+        "features": [
+          "15 personel hesabı",
+          "50 masa",
+          "500 menü öğesi",
+          "Gelişmiş analitik",
+          "Mutfak ekran sistemi",
+          "Öncelikli destek"
+        ]
+      },
+      "business": {
+        "name": "İşletme",
+        "description": "Çoklu lokasyon operasyonları için",
+        "price": "₺999",
+        "cta": "Satışla iletişime geç",
+        "features": [
+          "Sınırsız personel",
+          "Sınırsız masa",
+          "Sınırsız menü öğesi",
+          "Çoklu şube yönetimi",
+          "API erişimi",
+          "Özel destek"
+        ]
+      }
+    },
+    "trialNote": "Tüm planlar 14 günlük ücretsiz deneme içerir. Kredi kartı gerekmez."
+  },
+  "business": {
+    "badge": "Önemli Sonuçlar",
+    "title": "Kârlılığınız üzerinde gerçek etki",
+    "subtitle": "HummyTummy müşterileri ilk günden itibaren ölçülebilir iyileşmeler görüyor.",
+    "values": {
+      "time": {
+        "title": "Zaman Kazanın",
+        "metric": "%40",
+        "metricLabel": "daha hızlı sipariş işleme",
+        "description": "Tekrarlayan görevleri otomatikleştirin ve iş akışınızı kolaylaştırın. Yönetimle daha az, müşterilerle daha fazla zaman geçirin."
+      },
+      "errors": {
+        "title": "Hataları Azaltın",
+        "metric": "%85",
+        "metricLabel": "daha az sipariş hatası",
+        "description": "Dijital sipariş akışı yanlış iletişimi ortadan kaldırır. Siparişler doğrudan masadan mutfağa sıfır karışıklıkla gider."
+      },
+      "revenue": {
+        "title": "Geliri Artırın",
+        "metric": "%25",
+        "metricLabel": "daha yüksek masa devir hızı",
+        "description": "Daha hızlı hizmet, daha fazla müşteri demek. Gerçek zamanlı bilgiler maksimum kârlılık için optimize etmenize yardımcı olur."
+      }
     }
   },
-  "testimonials": {
-    "title": "Müşterilerimiz Ne Diyor",
-    "subtitle": "Günlük operasyonları için HummyTummy'ye güvenen yüzlerce restorana katılın",
-    "stats": {
-      "clients": "Mutlu Müşteriler",
-      "rating": "Ortalama Puan",
-      "support": "7/24 Destek",
-      "satisfaction": "Memnuniyet"
+  "security": {
+    "badge": "Güven ve Güvenlik",
+    "title": "Her restoran için kurumsal düzeyde güvenlik",
+    "subtitle": "Verileriniz işinizdir. Güvenliği ciddiye alıyoruz, böylece en önemli şeye odaklanabilirsiniz—müşterilerinize hizmet etmek.",
+    "points": {
+      "encryption": {
+        "title": "Uçtan Uca Şifreleme",
+        "description": "Tüm veriler endüstri standardı AES-256 şifreleme kullanılarak aktarımda ve depolamada şifrelenir."
+      },
+      "rbac": {
+        "title": "Role Dayalı Erişim Kontrolü",
+        "description": "İnce ayarlı izinler, her ekip üyesinin tam olarak neyi görebileceğini ve yapabileceğini kontrol etmenizi sağlar."
+      },
+      "uptime": {
+        "title": "%99.9 Çalışma Süresi SLA",
+        "description": "Birden fazla veri merkezinde yedeklilik ile kurumsal düzeyde altyapı."
+      },
+      "compliance": {
+        "title": "GDPR ve KVKK Uyumlu",
+        "description": "Avrupa ve Türk veri koruma düzenlemelerine tam uyumluluk."
+      }
+    },
+    "visual": {
+      "title": "Verileriniz Korunuyor",
+      "subtitle": "Sektör lideri güvenlik önlemleri işinizi güvende tutar.",
+      "encryption": "Şifreleme",
+      "uptime": "Çalışma Süresi",
+      "monitoring": "İzleme",
+      "compliant": "Uyumlu"
     }
   },
-  "contact": {
-    "title": "İletişime Geçin",
-    "subtitle": "Sorularınız mı var? Sizden haber almaktan mutluluk duyarız. Bize bir mesaj gönderin, en kısa sürede yanıt vereceğiz.",
-    "name": "Ad",
-    "namePlaceholder": "Adınız",
-    "email": "E-posta",
-    "emailPlaceholder": "email@adresiniz.com",
-    "phone": "Telefon",
-    "phonePlaceholder": "+90 (555) 123-4567",
-    "phoneOptional": "İsteğe Bağlı",
-    "message": "Mesaj",
-    "messagePlaceholder": "Restoranınız hakkında bize anlatın ve nasıl yardımcı olabileceğimizi söyleyin...",
-    "submit": "Mesaj Gönder",
-    "submitting": "Gönderiliyor...",
-    "success": "Mesajınız için teşekkürler! En kısa sürede size dönüş yapacağız.",
-    "info": {
-      "email": "E-posta",
-      "emailValue": "contact@hummytummy.com",
-      "chat": "Canlı Sohbet",
-      "chatValue": "Ekibimizle sohbet edin",
-      "hours": "Destek Saatleri",
-      "hoursValue": "7/24 Kullanılabilir"
-    }
+  "cta": {
+    "title": "Restoranınızı dönüştürmeye hazır mısınız?",
+    "subtitle": "Operasyonları kolaylaştırmak ve işlerini büyütmek için HummyTummy kullanan {count} restorana katılın.",
+    "primaryBtn": "Ücretsiz denemeye başla",
+    "secondaryBtn": "Satışla konuş",
+    "trustBadge1": "Kredi kartı gerekmez",
+    "trustBadge2": "14 günlük ücretsiz deneme",
+    "trustBadge3": "İstediğiniz zaman iptal"
   },
   "footer": {
-    "description": "Operasyonlarınızı kolaylaştırmak ve verimliliği artırmak için tasarlanmış modern restoran yönetim çözümü.",
+    "description": "Modern restoran yönetim platformu. Operasyonları kolaylaştırın, müşterileri memnun edin.",
     "product": "Ürün",
     "company": "Şirket",
+    "support": "Destek",
     "legal": "Yasal",
-    "features": "Özellikler",
-    "pricing": "Fiyatlandırma",
-    "freeTrial": "Ücretsiz Deneme",
-    "about": "Hakkında",
-    "contact": "İletişim",
-    "blog": "Blog",
-    "privacy": "Gizlilik Politikası",
-    "terms": "Hizmet Şartları",
-    "cookies": "Çerez Politikası",
-    "copyright": "Tüm hakları saklıdır."
-  },
-  "plans": {
-    "FREE": {
-      "name": "Ücretsiz",
-      "description": "Yeni başlayan küçük restoranlar için ideal"
+    "links": {
+      "features": "Özellikler",
+      "pricing": "Fiyatlandırma",
+      "security": "Güvenlik",
+      "integrations": "Entegrasyonlar",
+      "about": "Hakkımızda",
+      "blog": "Blog",
+      "careers": "Kariyer",
+      "contact": "İletişim",
+      "helpCenter": "Yardım Merkezi",
+      "documentation": "Dokümantasyon",
+      "apiReference": "API Referansı",
+      "status": "Durum",
+      "privacy": "Gizlilik Politikası",
+      "terms": "Kullanım Şartları",
+      "cookies": "Çerez Politikası"
     },
-    "BASIC": {
-      "name": "Temel",
-      "description": "Büyüyen restoranlar için harika"
-    },
-    "PRO": {
-      "name": "Profesyonel",
-      "description": "Birden fazla şubesi olan köklü restoranlar için"
-    },
-    "BUSINESS": {
-      "name": "Kurumsal",
-      "description": "Büyük restoran zincirleri için kurumsal çözüm"
-    }
+    "copyright": "HummyTummy. Tüm hakları saklıdır."
   }
 }

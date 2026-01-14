@@ -3,31 +3,38 @@
 import { motion } from 'framer-motion';
 import { Container } from '@/components/ui/Container';
 import { Shield, Lock, Server, Users } from 'lucide-react';
-
-const securityPoints = [
-  {
-    icon: Lock,
-    title: 'End-to-End Encryption',
-    description: 'All data is encrypted in transit and at rest using industry-standard AES-256 encryption.',
-  },
-  {
-    icon: Users,
-    title: 'Role-Based Access Control',
-    description: 'Fine-grained permissions let you control exactly what each team member can see and do.',
-  },
-  {
-    icon: Server,
-    title: '99.9% Uptime SLA',
-    description: 'Enterprise-grade infrastructure with redundancy across multiple data centers.',
-  },
-  {
-    icon: Shield,
-    title: 'GDPR & KVKK Compliant',
-    description: 'Full compliance with European and Turkish data protection regulations.',
-  },
-];
+import { useTranslations } from 'next-intl';
 
 export default function TrustSecurity() {
+  const t = useTranslations('security');
+
+  const securityPoints = [
+    {
+      key: 'encryption',
+      icon: Lock,
+      title: t('points.encryption.title'),
+      description: t('points.encryption.description'),
+    },
+    {
+      key: 'rbac',
+      icon: Users,
+      title: t('points.rbac.title'),
+      description: t('points.rbac.description'),
+    },
+    {
+      key: 'uptime',
+      icon: Server,
+      title: t('points.uptime.title'),
+      description: t('points.uptime.description'),
+    },
+    {
+      key: 'compliance',
+      icon: Shield,
+      title: t('points.compliance.title'),
+      description: t('points.compliance.description'),
+    },
+  ];
+
   return (
     <section id="security" className="section-padding bg-gradient-subtle">
       <Container>
@@ -40,20 +47,19 @@ export default function TrustSecurity() {
             transition={{ duration: 0.5 }}
           >
             <span className="inline-block text-sm font-semibold text-orange-600 mb-4 uppercase tracking-wider">
-              Trust & Security
+              {t('badge')}
             </span>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 tracking-tight mb-6">
-              Enterprise-grade security for every restaurant
+              {t('title')}
             </h2>
             <p className="text-lg text-slate-600 mb-8">
-              Your data is your business. We take security seriously so you can focus on
-              what matters most—serving your customers.
+              {t('subtitle')}
             </p>
 
             <div className="space-y-6">
               {securityPoints.map((point, index) => (
                 <motion.div
-                  key={point.title}
+                  key={point.key}
                   initial={{ opacity: 0, x: -20 }}
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
@@ -86,9 +92,9 @@ export default function TrustSecurity() {
                 <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                   <Shield className="w-10 h-10 text-green-600" />
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-2">Your Data is Protected</h3>
+                <h3 className="text-xl font-bold text-slate-900 mb-2">{t('visual.title')}</h3>
                 <p className="text-slate-600 mb-8">
-                  Industry-leading security measures keep your business safe.
+                  {t('visual.subtitle')}
                 </p>
 
                 {/* Trust indicators */}

@@ -3,13 +3,73 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Container } from '@/components/ui/Container';
-import { features } from '@/data/features';
+import { QrCode, LayoutGrid, CreditCard, ChefHat, Building2 } from 'lucide-react';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { useTranslations } from 'next-intl';
 
 export default function FeatureScroller() {
   const [activeIndex, setActiveIndex] = useState(0);
   const sectionRefs = useRef<(HTMLDivElement | null)[]>([]);
   const prefersReducedMotion = useReducedMotion();
+  const t = useTranslations('features');
+
+  const features = [
+    {
+      id: 'qr-menu',
+      icon: QrCode,
+      title: t('qrMenu.title'),
+      description: t('qrMenu.description'),
+      bullets: t.raw('qrMenu.bullets') as string[],
+      metrics: [
+        { label: t('qrMenu.metrics.printingCosts'), value: '₺0' },
+        { label: t('qrMenu.metrics.updateTime'), value: t('qrMenu.metrics.instant') },
+      ],
+    },
+    {
+      id: 'order-management',
+      icon: LayoutGrid,
+      title: t('orderManagement.title'),
+      description: t('orderManagement.description'),
+      bullets: t.raw('orderManagement.bullets') as string[],
+      metrics: [
+        { label: t('orderManagement.metrics.orderProcessing'), value: t('orderManagement.metrics.faster') },
+        { label: t('orderManagement.metrics.tableTurnover'), value: '+25%' },
+      ],
+    },
+    {
+      id: 'pos-payments',
+      icon: CreditCard,
+      title: t('posPayments.title'),
+      description: t('posPayments.description'),
+      bullets: t.raw('posPayments.bullets') as string[],
+      metrics: [
+        { label: t('posPayments.metrics.paymentSuccess'), value: '99.9%' },
+        { label: t('posPayments.metrics.checkoutTime'), value: '< 30s' },
+      ],
+    },
+    {
+      id: 'kitchen-flow',
+      icon: ChefHat,
+      title: t('kitchenFlow.title'),
+      description: t('kitchenFlow.description'),
+      bullets: t.raw('kitchenFlow.bullets') as string[],
+      metrics: [
+        { label: t('kitchenFlow.metrics.orderErrors'), value: '-85%' },
+        { label: t('kitchenFlow.metrics.avgPrepTime'), value: '12 min' },
+      ],
+    },
+    {
+      id: 'multi-branch',
+      icon: Building2,
+      title: t('multiBranch.title'),
+      description: t('multiBranch.description'),
+      bullets: t.raw('multiBranch.bullets') as string[],
+      metrics: [
+        { label: t('multiBranch.metrics.branches'), value: t('multiBranch.metrics.unlimited') },
+        { label: t('multiBranch.metrics.syncTime'), value: t('multiBranch.metrics.realTime') },
+      ],
+    },
+  ];
 
   useEffect(() => {
     const observers: IntersectionObserver[] = [];
@@ -54,13 +114,13 @@ export default function FeatureScroller() {
           className="text-center max-w-3xl mx-auto mb-16"
         >
           <span className="inline-block text-sm font-semibold text-orange-600 mb-4 uppercase tracking-wider">
-            Features
+            {t('badge')}
           </span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 tracking-tight mb-4">
-            Built for how restaurants actually work
+            {t('title')}
           </h2>
           <p className="text-lg text-slate-600">
-            Every feature designed with restaurant owners, managers, and staff in mind.
+            {t('subtitle')}
           </p>
         </motion.div>
 

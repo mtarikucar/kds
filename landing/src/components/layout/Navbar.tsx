@@ -7,19 +7,21 @@ import { Menu, X } from 'lucide-react';
 import { Link } from '@/i18n/routing';
 import { useScrollDirection } from '@/hooks/useScrollDirection';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { useTranslations } from 'next-intl';
 import LanguageSwitcher from './LanguageSwitcher';
-
-const navLinks = [
-  { href: '#product', label: 'Product' },
-  { href: '#features', label: 'Features' },
-  { href: '#pricing', label: 'Pricing' },
-  { href: '#security', label: 'Security' },
-];
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { scrollDirection, isAtTop } = useScrollDirection(80);
   const prefersReducedMotion = useReducedMotion();
+  const t = useTranslations('nav');
+
+  const navLinks = [
+    { href: '#product', label: t('product') },
+    { href: '#features', label: t('features') },
+    { href: '#pricing', label: t('pricing') },
+    { href: '#security', label: t('security') },
+  ];
 
   const isHidden = scrollDirection === 'down' && !isAtTop && !isMenuOpen;
 
@@ -69,13 +71,13 @@ export default function Navbar() {
               href="/app/login"
               className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
             >
-              Sign in
+              {t('signIn')}
             </a>
             <a
               href="/app/register"
               className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors"
             >
-              Start free
+              {t('startFree')}
             </a>
           </div>
 
@@ -118,13 +120,13 @@ export default function Navbar() {
                   href="/app/login"
                   className="block px-4 py-3 text-base font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-colors"
                 >
-                  Sign in
+                  {t('signIn')}
                 </a>
                 <a
                   href="/app/register"
                   className="block px-4 py-3 text-base font-medium text-center text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors"
                 >
-                  Start free
+                  {t('startFree')}
                 </a>
               </div>
             </div>

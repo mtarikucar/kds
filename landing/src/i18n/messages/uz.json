@@ -5,146 +5,289 @@
     "keywords": "restoran pos, oshxona displeyi, restoran boshqaruvi, qr menyu, stollarni boshqarish"
   },
   "nav": {
+    "product": "Mahsulot",
     "features": "Xususiyatlar",
     "pricing": "Narxlar",
-    "contact": "Aloqa",
-    "login": "Kirish",
-    "register": "Boshlash"
+    "security": "Xavfsizlik",
+    "signIn": "Kirish",
+    "startFree": "Bepul boshlash",
+    "openMenu": "Menyuni ochish",
+    "closeMenu": "Menyuni yopish"
   },
   "hero": {
-    "badge": "Hozir faol",
-    "headline": "Restoran operatsiyalaringizni",
-    "headlineHighlight": "Soddalashtiring",
-    "subtitle": "Restoranlar uchun mo'ljallangan zamonaviy POS tizimi. Buyurtmalar, oshxona displeyi, stollar va to'lovlarni bir joyda boshqaring.",
-    "cta": "Bepul sinovni boshlash",
-    "ctaSecondary": "Ko'proq bilish",
+    "badge": "Hozirda {count} ta restoranlarnga xizmat ko'rsatmoqdamiz",
+    "headline": "Zamonaviy restoranlar uchun",
+    "headlineHighlight": "operatsion tizim",
+    "subtitle": "HummyTummy'ning hamma narsani o'z ichiga olgan restoran boshqaruv platformasi bilan buyurtmalarni soddalashtiring, zalingizni boshqaring va biznesingizni rivojlantiring.",
+    "cta": "Bepul boshlash",
+    "ctaSecondary": "Demo ko'rish",
     "trustBadge1": "Kredit karta talab qilinmaydi",
     "trustBadge2": "5 daqiqada o'rnatish",
-    "trustBadge3": "Istalgan vaqtda bekor qilish"
+    "trustBadge3": "Istalgan vaqtda bekor qilish",
+    "mockStats": {
+      "activeTables": "Faol stollar",
+      "ordersToday": "Bugungi buyurtmalar",
+      "revenue": "Daromad"
+    },
+    "notification": {
+      "title": "Buyurtma #{number} tayyor",
+      "subtitle": "Stol {table} • Hozirgina"
+    },
+    "weekGrowth": "Bu hafta"
+  },
+  "product": {
+    "badge": "Nima uchun HummyTummy",
+    "title": "Zamonaviy restoran ishlatish uchun kerak bo'lgan hamma narsa",
+    "subtitle": "Buyurtma qabul qilishdan oshxonani boshqarishgacha, HummyTummy sizga restoran operatsiyalari ustidan to'liq nazoratni beradi. Endi ko'p vositalar bilan kurashish yoki buyurtmalarni yo'qotish yo'q.",
+    "benefits": {
+      "fast": {
+        "title": "Chaqmoqdek tez",
+        "description": "Buyurtmalarni daqiqalar emas, soniyalar ichida qayta ishlang. Tezlik uchun optimallashtirilgan."
+      },
+      "secure": {
+        "title": "Xavfsiz va ishonchli",
+        "description": "Korporativ darajadagi xavfsizlik bilan 99.9% ish vaqti."
+      },
+      "insights": {
+        "title": "Foydali tahlillar",
+        "description": "Biznesingizni rivojlantirish uchun real vaqt tahlili."
+      },
+      "global": {
+        "title": "Hamma joyda ishlaydi",
+        "description": "Ko'p tillar va valyutalarni qo'llab-quvvatlash."
+      }
+    },
+    "panels": {
+      "activeOrders": "Faol buyurtmalar",
+      "live": "Jonli",
+      "items": "mahsulot",
+      "table": "Stol",
+      "preparing": "Tayyorlanmoqda",
+      "ready": "Tayyor",
+      "new": "Yangi",
+      "platformPerformance": "Platforma ko'rsatkichlari",
+      "allTime": "barcha vaqt",
+      "total": "Jami",
+      "revenue": "Daromad",
+      "processed": "Qayta ishlangan",
+      "orders": "Buyurtmalar",
+      "active": "Faol",
+      "restaurants": "Restoranlar"
+    }
   },
   "features": {
-    "title": "Kerak bo'lgan hamma narsa",
-    "subtitle": "Restoraningiz muvaffaqiyati uchun mo'ljallangan kuchli xususiyatlar",
-    "pos": {
-      "title": "Aqlli POS tizimi",
-      "description": "Real vaqtda buyurtmalarni boshqarish bilan tez va intuitiv savdo nuqtasi tizimi"
+    "badge": "Xususiyatlar",
+    "title": "Restoranlar aslida qanday ishlashi uchun yaratilgan",
+    "subtitle": "Har bir xususiyat restoran egalari, menejerlari va xodimlarini hisobga olgan holda ishlab chiqilgan.",
+    "qrMenu": {
+      "title": "QR Menyu",
+      "description": "Mijozlar darhol skanerlashi va ko'rishi mumkin bo'lgan chiroyli raqamli menyular yarating. Narxlar va mahsulotlarni qayta chop etmasdan real vaqtda yangilang.",
+      "bullets": [
+        "Darhol menyu yangilanishlari, nol bosma xarajatlar",
+        "Xalqaro mehmonlar uchun ko'p tillarni qo'llab-quvvatlash",
+        "Allergen va dieta ma'lumotlarini ko'rsatish"
+      ],
+      "metrics": {
+        "printingCosts": "Bosma xarajatlar",
+        "updateTime": "Yangilash vaqti",
+        "instant": "Darhol"
+      }
     },
-    "kitchen": {
-      "title": "Oshxona displeyi",
-      "description": "Samarali buyurtma tayyorlash uchun real vaqtda oshxona displeyi tizimi"
+    "orderManagement": {
+      "title": "Buyurtma va stol boshqaruvi",
+      "description": "Butun zalingizni real vaqtda qush ko'zi bilan ko'ring. Stol holatini kuzating, bronlarni boshqaring va o'tirish joylarini optimallashtiring.",
+      "bullets": [
+        "Jonli stol holati bilan vizual zal rejasi",
+        "Aqlli bron boshqaruvi",
+        "Stol birlashtirish va ajratish funksiyasi"
+      ],
+      "metrics": {
+        "orderProcessing": "Buyurtmalarni qayta ishlash",
+        "faster": "40% tezroq",
+        "tableTurnover": "Stol aylanmasi"
+      }
     },
-    "tables": {
-      "title": "Stollarni boshqarish",
-      "description": "Stollar, band qilish va mijozlarni joylashtirish boshqaruvi"
+    "posPayments": {
+      "title": "POS va to'lovlar",
+      "description": "Barcha to'lov usullarini qo'llab-quvvatlaydigan tez, ishonchli savdo nuqtasi. Hisoblarni bo'ling, chegirmalar qo'llang va hisoblarni soniyalar ichida yoping.",
+      "bullets": [
+        "Kartalar, naqd pul va mobil to'lovlarni qabul qiling",
+        "Oson hisob bo'lish va mahsulot o'tkazish",
+        "Avtomatik tip hisoblash va taqsimlash"
+      ],
+      "metrics": {
+        "paymentSuccess": "To'lov muvaffaqiyati",
+        "checkoutTime": "To'lov vaqti"
+      }
     },
-    "payments": {
-      "title": "To'lovlarni qayta ishlash",
-      "description": "Ko'p to'lov usullari bilan xavfsiz to'lovlarni qayta ishlash"
+    "kitchenFlow": {
+      "title": "Xodimlar va oshxona oqimi",
+      "description": "Qog'oz chiptalarni yo'q qiladigan raqamli oshxona displeyi tizimi. Buyurtmalarni ustuvorlashtiring, pishirish vaqtlarini kuzating va jamoangizni muvofiqlashtiring.",
+      "bullets": [
+        "Real vaqtda oshxona ekranlari",
+        "Buyurtmalarni ustuvorlashtirish va vaqtlash",
+        "Rolga asoslangan xodimlar vazifalarini boshqarish"
+      ],
+      "metrics": {
+        "orderErrors": "Buyurtma xatolari",
+        "avgPrepTime": "O'rtacha tayyorlash vaqti"
+      }
     },
-    "analytics": {
-      "title": "Analitika va hisobotlar",
-      "description": "Biznes samaradorligini kuzatish uchun batafsil analitika va hisobotlar"
-    },
-    "multilang": {
-      "title": "Ko'p tilli qo'llab-quvvatlash",
-      "description": "Butun dunyo bo'ylab ko'p tillar va valyutalarni qo'llab-quvvatlash"
+    "multiBranch": {
+      "title": "Ko'p filial nazorati",
+      "description": "Barcha joylaringizni bitta boshqaruv panelidan boshqaring. Menyularni standartlashtiring, ko'rsatkichlarni kuzating va biznesingizni kengaytiring.",
+      "bullets": [
+        "Markazlashtirilgan menyu va narxlarni boshqarish",
+        "Joylar bo'yicha tahlil va hisobot",
+        "Filialga xos sozlash imkoniyatlari"
+      ],
+      "metrics": {
+        "branches": "Filiallar",
+        "unlimited": "Cheksiz",
+        "syncTime": "Sinxronizatsiya",
+        "realTime": "Real vaqt"
+      }
     }
   },
   "pricing": {
+    "badge": "Narxlar",
     "title": "Oddiy, shaffof narxlar",
-    "subtitle": "Restoraningiz uchun eng yaxshi rejani tanlang. Barcha rejalar bepul sinov davri bilan.",
-    "monthly": "Oylik",
-    "yearly": "Yillik",
-    "save20": "20% tejash",
-    "perMonth": "/oy",
-    "perYear": "/yil",
-    "getStarted": "Boshlash",
-    "currentPlan": "Joriy reja",
+    "subtitle": "Bepul boshlang, tayyor bo'lganingizda yangilang. Yashirin to'lovlar yo'q, istalgan vaqtda bekor qiling.",
     "mostPopular": "Eng mashhur",
-    "features": "Xususiyatlar",
-    "unlimited": "Cheksiz",
-    "users": "foydalanuvchilar",
-    "tables": "stollar",
-    "products": "mahsulotlar",
-    "orders": "buyurtmalar/oy",
-    "faq": {
-      "title": "Ko'p so'raladigan savollar",
-      "q1": "Bepul sinov qanday ishlaydi?",
-      "a1": "Barcha rejalar 14 kunlik bepul sinov davrini o'z ichiga oladi. Boshlash uchun kredit karta talab qilinmaydi.",
-      "q2": "Keyinroq rejani o'zgartirish mumkinmi?",
-      "a2": "Ha! Rejangizni istalgan vaqtda yangilash yoki pasaytirish mumkin.",
-      "q3": "Qanday to'lov usullarini qabul qilasiz?",
-      "a3": "Biz barcha asosiy kredit va debet kartalarini qabul qilamiz.",
-      "q4": "Ma'lumotlarim xavfsizmi?",
-      "a4": "Albatta. Biz ma'lumotlaringizni xavfsiz saqlash uchun sanoat standartidagi shifrlash va xavfsizlik amaliyotlarini qo'llaymiz."
+    "perMonth": "/oy",
+    "plans": {
+      "free": {
+        "name": "Bepul",
+        "description": "HummyTummy'ni sinab ko'rish uchun mukammal",
+        "price": "₺0",
+        "cta": "Bepul boshlash",
+        "features": [
+          "2 ta xodim hisobi",
+          "5 ta stol",
+          "20 ta menyu elementi",
+          "Asosiy tahlil",
+          "Email orqali yordam"
+        ]
+      },
+      "pro": {
+        "name": "Pro",
+        "description": "O'sib borayotgan restoranlar uchun",
+        "price": "₺599",
+        "cta": "Bepul sinovni boshlash",
+        "features": [
+          "15 ta xodim hisobi",
+          "50 ta stol",
+          "500 ta menyu elementi",
+          "Kengaytirilgan tahlil",
+          "Oshxona displeyi tizimi",
+          "Ustuvor yordam"
+        ]
+      },
+      "business": {
+        "name": "Biznes",
+        "description": "Ko'p joyli operatsiyalar uchun",
+        "price": "₺999",
+        "cta": "Sotuvlar bilan bog'lanish",
+        "features": [
+          "Cheksiz xodimlar",
+          "Cheksiz stollar",
+          "Cheksiz menyu elementlari",
+          "Ko'p filial boshqaruvi",
+          "API kirish",
+          "Maxsus yordam"
+        ]
+      }
+    },
+    "trialNote": "Barcha rejalar 14 kunlik bepul sinov davrini o'z ichiga oladi. Kredit karta talab qilinmaydi."
+  },
+  "business": {
+    "badge": "Muhim natijalar",
+    "title": "Foyda chizig'ingizga haqiqiy ta'sir",
+    "subtitle": "HummyTummy mijozlari birinchi kundan boshlab o'lchanadigan yaxshilanishlarni ko'rmoqdalar.",
+    "values": {
+      "time": {
+        "title": "Vaqtni tejash",
+        "metric": "40%",
+        "metricLabel": "tezroq buyurtma qayta ishlash",
+        "description": "Takrorlanuvchi vazifalarni avtomatlashtiring va ish oqimingizni soddalashtiring. Boshqaruvga kamroq, mijozlarga ko'proq vaqt sarflang."
+      },
+      "errors": {
+        "title": "Xatolarni kamaytirish",
+        "metric": "85%",
+        "metricLabel": "kamroq buyurtma xatolari",
+        "description": "Raqamli buyurtma oqimi noto'g'ri aloqani yo'q qiladi. Buyurtmalar to'g'ridan-to'g'ri stoldan oshxonaga hech qanday chalkashliksiz boradi."
+      },
+      "revenue": {
+        "title": "Daromadni oshirish",
+        "metric": "25%",
+        "metricLabel": "yuqoriroq stol aylanmasi",
+        "description": "Tezroq xizmat ko'proq mijozlar demak. Real vaqt tahlili maksimal foyda uchun optimallashtirish yordam beradi."
+      }
     }
   },
-  "testimonials": {
-    "title": "Mijozlarimiz nima deydi",
-    "subtitle": "Kundalik operatsiyalari uchun HummyTummy'ga ishongan yuzlab restoranlar bilan qo'shiling",
-    "stats": {
-      "clients": "Baxtli mijozlar",
-      "rating": "O'rtacha reyting",
-      "support": "24/7 Qo'llab-quvvatlash",
-      "satisfaction": "Qoniqish"
+  "security": {
+    "badge": "Ishonch va xavfsizlik",
+    "title": "Har bir restoran uchun korporativ darajadagi xavfsizlik",
+    "subtitle": "Ma'lumotlaringiz sizning biznesingiz. Biz xavfsizlikni jiddiy qabul qilamiz, shunda siz eng muhim narsaga e'tibor qaratishingiz mumkin — mijozlaringizga xizmat ko'rsatish.",
+    "points": {
+      "encryption": {
+        "title": "Uchidan-uchiga shifrlash",
+        "description": "Barcha ma'lumotlar sanoat standarti AES-256 shifrlash yordamida uzatishda va saqlashda shifrlanadi."
+      },
+      "rbac": {
+        "title": "Rolga asoslangan kirish nazorati",
+        "description": "Nozik sozlangan ruxsatlar har bir jamoa a'zosi aynan nimani ko'rishi va qilishi mumkinligini nazorat qilish imkonini beradi."
+      },
+      "uptime": {
+        "title": "99.9% ish vaqti SLA",
+        "description": "Bir nechta ma'lumotlar markazlarida zaxira bilan korporativ darajadagi infratuzilma."
+      },
+      "compliance": {
+        "title": "GDPR va KVKK muvofiq",
+        "description": "Yevropa va Turkiya ma'lumotlarni himoya qilish qoidalariga to'liq muvofiqlik."
+      }
+    },
+    "visual": {
+      "title": "Ma'lumotlaringiz himoyalangan",
+      "subtitle": "Sanoatda yetakchi xavfsizlik choralari biznesingizni xavfsiz saqlaydi.",
+      "encryption": "Shifrlash",
+      "uptime": "Ish vaqti",
+      "monitoring": "Monitoring",
+      "compliant": "Muvofiq"
     }
   },
-  "contact": {
-    "title": "Biz bilan bog'laning",
-    "subtitle": "Savollaringiz bormi? Sizdan xabar olishdan xursandmiz. Bizga xabar yuboring, tez orada javob beramiz.",
-    "name": "Ism",
-    "namePlaceholder": "Ismingiz",
-    "email": "Email",
-    "emailPlaceholder": "email@manzilingiz.com",
-    "phone": "Telefon",
-    "phonePlaceholder": "+998 (90) 123-4567",
-    "phoneOptional": "Ixtiyoriy",
-    "message": "Xabar",
-    "messagePlaceholder": "Restoraningiz haqida bizga ayting...",
-    "submit": "Xabar yuborish",
-    "submitting": "Yuborilmoqda...",
-    "success": "Xabaringiz uchun rahmat! Tez orada siz bilan bog'lanamiz.",
-    "info": {
-      "email": "Email",
-      "emailValue": "contact@hummytummy.com",
-      "chat": "Jonli chat",
-      "chatValue": "Jamoamiz bilan suhbatlashing",
-      "hours": "Qo'llab-quvvatlash vaqti",
-      "hoursValue": "24/7 Mavjud"
-    }
+  "cta": {
+    "title": "Restoraningizni o'zgartirishga tayyormisiz?",
+    "subtitle": "Operatsiyalarni soddalashtirish va biznesini rivojlantirish uchun HummyTummy'dan foydalanayotgan {count} ta restoraniga qo'shiling.",
+    "primaryBtn": "Bepul sinovni boshlash",
+    "secondaryBtn": "Sotuvlar bilan gaplashing",
+    "trustBadge1": "Kredit karta talab qilinmaydi",
+    "trustBadge2": "14 kunlik bepul sinov",
+    "trustBadge3": "Istalgan vaqtda bekor qilish"
   },
   "footer": {
-    "description": "Operatsiyalaringizni soddalashtirish va samaradorlikni oshirish uchun mo'ljallangan zamonaviy restoran boshqaruv yechimi.",
+    "description": "Zamonaviy restoran boshqaruv platformasi. Operatsiyalarni soddalashtiring, mijozlarni mamnun qiling.",
     "product": "Mahsulot",
     "company": "Kompaniya",
+    "support": "Qo'llab-quvvatlash",
     "legal": "Huquqiy",
-    "features": "Xususiyatlar",
-    "pricing": "Narxlar",
-    "freeTrial": "Bepul sinov",
-    "about": "Haqida",
-    "contact": "Aloqa",
-    "blog": "Blog",
-    "privacy": "Maxfiylik siyosati",
-    "terms": "Xizmat shartlari",
-    "cookies": "Cookie siyosati",
-    "copyright": "Barcha huquqlar himoyalangan."
-  },
-  "plans": {
-    "FREE": {
-      "name": "Bepul",
-      "description": "Yangi boshlayotgan kichik restoranlar uchun mukammal"
+    "links": {
+      "features": "Xususiyatlar",
+      "pricing": "Narxlar",
+      "security": "Xavfsizlik",
+      "integrations": "Integratsiyalar",
+      "about": "Haqida",
+      "blog": "Blog",
+      "careers": "Karyera",
+      "contact": "Aloqa",
+      "helpCenter": "Yordam markazi",
+      "documentation": "Hujjatlar",
+      "apiReference": "API ma'lumotlar",
+      "status": "Holat",
+      "privacy": "Maxfiylik siyosati",
+      "terms": "Xizmat shartlari",
+      "cookies": "Cookie siyosati"
     },
-    "BASIC": {
-      "name": "Asosiy",
-      "description": "O'sib borayotgan restoranlar uchun ajoyib"
-    },
-    "PRO": {
-      "name": "Professional",
-      "description": "Bir nechta joylari bo'lgan restoranlar uchun"
-    },
-    "BUSINESS": {
-      "name": "Biznes",
-      "description": "Katta restoran tarmoqlari uchun korporativ yechim"
-    }
+    "copyright": "HummyTummy. Barcha huquqlar himoyalangan."
   }
 }

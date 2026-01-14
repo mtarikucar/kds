@@ -3,33 +3,39 @@
 import { motion } from 'framer-motion';
 import { Container } from '@/components/ui/Container';
 import { Zap, Shield, TrendingUp, Globe } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { getStats } from '@/lib/api';
-
-const benefits = [
-  {
-    icon: Zap,
-    title: 'Lightning Fast',
-    description: 'Process orders in seconds, not minutes. Optimized for speed.',
-  },
-  {
-    icon: Shield,
-    title: 'Secure & Reliable',
-    description: '99.9% uptime with enterprise-grade security.',
-  },
-  {
-    icon: TrendingUp,
-    title: 'Actionable Insights',
-    description: 'Real-time analytics to grow your business.',
-  },
-  {
-    icon: Globe,
-    title: 'Works Anywhere',
-    description: 'Multi-language, multi-currency support.',
-  },
-];
 
 export default function ProductOverview() {
   const stats = getStats();
+  const t = useTranslations('product');
+
+  const benefits = [
+    {
+      key: 'fast',
+      icon: Zap,
+      title: t('benefits.fast.title'),
+      description: t('benefits.fast.description'),
+    },
+    {
+      key: 'secure',
+      icon: Shield,
+      title: t('benefits.secure.title'),
+      description: t('benefits.secure.description'),
+    },
+    {
+      key: 'insights',
+      icon: TrendingUp,
+      title: t('benefits.insights.title'),
+      description: t('benefits.insights.description'),
+    },
+    {
+      key: 'global',
+      icon: Globe,
+      title: t('benefits.global.title'),
+      description: t('benefits.global.description'),
+    },
+  ];
 
   return (
     <section id="product" className="section-padding bg-gradient-subtle">
@@ -43,21 +49,19 @@ export default function ProductOverview() {
             transition={{ duration: 0.5 }}
           >
             <span className="inline-block text-sm font-semibold text-orange-600 mb-4 uppercase tracking-wider">
-              Why HummyTummy
+              {t('badge')}
             </span>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 tracking-tight mb-6">
-              Everything you need to run a modern restaurant
+              {t('title')}
             </h2>
             <p className="text-lg text-slate-600 mb-8">
-              From taking orders to managing your kitchen, HummyTummy gives you complete
-              control over your restaurant operations. No more juggling multiple tools or
-              losing track of orders.
+              {t('subtitle')}
             </p>
 
             <div className="grid sm:grid-cols-2 gap-6">
               {benefits.map((benefit, index) => (
                 <motion.div
-                  key={benefit.title}
+                  key={benefit.key}
                   initial={{ opacity: 0, y: 20 }}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}

@@ -3,61 +3,47 @@
 import { motion } from 'framer-motion';
 import { Container } from '@/components/ui/Container';
 import { Check, ArrowRight } from 'lucide-react';
-
-const plans = [
-  {
-    name: 'Free',
-    description: 'Perfect for trying out HummyTummy',
-    price: '₺0',
-    period: '/month',
-    features: [
-      '2 staff accounts',
-      '5 tables',
-      '20 menu items',
-      'Basic analytics',
-      'Email support',
-    ],
-    cta: 'Start free',
-    href: '/app/register?plan=FREE',
-    popular: false,
-  },
-  {
-    name: 'Pro',
-    description: 'For growing restaurants',
-    price: '₺599',
-    period: '/month',
-    features: [
-      '15 staff accounts',
-      '50 tables',
-      '500 menu items',
-      'Advanced analytics',
-      'Kitchen display system',
-      'Priority support',
-    ],
-    cta: 'Start free trial',
-    href: '/app/register?plan=PRO',
-    popular: true,
-  },
-  {
-    name: 'Business',
-    description: 'For multi-location operations',
-    price: '₺999',
-    period: '/month',
-    features: [
-      'Unlimited staff',
-      'Unlimited tables',
-      'Unlimited menu items',
-      'Multi-branch management',
-      'API access',
-      'Dedicated support',
-    ],
-    cta: 'Contact sales',
-    href: '/app/register?plan=BUSINESS',
-    popular: false,
-  },
-];
+import { useTranslations } from 'next-intl';
 
 export default function Pricing() {
+  const t = useTranslations('pricing');
+
+  const plans = [
+    {
+      key: 'free',
+      name: t('plans.free.name'),
+      description: t('plans.free.description'),
+      price: t('plans.free.price'),
+      period: t('perMonth'),
+      features: t.raw('plans.free.features') as string[],
+      cta: t('plans.free.cta'),
+      href: '/app/register?plan=FREE',
+      popular: false,
+    },
+    {
+      key: 'pro',
+      name: t('plans.pro.name'),
+      description: t('plans.pro.description'),
+      price: t('plans.pro.price'),
+      period: t('perMonth'),
+      features: t.raw('plans.pro.features') as string[],
+      cta: t('plans.pro.cta'),
+      href: '/app/register?plan=PRO',
+      popular: true,
+    },
+    {
+      key: 'business',
+      name: t('plans.business.name'),
+      description: t('plans.business.description'),
+      price: t('plans.business.price'),
+      period: t('perMonth'),
+      features: t.raw('plans.business.features') as string[],
+      cta: t('plans.business.cta'),
+      href: '/app/register?plan=BUSINESS',
+      popular: false,
+    },
+  ];
+
   return (
     <section id="pricing" className="section-padding">
       <Container>
@@ -69,20 +55,20 @@ export default function Pricing() {
           className="text-center max-w-3xl mx-auto mb-16"
         >
           <span className="inline-block text-sm font-semibold text-orange-600 mb-4 uppercase tracking-wider">
-            Pricing
+            {t('badge')}
           </span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 tracking-tight mb-4">
-            Simple, transparent pricing
+            {t('title')}
           </h2>
           <p className="text-lg text-slate-600">
-            Start free, upgrade when you&apos;re ready. No hidden fees, cancel anytime.
+            {t('subtitle')}
           </p>
         </motion.div>
 
         <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
           {plans.map((plan, index) => (
             <motion.div
-              key={plan.name}
+              key={plan.key}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -95,7 +81,7 @@ export default function Pricing() {
             >
               {plan.popular && (
                 <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-sm font-semibold px-4 py-1 rounded-full">
-                  Most Popular
+                  {t('mostPopular')}
                 </div>
               )}
 
@@ -140,7 +126,7 @@ export default function Pricing() {
           transition={{ duration: 0.5, delay: 0.4 }}
           className="text-center text-sm text-slate-500 mt-12"
         >
-          All plans include 14-day free trial. No credit card required.
+          {t('trialNote')}
         </motion.p>
       </Container>
     </section>

@@ -5,146 +5,289 @@
     "keywords": "restaurant pos, kitchen display system, restaurant management, qr menu, table management"
   },
   "nav": {
+    "product": "Product",
     "features": "Features",
     "pricing": "Pricing",
-    "contact": "Contact",
-    "login": "Login",
-    "register": "Get Started"
+    "security": "Security",
+    "signIn": "Sign in",
+    "startFree": "Start free",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
   },
   "hero": {
-    "badge": "Now Live",
-    "headline": "Streamline Your Restaurant",
-    "headlineHighlight": "Operations",
-    "subtitle": "Modern POS system designed for restaurants. Manage orders, kitchen display, tables, and payments all in one place.",
-    "cta": "Start Free Trial",
-    "ctaSecondary": "Learn More",
+    "badge": "Now serving {count} restaurants",
+    "headline": "The operating system for",
+    "headlineHighlight": "modern restaurants",
+    "subtitle": "Streamline orders, manage your floor, and grow your business with HummyTummy's all-in-one restaurant management platform.",
+    "cta": "Start free",
+    "ctaSecondary": "Watch demo",
     "trustBadge1": "No credit card required",
     "trustBadge2": "Setup in 5 minutes",
-    "trustBadge3": "Cancel anytime"
+    "trustBadge3": "Cancel anytime",
+    "mockStats": {
+      "activeTables": "Active Tables",
+      "ordersToday": "Orders Today",
+      "revenue": "Revenue"
+    },
+    "notification": {
+      "title": "Order #{number} Ready",
+      "subtitle": "Table {table} • Just now"
+    },
+    "weekGrowth": "This week"
+  },
+  "product": {
+    "badge": "Why HummyTummy",
+    "title": "Everything you need to run a modern restaurant",
+    "subtitle": "From taking orders to managing your kitchen, HummyTummy gives you complete control over your restaurant operations. No more juggling multiple tools or losing track of orders.",
+    "benefits": {
+      "fast": {
+        "title": "Lightning Fast",
+        "description": "Process orders in seconds, not minutes. Optimized for speed."
+      },
+      "secure": {
+        "title": "Secure & Reliable",
+        "description": "99.9% uptime with enterprise-grade security."
+      },
+      "insights": {
+        "title": "Actionable Insights",
+        "description": "Real-time analytics to grow your business."
+      },
+      "global": {
+        "title": "Works Anywhere",
+        "description": "Multi-language, multi-currency support."
+      }
+    },
+    "panels": {
+      "activeOrders": "Active Orders",
+      "live": "Live",
+      "items": "items",
+      "table": "Table",
+      "preparing": "Preparing",
+      "ready": "Ready",
+      "new": "New",
+      "platformPerformance": "Platform Performance",
+      "allTime": "all time",
+      "total": "Total",
+      "revenue": "Revenue",
+      "processed": "Processed",
+      "orders": "Orders",
+      "active": "Active",
+      "restaurants": "Restaurants"
+    }
   },
   "features": {
-    "title": "Everything You Need",
-    "subtitle": "Powerful features designed to help your restaurant succeed",
-    "pos": {
-      "title": "Smart POS System",
-      "description": "Fast, intuitive point of sale system with real-time order management"
+    "badge": "Features",
+    "title": "Built for how restaurants actually work",
+    "subtitle": "Every feature designed with restaurant owners, managers, and staff in mind.",
+    "qrMenu": {
+      "title": "QR Menu",
+      "description": "Create beautiful digital menus that customers can scan and browse instantly. Update prices and items in real-time without reprinting.",
+      "bullets": [
+        "Instant menu updates, zero printing costs",
+        "Multi-language support for international guests",
+        "Allergen and dietary information display"
+      ],
+      "metrics": {
+        "printingCosts": "Printing costs",
+        "updateTime": "Update time",
+        "instant": "Instant"
+      }
     },
-    "kitchen": {
-      "title": "Kitchen Display",
-      "description": "Real-time kitchen display system for efficient order preparation"
+    "orderManagement": {
+      "title": "Order & Table Management",
+      "description": "Get a real-time bird's eye view of your entire floor. Track table status, manage reservations, and optimize seating.",
+      "bullets": [
+        "Visual floor plan with live table status",
+        "Smart reservation management",
+        "Table merge and split functionality"
+      ],
+      "metrics": {
+        "orderProcessing": "Order processing",
+        "faster": "40% faster",
+        "tableTurnover": "Table turnover"
+      }
     },
-    "tables": {
-      "title": "Table Management",
-      "description": "Manage tables, reservations, and customer seating efficiently"
+    "posPayments": {
+      "title": "POS & Payments",
+      "description": "Fast, reliable point of sale with support for all payment methods. Split bills, apply discounts, and close tabs in seconds.",
+      "bullets": [
+        "Accept cards, cash, and mobile payments",
+        "Easy bill splitting and item transfers",
+        "Automatic tip calculation and distribution"
+      ],
+      "metrics": {
+        "paymentSuccess": "Payment success",
+        "checkoutTime": "Checkout time"
+      }
     },
-    "payments": {
-      "title": "Payment Processing",
-      "description": "Secure payment processing with multiple payment methods"
+    "kitchenFlow": {
+      "title": "Staff & Kitchen Flow",
+      "description": "Digital kitchen display system that eliminates paper tickets. Prioritize orders, track cook times, and coordinate your team.",
+      "bullets": [
+        "Real-time kitchen display screens",
+        "Order prioritization and timing",
+        "Role-based staff task management"
+      ],
+      "metrics": {
+        "orderErrors": "Order errors",
+        "avgPrepTime": "Avg prep time"
+      }
     },
-    "analytics": {
-      "title": "Analytics & Reports",
-      "description": "Detailed analytics and reports to track your business performance"
-    },
-    "multilang": {
-      "title": "Multi-language Support",
-      "description": "Support for multiple languages and currencies worldwide"
+    "multiBranch": {
+      "title": "Multi-Branch Control",
+      "description": "Manage all your locations from a single dashboard. Standardize menus, monitor performance, and scale your business.",
+      "bullets": [
+        "Centralized menu and pricing control",
+        "Cross-location analytics and reporting",
+        "Branch-specific customization options"
+      ],
+      "metrics": {
+        "branches": "Branches",
+        "unlimited": "Unlimited",
+        "syncTime": "Sync time",
+        "realTime": "Real-time"
+      }
     }
   },
   "pricing": {
-    "title": "Simple, Transparent Pricing",
-    "subtitle": "Choose the perfect plan for your restaurant. All plans include a free trial.",
-    "monthly": "Monthly",
-    "yearly": "Yearly",
-    "save20": "Save 20%",
-    "perMonth": "/month",
-    "perYear": "/year",
-    "getStarted": "Get Started",
-    "currentPlan": "Current Plan",
+    "badge": "Pricing",
+    "title": "Simple, transparent pricing",
+    "subtitle": "Start free, upgrade when you're ready. No hidden fees, cancel anytime.",
     "mostPopular": "Most Popular",
-    "features": "Features",
-    "unlimited": "Unlimited",
-    "users": "users",
-    "tables": "tables",
-    "products": "products",
-    "orders": "orders/month",
-    "faq": {
-      "title": "Frequently Asked Questions",
-      "q1": "How does the free trial work?",
-      "a1": "All plans include a 14-day free trial. No credit card required to start. You can cancel anytime during the trial period.",
-      "q2": "Can I change plans later?",
-      "a2": "Yes! You can upgrade or downgrade your plan at any time. Changes will be reflected in your next billing cycle.",
-      "q3": "What payment methods do you accept?",
-      "a3": "We accept all major credit cards, debit cards, and support both international and local payment methods.",
-      "q4": "Is my data secure?",
-      "a4": "Absolutely. We use industry-standard encryption and security practices to keep your data safe."
+    "perMonth": "/month",
+    "plans": {
+      "free": {
+        "name": "Free",
+        "description": "Perfect for trying out HummyTummy",
+        "price": "₺0",
+        "cta": "Start free",
+        "features": [
+          "2 staff accounts",
+          "5 tables",
+          "20 menu items",
+          "Basic analytics",
+          "Email support"
+        ]
+      },
+      "pro": {
+        "name": "Pro",
+        "description": "For growing restaurants",
+        "price": "₺599",
+        "cta": "Start free trial",
+        "features": [
+          "15 staff accounts",
+          "50 tables",
+          "500 menu items",
+          "Advanced analytics",
+          "Kitchen display system",
+          "Priority support"
+        ]
+      },
+      "business": {
+        "name": "Business",
+        "description": "For multi-location operations",
+        "price": "₺999",
+        "cta": "Contact sales",
+        "features": [
+          "Unlimited staff",
+          "Unlimited tables",
+          "Unlimited menu items",
+          "Multi-branch management",
+          "API access",
+          "Dedicated support"
+        ]
+      }
+    },
+    "trialNote": "All plans include 14-day free trial. No credit card required."
+  },
+  "business": {
+    "badge": "Results That Matter",
+    "title": "Real impact on your bottom line",
+    "subtitle": "HummyTummy customers see measurable improvements from day one.",
+    "values": {
+      "time": {
+        "title": "Save Time",
+        "metric": "40%",
+        "metricLabel": "faster order processing",
+        "description": "Automate repetitive tasks and streamline your workflow. Spend less time on admin and more time with customers."
+      },
+      "errors": {
+        "title": "Reduce Errors",
+        "metric": "85%",
+        "metricLabel": "fewer order mistakes",
+        "description": "Digital order flow eliminates miscommunication. Orders go directly from table to kitchen with zero confusion."
+      },
+      "revenue": {
+        "title": "Increase Revenue",
+        "metric": "25%",
+        "metricLabel": "higher table turnover",
+        "description": "Faster service means more customers served. Real-time insights help you optimize for maximum profitability."
+      }
     }
   },
-  "testimonials": {
-    "title": "What Our Clients Say",
-    "subtitle": "Join hundreds of restaurants that trust HummyTummy for their daily operations",
-    "stats": {
-      "clients": "Happy Clients",
-      "rating": "Average Rating",
-      "support": "24/7 Support",
-      "satisfaction": "Satisfaction"
+  "security": {
+    "badge": "Trust & Security",
+    "title": "Enterprise-grade security for every restaurant",
+    "subtitle": "Your data is your business. We take security seriously so you can focus on what matters most—serving your customers.",
+    "points": {
+      "encryption": {
+        "title": "End-to-End Encryption",
+        "description": "All data is encrypted in transit and at rest using industry-standard AES-256 encryption."
+      },
+      "rbac": {
+        "title": "Role-Based Access Control",
+        "description": "Fine-grained permissions let you control exactly what each team member can see and do."
+      },
+      "uptime": {
+        "title": "99.9% Uptime SLA",
+        "description": "Enterprise-grade infrastructure with redundancy across multiple data centers."
+      },
+      "compliance": {
+        "title": "GDPR & KVKK Compliant",
+        "description": "Full compliance with European and Turkish data protection regulations."
+      }
+    },
+    "visual": {
+      "title": "Your Data is Protected",
+      "subtitle": "Industry-leading security measures keep your business safe.",
+      "encryption": "Encryption",
+      "uptime": "Uptime",
+      "monitoring": "Monitoring",
+      "compliant": "Compliant"
     }
   },
-  "contact": {
-    "title": "Get In Touch",
-    "subtitle": "Have questions? We'd love to hear from you. Send us a message and we'll respond as soon as possible.",
-    "name": "Name",
-    "namePlaceholder": "Your name",
-    "email": "Email",
-    "emailPlaceholder": "your@email.com",
-    "phone": "Phone",
-    "phonePlaceholder": "+1 (555) 123-4567",
-    "phoneOptional": "Optional",
-    "message": "Message",
-    "messagePlaceholder": "Tell us about your restaurant and how we can help...",
-    "submit": "Send Message",
-    "submitting": "Sending...",
-    "success": "Thank you for your message! We'll get back to you soon.",
-    "info": {
-      "email": "Email",
-      "emailValue": "contact@hummytummy.com",
-      "chat": "Live Chat",
-      "chatValue": "Chat with our team",
-      "hours": "Support Hours",
-      "hoursValue": "24/7 Available"
-    }
+  "cta": {
+    "title": "Ready to transform your restaurant?",
+    "subtitle": "Join {count} restaurants already using HummyTummy to streamline operations and grow their business.",
+    "primaryBtn": "Start free trial",
+    "secondaryBtn": "Talk to sales",
+    "trustBadge1": "No credit card required",
+    "trustBadge2": "14-day free trial",
+    "trustBadge3": "Cancel anytime"
   },
   "footer": {
-    "description": "Modern restaurant management solution designed to streamline your operations and boost efficiency.",
+    "description": "The modern restaurant management platform. Streamline operations, delight customers.",
     "product": "Product",
     "company": "Company",
+    "support": "Support",
     "legal": "Legal",
-    "features": "Features",
-    "pricing": "Pricing",
-    "freeTrial": "Free Trial",
-    "about": "About",
-    "contact": "Contact",
-    "blog": "Blog",
-    "privacy": "Privacy Policy",
-    "terms": "Terms of Service",
-    "cookies": "Cookie Policy",
-    "copyright": "All rights reserved."
-  },
-  "plans": {
-    "FREE": {
-      "name": "Free",
-      "description": "Perfect for small restaurants getting started"
+    "links": {
+      "features": "Features",
+      "pricing": "Pricing",
+      "security": "Security",
+      "integrations": "Integrations",
+      "about": "About",
+      "blog": "Blog",
+      "careers": "Careers",
+      "contact": "Contact",
+      "helpCenter": "Help Center",
+      "documentation": "Documentation",
+      "apiReference": "API Reference",
+      "status": "Status",
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Service",
+      "cookies": "Cookie Policy"
     },
-    "BASIC": {
-      "name": "Basic",
-      "description": "Great for growing restaurants"
-    },
-    "PRO": {
-      "name": "Pro",
-      "description": "For established restaurants with multiple locations"
-    },
-    "BUSINESS": {
-      "name": "Business",
-      "description": "Enterprise solution for large restaurant chains"
-    }
+    "copyright": "HummyTummy. All rights reserved."
   }
 }

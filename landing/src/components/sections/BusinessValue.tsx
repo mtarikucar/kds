@@ -3,35 +3,41 @@
 import { motion } from 'framer-motion';
 import { Container } from '@/components/ui/Container';
 import { Clock, CheckCircle, TrendingUp } from 'lucide-react';
-
-const values = [
-  {
-    icon: Clock,
-    title: 'Save Time',
-    metric: '40%',
-    metricLabel: 'faster order processing',
-    description: 'Automate repetitive tasks and streamline your workflow. Spend less time on admin and more time with customers.',
-    color: 'bg-blue-500',
-  },
-  {
-    icon: CheckCircle,
-    title: 'Reduce Errors',
-    metric: '85%',
-    metricLabel: 'fewer order mistakes',
-    description: 'Digital order flow eliminates miscommunication. Orders go directly from table to kitchen with zero confusion.',
-    color: 'bg-green-500',
-  },
-  {
-    icon: TrendingUp,
-    title: 'Increase Revenue',
-    metric: '25%',
-    metricLabel: 'higher table turnover',
-    description: 'Faster service means more customers served. Real-time insights help you optimize for maximum profitability.',
-    color: 'bg-orange-500',
-  },
-];
+import { useTranslations } from 'next-intl';
 
 export default function BusinessValue() {
+  const t = useTranslations('business');
+
+  const values = [
+    {
+      key: 'time',
+      icon: Clock,
+      title: t('values.time.title'),
+      metric: t('values.time.metric'),
+      metricLabel: t('values.time.metricLabel'),
+      description: t('values.time.description'),
+      color: 'bg-blue-500',
+    },
+    {
+      key: 'errors',
+      icon: CheckCircle,
+      title: t('values.errors.title'),
+      metric: t('values.errors.metric'),
+      metricLabel: t('values.errors.metricLabel'),
+      description: t('values.errors.description'),
+      color: 'bg-green-500',
+    },
+    {
+      key: 'revenue',
+      icon: TrendingUp,
+      title: t('values.revenue.title'),
+      metric: t('values.revenue.metric'),
+      metricLabel: t('values.revenue.metricLabel'),
+      description: t('values.revenue.description'),
+      color: 'bg-orange-500',
+    },
+  ];
+
   return (
     <section className="section-padding bg-slate-900">
       <Container>
@@ -43,20 +49,20 @@ export default function BusinessValue() {
           className="text-center max-w-3xl mx-auto mb-16"
         >
           <span className="inline-block text-sm font-semibold text-orange-400 mb-4 uppercase tracking-wider">
-            Results That Matter
+            {t('badge')}
           </span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight mb-4">
-            Real impact on your bottom line
+            {t('title')}
           </h2>
           <p className="text-lg text-slate-400">
-            HummyTummy customers see measurable improvements from day one.
+            {t('subtitle')}
           </p>
         </motion.div>
 
         <div className="grid md:grid-cols-3 gap-8">
           {values.map((value, index) => (
             <motion.div
-              key={value.title}
+              key={value.key}
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}

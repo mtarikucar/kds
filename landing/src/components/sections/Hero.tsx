@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Play } from 'lucide-react';
 import { Container } from '@/components/ui/Container';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { useTranslations } from 'next-intl';
 import { getStats } from '@/lib/api';
 
 const containerVariants = {
@@ -29,6 +30,7 @@ const itemVariants = {
 export default function Hero() {
   const prefersReducedMotion = useReducedMotion();
   const stats = getStats();
+  const t = useTranslations('hero');
 
   const variants = prefersReducedMotion
     ? { hidden: { opacity: 1 }, visible: { opacity: 1 } }
@@ -61,23 +63,22 @@ export default function Hero() {
               className="inline-flex items-center gap-2 px-3 py-1.5 mb-6 text-sm font-medium text-slate-600 bg-white/80 rounded-full border border-slate-200/50 backdrop-blur-sm"
             >
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              Now serving {stats.restaurantCount} restaurants
+              {t('badge', { count: stats.restaurantCount })}
             </motion.div>
 
             <motion.h1
               variants={childVariants}
               className="text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 tracking-tight leading-[1.1] mb-6"
             >
-              The operating system for{' '}
-              <span className="text-gradient">modern restaurants</span>
+              {t('headline')}{' '}
+              <span className="text-gradient">{t('headlineHighlight')}</span>
             </motion.h1>
 
             <motion.p
               variants={childVariants}
               className="text-lg lg:text-xl text-slate-600 mb-8 max-w-xl mx-auto lg:mx-0"
             >
-              Streamline orders, manage your floor, and grow your business with
-              HummyTummy&apos;s all-in-one restaurant management platform.
+              {t('subtitle')}
             </motion.p>
 
             <motion.div
@@ -88,7 +89,7 @@ export default function Hero() {
                 href="/app/register"
                 className="inline-flex items-center justify-center gap-2 px-6 py-3.5 text-base font-semibold text-white bg-slate-900 rounded-xl hover:bg-slate-800 transition-all hover:shadow-lg group"
               >
-                Start free
+                {t('cta')}
                 <ArrowRight
                   size={18}
                   className="group-hover:translate-x-0.5 transition-transform"
@@ -99,7 +100,7 @@ export default function Hero() {
                 className="inline-flex items-center justify-center gap-2 px-6 py-3.5 text-base font-semibold text-slate-700 bg-white rounded-xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all"
               >
                 <Play size={18} className="text-slate-500" />
-                Watch demo
+                {t('ctaSecondary')}
               </a>
             </motion.div>
 
@@ -111,19 +112,19 @@ export default function Hero() {
                 <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
-                No credit card required
+                {t('trustBadge1')}
               </div>
               <div className="flex items-center gap-2">
                 <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
-                Setup in 5 minutes
+                {t('trustBadge2')}
               </div>
               <div className="flex items-center gap-2">
                 <svg className="w-4 h-4 text-green-500" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                 </svg>
-                Cancel anytime
+                {t('trustBadge3')}
               </div>
             </motion.div>
           </motion.div>
