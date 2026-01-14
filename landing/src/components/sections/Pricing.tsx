@@ -21,6 +21,17 @@ export default function Pricing() {
       popular: false,
     },
     {
+      key: 'basic',
+      name: t('plans.basic.name'),
+      description: t('plans.basic.description'),
+      price: t('plans.basic.price'),
+      period: t('perMonth'),
+      features: t.raw('plans.basic.features') as string[],
+      cta: t('plans.basic.cta'),
+      href: '/app/register?plan=BASIC',
+      popular: false,
+    },
+    {
       key: 'pro',
       name: t('plans.pro.name'),
       description: t('plans.pro.description'),
@@ -65,7 +76,7 @@ export default function Pricing() {
           </p>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
           {plans.map((plan, index) => (
             <motion.div
               key={plan.key}

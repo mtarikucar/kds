@@ -159,42 +159,58 @@
       "free": {
         "name": "Ücretsiz",
         "description": "HummyTummy'yi denemek için mükemmel",
-        "price": "₺0",
+        "price": "$0",
         "cta": "Ücretsiz başla",
         "features": [
-          "2 personel hesabı",
+          "2 kullanıcı",
           "5 masa",
-          "20 menü öğesi",
-          "Temel analitik",
-          "E-posta desteği"
+          "25 ürün",
+          "5 kategori",
+          "KDS entegrasyonu"
+        ]
+      },
+      "basic": {
+        "name": "Basic",
+        "description": "Küçük restoranlar için",
+        "price": "$29.99",
+        "cta": "Ücretsiz denemeye başla",
+        "features": [
+          "5 kullanıcı",
+          "20 masa",
+          "100 ürün",
+          "20 kategori",
+          "Stok takibi",
+          "KDS entegrasyonu"
         ]
       },
       "pro": {
         "name": "Pro",
         "description": "Büyüyen restoranlar için",
-        "price": "₺599",
+        "price": "$79.99",
         "cta": "Ücretsiz denemeye başla",
         "features": [
-          "15 personel hesabı",
+          "15 kullanıcı",
           "50 masa",
-          "500 menü öğesi",
-          "Gelişmiş analitik",
-          "Mutfak ekran sistemi",
+          "500 ürün",
+          "50 kategori",
+          "Gelişmiş raporlar",
+          "Çoklu şube",
+          "Özel marka",
           "Öncelikli destek"
         ]
       },
       "business": {
-        "name": "İşletme",
+        "name": "Business",
         "description": "Çoklu lokasyon operasyonları için",
-        "price": "₺999",
+        "price": "$199.99",
         "cta": "Satışla iletişime geç",
         "features": [
-          "Sınırsız personel",
+          "Sınırsız kullanıcı",
           "Sınırsız masa",
-          "Sınırsız menü öğesi",
-          "Çoklu şube yönetimi",
+          "Sınırsız ürün",
+          "Sınırsız kategori",
           "API erişimi",
-          "Özel destek"
+          "Tüm özellikler dahil"
         ]
       }
     },

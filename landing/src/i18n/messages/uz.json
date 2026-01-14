@@ -159,42 +159,58 @@
       "free": {
         "name": "Bepul",
         "description": "HummyTummy'ni sinab ko'rish uchun mukammal",
-        "price": "₺0",
+        "price": "$0",
         "cta": "Bepul boshlash",
         "features": [
-          "2 ta xodim hisobi",
+          "2 ta foydalanuvchi",
           "5 ta stol",
-          "20 ta menyu elementi",
-          "Asosiy tahlil",
-          "Email orqali yordam"
+          "25 ta mahsulot",
+          "5 ta kategoriya",
+          "KDS integratsiyasi"
+        ]
+      },
+      "basic": {
+        "name": "Asosiy",
+        "description": "Kichik restoranlar uchun",
+        "price": "$29.99",
+        "cta": "Bepul sinovni boshlash",
+        "features": [
+          "5 ta foydalanuvchi",
+          "20 ta stol",
+          "100 ta mahsulot",
+          "20 ta kategoriya",
+          "Inventar kuzatuvi",
+          "KDS integratsiyasi"
         ]
       },
       "pro": {
         "name": "Pro",
         "description": "O'sib borayotgan restoranlar uchun",
-        "price": "₺599",
+        "price": "$79.99",
         "cta": "Bepul sinovni boshlash",
         "features": [
-          "15 ta xodim hisobi",
+          "15 ta foydalanuvchi",
           "50 ta stol",
-          "500 ta menyu elementi",
-          "Kengaytirilgan tahlil",
-          "Oshxona displeyi tizimi",
+          "500 ta mahsulot",
+          "50 ta kategoriya",
+          "Kengaytirilgan hisobotlar",
+          "Ko'p joylashuv",
+          "Maxsus brend",
           "Ustuvor yordam"
         ]
       },
       "business": {
         "name": "Biznes",
         "description": "Ko'p joyli operatsiyalar uchun",
-        "price": "₺999",
+        "price": "$199.99",
         "cta": "Sotuvlar bilan bog'lanish",
         "features": [
-          "Cheksiz xodimlar",
+          "Cheksiz foydalanuvchilar",
           "Cheksiz stollar",
-          "Cheksiz menyu elementlari",
-          "Ko'p filial boshqaruvi",
+          "Cheksiz mahsulotlar",
+          "Cheksiz kategoriyalar",
           "API kirish",
-          "Maxsus yordam"
+          "Barcha xususiyatlar kiritilgan"
         ]
       }
     },

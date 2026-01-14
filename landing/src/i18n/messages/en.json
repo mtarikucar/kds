@@ -159,42 +159,58 @@
       "free": {
         "name": "Free",
         "description": "Perfect for trying out HummyTummy",
-        "price": "₺0",
+        "price": "$0",
         "cta": "Start free",
         "features": [
-          "2 staff accounts",
+          "2 users",
           "5 tables",
-          "20 menu items",
-          "Basic analytics",
-          "Email support"
+          "25 products",
+          "5 categories",
+          "KDS integration"
+        ]
+      },
+      "basic": {
+        "name": "Basic",
+        "description": "For small restaurants",
+        "price": "$29.99",
+        "cta": "Start free trial",
+        "features": [
+          "5 users",
+          "20 tables",
+          "100 products",
+          "20 categories",
+          "Inventory tracking",
+          "KDS integration"
         ]
       },
       "pro": {
         "name": "Pro",
         "description": "For growing restaurants",
-        "price": "₺599",
+        "price": "$79.99",
         "cta": "Start free trial",
         "features": [
-          "15 staff accounts",
+          "15 users",
           "50 tables",
-          "500 menu items",
-          "Advanced analytics",
-          "Kitchen display system",
+          "500 products",
+          "50 categories",
+          "Advanced reports",
+          "Multi-location",
+          "Custom branding",
           "Priority support"
         ]
       },
       "business": {
         "name": "Business",
         "description": "For multi-location operations",
-        "price": "₺999",
+        "price": "$199.99",
         "cta": "Contact sales",
         "features": [
-          "Unlimited staff",
+          "Unlimited users",
           "Unlimited tables",
-          "Unlimited menu items",
-          "Multi-branch management",
+          "Unlimited products",
+          "Unlimited categories",
           "API access",
-          "Dedicated support"
+          "All features included"
         ]
       }
     },
