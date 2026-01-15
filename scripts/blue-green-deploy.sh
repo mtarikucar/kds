@@ -8,6 +8,12 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 NGINX_CONFIG="/etc/nginx/sites-available/hummytummy.com"
+ENV_FILE="$PROJECT_ROOT/.env.production"
+
+# Docker compose command with env file
+docker_compose() {
+    docker compose --env-file "$ENV_FILE" -f "$PROJECT_ROOT/docker-compose.prod.yml" "$@"
+}
 
 # Colors for output
 RED='\033[0;31m'
@@ -140,15 +146,15 @@ deploy() {
 
     # Stop inactive environment containers if running
     log "Stopping $inactive_env environment..."
-    docker compose -f "$PROJECT_ROOT/docker-compose.prod.yml" stop backend-$inactive_env frontend-$inactive_env 2>/dev/null || true
+    docker_compose stop backend-$inactive_env frontend-$inactive_env 2>/dev/null || true
 
     # Build new images
     log "Building $inactive_env environment..."
-    docker compose -f "$PROJECT_ROOT/docker-compose.prod.yml" build backend-$inactive_env frontend-$inactive_env
+    docker_compose build backend-$inactive_env frontend-$inactive_env
 
     # Start inactive environment
     log "Starting $inactive_env environment..."
-    docker compose -f "$PROJECT_ROOT/docker-compose.prod.yml" up -d backend-$inactive_env frontend-$inactive_env
+    docker_compose up -d backend-$inactive_env frontend-$inactive_env
 
     # Wait for services to be ready
     log "Waiting for $inactive_env environment to be ready..."
@@ -156,7 +162,7 @@ deploy() {
 
     # Run database migrations on inactive environment with baseline support
     log "Running database migrations..."
-    MIGRATION_OUTPUT=$(docker compose -f "$PROJECT_ROOT/docker-compose.prod.yml" exec -T backend-$inactive_env npx prisma migrate deploy 2>&1) && {
+    MIGRATION_OUTPUT=$(docker_compose exec -T backend-$inactive_env npx prisma migrate deploy 2>&1) && {
         log "Migrations applied successfully"
     } || {
         if echo "$MIGRATION_OUTPUT" | grep -q "P3005"; then
@@ -164,11 +170,11 @@ deploy() {
             # Get list of migrations and mark them as applied
             for migration in $(ls -1 "$PROJECT_ROOT/backend/prisma/migrations" | grep -E '^[0-9]+' | sort); do
                 log "Marking migration $migration as applied..."
-                docker compose -f "$PROJECT_ROOT/docker-compose.prod.yml" exec -T backend-$inactive_env npx prisma migrate resolve --applied "$migration" || true
+                docker_compose exec -T backend-$inactive_env npx prisma migrate resolve --applied "$migration" || true
             done
             # Retry migration deploy
             log "Retrying migration deploy..."
-            docker compose -f "$PROJECT_ROOT/docker-compose.prod.yml" exec -T backend-$inactive_env npx prisma migrate deploy || {
+            docker_compose exec -T backend-$inactive_env npx prisma migrate deploy || {
                 error "Database migration failed after baseline: $MIGRATION_OUTPUT"
                 return 1
             }
@@ -183,14 +189,14 @@ deploy() {
     if ! check_health "$inactive_env"; then
         error "Health check failed for $inactive_env environment"
         log "Keeping $active_env environment active"
-        docker compose -f "$PROJECT_ROOT/docker-compose.prod.yml" stop backend-$inactive_env frontend-$inactive_env
+        docker_compose stop backend-$inactive_env frontend-$inactive_env
         return 1
     fi
 
     # Switch traffic to new environment
     if ! switch_nginx "$inactive_env"; then
         error "Failed to switch nginx"
-        docker compose -f "$PROJECT_ROOT/docker-compose.prod.yml" stop backend-$inactive_env frontend-$inactive_env
+        docker_compose stop backend-$inactive_env frontend-$inactive_env
         return 1
     fi
 
@@ -208,7 +214,7 @@ deploy() {
 
     # Stop old environment after successful switch
     log "Stopping old $active_env environment..."
-    docker compose -f "$PROJECT_ROOT/docker-compose.prod.yml" stop backend-$active_env frontend-$active_env
+    docker_compose stop backend-$active_env frontend-$active_env
 
     # Show status
     log "=== Deployment Complete ==="
@@ -233,7 +239,7 @@ rollback() {
 
     # Start old environment
     log "Starting $inactive_env environment..."
-    docker compose -f "$PROJECT_ROOT/docker-compose.prod.yml" up -d backend-$inactive_env frontend-$inactive_env
+    docker_compose up -d backend-$inactive_env frontend-$inactive_env
 
     sleep 10
 
@@ -252,7 +258,7 @@ rollback() {
     success "Rollback successful! $inactive_env is now active"
 
     # Stop failed environment
-    docker compose -f "$PROJECT_ROOT/docker-compose.prod.yml" stop backend-$active_env frontend-$active_env
+    docker_compose stop backend-$active_env frontend-$active_env
 
     return 0
 }
@@ -268,7 +274,7 @@ status() {
     echo ""
 
     log "Container status:"
-    docker compose -f "$PROJECT_ROOT/docker-compose.prod.yml" ps
+    docker_compose ps
 
     echo ""
     log "Nginx upstream configuration:"

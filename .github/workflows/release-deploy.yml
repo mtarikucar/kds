@@ -216,6 +216,7 @@ jobs:
 
             # Pull latest code
             git fetch --all --tags
+            git reset --hard HEAD
             git checkout ${{ steps.version.outputs.VERSION }}
 
             # Create .env.production with all required variables
