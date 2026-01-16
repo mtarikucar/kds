@@ -173,6 +173,9 @@ jobs:
         run: |
           ssh root@${{ env.SERVER_HOST }} << 'EOF'
             cd /root/kds
+            # Ensure correct database name for backup
+            sed -i 's/POSTGRES_DB=restaurant_pos$/POSTGRES_DB=restaurant_pos_prod/' .env.production 2>/dev/null || true
+            sed -i 's|/restaurant_pos?|/restaurant_pos_prod?|' .env.production 2>/dev/null || true
             ./scripts/backup-database.sh
           EOF
 
