@@ -15,6 +15,7 @@ import { OrdersService } from '../services/orders.service';
 import { CreateOrderDto } from '../dto/create-order.dto';
 import { UpdateOrderDto } from '../dto/update-order.dto';
 import { UpdateOrderStatusDto } from '../dto/update-order-status.dto';
+import { TransferTableOrdersDto } from '../dto/transfer-table.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
@@ -101,6 +102,17 @@ export class OrdersController {
     @Request() req,
   ) {
     return this.ordersService.updateStatus(id, updateStatusDto, req.tenantId);
+  }
+
+  @Post('transfer-table')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiOperation({ summary: 'Transfer orders from one table to another (ADMIN, MANAGER, WAITER)' })
+  @ApiResponse({ status: 200, description: 'Orders successfully transferred' })
+  @ApiResponse({ status: 400, description: 'Invalid transfer request' })
+  @ApiResponse({ status: 404, description: 'Source or target table not found' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  transferTableOrders(@Body() dto: TransferTableOrdersDto, @Request() req) {
+    return this.ordersService.transferTableOrders(dto, req.tenantId);
   }
 
   @Post(':id/approve')

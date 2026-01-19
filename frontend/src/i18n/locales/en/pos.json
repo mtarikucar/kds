@@ -171,5 +171,24 @@
     "create": "Create",
     "payment": "Payment"
   },
-  "newCustomerOrder": "New Customer Order: #{{orderNumber}}"
+  "newCustomerOrder": "New Customer Order: #{{orderNumber}}",
+  "transfer": {
+    "title": "Transfer Table Orders",
+    "buttonTitle": "Transfer orders to another table",
+    "sourceTable": "Source Table",
+    "activeOrders": "Active Orders",
+    "selectTarget": "Select a target table to transfer orders to:",
+    "noAvailableTables": "No available tables for transfer",
+    "willMerge": "Orders will merge",
+    "from": "From",
+    "to": "To",
+    "ordersToTransfer": "Orders to Transfer",
+    "mergeWarningTitle": "Target table has active orders",
+    "mergeWarningDescription": "The orders will be merged with existing orders on this table.",
+    "confirmText": "Transfer {{count}} order(s) from Table {{sourceTable}} to Table {{targetTable}}?",
+    "confirm": "Transfer",
+    "success": "Orders transferred from Table {{sourceTable}} to Table {{targetTable}}",
+    "failed": "Failed to transfer orders",
+    "socketNotification": "{{count}} order(s) transferred from Table {{sourceTable}} to Table {{targetTable}}"
+  }
 }

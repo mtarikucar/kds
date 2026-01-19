@@ -291,4 +291,31 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       });
     }
   }
+
+  // ========================================
+  // TABLE TRANSFER EVENTS
+  // ========================================
+
+  emitTableTransfer(tenantId: string, data: {
+    sourceTableId: string;
+    targetTableId: string;
+    sourceTableNumber: string;
+    targetTableNumber: string;
+    orders: any[];
+    transferredCount: number;
+  }) {
+    this.server.to(`kitchen-${tenantId}`).to(`pos-${tenantId}`).emit('table:orders-transferred', {
+      sourceTableId: data.sourceTableId,
+      targetTableId: data.targetTableId,
+      sourceTableNumber: data.sourceTableNumber,
+      targetTableNumber: data.targetTableNumber,
+      orders: data.orders,
+      transferredCount: data.transferredCount,
+      timestamp: new Date(),
+    });
+
+    this.logger.log(
+      `Table transfer emitted: ${data.transferredCount} order(s) from table ${data.sourceTableNumber} to table ${data.targetTableNumber}`
+    );
+  }
 }

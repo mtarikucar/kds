@@ -245,12 +245,47 @@ export const usePosSocket = () => {
       );
     };
 
+    const handleTableTransfer = (event: any) => {
+      console.log('[POS Socket] Table orders transferred:', event);
+
+      const { sourceTableId, targetTableId, orders } = event;
+
+      // Remove orders from source table cache
+      const sourceActiveStatuses = 'PENDING,PREPARING,READY,SERVED';
+      const sourceQueryKey = ['orders', { tableId: sourceTableId, status: sourceActiveStatuses }];
+      queryClient.setQueryData(sourceQueryKey, []);
+      console.log('[POS Socket] Cleared source table cache:', sourceTableId);
+
+      // Add orders to target table cache
+      const targetQueryKey = ['orders', { tableId: targetTableId, status: sourceActiveStatuses }];
+      const existingTargetOrders = queryClient.getQueryData<any[]>(targetQueryKey) || [];
+      queryClient.setQueryData(targetQueryKey, [...orders, ...existingTargetOrders]);
+      console.log('[POS Socket] Updated target table cache with', orders.length, 'orders');
+
+      // Invalidate tables to update status (source → AVAILABLE, target → OCCUPIED)
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+
+      // Play notification sound
+      playNotificationSound();
+
+      // Show toast notification
+      toast.info(i18n.t('pos:transfer.socketNotification', {
+        count: event.transferredCount,
+        sourceTable: event.sourceTableNumber,
+        targetTable: event.targetTableNumber,
+      }), {
+        duration: 5000,
+        position: 'top-right',
+      });
+    };
+
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('order:new', handleNewOrder);
     socket.on('order:updated', handleOrderUpdated);
     socket.on('order:status-changed', handleOrderStatusChanged);
     socket.on('order:item-status-changed', handleOrderItemStatusChanged);
+    socket.on('table:orders-transferred', handleTableTransfer);
 
     // Join POS room
     socket.emit('join-pos');
@@ -262,6 +297,7 @@ export const usePosSocket = () => {
       socket.off('order:updated', handleOrderUpdated);
       socket.off('order:status-changed', handleOrderStatusChanged);
       socket.off('order:item-status-changed', handleOrderItemStatusChanged);
+      socket.off('table:orders-transferred', handleTableTransfer);
       socket.emit('leave-pos');
       disconnectSocket();
     };

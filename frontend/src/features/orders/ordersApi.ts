@@ -345,3 +345,46 @@ export const useCompleteBillRequest = () => {
     },
   });
 };
+
+// ========================================
+// TABLE TRANSFER - STAFF HOOKS
+// ========================================
+
+export interface TransferTableOrdersDto {
+  sourceTableId: string;
+  targetTableId: string;
+  allowMerge?: boolean;
+}
+
+export interface TransferTableResponse {
+  message: string;
+  transferredOrders: Order[];
+  sourceTable: { id: string; number: string; newStatus: string };
+  targetTable: { id: string; number: string; newStatus: string };
+}
+
+export const useTransferTableOrders = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: TransferTableOrdersDto): Promise<TransferTableResponse> => {
+      const response = await api.post('/orders/transfer-table', data);
+      return response.data;
+    },
+    onSuccess: (data) => {
+      // Invalidate orders and tables queries
+      queryClient.invalidateQueries({
+        queryKey: ['orders'],
+        refetchType: 'all'
+      });
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      toast.success(i18n.t('pos:transfer.success', {
+        sourceTable: data.sourceTable.number,
+        targetTable: data.targetTable.number,
+      }));
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || i18n.t('pos:transfer.failed'));
+    },
+  });
+};

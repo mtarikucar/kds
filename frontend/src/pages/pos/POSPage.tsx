@@ -12,8 +12,9 @@ import NotificationBar from '../../components/pos/NotificationBar';
 import PendingOrdersPanel from '../../components/pos/PendingOrdersPanel';
 import WaiterRequestsPanel from '../../components/pos/WaiterRequestsPanel';
 import BillRequestsPanel from '../../components/pos/BillRequestsPanel';
-import { useCreateOrder, useUpdateOrder, useOrders } from '../../features/orders/ordersApi';
+import { useCreateOrder, useUpdateOrder, useOrders, useTransferTableOrders } from '../../features/orders/ordersApi';
 import { useCreatePayment } from '../../features/orders/ordersApi';
+import TransferTableModal from '../../components/pos/TransferTableModal';
 import { useUpdateTableStatus } from '../../features/tables/tablesApi';
 import { useGetPosSettings } from '../../features/pos/posApi';
 import { usePosSocket } from '../../features/pos/usePosSocket';
@@ -43,6 +44,7 @@ const POSPage = () => {
   const [isBillRequestsPanelOpen, setIsBillRequestsPanelOpen] = useState(false);
   const [isProductOptionsModalOpen, setIsProductOptionsModalOpen] = useState(false);
   const [productForOptions, setProductForOptions] = useState<Product | null>(null);
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
 
   // Responsive hook
   const { isDesktop, isMobile, isTablet } = useResponsive();
@@ -57,6 +59,7 @@ const POSPage = () => {
   const { mutate: updateOrder, isPending: isUpdatingOrder } = useUpdateOrder();
   const { mutate: createPayment, isPending: isCreatingPayment } = useCreatePayment();
   const { mutate: updateTableStatus } = useUpdateTableStatus();
+  const { mutate: transferTableOrders, isPending: isTransferring } = useTransferTableOrders();
 
   // Determine if tableless mode is enabled
   const isTablelessMode = posSettings?.enableTablelessMode ?? false;
@@ -393,6 +396,37 @@ const POSPage = () => {
     );
   };
 
+  // Handle table transfer
+  const handleTransferTable = () => {
+    if (!selectedTable) return;
+    setIsTransferModalOpen(true);
+  };
+
+  const handleTransferConfirm = (targetTableId: string) => {
+    if (!selectedTable) return;
+
+    transferTableOrders(
+      {
+        sourceTableId: selectedTable.id,
+        targetTableId,
+        allowMerge: true,
+      },
+      {
+        onSuccess: () => {
+          // Reset state after successful transfer
+          setIsTransferModalOpen(false);
+          setSelectedTable(null);
+          setCartItems([]);
+          setDiscount(0);
+          setCustomerName('');
+          setOrderNotes('');
+          setCurrentOrderId(null);
+          setCurrentOrderAmount(null);
+        },
+      }
+    );
+  };
+
   // Calculate totals (including modifier prices)
   const subtotal = cartItems.reduce((sum, item) => {
     const itemPrice = Number(item.price);
@@ -483,9 +517,11 @@ const POSPage = () => {
                 onClearCart={handleClearCart}
                 onCheckout={handleCheckout}
                 onCreateOrder={handleCreateOrder}
+                onTransferTable={handleTransferTable}
                 isCheckingOut={isCreatingOrder || isUpdatingOrder}
                 isTwoStepCheckout={isTwoStepCheckout}
                 hasActiveOrder={!!currentOrderId}
+                hasSelectedTable={!!selectedTable}
               />
             </div>
           </div>
@@ -558,9 +594,14 @@ const POSPage = () => {
             handleCheckout();
           }}
           onCreateOrder={handleCreateOrder}
+          onTransferTable={() => {
+            setIsCartDrawerOpen(false);
+            handleTransferTable();
+          }}
           isCheckingOut={isCreatingOrder || isUpdatingOrder}
           isTwoStepCheckout={isTwoStepCheckout}
           hasActiveOrder={!!currentOrderId}
+          hasSelectedTable={!!selectedTable}
         />
       </CartDrawer>
 
@@ -599,6 +640,22 @@ const POSPage = () => {
         isOpen={isBillRequestsPanelOpen}
         onClose={() => setIsBillRequestsPanelOpen(false)}
       />
+
+      {/* Transfer Table Modal */}
+      {selectedTable && (
+        <TransferTableModal
+          isOpen={isTransferModalOpen}
+          onClose={() => setIsTransferModalOpen(false)}
+          sourceTable={selectedTable}
+          orderCount={tableOrders?.filter(
+            (order) =>
+              order.status !== OrderStatus.PAID &&
+              order.status !== OrderStatus.CANCELLED
+          ).length || 0}
+          onConfirm={handleTransferConfirm}
+          isLoading={isTransferring}
+        />
+      )}
     </div>
   );
 };

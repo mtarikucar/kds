@@ -171,5 +171,24 @@
     "create": "Oluştur",
     "payment": "Ödeme"
   },
-  "newCustomerOrder": "Yeni Müşteri Siparişi: #{{orderNumber}}"
+  "newCustomerOrder": "Yeni Müşteri Siparişi: #{{orderNumber}}",
+  "transfer": {
+    "title": "Masa Siparişlerini Aktar",
+    "buttonTitle": "Siparişleri başka bir masaya aktar",
+    "sourceTable": "Kaynak Masa",
+    "activeOrders": "Aktif Siparişler",
+    "selectTarget": "Siparişleri aktarmak için hedef masa seçin:",
+    "noAvailableTables": "Aktarım için uygun masa bulunmuyor",
+    "willMerge": "Siparişler birleşecek",
+    "from": "Kaynak",
+    "to": "Hedef",
+    "ordersToTransfer": "Aktarılacak Siparişler",
+    "mergeWarningTitle": "Hedef masada aktif siparişler var",
+    "mergeWarningDescription": "Siparişler bu masadaki mevcut siparişlerle birleştirilecek.",
+    "confirmText": "{{count}} sipariş Masa {{sourceTable}}'den Masa {{targetTable}}'e aktarılsın mı?",
+    "confirm": "Aktar",
+    "success": "Siparişler Masa {{sourceTable}}'den Masa {{targetTable}}'e aktarıldı",
+    "failed": "Siparişler aktarılamadı",
+    "socketNotification": "{{count}} sipariş Masa {{sourceTable}}'den Masa {{targetTable}}'e aktarıldı"
+  }
 }
