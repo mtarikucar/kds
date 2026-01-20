@@ -42,6 +42,18 @@ model Tenant {
   reportEmailEnabled  Boolean   @default(false)    // Enable automated email reports
   reportEmails        String[]  @default([])       // Array of email addresses to send reports
 
+  // WiFi settings
+  wifiSsid        String?   // WiFi network name
+  wifiPassword    String?   // WiFi password
+
+  // Social media links
+  socialInstagram String?   // Instagram username or URL
+  socialFacebook  String?   // Facebook page URL
+  socialTwitter   String?   // Twitter/X username or URL
+  socialTiktok    String?   // TikTok username or URL
+  socialYoutube   String?   // YouTube channel URL
+  socialWhatsapp  String?   // WhatsApp business number
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

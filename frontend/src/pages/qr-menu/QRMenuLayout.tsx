@@ -5,6 +5,7 @@ import axios from 'axios';
 import { UtensilsCrossed, Search } from 'lucide-react';
 import Spinner from '../../components/ui/Spinner';
 import QRMenuNavigation from '../../components/qr-menu/QRMenuNavigation';
+import RestaurantInfo from '../../components/qr-menu/RestaurantInfo';
 import { useCartStore } from '../../store/cartStore';
 
 export interface MenuSettings {
@@ -21,11 +22,27 @@ export interface MenuSettings {
   itemsPerRow: number;
 }
 
+export interface WifiInfo {
+  ssid: string;
+  password?: string;
+}
+
+export interface SocialMedia {
+  instagram?: string;
+  facebook?: string;
+  twitter?: string;
+  tiktok?: string;
+  youtube?: string;
+  whatsapp?: string;
+}
+
 export interface MenuData {
   tenant: {
     id: string;
     name: string;
     currency?: string;
+    wifi?: WifiInfo | null;
+    socialMedia?: SocialMedia;
   };
   table?: {
     id: string;
@@ -244,6 +261,15 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({ currentPage, children, onMe
             }
             return child;
           })}
+
+          {/* Restaurant Info - WiFi & Social Media */}
+          {currentPage === 'menu' && (
+            <RestaurantInfo
+              wifi={tenant.wifi}
+              socialMedia={tenant.socialMedia}
+              primaryColor={settings.primaryColor}
+            />
+          )}
         </main>
       </div>
     </div>

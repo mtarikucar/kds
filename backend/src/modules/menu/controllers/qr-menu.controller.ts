@@ -24,6 +24,18 @@ export class QrMenuController {
   ) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
+      select: {
+        id: true,
+        name: true,
+        wifiSsid: true,
+        wifiPassword: true,
+        socialInstagram: true,
+        socialFacebook: true,
+        socialTwitter: true,
+        socialTiktok: true,
+        socialYoutube: true,
+        socialWhatsapp: true,
+      },
     });
 
     if (!tenant) {
@@ -157,6 +169,18 @@ export class QrMenuController {
       tenant: {
         id: tenant.id,
         name: tenant.name,
+        wifi: tenant.wifiSsid ? {
+          ssid: tenant.wifiSsid,
+          password: tenant.wifiPassword,
+        } : null,
+        socialMedia: {
+          instagram: tenant.socialInstagram,
+          facebook: tenant.socialFacebook,
+          twitter: tenant.socialTwitter,
+          tiktok: tenant.socialTiktok,
+          youtube: tenant.socialYoutube,
+          whatsapp: tenant.socialWhatsapp,
+        },
       },
       table: table ? {
         id: table.id,

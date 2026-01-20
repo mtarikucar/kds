@@ -11,6 +11,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Ca
 import Button from '../../components/ui/Button';
 import ReportSettings from '../../components/settings/ReportSettings';
 import LocationSettings from '../../components/settings/LocationSettings';
+import WifiSocialSettings from '../../components/settings/WifiSocialSettings';
 const POSSettingsPage = () => {
   const { t } = useTranslation('settings');
   const { data: posSettings, isLoading } = useGetPosSettings();
@@ -361,6 +362,11 @@ const POSSettingsPage = () => {
         {/* Location Settings */}
         <div className="mt-6">
           <LocationSettings />
+        </div>
+
+        {/* WiFi & Social Media Settings */}
+        <div className="mt-6">
+          <WifiSocialSettings />
         </div>
       </div>
     </div>

@@ -609,7 +609,14 @@
     "selectOne": "Select one",
     "selectUpTo": "Select up to {{max}}",
     "selectMultiple": "Select multiple",
-    "specialInstructions": "Special Instructions"
+    "specialInstructions": "Special Instructions",
+    "wifi": "WiFi",
+    "wifiNetwork": "WiFi Network",
+    "wifiPassword": "Password",
+    "copyPassword": "Copy Password",
+    "passwordCopied": "Password copied!",
+    "socialMedia": "Follow Us",
+    "connectWithUs": "Connect with us"
   },
   "qr": {
     "shareText": "Check out our menu",
