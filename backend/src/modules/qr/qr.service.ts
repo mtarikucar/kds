@@ -86,8 +86,50 @@ export class QrService {
 
     const qrCodes = [];
 
+    // Generate subdomain-based URL if tenant has subdomain, otherwise fallback
+    const generateMenuUrl = (tableId?: string): string => {
+      if (tenant.subdomain) {
+        // Parse baseUrl to get domain parts
+        try {
+          const url = new URL(baseUrl);
+          const hostParts = url.hostname.split('.');
+          const isStaging = hostParts.includes('staging');
+
+          // Build subdomain URL
+          // For staging: {subdomain}.staging.hummytummy.com
+          // For production: {subdomain}.hummytummy.com
+          let subdomainHost: string;
+          if (isStaging) {
+            // staging.hummytummy.com -> {subdomain}.staging.hummytummy.com
+            subdomainHost = `${tenant.subdomain}.${url.hostname}`;
+          } else if (url.hostname === 'localhost' || url.hostname.includes('localhost')) {
+            // Local dev: use path-based URL
+            return tableId
+              ? `${baseUrl}/qr-menu/${tenantId}?tableId=${tableId}`
+              : `${baseUrl}/qr-menu/${tenantId}`;
+          } else {
+            // Production: hummytummy.com -> {subdomain}.hummytummy.com
+            subdomainHost = `${tenant.subdomain}.${url.hostname}`;
+          }
+
+          const subdomainUrl = `${url.protocol}//${subdomainHost}`;
+          return tableId ? `${subdomainUrl}?tableId=${tableId}` : subdomainUrl;
+        } catch {
+          // Fallback to path-based URL if parsing fails
+          return tableId
+            ? `${baseUrl}/qr-menu/${tenantId}?tableId=${tableId}`
+            : `${baseUrl}/qr-menu/${tenantId}`;
+        }
+      }
+
+      // Fallback to path-based URL
+      return tableId
+        ? `${baseUrl}/qr-menu/${tenantId}?tableId=${tableId}`
+        : `${baseUrl}/qr-menu/${tenantId}`;
+    };
+
     // Tenant-wide QR code
-    const tenantUrl = `${baseUrl}/qr-menu/${tenantId}`;
+    const tenantUrl = generateMenuUrl();
     const tenantQrDataUrl = await QRCode.toDataURL(tenantUrl, {
       width: 400,
       margin: 2,
@@ -108,7 +150,7 @@ export class QrService {
     // Table-specific QR codes (if enabled)
     if (settings.enableTableQR) {
       for (const table of tables) {
-        const tableUrl = `${baseUrl}/qr-menu/${tenantId}?tableId=${table.id}`;
+        const tableUrl = generateMenuUrl(table.id);
         const tableQrDataUrl = await QRCode.toDataURL(tableUrl, {
           width: 400,
           margin: 2,
@@ -134,6 +176,7 @@ export class QrService {
       tenant: {
         id: tenant.id,
         name: tenant.name,
+        subdomain: tenant.subdomain,
       },
       settings,
       qrCodes,

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ShoppingCart, ClipboardList, Home, Award } from 'lucide-react';
 import { useCartStore } from '../../store/cartStore';
 import MobileBottomMenu from './MobileBottomMenu';
+import { buildQRMenuUrl } from '../../utils/subdomain';
 
 interface QRMenuNavigationProps {
   currentPage: 'menu' | 'cart' | 'orders' | 'loyalty';
@@ -13,6 +14,7 @@ interface QRMenuNavigationProps {
   primaryColor: string;
   secondaryColor: string;
   enableCustomerOrdering: boolean;
+  subdomain?: string;
 }
 
 const QRMenuNavigation: React.FC<QRMenuNavigationProps> = ({
@@ -23,6 +25,7 @@ const QRMenuNavigation: React.FC<QRMenuNavigationProps> = ({
   primaryColor,
   secondaryColor,
   enableCustomerOrdering,
+  subdomain,
 }) => {
   const navigate = useNavigate();
   const { t } = useTranslation('common');
@@ -34,25 +37,14 @@ const QRMenuNavigation: React.FC<QRMenuNavigationProps> = ({
     setItemCount(newCount);
   }, [items]);
 
-  const handleNavigation = (page: string) => {
-    const baseUrl = `/qr-menu/${tenantId}`;
-    const params = tableId ? `?tableId=${tableId}` : '';
-    const sessionParam = sessionId ? `&sessionId=${sessionId}` : '';
-
-    switch (page) {
-      case 'menu':
-        navigate(`${baseUrl}${params}`);
-        break;
-      case 'cart':
-        navigate(`${baseUrl}/cart${params}`);
-        break;
-      case 'orders':
-        navigate(`${baseUrl}/orders${params}${sessionParam}`);
-        break;
-      case 'loyalty':
-        navigate(`${baseUrl}/loyalty${params}${sessionParam}`);
-        break;
-    }
+  const handleNavigation = (page: 'menu' | 'cart' | 'orders' | 'loyalty') => {
+    const url = buildQRMenuUrl(page, {
+      subdomain,
+      tenantId,
+      tableId,
+      sessionId,
+    });
+    navigate(url);
   };
 
   // Build nav items based on enableCustomerOrdering
@@ -104,6 +96,7 @@ const QRMenuNavigation: React.FC<QRMenuNavigationProps> = ({
           secondaryColor={secondaryColor}
           currentPage={currentPage}
           enableCustomerOrdering={enableCustomerOrdering}
+          subdomain={subdomain}
         />
       </div>
 

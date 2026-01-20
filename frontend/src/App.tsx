@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
@@ -12,6 +12,10 @@ import QRMenuPage from './pages/qr-menu/QRMenuPage';
 import CartPage from './pages/qr-menu/CartPage';
 import OrderTrackingPage from './pages/qr-menu/OrderTrackingPage';
 import LoyaltyPage from './pages/qr-menu/LoyaltyPage';
+import SubdomainQRMenuPage from './pages/qr-menu/SubdomainQRMenuPage';
+import SubdomainCartPage from './pages/qr-menu/SubdomainCartPage';
+import SubdomainOrdersPage from './pages/qr-menu/SubdomainOrdersPage';
+import SubdomainLoyaltyPage from './pages/qr-menu/SubdomainLoyaltyPage';
 import TermsOfServicePage from './pages/legal/TermsOfServicePage';
 import PrivacyPolicyPage from './pages/legal/PrivacyPolicyPage';
 import DashboardPage from './pages/DashboardPage';
@@ -39,10 +43,14 @@ import { useAutoUpdate } from './hooks/useAutoUpdate';
 import { useNotificationSocket } from './features/notifications/notificationsApi';
 import { useAuthStore } from './store/authStore';
 import { UserRole } from './types';
+import { detectSubdomain } from './utils/subdomain';
 
 function App() {
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const isAuthenticated = useAuthStore((state) => !!state.accessToken);
+
+  // Detect subdomain access
+  const subdomainInfo = useMemo(() => detectSubdomain(), []);
 
   // Auto-update hook - check for updates on app startup
   const updateState = useAutoUpdate(true);
@@ -62,6 +70,21 @@ function App() {
   const handleDismiss = () => {
     setShowUpdateDialog(false);
   };
+
+  // Subdomain access - only show QR menu routes
+  if (subdomainInfo.isSubdomainAccess && subdomainInfo.subdomain) {
+    return (
+      <>
+        <Routes>
+          <Route path="/" element={<SubdomainQRMenuPage subdomain={subdomainInfo.subdomain} />} />
+          <Route path="/cart" element={<SubdomainCartPage subdomain={subdomainInfo.subdomain} />} />
+          <Route path="/orders" element={<SubdomainOrdersPage subdomain={subdomainInfo.subdomain} />} />
+          <Route path="/loyalty" element={<SubdomainLoyaltyPage subdomain={subdomainInfo.subdomain} />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </>
+    );
+  }
 
   return (
     <>

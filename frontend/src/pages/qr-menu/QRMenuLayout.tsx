@@ -7,6 +7,7 @@ import Spinner from '../../components/ui/Spinner';
 import QRMenuNavigation from '../../components/qr-menu/QRMenuNavigation';
 import RestaurantInfo from '../../components/qr-menu/RestaurantInfo';
 import { useCartStore } from '../../store/cartStore';
+import { buildQRMenuUrl } from '../../utils/subdomain';
 
 export interface MenuSettings {
   primaryColor: string;
@@ -60,12 +61,14 @@ interface QRMenuLayoutProps {
   onMenuDataLoaded?: (data: MenuData) => void;
   onSessionIdChange?: (sessionId: string | null) => void;
   onSearchQueryChange?: (query: string) => void;
+  /** Subdomain for subdomain-based access (e.g., "demo" for demo.hummytummy.com) */
+  subdomain?: string;
 }
 
-const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({ currentPage, children, onMenuDataLoaded, onSessionIdChange, onSearchQueryChange }) => {
+const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({ currentPage, children, onMenuDataLoaded, onSessionIdChange, onSearchQueryChange, subdomain }) => {
   const { t, i18n } = useTranslation('common');
   const navigate = useNavigate();
-  const { tenantId } = useParams<{ tenantId: string }>();
+  const { tenantId: urlTenantId } = useParams<{ tenantId: string }>();
   const [searchParams] = useSearchParams();
   const tableId = searchParams.get('tableId');
   const urlSessionId = searchParams.get('sessionId');
@@ -81,15 +84,30 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({ currentPage, children, onMe
 
   const initializeSession = useCartStore(state => state.initializeSession);
 
-  // Fetch menu data - refresh when component mounts or tenantId changes
+  // Determine if we're in subdomain mode or path-based mode
+  const isSubdomainMode = !!subdomain;
+  // In subdomain mode, tenantId comes from API response; in path mode, from URL
+  const tenantId = menuData?.tenant?.id || urlTenantId;
+
+  // Fetch menu data - refresh when component mounts or identifier changes
   useEffect(() => {
     const fetchMenuData = async () => {
       try {
         setIsLoading(true);
         const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
-        const url = tableId
-          ? `${API_URL}/qr-menu/${tenantId}?tableId=${tableId}&t=${Date.now()}`
-          : `${API_URL}/qr-menu/${tenantId}?t=${Date.now()}`;
+
+        let url: string;
+        if (isSubdomainMode && subdomain) {
+          // Subdomain mode: use by-subdomain endpoint
+          url = tableId
+            ? `${API_URL}/qr-menu/by-subdomain/${subdomain}?tableId=${tableId}&t=${Date.now()}`
+            : `${API_URL}/qr-menu/by-subdomain/${subdomain}?t=${Date.now()}`;
+        } else {
+          // Path-based mode: use tenantId endpoint
+          url = tableId
+            ? `${API_URL}/qr-menu/${urlTenantId}?tableId=${tableId}&t=${Date.now()}`
+            : `${API_URL}/qr-menu/${urlTenantId}?t=${Date.now()}`;
+        }
 
         const response = await axios.get(url);
         setMenuData(response.data);
@@ -101,10 +119,10 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({ currentPage, children, onMe
       }
     };
 
-    if (tenantId) {
+    if (isSubdomainMode ? subdomain : urlTenantId) {
       fetchMenuData();
     }
-  }, [tenantId, tableId, t]);
+  }, [urlTenantId, subdomain, isSubdomainMode, tableId, t]);
 
   // Initialize cart session
   useEffect(() => {
@@ -251,6 +269,7 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({ currentPage, children, onMe
           primaryColor={settings.primaryColor}
           secondaryColor={settings.secondaryColor}
           enableCustomerOrdering={enableCustomerOrdering}
+          subdomain={subdomain}
         />
 
         {/* Main Content Area */}

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ShoppingCart, ClipboardList, Home, Award } from 'lucide-react';
 import { useCartStore } from '../../store/cartStore';
+import { buildQRMenuUrl } from '../../utils/subdomain';
 
 interface MobileBottomMenuProps {
   tenantId: string | undefined;
@@ -11,6 +12,7 @@ interface MobileBottomMenuProps {
   secondaryColor: string;
   currentPage: 'menu' | 'cart' | 'orders' | 'loyalty';
   enableCustomerOrdering: boolean;
+  subdomain?: string;
 }
 
 const MobileBottomMenu: React.FC<MobileBottomMenuProps> = ({
@@ -20,6 +22,7 @@ const MobileBottomMenu: React.FC<MobileBottomMenuProps> = ({
   secondaryColor,
   currentPage,
   enableCustomerOrdering,
+  subdomain,
 }) => {
   const navigate = useNavigate();
   const { t } = useTranslation('common');
@@ -33,24 +36,23 @@ const MobileBottomMenu: React.FC<MobileBottomMenuProps> = ({
     setItemCount(newCount);
   }, [items]);
 
-  const handleMenuClick = () => {
-    navigate(`/qr-menu/${tenantId}${tableId ? `?tableId=${tableId}` : ''}`);
+  const handleNavigation = (page: 'menu' | 'cart' | 'orders' | 'loyalty') => {
+    const url = buildQRMenuUrl(page, {
+      subdomain,
+      tenantId,
+      tableId,
+      sessionId,
+    });
+    navigate(url);
   };
 
-  const handleCartClick = () => {
-    navigate(`/qr-menu/${tenantId}/cart${tableId ? `?tableId=${tableId}` : ''}`);
-  };
-
+  const handleMenuClick = () => handleNavigation('menu');
+  const handleCartClick = () => handleNavigation('cart');
   const handleOrdersClick = () => {
-    if (sessionId) {
-      navigate(`/qr-menu/${tenantId}/orders?tableId=${tableId}&sessionId=${sessionId}`);
-    }
+    if (sessionId) handleNavigation('orders');
   };
-
   const handleLoyaltyClick = () => {
-    if (sessionId) {
-      navigate(`/qr-menu/${tenantId}/loyalty?tableId=${tableId}&sessionId=${sessionId}`);
-    }
+    if (sessionId) handleNavigation('loyalty');
   };
 
   // Build menu items based on enableCustomerOrdering

@@ -1,5 +1,5 @@
-import { Controller, Get, Param, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Param, Query, NotFoundException } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam } from '@nestjs/swagger';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { PosSettingsService } from '../../pos-settings/pos-settings.service';
 import { Public } from '../../auth/decorators/public.decorator';
@@ -11,6 +11,28 @@ export class QrMenuController {
     private prisma: PrismaService,
     private posSettingsService: PosSettingsService,
   ) {}
+
+  @Public()
+  @Get('by-subdomain/:subdomain')
+  @ApiOperation({ summary: 'Get public menu by subdomain (no authentication required)' })
+  @ApiParam({ name: 'subdomain', description: 'Restaurant subdomain' })
+  @ApiQuery({ name: 'tableId', required: false, description: 'Optional table ID for table-specific QR codes' })
+  @ApiResponse({ status: 200, description: 'Public menu with categories and products' })
+  @ApiResponse({ status: 404, description: 'Restaurant not found' })
+  async getPublicMenuBySubdomain(
+    @Param('subdomain') subdomain: string,
+    @Query('tableId') tableId?: string,
+  ) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { subdomain },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Restaurant not found');
+    }
+
+    return this.getPublicMenu(tenant.id, tableId);
+  }
 
   @Public()
   @Get(':tenantId')
