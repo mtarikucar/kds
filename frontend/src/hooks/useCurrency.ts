@@ -12,6 +12,16 @@ export interface TenantSettings {
   latitude?: number;
   longitude?: number;
   locationRadius?: number;
+  // WiFi settings
+  wifiSsid?: string;
+  wifiPassword?: string;
+  // Social media links
+  socialInstagram?: string;
+  socialFacebook?: string;
+  socialTwitter?: string;
+  socialTiktok?: string;
+  socialYoutube?: string;
+  socialWhatsapp?: string;
 }
 
 export interface UpdateTenantSettingsDto {
@@ -23,6 +33,16 @@ export interface UpdateTenantSettingsDto {
   latitude?: number | null;
   longitude?: number | null;
   locationRadius?: number;
+  // WiFi settings
+  wifiSsid?: string;
+  wifiPassword?: string;
+  // Social media links
+  socialInstagram?: string;
+  socialFacebook?: string;
+  socialTwitter?: string;
+  socialTiktok?: string;
+  socialYoutube?: string;
+  socialWhatsapp?: string;
 }
 
 export const SUPPORTED_CURRENCIES = [

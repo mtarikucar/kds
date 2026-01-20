@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Trash2, Plus, Minus } from 'lucide-react';
+import { Trash2, Plus, Minus, ArrowRightLeft } from 'lucide-react';
 import { Product } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import Button from '../ui/Button';
@@ -24,9 +24,11 @@ interface OrderCartProps {
   onClearCart: () => void;
   onCheckout: () => void;
   onCreateOrder: () => void;
+  onTransferTable?: () => void;
   isCheckingOut?: boolean;
   isTwoStepCheckout?: boolean;
   hasActiveOrder?: boolean;
+  hasSelectedTable?: boolean;
 }
 
 const OrderCart = ({
@@ -42,9 +44,11 @@ const OrderCart = ({
   onClearCart,
   onCheckout,
   onCreateOrder,
+  onTransferTable,
   isCheckingOut = false,
   isTwoStepCheckout = false,
   hasActiveOrder = false,
+  hasSelectedTable = false,
 }: OrderCartProps) => {
   const { t } = useTranslation('pos');
   const formatPrice = useFormatCurrency();
@@ -55,11 +59,24 @@ const OrderCart = ({
     <Card className="h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>{t('currentOrder')}</CardTitle>
-        {items.length > 0 && (
-          <Button variant="outline" size="sm" onClick={onClearCart}>
-            {t('clearAll')}
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {/* Transfer Button - only show when there's an active order and table selected */}
+          {hasActiveOrder && hasSelectedTable && onTransferTable && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onTransferTable}
+              title={t('transfer.buttonTitle')}
+            >
+              <ArrowRightLeft className="h-4 w-4" />
+            </Button>
+          )}
+          {items.length > 0 && (
+            <Button variant="outline" size="sm" onClick={onClearCart}>
+              {t('clearAll')}
+            </Button>
+          )}
+        </div>
       </CardHeader>
 
       <CardContent className="flex-1 flex flex-col">

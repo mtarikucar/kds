@@ -609,7 +609,14 @@
     "selectOne": "Bir tane seçin",
     "selectUpTo": "En fazla {{max}} tane seçin",
     "selectMultiple": "Birden fazla seçin",
-    "specialInstructions": "Özel Talimatlar"
+    "specialInstructions": "Özel Talimatlar",
+    "wifi": "WiFi",
+    "wifiNetwork": "WiFi Ağı",
+    "wifiPassword": "Şifre",
+    "copyPassword": "Şifreyi Kopyala",
+    "passwordCopied": "Şifre kopyalandı!",
+    "socialMedia": "Bizi Takip Edin",
+    "connectWithUs": "Bizimle bağlantı kurun"
   },
   "qr": {
     "shareText": "Menümüze göz atın",

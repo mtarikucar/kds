@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsIn, IsBoolean, IsArray, IsEmail, Matches, IsNumber, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsIn, IsBoolean, IsArray, IsEmail, Matches, IsNumber, Min, Max, MaxLength, IsUrl } from 'class-validator';
 import {
   SUPPORTED_CURRENCIES,
   SupportedCurrency,
@@ -84,4 +84,86 @@ export class UpdateTenantSettingsDto {
   @Min(10)
   @Max(1000)
   locationRadius?: number;
+
+  // WiFi settings
+  @ApiPropertyOptional({
+    description: 'WiFi network name (SSID)',
+    example: 'Restaurant-Guest',
+    maxLength: 64,
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(64)
+  wifiSsid?: string;
+
+  @ApiPropertyOptional({
+    description: 'WiFi password',
+    example: 'welcome123',
+    maxLength: 128,
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(128)
+  wifiPassword?: string;
+
+  // Social media links
+  @ApiPropertyOptional({
+    description: 'Instagram username or URL',
+    example: 'restaurant_official',
+    maxLength: 255,
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(255)
+  socialInstagram?: string;
+
+  @ApiPropertyOptional({
+    description: 'Facebook page URL',
+    example: 'https://facebook.com/restaurant',
+    maxLength: 255,
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(255)
+  socialFacebook?: string;
+
+  @ApiPropertyOptional({
+    description: 'Twitter/X username or URL',
+    example: 'restaurant_x',
+    maxLength: 255,
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(255)
+  socialTwitter?: string;
+
+  @ApiPropertyOptional({
+    description: 'TikTok username or URL',
+    example: 'restaurant_tiktok',
+    maxLength: 255,
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(255)
+  socialTiktok?: string;
+
+  @ApiPropertyOptional({
+    description: 'YouTube channel URL',
+    example: 'https://youtube.com/@restaurant',
+    maxLength: 255,
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(255)
+  socialYoutube?: string;
+
+  @ApiPropertyOptional({
+    description: 'WhatsApp business number',
+    example: '+905551234567',
+    maxLength: 20,
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(20)
+  socialWhatsapp?: string;
 }

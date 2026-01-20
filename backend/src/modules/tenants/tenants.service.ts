@@ -131,6 +131,16 @@ export class TenantsService {
         latitude: true,
         longitude: true,
         locationRadius: true,
+        // WiFi settings
+        wifiSsid: true,
+        wifiPassword: true,
+        // Social media links
+        socialInstagram: true,
+        socialFacebook: true,
+        socialTwitter: true,
+        socialTiktok: true,
+        socialYoutube: true,
+        socialWhatsapp: true,
       },
     });
 
@@ -165,6 +175,16 @@ export class TenantsService {
         latitude: true,
         longitude: true,
         locationRadius: true,
+        // WiFi settings
+        wifiSsid: true,
+        wifiPassword: true,
+        // Social media links
+        socialInstagram: true,
+        socialFacebook: true,
+        socialTwitter: true,
+        socialTiktok: true,
+        socialYoutube: true,
+        socialWhatsapp: true,
       },
     });
   }

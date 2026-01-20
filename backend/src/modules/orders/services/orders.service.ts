@@ -9,6 +9,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateOrderDto } from '../dto/create-order.dto';
 import { UpdateOrderDto } from '../dto/update-order.dto';
 import { UpdateOrderStatusDto } from '../dto/update-order-status.dto';
+import { TransferTableOrdersDto } from '../dto/transfer-table.dto';
 import { OrderStatus, StockMovementType } from '../../../common/constants/order-status.enum';
 import { validateTransition } from '../../../common/utils/order-state-machine';
 import { TableStatus } from '../../tables/dto/create-table.dto';
@@ -622,5 +623,144 @@ export class OrdersService {
     }
 
     return updatedOrder;
+  }
+
+  async transferTableOrders(dto: TransferTableOrdersDto, tenantId: string) {
+    const { sourceTableId, targetTableId, allowMerge = true } = dto;
+
+    // Validate: source and target cannot be the same
+    if (sourceTableId === targetTableId) {
+      throw new BadRequestException('Source and target tables cannot be the same');
+    }
+
+    // Validate source table exists and belongs to tenant
+    const sourceTable = await this.prisma.table.findFirst({
+      where: { id: sourceTableId, tenantId },
+    });
+
+    if (!sourceTable) {
+      throw new NotFoundException('Source table not found');
+    }
+
+    // Validate target table exists and belongs to tenant
+    const targetTable = await this.prisma.table.findFirst({
+      where: { id: targetTableId, tenantId },
+    });
+
+    if (!targetTable) {
+      throw new NotFoundException('Target table not found');
+    }
+
+    // Cannot transfer to a RESERVED table
+    if (targetTable.status === TableStatus.RESERVED) {
+      throw new BadRequestException('Cannot transfer orders to a reserved table');
+    }
+
+    // Check if target table has active orders (occupied)
+    if (targetTable.status === TableStatus.OCCUPIED && !allowMerge) {
+      throw new BadRequestException('Target table has active orders. Set allowMerge to true to merge orders.');
+    }
+
+    // Find active orders on source table (exclude PAID, CANCELLED, PENDING_APPROVAL)
+    const activeOrders = await this.prisma.order.findMany({
+      where: {
+        tableId: sourceTableId,
+        tenantId,
+        status: {
+          notIn: [OrderStatus.PAID, OrderStatus.CANCELLED, OrderStatus.PENDING_APPROVAL],
+        },
+      },
+      include: {
+        orderItems: {
+          include: {
+            product: {
+              select: { id: true, name: true, price: true, image: true },
+            },
+            modifiers: {
+              include: {
+                modifier: {
+                  select: { id: true, name: true, priceAdjustment: true },
+                },
+              },
+            },
+          },
+        },
+        table: { select: { id: true, number: true, section: true } },
+        user: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+
+    if (activeOrders.length === 0) {
+      throw new BadRequestException('No active orders found on source table');
+    }
+
+    // Perform the transfer in a transaction
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Update all active orders to the new table
+      await tx.order.updateMany({
+        where: {
+          id: { in: activeOrders.map((o) => o.id) },
+        },
+        data: {
+          tableId: targetTableId,
+        },
+      });
+
+      // Update source table to AVAILABLE
+      await tx.table.update({
+        where: { id: sourceTableId },
+        data: { status: TableStatus.AVAILABLE },
+      });
+
+      // Update target table to OCCUPIED
+      await tx.table.update({
+        where: { id: targetTableId },
+        data: { status: TableStatus.OCCUPIED },
+      });
+
+      // Fetch updated orders with new table info
+      const updatedOrders = await tx.order.findMany({
+        where: {
+          id: { in: activeOrders.map((o) => o.id) },
+        },
+        include: {
+          orderItems: {
+            include: {
+              product: {
+                select: { id: true, name: true, price: true, image: true },
+              },
+              modifiers: {
+                include: {
+                  modifier: {
+                    select: { id: true, name: true, priceAdjustment: true },
+                  },
+                },
+              },
+            },
+          },
+          table: { select: { id: true, number: true, section: true } },
+          user: { select: { id: true, firstName: true, lastName: true } },
+        },
+      });
+
+      return updatedOrders;
+    });
+
+    // Emit WebSocket event for table transfer
+    this.kdsGateway.emitTableTransfer(tenantId, {
+      sourceTableId,
+      targetTableId,
+      sourceTableNumber: sourceTable.number,
+      targetTableNumber: targetTable.number,
+      orders: result,
+      transferredCount: result.length,
+    });
+
+    return {
+      message: `Successfully transferred ${result.length} order(s) from table ${sourceTable.number} to table ${targetTable.number}`,
+      transferredOrders: result,
+      sourceTable: { id: sourceTableId, number: sourceTable.number, newStatus: TableStatus.AVAILABLE },
+      targetTable: { id: targetTableId, number: targetTable.number, newStatus: TableStatus.OCCUPIED },
+    };
   }
 }
