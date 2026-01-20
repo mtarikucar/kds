@@ -117,7 +117,7 @@ const POSSettingsPage = () => {
                     type="checkbox"
                     checked={enableTablelessMode}
                     onChange={(e) => setEnableTablelessMode(e.target.checked)}
-                    className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    className="w-5 h-5 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
                   />
                   <div>
                     <p className="font-semibold text-gray-900">
@@ -150,7 +150,7 @@ const POSSettingsPage = () => {
 
                         setEnableTwoStepCheckout(newValue);
                       }}
-                      className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      className="w-5 h-5 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
                     />
                     <div>
                       <p className="font-semibold text-gray-900">
@@ -179,7 +179,7 @@ const POSSettingsPage = () => {
                       type="checkbox"
                       checked={showProductImages}
                       onChange={(e) => setShowProductImages(e.target.checked)}
-                      className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      className="w-5 h-5 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
                     />
                     <div>
                       <p className="font-semibold text-gray-900">
@@ -216,7 +216,7 @@ const POSSettingsPage = () => {
 
                         setEnableCustomerOrdering(newValue);
                       }}
-                      className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      className="w-5 h-5 text-primary-600 border-neutral-300 rounded focus:ring-primary-500"
                     />
                     <div>
                       <p className="font-semibold text-gray-900">
@@ -232,8 +232,8 @@ const POSSettingsPage = () => {
             </div>
 
             {/* Info box */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-sm text-blue-800">
+            <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
+              <p className="text-sm text-primary-800">
                 <strong>{t('info.noteLabel')}</strong> {t('info.noteBody')}
               </p>
             </div>
@@ -267,7 +267,7 @@ const POSSettingsPage = () => {
               <select
                 value={currency}
                 onChange={(e) => setCurrency(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-background text-foreground"
               >
                 {SUPPORTED_CURRENCIES.map((curr) => (
                   <option key={curr.code} value={curr.code}>

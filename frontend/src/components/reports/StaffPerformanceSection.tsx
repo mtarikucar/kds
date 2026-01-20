@@ -48,7 +48,7 @@ const StaffPerformanceSection = ({ startDate, endDate }: StaffPerformanceSection
                 <p className="text-sm text-gray-600">{t('staffPerformance.totalStaff')}</p>
                 <p className="text-2xl font-bold">{data.summary.totalStaff}</p>
               </div>
-              <div className="p-3 rounded-full bg-blue-500">
+              <div className="p-3 rounded-full bg-primary-500">
                 <Users className="h-6 w-6 text-white" />
               </div>
             </div>
@@ -213,7 +213,7 @@ const StaffPerformanceSection = ({ startDate, endDate }: StaffPerformanceSection
                             ? 'bg-gray-400'
                             : index === 2
                             ? 'bg-amber-600'
-                            : 'bg-blue-500'
+                            : 'bg-primary-500'
                         }`}
                         style={{ width: `${percentage}%` }}
                       />

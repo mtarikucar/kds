@@ -185,11 +185,11 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
             {/* Stock Info - Modern badge */}
             {product.stockTracked && (
-              <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200">
-                <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider">
+              <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-primary-50 to-primary-100 border border-primary-200">
+                <p className="text-xs font-semibold text-primary-600 uppercase tracking-wider">
                   {t('qrMenu.quantity')}
                 </p>
-                <p className="text-2xl font-bold text-blue-700 mt-1">
+                <p className="text-2xl font-bold text-primary-700 mt-1">
                   {product.currentStock}
                 </p>
               </div>

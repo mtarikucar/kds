@@ -15,6 +15,7 @@ import LoyaltyPage from './pages/qr-menu/LoyaltyPage';
 import TermsOfServicePage from './pages/legal/TermsOfServicePage';
 import PrivacyPolicyPage from './pages/legal/PrivacyPolicyPage';
 import DashboardPage from './pages/DashboardPage';
+import HomePage from './pages/HomePage';
 import POSPage from './pages/pos/POSPage';
 import KitchenDisplayPage from './pages/kitchen/KitchenDisplayPage';
 import MenuManagementPage from './pages/admin/MenuManagementPage';
@@ -82,6 +83,7 @@ function App() {
 
       {/* Protected Routes - All authenticated users */}
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+        <Route path="/home" element={<HomePage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/profile" element={<ProfilePage />} />
       </Route>

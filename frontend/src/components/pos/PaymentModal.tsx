@@ -71,9 +71,9 @@ const PaymentModal = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={t('payment.title')} size="md">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        <div className="bg-blue-50 p-4 rounded-lg text-center">
-          <p className="text-sm text-gray-600 mb-1">{t('payment.totalAmount')}</p>
-          <p className="text-3xl font-bold text-blue-600">
+        <div className="bg-primary-50 p-4 rounded-lg text-center">
+          <p className="text-sm text-muted-foreground mb-1">{t('payment.totalAmount')}</p>
+          <p className="text-3xl font-bold text-primary-600">
             {formatPrice(total)}
           </p>
         </div>

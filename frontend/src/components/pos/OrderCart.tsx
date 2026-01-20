@@ -79,14 +79,14 @@ const OrderCart = ({
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 flex flex-col">
+      <CardContent className="flex-1 flex flex-col min-h-0">
         {items.length === 0 ? (
           <div className="flex-1 flex items-center justify-center text-gray-400">
             <p>{t('noItemsInCart')}</p>
           </div>
         ) : (
           <>
-            <div className="flex-1 overflow-y-auto space-y-3 mb-4">
+            <div className="flex-1 overflow-y-auto space-y-3 mb-4 pb-4">
               {items.map((item) => (
                 <div
                   key={item.id}
@@ -134,7 +134,7 @@ const OrderCart = ({
               ))}
             </div>
 
-            <div className="space-y-3 border-t pt-4">
+            <div className="space-y-3 border-t pt-4 bg-white sticky bottom-0 pb-4 lg:static lg:pb-0">
               <Input
                 label={t('customerNameLabel')}
                 type="text"

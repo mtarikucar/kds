@@ -38,46 +38,46 @@ const DashboardPage = () => {
   const userRole = user?.role as UserRole;
   const currency = useCurrency();
 
-  // Define quick actions with role-based access (using static Tailwind classes)
+  // Define quick actions with role-based access (using Warm Modern color palette)
   const quickActions: QuickAction[] = [
     {
       to: '/pos',
       icon: ShoppingCart,
       label: 'dashboard.newOrder',
-      bgColor: 'bg-blue-50',
-      hoverColor: 'hover:bg-blue-100',
-      iconColor: 'text-blue-600',
-      textColor: 'text-blue-900',
+      bgColor: 'bg-primary-50',
+      hoverColor: 'hover:bg-primary-100',
+      iconColor: 'text-primary-600',
+      textColor: 'text-primary-900',
       roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER],
     },
     {
       to: '/kitchen',
       icon: UtensilsCrossed,
       label: 'dashboard.kitchenDisplay',
-      bgColor: 'bg-green-50',
-      hoverColor: 'hover:bg-green-100',
-      iconColor: 'text-green-600',
-      textColor: 'text-green-900',
+      bgColor: 'bg-accent-50',
+      hoverColor: 'hover:bg-accent-100',
+      iconColor: 'text-accent-600',
+      textColor: 'text-accent-900',
       roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN],
     },
     {
       to: '/admin/menu',
       icon: UtensilsCrossed,
       label: 'dashboard.manageMenu',
-      bgColor: 'bg-purple-50',
-      hoverColor: 'hover:bg-purple-100',
-      iconColor: 'text-purple-600',
-      textColor: 'text-purple-900',
+      bgColor: 'bg-primary-50',
+      hoverColor: 'hover:bg-primary-100',
+      iconColor: 'text-primary-600',
+      textColor: 'text-primary-900',
       roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
     {
       to: '/admin/tables',
       icon: TableIcon,
       label: 'dashboard.manageTables',
-      bgColor: 'bg-orange-50',
-      hoverColor: 'hover:bg-orange-100',
-      iconColor: 'text-orange-600',
-      textColor: 'text-orange-900',
+      bgColor: 'bg-secondary-50',
+      hoverColor: 'hover:bg-secondary-100',
+      iconColor: 'text-secondary-600',
+      textColor: 'text-secondary-900',
       roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
   ];
@@ -126,7 +126,7 @@ const DashboardPage = () => {
           <CardContent className="pt-4 md:pt-6">
             <div className="flex items-center justify-between">
               <div className="min-w-0 flex-1">
-                <p className="text-xs md:text-sm text-gray-600 mb-1">{title}</p>
+                <p className="text-xs md:text-sm text-muted-foreground mb-1">{title}</p>
                 <p className="text-2xl md:text-3xl font-bold truncate">{value}</p>
               </div>
               <div className={`p-3 md:p-4 rounded-full ${color} flex-shrink-0`}>
@@ -161,8 +161,8 @@ const DashboardPage = () => {
   return (
     <div>
       <div className="mb-4 md:mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t('dashboard.title')}</h1>
-        <p className="text-sm md:text-base text-gray-600">{t('dashboard.welcome')}</p>
+        <h1 className="text-2xl md:text-3xl font-bold font-heading text-foreground">{t('dashboard.title')}</h1>
+        <p className="text-sm md:text-base text-muted-foreground">{t('dashboard.welcome')}</p>
       </div>
 
       {/* Stats Grid */}
@@ -171,28 +171,28 @@ const DashboardPage = () => {
           title={t('dashboard.todaysSales')}
           value={formatCurrency(todaySales, currency)}
           icon={TrendingUp}
-          color="bg-green-500"
+          color="bg-accent-500"
           link="/admin/reports"
         />
         <StatCard
           title={t('dashboard.todaysOrders')}
           value={todayOrders.length}
           icon={ShoppingCart}
-          color="bg-blue-500"
+          color="bg-primary-500"
           link="/pos"
         />
         <StatCard
           title={t('dashboard.activeOrders')}
           value={activeOrders.length}
           icon={Clock}
-          color="bg-orange-500"
+          color="bg-secondary-500"
           link="/kitchen"
         />
         <StatCard
           title={t('dashboard.availableTables')}
           value={`${availableTables.length}/${tables?.length || 0}`}
           icon={TableIcon}
-          color="bg-purple-500"
+          color="bg-primary-600"
           link="/admin/tables"
         />
       </div>
@@ -204,14 +204,14 @@ const DashboardPage = () => {
             <CardTitle>{t('dashboard.recentOrders')}</CardTitle>
             <Link
               to="/pos"
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              className="text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200"
             >
               {t('dashboard.viewAll')}
             </Link>
           </CardHeader>
           <CardContent>
             {recentOrders.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-muted-foreground">
                 <p>{t('dashboard.noOrders')}</p>
               </div>
             ) : (
@@ -219,14 +219,14 @@ const DashboardPage = () => {
                 {recentOrders.map((order) => (
                   <div
                     key={order.id}
-                    className="flex items-center justify-between p-2 md:p-3 bg-gray-50 rounded-lg"
+                    className="flex items-center justify-between p-2 md:p-3 bg-neutral-50 rounded-lg hover:bg-neutral-100 transition-colors duration-200"
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm md:text-base font-semibold truncate">#{order.orderNumber}</p>
-                      <p className="text-xs md:text-sm text-gray-600 truncate">
+                      <p className="text-sm md:text-base font-semibold truncate text-foreground">#{order.orderNumber}</p>
+                      <p className="text-xs md:text-sm text-muted-foreground truncate">
                         {t('pos:tableLabel')} {order.table?.number} • {formatTimeAgo(order.createdAt)}
                       </p>
-                      <p className="text-xs md:text-sm text-gray-600">
+                      <p className="text-xs md:text-sm text-muted-foreground">
                         {order.items?.length || 0} {t('dashboard.items')}
                       </p>
                     </div>
@@ -234,7 +234,7 @@ const DashboardPage = () => {
                       <Badge variant={getStatusVariant(order.status)}>
                         {order.status}
                       </Badge>
-                      <p className="text-xs md:text-sm font-bold text-gray-900 mt-1">
+                      <p className="text-xs md:text-sm font-bold text-foreground mt-1">
                         {formatCurrency(Number(order.finalAmount), currency)}
                       </p>
                     </div>
@@ -278,27 +278,27 @@ const DashboardPage = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-3 gap-2 md:gap-4">
-              <div className="p-4 bg-yellow-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">{t('dashboard.pending')}</p>
-                <p className="text-2xl font-bold text-yellow-600">
+              <div className="p-4 bg-warning-light rounded-lg">
+                <p className="text-sm text-muted-foreground mb-1">{t('dashboard.pending')}</p>
+                <p className="text-2xl font-bold text-warning-dark">
                   {
                     activeOrders.filter((o) => o.status === OrderStatus.PENDING)
                       .length
                   }
                 </p>
               </div>
-              <div className="p-4 bg-blue-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">{t('dashboard.preparing')}</p>
-                <p className="text-2xl font-bold text-blue-600">
+              <div className="p-4 bg-primary-50 rounded-lg">
+                <p className="text-sm text-muted-foreground mb-1">{t('dashboard.preparing')}</p>
+                <p className="text-2xl font-bold text-primary-600">
                   {
                     activeOrders.filter((o) => o.status === OrderStatus.PREPARING)
                       .length
                   }
                 </p>
               </div>
-              <div className="p-4 bg-green-50 rounded-lg">
-                <p className="text-sm text-gray-600 mb-1">{t('dashboard.ready')}</p>
-                <p className="text-2xl font-bold text-green-600">
+              <div className="p-4 bg-accent-50 rounded-lg">
+                <p className="text-sm text-muted-foreground mb-1">{t('dashboard.ready')}</p>
+                <p className="text-2xl font-bold text-accent-600">
                   {
                     activeOrders.filter((o) => o.status === OrderStatus.READY)
                       .length

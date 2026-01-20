@@ -59,8 +59,8 @@ export function EmailVerificationCard({ emailVerified, userEmail }: EmailVerific
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm">
-          <p className="text-blue-800">
+        <div className="bg-primary-50 border border-primary-200 rounded p-3 text-sm">
+          <p className="text-primary-800">
             <strong>{userEmail}</strong> adresine gönderilen 6 haneli doğrulama kodunu girin.
           </p>
         </div>

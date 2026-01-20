@@ -129,8 +129,8 @@ const ProfilePage = () => {
                 {...registerProfile('phone')}
               />
 
-              <div className="bg-blue-50 border border-blue-200 rounded p-3 text-xs md:text-sm">
-                <p className="text-blue-800 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-0">
+              <div className="bg-primary-50 border border-primary-200 rounded p-3 text-xs md:text-sm">
+                <p className="text-primary-800 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-0">
                   <span><strong>{t('profile.role')}:</strong> {profile?.role}</span>
                   {profile?.emailVerified ? (
                     <span className="sm:ml-4 text-green-600">✓ {t('profile.emailVerified')}</span>

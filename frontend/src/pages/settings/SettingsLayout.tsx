@@ -61,15 +61,15 @@ const SettingsLayout = () => {
               onClick={handleNavClick}
               className={`flex items-start gap-3 px-4 py-3 rounded-lg transition-colors ${
                 isActive
-                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                  ? 'bg-primary-50 text-primary-700 border border-primary-200'
                   : 'text-gray-700 hover:bg-gray-100'
               }`}
             >
               <item.icon className={`h-5 w-5 mt-0.5 flex-shrink-0 ${
-                isActive ? 'text-blue-600' : 'text-gray-500'
+                isActive ? 'text-primary-600' : 'text-muted-foreground'
               }`} />
               <div className="flex-1 min-w-0">
-                <div className={`font-medium ${isActive ? 'text-blue-700' : 'text-gray-900'}`}>
+                <div className={`font-medium ${isActive ? 'text-primary-700' : 'text-foreground'}`}>
                   {item.label}
                 </div>
                 <div className="text-xs text-gray-600 mt-0.5">
@@ -81,8 +81,8 @@ const SettingsLayout = () => {
         })}
       </nav>
 
-      <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <p className="text-sm text-blue-800">
+      <div className="mt-8 p-4 bg-primary-50 border border-primary-200 rounded-lg">
+        <p className="text-sm text-primary-800">
           <strong>{t('tip')}:</strong> {t('tipDescription')}
         </p>
       </div>

@@ -42,14 +42,14 @@ const LoginPage = () => {
 
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard');
+      navigate('/home');
     }
   }, [isAuthenticated, navigate]);
 
   const onSubmit = (data: LoginFormData) => {
     login(data, {
       onSuccess: () => {
-        navigate('/dashboard');
+        navigate('/home');
       },
     });
   };
@@ -59,7 +59,7 @@ const LoginPage = () => {
     onSuccess: (tokenResponse) => {
       googleAuth(tokenResponse.access_token, {
         onSuccess: () => {
-          navigate('/dashboard');
+          navigate('/home');
         },
       });
     },

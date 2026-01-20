@@ -27,18 +27,18 @@ const OrderQueue = ({
       case OrderStatus.PENDING:
         return 'bg-yellow-50 border-yellow-200';
       case OrderStatus.PREPARING:
-        return 'bg-blue-50 border-blue-200';
+        return 'bg-primary-50 border-primary-200';
       case OrderStatus.READY:
         return 'bg-green-50 border-green-200';
       default:
-        return 'bg-gray-50 border-gray-200';
+        return 'bg-neutral-50 border-neutral-200';
     }
   };
 
   return (
     <div className={`rounded-lg border-2 ${getColumnColor(status)} p-3 md:p-4 h-full flex flex-col min-h-0`}>
       <div className="mb-3 md:mb-4 flex-shrink-0">
-        <h2 className="text-lg md:text-xl font-bold text-gray-900">
+        <h2 className="text-lg md:text-xl font-bold font-heading text-foreground">
           {title}
           <span className="ml-2 text-sm font-normal text-gray-600">
             ({filteredOrders.length})

@@ -40,7 +40,7 @@ const InventorySection = () => {
                 <p className="text-sm text-gray-600">{t('inventoryReport.totalTrackedProducts')}</p>
                 <p className="text-2xl font-bold">{data.totalTrackedProducts}</p>
               </div>
-              <div className="p-3 rounded-full bg-blue-500">
+              <div className="p-3 rounded-full bg-primary-500">
                 <Package className="h-6 w-6 text-white" />
               </div>
             </div>
@@ -223,7 +223,7 @@ const InventorySection = () => {
                         ? 'bg-green-100 text-green-600'
                         : movement.type === 'OUT'
                         ? 'bg-red-100 text-red-600'
-                        : 'bg-blue-100 text-blue-600'
+                        : 'bg-primary-100 text-primary-600'
                     }`}
                   >
                     {movement.type === 'IN' ? (

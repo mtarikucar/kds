@@ -139,7 +139,7 @@ const ResetPasswordPage = () => {
               {...register('confirmPassword')}
             />
 
-            <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-800">
+            <div className="bg-primary-50 border border-primary-200 rounded p-3 text-sm text-primary-800">
               <p className="font-medium mb-1">{t('auth:resetPassword.requirements')}</p>
               <ul className="list-disc list-inside space-y-1 text-xs">
                 <li>{t('auth:resetPassword.requirement1')}</li>
@@ -155,7 +155,7 @@ const ResetPasswordPage = () => {
             <div className="text-center text-sm">
               <Link
                 to="/login"
-                className="text-blue-600 hover:text-blue-700 font-medium"
+                className="text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200"
               >
                 Back to Login
               </Link>

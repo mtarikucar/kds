@@ -86,7 +86,7 @@ const CartContent: React.FC<CartContentProps> = ({
 
                   {/* Notes */}
                   {item.notes && (
-                    <div className="text-sm text-gray-600 flex items-start gap-2 mb-3 p-2 bg-blue-50 rounded-lg">
+                    <div className="text-sm text-muted-foreground flex items-start gap-2 mb-3 p-2 bg-primary-50 rounded-lg">
                       <MessageSquare className="h-4 w-4 mt-0.5 flex-shrink-0" style={{ color: settings.primaryColor }} />
                       <span className="italic">{item.notes}</span>
                     </div>

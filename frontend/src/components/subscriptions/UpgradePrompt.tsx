@@ -85,7 +85,7 @@ const UpgradePrompt = ({
         </span>
         <button
           onClick={handleUpgrade}
-          className="text-blue-600 hover:text-blue-700 font-medium underline"
+          className="text-primary-600 hover:text-primary-700 font-medium underline transition-colors duration-200"
         >
           {t('subscriptions:subscriptions.upgrade')}
         </button>
@@ -106,7 +106,7 @@ const UpgradePrompt = ({
         {t('subscriptions:subscriptions.upgradeRequired')}
       </h3>
 
-      <p className="text-gray-600 mb-6 max-w-md mx-auto">
+      <p className="text-muted-foreground mb-6 max-w-md mx-auto">
         {limitType && currentCount !== undefined && limit !== undefined ? (
           <>
             {t('subscriptions:subscriptions.limitReachedDescription', {

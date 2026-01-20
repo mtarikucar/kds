@@ -30,7 +30,7 @@ const DesktopAppSettingsPage = () => {
       <div className="p-8 max-w-6xl mx-auto">
         <div className="flex items-center justify-center h-64">
           <div className="text-center">
-            <Loader2 className="h-12 w-12 text-blue-600 animate-spin mx-auto mb-4" />
+            <Loader2 className="h-12 w-12 text-primary-500 animate-spin mx-auto mb-4" />
             <p className="text-gray-600">{t('loadingDesktopAppInfo')}</p>
           </div>
         </div>
@@ -61,7 +61,7 @@ const DesktopAppSettingsPage = () => {
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">
-          <Monitor className="h-8 w-8 text-blue-600" />
+          <Monitor className="h-8 w-8 text-primary-500" />
           <h1 className="text-3xl font-bold text-gray-900">{t('desktopApp')}</h1>
         </div>
         <p className="text-gray-600">{t('desktopAppDesc')}</p>
@@ -69,7 +69,7 @@ const DesktopAppSettingsPage = () => {
 
       {/* Latest Version Banner */}
       {latestRelease && (
-        <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-xl p-6 mb-8 text-white">
+        <div className="bg-gradient-to-r from-primary-500 to-primary-600 rounded-xl p-6 mb-8 text-white">
           <div className="flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2 mb-2">
@@ -77,7 +77,7 @@ const DesktopAppSettingsPage = () => {
                 <span className="text-sm font-medium opacity-90">{t('latestVersion')}</span>
               </div>
               <h2 className="text-4xl font-bold mb-1">v{latestRelease.version}</h2>
-              <p className="text-blue-100 text-sm">
+              <p className="text-primary-100 text-sm">
                 {t('releasedOn')} {new Date(latestRelease.pubDate).toLocaleDateString()}
               </p>
             </div>
@@ -95,7 +95,7 @@ const DesktopAppSettingsPage = () => {
               key={platform.id}
               onClick={() => setSelectedPlatform(platform.id)}
               className={`text-left p-6 rounded-xl border-2 transition-all hover:shadow-lg ${selectedPlatform === platform.id
-                  ? 'border-blue-500 bg-blue-50 shadow-md'
+                  ? 'border-primary-500 bg-primary-50 shadow-md'
                   : 'border-gray-200 bg-white hover:border-gray-300'
                 }`}
             >
@@ -108,7 +108,7 @@ const DesktopAppSettingsPage = () => {
                   </div>
                 </div>
                 {selectedPlatform === platform.id && (
-                  <CheckCircle className="h-6 w-6 text-blue-600" />
+                  <CheckCircle className="h-6 w-6 text-primary-500" />
                 )}
               </div>
               <div className={`flex items-center mt-4 pt-4 border-t border-gray-200 ${platform.fileSize ? 'justify-between' : 'justify-end'}`}>
@@ -118,7 +118,7 @@ const DesktopAppSettingsPage = () => {
                     e.stopPropagation();
                     handleDownload(platform);
                   }}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  className="px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors flex items-center gap-2"
                 >
                   <Download className="h-4 w-4" />
                   {t('downloadBtn')}
@@ -132,7 +132,7 @@ const DesktopAppSettingsPage = () => {
       {/* Installation Instructions */}
       <div className="bg-gray-50 rounded-xl p-6 mb-8">
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <AlertCircle className="h-5 w-5 text-blue-600" />
+          <AlertCircle className="h-5 w-5 text-primary-500" />
           {t('installInstructions')}
         </h3>
         <div className="space-y-4">
@@ -158,8 +158,8 @@ const DesktopAppSettingsPage = () => {
       {/* Features & Benefits */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white rounded-xl p-6 border border-gray-200">
-          <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
-            <Monitor className="h-6 w-6 text-blue-600" />
+          <div className="h-12 w-12 bg-primary-100 rounded-lg flex items-center justify-center mb-4">
+            <Monitor className="h-6 w-6 text-primary-500" />
           </div>
           <h4 className="font-semibold text-gray-900 mb-2">{t('offlineMode')}</h4>
           <p className="text-sm text-gray-600">{t('offlineModeDesc')}</p>

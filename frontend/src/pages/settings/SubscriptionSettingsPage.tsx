@@ -186,8 +186,8 @@ const SubscriptionSettingsPage = () => {
                 </div>
                 {currentSubscription.isTrialPeriod && currentSubscription.trialEnd && (
                   <div className="flex items-center text-sm">
-                    <CheckCircle className="h-4 w-4 text-blue-500 mr-2" />
-                    <span className="text-blue-600">
+                    <CheckCircle className="h-4 w-4 text-primary-500 mr-2" />
+                    <span className="text-primary-600">
                       {t('subscriptions.trialEnds')}: {formatDate(currentSubscription.trialEnd)}
                     </span>
                   </div>
@@ -341,7 +341,7 @@ const SubscriptionSettingsPage = () => {
                             href={invoice.pdfUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800 inline-flex items-center"
+                            className="text-primary-600 hover:text-primary-700 inline-flex items-center transition-colors duration-200"
                           >
                             <Download className="h-4 w-4 mr-1" />
                             {t('subscriptions.download')}
@@ -379,7 +379,7 @@ const SubscriptionSettingsPage = () => {
               id="cancellation-reason"
               value={cancellationReason}
               onChange={(e) => setCancellationReason(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-input rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-background text-foreground"
             >
               <option value="">{t('subscriptions.cancelReasons.select')}</option>
               <option value="Too expensive">{t('subscriptions.cancelReasons.tooExpensive')}</option>

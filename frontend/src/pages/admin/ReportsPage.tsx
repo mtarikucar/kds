@@ -97,7 +97,7 @@ const ReportsPage = () => {
   return (
     <div>
       <div className="mb-4 md:mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t('reports.title')}</h1>
+        <h1 className="text-2xl md:text-3xl font-bold font-heading text-foreground">{t('reports.title')}</h1>
         <p className="text-sm md:text-base text-gray-600">{t('reports.viewReports')}</p>
       </div>
 
@@ -112,8 +112,8 @@ const ReportsPage = () => {
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === tab.id
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
                 }`}
               >
                 <Icon className="h-4 w-4" />
@@ -168,7 +168,7 @@ const ReportsPage = () => {
                   title={t('reports.totalOrders')}
                   value={salesReport?.totalOrders || 0}
                   icon={ShoppingCart}
-                  color="bg-blue-500"
+                  color="bg-primary-500"
                 />
                 <StatCard
                   title={t('reports.averageOrderValue')}
@@ -203,7 +203,7 @@ const ReportsPage = () => {
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-lg font-bold text-blue-600">
+                          <p className="text-lg font-bold text-primary-600">
                             {formatCurrency(method.total)}
                           </p>
                           <p className="text-sm text-gray-600">
@@ -232,7 +232,7 @@ const ReportsPage = () => {
                     {salesReport?.dailySales?.map((day) => (
                       <div
                         key={day.date}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-gray-50 rounded gap-2"
+                        className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-neutral-50 rounded gap-2"
                       >
                         <div>
                           <p className="font-medium text-sm sm:text-base">
@@ -243,12 +243,12 @@ const ReportsPage = () => {
                           </p>
                         </div>
                         <div className="sm:text-right">
-                          <p className="font-bold text-blue-600">
+                          <p className="font-bold text-primary-600">
                             {formatCurrency(day.sales)}
                           </p>
                           <div className="w-full sm:w-32 md:w-48 bg-gray-200 rounded-full h-2 mt-1">
                             <div
-                              className="bg-blue-600 h-2 rounded-full"
+                              className="bg-primary-500 h-2 rounded-full"
                               style={{
                                 width: `${
                                   salesReport?.totalSales
@@ -289,7 +289,7 @@ const ReportsPage = () => {
                           {topProducts?.map((product, index) => (
                             <tr key={product.productId} className="border-b">
                               <td className="py-3 px-4">
-                                <span className="font-bold text-blue-600">
+                                <span className="font-bold text-primary-600">
                                   #{index + 1}
                                 </span>
                               </td>

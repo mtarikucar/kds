@@ -64,7 +64,7 @@ const FormItem = React.forwardRef<HTMLDivElement, FormItemProps>(
 
     return (
       <FormItemContext.Provider value={{ id }}>
-        <div ref={ref} className={cn('space-y-2', className)} {...props} />
+        <div ref={ref} className={cn('space-y-1.5', className)} {...props} />
       </FormItemContext.Provider>
     );
   }
@@ -81,8 +81,8 @@ const FormLabel = React.forwardRef<HTMLLabelElement, FormLabelProps>(
       <label
         ref={ref}
         className={cn(
-          'text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
-          error && 'text-red-500',
+          'block text-sm font-medium text-foreground mb-1.5 peer-disabled:cursor-not-allowed peer-disabled:opacity-70 transition-colors duration-150',
+          error && 'text-error',
           className
         )}
         htmlFor={formItemId}
@@ -149,7 +149,8 @@ const FormMessage = React.forwardRef<HTMLParagraphElement, FormMessageProps>(
       <p
         ref={ref}
         id={formMessageId}
-        className={cn('text-sm font-medium text-red-500', className)}
+        role="alert"
+        className={cn('text-sm font-medium text-error mt-1.5', className)}
         {...props}
       >
         {body}
@@ -175,6 +176,66 @@ const Form = React.forwardRef<HTMLFormElement, FormProps>(
 );
 Form.displayName = 'Form';
 
+// Form Group Component
+interface FormGroupProps extends React.HTMLAttributes<HTMLDivElement> {
+  title?: string;
+  description?: string;
+  children: React.ReactNode;
+}
+
+const FormGroup = React.forwardRef<HTMLDivElement, FormGroupProps>(
+  ({ className, title, description, children, ...props }, ref) => {
+    return (
+      <div ref={ref} className={cn('space-y-4', className)} {...props}>
+        {(title || description) && (
+          <div className="space-y-1">
+            {title && (
+              <h3 className="text-base font-semibold text-foreground">{title}</h3>
+            )}
+            {description && (
+              <p className="text-sm text-muted-foreground">{description}</p>
+            )}
+          </div>
+        )}
+        <div className="space-y-4">{children}</div>
+      </div>
+    );
+  }
+);
+FormGroup.displayName = 'FormGroup';
+
+// Form Actions Component
+interface FormActionsProps extends React.HTMLAttributes<HTMLDivElement> {
+  children: React.ReactNode;
+  align?: 'left' | 'right' | 'center' | 'between';
+}
+
+const FormActions = React.forwardRef<HTMLDivElement, FormActionsProps>(
+  ({ className, align = 'right', children, ...props }, ref) => {
+    const alignClasses = {
+      left: 'justify-start',
+      right: 'justify-end',
+      center: 'justify-center',
+      between: 'justify-between',
+    };
+
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          'flex items-center gap-3 pt-4 border-t border-border',
+          alignClasses[align],
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </div>
+    );
+  }
+);
+FormActions.displayName = 'FormActions';
+
 export {
   useFormField,
   Form,
@@ -184,5 +245,7 @@ export {
   FormDescription,
   FormMessage,
   FormField,
+  FormGroup,
+  FormActions,
 };
 export default Form;

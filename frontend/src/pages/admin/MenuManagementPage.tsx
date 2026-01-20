@@ -522,15 +522,15 @@ const MenuManagementPage = () => {
           {categoryLimit.limit !== -1 && (
             <div className={`rounded-lg p-4 flex items-start gap-3 mb-4 ${
               canAddCategory
-                ? 'bg-blue-50 border border-blue-200'
+                ? 'bg-primary-50 border border-primary-200'
                 : 'bg-amber-50 border border-amber-200'
             }`}>
-              <AlertTriangle className={`h-5 w-5 mt-0.5 ${canAddCategory ? 'text-blue-600' : 'text-amber-600'}`} />
+              <AlertTriangle className={`h-5 w-5 mt-0.5 ${canAddCategory ? 'text-primary-600' : 'text-warning-dark'}`} />
               <div>
-                <h3 className={`font-semibold ${canAddCategory ? 'text-blue-900' : 'text-amber-900'}`}>
+                <h3 className={`font-semibold ${canAddCategory ? 'text-primary-900' : 'text-warning-dark'}`}>
                   {t('menu.categories')}: {categories?.length ?? 0} / {categoryLimit.limit}
                 </h3>
-                <p className={`text-sm ${canAddCategory ? 'text-blue-700' : 'text-amber-700'}`}>
+                <p className={`text-sm ${canAddCategory ? 'text-primary-700' : 'text-warning-dark'}`}>
                   {canAddCategory
                     ? t('common:admin.subscriptionLimitInfo')
                     : t('subscriptions:subscriptions.limitReachedDescription', {
@@ -620,15 +620,15 @@ const MenuManagementPage = () => {
           {productLimit.limit !== -1 && (
             <div className={`rounded-lg p-4 flex items-start gap-3 mb-4 ${
               canAddProduct
-                ? 'bg-blue-50 border border-blue-200'
+                ? 'bg-primary-50 border border-primary-200'
                 : 'bg-amber-50 border border-amber-200'
             }`}>
-              <AlertTriangle className={`h-5 w-5 mt-0.5 ${canAddProduct ? 'text-blue-600' : 'text-amber-600'}`} />
+              <AlertTriangle className={`h-5 w-5 mt-0.5 ${canAddProduct ? 'text-primary-600' : 'text-warning-dark'}`} />
               <div>
-                <h3 className={`font-semibold ${canAddProduct ? 'text-blue-900' : 'text-amber-900'}`}>
+                <h3 className={`font-semibold ${canAddProduct ? 'text-primary-900' : 'text-warning-dark'}`}>
                   {t('menu.items')}: {products?.length ?? 0} / {productLimit.limit}
                 </h3>
-                <p className={`text-sm ${canAddProduct ? 'text-blue-700' : 'text-amber-700'}`}>
+                <p className={`text-sm ${canAddProduct ? 'text-primary-700' : 'text-warning-dark'}`}>
                   {canAddProduct
                     ? t('common:admin.subscriptionLimitInfo')
                     : t('subscriptions:subscriptions.limitReachedDescription', {
@@ -698,7 +698,7 @@ const MenuManagementPage = () => {
                             {product.description}
                           </p>
                         )}
-                        <p className="text-lg font-bold text-blue-600">
+                        <p className="text-lg font-bold text-primary-600">
                           {formatCurrency(product.price)}
                         </p>
                         <p className="text-sm text-gray-600">
@@ -754,7 +754,7 @@ const MenuManagementPage = () => {
                 onDrop={handleImageDrop}
                 className={cn(
                   'border-2 border-dashed rounded-lg p-6 text-center transition-all cursor-pointer',
-                  isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400',
+                  isDragging ? 'border-primary-500 bg-primary-50' : 'border-neutral-300 hover:border-neutral-400',
                   (isProcessing || uploadImagesMutation.isPending) && 'opacity-50 pointer-events-none'
                 )}
               >
@@ -910,7 +910,7 @@ const MenuManagementPage = () => {
                       className={cn(
                         'group relative aspect-square rounded-lg overflow-hidden cursor-pointer border-2 transition-all',
                         selectedImages.has(image.id)
-                          ? 'border-blue-500 ring-2 ring-blue-500/20'
+                          ? 'border-primary-500 ring-2 ring-primary-500/20'
                           : 'border-transparent hover:border-gray-300'
                       )}
                     >
@@ -923,7 +923,7 @@ const MenuManagementPage = () => {
                       <div className={cn(
                         'absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center transition-all',
                         selectedImages.has(image.id)
-                          ? 'bg-blue-500 text-white'
+                          ? 'bg-primary-500 text-white'
                           : 'bg-white/80 border border-gray-300 opacity-0 group-hover:opacity-100'
                       )}>
                         {selectedImages.has(image.id) && <Check className="w-3 h-3" />}
@@ -952,12 +952,12 @@ const MenuManagementPage = () => {
                       onClick={() => toggleImageSelection(image.id)}
                       className={cn(
                         'flex items-center gap-4 p-3 cursor-pointer transition-colors',
-                        selectedImages.has(image.id) ? 'bg-blue-50' : 'hover:bg-gray-50'
+                        selectedImages.has(image.id) ? 'bg-primary-50' : 'hover:bg-neutral-50'
                       )}
                     >
                       <div className={cn(
                         'w-5 h-5 rounded border flex items-center justify-center flex-shrink-0',
-                        selectedImages.has(image.id) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'
+                        selectedImages.has(image.id) ? 'bg-primary-500 border-primary-500' : 'border-neutral-300'
                       )}>
                         {selectedImages.has(image.id) && <Check className="w-3 h-3 text-white" />}
                       </div>

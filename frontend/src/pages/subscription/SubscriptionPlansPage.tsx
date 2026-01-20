@@ -85,8 +85,8 @@ const SubscriptionPlansPage = () => {
           <button
             onClick={() => setBillingCycle(BillingCycle.MONTHLY)}
             className={`px-6 py-2 rounded-md font-medium transition-colors ${billingCycle === BillingCycle.MONTHLY
-              ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-card text-primary-600 shadow-sm'
+              : 'text-neutral-600 hover:text-foreground'
               }`}
           >
             {t('subscriptions.monthly')}
@@ -94,8 +94,8 @@ const SubscriptionPlansPage = () => {
           <button
             onClick={() => setBillingCycle(BillingCycle.YEARLY)}
             className={`px-6 py-2 rounded-md font-medium transition-colors ${billingCycle === BillingCycle.YEARLY
-              ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-card text-primary-600 shadow-sm'
+              : 'text-neutral-600 hover:text-foreground'
               }`}
           >
             {t('subscriptions.yearly')}

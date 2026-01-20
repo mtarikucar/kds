@@ -107,7 +107,7 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
           {localSelection.size > 0 && (
             <button
               onClick={handleReset}
-              className="text-blue-600 hover:text-blue-700 font-medium"
+              className="text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200"
             >
               {t('menu.clearSelection')}
             </button>
@@ -124,7 +124,7 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
           ) : filteredImages.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
               <ImageIcon className="h-12 w-12 text-gray-400" />
-              <p className="mt-4 text-sm font-medium text-gray-900">
+              <p className="mt-4 text-sm font-medium text-foreground">
                 {searchTerm ? t('menu.noImagesFoundSearch') : t('menu.noImagesInLibrary')}
               </p>
               <p className="mt-1 text-xs text-gray-500">
@@ -144,7 +144,7 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
                     className={cn(
                       'relative group rounded-lg border-2 overflow-hidden cursor-pointer transition-all',
                       isSelected
-                        ? 'border-blue-500 ring-2 ring-blue-500'
+                        ? 'border-primary-500 ring-2 ring-primary-500'
                         : 'border-gray-200 hover:border-gray-300'
                     )}
                   >
@@ -153,7 +153,7 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
                       className={cn(
                         'absolute top-2 left-2 z-10 w-6 h-6 rounded-full flex items-center justify-center transition-all',
                         isSelected
-                          ? 'bg-blue-500 text-white'
+                          ? 'bg-primary-500 text-white'
                           : 'bg-white bg-opacity-80 border-2 border-gray-300 group-hover:bg-opacity-100'
                       )}
                     >
@@ -180,7 +180,7 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
 
                     {/* Info */}
                     <div className="p-2 bg-white">
-                      <p className="text-xs truncate font-medium text-gray-900">
+                      <p className="text-xs truncate font-medium text-foreground">
                         {image.filename}
                       </p>
                       <p className="text-xs text-gray-500">

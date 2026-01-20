@@ -154,15 +154,15 @@ const TableManagementPage = () => {
       {tableLimit.limit !== -1 && (
         <div className={`rounded-lg p-4 flex items-start gap-3 ${
           canAddTable
-            ? 'bg-blue-50 border border-blue-200'
+            ? 'bg-primary-50 border border-primary-200'
             : 'bg-amber-50 border border-amber-200'
         }`}>
-          <AlertTriangle className={`h-5 w-5 mt-0.5 ${canAddTable ? 'text-blue-600' : 'text-amber-600'}`} />
+          <AlertTriangle className={`h-5 w-5 mt-0.5 ${canAddTable ? 'text-primary-600' : 'text-warning-dark'}`} />
           <div>
-            <h3 className={`font-semibold ${canAddTable ? 'text-blue-900' : 'text-amber-900'}`}>
+            <h3 className={`font-semibold ${canAddTable ? 'text-primary-900' : 'text-warning-dark'}`}>
               {t('admin.tables')}: {tables?.length ?? 0} / {tableLimit.limit}
             </h3>
-            <p className={`text-sm ${canAddTable ? 'text-blue-700' : 'text-amber-700'}`}>
+            <p className={`text-sm ${canAddTable ? 'text-primary-700' : 'text-warning-dark'}`}>
               {canAddTable
                 ? t('admin.subscriptionLimitInfo')
                 : t('subscriptions:subscriptions.limitReachedDescription', {

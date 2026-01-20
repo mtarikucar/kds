@@ -35,7 +35,7 @@ export default function NetworkErrorPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="max-w-md w-full text-center">
         {/* Network Icon */}
         <div className="mb-8">

@@ -33,7 +33,7 @@ export const UpdateDialog: React.FC<UpdateDialogProps> = ({
             </div>
             <div>
               <h3 className="text-xl font-bold text-white">Update Available</h3>
-              <p className="text-blue-100 text-sm">A new version is ready to install</p>
+              <p className="text-primary-100 text-sm">A new version is ready to install</p>
             </div>
           </div>
         </div>
@@ -58,12 +58,12 @@ export const UpdateDialog: React.FC<UpdateDialogProps> = ({
                 <div className="text-gray-400">→</div>
                 <div className="text-right">
                   <p className="text-sm text-gray-600">New Version</p>
-                  <p className="text-lg font-semibold text-blue-600">{version}</p>
+                  <p className="text-lg font-semibold text-primary-600">{version}</p>
                 </div>
               </div>
 
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-900">
+              <div className="p-4 bg-primary-50 border border-primary-200 rounded-lg">
+                <p className="text-sm text-primary-900">
                   This update includes the latest features, improvements, and security fixes.
                   The application will restart after the update is installed.
                 </p>
@@ -84,7 +84,7 @@ export const UpdateDialog: React.FC<UpdateDialogProps> = ({
           <button
             onClick={onUpdate}
             disabled={downloading}
-            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
           >
             {downloading ? (
               <>

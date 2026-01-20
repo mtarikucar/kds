@@ -145,7 +145,7 @@ function TranslatedErrorFallback({ error, errorInfo, onReset, onReload }: ErrorF
         <div className="mt-8 space-y-3">
           <button
             onClick={onReset}
-            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200"
           >
             {t('errors.tryAgainBtn')}
           </button>

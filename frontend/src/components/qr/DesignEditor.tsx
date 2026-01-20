@@ -212,7 +212,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
       <button
         type="button"
         onClick={() => setShowColorPicker(showColorPicker === colorKey ? null : colorKey)}
-        className="w-full h-10 rounded border-2 border-gray-300 flex items-center gap-2 px-3 hover:border-blue-500"
+        className="w-full h-10 rounded border-2 border-neutral-300 flex items-center gap-2 px-3 hover:border-primary-500 transition-colors duration-200"
       >
         <div
           className="w-6 h-6 rounded border border-gray-300"
@@ -304,8 +304,8 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
               className={`
                 py-3 px-4 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors
                 ${activeTab === tab.id
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-primary-500 text-primary-600'
+                  : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
                 }
               `}
             >
@@ -340,7 +340,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                     key={template.id}
                     type="button"
                     onClick={() => applyTemplate(template)}
-                    className="p-4 rounded-lg border-2 border-gray-200 hover:border-blue-500 transition-all hover:shadow-md text-left"
+                    className="p-4 rounded-lg border-2 border-neutral-200 hover:border-primary-500 transition-all hover:shadow-md text-left"
                   >
                     <div className="flex items-center gap-3 mb-3">
                       <span className="text-2xl">{template.preview}</span>
@@ -382,7 +382,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                       key={theme.id}
                       type="button"
                       onClick={() => applyTheme(theme)}
-                      className="p-3 rounded-lg border-2 border-gray-200 hover:border-blue-500 transition-colors"
+                      className="p-3 rounded-lg border-2 border-neutral-200 hover:border-primary-500 transition-colors"
                     >
                       <div className="flex items-center gap-2 mb-2">
                         <div className="flex gap-1">
@@ -430,8 +430,8 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                       onClick={() => setFormData({ ...formData, fontFamily: font.value })}
                       className={`p-4 rounded-lg border-2 transition-all ${
                         formData.fontFamily === font.value
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                          ? 'border-primary-500 bg-primary-50'
+                          : 'border-neutral-200 hover:border-neutral-300'
                       }`}
                     >
                       <p className={`text-lg ${font.className} font-medium`}>{font.label}</p>
@@ -455,7 +455,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                   />
                   <label
                     htmlFor="logo-upload"
-                    className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-700"
+                    className="inline-block px-4 py-2 bg-primary-500 text-white rounded-lg cursor-pointer hover:bg-primary-600 transition-colors duration-200"
                   >
                     {t('common:qrDesigner.chooseFile')}
                   </label>
@@ -491,8 +491,8 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                       onClick={() => setFormData({ ...formData, layoutStyle: style.value as any })}
                       className={`p-4 rounded-lg border-2 text-left transition-all ${
                         formData.layoutStyle === style.value
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                          ? 'border-primary-500 bg-primary-50'
+                          : 'border-neutral-200 hover:border-neutral-300'
                       }`}
                     >
                       <p className="font-medium text-gray-900">{style.label}</p>
@@ -513,8 +513,8 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                         onClick={() => setFormData({ ...formData, itemsPerRow: num })}
                         className={`px-6 py-2 rounded-lg font-medium transition-all ${
                           formData.itemsPerRow === num
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            ? 'bg-primary-500 text-white'
+                            : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                         }`}
                       >
                         {num}
@@ -538,7 +538,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                         type="checkbox"
                         checked={formData[option.key as keyof typeof formData] as boolean}
                         onChange={(e) => setFormData({ ...formData, [option.key]: e.target.checked })}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
                       />
                       <span className="text-sm text-gray-700">{option.label}</span>
                     </label>
@@ -563,7 +563,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                     type="checkbox"
                     checked={formData.enableTableQR}
                     onChange={(e) => setFormData({ ...formData, enableTableQR: e.target.checked })}
-                    className="rounded border-gray-300 text-blue-600"
+                    className="rounded border-neutral-300 text-primary-600"
                   />
                   <div>
                     <span className="text-sm font-medium text-gray-700">{t('admin.enableTableQR')}</span>
@@ -580,9 +580,9 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                       onChange={(e) => setFormData({ ...formData, tableQRMessage: e.target.value })}
                       placeholder={t('admin.scanToViewMenu')}
                     />
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <p className="text-xs font-medium text-blue-900 mb-1">{t('common:qrDesigner.proTip')}</p>
-                      <p className="text-xs text-blue-800">
+                    <div className="bg-primary-50 border border-primary-200 rounded-lg p-3">
+                      <p className="text-xs font-medium text-primary-900 mb-1">{t('common:qrDesigner.proTip')}</p>
+                      <p className="text-xs text-primary-800">
                         {t('common:qrDesigner.proTipText')}
                       </p>
                     </div>
@@ -708,8 +708,8 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                         onClick={() => setPreviewMode('mobile')}
                         className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                           previewMode === 'mobile'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            ? 'bg-primary-500 text-white'
+                            : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                         }`}
                       >
                         Mobile
@@ -719,8 +719,8 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                         onClick={() => setPreviewMode('tablet')}
                         className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                           previewMode === 'tablet'
-                            ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            ? 'bg-primary-500 text-white'
+                            : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                         }`}
                       >
                         Tablet

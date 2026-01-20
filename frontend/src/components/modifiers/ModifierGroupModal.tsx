@@ -139,7 +139,7 @@ const ModifierGroupModal = ({
                 type="radio"
                 value="SINGLE"
                 {...register('selectionType')}
-                className="text-blue-600"
+                className="text-primary-600"
               />
               <span className="text-sm">{t('menu.singleSelection')}</span>
             </label>
@@ -148,7 +148,7 @@ const ModifierGroupModal = ({
                 type="radio"
                 value="MULTIPLE"
                 {...register('selectionType')}
-                className="text-blue-600"
+                className="text-primary-600"
               />
               <span className="text-sm">{t('menu.multipleSelection')}</span>
             </label>

@@ -132,12 +132,12 @@ const ChangePlanPage = () => {
       <div className="mb-8">
         <button
           onClick={() => navigate('/admin/settings/subscription')}
-          className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
+          className="flex items-center text-muted-foreground hover:text-foreground mb-4 transition-colors duration-200"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           {t('subscriptions.backToSubscription')}
         </button>
-        <h1 className="text-3xl font-bold text-gray-900">{t('subscriptions.changePlanTitle')}</h1>
+        <h1 className="text-3xl font-bold font-heading text-foreground">{t('subscriptions.changePlanTitle')}</h1>
         <p className="text-gray-600 mt-2">
           {t('subscriptions.currentPlanLabel')}: <span className="font-semibold">{currentPlan?.displayName}</span>
         </p>
@@ -166,8 +166,8 @@ const ChangePlanPage = () => {
             onClick={() => setBillingCycle(BillingCycle.MONTHLY)}
             className={`px-6 py-2 rounded-md font-medium transition-colors ${
               billingCycle === BillingCycle.MONTHLY
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-card text-primary-600 shadow-sm'
+                : 'text-neutral-600 hover:text-foreground'
             }`}
           >
             {t('subscriptions.monthly')}
@@ -176,8 +176,8 @@ const ChangePlanPage = () => {
             onClick={() => setBillingCycle(BillingCycle.YEARLY)}
             className={`px-6 py-2 rounded-md font-medium transition-colors ${
               billingCycle === BillingCycle.YEARLY
-                ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-card text-primary-600 shadow-sm'
+                : 'text-neutral-600 hover:text-foreground'
             }`}
           >
             {t('subscriptions.yearly')}
@@ -236,7 +236,7 @@ const ChangePlanPage = () => {
               <TrendingDown className="h-6 w-6 text-orange-600 mr-3" />
             )}
             <div>
-              <p className="font-medium text-gray-900">
+              <p className="font-medium text-foreground">
                 {currentPlan?.displayName} → {selectedPlan?.displayName}
               </p>
               <p className="text-sm text-gray-600">

@@ -72,7 +72,7 @@ const ForgotPasswordPage = () => {
               <div className="pt-4 border-t">
                 <Link
                   to="/login"
-                  className="text-blue-600 hover:text-blue-700 font-medium text-sm block text-center"
+                  className="text-primary-600 hover:text-primary-700 font-medium text-sm block text-center transition-colors duration-200"
                 >
                   {t('auth:forgotPassword.backToLogin')}
                 </Link>
@@ -114,7 +114,7 @@ const ForgotPasswordPage = () => {
               <div>
                 <Link
                   to="/login"
-                  className="text-blue-600 hover:text-blue-700 font-medium"
+                  className="text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200"
                 >
                   {t('auth:forgotPassword.backToLogin')}
                 </Link>
@@ -123,7 +123,7 @@ const ForgotPasswordPage = () => {
                 {t('auth:forgotPassword.noAccount')}{' '}
                 <Link
                   to="/register"
-                  className="text-blue-600 hover:text-blue-700 font-medium"
+                  className="text-primary-600 hover:text-primary-700 font-medium transition-colors duration-200"
                 >
                   {t('auth:forgotPassword.register')}
                 </Link>

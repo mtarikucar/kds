@@ -60,7 +60,7 @@ const HourlyOrdersChart = ({ date }: HourlyOrdersChartProps) => {
               <div className="flex-1">
                 <div className="relative h-6 bg-gray-100 rounded overflow-hidden">
                   <div
-                    className="absolute inset-y-0 left-0 bg-blue-500 rounded transition-all duration-300"
+                    className="absolute inset-y-0 left-0 bg-primary-500 rounded transition-all duration-300"
                     style={{
                       width: `${(hourData.orderCount / maxOrders) * 100}%`,
                     }}

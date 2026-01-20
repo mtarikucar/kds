@@ -48,7 +48,7 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
   }
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 to-white rounded-xl">
+    <div className="flex flex-col h-full bg-background">
       {/* Header Section */}
       <div className="p-4 bg-white rounded-t-xl border-b border-gray-200 space-y-4">
         {/* Search Bar */}
@@ -79,8 +79,8 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
               onClick={() => setSelectedCategoryId('')}
               className={`px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap flex-shrink-0 transition-all transform hover:scale-105 ${
                 !selectedCategoryId
-                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md'
-                  : 'bg-white border-2 border-gray-300 text-gray-700 hover:border-blue-400'
+                  ? 'bg-gradient-to-r from-primary-500 to-primary-600 text-white shadow-md'
+                  : 'bg-white border-2 border-neutral-300 text-neutral-700 hover:border-primary-400'
               }`}
             >
               <span className="flex items-center gap-1">
@@ -95,7 +95,7 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
                 className={`px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap flex-shrink-0 transition-all transform hover:scale-105 ${
                   selectedCategoryId === category.id
                     ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md'
-                    : 'bg-white border-2 border-gray-300 text-gray-700 hover:border-blue-400'
+                    : 'bg-white border-2 border-neutral-300 text-neutral-700 hover:border-primary-400'
                 }`}
               >
                 {category.name}
@@ -109,7 +109,7 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
               onClick={() => setViewMode('grid')}
               className={`p-2 rounded-md transition-all ${
                 viewMode === 'grid'
-                  ? 'bg-blue-600 text-white shadow-sm'
+                  ? 'bg-primary-500 text-white shadow-sm'
                   : 'text-gray-600 hover:bg-white'
               }`}
               aria-label={t('menu.gridView')}
@@ -121,7 +121,7 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
               onClick={() => setViewMode('list')}
               className={`p-2 rounded-md transition-all ${
                 viewMode === 'list'
-                  ? 'bg-blue-600 text-white shadow-sm'
+                  ? 'bg-primary-500 text-white shadow-sm'
                   : 'text-gray-600 hover:bg-white'
               }`}
               aria-label={t('menu.listView')}
@@ -152,7 +152,7 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="mt-4 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
               >
                 {t('menu.clearSearch')}
               </button>
@@ -234,7 +234,7 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
                         className={`w-full font-bold py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 backdrop-blur-sm ${
                           product.currentStock === 0
                             ? 'bg-gray-500/50 text-white/50 cursor-not-allowed'
-                            : 'bg-white/95 hover:bg-white text-blue-600 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95'
+                            : 'bg-white/95 hover:bg-white text-primary-600 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95'
                         }`}
                       >
                         <Plus className="h-5 w-5" />
@@ -255,7 +255,7 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
                 className="animate-in fade-in slide-in-from-left duration-300"
                 style={{ animationDelay: `${index * 20}ms` }}
               >
-                <Card className="relative h-28 overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer border-2 border-transparent hover:border-blue-200">
+                <Card className="relative h-28 overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer border-2 border-transparent hover:border-primary-200">
                   {/* Background Image with Gradient */}
                   <div className="absolute inset-0 flex">
                     {/* Left: Image Section */}

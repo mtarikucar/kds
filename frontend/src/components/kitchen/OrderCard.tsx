@@ -98,7 +98,7 @@ const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating }: OrderCa
                 {item.modifiers && item.modifiers.length > 0 && (
                   <div className="mt-1 space-y-0.5">
                     {item.modifiers.map((mod: any) => (
-                      <p key={mod.id} className="text-sm text-blue-600 pl-2">
+                      <p key={mod.id} className="text-sm text-primary-600 pl-2">
                         + {mod.modifier?.name || mod.name}
                         {mod.quantity > 1 && ` x${mod.quantity}`}
                       </p>
@@ -125,7 +125,7 @@ const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating }: OrderCa
         )}
 
         <div className="flex items-center justify-between text-sm mb-4">
-          <div className="flex items-center gap-1 text-blue-600 font-semibold">
+          <div className="flex items-center gap-1 text-primary-600 font-semibold">
             <Clock className="h-4 w-4" />
             <span>{elapsedTime}</span>
           </div>

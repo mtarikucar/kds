@@ -83,7 +83,7 @@ const NotificationCenter = () => {
               {unreadCount > 0 && (
                 <button
                   onClick={() => markAllAsRead()}
-                  className="text-xs md:text-sm text-blue-600 hover:text-blue-700"
+                  className="text-xs md:text-sm text-primary-600 hover:text-primary-700 transition-colors duration-200"
                 >
                   {t('header.markAllAsRead')}
                 </button>
@@ -104,7 +104,7 @@ const NotificationCenter = () => {
                     <div
                       key={notification.id}
                       onClick={() => handleNotificationClick(notification)}
-                      className={`p-3 md:p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors ${!isRead ? 'bg-blue-50' : ''
+                      className={`p-3 md:p-4 border-b border-neutral-100 hover:bg-neutral-50 cursor-pointer transition-colors ${!isRead ? 'bg-primary-50' : ''
                         }`}
                     >
                       <div className="flex items-start gap-2 md:gap-3">
@@ -117,7 +117,7 @@ const NotificationCenter = () => {
                           </p>
                         </div>
                         {!isRead && (
-                          <div className="w-2 h-2 bg-blue-600 rounded-full flex-shrink-0 mt-1"></div>
+                          <div className="w-2 h-2 bg-primary-500 rounded-full flex-shrink-0 mt-1"></div>
                         )}
                       </div>
                     </div>

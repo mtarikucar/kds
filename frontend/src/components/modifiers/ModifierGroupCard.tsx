@@ -43,7 +43,7 @@ const ModifierGroupCard = ({
       <div className="flex items-start justify-between mb-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <h3 className="font-semibold text-gray-900">{group.displayName}</h3>
+            <h3 className="font-semibold text-foreground">{group.displayName}</h3>
             <Badge variant={group.isRequired ? 'danger' : 'default'}>
               {group.isRequired ? t('menu.required') : t('menu.optional')}
             </Badge>
@@ -90,7 +90,7 @@ const ModifierGroupCard = ({
                   key={modifier.id}
                   className={`group relative inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm border transition-colors ${
                     modifier.isAvailable
-                      ? 'bg-gray-50 border-gray-200 text-gray-700'
+                      ? 'bg-neutral-50 border-neutral-200 text-neutral-700'
                       : 'bg-gray-100 border-gray-300 text-gray-400 line-through'
                   }`}
                 >
@@ -106,7 +106,7 @@ const ModifierGroupCard = ({
                         e.stopPropagation();
                         onEditModifier(modifier);
                       }}
-                      className="p-1 bg-blue-500 text-white rounded-full hover:bg-blue-600 shadow-sm"
+                      className="p-1 bg-primary-500 text-white rounded-full hover:bg-primary-600 shadow-sm transition-colors duration-200"
                       title={t('common:app.edit')}
                     >
                       <Edit className="h-3 w-3" />

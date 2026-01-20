@@ -118,7 +118,7 @@ const CustomersPage = () => {
                         {customer.tags.map((tag: string) => (
                           <span
                             key={tag}
-                            className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded"
+                            className="px-2 py-1 text-xs bg-primary-100 text-primary-800 rounded"
                           >
                             {tag}
                           </span>
@@ -169,8 +169,8 @@ const CustomersPage = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 text-center">
-              <div className="p-3 bg-blue-50 rounded-lg sm:bg-transparent sm:p-0">
-                <p className="text-xl md:text-2xl font-bold text-blue-600">{customers.length}</p>
+              <div className="p-3 bg-primary-50 rounded-lg sm:bg-transparent sm:p-0">
+                <p className="text-xl md:text-2xl font-bold text-primary-600">{customers.length}</p>
                 <p className="text-xs md:text-sm text-gray-600">{t('customers.title')}</p>
               </div>
               <div className="p-3 bg-green-50 rounded-lg sm:bg-transparent sm:p-0">

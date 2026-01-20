@@ -158,7 +158,7 @@ const ProductOptionsModal = ({
             )}
             <div className="flex-1">
               <p className="text-gray-600 text-sm line-clamp-2">{product.description}</p>
-              <p className="text-xl font-bold text-blue-600 mt-1">{formatPrice(product.price)}</p>
+              <p className="text-xl font-bold text-primary-600 mt-1">{formatPrice(product.price)}</p>
             </div>
           </div>
 
@@ -193,26 +193,26 @@ const ProductOptionsModal = ({
                       onClick={() => handleModifierToggle(group, modifier)}
                       className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all ${
                         isSelected
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                          ? 'border-primary-500 bg-primary-50'
+                          : 'border-neutral-200 hover:border-primary-300 hover:bg-neutral-50'
                       }`}
                     >
                       <div className="flex items-center gap-3">
                         <div
                           className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
                             isSelected
-                              ? 'border-blue-500 bg-blue-500'
+                              ? 'border-primary-500 bg-primary-500'
                               : 'border-gray-300'
                           }`}
                         >
                           {isSelected && <Check className="w-3 h-3 text-white" />}
                         </div>
-                        <span className={`font-medium ${isSelected ? 'text-blue-700' : 'text-gray-700'}`}>
+                        <span className={`font-medium ${isSelected ? 'text-primary-700' : 'text-neutral-700'}`}>
                           {modifier.name}
                         </span>
                       </div>
                       {Number(modifier.priceAdjustment) > 0 && (
-                        <span className={`text-sm font-semibold ${isSelected ? 'text-blue-600' : 'text-gray-500'}`}>
+                        <span className={`text-sm font-semibold ${isSelected ? 'text-primary-600' : 'text-neutral-500'}`}>
                           +{formatPrice(modifier.priceAdjustment)}
                         </span>
                       )}

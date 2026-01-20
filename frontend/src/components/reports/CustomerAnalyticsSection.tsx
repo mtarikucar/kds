@@ -51,7 +51,7 @@ const CustomerAnalyticsSection = ({ startDate, endDate }: CustomerAnalyticsSecti
                 <p className="text-sm text-gray-600">{t('customerAnalytics.totalCustomers')}</p>
                 <p className="text-2xl font-bold">{data.totalCustomers}</p>
               </div>
-              <div className="p-3 rounded-full bg-blue-500">
+              <div className="p-3 rounded-full bg-primary-500">
                 <Users className="h-6 w-6 text-white" />
               </div>
             </div>
@@ -128,7 +128,7 @@ const CustomerAnalyticsSection = ({ startDate, endDate }: CustomerAnalyticsSecti
             {data.tierDistribution.map((tier) => (
               <div
                 key={tier.tier}
-                className="flex-1 min-w-[120px] p-4 rounded-lg bg-gray-50"
+                className="flex-1 min-w-[120px] p-4 rounded-lg bg-neutral-50"
               >
                 <div className="flex items-center gap-2 mb-2">
                   <div className={`w-3 h-3 rounded-full ${tierColors[tier.tier] || 'bg-gray-400'}`} />
@@ -169,9 +169,9 @@ const CustomerAnalyticsSection = ({ startDate, endDate }: CustomerAnalyticsSecti
                 </thead>
                 <tbody>
                   {data.topCustomers.map((customer, index) => (
-                    <tr key={customer.id} className="border-b hover:bg-gray-50">
+                    <tr key={customer.id} className="border-b hover:bg-neutral-50 transition-colors duration-200">
                       <td className="py-3 px-4">
-                        <span className="font-bold text-blue-600">#{index + 1}</span>
+                        <span className="font-bold text-primary-600">#{index + 1}</span>
                       </td>
                       <td className="py-3 px-4">
                         <div>

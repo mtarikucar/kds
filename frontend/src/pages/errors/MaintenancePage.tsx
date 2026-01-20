@@ -3,13 +3,13 @@ import { useTranslation } from 'react-i18next';
 export default function MaintenancePage() {
   const { t } = useTranslation('errors');
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 to-primary-100 px-4">
       <div className="max-w-md w-full text-center">
         {/* Maintenance Icon */}
         <div className="mb-8">
           <div className="mx-auto h-32 w-32 flex items-center justify-center rounded-full bg-white shadow-lg">
             <svg
-              className="h-20 w-20 text-blue-600"
+              className="h-20 w-20 text-primary-500"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -31,8 +31,8 @@ export default function MaintenancePage() {
         </div>
 
         {/* Content */}
-        <h1 className="text-3xl font-extrabold text-gray-900 mb-2">{t('pages.maintenance.title')}</h1>
-        <p className="text-lg text-gray-600 mb-8">
+        <h1 className="text-3xl font-extrabold font-heading text-foreground mb-2">{t('pages.maintenance.title')}</h1>
+        <p className="text-lg text-muted-foreground mb-8">
           {t('pages.maintenance.description')}
         </p>
 
@@ -40,7 +40,7 @@ export default function MaintenancePage() {
         <div className="mb-8 p-6 bg-white rounded-lg shadow-md">
           <div className="flex items-center justify-center space-x-2 mb-4">
             <svg
-              className="h-5 w-5 text-blue-600 animate-spin"
+              className="h-5 w-5 text-primary-500 animate-spin"
               fill="none"
               viewBox="0 0 24 24"
             >
@@ -74,7 +74,7 @@ export default function MaintenancePage() {
             <ul className="text-left space-y-2 max-w-xs mx-auto">
               <li className="flex items-start">
                 <svg
-                  className="h-5 w-5 text-blue-600 mr-2 flex-shrink-0"
+                  className="h-5 w-5 text-primary-500 mr-2 flex-shrink-0"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -90,7 +90,7 @@ export default function MaintenancePage() {
               </li>
               <li className="flex items-start">
                 <svg
-                  className="h-5 w-5 text-blue-600 mr-2 flex-shrink-0"
+                  className="h-5 w-5 text-primary-500 mr-2 flex-shrink-0"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -106,7 +106,7 @@ export default function MaintenancePage() {
               </li>
               <li className="flex items-start">
                 <svg
-                  className="h-5 w-5 text-blue-600 mr-2 flex-shrink-0"
+                  className="h-5 w-5 text-primary-500 mr-2 flex-shrink-0"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
@@ -125,10 +125,10 @@ export default function MaintenancePage() {
         </div>
 
         {/* Contact */}
-        <div className="mt-8 p-4 bg-blue-50 rounded-lg">
-          <p className="text-sm text-blue-800">
+        <div className="mt-8 p-4 bg-primary-50 rounded-lg">
+          <p className="text-sm text-primary-800">
             {t('pages.maintenance.needHelp')}{' '}
-            <a href="mailto:support@example.com" className="font-medium underline hover:text-blue-900">
+            <a href="mailto:support@example.com" className="font-medium underline hover:text-primary-900 transition-colors duration-200">
               {t('pages.maintenance.contactSupport')}
             </a>
           </p>

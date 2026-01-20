@@ -116,22 +116,22 @@ export default function SubscriptionPaymentPage() {
   // Email request sent - show confirmation for international customers
   if (paymentStatus === 'email_sent') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
-          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Mail className="w-8 h-8 text-blue-600" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="max-w-md w-full bg-card rounded-lg shadow-lg p-8 text-center">
+          <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Mail className="w-8 h-8 text-primary-600" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <h2 className="text-2xl font-bold font-heading text-foreground mb-2">
             {t('subscriptions.payment.requestSubmitted', 'Request Submitted')}
           </h2>
           <p className="text-gray-600 mb-6">
             {emailMessage || t('subscriptions.payment.contactSoon', 'Our team will contact you shortly to complete the payment process.')}
           </p>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
-            <h3 className="font-semibold text-blue-900 mb-2">
+          <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 mb-6 text-left">
+            <h3 className="font-semibold text-primary-900 mb-2">
               {t('subscriptions.payment.whatHappensNext', 'What happens next?')}
             </h3>
-            <ul className="text-sm text-blue-800 space-y-2">
+            <ul className="text-sm text-primary-800 space-y-2">
               <li>• {t('subscriptions.payment.step1', 'You will receive a confirmation email')}</li>
               <li>• {t('subscriptions.payment.step2', 'Our team will contact you within 24 hours')}</li>
               <li>• {t('subscriptions.payment.step3', 'We will arrange payment via bank transfer or other methods')}</li>
@@ -151,10 +151,10 @@ export default function SubscriptionPaymentPage() {
 
   if (paymentStatus === 'success') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
-          <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="max-w-md w-full bg-card rounded-lg shadow-lg p-8 text-center">
+          <CheckCircle2 className="w-16 h-16 text-accent-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-bold font-heading text-foreground mb-2">
             {t('subscriptions.payment.success.title')}
           </h2>
           <p className="text-gray-600 mb-6">
@@ -183,7 +183,7 @@ export default function SubscriptionPaymentPage() {
             <ArrowLeft className="w-4 h-4" />
             {t('subscriptions.payment.backToPlans')}
           </button>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-3xl font-bold font-heading text-foreground">
             {t('subscriptions.payment.completePayment')}
           </h1>
           <p className="text-gray-600 mt-2">
@@ -207,14 +207,14 @@ export default function SubscriptionPaymentPage() {
         )}
 
         {/* Security Notice */}
-        <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="mt-8 p-4 bg-primary-50 border border-primary-200 rounded-lg">
           <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <AlertCircle className="w-5 h-5 text-primary-500 flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-semibold text-blue-900 mb-1">
+              <h3 className="font-semibold text-primary-900 mb-1">
                 {t('subscriptions.payment.securePaymentTitle')}
               </h3>
-              <p className="text-sm text-blue-800">
+              <p className="text-sm text-primary-800">
                 {t('subscriptions.payment.securePaymentDescPaytr')}
               </p>
             </div>

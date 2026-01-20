@@ -261,7 +261,7 @@ const QRManagementPage = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900">{t('admin.qrCodeManagement')}</h1>
+        <h1 className="text-3xl font-bold font-heading text-foreground">{t('admin.qrCodeManagement')}</h1>
         <p className="text-gray-600">{t('admin.generateCustomizeQR')}</p>
       </div>
 
@@ -273,7 +273,7 @@ const QRManagementPage = () => {
             className={`
               py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2
               ${activeTab === 'codes'
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-primary-500 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }
             `}
@@ -286,7 +286,7 @@ const QRManagementPage = () => {
             className={`
               py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2
               ${activeTab === 'design'
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-primary-500 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }
             `}
@@ -332,9 +332,9 @@ const QRManagementPage = () => {
                   </Button>
                 )}
               </div>
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-xs font-medium text-blue-900 mb-1">{t('admin.batchTips')}:</p>
-                <ul className="text-xs text-blue-800 space-y-1">
+              <div className="mt-4 p-3 bg-primary-50 border border-primary-200 rounded-lg">
+                <p className="text-xs font-medium text-primary-900 mb-1">{t('admin.batchTips')}:</p>
+                <ul className="text-xs text-primary-800 space-y-1">
                   <li>• {t('admin.batchTip1')}</li>
                   <li>• {t('admin.batchTip2')}</li>
                   <li>• {t('admin.batchTip3')}</li>

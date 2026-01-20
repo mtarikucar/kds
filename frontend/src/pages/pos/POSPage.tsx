@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import TableGrid from '../../components/pos/TableGrid';
@@ -15,12 +16,15 @@ import BillRequestsPanel from '../../components/pos/BillRequestsPanel';
 import { useCreateOrder, useUpdateOrder, useOrders, useTransferTableOrders } from '../../features/orders/ordersApi';
 import { useCreatePayment } from '../../features/orders/ordersApi';
 import TransferTableModal from '../../components/pos/TransferTableModal';
+import TableActionModal from '../../components/pos/TableActionModal';
 import { useUpdateTableStatus } from '../../features/tables/tablesApi';
 import { useGetPosSettings } from '../../features/pos/posApi';
 import { usePosSocket } from '../../features/pos/usePosSocket';
 import { Product, Table, TableStatus, OrderType, OrderStatus } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
+import Badge from '../../components/ui/Badge';
 import { useResponsive } from '../../hooks/useResponsive';
+import { cn } from '../../lib/utils';
 
 interface CartItem extends Product {
   quantity: number;
@@ -30,6 +34,7 @@ interface CartItem extends Product {
 
 const POSPage = () => {
   const { t } = useTranslation('pos');
+  const [viewMode, setViewMode] = useState<'tables' | 'ordering' | 'payment'>('tables');
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState(0);
@@ -45,6 +50,9 @@ const POSPage = () => {
   const [isProductOptionsModalOpen, setIsProductOptionsModalOpen] = useState(false);
   const [productForOptions, setProductForOptions] = useState<Product | null>(null);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [isTableActionModalOpen, setIsTableActionModalOpen] = useState(false);
+  const [isOrderSummaryOpen, setIsOrderSummaryOpen] = useState(false);
+  const [isTablesPanelOpen, setIsTablesPanelOpen] = useState(false);
 
   // Responsive hook
   const { isDesktop, isMobile, isTablet } = useResponsive();
@@ -80,9 +88,27 @@ const POSPage = () => {
       : undefined
   );
 
-  // Load existing orders when an occupied table is selected
+  // Reset to tables view when navigating to POS from sidebar (only if no table selected)
   useEffect(() => {
-    if (selectedTable?.status === TableStatus.OCCUPIED && tableOrders) {
+    // When location changes to /pos and no table is selected, reset to tables view
+    if (location.pathname === '/pos' && !selectedTable && viewMode !== 'tables') {
+      setViewMode('tables');
+      setCartItems([]);
+      setDiscount(0);
+      setCustomerName('');
+      setOrderNotes('');
+      setCurrentOrderId(null);
+      setCurrentOrderAmount(null);
+    }
+  }, [location.pathname, selectedTable, viewMode]);
+
+  // Load existing orders when an occupied table is selected and in ordering mode
+  useEffect(() => {
+    if (
+      selectedTable?.status === TableStatus.OCCUPIED &&
+      tableOrders &&
+      viewMode === 'ordering'
+    ) {
       // Find the most recent editable order (only PENDING or PREPARING)
       // READY and SERVED orders should not be continued - new order should be created
       const activeOrder = tableOrders.find(
@@ -111,15 +137,13 @@ const POSPage = () => {
         toast.info(
           t('loadedExistingOrder', { orderNumber: activeOrder.orderNumber, count: items.length })
         );
-      } else {
-        // Table is marked occupied but no active orders found
-  toast.warning(t('tableOccupiedNoOrders'));
       }
     }
-  }, [selectedTable, tableOrders]);
+  }, [selectedTable, tableOrders, viewMode]);
 
   const handleSelectTable = (table: Table) => {
     if (table.status === TableStatus.AVAILABLE) {
+      // Boş masa: Direkt sipariş ekleme moduna geç
       setSelectedTable(table);
       setCartItems([]);
       setDiscount(0);
@@ -127,17 +151,57 @@ const POSPage = () => {
       setOrderNotes('');
       setCurrentOrderId(null);
       setCurrentOrderAmount(null);
+      setViewMode('ordering');
     } else if (table.status === TableStatus.OCCUPIED) {
+      // Dolu masa: Modal aç
       setSelectedTable(table);
-      // Clear cart first - useEffect will load existing orders
-      setCartItems([]);
-      setDiscount(0);
-      setCustomerName('');
-      setOrderNotes('');
-  toast.info(t('loadingExistingOrder'));
+      setIsTableActionModalOpen(true);
     } else {
-  toast.warning(t('tableReserved'));
+      toast.warning(t('tableReserved'));
     }
+  };
+
+  const handleAddNewOrder = () => {
+    // Yeni sipariş ekleme moduna geç
+    // selectedTable zaten set edilmiş durumda (modal açılmadan önce)
+    setCartItems([]);
+    setDiscount(0);
+    setCustomerName('');
+    setOrderNotes('');
+    setCurrentOrderId(null);
+    setCurrentOrderAmount(null);
+    setViewMode('ordering');
+    // Masalar panelini aç (ordering modunda)
+    setIsTablesPanelOpen(true);
+    // Modal kapanacak ama selectedTable korunacak
+  };
+
+  const handleCloseBillFromModal = () => {
+    // Tüm aktif siparişlerin toplam tutarını hesapla ve ödeme modal'ını aç
+    if (tableOrders && tableOrders.length > 0) {
+      const totalAmount = tableOrders.reduce(
+        (sum, order) => sum + Number(order.finalAmount || 0),
+        0
+      );
+      // İlk siparişi referans olarak kullan (tüm siparişler için ödeme yapılacak)
+      const firstOrder = tableOrders[0];
+      setCurrentOrderId(firstOrder.id);
+      setCurrentOrderAmount(totalAmount);
+      setViewMode('ordering');
+      setIsPaymentModalOpen(true);
+    }
+  };
+
+  const handleBackToTables = () => {
+    setViewMode('tables');
+    setSelectedTable(null);
+    setCartItems([]);
+    setDiscount(0);
+    setCustomerName('');
+    setOrderNotes('');
+    setCurrentOrderId(null);
+    setCurrentOrderAmount(null);
+    setIsTablesPanelOpen(false);
   };
 
   const handleAddItem = (product: Product) => {
@@ -413,8 +477,9 @@ const POSPage = () => {
       },
       {
         onSuccess: () => {
-          // Reset state after successful transfer
+          // Reset state after successful transfer and go back to tables view
           setIsTransferModalOpen(false);
+          setViewMode('tables');
           setSelectedTable(null);
           setCartItems([]);
           setDiscount(0);
@@ -440,70 +505,146 @@ const POSPage = () => {
   const hasCartItems = cartItems.length > 0;
 
   return (
-    <div className="h-full pb-20 lg:pb-0">
-      {/* Notification Bar */}
+    <div className="h-screen flex flex-col overflow-hidden bg-background">
+      {/* Minimal Notification Bar - Only show when there are notifications */}
       <NotificationBar
         onShowPendingOrders={() => setIsPendingOrdersPanelOpen(true)}
         onShowWaiterRequests={() => setIsWaiterRequestsPanelOpen(true)}
         onShowBillRequests={() => setIsBillRequestsPanelOpen(true)}
       />
 
-      {/* Header */}
-      <div className="mb-4 md:mb-6">
-  <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t('title')}</h1>
-        <p className="text-sm md:text-base text-gray-600">
-          {isTablelessMode
-            ? t('startTakingOrdersTableless')
-            : t('selectTableAndStart')}
-        </p>
-        {/* Selected Table Indicator - Mobile/Tablet */}
-        {selectedTable && !isDesktop && (
-          <div className="mt-2 inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-            </svg>
-            {t('table')} {selectedTable.number}
+      {/* TABLES VIEW - Full screen, minimal header */}
+      {viewMode === 'tables' && !isTablelessMode && (
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="px-6 py-4 border-b border-border bg-white">
+            <h1 className="text-xl font-semibold text-foreground">{t('selectTable', 'Masa Seçin')}</h1>
           </div>
-        )}
-      </div>
+          <div className="flex-1 overflow-hidden p-6">
+            <TableGrid selectedTable={selectedTable} onSelectTable={handleSelectTable} />
+          </div>
+        </div>
+      )}
 
-      {/* DESKTOP LAYOUT (≥1024px) - 3-Panel */}
-      {isDesktop && (
-        <div className="flex gap-6 h-[calc(100vh-200px)]">
-          {/* Tables Section - hidden in tableless mode */}
-          {!isTablelessMode && (
-            <div className="w-1/4">
-              <Card className="h-full">
-                <CardHeader>
-                  <CardTitle>{t('common:navigation.tables')}</CardTitle>
-                </CardHeader>
-                <CardContent className="overflow-y-auto">
-                  <TableGrid
-                    selectedTable={selectedTable}
-                    onSelectTable={handleSelectTable}
-                  />
-                </CardContent>
-              </Card>
+      {/* ORDERING VIEW - Menu without tables panel */}
+      {viewMode === 'ordering' && (
+        <div className="flex-1 flex overflow-hidden">
+          {/* Main Content Area */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Minimal Header - Table info + Actions */}
+            <div className="px-4 md:px-6 py-3 border-b border-border bg-white flex items-center justify-between flex-shrink-0">
+              <div className="flex items-center gap-3">
+                {selectedTable && (
+                  <>
+                    <div className="px-3 py-1.5 bg-primary-100 text-primary-700 rounded-lg font-semibold text-sm">
+                      {t('tableLabel')} {selectedTable.number}
+                    </div>
+                    <Badge variant={selectedTable.status === TableStatus.OCCUPIED ? 'danger' : 'success'} className="text-xs">
+                      {t(`tableGrid.status.${selectedTable.status}`)}
+                    </Badge>
+                  </>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Cart Button - Shows item count */}
+                {hasCartItems && (
+                  <button
+                    onClick={() => setIsOrderSummaryOpen(true)}
+                    className="relative flex items-center gap-2 px-3 md:px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors duration-150 font-medium text-sm"
+                  >
+                    <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span className="hidden sm:inline">{cartItems.length}</span>
+                    <span className="absolute -top-1.5 -right-1.5 bg-error text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                      {cartItems.reduce((sum, item) => sum + item.quantity, 0)}
+                    </span>
+                  </button>
+                )}
+                {selectedTable && (
+                  <button
+                    onClick={handleBackToTables}
+                    className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-neutral-100 rounded-lg transition-colors duration-150"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                    </svg>
+                    <span className="hidden sm:inline">{t('backToTables', 'Masalara Dön')}</span>
+                  </button>
+                )}
+              </div>
             </div>
-          )}
 
-          {/* Menu Section */}
-          <div className={`flex-1 ${isTablelessMode ? 'w-3/4' : 'w-1/2'}`}>
-            <Card className="h-full">
-              <CardHeader>
-                <CardTitle>
-                  {t('common:navigation.menu')} {selectedTable && `- ${t('tableLabel')} ${selectedTable.number}`}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="h-[calc(100%-80px)] overflow-y-auto">
-                <MenuPanel onAddItem={handleAddItem} />
-              </CardContent>
-            </Card>
+            {/* Full Screen Menu */}
+            <div className="flex-1 overflow-hidden">
+              <MenuPanel onAddItem={handleAddItem} />
+            </div>
           </div>
+        </div>
+      )}
 
-          {/* Order Cart Section */}
-          <div className="w-1/4">
-            <div className="sticky top-0">
+
+      {/* TABLELESS MODE - Show menu directly */}
+      {isTablelessMode && (
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {/* Minimal Header */}
+          <div className="px-6 py-3 border-b border-border bg-white flex items-center justify-between">
+            <h1 className="text-xl font-semibold text-foreground">{t('common:navigation.menu')}</h1>
+            {hasCartItems && (
+              <button
+                onClick={() => setIsOrderSummaryOpen(true)}
+                className="relative flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors duration-150 font-medium"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <span>{cartItems.length}</span>
+                <span className="hidden md:inline">{t('items', 'ürün')}</span>
+                <span className="absolute -top-2 -right-2 bg-error text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                  {cartItems.reduce((sum, item) => sum + item.quantity, 0)}
+                </span>
+              </button>
+            )}
+          </div>
+          {/* Full Screen Menu */}
+          <div className="flex-1 overflow-hidden">
+            <MenuPanel onAddItem={handleAddItem} />
+          </div>
+        </div>
+      )}
+
+      {/* STICKY BOTTOM CART BAR - Mobile/Tablet only, show in ordering mode */}
+      {viewMode === 'ordering' && !isDesktop && (
+        <StickyCartBar
+          itemCount={cartItems.length}
+          total={total}
+          onViewCart={() => setIsOrderSummaryOpen(true)}
+          onCheckout={handleCheckout}
+          onCreateOrder={handleCreateOrder}
+          isCheckingOut={isCreatingOrder || isUpdatingOrder}
+          hasItems={hasCartItems}
+          isTwoStepCheckout={isTwoStepCheckout}
+          hasActiveOrder={!!currentOrderId}
+        />
+      )}
+
+      {/* ORDER SUMMARY DRAWER/MODAL - Desktop: Right sidebar, Mobile: Bottom drawer */}
+      {isDesktop ? (
+        <>
+          {/* Desktop Backdrop */}
+          {isOrderSummaryOpen && (
+            <div
+              className="fixed inset-0 bg-black bg-opacity-30 z-40 transition-opacity"
+              onClick={() => setIsOrderSummaryOpen(false)}
+              aria-hidden="true"
+            />
+          )}
+          {/* Desktop Right Sidebar */}
+          <div
+            className={`fixed right-0 top-0 bottom-0 w-96 bg-white shadow-2xl z-50 transform transition-transform duration-300 ease-out ${
+              isOrderSummaryOpen ? 'translate-x-0' : 'translate-x-full'
+            } flex flex-col`}
+          >
+            <div className="flex-1 overflow-y-auto">
               <OrderCart
                 items={cartItems}
                 discount={discount}
@@ -515,9 +656,15 @@ const POSPage = () => {
                 onUpdateCustomerName={setCustomerName}
                 onUpdateOrderNotes={setOrderNotes}
                 onClearCart={handleClearCart}
-                onCheckout={handleCheckout}
+                onCheckout={() => {
+                  setIsOrderSummaryOpen(false);
+                  handleCheckout();
+                }}
                 onCreateOrder={handleCreateOrder}
-                onTransferTable={handleTransferTable}
+                onTransferTable={() => {
+                  setIsOrderSummaryOpen(false);
+                  handleTransferTable();
+                }}
                 isCheckingOut={isCreatingOrder || isUpdatingOrder}
                 isTwoStepCheckout={isTwoStepCheckout}
                 hasActiveOrder={!!currentOrderId}
@@ -525,85 +672,44 @@ const POSPage = () => {
               />
             </div>
           </div>
-        </div>
-      )}
-
-      {/* TABLET/MOBILE LAYOUT (<1024px) - Full-screen Menu + Sticky Bar */}
-      {!isDesktop && (
-        <div className="h-[calc(100vh-220px)]">
-          {/* Tables Section - Collapsible on mobile/tablet */}
-          {!isTablelessMode && !selectedTable && (
-            <Card className="mb-4">
-              <CardHeader>
-                <CardTitle className="text-lg">{t('selectTableTitle')}</CardTitle>
-              </CardHeader>
-              <CardContent className="max-h-[300px] overflow-y-auto">
-                <TableGrid
-                  selectedTable={selectedTable}
-                  onSelectTable={handleSelectTable}
-                />
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Menu Section - Full Screen */}
-          <Card className="h-full">
-            <CardHeader>
-              <CardTitle className="text-lg">
-                {t('common:navigation.menu')} {selectedTable && `- ${t('tableLabel')} ${selectedTable.number}`}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="h-[calc(100%-70px)] overflow-y-auto">
-              <MenuPanel onAddItem={handleAddItem} />
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* STICKY BOTTOM CART BAR - Mobile/Tablet only */}
-      <StickyCartBar
-        itemCount={cartItems.length}
-        total={total}
-        onViewCart={() => setIsCartDrawerOpen(true)}
-        onCheckout={handleCheckout}
-        onCreateOrder={handleCreateOrder}
-        isCheckingOut={isCreatingOrder || isUpdatingOrder}
-        hasItems={hasCartItems}
-        isTwoStepCheckout={isTwoStepCheckout}
-        hasActiveOrder={!!currentOrderId}
-      />
-
-      {/* CART DRAWER - Mobile only */}
-      <CartDrawer
-        isOpen={isCartDrawerOpen}
-        onClose={() => setIsCartDrawerOpen(false)}
-      >
-        <OrderCart
-          items={cartItems}
-          discount={discount}
-          customerName={customerName}
-          orderNotes={orderNotes}
-          onUpdateQuantity={handleUpdateQuantity}
-          onRemoveItem={handleRemoveItem}
-          onUpdateDiscount={setDiscount}
-          onUpdateCustomerName={setCustomerName}
-          onUpdateOrderNotes={setOrderNotes}
-          onClearCart={handleClearCart}
-          onCheckout={() => {
+        </>
+      ) : (
+        <CartDrawer
+          isOpen={isOrderSummaryOpen || isCartDrawerOpen}
+          onClose={() => {
+            setIsOrderSummaryOpen(false);
             setIsCartDrawerOpen(false);
-            handleCheckout();
           }}
-          onCreateOrder={handleCreateOrder}
-          onTransferTable={() => {
-            setIsCartDrawerOpen(false);
-            handleTransferTable();
-          }}
-          isCheckingOut={isCreatingOrder || isUpdatingOrder}
-          isTwoStepCheckout={isTwoStepCheckout}
-          hasActiveOrder={!!currentOrderId}
-          hasSelectedTable={!!selectedTable}
-        />
-      </CartDrawer>
+        >
+          <OrderCart
+            items={cartItems}
+            discount={discount}
+            customerName={customerName}
+            orderNotes={orderNotes}
+            onUpdateQuantity={handleUpdateQuantity}
+            onRemoveItem={handleRemoveItem}
+            onUpdateDiscount={setDiscount}
+            onUpdateCustomerName={setCustomerName}
+            onUpdateOrderNotes={setOrderNotes}
+            onClearCart={handleClearCart}
+            onCheckout={() => {
+              setIsOrderSummaryOpen(false);
+              setIsCartDrawerOpen(false);
+              handleCheckout();
+            }}
+            onCreateOrder={handleCreateOrder}
+            onTransferTable={() => {
+              setIsOrderSummaryOpen(false);
+              setIsCartDrawerOpen(false);
+              handleTransferTable();
+            }}
+            isCheckingOut={isCreatingOrder || isUpdatingOrder}
+            isTwoStepCheckout={isTwoStepCheckout}
+            hasActiveOrder={!!currentOrderId}
+            hasSelectedTable={!!selectedTable}
+          />
+        </CartDrawer>
+      )}
 
       {/* Payment Modal */}
       <PaymentModal
@@ -654,6 +760,30 @@ const POSPage = () => {
           ).length || 0}
           onConfirm={handleTransferConfirm}
           isLoading={isTransferring}
+        />
+      )}
+
+      {/* Table Action Modal */}
+      {selectedTable && selectedTable.status === TableStatus.OCCUPIED && (
+        <TableActionModal
+          isOpen={isTableActionModalOpen}
+          onClose={() => {
+            setIsTableActionModalOpen(false);
+            // Sadece modal kapatıldığında (X veya backdrop) masa seçimini temizle
+            // "Sipariş Ekle" butonuna tıklandığında handleAddNewOrder içinde modal kapanacak
+            // ama selectedTable korunacak
+            if (viewMode === 'tables') {
+              setSelectedTable(null);
+            }
+          }}
+          table={selectedTable}
+          onAddOrder={() => {
+            // Önce modal'ı kapat, sonra ordering moduna geç
+            setIsTableActionModalOpen(false);
+            // selectedTable korunacak, sadece viewMode değişecek
+            handleAddNewOrder();
+          }}
+          onCloseBill={handleCloseBillFromModal}
         />
       )}
     </div>

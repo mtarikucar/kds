@@ -74,13 +74,13 @@ const ProductModifierSelector = ({
             key={group.id}
             className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
               isSelected
-                ? 'border-blue-500 bg-blue-50'
+                ? 'border-primary-500 bg-primary-50'
                 : 'border-gray-200 bg-white hover:border-gray-300'
             }`}
           >
             <div
               className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${
-                isSelected ? 'bg-blue-500 border-blue-500' : 'border-gray-300'
+                isSelected ? 'bg-primary-500 border-primary-500' : 'border-neutral-300'
               }`}
             >
               {isSelected && <Check className="w-3 h-3 text-white" />}
@@ -93,7 +93,7 @@ const ProductModifierSelector = ({
             />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-medium text-gray-900">{group.displayName}</span>
+                <span className="font-medium text-foreground">{group.displayName}</span>
                 <Badge variant={group.isRequired ? 'danger' : 'default'}>
                   {group.isRequired ? t('menu.required') : t('menu.optional')}
                 </Badge>

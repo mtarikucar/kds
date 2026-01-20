@@ -132,7 +132,7 @@ const UserManagementPage = () => {
   const getRoleBadgeColor = (role: UserRole) => {
     const colors: Record<UserRole, string> = {
       [UserRole.ADMIN]: 'bg-red-100 text-red-800',
-      [UserRole.MANAGER]: 'bg-blue-100 text-blue-800',
+      [UserRole.MANAGER]: 'bg-primary-100 text-primary-800',
       [UserRole.WAITER]: 'bg-green-100 text-green-800',
       [UserRole.KITCHEN]: 'bg-orange-100 text-orange-800',
       [UserRole.COURIER]: 'bg-purple-100 text-purple-800',
@@ -167,7 +167,7 @@ const UserManagementPage = () => {
           disabled={!canAddUser}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg w-full sm:w-auto justify-center ${
             canAddUser
-              ? 'bg-blue-600 text-white hover:bg-blue-700'
+              ? 'bg-primary-500 text-white hover:bg-primary-600'
               : 'bg-gray-300 text-gray-500 cursor-not-allowed'
           }`}
         >
@@ -183,16 +183,16 @@ const UserManagementPage = () => {
       {/* User Count Alert */}
       <div className={`rounded-lg p-4 flex items-start gap-3 ${
         canAddUser
-          ? 'bg-blue-50 border border-blue-200'
+          ? 'bg-primary-50 border border-primary-200'
           : 'bg-amber-50 border border-amber-200'
       }`}>
-        <AlertTriangle className={`h-5 w-5 mt-0.5 ${canAddUser ? 'text-blue-600' : 'text-amber-600'}`} />
+        <AlertTriangle className={`h-5 w-5 mt-0.5 ${canAddUser ? 'text-primary-600' : 'text-warning-dark'}`} />
         <div>
-          <h3 className={`font-semibold ${canAddUser ? 'text-blue-900' : 'text-amber-900'}`}>
+          <h3 className={`font-semibold ${canAddUser ? 'text-primary-900' : 'text-warning-dark'}`}>
             {t('admin.currentUsers')}: {users.length}
             {userLimit.limit !== -1 && ` / ${userLimit.limit}`}
           </h3>
-          <p className={`text-sm ${canAddUser ? 'text-blue-700' : 'text-amber-700'}`}>
+          <p className={`text-sm ${canAddUser ? 'text-primary-700' : 'text-warning-dark'}`}>
             {canAddUser
               ? t('admin.subscriptionLimitInfo')
               : t('subscriptions:subscriptions.limitReachedDescription', {
@@ -244,7 +244,7 @@ const UserManagementPage = () => {
               <tr key={user.id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
-                    <div className="h-10 w-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-semibold">
+                    <div className="h-10 w-10 rounded-full bg-primary-500 flex items-center justify-center text-white font-semibold">
                       {user.firstName[0]}{user.lastName[0]}
                     </div>
                     <div className="ml-4">
@@ -252,7 +252,7 @@ const UserManagementPage = () => {
                         {user.firstName} {user.lastName}
                       </div>
                       {currentUser?.id === user.id && (
-                        <span className="text-xs text-blue-600">({t('admin.you')})</span>
+                        <span className="text-xs text-primary-600">({t('admin.you')})</span>
                       )}
                     </div>
                   </div>
@@ -276,7 +276,7 @@ const UserManagementPage = () => {
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                   <button
                     onClick={() => handleOpenModal(user)}
-                    className="text-blue-600 hover:text-blue-900 mr-4"
+                    className="text-primary-600 hover:text-primary-700 mr-4 transition-colors duration-200"
                   >
                     <Edit2 className="h-4 w-4 inline" />
                   </button>
@@ -397,7 +397,7 @@ const UserManagementPage = () => {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="flex-1 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors duration-200"
                 >
                   {editingUser ? t('admin.editUser') : t('admin.addNewUser')}
                 </button>

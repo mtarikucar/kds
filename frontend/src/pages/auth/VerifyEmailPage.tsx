@@ -59,9 +59,9 @@ const VerifyEmailPage = () => {
           </CardHeader>
           <CardContent>
             <div className="text-center">
-              <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4 animate-pulse">
+              <div className="mx-auto w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mb-4 animate-pulse">
                 <svg
-                  className="w-8 h-8 text-blue-600"
+                  className="w-8 h-8 text-primary-600"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"

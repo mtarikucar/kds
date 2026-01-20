@@ -215,7 +215,7 @@ export default function WifiSocialSettings() {
           {/* Facebook */}
           <div>
             <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
-              <span className="text-blue-600"><FacebookIcon /></span>
+              <span className="text-primary-600"><FacebookIcon /></span>
               {t('wifiSocialSettings.facebook')}
             </label>
             <input

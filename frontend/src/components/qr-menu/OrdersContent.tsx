@@ -39,9 +39,9 @@ const OrdersContent: React.FC<OrdersContentProps> = ({
       case 'PENDING':
         return {
           icon: Clock,
-          color: 'text-blue-600',
-          bg: 'bg-blue-50',
-          border: 'border-blue-200',
+          color: 'text-primary-600',
+          bg: 'bg-primary-50',
+          border: 'border-primary-200',
           label: t('orderStatus.pending', 'Confirmed'),
         };
       case 'PREPARING':

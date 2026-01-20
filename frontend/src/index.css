@@ -4,48 +4,47 @@
 
 @layer base {
   :root {
-    --background: 38 45% 96%;
-    --foreground: 24 40% 28%;
-    --card: 0 0% 100%;
-    --card-foreground: 24 40% 28%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 24 40% 28%;
-    --primary: 24 62% 60%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 38 45% 92%;
-    --secondary-foreground: 24 40% 28%;
-    --muted: 38 30% 88%;
-    --muted-foreground: 24 20% 50%;
-    --accent: 30 45% 85%;
-    --accent-foreground: 24 40% 28%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 24 30% 85%;
-    --input: 24 30% 85%;
-    --ring: 24 62% 60%;
-    --radius: 0.75rem;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
+    /* Warm Modern Color Palette - HSL Values */
+    
+    /* Background Colors */
+    --background: 0 0% 99%;           /* #fafaf9 - Very light neutral */
+    --foreground: 24 10% 10%;          /* #1c1917 - Dark neutral for text */
+    
+    /* Card Colors */
+    --card: 0 0% 100%;                 /* #ffffff - Pure white */
+    --card-foreground: 24 10% 10%;     /* #1c1917 - Dark text on cards */
+    
+    /* Popover Colors */
+    --popover: 0 0% 100%;              /* #ffffff - Pure white */
+    --popover-foreground: 24 10% 10%;  /* #1c1917 - Dark text */
+    
+    /* Primary Colors - Warm Orange (#f97316) */
+    --primary: 24 95% 53%;             /* #f97316 - Warm orange */
+    --primary-foreground: 0 0% 100%;   /* #ffffff - White text on primary */
+    
+    /* Secondary Colors - Deep Orange (#ea580c) */
+    --secondary: 24 90% 48%;           /* #ea580c - Deep orange */
+    --secondary-foreground: 0 0% 100%; /* #ffffff - White text on secondary */
+    
+    /* Accent Colors - Green (#10b981) */
+    --accent: 160 84% 39%;             /* #10b981 - Success green */
+    --accent-foreground: 0 0% 100%;    /* #ffffff - White text on accent */
+    
+    /* Muted Colors */
+    --muted: 30 10% 92%;               /* #f5f5f4 - Light neutral */
+    --muted-foreground: 24 5% 45%;     /* #78716c - Medium neutral text */
+    
+    /* Destructive Colors - Red */
+    --destructive: 0 84% 60%;          /* #ef4444 - Error red */
+    --destructive-foreground: 0 0% 100%; /* #ffffff - White text on error */
+    
+    /* Border & Input Colors */
+    --border: 30 10% 88%;              /* #e7e5e4 - Light border */
+    --input: 30 10% 88%;               /* #e7e5e4 - Input border */
+    --ring: 24 95% 53%;                /* #f97316 - Focus ring (primary) */
+    
+    /* Border Radius */
+    --radius: 0.75rem;                 /* 12px - Default border radius */
   }
 }
 
@@ -58,23 +57,23 @@
   }
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - Warm Modern Theme */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background-color: rgb(245 230 211);
+  background-color: hsl(30 10% 96%); /* Light neutral background */
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: rgb(212 145 94);
+  background-color: hsl(24 95% 53%); /* Primary orange */
   border-radius: 0.5rem;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: rgb(193 122 77);
+  background-color: hsl(24 90% 48%); /* Secondary orange (darker) */
 }
 
 /* Hide scrollbar utility */
@@ -106,6 +105,27 @@
     transform: translateY(0);
     opacity: 1;
   }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+/* Shimmer effect for skeleton */
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(30 10% 92%) 0%,
+    hsl(30 10% 96%) 50%,
+    hsl(30 10% 92%) 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s linear infinite;
 }
 
 @keyframes slide-in-from-left {

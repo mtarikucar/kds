@@ -41,7 +41,7 @@ const WaiterRequestsPanel = ({ isOpen, onClose }: WaiterRequestsPanelProps) => {
         );
       case 'ACKNOWLEDGED':
         return (
-          <span className="px-2 py-1 text-xs font-semibold bg-blue-100 text-blue-800 rounded">
+          <span className="px-2 py-1 text-xs font-semibold bg-primary-100 text-primary-800 rounded">
             {t('waiterRequests.inProgress')}
           </span>
         );
@@ -96,11 +96,11 @@ const WaiterRequestsPanel = ({ isOpen, onClose }: WaiterRequestsPanelProps) => {
               {waiterRequests.map((request: WaiterRequest) => (
                 <div
                   key={request.id}
-                  className={`bg-white border-2 rounded-xl shadow-md overflow-hidden ${request.status === 'PENDING' ? 'border-yellow-200' : 'border-blue-200'
+                  className={`bg-white border-2 rounded-xl shadow-md overflow-hidden ${request.status === 'PENDING' ? 'border-warning-light' : 'border-primary-200'
                     }`}
                 >
                   {/* Request Header */}
-                  <div className={`px-4 py-3 border-b ${request.status === 'PENDING' ? 'bg-yellow-50 border-yellow-200' : 'bg-blue-50 border-blue-200'
+                  <div className={`px-4 py-3 border-b ${request.status === 'PENDING' ? 'bg-warning-light border-warning-light' : 'bg-primary-50 border-primary-200'
                     }`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">

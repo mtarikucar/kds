@@ -70,18 +70,18 @@ const PlanCard = ({
   };
 
   const planColors = {
-    [SubscriptionPlanType.FREE]: 'border-gray-300',
-    [SubscriptionPlanType.BASIC]: 'border-blue-300',
-    [SubscriptionPlanType.PRO]: 'border-purple-500',
-    [SubscriptionPlanType.BUSINESS]: 'border-yellow-500',
+    [SubscriptionPlanType.FREE]: 'border-neutral-300',
+    [SubscriptionPlanType.BASIC]: 'border-primary-300',
+    [SubscriptionPlanType.PRO]: 'border-primary-500',
+    [SubscriptionPlanType.BUSINESS]: 'border-secondary-500',
   };
 
   return (
     <div
       className={cn(
-        'relative bg-white rounded-xl border-2 shadow-lg p-6 flex flex-col transition-all duration-300',
-        isPopular ? 'border-blue-500 ring-2 ring-blue-500 ring-offset-2' : planColors[plan.name],
-        isCurrentPlan && 'bg-blue-50',
+        'relative bg-card rounded-xl border-2 shadow-lg p-6 flex flex-col transition-all duration-300',
+        isPopular ? 'border-primary-500 ring-2 ring-primary-500 ring-offset-2' : planColors[plan.name],
+        isCurrentPlan && 'bg-primary-50',
         hasDiscount && 'ring-2 ring-red-400 ring-offset-2 border-red-400'
       )}
     >
@@ -97,7 +97,7 @@ const PlanCard = ({
 
       {isPopular && !hasDiscount && (
         <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-          <span className="bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
+          <span className="bg-primary-500 text-primary-foreground px-4 py-1 rounded-full text-sm font-semibold shadow-md">
             {t('pricing.mostPopular')}
           </span>
         </div>
@@ -127,7 +127,7 @@ const PlanCard = ({
         <div className="flex items-baseline">
           <span className={cn(
             'text-4xl font-bold',
-            hasDiscount ? 'text-red-600' : 'text-gray-900'
+            hasDiscount ? 'text-error' : 'text-card-foreground'
           )}>
             {getCurrencySymbol(plan.currency)}{price.toFixed(2)}
           </span>
@@ -159,7 +159,7 @@ const PlanCard = ({
         )}
 
         {plan.trialDays > 0 && !hasDiscount && (
-          <p className="text-sm text-blue-600 mt-1">{plan.trialDays} {t('pricing.dayFreeTrial')}</p>
+          <p className="text-sm text-primary-600 mt-1">{plan.trialDays} {t('pricing.dayFreeTrial')}</p>
         )}
       </div>
 
@@ -192,7 +192,7 @@ const PlanCard = ({
           </li>
         </ul>
 
-        <h4 className="font-semibold text-gray-900 mb-3">{t('subscriptions.features')}:</h4>
+        <h4 className="font-semibold text-card-foreground mb-3">{t('subscriptions.features')}:</h4>
         <ul className="space-y-2">
           {Object.entries(plan.features).map(([key, value]) => {
             const featureLabels: Record<string, string> = {

@@ -44,24 +44,24 @@ export function calculateOrderTotal(
 export function getStatusColor(status: string): string {
   const colors: Record<string, string> = {
     // Order statuses
-    pending: 'bg-yellow-100 text-yellow-800',
-    preparing: 'bg-blue-100 text-blue-800',
-    ready: 'bg-green-100 text-green-800',
-    served: 'bg-gray-100 text-gray-800',
-    cancelled: 'bg-red-100 text-red-800',
+    pending: 'bg-warning-light text-warning-dark',
+    preparing: 'bg-primary-100 text-primary-800',
+    ready: 'bg-accent-100 text-accent-800',
+    served: 'bg-neutral-100 text-neutral-800',
+    cancelled: 'bg-error-light text-error-dark',
 
     // Table statuses
-    available: 'bg-green-100 text-green-800',
-    occupied: 'bg-blue-100 text-blue-800',
-    reserved: 'bg-yellow-100 text-yellow-800',
+    available: 'bg-accent-100 text-accent-800',
+    occupied: 'bg-primary-100 text-primary-800',
+    reserved: 'bg-warning-light text-warning-dark',
 
     // Payment statuses
-    paid: 'bg-green-100 text-green-800',
-    unpaid: 'bg-yellow-100 text-yellow-800',
-    refunded: 'bg-red-100 text-red-800',
+    paid: 'bg-accent-100 text-accent-800',
+    unpaid: 'bg-warning-light text-warning-dark',
+    refunded: 'bg-error-light text-error-dark',
   };
 
-  return colors[status.toLowerCase()] || 'bg-gray-100 text-gray-800';
+  return colors[status.toLowerCase()] || 'bg-neutral-100 text-neutral-800';
 }
 
 export function debounce<T extends (...args: any[]) => any>(

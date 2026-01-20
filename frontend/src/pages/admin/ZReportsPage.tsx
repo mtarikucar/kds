@@ -122,7 +122,7 @@ const ZReportsPage = () => {
     <div>
       <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">
+          <h1 className="text-2xl md:text-3xl font-bold font-heading text-foreground">
             {t('zReports.title', 'Z-Reports')}
           </h1>
           <p className="text-gray-600">
@@ -179,7 +179,7 @@ const ZReportsPage = () => {
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-neutral-50 border-b">
                   <tr>
                     <th className="text-left py-3 px-4 font-semibold text-gray-700">
                       {t('zReports.reportNumber', 'Report #')}
@@ -205,9 +205,9 @@ const ZReportsPage = () => {
                   {reportsData?.data.map((report) => (
                     <tr
                       key={report.id}
-                      className="border-b hover:bg-gray-50 transition-colors"
+                      className="border-b hover:bg-neutral-50 transition-colors"
                     >
-                      <td className="py-3 px-4 font-medium text-blue-600">
+                      <td className="py-3 px-4 font-medium text-primary-600">
                         {report.reportNumber}
                       </td>
                       <td className="py-3 px-4">
@@ -332,12 +332,12 @@ const ZReportsPage = () => {
                 label={t('zReports.totalOrders', 'Total Orders')}
                 value={selectedReport.totalOrders}
                 icon={ShoppingCart}
-                color="bg-blue-500"
+                color="bg-primary-500"
               />
             </div>
 
             {/* Sales Summary */}
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-neutral-50 rounded-lg p-4">
               <h4 className="font-semibold mb-3">{t('zReports.salesSummary', 'Sales Summary')}</h4>
               <div className="space-y-2">
                 <div className="flex justify-between">
@@ -356,7 +356,7 @@ const ZReportsPage = () => {
             </div>
 
             {/* Payment Methods */}
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-neutral-50 rounded-lg p-4">
               <h4 className="font-semibold mb-3">{t('zReports.paymentMethods', 'Payment Methods')}</h4>
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
@@ -368,7 +368,7 @@ const ZReportsPage = () => {
                 </div>
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-blue-600" />
+                    <CreditCard className="w-4 h-4 text-primary-600" />
                     <span className="text-gray-600">{t('zReports.card', 'Card')}</span>
                   </div>
                   <span className="font-medium">{formatCurrency(selectedReport.cardPayments)}</span>
@@ -416,7 +416,7 @@ const ZReportsPage = () => {
 
             {/* Top Products */}
             {selectedReport.topProducts && selectedReport.topProducts.length > 0 && (
-              <div className="bg-gray-50 rounded-lg p-4">
+              <div className="bg-neutral-50 rounded-lg p-4">
                 <h4 className="font-semibold mb-3">{t('zReports.topProducts', 'Top Products')}</h4>
                 <div className="space-y-2">
                   {selectedReport.topProducts.slice(0, 5).map((product, index) => (
@@ -502,7 +502,7 @@ const ZReportsPage = () => {
               {t('zReports.notes', 'Notes')}
             </label>
             <textarea
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-background text-foreground"
               rows={3}
               value={generateForm.notes}
               onChange={(e) =>
@@ -555,7 +555,7 @@ const ZReportsPage = () => {
               {t('zReports.emailRecipients', 'Email Recipients')}
             </label>
             <textarea
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-background text-foreground"
               rows={3}
               value={emailInput}
               onChange={(e) => setEmailInput(e.target.value)}

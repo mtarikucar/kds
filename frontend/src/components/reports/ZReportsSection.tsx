@@ -174,7 +174,7 @@ const ZReportsSection = () => {
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-neutral-50 border-b">
                   <tr>
                     <th className="text-left py-3 px-4 font-semibold text-gray-700">
                       {t('zReports.reportNumber', 'Report #')}
@@ -200,9 +200,9 @@ const ZReportsSection = () => {
                   {reportsData?.data.map((report) => (
                     <tr
                       key={report.id}
-                      className="border-b hover:bg-gray-50 transition-colors"
+                      className="border-b hover:bg-neutral-50 transition-colors"
                     >
-                      <td className="py-3 px-4 font-medium text-blue-600">
+                      <td className="py-3 px-4 font-medium text-primary-600">
                         {report.reportNumber}
                       </td>
                       <td className="py-3 px-4">
@@ -327,7 +327,7 @@ const ZReportsSection = () => {
                 label={t('zReports.totalOrders', 'Total Orders')}
                 value={selectedReport.totalOrders}
                 icon={ShoppingCart}
-                color="bg-blue-500"
+                color="bg-primary-500"
               />
             </div>
 
@@ -363,7 +363,7 @@ const ZReportsSection = () => {
                 </div>
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-blue-600" />
+                    <CreditCard className="w-4 h-4 text-primary-600" />
                     <span className="text-gray-600">{t('zReports.card', 'Card')}</span>
                   </div>
                   <span className="font-medium">{formatCurrency(selectedReport.cardPayments)}</span>
@@ -497,7 +497,7 @@ const ZReportsSection = () => {
               {t('zReports.notes', 'Notes')}
             </label>
             <textarea
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-background text-foreground"
               rows={3}
               value={generateForm.notes}
               onChange={(e) =>
@@ -550,7 +550,7 @@ const ZReportsSection = () => {
               {t('zReports.emailRecipients', 'Email Recipients')}
             </label>
             <textarea
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-input rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 bg-background text-foreground"
               rows={3}
               value={emailInput}
               onChange={(e) => setEmailInput(e.target.value)}

@@ -1,13 +1,18 @@
 import { useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import { useUiStore } from '../../store/uiStore';
 import { SubscriptionProvider } from '../../contexts/SubscriptionContext';
+import { cn } from '../../lib/utils';
 
 const Layout = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const { isSidebarCollapsed } = useUiStore();
+  const location = useLocation();
+
+  // Hide sidebar on HomePage
+  const shouldHideSidebar = location.pathname === '/home';
 
   const toggleSidebar = () => {
     setIsSidebarOpen(!isSidebarOpen);
@@ -21,18 +26,24 @@ const Layout = () => {
     <SubscriptionProvider>
       <div className="flex h-screen overflow-hidden">
         {/* Mobile overlay */}
-        {isSidebarOpen && (
+        {!shouldHideSidebar && isSidebarOpen && (
           <div
             className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
             onClick={closeSidebar}
           />
         )}
 
-        <Sidebar isOpen={isSidebarOpen} onClose={closeSidebar} />
+        {/* Sidebar - hidden on HomePage */}
+        {!shouldHideSidebar && (
+          <Sidebar isOpen={isSidebarOpen} onClose={closeSidebar} />
+        )}
 
       <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300`}>
-        <Header onMenuClick={toggleSidebar} />
-        <main className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-6 relative">
+        <Header onMenuClick={shouldHideSidebar ? undefined : toggleSidebar} />
+        <main className={cn(
+          'flex-1 overflow-y-auto bg-background relative',
+          shouldHideSidebar ? '' : 'p-4 md:p-6'
+        )}>
           <Outlet />
           {import.meta.env.VITE_APP_VERSION && (
             <div

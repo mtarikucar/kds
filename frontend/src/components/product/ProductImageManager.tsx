@@ -131,7 +131,7 @@ const ProductImageManager: React.FC<ProductImageManagerProps> = ({
                   className={cn(
                     'grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-lg border-2 border-dashed transition-colors',
                     snapshot.isDraggingOver
-                      ? 'border-blue-500 bg-blue-50'
+                      ? 'border-primary-500 bg-primary-50'
                       : 'border-gray-300'
                   )}
                 >
@@ -194,8 +194,8 @@ const ProductImageManager: React.FC<ProductImageManagerProps> = ({
                           </div>
 
                           {/* Info */}
-                          <div className="p-2 bg-gray-50">
-                            <p className="text-xs truncate font-medium text-gray-900">
+                          <div className="p-2 bg-neutral-50">
+                            <p className="text-xs truncate font-medium text-foreground">
                               {image.filename}
                             </p>
                             <p className="text-xs text-gray-500">
@@ -204,7 +204,7 @@ const ProductImageManager: React.FC<ProductImageManagerProps> = ({
                           </div>
 
                           {/* Order Badge */}
-                          <div className="absolute bottom-14 left-2 bg-gray-900 bg-opacity-75 text-white text-xs font-bold px-2 py-1 rounded">
+                          <div className="absolute bottom-14 left-2 bg-neutral-900 bg-opacity-75 text-white text-xs font-bold px-2 py-1 rounded">
                             #{index + 1}
                           </div>
                         </div>
@@ -223,7 +223,7 @@ const ProductImageManager: React.FC<ProductImageManagerProps> = ({
       {images.length === 0 && (
         <div className="text-center py-8 px-4 border-2 border-dashed border-gray-300 rounded-lg">
           <ImageIcon className="mx-auto h-12 w-12 text-gray-400" />
-          <p className="mt-2 text-sm font-medium text-gray-900">No images added</p>
+          <p className="mt-2 text-sm font-medium text-foreground">No images added</p>
           <p className="mt-1 text-xs text-gray-500">
             Upload images or choose from library to get started
           </p>

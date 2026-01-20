@@ -112,9 +112,9 @@ const CustomerDetailPage = () => {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
-              <div className="text-center p-3 bg-blue-50 rounded-lg">
-                <ShoppingBag className="h-5 w-5 mx-auto mb-1 text-blue-600" />
-                <p className="text-xl font-bold text-blue-600">{typedCustomer.totalOrders || 0}</p>
+              <div className="text-center p-3 bg-primary-50 rounded-lg">
+                <ShoppingBag className="h-5 w-5 mx-auto mb-1 text-primary-600" />
+                <p className="text-xl font-bold text-primary-600">{typedCustomer.totalOrders || 0}</p>
                 <p className="text-xs text-gray-600">{t('customers.totalOrders')}</p>
               </div>
               <div className="text-center p-3 bg-green-50 rounded-lg">
@@ -151,7 +151,7 @@ const CustomerDetailPage = () => {
                   {typedCustomer.tags.map((tag) => (
                     <span
                       key={tag}
-                      className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded"
+                      className="px-2 py-1 text-xs bg-primary-100 text-primary-800 rounded"
                     >
                       {tag}
                     </span>
@@ -191,7 +191,7 @@ const CustomerDetailPage = () => {
                 </thead>
                 <tbody>
                   {(typedCustomer.orders as any[]).map((order: any) => (
-                    <tr key={order.id} className="border-b hover:bg-gray-50">
+                    <tr key={order.id} className="border-b hover:bg-neutral-50 transition-colors duration-200">
                       <td className="py-2 px-3">{order.orderNumber}</td>
                       <td className="py-2 px-3">{new Date(order.createdAt).toLocaleDateString()}</td>
                       <td className="py-2 px-3">
