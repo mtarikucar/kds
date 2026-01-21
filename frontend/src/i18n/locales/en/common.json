@@ -344,7 +344,10 @@
     "popupBlocked": "Popup blocked. Please allow popups for this site to print QR codes.",
     "noQRCodesForPrinting": "No QR codes could be found for printing. Please ensure QR codes are loaded.",
     "noTablesFound": "No tables found. Please add tables first.",
-    "noQRCodesToDownload": "No QR codes found to download"
+    "noQRCodesToDownload": "No QR codes found to download",
+    "noTables": "No tables yet",
+    "noTablesDescription": "Add your first table to start managing your restaurant seating",
+    "addFirstTable": "Add First Table"
   },
   "qrDesigner": {
     "quickColorThemes": "Quick Color Themes",

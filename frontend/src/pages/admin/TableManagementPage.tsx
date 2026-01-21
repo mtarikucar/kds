@@ -1,9 +1,20 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
-import { Plus, Edit, Trash2, Lock, AlertTriangle } from 'lucide-react';
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Lock,
+  AlertTriangle,
+  LayoutGrid,
+  Users,
+  CheckCircle,
+  Clock,
+  XCircle,
+} from 'lucide-react';
 import {
   useTables,
   useCreateTable,
@@ -11,16 +22,13 @@ import {
   useDeleteTable,
 } from '../../features/tables/tablesApi';
 import { Table, TableStatus } from '../../types';
-import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Input from '../../components/ui/Input';
 import Select from '../../components/ui/Select';
-import Badge from '../../components/ui/Badge';
 import Spinner from '../../components/ui/Spinner';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import UpgradePrompt from '../../components/subscriptions/UpgradePrompt';
-// import { getStatusColor } from '../../lib/utils';
 
 const TableManagementPage = () => {
   const { t } = useTranslation(['common', 'subscriptions']);
@@ -44,6 +52,17 @@ const TableManagementPage = () => {
   // Check table limit
   const tableLimit = checkLimit('maxTables', tables?.length ?? 0);
   const canAddTable = tableLimit.allowed;
+
+  // Calculate statistics
+  const stats = useMemo(() => {
+    if (!tables) return { total: 0, available: 0, occupied: 0, reserved: 0 };
+    return {
+      total: tables.length,
+      available: tables.filter((t) => t.status === TableStatus.AVAILABLE).length,
+      occupied: tables.filter((t) => t.status === TableStatus.OCCUPIED).length,
+      reserved: tables.filter((t) => t.status === TableStatus.RESERVED).length,
+    };
+  }, [tables]);
 
   const form = useForm<TableFormData>({
     resolver: zodResolver(tableSchema),
@@ -78,9 +97,6 @@ const TableManagementPage = () => {
       status: data.status as TableStatus,
     };
 
-    console.log('Form data:', data);
-    console.log('Submit data:', submitData);
-
     if (editingTable) {
       updateTable(
         { id: editingTable.id, data: submitData },
@@ -107,38 +123,61 @@ const TableManagementPage = () => {
     { value: TableStatus.RESERVED, label: t('admin.reserved') },
   ];
 
-  const getStatusVariant = (status: TableStatus) => {
+  const getStatusConfig = (status: TableStatus) => {
     switch (status) {
       case TableStatus.AVAILABLE:
-        return 'success';
+        return {
+          variant: 'success' as const,
+          label: t('admin.available'),
+          icon: CheckCircle,
+          gradient: 'bg-gradient-to-br from-emerald-500 to-emerald-600',
+          lightBg: 'bg-emerald-50',
+          barGradient: 'bg-gradient-to-r from-emerald-400 to-emerald-500',
+        };
       case TableStatus.OCCUPIED:
-        return 'danger';
+        return {
+          variant: 'danger' as const,
+          label: t('admin.occupied'),
+          icon: XCircle,
+          gradient: 'bg-gradient-to-br from-red-500 to-red-600',
+          lightBg: 'bg-red-50',
+          barGradient: 'bg-gradient-to-r from-red-400 to-red-500',
+        };
       case TableStatus.RESERVED:
-        return 'warning';
+        return {
+          variant: 'warning' as const,
+          label: t('admin.reserved'),
+          icon: Clock,
+          gradient: 'bg-gradient-to-br from-amber-500 to-amber-600',
+          lightBg: 'bg-amber-50',
+          barGradient: 'bg-gradient-to-r from-amber-400 to-amber-500',
+        };
       default:
-        return 'default';
-    }
-  };
-
-  const getStatusLabel = (status: TableStatus) => {
-    switch (status) {
-      case TableStatus.AVAILABLE:
-        return t('admin.available');
-      case TableStatus.OCCUPIED:
-        return t('admin.occupied');
-      case TableStatus.RESERVED:
-        return t('admin.reserved');
-      default:
-        return String(status);
+        return {
+          variant: 'default' as const,
+          label: String(status),
+          icon: CheckCircle,
+          gradient: 'bg-gradient-to-br from-slate-500 to-slate-600',
+          lightBg: 'bg-slate-50',
+          barGradient: 'bg-gradient-to-r from-slate-400 to-slate-500',
+        };
     }
   };
 
   return (
     <div className="space-y-6">
+      {/* Page Header */}
       <div className="flex items-center justify-between">
-        <div className="mb-8">
-          <h1 className="text-2xl font-heading font-bold text-slate-900">{t('admin.tableManagement')}</h1>
-          <p className="text-slate-500 mt-1">{t('admin.manageTablesSeating')}</p>
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20">
+            <LayoutGrid className="w-7 h-7 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-heading font-bold text-slate-900">
+              {t('admin.tableManagement')}
+            </h1>
+            <p className="text-slate-500 mt-0.5">{t('admin.manageTablesSeating')}</p>
+          </div>
         </div>
         <Button onClick={() => handleOpenModal()} disabled={!canAddTable}>
           {canAddTable ? (
@@ -150,19 +189,27 @@ const TableManagementPage = () => {
         </Button>
       </div>
 
-      {/* Limit Info */}
+      {/* Limit Info Banner */}
       {tableLimit.limit !== -1 && (
-        <div className={`rounded-xl px-6 py-5 flex items-start gap-3 ${
-          canAddTable
-            ? 'bg-blue-50 border border-blue-200'
-            : 'bg-amber-50 border border-amber-200'
-        }`}>
-          <AlertTriangle className={`h-5 w-5 mt-0.5 ${canAddTable ? 'text-blue-600' : 'text-amber-600'}`} />
+        <div
+          className={`rounded-xl px-6 py-4 flex items-start gap-3 ${
+            canAddTable
+              ? 'bg-blue-50 border border-blue-200'
+              : 'bg-amber-50 border border-amber-200'
+          }`}
+        >
+          <AlertTriangle
+            className={`h-5 w-5 mt-0.5 ${canAddTable ? 'text-blue-600' : 'text-amber-600'}`}
+          />
           <div>
-            <h3 className={`font-semibold ${canAddTable ? 'text-blue-900' : 'text-amber-900'}`}>
+            <h3
+              className={`font-semibold ${canAddTable ? 'text-blue-900' : 'text-amber-900'}`}
+            >
               {t('admin.tables')}: {tables?.length ?? 0} / {tableLimit.limit}
             </h3>
-            <p className={`text-sm ${canAddTable ? 'text-blue-700' : 'text-amber-700'}`}>
+            <p
+              className={`text-sm ${canAddTable ? 'text-blue-700' : 'text-amber-700'}`}
+            >
               {canAddTable
                 ? t('admin.subscriptionLimitInfo')
                 : t('subscriptions:subscriptions.limitReachedDescription', {
@@ -184,59 +231,145 @@ const TableManagementPage = () => {
         />
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('admin.tables')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isLoading ? (
-            <Spinner />
-          ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
-              {tables?.map((table) => (
-                <div
-                  key={table.id}
-                  className="border border-slate-200/60 rounded-xl p-4 hover:shadow-md transition-shadow duration-200"
-                >
-                  <div className="text-center mb-3">
-                    <div className="text-2xl font-bold mb-2">
-                      {t('admin.table')} {table.number}
-                    </div>
-                    <Badge variant={getStatusVariant(table.status as TableStatus)}>
-                      {getStatusLabel(table.status as TableStatus)}
-                    </Badge>
-                    <div className="text-sm text-slate-600 mt-2">
-                      {t('admin.capacity')}: {table.capacity} {t('admin.people')}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
-                      onClick={() => handleOpenModal(table)}
-                    >
-                      <Edit className="h-4 w-4 mr-1" />
-                      {t('app.edit')}
-                    </Button>
-                    <Button
-                      variant="danger"
-                      size="sm"
-                      onClick={() => {
-                        if (confirm(t('admin.deleteTableConfirm'))) {
-                          deleteTable(table.id);
-                        }
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+      {/* Statistics Overview */}
+      {tables && tables.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {/* Total Tables */}
+          <div className="bg-white rounded-xl border border-slate-200/60 p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center">
+              <LayoutGrid className="w-6 h-6 text-slate-600" />
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <div>
+              <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
+              <p className="text-sm text-slate-500">{t('admin.tables')}</p>
+            </div>
+          </div>
+
+          {/* Available */}
+          <div className="bg-white rounded-xl border border-slate-200/60 p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
+              <CheckCircle className="w-6 h-6 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-emerald-600">{stats.available}</p>
+              <p className="text-sm text-slate-500">{t('admin.available')}</p>
+            </div>
+          </div>
+
+          {/* Occupied */}
+          <div className="bg-white rounded-xl border border-slate-200/60 p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
+              <XCircle className="w-6 h-6 text-red-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-red-600">{stats.occupied}</p>
+              <p className="text-sm text-slate-500">{t('admin.occupied')}</p>
+            </div>
+          </div>
+
+          {/* Reserved */}
+          <div className="bg-white rounded-xl border border-slate-200/60 p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
+              <Clock className="w-6 h-6 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-amber-600">{stats.reserved}</p>
+              <p className="text-sm text-slate-500">{t('admin.reserved')}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Content */}
+      {isLoading ? (
+        <div className="flex justify-center py-16">
+          <Spinner />
+        </div>
+      ) : !tables || tables.length === 0 ? (
+        /* Empty State */
+        <div className="bg-white rounded-2xl border border-slate-200/60 py-16 text-center">
+          <div className="mx-auto w-20 h-20 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+            <LayoutGrid className="w-10 h-10 text-slate-400" />
+          </div>
+          <h3 className="text-lg font-semibold text-slate-900">{t('admin.noTables')}</h3>
+          <p className="mt-2 text-sm text-slate-500 max-w-sm mx-auto">
+            {t('admin.noTablesDescription')}
+          </p>
+          <Button className="mt-6" onClick={() => handleOpenModal()} disabled={!canAddTable}>
+            <Plus className="h-4 w-4 mr-2" />
+            {t('admin.addFirstTable')}
+          </Button>
+        </div>
+      ) : (
+        /* Table Cards Grid */
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+          {tables?.map((table) => {
+            const statusConfig = getStatusConfig(table.status as TableStatus);
+            const StatusIcon = statusConfig.icon;
+
+            return (
+              <div
+                key={table.id}
+                className="group relative bg-white rounded-2xl border border-slate-200/60 p-5 hover:shadow-lg hover:border-primary-200 transition-all duration-300"
+              >
+                {/* Status indicator bar at top */}
+                <div
+                  className={`absolute top-0 left-4 right-4 h-1 rounded-b-full ${statusConfig.barGradient}`}
+                />
+
+                {/* Table visual representation */}
+                <div
+                  className={`mx-auto w-20 h-20 rounded-xl flex items-center justify-center mb-4 ${statusConfig.gradient} shadow-lg`}
+                >
+                  <span className="text-3xl font-bold text-white">{table.number}</span>
+                </div>
+
+                {/* Status badge */}
+                <div className="text-center mb-3">
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusConfig.lightBg}`}
+                  >
+                    <StatusIcon className="w-3.5 h-3.5" />
+                    {statusConfig.label}
+                  </span>
+                </div>
+
+                {/* Capacity */}
+                <div className="flex items-center justify-center gap-1.5 text-slate-600 mb-4">
+                  <Users className="w-4 h-4" />
+                  <span className="text-sm">
+                    {table.capacity} {t('admin.people')}
+                  </span>
+                </div>
+
+                {/* Actions - visible on hover */}
+                <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => handleOpenModal(table)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-500 hover:bg-red-50 hover:text-red-600"
+                    onClick={() => {
+                      if (confirm(t('admin.deleteTableConfirm'))) {
+                        deleteTable(table.id);
+                      }
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
       {/* Table Modal */}
       <Modal

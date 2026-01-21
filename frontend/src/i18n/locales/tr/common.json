@@ -344,7 +344,10 @@
     "popupBlocked": "Açılır pencere engellendi. QR kodlarını yazdırmak için bu site için açılır pencerelere izin verin.",
     "noQRCodesForPrinting": "Yazdırma için QR kodları bulunamadı. Lütfen QR kodlarının yüklendiğinden emin olun.",
     "noTablesFound": "Masa bulunamadı. Lütfen önce masaları ekleyin.",
-    "noQRCodesToDownload": "İndirilecek QR kod bulunamadı"
+    "noQRCodesToDownload": "İndirilecek QR kod bulunamadı",
+    "noTables": "Henüz masa yok",
+    "noTablesDescription": "Restoran oturma düzeninizi yönetmeye başlamak için ilk masanızı ekleyin",
+    "addFirstTable": "İlk Masayı Ekle"
   },
   "qrDesigner": {
     "quickColorThemes": "Hızlı Renk Temaları",
