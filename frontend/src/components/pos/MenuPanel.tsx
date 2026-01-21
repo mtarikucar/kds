@@ -6,7 +6,6 @@ import { useGetPosSettings } from '../../features/pos/posApi';
 import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import { Product } from '../../types';
 import { Card } from '../ui/Card';
-import Button from '../ui/Button';
 import Spinner from '../ui/Spinner';
 import { Plus, Grid3x3, List, Search, Package, AlertCircle, Sparkles } from 'lucide-react';
 
@@ -31,13 +30,12 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
 
   const showImages = posSettings?.showProductImages ?? true;
 
-  // Filter products based on search query
   const filteredProducts = useMemo(() => {
     if (!products) return [];
     if (!searchQuery.trim()) return products;
-    
+
     const query = searchQuery.toLowerCase().trim();
-    return products.filter(product => 
+    return products.filter(product =>
       product.name.toLowerCase().includes(query) ||
       product.description?.toLowerCase().includes(query)
     );
@@ -48,23 +46,23 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
   }
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 to-white rounded-xl">
+    <div className="flex flex-col h-full bg-slate-50/50 rounded-xl">
       {/* Header Section */}
-      <div className="p-4 bg-white rounded-t-xl border-b border-gray-200 space-y-4">
+      <div className="p-4 bg-white rounded-t-xl border-b border-slate-100 space-y-4">
         {/* Search Bar */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('menu.searchProducts')}
-            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
+            className="w-full pl-11 pr-4 py-3 border border-slate-200 rounded-xl bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 transition-all text-sm shadow-sm"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
             >
               ×
             </button>
@@ -77,13 +75,13 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
           <div className="flex gap-2 overflow-x-auto pb-2 flex-1 scrollbar-hide" style={{ scrollbarWidth: 'none' }}>
             <button
               onClick={() => setSelectedCategoryId('')}
-              className={`px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap flex-shrink-0 transition-all transform hover:scale-105 ${
+              className={`px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap flex-shrink-0 transition-all duration-200 ${
                 !selectedCategoryId
-                  ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md'
-                  : 'bg-white border-2 border-gray-300 text-gray-700 hover:border-blue-400'
+                  ? 'bg-primary-500 text-white shadow-sm'
+                  : 'bg-white border border-slate-200 text-slate-600 hover:border-primary-300 hover:text-primary-600'
               }`}
             >
-              <span className="flex items-center gap-1">
+              <span className="flex items-center gap-1.5">
                 <Sparkles className="h-4 w-4" />
                 {t('common:all')}
               </span>
@@ -92,10 +90,10 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
               <button
                 key={category.id}
                 onClick={() => setSelectedCategoryId(category.id)}
-                className={`px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap flex-shrink-0 transition-all transform hover:scale-105 ${
+                className={`px-4 py-2 rounded-full font-medium text-sm whitespace-nowrap flex-shrink-0 transition-all duration-200 ${
                   selectedCategoryId === category.id
-                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md'
-                    : 'bg-white border-2 border-gray-300 text-gray-700 hover:border-blue-400'
+                    ? 'bg-primary-500 text-white shadow-sm'
+                    : 'bg-white border border-slate-200 text-slate-600 hover:border-primary-300 hover:text-primary-600'
                 }`}
               >
                 {category.name}
@@ -104,13 +102,13 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
           </div>
 
           {/* View Mode Toggle */}
-          <div className="flex gap-1 bg-gray-100 rounded-lg p-1 flex-shrink-0">
+          <div className="flex gap-1 bg-slate-100 rounded-lg p-1 flex-shrink-0">
             <button
               onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-md transition-all ${
+              className={`p-2 rounded-lg transition-all duration-200 ${
                 viewMode === 'grid'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-gray-600 hover:bg-white'
+                  ? 'bg-white text-primary-600 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
               }`}
               aria-label={t('menu.gridView')}
               title={t('menu.gridView')}
@@ -119,10 +117,10 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
             </button>
             <button
               onClick={() => setViewMode('list')}
-              className={`p-2 rounded-md transition-all ${
+              className={`p-2 rounded-lg transition-all duration-200 ${
                 viewMode === 'list'
-                  ? 'bg-blue-600 text-white shadow-sm'
-                  : 'text-gray-600 hover:bg-white'
+                  ? 'bg-white text-primary-600 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
               }`}
               aria-label={t('menu.listView')}
               title={t('menu.listView')}
@@ -142,200 +140,154 @@ const MenuPanel = ({ onAddItem }: MenuPanelProps) => {
         ) : filteredProducts.length === 0 ? (
           /* Empty State */
           <div className="flex flex-col items-center justify-center h-64 text-center">
-            <Package className="h-16 w-16 text-gray-300 mb-4" />
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">
+            <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+              <Package className="h-8 w-8 text-slate-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">
               {searchQuery ? t('menu.noProductsFound') : t('menu.noProducts')}
             </h3>
-            <p className="text-gray-500 text-sm">
+            <p className="text-slate-500 text-sm">
               {searchQuery ? t('menu.tryDifferentSearch') : t('menu.selectDifferentCategory')}
             </p>
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                className="mt-4 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors shadow-sm"
               >
                 {t('menu.clearSearch')}
               </button>
             )}
           </div>
         ) : viewMode === 'grid' ? (
-          /* Grid View - Compact Overlay Design */
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-4">
-            {filteredProducts.map((product, index) => (
+          /* Grid View */
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+            {filteredProducts.map((product) => (
               <div
                 key={product.id}
-                className="group animate-in fade-in slide-in-from-bottom-4 duration-300"
-                style={{ animationDelay: `${index * 30}ms` }}
+                className="group bg-white rounded-xl border border-slate-200/60 overflow-hidden hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200"
               >
-                <Card className="relative h-56 overflow-hidden hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer">
-                  {/* Background Image */}
-                  <div className="absolute inset-0">
-                    {showImages && product.images && product.images.length > 0 ? (
-                      <>
-                        <img
-                          src={product.images[0].url.startsWith('http://') || product.images[0].url.startsWith('https://')
-                            ? product.images[0].url
-                            : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${product.images[0].url}`}
-                          alt={product.name}
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                        />
-                        {/* Dark gradient overlay */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20" />
-                      </>
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-600 to-blue-700">
-                        <Package className="h-16 w-16 text-white/30" />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                      </div>
-                    )}
-                  </div>
+                {/* Image */}
+                <div className="aspect-[4/3] bg-slate-100 overflow-hidden relative">
+                  {showImages && product.images && product.images.length > 0 ? (
+                    <img
+                      src={product.images[0].url.startsWith('http://') || product.images[0].url.startsWith('https://')
+                        ? product.images[0].url
+                        : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${product.images[0].url}`}
+                      alt={product.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-50">
+                      <Package className="h-12 w-12 text-slate-300" />
+                    </div>
+                  )}
 
-                  {/* Stock Badge - Top Right */}
+                  {/* Stock Badge */}
                   {product.currentStock !== null && product.currentStock <= 5 && (
-                    <div className="absolute top-2 right-2 z-10">
-                      <div className={`text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 shadow-lg backdrop-blur-sm ${
-                        product.currentStock === 0 ? 'bg-red-500/90' : 'bg-orange-500/90'
+                    <div className="absolute top-2 right-2">
+                      <div className={`text-white text-xs font-bold px-2 py-1 rounded-full flex items-center gap-1 ${
+                        product.currentStock === 0 ? 'bg-red-500' : 'bg-amber-500'
                       }`}>
                         <AlertCircle className="h-3 w-3" />
                         {product.currentStock === 0 ? t('outOfStock') : product.currentStock}
                       </div>
                     </div>
                   )}
+                </div>
 
-                  {/* Content Overlay */}
-                  <div className="absolute inset-0 p-4 flex flex-col justify-between">
-                    {/* Top: Product Name */}
-                    <div>
-                      <h3 className="font-bold text-white text-base leading-tight line-clamp-2 drop-shadow-lg">
-                        {product.name}
-                      </h3>
-                      {product.description && (
-                        <p className="text-white/90 text-xs mt-1.5 line-clamp-1 drop-shadow-md">
-                          {product.description}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Bottom: Price & Add Button */}
-                    <div className="space-y-2.5">
-                      <div className="flex items-center justify-between">
-                        <p className="text-white font-black text-2xl drop-shadow-lg">
-                          {formatPrice(product.price)}
-                        </p>
-                      </div>
-
-                      {/* Add Button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onAddItem(product);
-                        }}
-                        disabled={product.currentStock === 0}
-                        className={`w-full font-bold py-3 px-4 rounded-lg transition-all flex items-center justify-center gap-2 backdrop-blur-sm ${
-                          product.currentStock === 0
-                            ? 'bg-gray-500/50 text-white/50 cursor-not-allowed'
-                            : 'bg-white/95 hover:bg-white text-blue-600 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95'
-                        }`}
-                      >
-                        <Plus className="h-5 w-5" />
-                        <span className="text-sm">{product.currentStock === 0 ? t('outOfStock') : t('addToOrder')}</span>
-                      </button>
-                    </div>
+                {/* Content */}
+                <div className="p-4">
+                  <h3 className="font-semibold text-slate-900 truncate">{product.name}</h3>
+                  {product.description && (
+                    <p className="text-sm text-slate-500 mt-1 line-clamp-1">{product.description}</p>
+                  )}
+                  <div className="flex items-center justify-between mt-3">
+                    <p className="text-primary-600 font-bold text-lg">{formatPrice(product.price)}</p>
+                    <button
+                      onClick={() => onAddItem(product)}
+                      disabled={product.currentStock === 0}
+                      className={`p-2 rounded-lg transition-all duration-200 ${
+                        product.currentStock === 0
+                          ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                          : 'bg-primary-500 text-white hover:bg-primary-600 shadow-sm hover:shadow active:scale-95'
+                      }`}
+                    >
+                      <Plus className="h-5 w-5" />
+                    </button>
                   </div>
-                </Card>
+                </div>
               </div>
             ))}
           </div>
         ) : (
-          /* List View - Compact Horizontal Cards */
-          <div className="space-y-2">
-            {filteredProducts.map((product, index) => (
+          /* List View */
+          <div className="space-y-3">
+            {filteredProducts.map((product) => (
               <div
                 key={product.id}
-                className="animate-in fade-in slide-in-from-left duration-300"
-                style={{ animationDelay: `${index * 20}ms` }}
+                className="bg-white rounded-xl border border-slate-200/60 overflow-hidden hover:shadow-md transition-all duration-200 flex"
               >
-                <Card className="relative h-28 overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer border-2 border-transparent hover:border-blue-200">
-                  {/* Background Image with Gradient */}
-                  <div className="absolute inset-0 flex">
-                    {/* Left: Image Section */}
-                    <div className="w-36 flex-shrink-0 relative overflow-hidden">
-                      {showImages && product.images && product.images.length > 0 ? (
-                        <>
-                          <img
-                            src={product.images[0].url.startsWith('http://') || product.images[0].url.startsWith('https://')
-                              ? product.images[0].url
-                              : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${product.images[0].url}`}
-                            alt={product.name}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-r from-transparent to-black/40" />
-                        </>
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-blue-600 to-blue-700 flex items-center justify-center">
-                          <Package className="h-10 w-10 text-white/30" />
-                        </div>
-                      )}
-
-                      {/* Stock Badge */}
-                      {product.currentStock !== null && product.currentStock <= 5 && (
-                        <div className="absolute top-1 right-1">
-                          <div className={`text-white text-xs font-bold px-1.5 py-0.5 rounded-full shadow-lg ${
-                            product.currentStock === 0 ? 'bg-red-500' : 'bg-orange-500'
-                          }`}>
-                            {product.currentStock === 0 ? '0' : product.currentStock}
-                          </div>
-                        </div>
-                      )}
+                {/* Image */}
+                <div className="w-32 h-28 flex-shrink-0 bg-slate-100 overflow-hidden relative">
+                  {showImages && product.images && product.images.length > 0 ? (
+                    <img
+                      src={product.images[0].url.startsWith('http://') || product.images[0].url.startsWith('https://')
+                        ? product.images[0].url
+                        : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${product.images[0].url}`}
+                      alt={product.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Package className="h-8 w-8 text-slate-300" />
                     </div>
+                  )}
 
-                    {/* Right: Content Section with White Background */}
-                    <div className="flex-1 bg-white flex items-center justify-between px-5 gap-4">
-                      {/* Product Info */}
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-bold text-lg text-gray-800 line-clamp-1 mb-1">
-                          {product.name}
-                        </h3>
-                        {product.description && (
-                          <p className="text-sm text-gray-500 line-clamp-1 mb-1.5">
-                            {product.description}
-                          </p>
-                        )}
-                        <div className="flex items-center gap-2">
-                          <p className="text-2xl font-black bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent">
-                            {formatPrice(product.price)}
-                          </p>
-                          {product.currentStock !== null && product.currentStock <= 5 && product.currentStock > 0 && (
-                            <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
-                              <AlertCircle className="h-3 w-3" />
-                              {t('lowStock')}
-                            </span>
-                          )}
-                        </div>
+                  {/* Stock Badge */}
+                  {product.currentStock !== null && product.currentStock <= 5 && (
+                    <div className="absolute top-1.5 right-1.5">
+                      <div className={`text-white text-xs font-bold px-1.5 py-0.5 rounded-full ${
+                        product.currentStock === 0 ? 'bg-red-500' : 'bg-amber-500'
+                      }`}>
+                        {product.currentStock === 0 ? '0' : product.currentStock}
                       </div>
+                    </div>
+                  )}
+                </div>
 
-                      {/* Add Button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onAddItem(product);
-                        }}
-                        disabled={product.currentStock === 0}
-                        className={`font-bold px-5 py-3 rounded-lg transition-all flex items-center justify-center gap-2 flex-shrink-0 min-w-[110px] ${
-                          product.currentStock === 0
-                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                            : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-md hover:shadow-lg transform hover:scale-105 active:scale-95'
-                        }`}
-                        aria-label={t('addToOrder')}
-                      >
-                        <Plus className="h-5 w-5" />
-                        <span className="text-sm hidden md:inline">
-                          {product.currentStock === 0 ? t('outOfStock') : t('addToOrder')}
+                {/* Content */}
+                <div className="flex-1 p-4 flex items-center justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-slate-900 truncate">{product.name}</h3>
+                    {product.description && (
+                      <p className="text-sm text-slate-500 line-clamp-1 mt-0.5">{product.description}</p>
+                    )}
+                    <div className="flex items-center gap-2 mt-2">
+                      <p className="text-primary-600 font-bold text-lg">{formatPrice(product.price)}</p>
+                      {product.currentStock !== null && product.currentStock <= 5 && product.currentStock > 0 && (
+                        <span className="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded-full font-medium ring-1 ring-inset ring-amber-200/60">
+                          {t('lowStock')}
                         </span>
-                      </button>
+                      )}
                     </div>
                   </div>
-                </Card>
+
+                  {/* Add Button */}
+                  <button
+                    onClick={() => onAddItem(product)}
+                    disabled={product.currentStock === 0}
+                    className={`px-4 py-2.5 rounded-lg font-medium transition-all duration-200 flex items-center gap-2 ${
+                      product.currentStock === 0
+                        ? 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                        : 'bg-primary-500 text-white hover:bg-primary-600 shadow-sm hover:shadow active:scale-95'
+                    }`}
+                  >
+                    <Plus className="h-5 w-5" />
+                    <span className="hidden md:inline text-sm">
+                      {product.currentStock === 0 ? t('outOfStock') : t('addToOrder')}
+                    </span>
+                  </button>
+                </div>
               </div>
             ))}
           </div>

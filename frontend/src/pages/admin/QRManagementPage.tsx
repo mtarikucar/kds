@@ -260,13 +260,13 @@ const QRManagementPage = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">{t('admin.qrCodeManagement')}</h1>
-        <p className="text-gray-600">{t('admin.generateCustomizeQR')}</p>
+      <div className="mb-8">
+        <h1 className="text-2xl font-heading font-bold text-slate-900">{t('admin.qrCodeManagement')}</h1>
+        <p className="text-slate-500 mt-1">{t('admin.generateCustomizeQR')}</p>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-slate-200/60">
         <nav className="-mb-px flex space-x-8">
           <button
             onClick={() => setActiveTab('codes')}
@@ -274,7 +274,7 @@ const QRManagementPage = () => {
               py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2
               ${activeTab === 'codes'
                 ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
               }
             `}
           >
@@ -287,7 +287,7 @@ const QRManagementPage = () => {
               py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2
               ${activeTab === 'design'
                 ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
               }
             `}
           >
@@ -309,7 +309,7 @@ const QRManagementPage = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-slate-500 mb-4">
                 {t('admin.batchOperationsDesc')}
               </p>
               <div className="flex flex-wrap gap-3">
@@ -332,7 +332,7 @@ const QRManagementPage = () => {
                   </Button>
                 )}
               </div>
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="mt-4 px-6 py-5 bg-blue-50 border border-blue-200 rounded-xl">
                 <p className="text-xs font-medium text-blue-900 mb-1">{t('admin.batchTips')}:</p>
                 <ul className="text-xs text-blue-800 space-y-1">
                   <li>• {t('admin.batchTip1')}</li>
@@ -348,7 +348,7 @@ const QRManagementPage = () => {
               <CardTitle>{t('admin.restaurantQRCode')}</CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-slate-500 mb-4">
                 {t('admin.restaurantQRDesc')}
               </p>
               {qrCodes.filter(qr => qr.type === 'TENANT').map(qr => (
@@ -393,7 +393,7 @@ const QRManagementPage = () => {
                 )}
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-gray-600 mb-4">
+                <p className="text-sm text-slate-500 mb-4">
                   {t('admin.tableSpecificQRDesc')}
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -411,7 +411,7 @@ const QRManagementPage = () => {
                   ))}
                 </div>
                 {qrCodes.filter(qr => qr.type === 'TABLE').length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
+                  <div className="text-center py-8 text-slate-500">
                     <p>{t('admin.noTablesFound')}</p>
                   </div>
                 )}

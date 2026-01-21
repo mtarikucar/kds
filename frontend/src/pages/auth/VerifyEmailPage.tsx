@@ -52,32 +52,28 @@ const VerifyEmailPage = () => {
   // Verifying state
   if (verificationState === 'verifying' && token) {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center text-2xl">{t('verifyEmail.verifying')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-center">
-              <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4 animate-pulse">
-                <svg
-                  className="w-8 h-8 text-blue-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-              </div>
-              <p className="text-gray-600">{t('verifyEmail.verifyingMessage')}</p>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white rounded-xl border border-slate-200/60 shadow-sm p-8">
+          <h1 className="text-2xl font-heading font-bold text-slate-900 text-center mb-6">{t('verifyEmail.verifying')}</h1>
+          <div className="text-center">
+            <div className="mx-auto w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4 animate-pulse">
+              <svg
+                className="w-8 h-8 text-blue-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
             </div>
-          </CardContent>
-        </Card>
+            <p className="text-slate-600">{t('verifyEmail.verifyingMessage')}</p>
+          </div>
+        </div>
       </div>
     );
   }
@@ -85,115 +81,14 @@ const VerifyEmailPage = () => {
   // Success state
   if (verificationState === 'success') {
     return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center text-2xl">{t('verifyEmail.success')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="text-center">
-                <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                  <svg
-                    className="w-8 h-8 text-green-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M5 13l4 4L19 7"
-                    />
-                  </svg>
-                </div>
-                <p className="text-gray-600 mb-4">
-                  {t('verifyEmail.successMessage')}
-                </p>
-                <p className="text-sm text-gray-500 mb-6">
-                  {t('verifyEmail.redirecting')}
-                </p>
-              </div>
-
-              <Link to={isAuthenticated ? '/dashboard' : '/login'}>
-                <Button className="w-full">
-                  {isAuthenticated ? t('verifyEmail.goToDashboard') : t('verifyEmail.goToLogin')}
-                </Button>
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Error state
-  if (verificationState === 'error') {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="text-center text-2xl">{t('verifyEmail.failed')}</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="text-center">
-                <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-                  <svg
-                    className="w-8 h-8 text-red-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18L18 6M6 6l12 12"
-                    />
-                  </svg>
-                </div>
-                <p className="text-gray-600 mb-4">{errorMessage}</p>
-              </div>
-
-              {isAuthenticated && (
-                <Button
-                  onClick={handleResendVerification}
-                  className="w-full"
-                  isLoading={isResending}
-                >
-                  {t('verifyEmail.resendEmail')}
-                </Button>
-              )}
-
-              <div className="pt-4 border-t text-center space-y-2">
-                <Link to="/login">
-                  <Button variant="outline" className="w-full">
-                    {t('verifyEmail.backToLogin')}
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Resend verification (no token, authenticated user)
-  return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="text-center text-2xl">{t('verifyEmail.title')}</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white rounded-xl border border-slate-200/60 shadow-sm p-8">
+          <h1 className="text-2xl font-heading font-bold text-slate-900 text-center mb-6">{t('verifyEmail.success')}</h1>
           <div className="space-y-4">
             <div className="text-center">
-              <div className="mx-auto w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
+              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
                 <svg
-                  className="w-8 h-8 text-yellow-600"
+                  className="w-8 h-8 text-green-600"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -202,36 +97,125 @@ const VerifyEmailPage = () => {
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     strokeWidth={2}
-                    d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                    d="M5 13l4 4L19 7"
                   />
                 </svg>
               </div>
-              <p className="text-gray-600 mb-4">
-                {t('verifyEmail.description')}
+              <p className="text-slate-600 mb-4">
+                {t('verifyEmail.successMessage')}
               </p>
-              <p className="text-sm text-gray-500 mb-6">
-                {t('verifyEmail.checkInbox')}
+              <p className="text-sm text-slate-500 mb-6">
+                {t('verifyEmail.redirecting')}
               </p>
             </div>
 
-            <Button
-              onClick={handleResendVerification}
-              className="w-full"
-              isLoading={isResending}
-            >
-              {t('verifyEmail.resendEmail')}
-            </Button>
+            <Link to={isAuthenticated ? '/dashboard' : '/login'}>
+              <Button className="w-full">
+                {isAuthenticated ? t('verifyEmail.goToDashboard') : t('verifyEmail.goToLogin')}
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-            <div className="pt-4 border-t text-center">
-              <Link to="/dashboard">
+  // Error state
+  if (verificationState === 'error') {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+        <div className="w-full max-w-md bg-white rounded-xl border border-slate-200/60 shadow-sm p-8">
+          <h1 className="text-2xl font-heading font-bold text-slate-900 text-center mb-6">{t('verifyEmail.failed')}</h1>
+          <div className="space-y-4">
+            <div className="text-center">
+              <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+                <svg
+                  className="w-8 h-8 text-red-600"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </div>
+              <p className="text-slate-600 mb-4">{errorMessage}</p>
+            </div>
+
+            {isAuthenticated && (
+              <Button
+                onClick={handleResendVerification}
+                className="w-full"
+                isLoading={isResending}
+              >
+                {t('verifyEmail.resendEmail')}
+              </Button>
+            )}
+
+            <div className="pt-4 border-t border-slate-200/60 text-center space-y-2">
+              <Link to="/login">
                 <Button variant="outline" className="w-full">
-                  {t('verifyEmail.backToDashboard')}
+                  {t('verifyEmail.backToLogin')}
                 </Button>
               </Link>
             </div>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
+    );
+  }
+
+  // Resend verification (no token, authenticated user)
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+      <div className="w-full max-w-md bg-white rounded-xl border border-slate-200/60 shadow-sm p-8">
+        <h1 className="text-2xl font-heading font-bold text-slate-900 text-center mb-6">{t('verifyEmail.title')}</h1>
+        <div className="space-y-4">
+          <div className="text-center">
+            <div className="mx-auto w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mb-4">
+              <svg
+                className="w-8 h-8 text-yellow-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
+                />
+              </svg>
+            </div>
+            <p className="text-slate-600 mb-4">
+              {t('verifyEmail.description')}
+            </p>
+            <p className="text-sm text-slate-500 mb-6">
+              {t('verifyEmail.checkInbox')}
+            </p>
+          </div>
+
+          <Button
+            onClick={handleResendVerification}
+            className="w-full"
+            isLoading={isResending}
+          >
+            {t('verifyEmail.resendEmail')}
+          </Button>
+
+          <div className="pt-4 border-t border-slate-200/60 text-center">
+            <Link to="/dashboard">
+              <Button variant="outline" className="w-full">
+                {t('verifyEmail.backToDashboard')}
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

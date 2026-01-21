@@ -27,7 +27,7 @@ const CustomerDetailPage = () => {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-600">{t('app:app.loading')}</div>
+        <div className="text-slate-600">{t('app:app.loading')}</div>
       </div>
     );
   }
@@ -35,7 +35,7 @@ const CustomerDetailPage = () => {
   if (!customer) {
     return (
       <div className="container mx-auto p-4 md:p-6">
-        <div className="text-center text-gray-500">
+        <div className="text-center text-slate-500">
           {t('customers.noCustomers')}
         </div>
       </div>
@@ -80,13 +80,13 @@ const CustomerDetailPage = () => {
           <CardContent className="space-y-3">
             {typedCustomer.email && (
               <div className="flex items-center gap-2 text-sm">
-                <Mail className="h-4 w-4 text-gray-400" />
+                <Mail className="h-4 w-4 text-slate-400" />
                 <span>{typedCustomer.email}</span>
               </div>
             )}
             {typedCustomer.phone && (
               <div className="flex items-center gap-2 text-sm">
-                <Phone className="h-4 w-4 text-gray-400" />
+                <Phone className="h-4 w-4 text-slate-400" />
                 <span>{typedCustomer.phone}</span>
                 {typedCustomer.phoneVerified && (
                   <span className="text-xs text-green-600">({t('customers.verified', 'Verified')})</span>
@@ -95,12 +95,12 @@ const CustomerDetailPage = () => {
             )}
             {typedCustomer.birthday && (
               <div className="flex items-center gap-2 text-sm">
-                <Calendar className="h-4 w-4 text-gray-400" />
+                <Calendar className="h-4 w-4 text-slate-400" />
                 <span>{new Date(typedCustomer.birthday).toLocaleDateString()}</span>
               </div>
             )}
             {!typedCustomer.email && !typedCustomer.phone && (
-              <p className="text-sm text-gray-500">{t('customers.noContactInfo', 'No contact information')}</p>
+              <p className="text-sm text-slate-500">{t('customers.noContactInfo', 'No contact information')}</p>
             )}
           </CardContent>
         </Card>
@@ -115,24 +115,24 @@ const CustomerDetailPage = () => {
               <div className="text-center p-3 bg-blue-50 rounded-lg">
                 <ShoppingBag className="h-5 w-5 mx-auto mb-1 text-blue-600" />
                 <p className="text-xl font-bold text-blue-600">{typedCustomer.totalOrders || 0}</p>
-                <p className="text-xs text-gray-600">{t('customers.totalOrders')}</p>
+                <p className="text-xs text-slate-600">{t('customers.totalOrders')}</p>
               </div>
               <div className="text-center p-3 bg-green-50 rounded-lg">
                 <span className="text-xl font-bold text-green-600">
                   ${parseFloat(String(typedCustomer.totalSpent || 0)).toFixed(2)}
                 </span>
-                <p className="text-xs text-gray-600">{t('customers.totalSpent')}</p>
+                <p className="text-xs text-slate-600">{t('customers.totalSpent')}</p>
               </div>
               <div className="text-center p-3 bg-purple-50 rounded-lg">
                 <Award className="h-5 w-5 mx-auto mb-1 text-purple-600" />
                 <p className="text-xl font-bold text-purple-600">{typedCustomer.loyaltyPoints || 0}</p>
-                <p className="text-xs text-gray-600">{t('customers.loyaltyPoints', 'Loyalty Points')}</p>
+                <p className="text-xs text-slate-600">{t('customers.loyaltyPoints', 'Loyalty Points')}</p>
               </div>
               <div className="text-center p-3 bg-orange-50 rounded-lg">
                 <span className="text-xl font-bold text-orange-600">
                   ${parseFloat(String(typedCustomer.averageOrder || 0)).toFixed(2)}
                 </span>
-                <p className="text-xs text-gray-600">{t('customers.avgOrder', 'Avg Order')}</p>
+                <p className="text-xs text-slate-600">{t('customers.avgOrder', 'Avg Order')}</p>
               </div>
             </div>
           </CardContent>
@@ -146,7 +146,7 @@ const CustomerDetailPage = () => {
           <CardContent className="space-y-4">
             {typedCustomer.tags && typedCustomer.tags.length > 0 && (
               <div>
-                <p className="text-sm font-medium text-gray-700 mb-2">Tags</p>
+                <p className="text-sm font-medium text-slate-700 mb-2">Tags</p>
                 <div className="flex flex-wrap gap-2">
                   {typedCustomer.tags.map((tag) => (
                     <span
@@ -161,12 +161,12 @@ const CustomerDetailPage = () => {
             )}
             {typedCustomer.notes && (
               <div>
-                <p className="text-sm font-medium text-gray-700 mb-2">{t('customers.notes')}</p>
-                <p className="text-sm text-gray-600">{typedCustomer.notes}</p>
+                <p className="text-sm font-medium text-slate-700 mb-2">{t('customers.notes')}</p>
+                <p className="text-sm text-slate-600">{typedCustomer.notes}</p>
               </div>
             )}
             {(!typedCustomer.tags || typedCustomer.tags.length === 0) && !typedCustomer.notes && (
-              <p className="text-sm text-gray-500">{t('customers.noTagsNotes', 'No tags or notes')}</p>
+              <p className="text-sm text-slate-500">{t('customers.noTagsNotes', 'No tags or notes')}</p>
             )}
           </CardContent>
         </Card>
@@ -191,14 +191,14 @@ const CustomerDetailPage = () => {
                 </thead>
                 <tbody>
                   {(typedCustomer.orders as any[]).map((order: any) => (
-                    <tr key={order.id} className="border-b hover:bg-gray-50">
+                    <tr key={order.id} className="border-b hover:bg-slate-50">
                       <td className="py-2 px-3">{order.orderNumber}</td>
                       <td className="py-2 px-3">{new Date(order.createdAt).toLocaleDateString()}</td>
                       <td className="py-2 px-3">
                         <span className={`px-2 py-1 text-xs rounded ${
                           order.status === 'PAID' ? 'bg-green-100 text-green-800' :
                           order.status === 'CANCELLED' ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100 text-gray-800'
+                          'bg-slate-100 text-slate-800'
                         }`}>
                           {order.status}
                         </span>
@@ -210,7 +210,7 @@ const CustomerDetailPage = () => {
               </table>
             </div>
           ) : (
-            <p className="text-center text-gray-500 py-4">{t('customers.noOrders', 'No orders yet')}</p>
+            <p className="text-center text-slate-500 py-4">{t('customers.noOrders', 'No orders yet')}</p>
           )}
         </CardContent>
       </Card>
@@ -220,19 +220,19 @@ const CustomerDetailPage = () => {
         <Card>
           <CardContent className="py-4">
             <div className="flex justify-between items-center text-sm">
-              <span className="text-gray-600">{t('customers.joinDate')}</span>
+              <span className="text-slate-600">{t('customers.joinDate')}</span>
               <span className="font-medium">{new Date(typedCustomer.createdAt).toLocaleDateString()}</span>
             </div>
             {typedCustomer.lastVisit && (
               <div className="flex justify-between items-center text-sm mt-2">
-                <span className="text-gray-600">{t('customers.lastVisit', 'Last Visit')}</span>
+                <span className="text-slate-600">{t('customers.lastVisit', 'Last Visit')}</span>
                 <span className="font-medium">{new Date(typedCustomer.lastVisit).toLocaleDateString()}</span>
               </div>
             )}
             {typedCustomer.referralCode && (
               <div className="flex justify-between items-center text-sm mt-2">
-                <span className="text-gray-600">{t('customers.referralCode', 'Referral Code')}</span>
-                <span className="font-mono bg-gray-100 px-2 py-1 rounded">{typedCustomer.referralCode}</span>
+                <span className="text-slate-600">{t('customers.referralCode', 'Referral Code')}</span>
+                <span className="font-mono bg-slate-100 px-2 py-1 rounded">{typedCustomer.referralCode}</span>
               </div>
             )}
           </CardContent>

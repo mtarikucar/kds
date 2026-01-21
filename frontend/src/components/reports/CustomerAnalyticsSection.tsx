@@ -27,7 +27,7 @@ const CustomerAnalyticsSection = ({ startDate, endDate }: CustomerAnalyticsSecti
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-center text-gray-500">{t('reports.noData')}</p>
+          <p className="text-center text-slate-500">{t('reports.noData')}</p>
         </CardContent>
       </Card>
     );
@@ -35,7 +35,7 @@ const CustomerAnalyticsSection = ({ startDate, endDate }: CustomerAnalyticsSecti
 
   const tierColors: Record<string, string> = {
     BRONZE: 'bg-amber-600',
-    SILVER: 'bg-gray-400',
+    SILVER: 'bg-slate-400',
     GOLD: 'bg-yellow-500',
     PLATINUM: 'bg-purple-500',
   };
@@ -48,7 +48,7 @@ const CustomerAnalyticsSection = ({ startDate, endDate }: CustomerAnalyticsSecti
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">{t('customerAnalytics.totalCustomers')}</p>
+                <p className="text-sm text-slate-600">{t('customerAnalytics.totalCustomers')}</p>
                 <p className="text-2xl font-bold">{data.totalCustomers}</p>
               </div>
               <div className="p-3 rounded-full bg-blue-500">
@@ -62,7 +62,7 @@ const CustomerAnalyticsSection = ({ startDate, endDate }: CustomerAnalyticsSecti
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">{t('customerAnalytics.newCustomers')}</p>
+                <p className="text-sm text-slate-600">{t('customerAnalytics.newCustomers')}</p>
                 <p className="text-2xl font-bold">{data.newCustomers}</p>
               </div>
               <div className="p-3 rounded-full bg-green-500">
@@ -76,7 +76,7 @@ const CustomerAnalyticsSection = ({ startDate, endDate }: CustomerAnalyticsSecti
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">{t('customerAnalytics.returningCustomers')}</p>
+                <p className="text-sm text-slate-600">{t('customerAnalytics.returningCustomers')}</p>
                 <p className="text-2xl font-bold">{data.returningCustomers}</p>
               </div>
               <div className="p-3 rounded-full bg-purple-500">
@@ -90,7 +90,7 @@ const CustomerAnalyticsSection = ({ startDate, endDate }: CustomerAnalyticsSecti
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">{t('customerAnalytics.averageLifetimeValue')}</p>
+                <p className="text-sm text-slate-600">{t('customerAnalytics.averageLifetimeValue')}</p>
                 <p className="text-2xl font-bold">{formatCurrency(data.averageLifetimeValue)}</p>
               </div>
               <div className="p-3 rounded-full bg-amber-500">
@@ -104,7 +104,7 @@ const CustomerAnalyticsSection = ({ startDate, endDate }: CustomerAnalyticsSecti
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">{t('customerAnalytics.totalLoyaltyPoints')}</p>
+                <p className="text-sm text-slate-600">{t('customerAnalytics.totalLoyaltyPoints')}</p>
                 <p className="text-2xl font-bold">{data.totalLoyaltyPoints.toLocaleString()}</p>
               </div>
               <div className="p-3 rounded-full bg-yellow-500">
@@ -128,14 +128,14 @@ const CustomerAnalyticsSection = ({ startDate, endDate }: CustomerAnalyticsSecti
             {data.tierDistribution.map((tier) => (
               <div
                 key={tier.tier}
-                className="flex-1 min-w-[120px] p-4 rounded-lg bg-gray-50"
+                className="flex-1 min-w-[120px] p-4 rounded-lg bg-slate-50"
               >
                 <div className="flex items-center gap-2 mb-2">
-                  <div className={`w-3 h-3 rounded-full ${tierColors[tier.tier] || 'bg-gray-400'}`} />
+                  <div className={`w-3 h-3 rounded-full ${tierColors[tier.tier] || 'bg-slate-400'}`} />
                   <span className="font-medium capitalize">{tier.tier.toLowerCase()}</span>
                 </div>
                 <p className="text-2xl font-bold">{tier.count}</p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-slate-500">
                   {data.totalCustomers > 0
                     ? ((tier.count / data.totalCustomers) * 100).toFixed(1)
                     : 0}%
@@ -153,7 +153,7 @@ const CustomerAnalyticsSection = ({ startDate, endDate }: CustomerAnalyticsSecti
         </CardHeader>
         <CardContent>
           {data.topCustomers.length === 0 ? (
-            <p className="text-center text-gray-500 py-4">{t('reports.noData')}</p>
+            <p className="text-center text-slate-500 py-4">{t('reports.noData')}</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -169,7 +169,7 @@ const CustomerAnalyticsSection = ({ startDate, endDate }: CustomerAnalyticsSecti
                 </thead>
                 <tbody>
                   {data.topCustomers.map((customer, index) => (
-                    <tr key={customer.id} className="border-b hover:bg-gray-50">
+                    <tr key={customer.id} className="border-b hover:bg-slate-50">
                       <td className="py-3 px-4">
                         <span className="font-bold text-blue-600">#{index + 1}</span>
                       </td>
@@ -177,14 +177,14 @@ const CustomerAnalyticsSection = ({ startDate, endDate }: CustomerAnalyticsSecti
                         <div>
                           <p className="font-medium">{customer.name}</p>
                           {customer.email && (
-                            <p className="text-sm text-gray-500">{customer.email}</p>
+                            <p className="text-sm text-slate-500">{customer.email}</p>
                           )}
                         </div>
                       </td>
                       <td className="py-3 px-4">
                         <span
                           className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium text-white ${
-                            tierColors[customer.loyaltyTier] || 'bg-gray-400'
+                            tierColors[customer.loyaltyTier] || 'bg-slate-400'
                           }`}
                         >
                           {customer.loyaltyTier}

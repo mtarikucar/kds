@@ -8,7 +8,7 @@ const TermsOfServicePage: React.FC = () => {
   const isEnglish = i18n.language === 'en';
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50">
       {/* Header */}
       <header className="bg-white shadow-sm sticky top-0 z-10">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -18,7 +18,7 @@ const TermsOfServicePage: React.FC = () => {
           </Link>
           <div className="flex items-center gap-2">
             <ChefHat className="w-6 h-6 text-primary-600" />
-            <span className="font-heading font-bold text-gray-900">HummyTummy</span>
+            <span className="font-heading font-bold text-slate-900">HummyTummy</span>
           </div>
         </div>
       </header>
@@ -26,10 +26,10 @@ const TermsOfServicePage: React.FC = () => {
       {/* Content */}
       <main className="max-w-4xl mx-auto px-4 py-8 md:py-12">
         <div className="bg-white rounded-2xl shadow-sm p-6 md:p-10">
-          <h1 className="text-3xl md:text-4xl font-heading font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl md:text-4xl font-heading font-bold text-slate-900 mb-2">
             {isEnglish ? 'Terms of Service' : 'Hizmet Şartları'}
           </h1>
-          <p className="text-gray-500 mb-8">
+          <p className="text-slate-500 mb-8">
             {isEnglish ? 'Last updated: December 2024' : 'Son güncelleme: Aralık 2024'}
           </p>
 
@@ -190,13 +190,13 @@ const TermsOfServicePage: React.FC = () => {
       </main>
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-white py-8 mt-12">
+      <footer className="bg-slate-900 text-white py-8 mt-12">
         <div className="max-w-4xl mx-auto px-4 text-center">
-          <p className="text-gray-400">
+          <p className="text-slate-400">
             © {new Date().getFullYear()} HummyTummy. {isEnglish ? 'All rights reserved.' : 'Tüm hakları saklıdır.'}
           </p>
           <div className="flex justify-center gap-6 mt-4">
-            <Link to="/privacy" className="text-gray-400 hover:text-white transition-colors">
+            <Link to="/privacy" className="text-slate-400 hover:text-white transition-colors">
               {isEnglish ? 'Privacy Policy' : 'Gizlilik Politikası'}
             </Link>
             <Link to="/terms" className="text-primary-400 hover:text-primary-300 transition-colors">

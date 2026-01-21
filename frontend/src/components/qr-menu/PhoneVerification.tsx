@@ -105,7 +105,7 @@ const PhoneVerification = ({
         <h2 className="text-2xl font-bold text-center mb-2">
           {t('phoneVerification.title', 'Verify Your Phone')}
         </h2>
-        <p className="text-gray-600 text-center mb-6">
+        <p className="text-slate-600 text-center mb-6">
           {t(
             'phoneVerification.subtitle',
             'Enter your phone number to receive a verification code'
@@ -114,7 +114,7 @@ const PhoneVerification = ({
 
         <form onSubmit={handleSendOTP}>
           <div className="mb-4">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
               {t('phoneVerification.phoneLabel', 'Phone Number')}
             </label>
             <input
@@ -122,12 +122,12 @@ const PhoneVerification = ({
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+905551234567"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 text-lg"
+              className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-opacity-50 text-lg"
               style={{ focusRing: primaryColor }}
               disabled={isLoading}
               autoFocus
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-slate-500 mt-1">
               {t('phoneVerification.phoneHint', 'Include country code (e.g., +90)')}
             </p>
           </div>
@@ -166,13 +166,13 @@ const PhoneVerification = ({
       <h2 className="text-2xl font-bold text-center mb-2">
         {t('phoneVerification.enterCode', 'Enter Verification Code')}
       </h2>
-      <p className="text-gray-600 text-center mb-6">
+      <p className="text-slate-600 text-center mb-6">
         {t('phoneVerification.codeSent', `Code sent to ${phone}`)}
       </p>
 
       <form onSubmit={handleVerifyOTP}>
         <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-slate-700 mb-2">
             {t('phoneVerification.codeLabel', '6-Digit Code')}
           </label>
           <input
@@ -180,7 +180,7 @@ const PhoneVerification = ({
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
             placeholder="000000"
-            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 text-lg text-center tracking-widest font-mono"
+            className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-opacity-50 text-lg text-center tracking-widest font-mono"
             style={{ focusRing: primaryColor }}
             disabled={isLoading}
             autoFocus
@@ -209,7 +209,7 @@ const PhoneVerification = ({
         <button
           type="button"
           onClick={() => setStep('phone')}
-          className="w-full py-2 text-sm text-gray-600 hover:text-gray-900"
+          className="w-full py-2 text-sm text-slate-600 hover:text-slate-900"
           disabled={isLoading}
         >
           {t('phoneVerification.changeNumber', 'Change phone number')}

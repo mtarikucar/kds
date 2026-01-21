@@ -149,6 +149,17 @@
     "customerRequestedNote": "Buyurtma eslatmasi",
     "unknownProduct": "Noma'lum mahsulot"
   },
+  "tableSelection": {
+    "title": "Stol tanlang",
+    "description": "Buyurtma olishni boshlash uchun stol tanlang",
+    "takeawayOrder": "Olib ketish buyurtmasi",
+    "takeawayDescription": "Stolsiz buyurtma",
+    "backToTables": "Stollarga qaytish",
+    "seats": "{{count}} o'rindiq",
+    "pendingOrders": "kutilmoqda",
+    "waiterCalls": "ofitsiant",
+    "billRequests": "hisob"
+  },
   "tableGrid": {
     "selected": "Tanlangan",
     "pendingOrder": "Kutilayotgan buyurtma",

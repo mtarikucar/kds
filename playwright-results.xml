@@ -1,0 +1,232 @@
+<testsuites id="" name="" tests="17" failures="2" skipped="15" errors="0" time="68.037416">
+<testsuite name="order-management.spec.ts" timestamp="2026-01-20T13:37:01.238Z" hostname="chromium" tests="17" failures="2" skipped="15" time="64.919" errors="0">
+<testcase name="Order Management E2E Tests › 1. Creating a New Order › should create order by selecting table and adding items" classname="order-management.spec.ts" time="32.79">
+<failure message="order-management.spec.ts:41:9 should create order by selecting table and adding items" type="FAILURE">
+<![CDATA[  [chromium] › order-management.spec.ts:41:9 › Order Management E2E Tests › 1. Creating a New Order › should create order by selecting table and adding items 
+
+    TimeoutError: locator.fill: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for locator('input[type="email"]')
+
+
+       at pages/LoginPage.ts:30
+
+      28 |
+      29 |   async login(email: string, password: string) {
+    > 30 |     await this.emailInput.fill(email);
+         |                           ^
+      31 |     await this.passwordInput.fill(password);
+      32 |     await this.submitButton.click();
+      33 |   }
+        at LoginPage.login (/home/tarik/projects/kds/tests/e2e/pages/LoginPage.ts:30:27)
+        at /home/tarik/projects/kds/tests/e2e/order-management.spec.ts:29:21
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/order-management-Order-Man-c7fbb-ting-table-and-adding-items-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../test-results/order-management-Order-Man-c7fbb-ting-table-and-adding-items-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/order-management-Order-Man-c7fbb-ting-table-and-adding-items-chromium/error-context.md
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    TimeoutError: locator.fill: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for locator('input[type="email"]')
+
+
+       at pages/LoginPage.ts:30
+
+      28 |
+      29 |   async login(email: string, password: string) {
+    > 30 |     await this.emailInput.fill(email);
+         |                           ^
+      31 |     await this.passwordInput.fill(password);
+      32 |     await this.submitButton.click();
+      33 |   }
+        at LoginPage.login (/home/tarik/projects/kds/tests/e2e/pages/LoginPage.ts:30:27)
+        at /home/tarik/projects/kds/tests/e2e/order-management.spec.ts:29:21
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/order-management-Order-Man-c7fbb-ting-table-and-adding-items-chromium-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../test-results/order-management-Order-Man-c7fbb-ting-table-and-adding-items-chromium-retry1/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/order-management-Order-Man-c7fbb-ting-table-and-adding-items-chromium-retry1/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../test-results/order-management-Order-Man-c7fbb-ting-table-and-adding-items-chromium-retry1/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../test-results/order-management-Order-Man-c7fbb-ting-table-and-adding-items-chromium-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|test-results/order-management-Order-Man-c7fbb-ting-table-and-adding-items-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|test-results/order-management-Order-Man-c7fbb-ting-table-and-adding-items-chromium/video.webm]]
+
+[[ATTACHMENT|test-results/order-management-Order-Man-c7fbb-ting-table-and-adding-items-chromium/error-context.md]]
+
+[[ATTACHMENT|test-results/order-management-Order-Man-c7fbb-ting-table-and-adding-items-chromium-retry1/test-failed-1.png]]
+
+[[ATTACHMENT|test-results/order-management-Order-Man-c7fbb-ting-table-and-adding-items-chromium-retry1/video.webm]]
+
+[[ATTACHMENT|test-results/order-management-Order-Man-c7fbb-ting-table-and-adding-items-chromium-retry1/error-context.md]]
+
+[[ATTACHMENT|test-results/order-management-Order-Man-c7fbb-ting-table-and-adding-items-chromium-retry1/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Order Management E2E Tests › 1. Creating a New Order › should not allow order creation without selecting table (when table mode enabled)" classname="order-management.spec.ts" time="32.129">
+<failure message="order-management.spec.ts:80:9 should not allow order creation without selecting table (when table mode enabled)" type="FAILURE">
+<![CDATA[  [chromium] › order-management.spec.ts:80:9 › Order Management E2E Tests › 1. Creating a New Order › should not allow order creation without selecting table (when table mode enabled) 
+
+    TimeoutError: locator.fill: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for locator('input[type="email"]')
+
+
+       at pages/LoginPage.ts:30
+
+      28 |
+      29 |   async login(email: string, password: string) {
+    > 30 |     await this.emailInput.fill(email);
+         |                           ^
+      31 |     await this.passwordInput.fill(password);
+      32 |     await this.submitButton.click();
+      33 |   }
+        at LoginPage.login (/home/tarik/projects/kds/tests/e2e/pages/LoginPage.ts:30:27)
+        at /home/tarik/projects/kds/tests/e2e/order-management.spec.ts:29:21
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/order-management-Order-Man-52ac6-le-when-table-mode-enabled--chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    ../../test-results/order-management-Order-Man-52ac6-le-when-table-mode-enabled--chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/order-management-Order-Man-52ac6-le-when-table-mode-enabled--chromium/error-context.md
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    TimeoutError: locator.fill: Timeout 15000ms exceeded.
+    Call log:
+      - waiting for locator('input[type="email"]')
+
+
+       at pages/LoginPage.ts:30
+
+      28 |
+      29 |   async login(email: string, password: string) {
+    > 30 |     await this.emailInput.fill(email);
+         |                           ^
+      31 |     await this.passwordInput.fill(password);
+      32 |     await this.submitButton.click();
+      33 |   }
+        at LoginPage.login (/home/tarik/projects/kds/tests/e2e/pages/LoginPage.ts:30:27)
+        at /home/tarik/projects/kds/tests/e2e/order-management.spec.ts:29:21
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    ../../test-results/order-management-Order-Man-52ac6-le-when-table-mode-enabled--chromium-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: ../../test-results/order-management-Order-Man-52ac6-le-when-table-mode-enabled--chromium-retry1/error-context.md
+
+    attachment #3: trace (application/zip) ─────────────────────────────────────────────────────────
+    ../../test-results/order-management-Order-Man-52ac6-le-when-table-mode-enabled--chromium-retry1/trace.zip
+    Usage:
+
+        npx playwright show-trace ../../test-results/order-management-Order-Man-52ac6-le-when-table-mode-enabled--chromium-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|test-results/order-management-Order-Man-52ac6-le-when-table-mode-enabled--chromium/test-failed-1.png]]
+
+[[ATTACHMENT|test-results/order-management-Order-Man-52ac6-le-when-table-mode-enabled--chromium/video.webm]]
+
+[[ATTACHMENT|test-results/order-management-Order-Man-52ac6-le-when-table-mode-enabled--chromium/error-context.md]]
+
+[[ATTACHMENT|test-results/order-management-Order-Man-52ac6-le-when-table-mode-enabled--chromium-retry1/test-failed-1.png]]
+
+[[ATTACHMENT|test-results/order-management-Order-Man-52ac6-le-when-table-mode-enabled--chromium-retry1/error-context.md]]
+
+[[ATTACHMENT|test-results/order-management-Order-Man-52ac6-le-when-table-mode-enabled--chromium-retry1/trace.zip]]
+]]>
+</system-out>
+</testcase>
+<testcase name="Order Management E2E Tests › 1. Creating a New Order › should create order with multiple items" classname="order-management.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Order Management E2E Tests › 2. Adding Items to Existing Order › should add items to existing order on occupied table" classname="order-management.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Order Management E2E Tests › 3. Modifying Order Items › should increase item quantity" classname="order-management.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Order Management E2E Tests › 3. Modifying Order Items › should decrease item quantity" classname="order-management.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Order Management E2E Tests › 3. Modifying Order Items › should remove item from cart" classname="order-management.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Order Management E2E Tests › 3. Modifying Order Items › should clear entire cart" classname="order-management.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Order Management E2E Tests › 4. Order Status Transitions › should transition order through status workflow" classname="order-management.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Order Management E2E Tests › 5. Table Order Transfer › should transfer order from one table to another" classname="order-management.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Order Management E2E Tests › 5. Table Order Transfer › should show merge warning when transferring to occupied table" classname="order-management.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Order Management E2E Tests › 6. Order Cancellation › should cancel a pending order" classname="order-management.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Order Management E2E Tests › 7. Order Payment/Checkout Flow › should complete payment with cash" classname="order-management.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Order Management E2E Tests › 7. Order Payment/Checkout Flow › should complete payment with card" classname="order-management.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Order Management E2E Tests › 7. Order Payment/Checkout Flow › should apply discount before payment" classname="order-management.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Order Management E2E Tests › 7. Order Payment/Checkout Flow › should cancel payment and return to cart" classname="order-management.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+<testcase name="Order Management E2E Tests › Complete Order Lifecycle › should complete full order lifecycle: create -&gt; modify -&gt; pay" classname="order-management.spec.ts" time="0">
+<skipped>
+</skipped>
+</testcase>
+</testsuite>
+</testsuites>

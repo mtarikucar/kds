@@ -1,8 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
+import { DragDropContext, Droppable, DropResult } from '@hello-pangea/dnd';
 import {
   Plus,
   Edit,
@@ -19,6 +20,8 @@ import {
   Settings2,
   Lock,
   AlertTriangle,
+  ChevronsUpDown,
+  Package,
 } from 'lucide-react';
 import {
   initializeModel,
@@ -35,6 +38,8 @@ import {
   useCreateProduct,
   useUpdateProduct,
   useDeleteProduct,
+  useReorderCategories,
+  useReorderProducts,
 } from '../../features/menu/menuApi';
 import {
   useProductImages,
@@ -51,7 +56,6 @@ import {
   useUpdateModifier,
   useDeleteModifier,
   useAssignModifiersToProduct,
-  useProductModifiers,
 } from '../../features/modifiers/modifiersApi';
 import {
   ModifierGroupCard,
@@ -59,15 +63,13 @@ import {
   ModifierItemModal,
   ProductModifierSelector,
 } from '../../components/modifiers';
+import { DraggableCategoryCard } from '../../components/menu';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Input from '../../components/ui/Input';
-import Badge from '../../components/ui/Badge';
 import Spinner from '../../components/ui/Spinner';
 import ImageLibraryModal from '../../components/product/ImageLibraryModal';
-import ImageUploadZone from '../../components/ui/ImageUploadZone';
-import { formatCurrency } from '../../lib/utils';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import UpgradePrompt from '../../components/subscriptions/UpgradePrompt';
 
@@ -84,13 +86,21 @@ const createProductSchema = (t: (key: string) => string) => z.object({
   price: z.number().min(0, t('menu.validation.pricePositive')),
   categoryId: z.string().min(1, t('menu.validation.categoryRequired')),
   currentStock: z.number().min(0, t('menu.validation.stockPositive')).optional(),
-  image: z.string().url(t('menu.validation.invalidUrl')).optional().or(z.literal('')), // Legacy field
-  imageIds: z.array(z.string()).optional(), // New multi-image support
+  image: z.string().url(t('menu.validation.invalidUrl')).optional().or(z.literal('')),
+  imageIds: z.array(z.string()).optional(),
   isAvailable: z.boolean().optional(),
 });
 
 type CategoryFormData = z.infer<ReturnType<typeof createCategorySchema>>;
 type ProductFormData = z.infer<ReturnType<typeof createProductSchema>>;
+
+// Helper function to reorder items in an array
+const reorder = <T,>(list: T[], startIndex: number, endIndex: number): T[] => {
+  const result = Array.from(list);
+  const [removed] = result.splice(startIndex, 1);
+  result.splice(endIndex, 0, removed);
+  return result;
+};
 
 const MenuManagementPage = () => {
   const { t } = useTranslation(['menu', 'common', 'subscriptions']);
@@ -100,13 +110,15 @@ const MenuManagementPage = () => {
   const categorySchema = createCategorySchema(t);
   const productSchema = createProductSchema(t);
 
-  const [activeTab, setActiveTab] = useState<'categories' | 'products' | 'images' | 'modifiers'>('categories');
+  const [activeTab, setActiveTab] = useState<'menu' | 'images' | 'modifiers'>('menu');
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [imageLibraryModalOpen, setImageLibraryModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productImages, setProductImages] = useState<ProductImage[]>([]);
+  const [preselectedCategoryId, setPreselectedCategoryId] = useState<string | null>(null);
+  const [allCategoriesExpanded, setAllCategoriesExpanded] = useState(true);
 
   // Modifier states
   const [modifierGroupModalOpen, setModifierGroupModalOpen] = useState(false);
@@ -145,6 +157,10 @@ const MenuManagementPage = () => {
   const { mutate: deleteImage } = useDeleteProductImage();
   const uploadImagesMutation = useUploadProductImages();
 
+  // Reorder mutations
+  const { mutate: reorderCategories } = useReorderCategories();
+  const { mutate: reorderProducts } = useReorderProducts();
+
   // Modifier hooks
   const { data: modifierGroups, isLoading: modifierGroupsLoading } = useModifierGroups(true);
   const { mutate: createModifierGroup, isPending: isCreatingModifierGroup } = useCreateModifierGroup();
@@ -163,6 +179,73 @@ const MenuManagementPage = () => {
     resolver: zodResolver(productSchema),
   });
 
+  // Sort categories by displayOrder
+  const sortedCategories = useMemo(() => {
+    if (!categories) return [];
+    return [...categories].sort((a, b) => a.displayOrder - b.displayOrder);
+  }, [categories]);
+
+  // Group products by category
+  const productsByCategory = useMemo(() => {
+    if (!products) return {};
+    return products.reduce((acc, product) => {
+      const categoryId = product.categoryId;
+      if (!acc[categoryId]) {
+        acc[categoryId] = [];
+      }
+      acc[categoryId].push(product);
+      return acc;
+    }, {} as Record<string, Product[]>);
+  }, [products]);
+
+  // Products without category (uncategorized)
+  const uncategorizedProducts = useMemo(() => {
+    if (!products || !categories) return [];
+    const categoryIds = new Set(categories.map(c => c.id));
+    return products.filter(p => !categoryIds.has(p.categoryId));
+  }, [products, categories]);
+
+  // Drag & Drop handler
+  const handleDragEnd = useCallback((result: DropResult) => {
+    const { source, destination, type, draggableId } = result;
+
+    console.log('handleDragEnd called:', { source, destination, type, draggableId });
+
+    if (!destination) {
+      console.log('No destination, returning');
+      return;
+    }
+    if (source.index === destination.index && source.droppableId === destination.droppableId) {
+      console.log('Same position, returning');
+      return;
+    }
+
+    if (type === 'CATEGORY') {
+      console.log('Reordering categories');
+      const reordered = reorder(sortedCategories, source.index, destination.index);
+      reorderCategories(reordered.map(c => c.id));
+    } else if (type === 'PRODUCT') {
+      // droppableId is "products-{categoryId}"
+      const categoryId = source.droppableId.replace('products-', '');
+      console.log('Reordering products in category:', categoryId);
+      const categoryProducts = productsByCategory[categoryId] || [];
+      console.log('Category products:', categoryProducts.map(p => ({ id: p.id, name: p.name, displayOrder: p.displayOrder })));
+
+      const sortedCategoryProducts = [...categoryProducts].sort((a, b) => {
+        const orderA = a.displayOrder ?? 0;
+        const orderB = b.displayOrder ?? 0;
+        return orderA - orderB;
+      });
+      console.log('Sorted products before reorder:', sortedCategoryProducts.map(p => p.name));
+
+      const reordered = reorder(sortedCategoryProducts, source.index, destination.index);
+      console.log('Reordered products:', reordered.map(p => p.name));
+      console.log('Sending IDs to API:', reordered.map(p => p.id));
+
+      reorderProducts(reordered.map(p => p.id));
+    }
+  }, [sortedCategories, productsByCategory, reorderCategories, reorderProducts]);
+
   const handleOpenCategoryModal = (category?: Category) => {
     if (category) {
       setEditingCategory(category);
@@ -178,13 +261,11 @@ const MenuManagementPage = () => {
     setCategoryModalOpen(true);
   };
 
-  const handleOpenProductModal = (product?: Product) => {
+  const handleOpenProductModal = (product?: Product, categoryId?: string) => {
     if (product) {
       setEditingProduct(product);
-      // Safely handle images array
       const productImagesList = Array.isArray(product.images) ? product.images : [];
       setProductImages(productImagesList);
-      // Safely handle modifier groups array
       const productModifierGroupIds = Array.isArray(product.modifierGroups)
         ? product.modifierGroups.map((mg) => mg.id)
         : [];
@@ -199,12 +280,15 @@ const MenuManagementPage = () => {
         imageIds: productImagesList.map((img) => img.id),
         isAvailable: product.isAvailable ?? true,
       });
+      setPreselectedCategoryId(null);
     } else {
       setEditingProduct(null);
       setProductImages([]);
       setSelectedModifierGroupIds([]);
+      setPreselectedCategoryId(categoryId || null);
       productForm.reset({
         isAvailable: true,
+        categoryId: categoryId || '',
       });
     }
     setProductModalOpen(true);
@@ -232,9 +316,6 @@ const MenuManagementPage = () => {
   };
 
   const handleProductSubmit = (data: ProductFormData) => {
-    console.log('Form submitted with data:', data);
-    console.log('Form validation errors:', productForm.formState.errors);
-
     const submitData = {
       ...data,
       price: Number(data.price),
@@ -242,15 +323,11 @@ const MenuManagementPage = () => {
       imageIds: productImages.map((img) => img.id),
     };
 
-    console.log('Submitting product data:', submitData);
-
     if (editingProduct) {
       updateProduct(
         { id: editingProduct.id, data: submitData },
         {
           onSuccess: () => {
-            console.log('Product updated successfully');
-            // Assign modifier groups
             if (selectedModifierGroupIds.length > 0) {
               assignModifiersToProduct({
                 productId: editingProduct.id,
@@ -265,18 +342,14 @@ const MenuManagementPage = () => {
             setProductModalOpen(false);
             setProductImages([]);
             setSelectedModifierGroupIds([]);
+            setPreselectedCategoryId(null);
             productForm.reset();
-          },
-          onError: (error: any) => {
-            console.error('Error updating product:', error);
           },
         }
       );
     } else {
       createProduct(submitData, {
         onSuccess: (newProduct) => {
-          console.log('Product created successfully');
-          // Assign modifier groups to newly created product
           if (selectedModifierGroupIds.length > 0 && newProduct?.id) {
             assignModifiersToProduct({
               productId: newProduct.id,
@@ -291,17 +364,26 @@ const MenuManagementPage = () => {
           setProductModalOpen(false);
           setProductImages([]);
           setSelectedModifierGroupIds([]);
+          setPreselectedCategoryId(null);
           productForm.reset();
-        },
-        onError: (error: any) => {
-          console.error('Error creating product:', error);
         },
       });
     }
   };
 
+  const handleDeleteCategoryConfirm = (category: Category) => {
+    if (confirm(t('menu.confirmDeleteCategory'))) {
+      deleteCategory(category.id);
+    }
+  };
+
+  const handleDeleteProductConfirm = (product: Product) => {
+    if (confirm(t('menu.confirmDeleteItem'))) {
+      deleteProduct(product.id);
+    }
+  };
+
   const handleSelectImagesFromLibrary = (images: ProductImage[]) => {
-    // Replace with selected images from library (not append, to avoid duplicates)
     setProductImages(images);
   };
 
@@ -384,7 +466,7 @@ const MenuManagementPage = () => {
     try {
       await uploadImagesMutation.mutateAsync(files);
     } catch (error) {
-      console.error('Failed to upload images:', error);
+      // Error handled by mutation
     }
   };
 
@@ -471,272 +553,217 @@ const MenuManagementPage = () => {
     }
   };
 
+  const isLoading = categoriesLoading || productsLoading;
+
   return (
     <div>
-      <div className="mb-4 md:mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t('menu.title')}</h1>
-        <p className="text-sm md:text-base text-gray-600">{t('menu.manageCategoriesAndProducts')}</p>
+      <div className="mb-8">
+        <h1 className="text-2xl font-heading font-bold text-slate-900">{t('menu.title')}</h1>
+        <p className="text-slate-500 mt-1">{t('menu.manageCategoriesAndProducts')}</p>
       </div>
 
       {/* Tabs */}
-      <div className="mb-4 md:mb-6 flex flex-wrap gap-2 md:gap-4">
-        <Button
-          variant={activeTab === 'categories' ? 'primary' : 'outline'}
-          onClick={() => setActiveTab('categories')}
-          size="sm"
-          className="md:text-base"
-        >
-          {t('menu.categories')}
-        </Button>
-        <Button
-          variant={activeTab === 'products' ? 'primary' : 'outline'}
-          onClick={() => setActiveTab('products')}
-          size="sm"
-          className="md:text-base"
-        >
-          {t('menu.items')}
-        </Button>
-        <Button
-          variant={activeTab === 'images' ? 'primary' : 'outline'}
-          onClick={() => setActiveTab('images')}
-          size="sm"
-          className="md:text-base"
-        >
-          {t('menu.imageLibrary')}
-        </Button>
-        <Button
-          variant={activeTab === 'modifiers' ? 'primary' : 'outline'}
-          onClick={() => setActiveTab('modifiers')}
-          size="sm"
-          className="md:text-base"
-        >
-          <Settings2 className="h-4 w-4 mr-1 md:mr-2" />
-          {t('menu.modifiers')}
-        </Button>
+      <div className="mb-4 md:mb-6 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-2 md:gap-4">
+          <Button
+            variant={activeTab === 'menu' ? 'primary' : 'outline'}
+            onClick={() => setActiveTab('menu')}
+            size="sm"
+            className="md:text-base"
+          >
+            {t('menu.menuTab')}
+          </Button>
+          <Button
+            variant={activeTab === 'images' ? 'primary' : 'outline'}
+            onClick={() => setActiveTab('images')}
+            size="sm"
+            className="md:text-base"
+          >
+            {t('menu.imageLibrary')}
+          </Button>
+          <Button
+            variant={activeTab === 'modifiers' ? 'primary' : 'outline'}
+            onClick={() => setActiveTab('modifiers')}
+            size="sm"
+            className="md:text-base"
+          >
+            <Settings2 className="h-4 w-4 mr-1 md:mr-2" />
+            {t('menu.modifiers')}
+          </Button>
+        </div>
+
+        {/* Add Category button (only on menu tab) */}
+        {activeTab === 'menu' && (
+          <Button onClick={() => handleOpenCategoryModal()} disabled={!canAddCategory}>
+            {canAddCategory ? (
+              <Plus className="h-4 w-4 mr-2" />
+            ) : (
+              <Lock className="h-4 w-4 mr-2" />
+            )}
+            {t('menu.addCategory')}
+          </Button>
+        )}
       </div>
 
-      {/* Categories Tab */}
-      {activeTab === 'categories' && (
+      {/* Menu Tab - Unified Categories & Products */}
+      {activeTab === 'menu' && (
         <>
-          {/* Category Limit Info */}
-          {categoryLimit.limit !== -1 && (
-            <div className={`rounded-lg p-4 flex items-start gap-3 mb-4 ${
-              canAddCategory
-                ? 'bg-blue-50 border border-blue-200'
-                : 'bg-amber-50 border border-amber-200'
-            }`}>
-              <AlertTriangle className={`h-5 w-5 mt-0.5 ${canAddCategory ? 'text-blue-600' : 'text-amber-600'}`} />
-              <div>
-                <h3 className={`font-semibold ${canAddCategory ? 'text-blue-900' : 'text-amber-900'}`}>
-                  {t('menu.categories')}: {categories?.length ?? 0} / {categoryLimit.limit}
-                </h3>
-                <p className={`text-sm ${canAddCategory ? 'text-blue-700' : 'text-amber-700'}`}>
-                  {canAddCategory
-                    ? t('common:admin.subscriptionLimitInfo')
-                    : t('subscriptions:subscriptions.limitReachedDescription', {
-                        resource: t('menu.categories'),
-                        current: categories?.length ?? 0,
-                        limit: categoryLimit.limit,
-                      })}
-                </p>
-              </div>
+          {/* Limit Info Banners */}
+          {(categoryLimit.limit !== -1 || productLimit.limit !== -1) && (
+            <div className="space-y-3 mb-4">
+              {categoryLimit.limit !== -1 && (
+                <div className={`rounded-xl px-6 py-4 flex items-start gap-3 ${
+                  canAddCategory
+                    ? 'bg-blue-50 border border-blue-200'
+                    : 'bg-amber-50 border border-amber-200'
+                }`}>
+                  <AlertTriangle className={`h-5 w-5 mt-0.5 ${canAddCategory ? 'text-blue-600' : 'text-amber-600'}`} />
+                  <div>
+                    <h3 className={`font-semibold text-sm ${canAddCategory ? 'text-blue-900' : 'text-amber-900'}`}>
+                      {t('menu.categories')}: {categories?.length ?? 0} / {categoryLimit.limit}
+                    </h3>
+                  </div>
+                </div>
+              )}
+
+              {productLimit.limit !== -1 && (
+                <div className={`rounded-xl px-6 py-4 flex items-start gap-3 ${
+                  canAddProduct
+                    ? 'bg-blue-50 border border-blue-200'
+                    : 'bg-amber-50 border border-amber-200'
+                }`}>
+                  <AlertTriangle className={`h-5 w-5 mt-0.5 ${canAddProduct ? 'text-blue-600' : 'text-amber-600'}`} />
+                  <div>
+                    <h3 className={`font-semibold text-sm ${canAddProduct ? 'text-blue-900' : 'text-amber-900'}`}>
+                      {t('menu.items')}: {products?.length ?? 0} / {productLimit.limit}
+                    </h3>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
-          {/* Upgrade Prompt when category limit reached */}
-          {!canAddCategory && (
+          {/* Upgrade Prompts */}
+          {(!canAddCategory || !canAddProduct) && (
             <div className="mb-4">
-              <UpgradePrompt
-                limitType="maxCategories"
-                currentCount={categories?.length ?? 0}
-                limit={categoryLimit.limit}
-              />
+              {!canAddCategory && (
+                <UpgradePrompt
+                  limitType="maxCategories"
+                  currentCount={categories?.length ?? 0}
+                  limit={categoryLimit.limit}
+                />
+              )}
+              {!canAddProduct && canAddCategory && (
+                <UpgradePrompt
+                  limitType="maxProducts"
+                  currentCount={products?.length ?? 0}
+                  limit={productLimit.limit}
+                />
+              )}
             </div>
           )}
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>{t('menu.categories')}</CardTitle>
-              <Button onClick={() => handleOpenCategoryModal()} disabled={!canAddCategory}>
-                {canAddCategory ? (
-                  <Plus className="h-4 w-4 mr-2" />
-                ) : (
-                  <Lock className="h-4 w-4 mr-2" />
-                )}
-                {t('menu.addCategory')}
-              </Button>
-            </CardHeader>
-            <CardContent>
-            {categoriesLoading ? (
+          {/* Drag to Reorder Info & Expand/Collapse Toggle */}
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm text-slate-500">
+              {t('menu.dragToReorder')}
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setAllCategoriesExpanded(!allCategoriesExpanded)}
+              className="text-slate-600"
+            >
+              <ChevronsUpDown className="h-4 w-4 mr-1" />
+              {allCategoriesExpanded ? t('menu.collapseAll') : t('menu.expandAll')}
+            </Button>
+          </div>
+
+          {isLoading ? (
+            <div className="flex justify-center py-12">
               <Spinner />
-            ) : (
-              <div className="space-y-2">
-                {categories?.map((category) => (
+            </div>
+          ) : sortedCategories.length === 0 ? (
+            <Card>
+              <CardContent className="py-12 text-center">
+                <Package className="mx-auto h-12 w-12 text-slate-400" />
+                <h3 className="mt-4 text-lg font-medium text-slate-900">
+                  {t('menu.noCategories')}
+                </h3>
+                <p className="mt-2 text-sm text-slate-500">
+                  {t('menu.noCategoriesDesc')}
+                </p>
+                <Button
+                  className="mt-4"
+                  onClick={() => handleOpenCategoryModal()}
+                  disabled={!canAddCategory}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  {t('menu.addCategory')}
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <DragDropContext onDragEnd={handleDragEnd}>
+              <Droppable droppableId="categories" type="CATEGORY">
+                {(provided) => (
                   <div
-                    key={category.id}
-                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                    ref={provided.innerRef}
+                    {...provided.droppableProps}
+                    className="space-y-4"
                   >
-                    <div>
-                      <h3 className="font-semibold">{category.name}</h3>
-                      {category.description && (
-                        <p className="text-sm text-gray-600">
-                          {category.description}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex gap-2">
+                    {sortedCategories.map((category, index) => (
+                      <DraggableCategoryCard
+                        key={category.id}
+                        category={category}
+                        products={productsByCategory[category.id] || []}
+                        index={index}
+                        onEditCategory={handleOpenCategoryModal}
+                        onDeleteCategory={handleDeleteCategoryConfirm}
+                        onAddProduct={(categoryId) => handleOpenProductModal(undefined, categoryId)}
+                        onEditProduct={(product) => handleOpenProductModal(product)}
+                        onDeleteProduct={handleDeleteProductConfirm}
+                        defaultExpanded={allCategoriesExpanded}
+                      />
+                    ))}
+                    {provided.placeholder}
+                  </div>
+                )}
+              </Droppable>
+            </DragDropContext>
+          )}
+
+          {/* Uncategorized Products */}
+          {uncategorizedProducts.length > 0 && (
+            <Card className="mt-4">
+              <CardHeader>
+                <CardTitle className="text-amber-600">{t('menu.uncategorized')}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-slate-500 mb-4">
+                  {t('menu.uncategorizedDesc')}
+                </p>
+                <div className="space-y-2">
+                  {uncategorizedProducts.map((product) => (
+                    <div
+                      key={product.id}
+                      className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200"
+                    >
+                      <span className="font-medium">{product.name}</span>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleOpenCategoryModal(category)}
+                        onClick={() => handleOpenProductModal(product)}
                       >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="danger"
-                        size="sm"
-                        onClick={() => {
-                          if (confirm(t('menu.confirmDeleteCategory'))) {
-                            deleteCategory(category.id);
-                          }
-                        }}
-                      >
-                        <Trash2 className="h-4 w-4" />
+                        <Edit className="h-4 w-4 mr-1" />
+                        {t('common:app.edit')}
                       </Button>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            </CardContent>
-          </Card>
-        </>
-      )}
-
-      {/* Products Tab */}
-      {activeTab === 'products' && (
-        <>
-          {/* Product Limit Info */}
-          {productLimit.limit !== -1 && (
-            <div className={`rounded-lg p-4 flex items-start gap-3 mb-4 ${
-              canAddProduct
-                ? 'bg-blue-50 border border-blue-200'
-                : 'bg-amber-50 border border-amber-200'
-            }`}>
-              <AlertTriangle className={`h-5 w-5 mt-0.5 ${canAddProduct ? 'text-blue-600' : 'text-amber-600'}`} />
-              <div>
-                <h3 className={`font-semibold ${canAddProduct ? 'text-blue-900' : 'text-amber-900'}`}>
-                  {t('menu.items')}: {products?.length ?? 0} / {productLimit.limit}
-                </h3>
-                <p className={`text-sm ${canAddProduct ? 'text-blue-700' : 'text-amber-700'}`}>
-                  {canAddProduct
-                    ? t('common:admin.subscriptionLimitInfo')
-                    : t('subscriptions:subscriptions.limitReachedDescription', {
-                        resource: t('subscriptions:subscriptions.planLimits.products'),
-                        current: products?.length ?? 0,
-                        limit: productLimit.limit,
-                      })}
-                </p>
-              </div>
-            </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           )}
-
-          {/* Upgrade Prompt when product limit reached */}
-          {!canAddProduct && (
-            <div className="mb-4">
-              <UpgradePrompt
-                limitType="maxProducts"
-                currentCount={products?.length ?? 0}
-                limit={productLimit.limit}
-              />
-            </div>
-          )}
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>{t('menu.items')}</CardTitle>
-              <Button onClick={() => handleOpenProductModal()} disabled={!canAddProduct}>
-                {canAddProduct ? (
-                  <Plus className="h-4 w-4 mr-2" />
-                ) : (
-                  <Lock className="h-4 w-4 mr-2" />
-                )}
-                {t('menu.addItem')}
-              </Button>
-            </CardHeader>
-            <CardContent>
-            {productsLoading ? (
-              <Spinner />
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {products?.map((product) => {
-                  const primaryImage = product.images?.[0] || null;
-                  const imageUrl = primaryImage
-                    ? (primaryImage.url.startsWith('http://') || primaryImage.url.startsWith('https://')
-                      ? primaryImage.url
-                      : `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000'}${primaryImage.url}`)
-                    : product.image || null;
-
-                  return (
-                    <div key={product.id} className="border rounded-lg p-4">
-                      {imageUrl && (
-                        <img
-                          src={imageUrl}
-                          alt={product.name}
-                          className="w-full h-32 object-cover rounded-md mb-3"
-                        />
-                      )}
-                      <div className="mb-3">
-                        <div className="flex items-start justify-between mb-2">
-                          <h3 className="font-semibold">{product.name}</h3>
-                          <Badge variant={product.isAvailable ? 'success' : 'danger'}>
-                            {product.isAvailable ? t('menu.available') : t('menu.unavailable')}
-                          </Badge>
-                        </div>
-                        {product.description && (
-                          <p className="text-sm text-gray-600 mb-2">
-                            {product.description}
-                          </p>
-                        )}
-                        <p className="text-lg font-bold text-blue-600">
-                          {formatCurrency(product.price)}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {t('menu.stock')}: {product.currentStock}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {t('menu.category')}: {product.category?.name}
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                          onClick={() => handleOpenProductModal(product)}
-                        >
-                          <Edit className="h-4 w-4 mr-1" />
-                          {t('common:app.edit')}
-                        </Button>
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => {
-                            if (confirm(t('menu.confirmDeleteItem'))) {
-                              deleteProduct(product.id);
-                            }
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            </CardContent>
-          </Card>
         </>
       )}
 
@@ -746,15 +773,15 @@ const MenuManagementPage = () => {
           {/* Sidebar */}
           <div className="lg:col-span-1 space-y-4">
             {/* Upload Zone */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
-              <h3 className="text-sm font-medium text-gray-900 mb-3">Upload</h3>
+            <div className="bg-white rounded-xl border border-slate-200 p-4">
+              <h3 className="text-sm font-medium text-slate-900 mb-3">Upload</h3>
               <div
                 onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={handleImageDrop}
                 className={cn(
-                  'border-2 border-dashed rounded-lg p-6 text-center transition-all cursor-pointer',
-                  isDragging ? 'border-blue-500 bg-blue-50' : 'border-gray-300 hover:border-gray-400',
+                  'border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer',
+                  isDragging ? 'border-blue-500 bg-blue-50' : 'border-slate-300 hover:border-slate-400',
                   (isProcessing || uploadImagesMutation.isPending) && 'opacity-50 pointer-events-none'
                 )}
               >
@@ -769,35 +796,35 @@ const MenuManagementPage = () => {
                 />
                 <label htmlFor="image-upload" className="cursor-pointer">
                   {uploadImagesMutation.isPending ? (
-                    <Loader2 className="w-8 h-8 mx-auto text-gray-400 animate-spin" />
+                    <Loader2 className="w-8 h-8 mx-auto text-slate-400 animate-spin" />
                   ) : (
-                    <Upload className="w-8 h-8 mx-auto text-gray-400" />
+                    <Upload className="w-8 h-8 mx-auto text-slate-400" />
                   )}
-                  <p className="mt-2 text-sm text-gray-600">
+                  <p className="mt-2 text-sm text-slate-600">
                     {uploadImagesMutation.isPending ? t('menu.imageLibraryUI.uploading') : t('menu.imageLibraryUI.dropOrClick')}
                   </p>
-                  <p className="mt-1 text-xs text-gray-400">{t('menu.imageLibraryUI.uploadHint')}</p>
+                  <p className="mt-1 text-xs text-slate-400">{t('menu.imageLibraryUI.uploadHint')}</p>
                 </label>
               </div>
             </div>
 
             {/* Background Removal */}
             {bgRemovalSupported && (
-              <div className="bg-white rounded-xl border border-gray-200 p-4">
+              <div className="bg-white rounded-xl border border-slate-200 p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className={cn(
                       'w-8 h-8 rounded-lg flex items-center justify-center',
-                      bgRemovalEnabled ? 'bg-violet-100' : 'bg-gray-100'
+                      bgRemovalEnabled ? 'bg-violet-100' : 'bg-slate-100'
                     )}>
                       <Sparkles className={cn(
                         'w-4 h-4',
-                        bgRemovalEnabled ? 'text-violet-600' : 'text-gray-400'
+                        bgRemovalEnabled ? 'text-violet-600' : 'text-slate-400'
                       )} />
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{t('menu.imageLibraryUI.removeBg')}</p>
-                      <p className="text-xs text-gray-500">{t('menu.imageLibraryUI.aiPowered')}</p>
+                      <p className="text-sm font-medium text-slate-900">{t('menu.imageLibraryUI.removeBg')}</p>
+                      <p className="text-xs text-slate-500">{t('menu.imageLibraryUI.aiPowered')}</p>
                     </div>
                   </div>
                   <button
@@ -805,7 +832,7 @@ const MenuManagementPage = () => {
                     disabled={isProcessing}
                     className={cn(
                       'relative w-10 h-5 rounded-full transition-colors',
-                      bgRemovalEnabled ? 'bg-violet-600' : 'bg-gray-200'
+                      bgRemovalEnabled ? 'bg-violet-600' : 'bg-slate-200'
                     )}
                   >
                     <span className={cn(
@@ -828,32 +855,32 @@ const MenuManagementPage = () => {
             )}
 
             {/* Search */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="bg-white rounded-xl border border-slate-200 p-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                   type="text"
                   placeholder="Search..."
                   value={imageSearchTerm}
                   onChange={(e) => setImageSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-8 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full pl-9 pr-8 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 {imageSearchTerm && (
                   <button onClick={() => setImageSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                    <X className="w-4 h-4 text-slate-400 hover:text-slate-600" />
                   </button>
                 )}
               </div>
             </div>
 
             {/* View Toggle */}
-            <div className="bg-white rounded-xl border border-gray-200 p-4">
+            <div className="bg-white rounded-xl border border-slate-200 p-4">
               <div className="flex gap-2">
                 <button
                   onClick={() => setImageViewMode('grid')}
                   className={cn(
                     'flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm font-medium transition-colors',
-                    imageViewMode === 'grid' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'
+                    imageViewMode === 'grid' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
                   )}
                 >
                   <Grid3X3 className="w-4 h-4" />
@@ -862,7 +889,7 @@ const MenuManagementPage = () => {
                   onClick={() => setImageViewMode('list')}
                   className={cn(
                     'flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-sm font-medium transition-colors',
-                    imageViewMode === 'list' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-600'
+                    imageViewMode === 'list' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
                   )}
                 >
                   <LayoutList className="w-4 h-4" />
@@ -884,20 +911,20 @@ const MenuManagementPage = () => {
 
           {/* Main Content */}
           <div className="lg:col-span-3">
-            <div className="bg-white rounded-xl border border-gray-200 min-h-[500px]">
+            <div className="bg-white rounded-xl border border-slate-200 min-h-[500px]">
               {imagesLoading ? (
                 <div className="flex items-center justify-center h-96">
-                  <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+                  <Loader2 className="w-8 h-8 text-slate-400 animate-spin" />
                 </div>
               ) : filteredImages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-96 text-center px-4">
-                  <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                    <ImageIcon className="w-7 h-7 text-gray-400" />
+                  <div className="w-14 h-14 bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                    <ImageIcon className="w-7 h-7 text-slate-400" />
                   </div>
-                  <h3 className="text-base font-medium text-gray-900">
+                  <h3 className="text-base font-medium text-slate-900">
                     {imageSearchTerm ? t('menu.imageLibraryUI.noImagesFound') : t('menu.imageLibraryUI.noImagesYet')}
                   </h3>
-                  <p className="mt-1 text-sm text-gray-500">
+                  <p className="mt-1 text-sm text-slate-500">
                     {imageSearchTerm ? t('menu.imageLibraryUI.tryDifferentSearch') : t('menu.imageLibraryUI.uploadToStart')}
                   </p>
                 </div>
@@ -908,10 +935,10 @@ const MenuManagementPage = () => {
                       key={image.id}
                       onClick={() => toggleImageSelection(image.id)}
                       className={cn(
-                        'group relative aspect-square rounded-lg overflow-hidden cursor-pointer border-2 transition-all',
+                        'group relative aspect-square rounded-xl overflow-hidden cursor-pointer border-2 transition-all',
                         selectedImages.has(image.id)
                           ? 'border-blue-500 ring-2 ring-blue-500/20'
-                          : 'border-transparent hover:border-gray-300'
+                          : 'border-transparent hover:border-slate-300'
                       )}
                     >
                       <div
@@ -924,7 +951,7 @@ const MenuManagementPage = () => {
                         'absolute top-2 left-2 w-5 h-5 rounded-full flex items-center justify-center transition-all',
                         selectedImages.has(image.id)
                           ? 'bg-blue-500 text-white'
-                          : 'bg-white/80 border border-gray-300 opacity-0 group-hover:opacity-100'
+                          : 'bg-white/80 border border-slate-300 opacity-0 group-hover:opacity-100'
                       )}>
                         {selectedImages.has(image.id) && <Check className="w-3 h-3" />}
                       </div>
@@ -945,19 +972,19 @@ const MenuManagementPage = () => {
                   ))}
                 </div>
               ) : (
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-slate-100">
                   {filteredImages.map((image) => (
                     <div
                       key={image.id}
                       onClick={() => toggleImageSelection(image.id)}
                       className={cn(
                         'flex items-center gap-4 p-3 cursor-pointer transition-colors',
-                        selectedImages.has(image.id) ? 'bg-blue-50' : 'hover:bg-gray-50'
+                        selectedImages.has(image.id) ? 'bg-blue-50' : 'hover:bg-slate-50'
                       )}
                     >
                       <div className={cn(
                         'w-5 h-5 rounded border flex items-center justify-center flex-shrink-0',
-                        selectedImages.has(image.id) ? 'bg-blue-500 border-blue-500' : 'border-gray-300'
+                        selectedImages.has(image.id) ? 'bg-blue-500 border-blue-500' : 'border-slate-300'
                       )}>
                         {selectedImages.has(image.id) && <Check className="w-3 h-3 text-white" />}
                       </div>
@@ -969,16 +996,16 @@ const MenuManagementPage = () => {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-gray-900 truncate">{image.filename}</p>
+                          <p className="text-sm font-medium text-slate-900 truncate">{image.filename}</p>
                           {image.filename.includes('_nobg') && (
                             <span className="px-1.5 py-0.5 bg-violet-100 text-violet-700 text-xs font-medium rounded">AI</span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500">{(image.size / 1024).toFixed(1)} KB</p>
+                        <p className="text-xs text-slate-500">{(image.size / 1024).toFixed(1)} KB</p>
                       </div>
                       <button
                         onClick={(e) => { e.stopPropagation(); handleDeleteImage(image.id); }}
-                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
+                        className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -1006,11 +1033,11 @@ const MenuManagementPage = () => {
               <Spinner />
             ) : !modifierGroups || modifierGroups.length === 0 ? (
               <div className="text-center py-12">
-                <Settings2 className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-4 text-lg font-medium text-gray-900">
+                <Settings2 className="mx-auto h-12 w-12 text-slate-400" />
+                <h3 className="mt-4 text-lg font-medium text-slate-900">
                   {t('menu.noModifierGroups')}
                 </h3>
-                <p className="mt-2 text-sm text-gray-500">
+                <p className="mt-2 text-sm text-slate-500">
                   {t('menu.noModifierGroupsDesc')}
                 </p>
                 <Button
@@ -1062,12 +1089,6 @@ const MenuManagementPage = () => {
             error={categoryForm.formState.errors.description?.message}
             {...categoryForm.register('description')}
           />
-          <Input
-            label={t('menu.displayOrder')}
-            type="number"
-            error={categoryForm.formState.errors.displayOrder?.message}
-            {...categoryForm.register('displayOrder', { valueAsNumber: true })}
-          />
           <div className="flex gap-3">
             <Button
               type="button"
@@ -1087,7 +1108,10 @@ const MenuManagementPage = () => {
       {/* Product Modal */}
       <Modal
         isOpen={productModalOpen}
-        onClose={() => setProductModalOpen(false)}
+        onClose={() => {
+          setProductModalOpen(false);
+          setPreselectedCategoryId(null);
+        }}
         title={editingProduct ? t('menu.editItem') : t('menu.addItem')}
         size="lg"
       >
@@ -1113,11 +1137,11 @@ const MenuManagementPage = () => {
             {...productForm.register('price', { valueAsNumber: true })}
           />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               {t('menu.category')}
             </label>
             <select
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               {...productForm.register('categoryId')}
             >
               <option value="">{t('menu.selectCategory')}</option>
@@ -1142,7 +1166,7 @@ const MenuManagementPage = () => {
 
           {/* Product Images */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
               {t('menu.productImages')}
             </label>
 
@@ -1152,7 +1176,7 @@ const MenuManagementPage = () => {
                 <div className="grid grid-cols-4 gap-3">
                   {productImages.map((image, index) => (
                     <div key={image.id} className="relative group">
-                      <div className="aspect-square rounded-lg overflow-hidden border-2 border-gray-200">
+                      <div className="aspect-square rounded-lg overflow-hidden border-2 border-slate-200">
                         <img
                           src={image.url.startsWith('http://') || image.url.startsWith('https://')
                             ? image.url
@@ -1181,9 +1205,9 @@ const MenuManagementPage = () => {
                 </div>
               </div>
             ) : (
-              <div className="mb-4 text-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
-                <ImageIcon className="mx-auto h-10 w-10 text-gray-400" />
-                <p className="mt-2 text-sm text-gray-600">{t('menu.noImagesSelected')}</p>
+              <div className="mb-4 text-center py-8 border-2 border-dashed border-slate-300 rounded-xl">
+                <ImageIcon className="mx-auto h-10 w-10 text-slate-400" />
+                <p className="mt-2 text-sm text-slate-600">{t('menu.noImagesSelected')}</p>
               </div>
             )}
 
@@ -1201,7 +1225,7 @@ const MenuManagementPage = () => {
 
           {/* Modifier Groups */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
               {t('menu.modifierGroups')}
             </label>
             <ProductModifierSelector
@@ -1227,7 +1251,10 @@ const MenuManagementPage = () => {
               type="button"
               variant="outline"
               className="flex-1"
-              onClick={() => setProductModalOpen(false)}
+              onClick={() => {
+                setProductModalOpen(false);
+                setPreselectedCategoryId(null);
+              }}
               disabled={isCreatingProduct || isUpdatingProduct}
             >
               {t('common:app.cancel')}

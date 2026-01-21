@@ -1,8 +1,10 @@
 {
   "menu": {
     "title": "Menu Management",
+    "menuTab": "Menu",
     "categories": "Categories",
     "items": "Items",
+    "item": "item",
     "addCategory": "Add Category",
     "addItem": "Add Item",
     "editCategory": "Edit Category",
@@ -86,6 +88,15 @@
     "noModifierGroupsAvailable": "No modifier groups available",
     "confirmDeleteModifierGroup": "Delete this modifier group?",
     "confirmDeleteModifier": "Delete this modifier?",
+    "dragToReorder": "Drag to reorder categories and products",
+    "addProductToCategory": "Add product to this category",
+    "noProductsInCategory": "No products in this category",
+    "noCategories": "No categories yet",
+    "noCategoriesDesc": "Create categories to organize your menu items",
+    "uncategorized": "Uncategorized",
+    "uncategorizedDesc": "These products don't have a valid category. Edit them to assign a category.",
+    "collapseAll": "Collapse All",
+    "expandAll": "Expand All",
     "validation": {
       "nameRequired": "Name is required",
       "pricePositive": "Price must be positive",

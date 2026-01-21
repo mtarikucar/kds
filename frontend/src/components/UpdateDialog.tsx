@@ -50,14 +50,14 @@ export const UpdateDialog: React.FC<UpdateDialogProps> = ({
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center justify-between py-3 px-4 bg-gray-50 rounded-lg">
+              <div className="flex items-center justify-between py-3 px-4 bg-slate-50 rounded-lg">
                 <div>
-                  <p className="text-sm text-gray-600">Current Version</p>
-                  <p className="text-lg font-semibold text-gray-900">{currentVersion}</p>
+                  <p className="text-sm text-slate-600">Current Version</p>
+                  <p className="text-lg font-semibold text-slate-900">{currentVersion}</p>
                 </div>
-                <div className="text-gray-400">→</div>
+                <div className="text-slate-400">→</div>
                 <div className="text-right">
-                  <p className="text-sm text-gray-600">New Version</p>
+                  <p className="text-sm text-slate-600">New Version</p>
                   <p className="text-lg font-semibold text-blue-600">{version}</p>
                 </div>
               </div>
@@ -73,11 +73,11 @@ export const UpdateDialog: React.FC<UpdateDialogProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex gap-3">
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 flex gap-3">
           <button
             onClick={onDismiss}
             disabled={downloading}
-            className="flex-1 px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {error ? 'Close' : 'Later'}
           </button>

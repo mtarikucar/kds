@@ -102,11 +102,11 @@ const UpgradePrompt = ({
         <Sparkles className="h-8 w-8 text-amber-600" />
       </div>
 
-      <h3 className="text-xl font-bold text-gray-900 mb-2">
+      <h3 className="text-xl font-bold text-slate-900 mb-2">
         {t('subscriptions:subscriptions.upgradeRequired')}
       </h3>
 
-      <p className="text-gray-600 mb-6 max-w-md mx-auto">
+      <p className="text-slate-600 mb-6 max-w-md mx-auto">
         {limitType && currentCount !== undefined && limit !== undefined ? (
           <>
             {t('subscriptions:subscriptions.limitReachedDescription', {

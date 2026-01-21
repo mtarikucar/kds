@@ -101,7 +101,7 @@ const QRMenuNavigation: React.FC<QRMenuNavigationProps> = ({
       </div>
 
       {/* Tablet & Desktop Navigation - Horizontal Tabs */}
-      <nav className="hidden md:flex w-full border-b border-gray-200 bg-white overflow-x-auto">
+      <nav className="hidden md:flex w-full border-b border-slate-200/60 bg-white overflow-x-auto">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = item.active;
@@ -119,7 +119,7 @@ const QRMenuNavigation: React.FC<QRMenuNavigationProps> = ({
               } ${isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
               style={{
                 borderBottomColor: isActive ? primaryColor : 'transparent',
-                color: isActive ? primaryColor : '#6B7280',
+                color: isActive ? primaryColor : '#64748B',
               }}
             >
               <Icon className="h-5 w-5 flex-shrink-0" />

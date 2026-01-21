@@ -13,7 +13,7 @@ export function DeviceStatusIndicator({
 }: DeviceStatusIndicatorProps) {
   const getStatusColor = () => {
     if (connectionStatus === ConnectionStatus.DISCONNECTED) {
-      return 'bg-gray-400';
+      return 'bg-slate-400';
     }
     if (connectionStatus === ConnectionStatus.CONNECTING) {
       return 'bg-yellow-400 animate-pulse';
@@ -31,7 +31,7 @@ export function DeviceStatusIndicator({
       case HealthStatus.ERROR:
         return 'bg-red-500';
       default:
-        return 'bg-gray-400';
+        return 'bg-slate-400';
     }
   };
 
@@ -63,7 +63,7 @@ export function DeviceStatusIndicator({
     <div className="flex items-center gap-2">
       <div className={`h-3 w-3 rounded-full ${getStatusColor()}`} />
       {showLabel && (
-        <span className="text-sm text-gray-600">{getStatusLabel()}</span>
+        <span className="text-sm text-slate-600">{getStatusLabel()}</span>
       )}
     </div>
   );

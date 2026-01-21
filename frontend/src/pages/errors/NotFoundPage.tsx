@@ -6,14 +6,14 @@ export default function NotFoundPage() {
   const { t } = useTranslation('errors');
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
       <div className="max-w-md w-full text-center">
         {/* 404 Icon */}
         <div className="mb-8">
           <h1 className="text-9xl font-extrabold text-blue-600">404</h1>
           <div className="mt-4">
             <svg
-              className="mx-auto h-32 w-32 text-gray-400"
+              className="mx-auto h-32 w-32 text-slate-400"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor"
@@ -29,8 +29,8 @@ export default function NotFoundPage() {
         </div>
 
         {/* Content */}
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">{t('pages.notFound.title')}</h2>
-        <p className="text-gray-600 mb-8">
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">{t('pages.notFound.title')}</h2>
+        <p className="text-slate-600 mb-8">
           {t('pages.notFound.description')}
         </p>
 
@@ -58,14 +58,14 @@ export default function NotFoundPage() {
 
           <button
             onClick={() => navigate('/')}
-            className="w-full flex justify-center py-3 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+            className="w-full flex justify-center py-3 px-4 border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
           >
             {t('pages.notFound.goHome')}
           </button>
         </div>
 
         {/* Help text */}
-        <p className="mt-8 text-xs text-gray-500">
+        <p className="mt-8 text-xs text-slate-500">
           {t('pages.notFound.contactSupport')}
         </p>
       </div>

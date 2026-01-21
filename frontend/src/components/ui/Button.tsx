@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { cn } from '../../lib/utils';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'outline';
+  variant?: 'primary' | 'secondary' | 'danger' | 'success' | 'outline' | 'ghost';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
 }
@@ -23,25 +23,27 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ) => {
     const { t } = useTranslation('common');
     const baseStyles =
-      'inline-flex items-center justify-center rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
+      'inline-flex items-center justify-center rounded-lg font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
 
     const variants = {
       primary:
-        'bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500',
+        'bg-primary-500 text-white shadow-sm hover:bg-primary-600 hover:shadow transition-all duration-200 focus:ring-primary-500 active:bg-primary-700',
       secondary:
-        'bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500',
+        'bg-white border border-slate-200 text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 focus:ring-slate-400 active:bg-slate-100',
       danger:
-        'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
+        'bg-red-500 text-white shadow-sm hover:bg-red-600 hover:shadow transition-all duration-200 focus:ring-red-500 active:bg-red-700',
       success:
-        'bg-green-600 text-white hover:bg-green-700 focus:ring-green-500',
+        'bg-success-500 text-white shadow-sm hover:bg-success-600 hover:shadow transition-all duration-200 focus:ring-success-500 active:bg-success-700',
       outline:
-        'border-2 border-gray-300 bg-transparent hover:bg-gray-50 focus:ring-gray-500',
+        'border border-slate-200 bg-white text-slate-700 shadow-xs hover:bg-slate-50 hover:border-slate-300 transition-all duration-200 focus:ring-primary-500 active:bg-slate-100',
+      ghost:
+        'text-slate-600 hover:bg-slate-100/80 hover:text-slate-900 transition-all duration-150 focus:ring-slate-400 active:bg-slate-200',
     };
 
     const sizes = {
       sm: 'px-3 py-1.5 text-sm',
-      md: 'px-4 py-2 text-base',
-      lg: 'px-6 py-3 text-lg',
+      md: 'px-4 py-2 text-sm',
+      lg: 'px-6 py-3 text-base',
     };
 
     return (

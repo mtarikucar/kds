@@ -94,7 +94,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
           {/* Product Image - Modern with overlay */}
           {showImages && (
-            <div className="relative w-full h-72 bg-gradient-to-br from-gray-100 to-gray-200 overflow-hidden">
+            <div className="relative w-full h-72 bg-gradient-to-br from-slate-100 to-slate-200 overflow-hidden">
               {imageUrl ? (
                 <>
                   <img
@@ -108,8 +108,8 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   ></div>
                 </>
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 via-gray-150 to-gray-200">
-                  <UtensilsCrossed className="h-20 w-20 text-gray-300" />
+                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 via-slate-150 to-slate-200">
+                  <UtensilsCrossed className="h-20 w-20 text-slate-300" />
                 </div>
               )}
 
@@ -158,8 +158,8 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
             {/* Price - Large and prominent */}
             {showPrices && (
-              <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-gray-50 to-gray-100">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              <div className="mb-6 p-4 rounded-2xl bg-gradient-to-r from-slate-50 to-slate-100">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                   {t('qrMenu.price')}
                 </p>
                 <p
@@ -173,11 +173,11 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
             {/* Description - Modern card style */}
             {showDescription && (
-              <div className="mb-6 p-4 rounded-2xl bg-gray-50 border border-gray-100">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+              <div className="mb-6 p-4 rounded-2xl bg-slate-50 border border-slate-200/60">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
                   {t('qrMenu.description')}
                 </p>
-                <p className="text-gray-700 leading-relaxed text-sm">
+                <p className="text-slate-700 leading-relaxed text-sm">
                   {product.description || t('qrMenu.noDescription')}
                 </p>
               </div>
@@ -196,7 +196,7 @@ const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             )}
 
             {/* Info text */}
-            <p className="text-center text-xs text-gray-500 mt-4">
+            <p className="text-center text-xs text-slate-500 mt-4">
               {t('qrMenu.close')} - ESC
             </p>
           </div>

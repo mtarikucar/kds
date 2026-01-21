@@ -157,7 +157,7 @@ const ProductOptionsModal = ({
               />
             )}
             <div className="flex-1">
-              <p className="text-gray-600 text-sm line-clamp-2">{product.description}</p>
+              <p className="text-slate-600 text-sm line-clamp-2">{product.description}</p>
               <p className="text-xl font-bold text-blue-600 mt-1">{formatPrice(product.price)}</p>
             </div>
           </div>
@@ -166,20 +166,20 @@ const ProductOptionsModal = ({
           {hasModifierGroups && product.modifierGroups!.map((group) => (
             <div key={group.id} className="space-y-2">
               <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-gray-800">{group.displayName}</h3>
+                <h3 className="font-semibold text-slate-800">{group.displayName}</h3>
                 {(group.isRequired || group.minSelections > 0) && (
                   <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full font-medium">
                     {t('required')}
                   </span>
                 )}
                 {group.selectionType === SelectionType.MULTIPLE && group.maxSelections && (
-                  <span className="text-xs text-gray-500">
+                  <span className="text-xs text-slate-500">
                     ({t('maxSelections', { count: group.maxSelections })})
                   </span>
                 )}
               </div>
               {group.description && (
-                <p className="text-sm text-gray-500">{group.description}</p>
+                <p className="text-sm text-slate-500">{group.description}</p>
               )}
 
               <div className="space-y-2">
@@ -194,7 +194,7 @@ const ProductOptionsModal = ({
                       className={`w-full flex items-center justify-between p-3 rounded-lg border-2 transition-all ${
                         isSelected
                           ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'
+                          : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -202,17 +202,17 @@ const ProductOptionsModal = ({
                           className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
                             isSelected
                               ? 'border-blue-500 bg-blue-500'
-                              : 'border-gray-300'
+                              : 'border-slate-300'
                           }`}
                         >
                           {isSelected && <Check className="w-3 h-3 text-white" />}
                         </div>
-                        <span className={`font-medium ${isSelected ? 'text-blue-700' : 'text-gray-700'}`}>
+                        <span className={`font-medium ${isSelected ? 'text-blue-700' : 'text-slate-700'}`}>
                           {modifier.name}
                         </span>
                       </div>
                       {Number(modifier.priceAdjustment) > 0 && (
-                        <span className={`text-sm font-semibold ${isSelected ? 'text-blue-600' : 'text-gray-500'}`}>
+                        <span className={`text-sm font-semibold ${isSelected ? 'text-blue-600' : 'text-slate-500'}`}>
                           +{formatPrice(modifier.priceAdjustment)}
                         </span>
                       )}
@@ -226,11 +226,11 @@ const ProductOptionsModal = ({
           {/* Quantity Selector */}
           <div className="pt-4 border-t">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-gray-800">{t('quantity')}</span>
+              <span className="font-semibold text-slate-800">{t('quantity')}</span>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors disabled:opacity-50"
+                  className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors disabled:opacity-50"
                   disabled={quantity <= 1}
                 >
                   <Minus className="h-4 w-4" />
@@ -238,7 +238,7 @@ const ProductOptionsModal = ({
                 <span className="text-xl font-bold w-8 text-center">{quantity}</span>
                 <button
                   onClick={() => setQuantity(quantity + 1)}
-                  className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors"
+                  className="p-2 rounded-lg bg-slate-100 hover:bg-slate-200 transition-colors"
                 >
                   <Plus className="h-4 w-4" />
                 </button>
@@ -248,7 +248,7 @@ const ProductOptionsModal = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t bg-gray-50 space-y-3">
+        <div className="p-4 border-t bg-slate-50 space-y-3">
           {!canAddToCart() && (
             <p className="text-sm text-red-600 text-center">
               {t('selectRequiredOptions')}

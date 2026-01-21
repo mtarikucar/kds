@@ -18,7 +18,7 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
     return (
       <div className="w-full">
         {label && (
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-slate-700 mb-1">
             {label}
           </label>
         )}
@@ -27,9 +27,9 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
             ref={ref}
             type={showPassword ? 'text' : 'password'}
             className={cn(
-              'w-full px-3 py-2.5 pr-10 border border-gray-300 rounded-lg shadow-sm',
+              'w-full px-3 py-2.5 pr-10 border border-slate-300 rounded-lg shadow-sm',
               'focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500',
-              'disabled:bg-gray-100 disabled:cursor-not-allowed',
+              'disabled:bg-slate-100 disabled:cursor-not-allowed',
               'transition-colors duration-200',
               error && 'border-red-500 focus:ring-red-500 focus:border-red-500',
               className
@@ -41,8 +41,8 @@ const PasswordInput = React.forwardRef<HTMLInputElement, PasswordInputProps>(
             onClick={toggleVisibility}
             className={cn(
               'absolute right-3 top-1/2 -translate-y-1/2',
-              'text-gray-400 hover:text-gray-600',
-              'focus:outline-none focus:text-gray-600',
+              'text-slate-400 hover:text-slate-600',
+              'focus:outline-none focus:text-slate-600',
               'transition-colors duration-200'
             )}
             aria-label={showPassword ? 'Hide password' : 'Show password'}

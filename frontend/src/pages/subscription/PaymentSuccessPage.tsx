@@ -38,17 +38,17 @@ export default function PaymentSuccessPage() {
 
   if (isVerifying) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mx-auto mb-4" />
-          <p className="text-gray-600">{t('subscriptions.payment.verifying')}</p>
+          <p className="text-slate-600">{t('subscriptions.payment.verifying')}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
         {/* Success Icon */}
         <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -56,12 +56,12 @@ export default function PaymentSuccessPage() {
         </div>
 
         {/* Title */}
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">
           {t('subscriptions.payment.success.title')}
         </h2>
 
         {/* Description */}
-        <p className="text-gray-600 mb-6">
+        <p className="text-slate-600 mb-6">
           {type === 'plan_change'
             ? t('subscriptions.payment.success.planChangeComplete')
             : t('subscriptions.payment.success.subscriptionActive')}
@@ -69,9 +69,9 @@ export default function PaymentSuccessPage() {
 
         {/* Order Reference */}
         {merchantOid && (
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <p className="text-sm text-gray-500 mb-1">{t('subscriptions.payment.orderReference')}</p>
-            <p className="text-sm font-mono text-gray-700">{merchantOid}</p>
+          <div className="bg-slate-50 rounded-lg p-4 mb-6">
+            <p className="text-sm text-slate-500 mb-1">{t('subscriptions.payment.orderReference')}</p>
+            <p className="text-sm font-mono text-slate-700">{merchantOid}</p>
           </div>
         )}
 
@@ -87,7 +87,7 @@ export default function PaymentSuccessPage() {
         {/* Dashboard Link */}
         <button
           onClick={() => navigate('/dashboard')}
-          className="w-full mt-3 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+          className="w-full mt-3 px-6 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors"
         >
           {t('subscriptions.payment.success.goToDashboard')}
         </button>

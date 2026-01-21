@@ -35,7 +35,7 @@ export default function NetworkErrorPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4">
       <div className="max-w-md w-full text-center">
         {/* Network Icon */}
         <div className="mb-8">
@@ -57,10 +57,10 @@ export default function NetworkErrorPage() {
         </div>
 
         {/* Content */}
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">
           {t('pages.networkError.title')}
         </h2>
-        <p className="text-gray-600 mb-8">
+        <p className="text-slate-600 mb-8">
           {t('pages.networkError.description')}
         </p>
 
@@ -72,7 +72,7 @@ export default function NetworkErrorPage() {
                 isOnline ? 'bg-yellow-500' : 'bg-red-500'
               } animate-pulse`}
             />
-            <span className="text-sm text-gray-600">
+            <span className="text-sm text-slate-600">
               {isOnline ? t('errors:connectionError') : t('errors:networkError')}
             </span>
           </div>
@@ -131,7 +131,7 @@ export default function NetworkErrorPage() {
 
           <button
             onClick={() => navigate('/')}
-            className="w-full flex justify-center py-3 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors"
+            className="w-full flex justify-center py-3 px-4 border border-slate-300 rounded-md shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 transition-colors"
           >
             {t('pages.networkError.goHome')}
           </button>

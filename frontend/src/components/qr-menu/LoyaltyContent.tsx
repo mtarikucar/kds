@@ -96,7 +96,7 @@ const LoyaltyContent: React.FC<LoyaltyContentProps> = ({
 
         {/* Apply Referral Code Card */}
         <div className="bg-white rounded-2xl shadow-md p-4 sm:p-6 mt-4 animate-in fade-in slide-in-from-bottom delay-300">
-          <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+          <h3 className="text-base sm:text-lg font-bold text-slate-900 mb-3 flex items-center gap-2">
             <Gift className="h-5 w-5 flex-shrink-0" style={{ color: settings.primaryColor }} />
             <span className="truncate">{t('loyalty.haveReferralCode')}</span>
           </h3>
@@ -106,7 +106,7 @@ const LoyaltyContent: React.FC<LoyaltyContentProps> = ({
               value={referralCode}
               onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
               placeholder={t('loyalty.enterCode')}
-              className="flex-1 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-opacity-50 uppercase text-sm sm:text-base"
+              className="flex-1 px-3 sm:px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-opacity-50 uppercase text-sm sm:text-base"
               style={{ focusRingColor: settings.primaryColor }}
               disabled={isApplyingReferral}
               maxLength={12}
@@ -131,11 +131,11 @@ const LoyaltyContent: React.FC<LoyaltyContentProps> = ({
             >
               <div className="flex items-center gap-2">
                 <History className="h-5 w-5" style={{ color: settings.primaryColor }} />
-                <span className="font-semibold text-gray-900">
+                <span className="font-semibold text-slate-900">
                   {t('loyalty.transactionHistory', 'Transaction History')}
                 </span>
               </div>
-              <span className="text-gray-500">{showTransactions ? '▼' : '▶'}</span>
+              <span className="text-slate-500">{showTransactions ? '▼' : '▶'}</span>
             </button>
 
             {showTransactions && (
@@ -151,10 +151,10 @@ const LoyaltyContent: React.FC<LoyaltyContentProps> = ({
                         {getTransactionEmoji(transaction.type)}
                       </span>
                       <div className="flex-1">
-                        <p className="font-medium text-gray-900">
+                        <p className="font-medium text-slate-900">
                           {transaction.description}
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-slate-500">
                           {new Date(transaction.createdAt).toLocaleDateString()}
                         </p>
                       </div>

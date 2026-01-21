@@ -34,7 +34,33 @@
     "noteLabel": "Примечание",
     "markAs": "Отметить как {{status}}",
     "cancelOrder": "Отменить заказ",
+    "moreOptions": "Дополнительные опции",
     "newOrderNotification": "Новый заказ: №{{orderNumber}}",
-    "orderUpdatedNotification": "Заказ обновлен: №{{orderNumber}}"
+    "orderUpdatedNotification": "Заказ обновлен: №{{orderNumber}}",
+    "stats": {
+      "activeOrders": "Активные заказы",
+      "avgWaitTime": "Сред. ожидание",
+      "urgentOrders": "Срочные",
+      "urgent": "срочн."
+    },
+    "urgency": {
+      "fresh": "Новый",
+      "attention": "Внимание",
+      "urgent": "Срочный",
+      "critical": "Критический"
+    },
+    "actions": {
+      "startPreparing": "Начать готовить",
+      "markReady": "Отметить готовым",
+      "markServed": "Отметить поданным"
+    },
+    "empty": {
+      "pendingTitle": "Нет ожидающих заказов",
+      "pendingDescription": "Новые заказы появятся здесь",
+      "preparingTitle": "Нет заказов в работе",
+      "preparingDescription": "Заказы в процессе приготовления появятся здесь",
+      "readyTitle": "Нет готовых заказов",
+      "readyDescription": "Завершенные заказы появятся здесь"
+    }
   }
 }

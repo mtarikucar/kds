@@ -101,14 +101,14 @@ export function PrinterSettings() {
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-semibold mb-4">{t('settings.printer.title')}</h3>
-        <p className="text-sm text-gray-600 mb-4">
+        <p className="text-sm text-slate-600 mb-4">
           {t('settings.printer.description')}
         </p>
       </div>
 
       <div className="space-y-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-slate-700 mb-2">
             {t('settings.printer.selectPort')}
           </label>
           <div className="flex gap-2">
@@ -162,7 +162,7 @@ export function PrinterSettings() {
 
       <div className="border-t pt-4">
         <h4 className="text-sm font-semibold mb-2">{t('settings.printer.setupTitle')}</h4>
-        <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
+        <ol className="text-sm text-slate-600 space-y-1 list-decimal list-inside">
           <li>{t('settings.printer.steps.connect')}</li>
           <li>{t('settings.printer.steps.refresh')}</li>
           <li>{t('settings.printer.steps.select')}</li>
@@ -173,7 +173,7 @@ export function PrinterSettings() {
 
       <div className="border-t pt-4">
         <h4 className="text-sm font-semibold mb-2">{t('settings.printer.supportedTitle')}</h4>
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-slate-600">
           {t('settings.printer.supportedDesc')}
         </p>
       </div>

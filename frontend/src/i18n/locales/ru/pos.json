@@ -149,6 +149,17 @@
     "customerRequestedNote": "Примечание к заказу",
     "unknownProduct": "Неизвестный продукт"
   },
+  "tableSelection": {
+    "title": "Выберите стол",
+    "description": "Выберите стол чтобы начать принимать заказы",
+    "takeawayOrder": "Заказ на вынос",
+    "takeawayDescription": "Заказ без стола",
+    "backToTables": "К столам",
+    "seats": "{{count}} мест",
+    "pendingOrders": "ожидание",
+    "waiterCalls": "официант",
+    "billRequests": "счет"
+  },
   "tableGrid": {
     "selected": "Выбран",
     "pendingOrder": "Ожидающий заказ",

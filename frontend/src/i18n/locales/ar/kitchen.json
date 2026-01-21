@@ -34,7 +34,33 @@
     "noteLabel": "ملاحظة",
     "markAs": "وضع علامة {{status}}",
     "cancelOrder": "إلغاء الطلب",
+    "moreOptions": "خيارات إضافية",
     "newOrderNotification": "طلب جديد: #{{orderNumber}}",
-    "orderUpdatedNotification": "تم تحديث الطلب: #{{orderNumber}}"
+    "orderUpdatedNotification": "تم تحديث الطلب: #{{orderNumber}}",
+    "stats": {
+      "activeOrders": "الطلبات النشطة",
+      "avgWaitTime": "متوسط الانتظار",
+      "urgentOrders": "عاجل",
+      "urgent": "عاجل"
+    },
+    "urgency": {
+      "fresh": "جديد",
+      "attention": "انتباه",
+      "urgent": "عاجل",
+      "critical": "حرج"
+    },
+    "actions": {
+      "startPreparing": "بدء التحضير",
+      "markReady": "وضع علامة جاهز",
+      "markServed": "وضع علامة تم التقديم"
+    },
+    "empty": {
+      "pendingTitle": "لا توجد طلبات قيد الانتظار",
+      "pendingDescription": "ستظهر الطلبات الجديدة هنا",
+      "preparingTitle": "لا توجد طلبات قيد التحضير",
+      "preparingDescription": "ستظهر الطلبات التي يتم تحضيرها هنا",
+      "readyTitle": "لا توجد طلبات جاهزة",
+      "readyDescription": "ستظهر الطلبات المكتملة هنا"
+    }
   }
 }

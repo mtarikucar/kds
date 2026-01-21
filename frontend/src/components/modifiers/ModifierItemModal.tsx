@@ -124,7 +124,7 @@ const ModifierItemModal = ({
             error={errors.priceAdjustment?.message}
             {...register('priceAdjustment', { valueAsNumber: true })}
           />
-          <p className="mt-1 text-xs text-gray-500">{t('menu.priceAdjustmentHint')}</p>
+          <p className="mt-1 text-xs text-slate-500">{t('menu.priceAdjustmentHint')}</p>
         </div>
 
         <Input

@@ -51,7 +51,7 @@ const SubscriptionPlansPage = () => {
   if (!plans || plans.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-600">{t('subscriptions.plansPage.noPlans')}</p>
+        <p className="text-slate-600">{t('subscriptions.plansPage.noPlans')}</p>
       </div>
     );
   }
@@ -75,18 +75,18 @@ const SubscriptionPlansPage = () => {
   return (
     <div className="max-w-7xl mx-auto">
       <div className="text-center mb-12">
-        <h1 className="text-4xl font-bold text-gray-900 mb-4">{t('subscriptions.plansPage.title')}</h1>
-        <p className="text-lg text-gray-600 mb-8">
+        <h1 className="text-4xl font-bold text-slate-900 mb-4">{t('subscriptions.plansPage.title')}</h1>
+        <p className="text-lg text-slate-600 mb-8">
           {t('subscriptions.plansPage.subtitle')}
         </p>
 
         {/* Billing Cycle Toggle */}
-        <div className="inline-flex items-center bg-gray-100 rounded-lg p-1">
+        <div className="inline-flex items-center bg-slate-100 rounded-lg p-1">
           <button
             onClick={() => setBillingCycle(BillingCycle.MONTHLY)}
             className={`px-6 py-2 rounded-md font-medium transition-colors ${billingCycle === BillingCycle.MONTHLY
               ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
+              : 'text-slate-600 hover:text-slate-900'
               }`}
           >
             {t('subscriptions.monthly')}
@@ -95,7 +95,7 @@ const SubscriptionPlansPage = () => {
             onClick={() => setBillingCycle(BillingCycle.YEARLY)}
             className={`px-6 py-2 rounded-md font-medium transition-colors ${billingCycle === BillingCycle.YEARLY
               ? 'bg-white text-blue-600 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
+              : 'text-slate-600 hover:text-slate-900'
               }`}
           >
             {t('subscriptions.yearly')}
@@ -125,10 +125,10 @@ const SubscriptionPlansPage = () => {
       {currentSubscription && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-6">
           <div className="text-center">
-            <h3 className="font-semibold text-gray-900 mb-2">
+            <h3 className="font-semibold text-slate-900 mb-2">
               {t('subscriptions.plansPage.haveActiveSubscription')}
             </h3>
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-slate-600 mb-4">
               {t('subscriptions.plansPage.toChangePlan')}
             </p>
             <Button variant="primary" onClick={() => navigate('/admin/settings/subscription')}>
@@ -140,31 +140,31 @@ const SubscriptionPlansPage = () => {
 
       {/* FAQ Section */}
       <div className="mt-16 border-t pt-12">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
+        <h2 className="text-2xl font-bold text-slate-900 mb-6 text-center">
           {t('subscriptions.plansPage.faqTitle')}
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           <div>
-            <h3 className="font-semibold text-gray-900 mb-2">{t('subscriptions.plansPage.faqChangePlans')}</h3>
-            <p className="text-gray-600 text-sm">
+            <h3 className="font-semibold text-slate-900 mb-2">{t('subscriptions.plansPage.faqChangePlans')}</h3>
+            <p className="text-slate-600 text-sm">
               {t('subscriptions.plansPage.faqChangePlansAnswer')}
             </p>
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900 mb-2">{t('subscriptions.plansPage.faqPaymentMethods')}</h3>
-            <p className="text-gray-600 text-sm">
+            <h3 className="font-semibold text-slate-900 mb-2">{t('subscriptions.plansPage.faqPaymentMethods')}</h3>
+            <p className="text-slate-600 text-sm">
               {t('subscriptions.plansPage.faqPaymentMethodsAnswer')}
             </p>
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900 mb-2">{t('subscriptions.plansPage.faqCancelAnytime')}</h3>
-            <p className="text-gray-600 text-sm">
+            <h3 className="font-semibold text-slate-900 mb-2">{t('subscriptions.plansPage.faqCancelAnytime')}</h3>
+            <p className="text-slate-600 text-sm">
               {t('subscriptions.plansPage.faqCancelAnytimeAnswer')}
             </p>
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900 mb-2">{t('subscriptions.plansPage.faqFreeTrial')}</h3>
-            <p className="text-gray-600 text-sm">
+            <h3 className="font-semibold text-slate-900 mb-2">{t('subscriptions.plansPage.faqFreeTrial')}</h3>
+            <p className="text-slate-600 text-sm">
               {t('subscriptions.plansPage.faqFreeTrialAnswer')}
             </p>
           </div>

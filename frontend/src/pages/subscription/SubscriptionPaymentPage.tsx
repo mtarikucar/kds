@@ -104,10 +104,10 @@ export default function SubscriptionPaymentPage() {
 
   if (createPaymentIntent.isPending || createUpgradeIntent.isPending) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-indigo-600 mx-auto mb-4" />
-          <p className="text-gray-600">{t('subscriptions.payment.preparing')}</p>
+          <p className="text-slate-600">{t('subscriptions.payment.preparing')}</p>
         </div>
       </div>
     );
@@ -116,15 +116,15 @@ export default function SubscriptionPaymentPage() {
   // Email request sent - show confirmation for international customers
   if (paymentStatus === 'email_sent') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
           <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <Mail className="w-8 h-8 text-blue-600" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">
             {t('subscriptions.payment.requestSubmitted', 'Request Submitted')}
           </h2>
-          <p className="text-gray-600 mb-6">
+          <p className="text-slate-600 mb-6">
             {emailMessage || t('subscriptions.payment.contactSoon', 'Our team will contact you shortly to complete the payment process.')}
           </p>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
@@ -151,13 +151,13 @@ export default function SubscriptionPaymentPage() {
 
   if (paymentStatus === 'success') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
           <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">
             {t('subscriptions.payment.success.title')}
           </h2>
-          <p className="text-gray-600 mb-6">
+          <p className="text-slate-600 mb-6">
             {t('subscriptions.payment.success.subscriptionActive')}
           </p>
           <button
@@ -172,21 +172,21 @@ export default function SubscriptionPaymentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-slate-50 py-8">
       <div className="max-w-3xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
           <button
             onClick={() => navigate('/subscription/plans')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4"
+            className="flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-4"
           >
             <ArrowLeft className="w-4 h-4" />
             {t('subscriptions.payment.backToPlans')}
           </button>
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-3xl font-bold text-slate-900">
             {t('subscriptions.payment.completePayment')}
           </h1>
-          <p className="text-gray-600 mt-2">
+          <p className="text-slate-600 mt-2">
             {t('subscriptions.payment.securePaymentWith')} PayTR
           </p>
         </div>
@@ -202,7 +202,7 @@ export default function SubscriptionPaymentPage() {
         ) : (
           <div className="bg-white rounded-lg p-8 text-center">
             <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto mb-4" />
-            <p className="text-gray-600">{t('subscriptions.payment.loadingForm')}</p>
+            <p className="text-slate-600">{t('subscriptions.payment.loadingForm')}</p>
           </div>
         )}
 

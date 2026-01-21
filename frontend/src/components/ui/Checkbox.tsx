@@ -5,10 +5,11 @@ import { cn } from '../../lib/utils';
 interface CheckboxProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'type'> {
   label?: React.ReactNode;
   error?: string;
+  description?: string;
 }
 
 const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
-  ({ className, label, error, id, ...props }, ref) => {
+  ({ className, label, error, description, id, ...props }, ref) => {
     const inputId = id || `checkbox-${Math.random().toString(36).substr(2, 9)}`;
 
     return (
@@ -30,12 +31,12 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
             />
             <div
               className={cn(
-                'w-5 h-5 border-2 rounded transition-all duration-200',
-                'border-gray-300 bg-white',
-                'peer-focus:ring-2 peer-focus:ring-primary-500 peer-focus:ring-offset-1',
+                'w-5 h-5 border-2 rounded-md transition-all duration-200',
+                'border-slate-300 bg-white',
+                'peer-focus-visible:ring-2 peer-focus-visible:ring-primary-500/20 peer-focus-visible:ring-offset-2',
                 'peer-checked:bg-primary-500 peer-checked:border-primary-500',
-                'group-hover:border-gray-400 peer-checked:group-hover:border-primary-600',
-                error && 'border-red-500',
+                'group-hover:border-slate-400 peer-checked:group-hover:border-primary-600 peer-checked:group-hover:bg-primary-600',
+                error && 'border-red-400',
                 className
               )}
             />
@@ -48,13 +49,22 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
               strokeWidth={3}
             />
           </div>
-          {label && (
-            <span className="text-sm text-gray-700 leading-tight select-none">
-              {label}
-            </span>
+          {(label || description) && (
+            <div className="flex flex-col">
+              {label && (
+                <span className="text-sm font-medium text-slate-700 leading-tight select-none">
+                  {label}
+                </span>
+              )}
+              {description && (
+                <span className="text-sm text-slate-500 mt-0.5 select-none">
+                  {description}
+                </span>
+              )}
+            </div>
           )}
         </label>
-        {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+        {error && <p className="mt-1.5 text-sm text-red-600">{error}</p>}
       </div>
     );
   }

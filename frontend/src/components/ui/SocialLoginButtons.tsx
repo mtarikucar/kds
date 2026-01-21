@@ -27,10 +27,10 @@ const SocialLoginButtons: React.FC<SocialLoginButtonsProps> = ({
       {/* Divider */}
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-200" />
+          <div className="w-full border-t border-slate-200" />
         </div>
         <div className="relative flex justify-center text-sm">
-          <span className="px-4 bg-white text-gray-500">{dividerText}</span>
+          <span className="px-4 bg-white text-slate-500">{dividerText}</span>
         </div>
       </div>
 
@@ -46,7 +46,7 @@ const SocialLoginButtons: React.FC<SocialLoginButtonsProps> = ({
           'border transition-all duration-200',
           'focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-primary-500',
           'disabled:opacity-50 disabled:cursor-not-allowed',
-          'bg-white hover:bg-gray-50 text-gray-700 border-gray-300'
+          'bg-white hover:bg-slate-50 text-slate-700 border-slate-300'
         )}
         aria-label="Continue with Google"
       >

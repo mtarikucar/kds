@@ -169,8 +169,8 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
 
   if (compact) {
     return (
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-shadow p-5 flex flex-col items-center">
-        <div className="bg-gradient-to-br from-gray-50 to-white p-3 rounded-lg border border-gray-100 mb-3">
+      <div className="bg-white border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-shadow p-5 flex flex-col items-center">
+        <div className="bg-gradient-to-br from-gray-50 to-white p-3 rounded-lg border border-slate-100 mb-3">
           <QRCode
             id={`qr-${qrCode.id}-small`}
             value={qrCode.url}
@@ -180,26 +180,26 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
             bgColor={settings?.backgroundColor || '#FFFFFF'}
           />
         </div>
-        <p className="font-semibold text-sm text-gray-900 mb-1">{qrCode.label}</p>
-        <p className="text-xs text-gray-500 mb-3">{t('admin.clickToViewOptions')}</p>
+        <p className="font-semibold text-sm text-slate-900 mb-1">{qrCode.label}</p>
+        <p className="text-xs text-slate-500 mb-3">{t('admin.clickToViewOptions')}</p>
         <div className="flex gap-2 w-full">
           <button
             onClick={() => downloadQR('small')}
-            className="flex-1 px-3 py-2 text-sm border border-gray-200 bg-white hover:bg-gray-50 rounded-lg flex items-center justify-center gap-1 transition-colors"
+            className="flex-1 px-3 py-2 text-sm border border-slate-200 bg-white hover:bg-slate-50 rounded-lg flex items-center justify-center gap-1 transition-colors"
             title={t('qr.downloadQrCode')}
           >
             <Download className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={openPreview}
-            className="flex-1 px-3 py-2 text-sm border border-gray-200 bg-white hover:bg-gray-50 rounded-lg flex items-center justify-center gap-1 transition-colors"
+            className="flex-1 px-3 py-2 text-sm border border-slate-200 bg-white hover:bg-slate-50 rounded-lg flex items-center justify-center gap-1 transition-colors"
             title={t('qr.previewMenu')}
           >
             <Search className="h-3.5 w-3.5" />
           </button>
           <button
             onClick={() => printQR('small')}
-            className="flex-1 px-3 py-2 text-sm border border-gray-200 bg-white hover:bg-gray-50 rounded-lg flex items-center justify-center gap-1 transition-colors"
+            className="flex-1 px-3 py-2 text-sm border border-slate-200 bg-white hover:bg-slate-50 rounded-lg flex items-center justify-center gap-1 transition-colors"
             title={t('qr.printQrCode')}
           >
             <Printer className="h-3.5 w-3.5" />
@@ -210,18 +210,18 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
       <div className="grid md:grid-cols-2 gap-8">
         {/* QR Code Display Section */}
         <div className="space-y-4">
           <div className="text-center">
-            <h3 className="text-xl font-bold text-gray-900 mb-2">{qrCode.label}</h3>
-            <p className="text-sm text-gray-600">{t('admin.scanToViewMenu')}</p>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">{qrCode.label}</h3>
+            <p className="text-sm text-slate-600">{t('admin.scanToViewMenu')}</p>
           </div>
 
           {/* Size Selector */}
-          <div className="bg-gray-50 rounded-lg p-3">
-            <p className="text-xs font-medium text-gray-700 mb-2 uppercase tracking-wide">{t('qr.previewSize')}</p>
+          <div className="bg-slate-50 rounded-lg p-3">
+            <p className="text-xs font-medium text-slate-700 mb-2 uppercase tracking-wide">{t('qr.previewSize')}</p>
             <div className="grid grid-cols-3 gap-2">
               {Object.entries(sizePresets).map(([key, preset]) => (
                 <button
@@ -229,7 +229,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
                   onClick={() => setSelectedSize(key as any)}
                   className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${selectedSize === key
                     ? 'bg-blue-600 text-white shadow-sm'
-                    : 'bg-white text-gray-700 border border-gray-200 hover:border-blue-300'
+                    : 'bg-white text-slate-700 border border-slate-200 hover:border-blue-300'
                     }`}
                 >
                   <div className="text-xs">{preset.label}</div>
@@ -241,7 +241,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
 
           {/* QR Code Preview */}
           <div className="flex justify-center">
-            <div className="bg-gradient-to-br from-gray-50 to-white p-4 rounded-xl border-2 border-gray-200 shadow-inner">
+            <div className="bg-gradient-to-br from-gray-50 to-white p-4 rounded-xl border-2 border-slate-200 shadow-inner">
               <QRCode
                 id={`qr-${qrCode.id}-${selectedSize}`}
                 value={qrCode.url}
@@ -257,9 +257,9 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
         {/* Actions Section */}
         <div className="space-y-4">
           {/* URL Display */}
-          <div className="bg-gray-50 rounded-lg p-4">
+          <div className="bg-slate-50 rounded-lg p-4">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-medium text-gray-700 uppercase tracking-wide">{t('qr.menuUrl')}</p>
+              <p className="text-xs font-medium text-slate-700 uppercase tracking-wide">{t('qr.menuUrl')}</p>
               <button
                 onClick={copyToClipboard}
                 className="text-xs text-blue-600 hover:text-blue-700 flex items-center gap-1"
@@ -270,20 +270,20 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
                   <><Copy className="h-3 w-3" /> {t('buttons.copy')}</>)}
               </button>
             </div>
-            <p className="text-sm text-gray-900 font-mono break-all bg-white rounded p-2 border border-gray-200">
+            <p className="text-sm text-slate-900 font-mono break-all bg-white rounded p-2 border border-slate-200">
               {qrCode.url}
             </p>
           </div>
 
           {/* Download Options */}
           <div className="space-y-3">
-            <p className="text-xs font-medium text-gray-700 uppercase tracking-wide">{t('qr.downloadFormat')}</p>
+            <p className="text-xs font-medium text-slate-700 uppercase tracking-wide">{t('qr.downloadFormat')}</p>
             <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={() => setDownloadFormat('png')}
                 className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all ${downloadFormat === 'png'
                   ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
-                  : 'bg-white text-gray-700 border border-gray-200 hover:border-gray-300'
+                  : 'bg-white text-slate-700 border border-slate-200 hover:border-slate-300'
                   }`}
               >
                 <FileImage className="h-4 w-4" />
@@ -293,7 +293,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
                 onClick={() => setDownloadFormat('svg')}
                 className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all ${downloadFormat === 'svg'
                   ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
-                  : 'bg-white text-gray-700 border border-gray-200 hover:border-gray-300'
+                  : 'bg-white text-slate-700 border border-slate-200 hover:border-slate-300'
                   }`}
               >
                 <FileImage className="h-4 w-4" />
@@ -303,7 +303,7 @@ const QrCodeDisplay = ({ qrCode, tenant, compact = false, settings }: QrCodeDisp
                 onClick={() => setDownloadFormat('pdf')}
                 className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-all ${downloadFormat === 'pdf'
                   ? 'bg-blue-100 text-blue-700 border-2 border-blue-300'
-                  : 'bg-white text-gray-700 border border-gray-200 hover:border-gray-300'
+                  : 'bg-white text-slate-700 border border-slate-200 hover:border-slate-300'
                   }`}
               >
                 <FileText className="h-4 w-4" />

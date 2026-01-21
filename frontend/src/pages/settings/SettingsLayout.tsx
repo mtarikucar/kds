@@ -43,10 +43,10 @@ const SettingsLayout = () => {
     <>
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
-          <Settings className="h-6 w-6 text-gray-700" />
-          <h2 className="text-xl font-bold text-gray-900">{t('title')}</h2>
+          <Settings className="h-6 w-6 text-slate-700" />
+          <h2 className="text-xl font-heading font-bold text-slate-900">{t('title')}</h2>
         </div>
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-slate-500">
           {t('manageConfiguration')}
         </p>
       </div>
@@ -59,20 +59,20 @@ const SettingsLayout = () => {
               key={item.to}
               to={item.to}
               onClick={handleNavClick}
-              className={`flex items-start gap-3 px-4 py-3 rounded-lg transition-colors ${
+              className={`flex items-start gap-3 px-4 py-3 rounded-xl transition-all duration-150 ${
                 isActive
-                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                  : 'text-gray-700 hover:bg-gray-100'
+                  ? 'bg-primary-50 text-primary-700 border border-primary-200/60 shadow-sm'
+                  : 'text-slate-700 hover:bg-slate-100/80'
               }`}
             >
               <item.icon className={`h-5 w-5 mt-0.5 flex-shrink-0 ${
-                isActive ? 'text-blue-600' : 'text-gray-500'
+                isActive ? 'text-primary-600' : 'text-slate-400'
               }`} />
               <div className="flex-1 min-w-0">
-                <div className={`font-medium ${isActive ? 'text-blue-700' : 'text-gray-900'}`}>
+                <div className={`font-medium ${isActive ? 'text-primary-700' : 'text-slate-900'}`}>
                   {item.label}
                 </div>
-                <div className="text-xs text-gray-600 mt-0.5">
+                <div className="text-xs text-slate-500 mt-0.5">
                   {item.description}
                 </div>
               </div>
@@ -81,8 +81,8 @@ const SettingsLayout = () => {
         })}
       </nav>
 
-      <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <p className="text-sm text-blue-800">
+      <div className="mt-8 p-4 bg-primary-50/50 border border-primary-200/60 rounded-xl">
+        <p className="text-sm text-primary-800">
           <strong>{t('tip')}:</strong> {t('tipDescription')}
         </p>
       </div>
@@ -95,16 +95,16 @@ const SettingsLayout = () => {
   return (
     <div className="h-full flex flex-col lg:flex-row">
       {/* Mobile Header */}
-      <div className="lg:hidden flex items-center justify-between p-4 border-b border-gray-200 bg-white">
+      <div className="lg:hidden flex items-center justify-between p-4 border-b border-slate-200/60 bg-white">
         <div className="flex items-center gap-2">
-          <Settings className="h-5 w-5 text-gray-700" />
-          <span className="font-semibold text-gray-900">
+          <Settings className="h-5 w-5 text-slate-700" />
+          <span className="font-semibold text-slate-900">
             {currentPage?.label || t('title')}
           </span>
         </div>
         <button
           onClick={() => setIsMobileMenuOpen(true)}
-          className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+          className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
         >
           <Menu className="h-6 w-6" />
         </button>
@@ -113,22 +113,22 @@ const SettingsLayout = () => {
       {/* Mobile Drawer Overlay */}
       {isMobileMenuOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+          className="lg:hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40"
           onClick={() => setIsMobileMenuOpen(false)}
         />
       )}
 
       {/* Mobile Drawer */}
       <div
-        className={`lg:hidden fixed inset-y-0 left-0 w-80 max-w-[85vw] bg-gray-50 z-50 transform transition-transform duration-300 ease-in-out ${
+        className={`lg:hidden fixed inset-y-0 left-0 w-80 max-w-[85vw] bg-slate-50 z-50 transform transition-transform duration-300 ease-out ${
           isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <span className="font-semibold text-gray-900">{t('title')}</span>
+        <div className="flex items-center justify-between p-4 border-b border-slate-200/60">
+          <span className="font-semibold text-slate-900">{t('title')}</span>
           <button
             onClick={() => setIsMobileMenuOpen(false)}
-            className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg"
+            className="p-2 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -139,12 +139,12 @@ const SettingsLayout = () => {
       </div>
 
       {/* Desktop Sidebar */}
-      <div className="hidden lg:block w-72 bg-gray-50 border-r border-gray-200 p-6 flex-shrink-0">
+      <div className="hidden lg:block w-72 bg-slate-50/50 border-r border-slate-200/60 p-6 flex-shrink-0">
         <SidebarContent />
       </div>
 
       {/* Settings Content */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto bg-white">
         <Outlet />
       </div>
     </div>

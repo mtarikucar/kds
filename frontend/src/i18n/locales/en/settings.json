@@ -1,5 +1,14 @@
 {
   "title": "Settings",
+  "autoSave": {
+    "idle": "No changes",
+    "saving": "Saving...",
+    "saved": "Saved",
+    "savedSuccess": "Changes saved automatically",
+    "error": "Save failed",
+    "retry": "Retry",
+    "currencyWarning": "Currency changes affect all prices in your system. Please verify before saving."
+  },
   "general": "General",
   "restaurant": "Restaurant",
   "pos": "POS",

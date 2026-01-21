@@ -58,7 +58,7 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
       <>
         {/* Backdrop */}
         <div
-          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm"
+          className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm"
           onClick={() => onOpenChange(false)}
         />
 
@@ -67,8 +67,8 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
           <div
             ref={ref}
             className={cn(
-              'relative bg-white rounded-lg shadow-lg w-full max-w-lg',
-              'animate-in fade-in-0 zoom-in-95',
+              'relative bg-white rounded-xl shadow-2xl w-full max-w-lg',
+              'animate-in fade-in-0 zoom-in-95 duration-200',
               className
             )}
             onClick={(e) => e.stopPropagation()}
@@ -77,7 +77,7 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
             {children}
             <button
               onClick={() => onOpenChange(false)}
-              className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-white transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2 disabled:pointer-events-none"
+              className="absolute right-4 top-4 rounded-lg p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:pointer-events-none"
             >
               <X className="h-4 w-4" />
               <span className="sr-only">Close</span>
@@ -121,7 +121,7 @@ const DialogFooter = React.forwardRef<HTMLDivElement, DialogFooterProps>(
       <div
         ref={ref}
         className={cn(
-          'flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2 px-6 pb-6',
+          'flex flex-col-reverse sm:flex-row sm:justify-end gap-3 px-6 pb-6 pt-4',
           className
         )}
         {...props}
@@ -143,7 +143,7 @@ const DialogTitle = React.forwardRef<HTMLHeadingElement, DialogTitleProps>(
     return (
       <h2
         ref={ref}
-        className={cn('text-lg font-semibold leading-none tracking-tight', className)}
+        className={cn('text-lg font-heading font-semibold leading-none tracking-tight text-slate-900', className)}
         {...props}
       >
         {children}
@@ -163,7 +163,7 @@ const DialogDescription = React.forwardRef<HTMLParagraphElement, DialogDescripti
     return (
       <p
         ref={ref}
-        className={cn('text-sm text-gray-500', className)}
+        className={cn('text-sm text-slate-500 mt-1', className)}
         {...props}
       >
         {children}

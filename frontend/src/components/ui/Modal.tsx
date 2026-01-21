@@ -7,7 +7,7 @@ interface ModalProps {
   onClose: () => void;
   title?: string;
   children: React.ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
 }
 
 const Modal: React.FC<ModalProps> = ({
@@ -42,6 +42,7 @@ const Modal: React.FC<ModalProps> = ({
     md: 'max-w-lg',
     lg: 'max-w-2xl',
     xl: 'max-w-4xl',
+    full: 'max-w-[95vw] md:max-w-[90vw]',
   };
 
   return (
@@ -49,24 +50,25 @@ const Modal: React.FC<ModalProps> = ({
       <div className="flex min-h-screen items-center justify-center p-4">
         {/* Backdrop */}
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity"
           onClick={onClose}
-        ></div>
+        />
 
         {/* Modal */}
         <div
           className={cn(
-            'relative w-full bg-white rounded-lg shadow-xl max-w-[95vw] sm:max-w-none',
+            'relative w-full bg-white rounded-xl shadow-2xl max-w-[95vw] sm:max-w-none',
+            'animate-in fade-in-0 zoom-in-95 duration-200',
             sizes[size]
           )}
         >
           {/* Header */}
           {title && (
-            <div className="flex items-center justify-between px-4 md:px-6 py-4 border-b border-gray-200">
-              <h2 className="text-lg md:text-xl font-semibold text-gray-900">{title}</h2>
+            <div className="flex items-center justify-between px-6 py-5 border-b border-slate-100">
+              <h2 className="text-lg md:text-xl font-heading font-semibold text-slate-900">{title}</h2>
               <button
                 onClick={onClose}
-                className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-2 transition-all duration-150"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -74,7 +76,7 @@ const Modal: React.FC<ModalProps> = ({
           )}
 
           {/* Content */}
-          <div className="px-4 md:px-6 py-4">{children}</div>
+          <div className="px-6 py-5">{children}</div>
         </div>
       </div>
     </div>

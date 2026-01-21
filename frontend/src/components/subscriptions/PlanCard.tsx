@@ -70,7 +70,7 @@ const PlanCard = ({
   };
 
   const planColors = {
-    [SubscriptionPlanType.FREE]: 'border-gray-300',
+    [SubscriptionPlanType.FREE]: 'border-slate-300',
     [SubscriptionPlanType.BASIC]: 'border-blue-300',
     [SubscriptionPlanType.PRO]: 'border-purple-500',
     [SubscriptionPlanType.BUSINESS]: 'border-yellow-500',
@@ -112,14 +112,14 @@ const PlanCard = ({
       )}
 
       <div className="mb-6">
-        <h3 className="text-2xl font-bold text-gray-900 mb-2">{planDisplayName}</h3>
-        <p className="text-gray-600 text-sm min-h-[40px]">{planDescription}</p>
+        <h3 className="text-2xl font-bold text-slate-900 mb-2">{planDisplayName}</h3>
+        <p className="text-slate-600 text-sm min-h-[40px]">{planDescription}</p>
       </div>
 
       <div className="mb-6">
         {/* Original price with strikethrough if discounted */}
         {hasDiscount && originalPrice > 0 && (
-          <div className="text-lg text-gray-400 line-through mb-1">
+          <div className="text-lg text-slate-400 line-through mb-1">
             {getCurrencySymbol(plan.currency)}{originalPrice.toFixed(2)}
           </div>
         )}
@@ -127,11 +127,11 @@ const PlanCard = ({
         <div className="flex items-baseline">
           <span className={cn(
             'text-4xl font-bold',
-            hasDiscount ? 'text-red-600' : 'text-gray-900'
+            hasDiscount ? 'text-red-600' : 'text-slate-900'
           )}>
             {getCurrencySymbol(plan.currency)}{price.toFixed(2)}
           </span>
-          <span className="text-gray-600 ml-2">
+          <span className="text-slate-600 ml-2">
             /{billingCycle === BillingCycle.MONTHLY ? t('pricing.month') : t('pricing.year')}
           </span>
         </div>
@@ -164,27 +164,27 @@ const PlanCard = ({
       </div>
 
       <div className="mb-6 flex-grow">
-        <h4 className="font-semibold text-gray-900 mb-3">{t('subscriptions.usageLimits')}:</h4>
+        <h4 className="font-semibold text-slate-900 mb-3">{t('subscriptions.usageLimits')}:</h4>
         <ul className="space-y-2 mb-4">
-          <li className="flex items-center text-sm text-gray-700">
+          <li className="flex items-center text-sm text-slate-700">
             <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
             <span>
               {formatLimit(plan.limits.maxUsers)} {isUnlimited(plan.limits.maxUsers) || plan.limits.maxUsers > 1 ? t('subscriptions.users') : t('subscriptions.user')}
             </span>
           </li>
-          <li className="flex items-center text-sm text-gray-700">
+          <li className="flex items-center text-sm text-slate-700">
             <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
             <span>
               {formatLimit(plan.limits.maxTables)} {isUnlimited(plan.limits.maxTables) || plan.limits.maxTables > 1 ? t('subscriptions.tables') : t('subscriptions.table')}
             </span>
           </li>
-          <li className="flex items-center text-sm text-gray-700">
+          <li className="flex items-center text-sm text-slate-700">
             <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
             <span>
               {formatLimit(plan.limits.maxProducts)} {isUnlimited(plan.limits.maxProducts) || plan.limits.maxProducts > 1 ? t('subscriptions.products') : t('subscriptions.product')}
             </span>
           </li>
-          <li className="flex items-center text-sm text-gray-700">
+          <li className="flex items-center text-sm text-slate-700">
             <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
             <span>
               {formatLimit(plan.limits.maxMonthlyOrders)} {isUnlimited(plan.limits.maxMonthlyOrders) || plan.limits.maxMonthlyOrders > 1 ? t('subscriptions.orders') : t('subscriptions.order')}/{t('pricing.month')}
@@ -192,7 +192,7 @@ const PlanCard = ({
           </li>
         </ul>
 
-        <h4 className="font-semibold text-gray-900 mb-3">{t('subscriptions.features')}:</h4>
+        <h4 className="font-semibold text-slate-900 mb-3">{t('subscriptions.features')}:</h4>
         <ul className="space-y-2">
           {Object.entries(plan.features).map(([key, value]) => {
             const featureLabels: Record<string, string> = {
@@ -206,7 +206,7 @@ const PlanCard = ({
             };
 
             return (
-              <li key={key} className="flex items-center text-sm text-gray-700">
+              <li key={key} className="flex items-center text-sm text-slate-700">
                 {value ? (
                   <>
                     <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
@@ -214,8 +214,8 @@ const PlanCard = ({
                   </>
                 ) : (
                   <>
-                    <X className="h-4 w-4 text-gray-400 mr-2 flex-shrink-0" />
-                    <span className="text-gray-400">{featureLabels[key]}</span>
+                    <X className="h-4 w-4 text-slate-400 mr-2 flex-shrink-0" />
+                    <span className="text-slate-400">{featureLabels[key]}</span>
                   </>
                 )}
               </li>

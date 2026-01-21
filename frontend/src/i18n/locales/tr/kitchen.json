@@ -34,8 +34,33 @@
     "noteLabel": "Not",
     "markAs": "{{status}} olarak işaretle",
     "cancelOrder": "Siparişi İptal Et",
+    "moreOptions": "Daha fazla seçenek",
     "newOrderNotification": "Yeni Sipariş: #{{orderNumber}}",
-    "orderUpdatedNotification": "Sipariş Güncellendi: #{{orderNumber}}"
+    "orderUpdatedNotification": "Sipariş Güncellendi: #{{orderNumber}}",
+    "stats": {
+      "activeOrders": "Aktif Siparişler",
+      "avgWaitTime": "Ort. Bekleme",
+      "urgentOrders": "Acil",
+      "urgent": "acil"
+    },
+    "urgency": {
+      "fresh": "Yeni",
+      "attention": "Dikkat",
+      "urgent": "Acil",
+      "critical": "Kritik"
+    },
+    "actions": {
+      "startPreparing": "Hazırlamaya Başla",
+      "markReady": "Hazır İşaretle",
+      "markServed": "Servis Edildi İşaretle"
+    },
+    "empty": {
+      "pendingTitle": "Bekleyen sipariş yok",
+      "pendingDescription": "Yeni siparişler burada görünecek",
+      "preparingTitle": "Hazırlanan sipariş yok",
+      "preparingDescription": "Hazırlanan siparişler burada görünecek",
+      "readyTitle": "Hazır sipariş yok",
+      "readyDescription": "Tamamlanan siparişler burada görünecek"
+    }
   }
 }
-

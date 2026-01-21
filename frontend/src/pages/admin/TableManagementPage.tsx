@@ -136,9 +136,9 @@ const TableManagementPage = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">{t('admin.tableManagement')}</h1>
-          <p className="text-gray-600">{t('admin.manageTablesSeating')}</p>
+        <div className="mb-8">
+          <h1 className="text-2xl font-heading font-bold text-slate-900">{t('admin.tableManagement')}</h1>
+          <p className="text-slate-500 mt-1">{t('admin.manageTablesSeating')}</p>
         </div>
         <Button onClick={() => handleOpenModal()} disabled={!canAddTable}>
           {canAddTable ? (
@@ -152,7 +152,7 @@ const TableManagementPage = () => {
 
       {/* Limit Info */}
       {tableLimit.limit !== -1 && (
-        <div className={`rounded-lg p-4 flex items-start gap-3 ${
+        <div className={`rounded-xl px-6 py-5 flex items-start gap-3 ${
           canAddTable
             ? 'bg-blue-50 border border-blue-200'
             : 'bg-amber-50 border border-amber-200'
@@ -196,7 +196,7 @@ const TableManagementPage = () => {
               {tables?.map((table) => (
                 <div
                   key={table.id}
-                  className="border rounded-lg p-4 hover:shadow-md transition-shadow"
+                  className="border border-slate-200/60 rounded-xl p-4 hover:shadow-md transition-shadow duration-200"
                 >
                   <div className="text-center mb-3">
                     <div className="text-2xl font-bold mb-2">
@@ -205,7 +205,7 @@ const TableManagementPage = () => {
                     <Badge variant={getStatusVariant(table.status as TableStatus)}>
                       {getStatusLabel(table.status as TableStatus)}
                     </Badge>
-                    <div className="text-sm text-gray-600 mt-2">
+                    <div className="text-sm text-slate-600 mt-2">
                       {t('admin.capacity')}: {table.capacity} {t('admin.people')}
                     </div>
                   </div>

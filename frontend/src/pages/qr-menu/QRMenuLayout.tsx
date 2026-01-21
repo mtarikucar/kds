@@ -152,7 +152,7 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({ currentPage, children, onMe
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <Spinner size="lg" />
       </div>
     );
@@ -160,7 +160,7 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({ currentPage, children, onMe
 
   if (error || !menuData) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 p-4">
         <p className="text-red-600 mb-4">{error || t('messages.operationFailed')}</p>
         <button
           onClick={() => navigate('/')}

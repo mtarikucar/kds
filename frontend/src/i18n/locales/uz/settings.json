@@ -1,5 +1,14 @@
 {
   "title": "Sozlamalar",
+  "autoSave": {
+    "idle": "O'zgarishlar yo'q",
+    "saving": "Saqlanmoqda...",
+    "saved": "Saqlandi",
+    "savedSuccess": "O'zgarishlar avtomatik saqlandi",
+    "error": "Saqlash xatosi",
+    "retry": "Qayta urinish",
+    "currencyWarning": "Valyuta o'zgarishlari tizimingizdagi barcha narxlarga ta'sir qiladi. Saqlashdan oldin tekshiring."
+  },
   "general": "Umumiy",
   "restaurant": "Restoran",
   "pos": "Kassa",

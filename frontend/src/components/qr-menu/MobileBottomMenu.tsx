@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
+import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingCart, ClipboardList, Home, Award } from 'lucide-react';
 import { useCartStore } from '../../store/cartStore';
 import { buildQRMenuUrl } from '../../utils/subdomain';
+import { cn } from '../../lib/utils';
 
 interface MobileBottomMenuProps {
   tenantId: string | undefined;
@@ -29,14 +31,43 @@ const MobileBottomMenu: React.FC<MobileBottomMenuProps> = ({
   const items = useCartStore(state => state.items);
   const sessionId = useCartStore(state => state.sessionId);
   const [itemCount, setItemCount] = useState(0);
+  const [prevCount, setPrevCount] = useState(0);
+  const [badgeBounce, setBadgeBounce] = useState(false);
 
-  // Update item count
+  // Haptic feedback helper
+  const triggerHaptic = (type: 'light' | 'medium' | 'heavy' = 'light') => {
+    if ('vibrate' in navigator) {
+      const patterns = {
+        light: [10],
+        medium: [20],
+        heavy: [30],
+      };
+      navigator.vibrate(patterns[type]);
+    }
+  };
+
+  // Update item count with animation
   useEffect(() => {
     const newCount = items.reduce((sum, item) => sum + item.quantity, 0);
-    setItemCount(newCount);
-  }, [items]);
+
+    if (newCount !== itemCount) {
+      setPrevCount(itemCount);
+      setItemCount(newCount);
+
+      // Trigger bounce animation when count increases
+      if (newCount > prevCount) {
+        setBadgeBounce(true);
+        triggerHaptic('light');
+        setTimeout(() => setBadgeBounce(false), 300);
+      }
+    }
+  }, [items, itemCount, prevCount]);
 
   const handleNavigation = (page: 'menu' | 'cart' | 'orders' | 'loyalty') => {
+    if (page === currentPage) return;
+
+    triggerHaptic('light');
+
     const url = buildQRMenuUrl(page, {
       subdomain,
       tenantId,
@@ -94,25 +125,31 @@ const MobileBottomMenu: React.FC<MobileBottomMenuProps> = ({
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 md:hidden">
-      {/* Gradient Background with Blur Effect */}
+    <div
+      className="fixed bottom-0 left-0 right-0 z-40 md:hidden"
+      style={{
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+      }}
+    >
+      {/* Background with blur */}
       <div
         className="absolute inset-0 backdrop-blur-xl"
         style={{
           background: `linear-gradient(to top, ${primaryColor}15, ${secondaryColor}08, transparent)`,
         }}
       />
-      
-      {/* Glass Morphism Container - Compact */}
+
+      {/* Glass Morphism Container */}
       <div
         className="relative mx-3 mb-3 rounded-2xl shadow-xl overflow-hidden"
         style={{
-          background: 'rgba(255, 255, 255, 0.9)',
+          background: 'rgba(255, 255, 255, 0.95)',
           backdropFilter: 'blur(20px)',
+          WebkitBackdropFilter: 'blur(20px)',
           border: '1px solid rgba(255, 255, 255, 0.5)',
         }}
       >
-        {/* Top Gradient Accent Line - Thinner */}
+        {/* Top Gradient Accent Line */}
         <div
           className="h-0.5"
           style={{
@@ -121,44 +158,52 @@ const MobileBottomMenu: React.FC<MobileBottomMenuProps> = ({
             animation: 'shimmer 3s ease-in-out infinite',
           }}
         />
-        
+
         <div className="flex items-center justify-around px-2 py-2.5">
-          {menuItems.map((item, index) => {
+          {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.active;
             const isDisabled = item.disabled;
 
             return (
-              <button
+              <motion.button
                 key={item.id}
                 onClick={item.onClick}
                 disabled={isDisabled}
-                className={`flex flex-col items-center gap-1 px-2.5 py-1.5 rounded-xl transition-all duration-300 relative group ${
-                  isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer active:scale-90'
-                }`}
+                className={cn(
+                  'flex flex-col items-center gap-1 px-3 py-1.5 rounded-xl transition-all duration-200 relative',
+                  isDisabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'
+                )}
                 style={{
                   backgroundColor: isActive ? `${primaryColor}12` : 'transparent',
-                  transform: isActive ? 'translateY(-2px)' : 'translateY(0)',
-                  animationDelay: `${index * 100}ms`,
                 }}
-                title={item.label}
+                whileTap={!isDisabled ? { scale: 0.9 } : {}}
+                animate={{
+                  y: isActive ? -2 : 0,
+                }}
               >
-                {/* Active Indicator - Top Dot - Smaller */}
-                {isActive && (
-                  <div
-                    className="absolute -top-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full animate-pulse"
-                    style={{
-                      background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-                      boxShadow: `0 0 6px ${primaryColor}60`,
-                    }}
-                  />
-                )}
+                {/* Active Indicator Dot */}
+                <AnimatePresence>
+                  {isActive && (
+                    <motion.div
+                      initial={{ scale: 0, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      exit={{ scale: 0, opacity: 0 }}
+                      className="absolute -top-0.5 left-1/2 transform -translate-x-1/2 w-1.5 h-1.5 rounded-full"
+                      style={{
+                        background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
+                        boxShadow: `0 0 8px ${primaryColor}60`,
+                      }}
+                    />
+                  )}
+                </AnimatePresence>
 
-                {/* Icon Container - Compact */}
+                {/* Icon Container */}
                 <div
-                  className={`relative p-1.5 rounded-xl transition-all duration-300 ${
-                    isActive ? 'scale-105' : 'group-hover:scale-102'
-                  }`}
+                  className={cn(
+                    'relative p-1.5 rounded-xl transition-all duration-200',
+                    isActive && 'scale-105'
+                  )}
                   style={{
                     background: isActive
                       ? `linear-gradient(135deg, ${primaryColor}18, ${secondaryColor}18)`
@@ -167,60 +212,71 @@ const MobileBottomMenu: React.FC<MobileBottomMenuProps> = ({
                   }}
                 >
                   <Icon
-                    className="h-5 w-5 transition-all duration-300"
+                    className="h-5 w-5 transition-all duration-200"
                     style={{
-                      color: isActive ? primaryColor : '#6b7280',
+                      color: isActive ? primaryColor : '#64748b',
                       strokeWidth: isActive ? 2.5 : 2,
                       filter: isActive ? `drop-shadow(0 1px 2px ${primaryColor}30)` : 'none',
                     }}
                   />
-                  
-                  {/* Badge - Smaller */}
-                  {item.badge && (
-                    <span
-                      className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center text-white shadow-md"
-                      style={{
-                        background: `linear-gradient(135deg, ${secondaryColor}, ${primaryColor})`,
-                        fontSize: '9px',
-                        fontWeight: '800',
-                        boxShadow: `0 1px 4px ${secondaryColor}50`,
-                      }}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
+
+                  {/* Badge with Animation */}
+                  <AnimatePresence>
+                    {item.badge && (
+                      <motion.span
+                        key={item.badge}
+                        initial={{ scale: 0 }}
+                        animate={{
+                          scale: badgeBounce && item.id === 'cart' ? [1, 1.3, 1] : 1,
+                        }}
+                        exit={{ scale: 0 }}
+                        className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full flex items-center justify-center text-white"
+                        style={{
+                          background: `linear-gradient(135deg, ${secondaryColor}, ${primaryColor})`,
+                          fontSize: '10px',
+                          fontWeight: '700',
+                          boxShadow: `0 2px 6px ${secondaryColor}50`,
+                        }}
+                      >
+                        {item.badge > 99 ? '99+' : item.badge}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
                 </div>
 
-                {/* Label - Smaller Font */}
+                {/* Label */}
                 <span
-                  className={`text-[10px] font-semibold transition-all duration-300 ${
-                    isActive ? 'scale-102' : ''
-                  }`}
+                  className="text-[10px] font-semibold transition-all duration-200"
                   style={{
-                    color: isActive ? primaryColor : '#6b7280',
+                    color: isActive ? primaryColor : '#64748b',
                     textShadow: isActive ? `0 0.5px 1px ${primaryColor}25` : 'none',
                   }}
                 >
                   {item.label}
                 </span>
 
-                {/* Ripple Effect - Subtle */}
-                {isActive && (
-                  <div
-                    className="absolute inset-0 rounded-xl animate-ping opacity-15"
-                    style={{
-                      background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-                      animationDuration: '2s',
-                    }}
-                  />
-                )}
-              </button>
+                {/* Ripple Effect on Active */}
+                <AnimatePresence>
+                  {isActive && (
+                    <motion.div
+                      initial={{ scale: 0, opacity: 0.3 }}
+                      animate={{ scale: 2, opacity: 0 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.6, repeat: Infinity, repeatDelay: 1 }}
+                      className="absolute inset-0 rounded-xl"
+                      style={{
+                        background: `radial-gradient(circle, ${primaryColor}30, transparent)`,
+                      }}
+                    />
+                  )}
+                </AnimatePresence>
+              </motion.button>
             );
           })}
         </div>
       </div>
 
-      {/* Add keyframe animation for shimmer effect */}
+      {/* Shimmer animation keyframes */}
       <style>{`
         @keyframes shimmer {
           0% { background-position: 200% 0; }
@@ -232,4 +288,3 @@ const MobileBottomMenu: React.FC<MobileBottomMenuProps> = ({
 };
 
 export default MobileBottomMenu;
-

@@ -47,14 +47,14 @@ const ScheduledDowngradeAlert = ({
         <div className="flex items-start gap-3">
           <Clock className="w-6 h-6 flex-shrink-0 mt-0.5 text-orange-600" />
           <div>
-            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+            <h3 className="font-semibold text-slate-900 flex items-center gap-2">
               {t('scheduledDowngrade.title')}
               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">
                 {t('scheduledDowngrade.scheduled')}
               </span>
             </h3>
 
-            <div className="mt-2 space-y-1 text-sm text-gray-600">
+            <div className="mt-2 space-y-1 text-sm text-slate-600">
               <div className="flex items-center gap-2">
                 <ArrowDownCircle className="w-4 h-4 text-orange-600" />
                 <span>
@@ -66,7 +66,7 @@ const ScheduledDowngradeAlert = ({
                 {t('scheduledDowngrade.scheduledFor')}: <strong>{formatDate(scheduledDowngrade.scheduledFor)}</strong>
               </div>
 
-              <p className="text-gray-500 text-xs mt-2">
+              <p className="text-slate-500 text-xs mt-2">
                 {t('scheduledDowngrade.description')}
               </p>
             </div>
@@ -76,7 +76,7 @@ const ScheduledDowngradeAlert = ({
         {/* Close/Cancel button */}
         <button
           onClick={() => setShowCancelConfirm(true)}
-          className="text-gray-400 hover:text-gray-600 p-1"
+          className="text-slate-400 hover:text-slate-600 p-1"
           title={t('scheduledDowngrade.cancel')}
         >
           <X className="w-5 h-5" />
@@ -98,10 +98,10 @@ const ScheduledDowngradeAlert = ({
       {showCancelConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">
               {t('scheduledDowngrade.cancelTitle')}
             </h3>
-            <p className="text-gray-600 mb-4">
+            <p className="text-slate-600 mb-4">
               {t('scheduledDowngrade.cancelConfirm')}
             </p>
             <div className="flex justify-end gap-2">

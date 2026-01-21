@@ -149,6 +149,17 @@
     "customerRequestedNote": "Sipariş Notu",
     "unknownProduct": "Bilinmeyen Ürün"
   },
+  "tableSelection": {
+    "title": "Masa Seçin",
+    "description": "Sipariş almaya başlamak için bir masa seçin",
+    "takeawayOrder": "Paket Sipariş",
+    "takeawayDescription": "Masa olmadan sipariş",
+    "backToTables": "Masalara Dön",
+    "seats": "{{count}} kişilik",
+    "pendingOrders": "bekleyen",
+    "waiterCalls": "garson",
+    "billRequests": "hesap"
+  },
   "tableGrid": {
     "selected": "Seçili",
     "pendingOrder": "Bekleyen Sipariş",

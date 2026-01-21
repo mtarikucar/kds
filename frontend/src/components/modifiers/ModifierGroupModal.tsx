@@ -130,7 +130,7 @@ const ModifierGroupModal = ({
         />
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-slate-700 mb-2">
             {t('menu.selectionType')}
           </label>
           <div className="flex gap-4">

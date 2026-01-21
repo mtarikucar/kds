@@ -1,11 +1,15 @@
-import { Clock } from 'lucide-react';
+import { Clock, MoreVertical, X } from 'lucide-react';
 import { Order, OrderStatus } from '../../types';
-import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
-import Badge from '../ui/Badge';
 import Button from '../ui/Button';
-import { formatTimeAgo, formatTime } from '../../lib/utils';
+import { getOrderUrgency, getUrgencyStyles, cn } from '../../lib/utils';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
 
 interface OrderCardProps {
   order: Order;
@@ -16,12 +20,13 @@ interface OrderCardProps {
 
 const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating }: OrderCardProps) => {
   const [elapsedTime, setElapsedTime] = useState('');
+  const [urgency, setUrgency] = useState(getOrderUrgency(order.createdAt));
   const { t } = useTranslation('kitchen');
 
-  // Update elapsed time every second
+  // Update elapsed time and urgency every second
   useEffect(() => {
-    const updateElapsedTime = () => {
-      const now = new Date().getTime();
+    const updateTimeAndUrgency = () => {
+      const now = Date.now();
       const created = new Date(order.createdAt).getTime();
       const diffMs = now - created;
       const diffMins = Math.floor(diffMs / 60000);
@@ -32,13 +37,18 @@ const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating }: OrderCa
       } else {
         setElapsedTime(`${diffSecs}s`);
       }
+
+      setUrgency(getOrderUrgency(order.createdAt));
     };
 
-    updateElapsedTime();
-    const interval = setInterval(updateElapsedTime, 1000);
+    updateTimeAndUrgency();
+    const interval = setInterval(updateTimeAndUrgency, 1000);
 
     return () => clearInterval(interval);
   }, [order.createdAt]);
+
+  const urgencyStyles = getUrgencyStyles(urgency);
+
   const getNextStatus = (currentStatus: OrderStatus): OrderStatus | null => {
     switch (currentStatus) {
       case OrderStatus.PENDING:
@@ -52,109 +62,155 @@ const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating }: OrderCa
     }
   };
 
-  const getStatusVariant = (status: OrderStatus) => {
+  const getActionButtonConfig = (status: OrderStatus) => {
     switch (status) {
       case OrderStatus.PENDING:
-        return 'warning';
+        return {
+          label: t('kitchen.actions.startPreparing'),
+          variant: 'primary' as const,
+          className: 'bg-blue-600 hover:bg-blue-700',
+        };
       case OrderStatus.PREPARING:
-        return 'primary';
+        return {
+          label: t('kitchen.actions.markReady'),
+          variant: 'primary' as const,
+          className: 'bg-emerald-600 hover:bg-emerald-700',
+        };
       case OrderStatus.READY:
-        return 'success';
+        return {
+          label: t('kitchen.actions.markServed'),
+          variant: 'outline' as const,
+          className: '',
+        };
       default:
-        return 'default';
+        return null;
     }
   };
 
   const nextStatus = getNextStatus(order.status);
-  const statusKey = order.status.toLowerCase();
-  const statusLabel = t(`kitchen.${statusKey}`);
+  const actionConfig = getActionButtonConfig(order.status);
+  const isCritical = urgency === 'critical';
 
   return (
-    <Card className="mb-4">
-      <CardHeader className="pb-3">
-        <div className="flex justify-between items-start">
-          <div>
-            <CardTitle className="text-lg">#{order.orderNumber}</CardTitle>
-            <p className="text-sm text-gray-600">
-              {t('kitchen.table')} {order.table?.number}
-            </p>
+    <div
+      className={cn(
+        'bg-white rounded-xl shadow-sm border-l-4 transition-all hover:shadow-md',
+        urgencyStyles.border,
+        isCritical && 'animate-pulse'
+      )}
+    >
+      {/* Header */}
+      <div className="p-3 md:p-4">
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2 min-w-0">
+            {/* Order Number */}
+            <span className="text-xl md:text-2xl font-bold text-slate-900">
+              #{order.orderNumber}
+            </span>
+            {/* Table Badge */}
+            {order.table && (
+              <span className="px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-600 rounded-full whitespace-nowrap">
+                {t('kitchen.table')} {order.table.number}
+              </span>
+            )}
           </div>
-          <Badge variant={getStatusVariant(order.status)}>
-            {statusLabel}
-          </Badge>
-        </div>
-      </CardHeader>
 
-      <CardContent>
-        <div className="space-y-2 mb-4">
-          {(order.orderItems || order.items || []).map((item) => (
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {/* Time Badge */}
             <div
-              key={item.id}
-              className="flex justify-between items-start py-2 border-b border-gray-100 last:border-0"
+              className={cn(
+                'flex items-center gap-1 px-2 py-1 rounded-lg text-sm font-semibold',
+                urgencyStyles.badge
+              )}
             >
-              <div className="flex-1">
-                <p className="font-medium">{item.product?.name}</p>
-                {/* Modifier'ları göster */}
+              <Clock className="h-3.5 w-3.5" />
+              <span>{elapsedTime}</span>
+            </div>
+
+            {/* Dropdown Menu for Cancel */}
+            {order.status === OrderStatus.PENDING && onCancelOrder && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 transition-colors"
+                    aria-label={t('kitchen.moreOptions')}
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => onCancelOrder(order.id)}
+                    className="text-red-600 focus:text-red-600"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    {t('kitchen.cancelOrder')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        </div>
+
+        {/* Order Items */}
+        <div className="space-y-1.5 mb-3">
+          {(order.orderItems || order.items || []).map((item) => (
+            <div key={item.id} className="flex items-start justify-between text-sm">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline gap-2">
+                  <span className="font-medium text-slate-900 truncate">
+                    {item.product?.name}
+                  </span>
+                </div>
+                {/* Modifiers */}
                 {item.modifiers && item.modifiers.length > 0 && (
-                  <div className="mt-1 space-y-0.5">
+                  <div className="mt-0.5 space-y-0.5">
                     {item.modifiers.map((mod: any) => (
-                      <p key={mod.id} className="text-sm text-blue-600 pl-2">
+                      <p key={mod.id} className="text-xs text-blue-600 pl-2">
                         + {mod.modifier?.name || mod.name}
                         {mod.quantity > 1 && ` x${mod.quantity}`}
                       </p>
                     ))}
                   </div>
                 )}
+                {/* Item Notes */}
                 {item.notes && (
-                  <p className="text-sm text-gray-600 italic mt-1">
-                    {t('kitchen.noteLabel')}: {item.notes}
+                  <p className="text-xs text-slate-500 italic mt-0.5 pl-2">
+                    {item.notes}
                   </p>
                 )}
               </div>
-              <span className="font-bold text-lg ml-2">x{item.quantity}</span>
+              <span className="font-bold text-slate-900 ml-2 tabular-nums">
+                x{item.quantity}
+              </span>
             </div>
           ))}
         </div>
 
+        {/* Order Notes */}
         {order.notes && (
-          <div className="mb-4 p-2 bg-yellow-50 border border-yellow-200 rounded">
-            <p className="text-sm text-yellow-800">
-              <strong>{t('kitchen.orderNoteLabel')}:</strong> {order.notes}
+          <div className="mb-3 p-2 bg-amber-50 border border-amber-100 rounded-lg">
+            <p className="text-xs text-amber-800">
+              <span className="font-semibold">{t('kitchen.orderNoteLabel')}:</span>{' '}
+              {order.notes}
             </p>
           </div>
         )}
 
-        <div className="flex items-center justify-between text-sm mb-4">
-          <div className="flex items-center gap-1 text-blue-600 font-semibold">
-            <Clock className="h-4 w-4" />
-            <span>{elapsedTime}</span>
-          </div>
-          <span className="text-gray-600">{formatTime(order.createdAt)}</span>
-        </div>
-
-        {nextStatus && (
+        {/* Action Button */}
+        {nextStatus && actionConfig && (
           <Button
-            variant="primary"
-            className="w-full"
+            variant={actionConfig.variant}
+            className={cn('w-full', actionConfig.className)}
             onClick={() => onUpdateStatus(order.id, nextStatus)}
             isLoading={isUpdating}
+            size="sm"
           >
-            {t('kitchen.markAs', { status: t(`kitchen.${nextStatus.toLowerCase()}`) })}
+            {actionConfig.label}
           </Button>
         )}
-
-        {order.status === OrderStatus.PENDING && onCancelOrder && (
-          <Button
-            variant="danger"
-            className="w-full mt-2"
-            onClick={() => onCancelOrder(order.id)}
-            isLoading={isUpdating}
-          >
-            {t('kitchen.cancelOrder')}
-          </Button>
-        )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 

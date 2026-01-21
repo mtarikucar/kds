@@ -132,13 +132,13 @@ const ChangePlanPage = () => {
       <div className="mb-8">
         <button
           onClick={() => navigate('/admin/settings/subscription')}
-          className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
+          className="flex items-center text-slate-600 hover:text-slate-900 mb-4"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           {t('subscriptions.backToSubscription')}
         </button>
-        <h1 className="text-3xl font-bold text-gray-900">{t('subscriptions.changePlanTitle')}</h1>
-        <p className="text-gray-600 mt-2">
+        <h1 className="text-3xl font-bold text-slate-900">{t('subscriptions.changePlanTitle')}</h1>
+        <p className="text-slate-600 mt-2">
           {t('subscriptions.currentPlanLabel')}: <span className="font-semibold">{currentPlan?.displayName}</span>
         </p>
       </div>
@@ -161,13 +161,13 @@ const ChangePlanPage = () => {
 
       {/* Billing Cycle Toggle */}
       <div className="flex justify-center mb-8">
-        <div className="inline-flex items-center bg-gray-100 rounded-lg p-1">
+        <div className="inline-flex items-center bg-slate-100 rounded-lg p-1">
           <button
             onClick={() => setBillingCycle(BillingCycle.MONTHLY)}
             className={`px-6 py-2 rounded-md font-medium transition-colors ${
               billingCycle === BillingCycle.MONTHLY
                 ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             {t('subscriptions.monthly')}
@@ -177,7 +177,7 @@ const ChangePlanPage = () => {
             className={`px-6 py-2 rounded-md font-medium transition-colors ${
               billingCycle === BillingCycle.YEARLY
                 ? 'bg-white text-blue-600 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                : 'text-slate-600 hover:text-slate-900'
             }`}
           >
             {t('subscriptions.yearly')}
@@ -236,10 +236,10 @@ const ChangePlanPage = () => {
               <TrendingDown className="h-6 w-6 text-orange-600 mr-3" />
             )}
             <div>
-              <p className="font-medium text-gray-900">
+              <p className="font-medium text-slate-900">
                 {currentPlan?.displayName} → {selectedPlan?.displayName}
               </p>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-slate-600">
                 {formatCurrency(
                   billingCycle === BillingCycle.MONTHLY
                     ? Number(selectedPlan?.monthlyPrice || 0)
@@ -253,7 +253,7 @@ const ChangePlanPage = () => {
 
           {/* Upgrade message */}
           {changeType === 'upgrade' && (
-            <p className="text-gray-600">{t('subscriptions.upgradeMessage')}</p>
+            <p className="text-slate-600">{t('subscriptions.upgradeMessage')}</p>
           )}
 
           {/* Downgrade message */}

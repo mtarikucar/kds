@@ -126,6 +126,7 @@ export interface Product {
   currentStock: number;
   stockTracked: boolean;
   isAvailable: boolean;
+  displayOrder: number;
   tenantId: string;
   createdAt: string;
   updatedAt: string;
@@ -141,6 +142,7 @@ export interface CreateProductDto {
   currentStock?: number;
   stockTracked?: boolean;
   isAvailable?: boolean;
+  displayOrder?: number;
 }
 
 export interface UpdateProductDto extends Partial<CreateProductDto> {}

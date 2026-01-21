@@ -27,7 +27,7 @@ const StaffPerformanceSection = ({ startDate, endDate }: StaffPerformanceSection
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-center text-gray-500">{t('reports.noData')}</p>
+          <p className="text-center text-slate-500">{t('reports.noData')}</p>
         </CardContent>
       </Card>
     );
@@ -45,7 +45,7 @@ const StaffPerformanceSection = ({ startDate, endDate }: StaffPerformanceSection
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">{t('staffPerformance.totalStaff')}</p>
+                <p className="text-sm text-slate-600">{t('staffPerformance.totalStaff')}</p>
                 <p className="text-2xl font-bold">{data.summary.totalStaff}</p>
               </div>
               <div className="p-3 rounded-full bg-blue-500">
@@ -59,7 +59,7 @@ const StaffPerformanceSection = ({ startDate, endDate }: StaffPerformanceSection
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">{t('staffPerformance.totalOrders')}</p>
+                <p className="text-sm text-slate-600">{t('staffPerformance.totalOrders')}</p>
                 <p className="text-2xl font-bold">{data.summary.totalOrders}</p>
               </div>
               <div className="p-3 rounded-full bg-green-500">
@@ -73,7 +73,7 @@ const StaffPerformanceSection = ({ startDate, endDate }: StaffPerformanceSection
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">{t('staffPerformance.averageOrdersPerStaff')}</p>
+                <p className="text-sm text-slate-600">{t('staffPerformance.averageOrdersPerStaff')}</p>
                 <p className="text-2xl font-bold">{data.summary.averageOrdersPerStaff.toFixed(1)}</p>
               </div>
               <div className="p-3 rounded-full bg-purple-500">
@@ -87,7 +87,7 @@ const StaffPerformanceSection = ({ startDate, endDate }: StaffPerformanceSection
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">{t('staffPerformance.averageSalesPerStaff')}</p>
+                <p className="text-sm text-slate-600">{t('staffPerformance.averageSalesPerStaff')}</p>
                 <p className="text-2xl font-bold">{formatCurrency(data.summary.averageSalesPerStaff)}</p>
               </div>
               <div className="p-3 rounded-full bg-amber-500">
@@ -108,14 +108,14 @@ const StaffPerformanceSection = ({ startDate, endDate }: StaffPerformanceSection
               </div>
               <div className="flex-1">
                 <p className="text-sm text-amber-700 font-medium">Top Performer</p>
-                <p className="text-xl font-bold text-gray-900">{topPerformer.staffName}</p>
-                <p className="text-sm text-gray-600 capitalize">{topPerformer.role.toLowerCase()}</p>
+                <p className="text-xl font-bold text-slate-900">{topPerformer.staffName}</p>
+                <p className="text-sm text-slate-600 capitalize">{topPerformer.role.toLowerCase()}</p>
               </div>
               <div className="text-right">
                 <p className="text-2xl font-bold text-green-600">
                   {formatCurrency(topPerformer.totalSales)}
                 </p>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-slate-500">
                   {topPerformer.totalOrders} orders
                 </p>
               </div>
@@ -131,7 +131,7 @@ const StaffPerformanceSection = ({ startDate, endDate }: StaffPerformanceSection
         </CardHeader>
         <CardContent>
           {data.staffPerformance.length === 0 ? (
-            <p className="text-center text-gray-500 py-4">{t('reports.noData')}</p>
+            <p className="text-center text-slate-500 py-4">{t('reports.noData')}</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -147,14 +147,14 @@ const StaffPerformanceSection = ({ startDate, endDate }: StaffPerformanceSection
                 </thead>
                 <tbody>
                   {sortedStaff.map((staff, index) => (
-                    <tr key={staff.userId} className="border-b hover:bg-gray-50">
+                    <tr key={staff.userId} className="border-b hover:bg-slate-50">
                       <td className="py-3 px-4">
                         {index === 0 ? (
                           <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-yellow-500 text-white text-sm font-bold">
                             1
                           </span>
                         ) : index === 1 ? (
-                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-gray-400 text-white text-sm font-bold">
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-400 text-white text-sm font-bold">
                             2
                           </span>
                         ) : index === 2 ? (
@@ -162,12 +162,12 @@ const StaffPerformanceSection = ({ startDate, endDate }: StaffPerformanceSection
                             3
                           </span>
                         ) : (
-                          <span className="text-gray-500 font-medium">{index + 1}</span>
+                          <span className="text-slate-500 font-medium">{index + 1}</span>
                         )}
                       </td>
                       <td className="py-3 px-4 font-medium">{staff.staffName}</td>
                       <td className="py-3 px-4">
-                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700 capitalize">
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700 capitalize">
                           {staff.role.toLowerCase()}
                         </span>
                       </td>
@@ -175,7 +175,7 @@ const StaffPerformanceSection = ({ startDate, endDate }: StaffPerformanceSection
                       <td className="py-3 px-4 text-right font-semibold text-green-600">
                         {formatCurrency(staff.totalSales)}
                       </td>
-                      <td className="py-3 px-4 text-right text-gray-600">
+                      <td className="py-3 px-4 text-right text-slate-600">
                         {formatCurrency(staff.averageOrderValue)}
                       </td>
                     </tr>
@@ -204,13 +204,13 @@ const StaffPerformanceSection = ({ startDate, endDate }: StaffPerformanceSection
                     <p className="font-medium text-sm">{staff.staffName}</p>
                   </div>
                   <div className="flex-1">
-                    <div className="relative h-8 bg-gray-100 rounded overflow-hidden">
+                    <div className="relative h-8 bg-slate-100 rounded overflow-hidden">
                       <div
                         className={`absolute inset-y-0 left-0 rounded transition-all duration-500 ${
                           index === 0
                             ? 'bg-yellow-500'
                             : index === 1
-                            ? 'bg-gray-400'
+                            ? 'bg-slate-400'
                             : index === 2
                             ? 'bg-amber-600'
                             : 'bg-blue-500'
@@ -218,7 +218,7 @@ const StaffPerformanceSection = ({ startDate, endDate }: StaffPerformanceSection
                         style={{ width: `${percentage}%` }}
                       />
                       <div className="absolute inset-0 flex items-center px-3">
-                        <span className="text-sm font-medium text-gray-700">
+                        <span className="text-sm font-medium text-slate-700">
                           {formatCurrency(staff.totalSales)}
                         </span>
                       </div>

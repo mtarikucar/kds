@@ -149,6 +149,17 @@
     "customerRequestedNote": "Order Note",
     "unknownProduct": "Unknown Product"
   },
+  "tableSelection": {
+    "title": "Select a Table",
+    "description": "Choose a table to start taking orders",
+    "takeawayOrder": "Takeaway Order",
+    "takeawayDescription": "Order without a table",
+    "backToTables": "Back to Tables",
+    "seats": "{{count}} seats",
+    "pendingOrders": "pending",
+    "waiterCalls": "waiter",
+    "billRequests": "bill"
+  },
   "tableGrid": {
     "selected": "Selected",
     "pendingOrder": "Pending Order",

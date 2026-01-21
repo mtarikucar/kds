@@ -17,6 +17,7 @@ interface CartState {
   updateItemQuantity: (itemId: string, quantity: number) => void;
   updateItemNotes: (itemId: string, notes: string) => void;
   removeItem: (itemId: string) => void;
+  reorderItems: (activeId: string, overId: string) => void;
   clearCart: () => void;
 
   // Computed values
@@ -177,6 +178,20 @@ export const useCartStore = create<CartState>()(
       removeItem: (itemId: string) => {
         const items = get().items;
         set({ items: items.filter(item => item.id !== itemId) });
+      },
+
+      reorderItems: (activeId: string, overId: string) => {
+        const items = get().items;
+        const oldIndex = items.findIndex(item => item.id === activeId);
+        const newIndex = items.findIndex(item => item.id === overId);
+
+        if (oldIndex === -1 || newIndex === -1) return;
+
+        const reorderedItems = [...items];
+        const [movedItem] = reorderedItems.splice(oldIndex, 1);
+        reorderedItems.splice(newIndex, 0, movedItem);
+
+        set({ items: reorderedItems });
       },
 
       clearCart: () => {

@@ -1,8 +1,10 @@
 {
   "menu": {
     "title": "Menyu boshqaruvi",
+    "menuTab": "Menyu",
     "categories": "Kategoriyalar",
     "items": "Mahsulotlar",
+    "item": "mahsulot",
     "addCategory": "Kategoriya qo'shish",
     "addItem": "Mahsulot qo'shish",
     "editCategory": "Kategoriyani tahrirlash",
@@ -86,6 +88,15 @@
     "noModifierGroupsAvailable": "Mavjud modifikator guruhlari yo'q",
     "confirmDeleteModifierGroup": "Ushbu modifikator guruhini o'chirishni xohlaysizmi?",
     "confirmDeleteModifier": "Ushbu modifikatorni o'chirishni xohlaysizmi?",
+    "dragToReorder": "Kategoriya va mahsulotlarni qayta tartiblash uchun torting",
+    "addProductToCategory": "Bu kategoriyaga mahsulot qo'shish",
+    "noProductsInCategory": "Bu kategoriyada mahsulotlar yo'q",
+    "noCategories": "Hali kategoriyalar yo'q",
+    "noCategoriesDesc": "Menyu elementlarini tartibga solish uchun kategoriyalar yarating",
+    "uncategorized": "Kategoriyasiz",
+    "uncategorizedDesc": "Bu mahsulotlarning haqiqiy kategoriyasi yo'q. Kategoriya belgilash uchun tahrirlang.",
+    "collapseAll": "Hammasini yig'ish",
+    "expandAll": "Hammasini yoyish",
     "validation": {
       "nameRequired": "Nom talab qilinadi",
       "pricePositive": "Narx musbat bo'lishi kerak",

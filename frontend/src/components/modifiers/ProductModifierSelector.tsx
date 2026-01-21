@@ -48,7 +48,7 @@ const ProductModifierSelector = ({
 
   if (!allGroups || allGroups.length === 0) {
     return (
-      <div className="text-center py-4 text-gray-500 text-sm">
+      <div className="text-center py-4 text-slate-500 text-sm">
         {t('menu.noModifierGroupsAvailable')}
       </div>
     );
@@ -59,7 +59,7 @@ const ProductModifierSelector = ({
 
   if (activeGroups.length === 0) {
     return (
-      <div className="text-center py-4 text-gray-500 text-sm">
+      <div className="text-center py-4 text-slate-500 text-sm">
         {t('menu.noModifierGroupsAvailable')}
       </div>
     );
@@ -75,12 +75,12 @@ const ProductModifierSelector = ({
             className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
               isSelected
                 ? 'border-blue-500 bg-blue-50'
-                : 'border-gray-200 bg-white hover:border-gray-300'
+                : 'border-slate-200 bg-white hover:border-slate-300'
             }`}
           >
             <div
               className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${
-                isSelected ? 'bg-blue-500 border-blue-500' : 'border-gray-300'
+                isSelected ? 'bg-blue-500 border-blue-500' : 'border-slate-300'
               }`}
             >
               {isSelected && <Check className="w-3 h-3 text-white" />}
@@ -93,13 +93,13 @@ const ProductModifierSelector = ({
             />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-medium text-gray-900">{group.displayName}</span>
+                <span className="font-medium text-slate-900">{group.displayName}</span>
                 <Badge variant={group.isRequired ? 'danger' : 'default'}>
                   {group.isRequired ? t('menu.required') : t('menu.optional')}
                 </Badge>
               </div>
               {group.modifiers && group.modifiers.length > 0 && (
-                <p className="text-sm text-gray-500 truncate">
+                <p className="text-sm text-slate-500 truncate">
                   {group.modifiers.map((m) => m.displayName).join(', ')}
                 </p>
               )}

@@ -1,8 +1,10 @@
 {
   "menu": {
     "title": "Управление меню",
+    "menuTab": "Меню",
     "categories": "Категории",
     "items": "Товары",
+    "item": "товар",
     "addCategory": "Добавить категорию",
     "addItem": "Добавить товар",
     "editCategory": "Редактировать категорию",
@@ -86,6 +88,15 @@
     "noModifierGroupsAvailable": "Нет доступных групп модификаторов",
     "confirmDeleteModifierGroup": "Удалить эту группу модификаторов?",
     "confirmDeleteModifier": "Удалить этот модификатор?",
+    "dragToReorder": "Перетащите для изменения порядка категорий и продуктов",
+    "addProductToCategory": "Добавить продукт в эту категорию",
+    "noProductsInCategory": "В этой категории нет продуктов",
+    "noCategories": "Категорий пока нет",
+    "noCategoriesDesc": "Создайте категории для организации пунктов меню",
+    "uncategorized": "Без категории",
+    "uncategorizedDesc": "У этих продуктов нет действительной категории. Отредактируйте их, чтобы назначить категорию.",
+    "collapseAll": "Свернуть все",
+    "expandAll": "Развернуть все",
     "validation": {
       "nameRequired": "Название обязательно",
       "pricePositive": "Цена должна быть положительной",

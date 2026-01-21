@@ -31,8 +31,8 @@ export default function MaintenancePage() {
         </div>
 
         {/* Content */}
-        <h1 className="text-3xl font-extrabold text-gray-900 mb-2">{t('pages.maintenance.title')}</h1>
-        <p className="text-lg text-gray-600 mb-8">
+        <h1 className="text-3xl font-extrabold text-slate-900 mb-2">{t('pages.maintenance.title')}</h1>
+        <p className="text-lg text-slate-600 mb-8">
           {t('pages.maintenance.description')}
         </p>
 
@@ -58,19 +58,19 @@ export default function MaintenancePage() {
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
               ></path>
             </svg>
-            <span className="text-sm font-medium text-gray-700">{t('app:messages.pleaseWait')}</span>
+            <span className="text-sm font-medium text-slate-700">{t('app:messages.pleaseWait')}</span>
           </div>
-          <p className="text-sm text-gray-500">
-            {t('pages.maintenance.expectedCompletion')}: <span className="font-semibold text-gray-700">{t('pages.maintenance.soon')}</span>
+          <p className="text-sm text-slate-500">
+            {t('pages.maintenance.expectedCompletion')}: <span className="font-semibold text-slate-700">{t('pages.maintenance.soon')}</span>
           </p>
         </div>
 
         {/* Info */}
-        <div className="space-y-4 text-sm text-gray-600">
+        <div className="space-y-4 text-sm text-slate-600">
           <p>{t('pages.maintenance.apology')}</p>
 
-          <div className="pt-4 border-t border-gray-200">
-            <p className="font-medium text-gray-700 mb-2">{t('pages.maintenance.whatsHappening')}</p>
+          <div className="pt-4 border-t border-slate-200">
+            <p className="font-medium text-slate-700 mb-2">{t('pages.maintenance.whatsHappening')}</p>
             <ul className="text-left space-y-2 max-w-xs mx-auto">
               <li className="flex items-start">
                 <svg

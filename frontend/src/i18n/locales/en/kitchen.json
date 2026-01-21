@@ -34,8 +34,33 @@
     "noteLabel": "Note",
     "markAs": "Mark as {{status}}",
     "cancelOrder": "Cancel Order",
+    "moreOptions": "More options",
     "newOrderNotification": "New Order: #{{orderNumber}}",
-    "orderUpdatedNotification": "Order Updated: #{{orderNumber}}"
+    "orderUpdatedNotification": "Order Updated: #{{orderNumber}}",
+    "stats": {
+      "activeOrders": "Active Orders",
+      "avgWaitTime": "Avg Wait",
+      "urgentOrders": "Urgent",
+      "urgent": "urgent"
+    },
+    "urgency": {
+      "fresh": "Fresh",
+      "attention": "Attention",
+      "urgent": "Urgent",
+      "critical": "Critical"
+    },
+    "actions": {
+      "startPreparing": "Start Preparing",
+      "markReady": "Mark Ready",
+      "markServed": "Mark Served"
+    },
+    "empty": {
+      "pendingTitle": "No pending orders",
+      "pendingDescription": "New orders will appear here",
+      "preparingTitle": "No orders in preparation",
+      "preparingDescription": "Orders being prepared will appear here",
+      "readyTitle": "No orders ready",
+      "readyDescription": "Completed orders will appear here"
+    }
   }
 }
-

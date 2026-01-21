@@ -122,7 +122,7 @@ export default function RestaurantInfo({ wifi, socialMedia, primaryColor }: Rest
     <div className="px-4 py-4 space-y-4">
       {/* WiFi Card */}
       {hasWifi && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4">
           <div className="flex items-center gap-3 mb-3">
             <div
               className="p-2 rounded-lg"
@@ -130,30 +130,30 @@ export default function RestaurantInfo({ wifi, socialMedia, primaryColor }: Rest
             >
               <Wifi className="w-5 h-5" style={{ color: primaryColor }} />
             </div>
-            <h3 className="font-semibold text-gray-900">{t('qrMenu.wifi')}</h3>
+            <h3 className="font-semibold text-slate-900">{t('qrMenu.wifi')}</h3>
           </div>
 
           <div className="space-y-2">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-500">{t('qrMenu.wifiNetwork')}</span>
-              <span className="font-medium text-gray-900">{wifi.ssid}</span>
+              <span className="text-sm text-slate-500">{t('qrMenu.wifiNetwork')}</span>
+              <span className="font-medium text-slate-900">{wifi.ssid}</span>
             </div>
             {wifi.password && (
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-500">{t('qrMenu.wifiPassword')}</span>
+                <span className="text-sm text-slate-500">{t('qrMenu.wifiPassword')}</span>
                 <div className="flex items-center gap-2">
-                  <span className="font-mono text-gray-900 bg-gray-100 px-2 py-1 rounded text-sm">
+                  <span className="font-mono text-slate-900 bg-slate-100 px-2 py-1 rounded text-sm">
                     {wifi.password}
                   </span>
                   <button
                     onClick={handleCopyPassword}
-                    className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                    className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
                     title={t('qrMenu.copyPassword')}
                   >
                     {copied ? (
                       <Check className="w-4 h-4 text-green-600" />
                     ) : (
-                      <Copy className="w-4 h-4 text-gray-500" />
+                      <Copy className="w-4 h-4 text-slate-500" />
                     )}
                   </button>
                 </div>
@@ -165,8 +165,8 @@ export default function RestaurantInfo({ wifi, socialMedia, primaryColor }: Rest
 
       {/* Social Media Links */}
       {hasSocial && socialLinks.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-          <h3 className="font-semibold text-gray-900 mb-3">{t('qrMenu.socialMedia')}</h3>
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200/60 p-4">
+          <h3 className="font-semibold text-slate-900 mb-3">{t('qrMenu.socialMedia')}</h3>
           <div className="flex flex-wrap gap-3 justify-center">
             {socialLinks.map(({ key, value, Icon, color }) => (
               <a
@@ -174,7 +174,7 @@ export default function RestaurantInfo({ wifi, socialMedia, primaryColor }: Rest
                 href={buildSocialUrl(key, value!)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="p-3 rounded-full bg-gray-100 hover:bg-gray-200 transition-colors"
+                className="p-3 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors"
                 style={{ color }}
                 title={key.charAt(0).toUpperCase() + key.slice(1)}
               >

@@ -40,7 +40,6 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
   const isRTL = RTL_LANGUAGES.includes(i18n.language);
 
   const handleNavClick = () => {
-    // Close sidebar on mobile when navigating
     if (window.innerWidth < 768) {
       onClose();
     }
@@ -120,20 +119,16 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
     },
   ];
 
-  // Filter nav items based on role and subscription features
   const filteredNavItems = navItems.filter((item) => {
-    // Check role first
     if (!user?.role || !item.roles.includes(user.role as UserRole)) {
       return false;
     }
-    // Check feature requirement if specified
     if (item.requiredFeature && !hasFeature(item.requiredFeature)) {
       return false;
     }
     return true;
   });
 
-  // Filter settings items based on subscription features
   const filteredSettingsItems = settingsItems.filter((item) => {
     if (item.requiredFeature && !hasFeature(item.requiredFeature)) {
       return false;
@@ -143,7 +138,7 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
 
   return (
     <aside
-      className={`fixed md:static inset-y-0 z-50 ${isRTL ? 'right-0' : 'left-0'} bg-gray-900 text-white min-h-screen transform transition-all duration-300 ease-in-out ${
+      className={`fixed md:static inset-y-0 z-50 ${isRTL ? 'right-0' : 'left-0'} bg-slate-900 text-white min-h-screen transform transition-all duration-300 ease-in-out ${
         isOpen
           ? 'translate-x-0'
           : isRTL
@@ -151,98 +146,110 @@ const Sidebar = ({ isOpen, onClose }: SidebarProps) => {
             : '-translate-x-full md:translate-x-0'
       } ${isSidebarCollapsed ? 'md:w-16' : 'md:w-64'} w-64`}
     >
-      <div className="p-6 flex items-center justify-between">
-        {!isSidebarCollapsed && <h2 className="text-xl font-bold">HummyTummy</h2>}
+      {/* Header */}
+      <div className="px-5 py-6 flex items-center justify-between border-b border-slate-800/50">
+        {!isSidebarCollapsed && (
+          <h2 className="text-xl font-heading font-bold bg-gradient-to-r from-primary-400 to-primary-300 bg-clip-text text-transparent">
+            HummyTummy
+          </h2>
+        )}
         {isSidebarCollapsed && <div className="w-full" />}
+
         {/* Mobile close button */}
         <button
           onClick={onClose}
-          className="md:hidden text-gray-400 hover:text-white"
+          className="md:hidden text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-all"
           aria-label="Close menu"
         >
-          <X className="h-6 w-6" />
+          <X className="h-5 w-5" />
         </button>
+
         {/* Desktop collapse toggle button */}
         <button
           onClick={toggleSidebar}
-          className="hidden md:block text-gray-400 hover:text-white"
+          className="hidden md:flex items-center justify-center w-8 h-8 text-slate-400 hover:text-white hover:bg-white/5 rounded-lg transition-all"
           aria-label={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           title={isSidebarCollapsed ? t('navigation.expandSidebar') : t('navigation.collapseSidebar')}
         >
           {isSidebarCollapsed
-            ? (isRTL ? <ChevronLeft className="h-6 w-6" /> : <ChevronRight className="h-6 w-6" />)
-            : (isRTL ? <ChevronRight className="h-6 w-6" /> : <ChevronLeft className="h-6 w-6" />)
+            ? (isRTL ? <ChevronLeft className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />)
+            : (isRTL ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />)
           }
         </button>
       </div>
 
-      <nav className="px-3">
-        {filteredNavItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            onClick={handleNavClick}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 transition-colors ${
-                isActive
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-              } ${isSidebarCollapsed ? 'justify-center' : ''}`
-            }
-            title={isSidebarCollapsed ? item.label : undefined}
-          >
-            <item.icon className="h-5 w-5" />
-            {!isSidebarCollapsed && <span className="font-medium">{item.label}</span>}
-          </NavLink>
-        ))}
-
-        {/* Settings Dropdown */}
-        {(user?.role === UserRole.ADMIN || user?.role === UserRole.MANAGER) && (
-          <div className="mt-1">
-            <button
-              onClick={() => !isSidebarCollapsed && setSettingsOpen(!settingsOpen)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                location.pathname.startsWith('/admin/settings')
-                  ? 'bg-blue-600 text-white'
-                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-              } ${isSidebarCollapsed ? 'justify-center' : ''}`}
-              title={isSidebarCollapsed ? t('navigation.settings') : undefined}
+      {/* Navigation */}
+      <nav className="px-3 py-4">
+        <div className="space-y-1">
+          {filteredNavItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onClick={handleNavClick}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 ${
+                  isActive
+                    ? 'bg-white/10 text-white font-medium'
+                    : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
+                } ${isSidebarCollapsed ? 'justify-center' : ''}`
+              }
+              title={isSidebarCollapsed ? item.label : undefined}
             >
-              <Settings className="h-5 w-5" />
-              {!isSidebarCollapsed && (
-                <>
-                  <span className={`font-medium flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>{t('navigation.settings')}</span>
-                  {settingsOpen ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    isRTL ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
-                  )}
-                </>
-              )}
-            </button>
+              <item.icon className="h-5 w-5 flex-shrink-0" />
+              {!isSidebarCollapsed && <span className="text-sm">{item.label}</span>}
+            </NavLink>
+          ))}
 
-            {!isSidebarCollapsed && settingsOpen && (
-              <div className={`${isRTL ? 'mr-4' : 'ml-4'} mt-1 space-y-1`}>
-                {filteredSettingsItems.map((item) => (
-                  <NavLink
-                    key={item.to}
-                    to={item.to}
-                    onClick={handleNavClick}
-                    className={({ isActive }) =>
-                      `flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors ${
-                        isActive
-                          ? 'bg-blue-500 text-white'
-                          : 'text-gray-400 hover:bg-gray-800 hover:text-white'
-                      }`
-                    }
-                  >
-                    <span>{item.label}</span>
-                  </NavLink>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+          {/* Settings Dropdown */}
+          {(user?.role === UserRole.ADMIN || user?.role === UserRole.MANAGER) && (
+            <div className="pt-2">
+              <button
+                onClick={() => !isSidebarCollapsed && setSettingsOpen(!settingsOpen)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 ${
+                  location.pathname.startsWith('/admin/settings')
+                    ? 'bg-white/10 text-white font-medium'
+                    : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
+                } ${isSidebarCollapsed ? 'justify-center' : ''}`}
+                title={isSidebarCollapsed ? t('navigation.settings') : undefined}
+              >
+                <Settings className="h-5 w-5 flex-shrink-0" />
+                {!isSidebarCollapsed && (
+                  <>
+                    <span className={`text-sm flex-1 ${isRTL ? 'text-right' : 'text-left'}`}>
+                      {t('navigation.settings')}
+                    </span>
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform duration-200 ${
+                        settingsOpen ? 'rotate-180' : ''
+                      }`}
+                    />
+                  </>
+                )}
+              </button>
+
+              {!isSidebarCollapsed && settingsOpen && (
+                <div className={`${isRTL ? 'mr-4' : 'ml-4'} mt-1 space-y-0.5 border-l border-slate-700/50 ${isRTL ? 'pr-3' : 'pl-3'}`}>
+                  {filteredSettingsItems.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      onClick={handleNavClick}
+                      className={({ isActive }) =>
+                        `flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all duration-150 ${
+                          isActive
+                            ? 'bg-white/10 text-white font-medium'
+                            : 'text-slate-500 hover:bg-white/5 hover:text-slate-300'
+                        }`
+                      }
+                    >
+                      <span>{item.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </nav>
     </aside>
   );

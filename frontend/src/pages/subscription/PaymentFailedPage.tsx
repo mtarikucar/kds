@@ -37,7 +37,7 @@ export default function PaymentFailedPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
         {/* Error Icon */}
         <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -45,18 +45,18 @@ export default function PaymentFailedPage() {
         </div>
 
         {/* Title */}
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+        <h2 className="text-2xl font-bold text-slate-900 mb-2">
           {t('subscriptions.payment.failed.title')}
         </h2>
 
         {/* Description */}
-        <p className="text-gray-600 mb-6">
+        <p className="text-slate-600 mb-6">
           {t('subscriptions.payment.failed.description')}
         </p>
 
         {/* Possible Reasons */}
-        <div className="bg-gray-50 rounded-lg p-4 mb-6 text-left">
-          <ul className="text-sm text-gray-600 space-y-2">
+        <div className="bg-slate-50 rounded-lg p-4 mb-6 text-left">
+          <ul className="text-sm text-slate-600 space-y-2">
             <li className="flex items-start gap-2">
               <span className="text-red-500 mt-0.5">-</span>
               <span>{t('subscriptions.payment.failed.incorrectCard')}</span>
@@ -78,9 +78,9 @@ export default function PaymentFailedPage() {
 
         {/* Order Reference */}
         {merchantOid && (
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <p className="text-sm text-gray-500 mb-1">{t('subscriptions.payment.orderReference')}</p>
-            <p className="text-sm font-mono text-gray-700">{merchantOid}</p>
+          <div className="bg-slate-50 rounded-lg p-4 mb-6">
+            <p className="text-sm text-slate-500 mb-1">{t('subscriptions.payment.orderReference')}</p>
+            <p className="text-sm font-mono text-slate-700">{merchantOid}</p>
           </div>
         )}
 
@@ -96,7 +96,7 @@ export default function PaymentFailedPage() {
 
           <button
             onClick={() => navigate('/admin/settings/subscription')}
-            className="w-full px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+            className="w-full px-6 py-3 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors flex items-center justify-center gap-2"
           >
             <ArrowLeft className="w-5 h-5" />
             {t('subscriptions.payment.failed.goBack')}
@@ -104,7 +104,7 @@ export default function PaymentFailedPage() {
         </div>
 
         {/* Help Link */}
-        <div className="mt-6 pt-6 border-t border-gray-200">
+        <div className="mt-6 pt-6 border-t border-slate-200">
           <a
             href="/contact"
             className="inline-flex items-center gap-2 text-sm text-indigo-600 hover:text-indigo-700"

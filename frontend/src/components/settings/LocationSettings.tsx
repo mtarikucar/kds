@@ -163,7 +163,7 @@ export default function LocationSettings() {
 
   if (settingsLoading) {
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
         <div className="flex items-center justify-center py-8">
           <Loader2 className="w-6 h-6 animate-spin text-indigo-600" />
         </div>
@@ -172,16 +172,16 @@ export default function LocationSettings() {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
       <div className="flex items-center gap-3 mb-4">
         <div className="p-2 bg-indigo-100 rounded-lg">
           <MapPin className="w-5 h-5 text-indigo-600" />
         </div>
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">
+          <h3 className="text-lg font-semibold text-slate-900">
             {t('locationSettings.title', 'Restoran Konumu')}
           </h3>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-slate-500">
             {t('locationSettings.description', 'QR menü siparişleri için konum doğrulaması ayarlayın')}
           </p>
         </div>
@@ -208,10 +208,10 @@ export default function LocationSettings() {
 
       {/* Map */}
       <div className="mb-4">
-        <p className="text-sm text-gray-600 mb-2">
+        <p className="text-sm text-slate-600 mb-2">
           {t('locationSettings.mapInstructions', 'Haritaya tıklayarak veya marker\'ı sürükleyerek konum seçin')}
         </p>
-        <div className="h-80 rounded-lg overflow-hidden border border-gray-200">
+        <div className="h-80 rounded-lg overflow-hidden border border-slate-200">
           <MapContainer
             center={mapCenter}
             zoom={currentZoom}
@@ -263,7 +263,7 @@ export default function LocationSettings() {
           <button
             type="button"
             onClick={handleClearLocation}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
           >
             <Trash2 className="w-4 h-4" />
             {t('locationSettings.clearLocation', 'Konumu Temizle')}
@@ -280,7 +280,7 @@ export default function LocationSettings() {
       {/* Coordinate inputs */}
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-slate-700 mb-1">
             {t('locationSettings.latitude', 'Enlem')}
           </label>
           <input
@@ -293,11 +293,11 @@ export default function LocationSettings() {
               setHasChanges(true);
             }}
             placeholder="39.9334"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-slate-700 mb-1">
             {t('locationSettings.longitude', 'Boylam')}
           </label>
           <input
@@ -310,17 +310,17 @@ export default function LocationSettings() {
               setHasChanges(true);
             }}
             placeholder="32.8597"
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
       </div>
 
       {/* Radius slider */}
       <div className="mb-6">
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-sm font-medium text-slate-700 mb-1">
           {t('locationSettings.radius', 'Sipariş Yarıçapı')}: {radius} {t('locationSettings.meters', 'metre')}
         </label>
-        <p className="text-xs text-gray-500 mb-2">
+        <p className="text-xs text-slate-500 mb-2">
           {t('locationSettings.radiusHelp', 'Müşterilerin sipariş verebileceği maksimum mesafe')}
         </p>
         <input
@@ -330,9 +330,9 @@ export default function LocationSettings() {
           step="10"
           value={radius}
           onChange={(e) => handleRadiusChange(parseInt(e.target.value))}
-          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+          className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
         />
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
+        <div className="flex justify-between text-xs text-slate-500 mt-1">
           <span>10m</span>
           <span>500m</span>
           <span>1000m</span>

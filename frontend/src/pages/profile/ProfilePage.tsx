@@ -81,7 +81,7 @@ const ProfilePage = () => {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-600">{t('app:app.loading')}</div>
+        <div className="text-slate-600">{t('app:app.loading')}</div>
       </div>
     );
   }
@@ -199,7 +199,7 @@ const ProfilePage = () => {
             <CardTitle>{t('profile.accountInformation')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2 text-xs md:text-sm text-gray-600">
+            <div className="space-y-2 text-xs md:text-sm text-slate-600">
               <p className="break-words"><strong>{t('profile.restaurant')}:</strong> {profile?.tenant?.name}</p>
               <p className="break-all"><strong>{t('profile.subdomain')}:</strong> {profile?.tenant?.subdomain}</p>
               <p><strong>{t('profile.memberSince')}:</strong> {new Date(profile?.createdAt).toLocaleDateString()}</p>

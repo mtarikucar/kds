@@ -1,8 +1,10 @@
 {
   "menu": {
     "title": "إدارة القائمة",
+    "menuTab": "القائمة",
     "categories": "الفئات",
     "items": "العناصر",
+    "item": "عنصر",
     "addCategory": "إضافة فئة",
     "addItem": "إضافة عنصر",
     "editCategory": "تعديل الفئة",
@@ -86,6 +88,15 @@
     "noModifierGroupsAvailable": "لا توجد مجموعات خيارات متاحة",
     "confirmDeleteModifierGroup": "حذف مجموعة الخيارات هذه؟",
     "confirmDeleteModifier": "حذف هذا الخيار؟",
+    "dragToReorder": "اسحب لإعادة ترتيب الفئات والمنتجات",
+    "addProductToCategory": "إضافة منتج لهذه الفئة",
+    "noProductsInCategory": "لا توجد منتجات في هذه الفئة",
+    "noCategories": "لا توجد فئات بعد",
+    "noCategoriesDesc": "أنشئ فئات لتنظيم عناصر قائمتك",
+    "uncategorized": "بدون فئة",
+    "uncategorizedDesc": "هذه المنتجات ليس لها فئة صالحة. عدّلها لتعيين فئة.",
+    "collapseAll": "طي الكل",
+    "expandAll": "توسيع الكل",
     "validation": {
       "nameRequired": "الاسم مطلوب",
       "pricePositive": "السعر يجب أن يكون موجباً",

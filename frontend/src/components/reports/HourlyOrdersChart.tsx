@@ -27,7 +27,7 @@ const HourlyOrdersChart = ({ date }: HourlyOrdersChartProps) => {
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-center text-gray-500">{t('reports.noData')}</p>
+          <p className="text-center text-slate-500">{t('reports.noData')}</p>
         </CardContent>
       </Card>
     );
@@ -52,13 +52,13 @@ const HourlyOrdersChart = ({ date }: HourlyOrdersChartProps) => {
           {data.hourlyData.map((hourData: HourlyData) => (
             <div
               key={hourData.hour}
-              className="flex items-center gap-3 p-2 rounded hover:bg-gray-50"
+              className="flex items-center gap-3 p-2 rounded hover:bg-slate-50"
             >
-              <div className="w-16 text-sm text-gray-600 font-medium">
+              <div className="w-16 text-sm text-slate-600 font-medium">
                 {formatHour(hourData.hour)}
               </div>
               <div className="flex-1">
-                <div className="relative h-6 bg-gray-100 rounded overflow-hidden">
+                <div className="relative h-6 bg-slate-100 rounded overflow-hidden">
                   <div
                     className="absolute inset-y-0 left-0 bg-blue-500 rounded transition-all duration-300"
                     style={{
@@ -66,7 +66,7 @@ const HourlyOrdersChart = ({ date }: HourlyOrdersChartProps) => {
                     }}
                   />
                   <div className="absolute inset-0 flex items-center px-2">
-                    <span className="text-xs font-medium text-gray-700">
+                    <span className="text-xs font-medium text-slate-700">
                       {hourData.orderCount} orders
                     </span>
                   </div>
@@ -82,13 +82,13 @@ const HourlyOrdersChart = ({ date }: HourlyOrdersChartProps) => {
         {/* Summary */}
         <div className="mt-4 pt-4 border-t flex justify-between text-sm">
           <div>
-            <span className="text-gray-600">Total Orders: </span>
+            <span className="text-slate-600">Total Orders: </span>
             <span className="font-bold">
               {data.hourlyData.reduce((sum: number, h: HourlyData) => sum + h.orderCount, 0)}
             </span>
           </div>
           <div>
-            <span className="text-gray-600">Total Sales: </span>
+            <span className="text-slate-600">Total Sales: </span>
             <span className="font-bold text-green-600">
               {formatCurrency(
                 data.hourlyData.reduce((sum: number, h: HourlyData) => sum + h.totalSales, 0)

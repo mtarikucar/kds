@@ -34,7 +34,33 @@
     "noteLabel": "Eslatma",
     "markAs": "{{status}} deb belgilash",
     "cancelOrder": "Buyurtmani bekor qilish",
+    "moreOptions": "Qo'shimcha variantlar",
     "newOrderNotification": "Yangi buyurtma: №{{orderNumber}}",
-    "orderUpdatedNotification": "Buyurtma yangilandi: №{{orderNumber}}"
+    "orderUpdatedNotification": "Buyurtma yangilandi: №{{orderNumber}}",
+    "stats": {
+      "activeOrders": "Faol buyurtmalar",
+      "avgWaitTime": "O'rt. kutish",
+      "urgentOrders": "Shoshilinch",
+      "urgent": "shoshilinch"
+    },
+    "urgency": {
+      "fresh": "Yangi",
+      "attention": "Diqqat",
+      "urgent": "Shoshilinch",
+      "critical": "Kritik"
+    },
+    "actions": {
+      "startPreparing": "Tayyorlashni boshlash",
+      "markReady": "Tayyor deb belgilash",
+      "markServed": "Berildi deb belgilash"
+    },
+    "empty": {
+      "pendingTitle": "Kutilayotgan buyurtmalar yo'q",
+      "pendingDescription": "Yangi buyurtmalar bu yerda ko'rinadi",
+      "preparingTitle": "Tayyorlanayotgan buyurtmalar yo'q",
+      "preparingDescription": "Tayyorlanayotgan buyurtmalar bu yerda ko'rinadi",
+      "readyTitle": "Tayyor buyurtmalar yo'q",
+      "readyDescription": "Bajarilgan buyurtmalar bu yerda ko'rinadi"
+    }
   }
 }

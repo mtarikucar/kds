@@ -23,7 +23,7 @@ const InventorySection = () => {
     return (
       <Card>
         <CardContent className="pt-6">
-          <p className="text-center text-gray-500">{t('reports.noData')}</p>
+          <p className="text-center text-slate-500">{t('reports.noData')}</p>
         </CardContent>
       </Card>
     );
@@ -37,7 +37,7 @@ const InventorySection = () => {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">{t('inventoryReport.totalTrackedProducts')}</p>
+                <p className="text-sm text-slate-600">{t('inventoryReport.totalTrackedProducts')}</p>
                 <p className="text-2xl font-bold">{data.totalTrackedProducts}</p>
               </div>
               <div className="p-3 rounded-full bg-blue-500">
@@ -51,7 +51,7 @@ const InventorySection = () => {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">{t('inventoryReport.lowStockCount')}</p>
+                <p className="text-sm text-slate-600">{t('inventoryReport.lowStockCount')}</p>
                 <p className="text-2xl font-bold text-amber-600">{data.lowStockCount}</p>
               </div>
               <div className="p-3 rounded-full bg-amber-500">
@@ -65,7 +65,7 @@ const InventorySection = () => {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">{t('inventoryReport.outOfStockCount')}</p>
+                <p className="text-sm text-slate-600">{t('inventoryReport.outOfStockCount')}</p>
                 <p className="text-2xl font-bold text-red-600">{data.outOfStockCount}</p>
               </div>
               <div className="p-3 rounded-full bg-red-500">
@@ -79,7 +79,7 @@ const InventorySection = () => {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">{t('inventoryReport.totalStockValue')}</p>
+                <p className="text-sm text-slate-600">{t('inventoryReport.totalStockValue')}</p>
                 <p className="text-2xl font-bold text-green-600">{formatCurrency(data.totalStockValue)}</p>
               </div>
               <div className="p-3 rounded-full bg-green-500">
@@ -108,7 +108,7 @@ const InventorySection = () => {
                 >
                   <p className="font-medium">{item.productName}</p>
                   {item.categoryName && (
-                    <p className="text-sm text-gray-500">{item.categoryName}</p>
+                    <p className="text-sm text-slate-500">{item.categoryName}</p>
                   )}
                   <p className="text-lg font-bold text-amber-600 mt-1">
                     {item.currentStock} units left
@@ -138,7 +138,7 @@ const InventorySection = () => {
                 >
                   <p className="font-medium">{item.productName}</p>
                   {item.categoryName && (
-                    <p className="text-sm text-gray-500">{item.categoryName}</p>
+                    <p className="text-sm text-slate-500">{item.categoryName}</p>
                   )}
                 </div>
               ))}
@@ -154,7 +154,7 @@ const InventorySection = () => {
         </CardHeader>
         <CardContent>
           {data.stockLevels.length === 0 ? (
-            <p className="text-center text-gray-500 py-4">{t('reports.noData')}</p>
+            <p className="text-center text-slate-500 py-4">{t('reports.noData')}</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -170,9 +170,9 @@ const InventorySection = () => {
                 </thead>
                 <tbody>
                   {data.stockLevels.map((item) => (
-                    <tr key={item.productId} className="border-b hover:bg-gray-50">
+                    <tr key={item.productId} className="border-b hover:bg-slate-50">
                       <td className="py-3 px-4 font-medium">{item.productName}</td>
-                      <td className="py-3 px-4 text-gray-600">{item.categoryName || '-'}</td>
+                      <td className="py-3 px-4 text-slate-600">{item.categoryName || '-'}</td>
                       <td className="py-3 px-4 text-right">{item.currentStock}</td>
                       <td className="py-3 px-4 text-right">{formatCurrency(item.price)}</td>
                       <td className="py-3 px-4 text-right font-semibold text-green-600">
@@ -209,13 +209,13 @@ const InventorySection = () => {
         </CardHeader>
         <CardContent>
           {data.recentMovements.length === 0 ? (
-            <p className="text-center text-gray-500 py-4">{t('reports.noData')}</p>
+            <p className="text-center text-slate-500 py-4">{t('reports.noData')}</p>
           ) : (
             <div className="space-y-3">
               {data.recentMovements.map((movement) => (
                 <div
                   key={movement.id}
-                  className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg"
+                  className="flex items-center gap-4 p-3 bg-slate-50 rounded-lg"
                 >
                   <div
                     className={`p-2 rounded-full ${
@@ -236,15 +236,15 @@ const InventorySection = () => {
                   </div>
                   <div className="flex-1">
                     <p className="font-medium">{movement.productName}</p>
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-slate-500">
                       {movement.type === 'IN' ? '+' : movement.type === 'OUT' ? '-' : ''}
                       {movement.quantity} units
                       {movement.reason && ` - ${movement.reason}`}
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-gray-500">{movement.performedBy}</p>
-                    <p className="text-xs text-gray-400">
+                    <p className="text-sm text-slate-500">{movement.performedBy}</p>
+                    <p className="text-xs text-slate-400">
                       {format(new Date(movement.createdAt), 'MMM dd, HH:mm')}
                     </p>
                   </div>

@@ -1,5 +1,19 @@
 {
+  "name": "kds",
+  "version": "1.0.0",
+  "description": "Restaurant POS & Kitchen Display System",
+  "scripts": {
+    "test:e2e": "npx playwright test",
+    "test:e2e:headed": "npx playwright test --headed",
+    "test:e2e:debug": "npx playwright test --debug",
+    "test:e2e:ui": "npx playwright test --ui",
+    "test:e2e:report": "npx playwright show-report",
+    "test:e2e:orders": "npx playwright test order-management.spec.ts"
+  },
   "dependencies": {
     "axios": "^1.12.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.57.0"
   }
 }

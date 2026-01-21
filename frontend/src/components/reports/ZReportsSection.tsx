@@ -120,7 +120,7 @@ const ZReportsSection = () => {
       {/* Header with Generate Button */}
       <div className="mb-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <p className="text-gray-600">
+          <p className="text-slate-600">
             {t('zReports.description', 'End-of-day reconciliation reports')}
           </p>
         </div>
@@ -174,24 +174,24 @@ const ZReportsSection = () => {
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-slate-50 border-b">
                   <tr>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                    <th className="text-left py-3 px-4 font-semibold text-slate-700">
                       {t('zReports.reportNumber', 'Report #')}
                     </th>
-                    <th className="text-left py-3 px-4 font-semibold text-gray-700">
+                    <th className="text-left py-3 px-4 font-semibold text-slate-700">
                       {t('zReports.date', 'Date')}
                     </th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-700">
+                    <th className="text-right py-3 px-4 font-semibold text-slate-700">
                       {t('zReports.netSales', 'Net Sales')}
                     </th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-700">
+                    <th className="text-right py-3 px-4 font-semibold text-slate-700">
                       {t('zReports.totalOrders', 'Orders')}
                     </th>
-                    <th className="text-center py-3 px-4 font-semibold text-gray-700">
+                    <th className="text-center py-3 px-4 font-semibold text-slate-700">
                       {t('zReports.status', 'Status')}
                     </th>
-                    <th className="text-right py-3 px-4 font-semibold text-gray-700">
+                    <th className="text-right py-3 px-4 font-semibold text-slate-700">
                       {t('common:actions', 'Actions')}
                     </th>
                   </tr>
@@ -200,7 +200,7 @@ const ZReportsSection = () => {
                   {reportsData?.data.map((report) => (
                     <tr
                       key={report.id}
-                      className="border-b hover:bg-gray-50 transition-colors"
+                      className="border-b hover:bg-slate-50 transition-colors"
                     >
                       <td className="py-3 px-4 font-medium text-blue-600">
                         {report.reportNumber}
@@ -260,8 +260,8 @@ const ZReportsSection = () => {
                   ))}
                   {reportsData?.data.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="py-12 text-center text-gray-500">
-                        <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                      <td colSpan={6} className="py-12 text-center text-slate-500">
+                        <FileText className="w-12 h-12 mx-auto mb-4 text-slate-300" />
                         <p>{t('zReports.noReports', 'No Z-Reports found')}</p>
                       </td>
                     </tr>
@@ -273,7 +273,7 @@ const ZReportsSection = () => {
             {/* Pagination */}
             {reportsData && reportsData.pages > 1 && (
               <div className="p-4 border-t flex items-center justify-between">
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-slate-600">
                   {t('common:showingPage', 'Page {{page}} of {{total}}', {
                     page,
                     total: reportsData.pages,
@@ -332,15 +332,15 @@ const ZReportsSection = () => {
             </div>
 
             {/* Sales Summary */}
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-slate-50 rounded-lg p-4">
               <h4 className="font-semibold mb-3">{t('zReports.salesSummary', 'Sales Summary')}</h4>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">{t('zReports.grossSales', 'Gross Sales')}</span>
+                  <span className="text-slate-600">{t('zReports.grossSales', 'Gross Sales')}</span>
                   <span className="font-medium">{formatCurrency(selectedReport.grossSales)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">{t('zReports.discounts', 'Discounts')}</span>
+                  <span className="text-slate-600">{t('zReports.discounts', 'Discounts')}</span>
                   <span className="font-medium text-red-600">-{formatCurrency(selectedReport.discounts)}</span>
                 </div>
                 <div className="flex justify-between border-t pt-2 mt-2">
@@ -351,27 +351,27 @@ const ZReportsSection = () => {
             </div>
 
             {/* Payment Methods */}
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-slate-50 rounded-lg p-4">
               <h4 className="font-semibold mb-3">{t('zReports.paymentMethods', 'Payment Methods')}</h4>
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <Banknote className="w-4 h-4 text-green-600" />
-                    <span className="text-gray-600">{t('zReports.cash', 'Cash')}</span>
+                    <span className="text-slate-600">{t('zReports.cash', 'Cash')}</span>
                   </div>
                   <span className="font-medium">{formatCurrency(selectedReport.cashPayments)}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <CreditCard className="w-4 h-4 text-blue-600" />
-                    <span className="text-gray-600">{t('zReports.card', 'Card')}</span>
+                    <span className="text-slate-600">{t('zReports.card', 'Card')}</span>
                   </div>
                   <span className="font-medium">{formatCurrency(selectedReport.cardPayments)}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-2">
                     <DollarSign className="w-4 h-4 text-purple-600" />
-                    <span className="text-gray-600">{t('zReports.digital', 'Digital')}</span>
+                    <span className="text-slate-600">{t('zReports.digital', 'Digital')}</span>
                   </div>
                   <span className="font-medium">{formatCurrency(selectedReport.digitalPayments)}</span>
                 </div>
@@ -386,15 +386,15 @@ const ZReportsSection = () => {
               <h4 className="font-semibold mb-3">{t('zReports.cashDrawer', 'Cash Drawer')}</h4>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span className="text-gray-600">{t('zReports.opening', 'Opening')}</span>
+                  <span className="text-slate-600">{t('zReports.opening', 'Opening')}</span>
                   <span className="font-medium">{formatCurrency(selectedReport.cashDrawerOpening)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">{t('zReports.expected', 'Expected')}</span>
+                  <span className="text-slate-600">{t('zReports.expected', 'Expected')}</span>
                   <span className="font-medium">{formatCurrency(selectedReport.expectedCash)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">{t('zReports.counted', 'Counted')}</span>
+                  <span className="text-slate-600">{t('zReports.counted', 'Counted')}</span>
                   <span className="font-medium">{formatCurrency(selectedReport.cashDrawerClosing)}</span>
                 </div>
                 <div className="flex justify-between border-t pt-2 mt-2">
@@ -411,15 +411,15 @@ const ZReportsSection = () => {
 
             {/* Top Products */}
             {selectedReport.topProducts && selectedReport.topProducts.length > 0 && (
-              <div className="bg-gray-50 rounded-lg p-4">
+              <div className="bg-slate-50 rounded-lg p-4">
                 <h4 className="font-semibold mb-3">{t('zReports.topProducts', 'Top Products')}</h4>
                 <div className="space-y-2">
                   {selectedReport.topProducts.slice(0, 5).map((product: any, index: number) => (
                     <div key={index} className="flex justify-between items-center">
-                      <span className="text-gray-600">{product.name}</span>
+                      <span className="text-slate-600">{product.name}</span>
                       <div className="text-right">
                         <span className="font-medium">{formatCurrency(product.revenue)}</span>
-                        <span className="text-xs text-gray-500 ml-2">({product.quantity} sold)</span>
+                        <span className="text-xs text-slate-500 ml-2">({product.quantity} sold)</span>
                       </div>
                     </div>
                   ))}
@@ -493,11 +493,11 @@ const ZReportsSection = () => {
             }
           />
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               {t('zReports.notes', 'Notes')}
             </label>
             <textarea
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               rows={3}
               value={generateForm.notes}
               onChange={(e) =>
@@ -542,21 +542,21 @@ const ZReportsSection = () => {
         title={t('zReports.sendEmailTitle', 'Send Z-Report via Email')}
       >
         <div className="space-y-4">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-slate-600">
             {t('zReports.emailDescription', 'Leave empty to use default recipients from tenant settings, or enter custom email addresses.')}
           </p>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-slate-700 mb-1">
               {t('zReports.emailRecipients', 'Email Recipients')}
             </label>
             <textarea
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               rows={3}
               value={emailInput}
               onChange={(e) => setEmailInput(e.target.value)}
               placeholder={t('zReports.emailPlaceholder', 'admin@example.com, manager@example.com')}
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-slate-500 mt-1">
               {t('zReports.emailHint', 'Separate multiple emails with commas')}
             </p>
           </div>

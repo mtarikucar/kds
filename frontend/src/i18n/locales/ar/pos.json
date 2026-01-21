@@ -149,6 +149,17 @@
     "customerRequestedNote": "ملاحظة الطلب",
     "unknownProduct": "منتج غير معروف"
   },
+  "tableSelection": {
+    "title": "اختر طاولة",
+    "description": "اختر طاولة لبدء استلام الطلبات",
+    "takeawayOrder": "طلب للاستلام",
+    "takeawayDescription": "طلب بدون طاولة",
+    "backToTables": "العودة للطاولات",
+    "seats": "{{count}} مقاعد",
+    "pendingOrders": "معلق",
+    "waiterCalls": "نادل",
+    "billRequests": "فاتورة"
+  },
   "tableGrid": {
     "selected": "محددة",
     "pendingOrder": "طلب معلق",

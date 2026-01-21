@@ -100,10 +100,10 @@ const LoginPage = () => {
       >
         {/* Header */}
         <motion.div variants={itemVariants} className="text-center mb-8">
-          <h1 className="text-3xl font-heading font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl font-heading font-bold text-slate-900 mb-2">
             {t('auth:login.welcomeBack', 'Welcome Back')}
           </h1>
-          <p className="text-gray-600">
+          <p className="text-slate-600">
             {t('auth:login.subtitle', 'Sign in to continue managing your restaurant')}
           </p>
         </motion.div>
@@ -174,7 +174,7 @@ const LoginPage = () => {
 
           <motion.div
             variants={itemVariants}
-            className="text-center text-sm text-gray-600 pt-2"
+            className="text-center text-sm text-slate-600 pt-2"
           >
             {t('auth:login.noAccount')}{' '}
             <Link

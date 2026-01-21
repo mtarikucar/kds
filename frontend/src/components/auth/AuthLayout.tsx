@@ -2,144 +2,114 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { UtensilsCrossed, ChefHat, ClipboardList, BarChart3 } from 'lucide-react';
+import { ChefHat } from 'lucide-react';
 import LanguageSwitcher from '../LanguageSwitcher';
+
+type AuthVariant = 'login' | 'register' | 'forgot-password';
 
 interface AuthLayoutProps {
   children: React.ReactNode;
-  variant?: 'login' | 'register';
+  variant?: AuthVariant;
 }
+
+const baseUrl = import.meta.env.BASE_URL || '/';
+
+const mascotConfig: Record<AuthVariant, { image: string; headlineKey: string; subtitleKey: string }> = {
+  login: {
+    image: `${baseUrl}voxel_chef_1_top_left.png`,
+    headlineKey: 'auth:branding.mascotHeadlineLogin',
+    subtitleKey: 'auth:branding.mascotSubtitleLogin',
+  },
+  register: {
+    image: `${baseUrl}voxel_chef_3_bottom_left.png`,
+    headlineKey: 'auth:branding.mascotHeadlineRegister',
+    subtitleKey: 'auth:branding.mascotSubtitleRegister',
+  },
+  'forgot-password': {
+    image: `${baseUrl}voxel_chef_2_top_right.png`,
+    headlineKey: 'auth:branding.mascotHeadlineForgot',
+    subtitleKey: 'auth:branding.mascotSubtitleForgot',
+  },
+};
 
 const AuthLayout: React.FC<AuthLayoutProps> = ({ children, variant = 'login' }) => {
   const { t } = useTranslation(['auth']);
-
-  const features = [
-    { icon: UtensilsCrossed, text: t('auth:branding.feature1', 'Easy table management') },
-    { icon: ClipboardList, text: t('auth:branding.feature2', 'Real-time order tracking') },
-    { icon: BarChart3, text: t('auth:branding.feature3', 'Powerful analytics') },
-  ];
+  const config = mascotConfig[variant];
 
   return (
     <div className="min-h-screen flex">
-      {/* Left Panel - Branding */}
-      <div className="hidden lg:flex lg:w-[45%] xl:w-[40%] bg-gradient-to-br from-warm-orange via-primary-600 to-warm-brown relative overflow-hidden">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-10 w-32 h-32 border-2 border-white rounded-full" />
-          <div className="absolute top-40 right-20 w-24 h-24 border-2 border-white rounded-full" />
-          <div className="absolute bottom-32 left-20 w-40 h-40 border-2 border-white rounded-full" />
-          <div className="absolute bottom-20 right-10 w-20 h-20 border-2 border-white rounded-full" />
+      {/* Left Panel - Branding with Mascot (Desktop only) */}
+      <div className="hidden lg:flex lg:w-[42%] xl:w-[40%] bg-gradient-to-br from-orange-400 via-primary-500 to-amber-600 relative overflow-hidden">
+        {/* Top Section: Logo + Headline */}
+        <div className="absolute top-0 left-0 right-0 z-20 p-8 xl:p-12">
+          <Link to="/" className="flex items-center gap-3 text-white mb-6">
+            <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
+              <ChefHat className="w-8 h-8" />
+            </div>
+            <span className="text-2xl font-heading font-bold">HummyTummy</span>
+          </Link>
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+          >
+            <h2 className="text-3xl xl:text-4xl font-heading font-bold text-white leading-tight">
+              {t(config.headlineKey, 'Welcome back, Chef!')}
+            </h2>
+            <p className="text-white/80 text-lg mt-2">
+              {t(config.subtitleKey, 'Your kitchen is ready and waiting')}
+            </p>
+          </motion.div>
         </div>
 
-        {/* Content */}
-        <div className="relative z-10 flex flex-col justify-between w-full p-8 xl:p-12">
-          {/* Logo & Tagline */}
-          <div>
-            <Link to="/" className="flex items-center gap-3 text-white">
-              <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
-                <ChefHat className="w-8 h-8" />
-              </div>
-              <span className="text-2xl font-heading font-bold">HummyTummy</span>
-            </Link>
-          </div>
+        {/* Mascot - Centered, large */}
+        <div className="absolute inset-0 flex items-center justify-center pt-32">
+          {/* Mascot */}
+          <motion.img
+            src={config.image}
+            alt="HummyTummy Chef Mascot"
+            className="w-[80%] max-w-[400px] object-contain drop-shadow-2xl"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{
+              opacity: 1,
+              y: [0, -8, 0]
+            }}
+            transition={{
+              opacity: { duration: 0.5 },
+              y: { duration: 3, repeat: Infinity, ease: 'easeInOut' }
+            }}
+          />
+        </div>
 
-          {/* Main Content */}
-          <div className="flex-1 flex flex-col justify-center">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-            >
-              <h1 className="text-4xl xl:text-5xl font-heading font-bold text-white leading-tight mb-4">
-                {variant === 'login'
-                  ? t('auth:branding.tagline', 'Manage your restaurant smarter')
-                  : t('auth:branding.registerTagline', 'Join thousands of restaurants')}
-              </h1>
-              <p className="text-white/80 text-lg mb-8">
-                {variant === 'login'
-                  ? t('auth:branding.loginSubtitle', 'Streamline operations, boost efficiency, delight customers.')
-                  : t('auth:branding.registerSubtitle', 'Start your journey to smarter restaurant management today.')}
-              </p>
-            </motion.div>
-
-            {/* Animated Illustration */}
-            <motion.div
-              className="relative h-48 xl:h-64 mb-8"
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-            >
-              <motion.div
-                className="absolute inset-0 flex items-center justify-center"
-                animate={{ y: [0, -10, 0] }}
-                transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <div className="relative">
-                  {/* Plate */}
-                  <div className="w-40 h-40 xl:w-52 xl:h-52 bg-white/20 rounded-full backdrop-blur-sm flex items-center justify-center">
-                    <div className="w-32 h-32 xl:w-44 xl:h-44 bg-white/30 rounded-full flex items-center justify-center">
-                      <UtensilsCrossed className="w-16 h-16 xl:w-20 xl:h-20 text-white" />
-                    </div>
-                  </div>
-                  {/* Floating elements */}
-                  <motion.div
-                    className="absolute -top-4 -right-4 p-3 bg-white/20 rounded-lg backdrop-blur-sm"
-                    animate={{ y: [0, -5, 0], rotate: [0, 5, 0] }}
-                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-                  >
-                    <ClipboardList className="w-6 h-6 text-white" />
-                  </motion.div>
-                  <motion.div
-                    className="absolute -bottom-2 -left-6 p-3 bg-white/20 rounded-lg backdrop-blur-sm"
-                    animate={{ y: [0, 5, 0], rotate: [0, -5, 0] }}
-                    transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut", delay: 0.3 }}
-                  >
-                    <BarChart3 className="w-6 h-6 text-white" />
-                  </motion.div>
-                </div>
-              </motion.div>
-            </motion.div>
-
-            {/* Features List */}
-            <motion.div
-              className="space-y-3"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-            >
-              {features.map((feature, index) => (
-                <motion.div
-                  key={index}
-                  className="flex items-center gap-3 text-white/90"
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.4, delay: 0.5 + index * 0.1 }}
-                >
-                  <div className="p-1.5 bg-white/20 rounded-lg">
-                    <feature.icon className="w-4 h-4" />
-                  </div>
-                  <span className="text-sm font-medium">{feature.text}</span>
-                </motion.div>
-              ))}
-            </motion.div>
-          </div>
-
-          {/* Footer */}
-          <div className="text-white/60 text-sm">
-            © {new Date().getFullYear()} HummyTummy. All rights reserved.
-          </div>
+        {/* Footer - Very Bottom */}
+        <div className="absolute bottom-4 left-8 xl:left-12 text-white/60 text-sm z-20">
+          &copy; {new Date().getFullYear()} HummyTummy
         </div>
       </div>
 
       {/* Right Panel - Form */}
-      <div className="flex-1 flex flex-col bg-gray-50">
+      <div className="flex-1 flex flex-col bg-gradient-to-br from-slate-50 to-orange-50/30">
         {/* Mobile Header */}
-        <div className="lg:hidden flex items-center justify-between p-4 bg-gradient-to-r from-warm-orange to-warm-brown">
-          <Link to="/" className="flex items-center gap-2 text-white">
-            <ChefHat className="w-6 h-6" />
-            <span className="text-lg font-heading font-bold">HummyTummy</span>
-          </Link>
-          <LanguageSwitcher />
+        <div className="lg:hidden relative bg-gradient-to-br from-orange-400 via-primary-500 to-amber-600 overflow-hidden">
+          <div className="relative z-10 flex items-center justify-between p-4">
+            <Link to="/" className="flex items-center gap-2 text-white">
+              <div className="p-1.5 bg-white/20 rounded-lg backdrop-blur-sm">
+                <ChefHat className="w-5 h-5" />
+              </div>
+              <span className="text-lg font-heading font-bold">HummyTummy</span>
+            </Link>
+            <LanguageSwitcher />
+          </div>
+          {/* Mascot peek */}
+          <div className="absolute bottom-0 right-4 rtl:right-auto rtl:left-4 pointer-events-none">
+            <img
+              src={config.image}
+              alt="Chef Mascot"
+              className="w-20 h-20 object-contain translate-y-2"
+            />
+          </div>
+          <div className="h-6" />
         </div>
 
         {/* Desktop Language Switcher */}
@@ -150,7 +120,10 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, variant = 'login' }) 
         {/* Form Content */}
         <div className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">
           <div className="w-full max-w-md">
-            {children}
+            {/* Form Card with warm shadow */}
+            <div className="bg-white rounded-2xl shadow-xl shadow-orange-500/5 p-6 sm:p-8">
+              {children}
+            </div>
           </div>
         </div>
       </div>

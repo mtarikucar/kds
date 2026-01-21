@@ -83,7 +83,7 @@ const ReportsPage = () => {
       <CardContent className="pt-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm text-gray-600 mb-1">{title}</p>
+            <p className="text-sm text-slate-500 mb-1">{title}</p>
             <p className="text-2xl font-bold">{value}</p>
           </div>
           <div className={`p-3 rounded-full ${color}`}>
@@ -96,13 +96,13 @@ const ReportsPage = () => {
 
   return (
     <div>
-      <div className="mb-4 md:mb-6">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t('reports.title')}</h1>
-        <p className="text-sm md:text-base text-gray-600">{t('reports.viewReports')}</p>
+      <div className="mb-8">
+        <h1 className="text-2xl font-heading font-bold text-slate-900">{t('reports.title')}</h1>
+        <p className="text-slate-500 mt-1">{t('reports.viewReports')}</p>
       </div>
 
       {/* Tabs */}
-      <div className="mb-4 md:mb-6 border-b border-gray-200 overflow-x-auto">
+      <div className="mb-4 md:mb-6 border-b border-slate-200/60 overflow-x-auto">
         <nav className="flex space-x-4 min-w-max" aria-label="Report tabs">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -113,7 +113,7 @@ const ReportsPage = () => {
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === tab.id
                     ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
                 }`}
               >
                 <Icon className="h-4 w-4" />
@@ -194,11 +194,11 @@ const ReportsPage = () => {
                     {salesReport?.paymentMethodBreakdown?.map((method) => (
                       <div
                         key={method.method}
-                        className="flex items-center justify-between p-4 bg-gray-50 rounded-lg"
+                        className="flex items-center justify-between p-4 bg-slate-50 rounded-xl"
                       >
                         <div>
                           <p className="font-semibold capitalize">{method.method}</p>
-                          <p className="text-sm text-gray-600">
+                          <p className="text-sm text-slate-500">
                             {method.count} transactions
                           </p>
                         </div>
@@ -206,7 +206,7 @@ const ReportsPage = () => {
                           <p className="text-lg font-bold text-blue-600">
                             {formatCurrency(method.total)}
                           </p>
-                          <p className="text-sm text-gray-600">
+                          <p className="text-sm text-slate-500">
                             {salesReport?.totalSales
                               ? (
                                   (method.total / salesReport.totalSales) *
@@ -232,13 +232,13 @@ const ReportsPage = () => {
                     {salesReport?.dailySales?.map((day) => (
                       <div
                         key={day.date}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-gray-50 rounded gap-2"
+                        className="flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-slate-50 rounded gap-2"
                       >
                         <div>
                           <p className="font-medium text-sm sm:text-base">
                             {format(new Date(day.date), 'MMM dd, yyyy')}
                           </p>
-                          <p className="text-xs sm:text-sm text-gray-600">
+                          <p className="text-xs sm:text-sm text-slate-500">
                             {day.orders} {t('reports.orders')}
                           </p>
                         </div>
@@ -246,7 +246,7 @@ const ReportsPage = () => {
                           <p className="font-bold text-blue-600">
                             {formatCurrency(day.sales)}
                           </p>
-                          <div className="w-full sm:w-32 md:w-48 bg-gray-200 rounded-full h-2 mt-1">
+                          <div className="w-full sm:w-32 md:w-48 bg-slate-200 rounded-full h-2 mt-1">
                             <div
                               className="bg-blue-600 h-2 rounded-full"
                               style={{
@@ -296,7 +296,7 @@ const ReportsPage = () => {
                               <td className="py-3 px-4 font-medium">
                                 {product.productName}
                               </td>
-                              <td className="py-3 px-4 text-gray-600">
+                              <td className="py-3 px-4 text-slate-600">
                                 {product.categoryName}
                               </td>
                               <td className="py-3 px-4 text-right">

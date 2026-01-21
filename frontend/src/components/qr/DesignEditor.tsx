@@ -208,14 +208,14 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
 
   const ColorPickerButton = ({ label, colorKey }: { label: string; colorKey: string }) => (
     <div className="relative">
-      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      <label className="block text-sm font-medium text-slate-700 mb-1">{label}</label>
       <button
         type="button"
         onClick={() => setShowColorPicker(showColorPicker === colorKey ? null : colorKey)}
-        className="w-full h-10 rounded border-2 border-gray-300 flex items-center gap-2 px-3 hover:border-blue-500"
+        className="w-full h-10 rounded border-2 border-slate-300 flex items-center gap-2 px-3 hover:border-blue-500"
       >
         <div
-          className="w-6 h-6 rounded border border-gray-300"
+          className="w-6 h-6 rounded border border-slate-300"
           style={{ backgroundColor: formData[colorKey as keyof typeof formData] as string }}
         />
         <span className="text-sm font-mono">{formData[colorKey as keyof typeof formData]}</span>
@@ -226,7 +226,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
             className="fixed inset-0"
             onClick={() => setShowColorPicker(null)}
           />
-          <div className="relative bg-white p-3 rounded-lg shadow-lg border border-gray-200">
+          <div className="relative bg-white p-3 rounded-lg shadow-lg border border-slate-200">
             <HexColorPicker
               color={formData[colorKey as keyof typeof formData] as string}
               onChange={(color) => setFormData({ ...formData, [colorKey]: color })}
@@ -288,7 +288,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
   return (
     <div className="space-y-6">
       {/* Tab Navigation */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-slate-200">
         <nav className="-mb-px flex flex-wrap gap-4">
           {[
             { id: 'templates', label: t('admin.templates'), icon: Sparkles },
@@ -305,7 +305,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                 py-3 px-4 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors
                 ${activeTab === tab.id
                   ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
                 }
               `}
             >
@@ -331,7 +331,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-gray-600 mb-4">
+              <p className="text-sm text-slate-600 mb-4">
                 {t('admin.choosePreDesignedTemplate')}
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -340,19 +340,19 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                     key={template.id}
                     type="button"
                     onClick={() => applyTemplate(template)}
-                    className="p-4 rounded-lg border-2 border-gray-200 hover:border-blue-500 transition-all hover:shadow-md text-left"
+                    className="p-4 rounded-lg border-2 border-slate-200 hover:border-blue-500 transition-all hover:shadow-md text-left"
                   >
                     <div className="flex items-center gap-3 mb-3">
                       <span className="text-2xl">{template.preview}</span>
                       <div className="flex gap-1">
                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: template.settings.primaryColor }} />
                         <div className="w-3 h-3 rounded-full" style={{ backgroundColor: template.settings.secondaryColor }} />
-                        <div className="w-3 h-3 rounded-full border border-gray-300" style={{ backgroundColor: template.settings.backgroundColor }} />
+                        <div className="w-3 h-3 rounded-full border border-slate-300" style={{ backgroundColor: template.settings.backgroundColor }} />
                       </div>
                     </div>
-                    <p className="font-semibold text-gray-900 mb-1">{t(`common:qrDesigner.templates.${template.id}.name`)}</p>
-                    <p className="text-xs text-gray-600">{t(`common:qrDesigner.templates.${template.id}.description`)}</p>
-                    <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+                    <p className="font-semibold text-slate-900 mb-1">{t(`common:qrDesigner.templates.${template.id}.name`)}</p>
+                    <p className="text-xs text-slate-600">{t(`common:qrDesigner.templates.${template.id}.description`)}</p>
+                    <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
                       <span>{template.settings.layoutStyle}</span>
                       <span>•</span>
                       <span>{template.settings.fontFamily}</span>
@@ -382,16 +382,16 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                       key={theme.id}
                       type="button"
                       onClick={() => applyTheme(theme)}
-                      className="p-3 rounded-lg border-2 border-gray-200 hover:border-blue-500 transition-colors"
+                      className="p-3 rounded-lg border-2 border-slate-200 hover:border-blue-500 transition-colors"
                     >
                       <div className="flex items-center gap-2 mb-2">
                         <div className="flex gap-1">
                           <div className="w-5 h-5 rounded" style={{ backgroundColor: theme.primary }} />
                           <div className="w-5 h-5 rounded" style={{ backgroundColor: theme.secondary }} />
-                          <div className="w-5 h-5 rounded border border-gray-200" style={{ backgroundColor: theme.background }} />
+                          <div className="w-5 h-5 rounded border border-slate-200" style={{ backgroundColor: theme.background }} />
                         </div>
                       </div>
-                      <p className="text-sm font-medium text-gray-700">{t(`common:qrDesigner.themes.${theme.id}`)}</p>
+                      <p className="text-sm font-medium text-slate-700">{t(`common:qrDesigner.themes.${theme.id}`)}</p>
                     </button>
                   ))}
                 </div>
@@ -421,7 +421,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
             </CardHeader>
             <CardContent className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">{t('common:qrDesigner.fontFamily')}</label>
+                <label className="block text-sm font-medium text-slate-700 mb-3">{t('common:qrDesigner.fontFamily')}</label>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                   {fontOptions.map((font) => (
                     <button
@@ -431,21 +431,21 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                       className={`p-4 rounded-lg border-2 transition-all ${
                         formData.fontFamily === font.value
                           ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                          : 'border-slate-200 hover:border-slate-300'
                       }`}
                     >
                       <p className={`text-lg ${font.className} font-medium`}>{font.label}</p>
-                      <p className="text-xs text-gray-500 mt-1">{t('common:qrDesigner.sampleText')}</p>
+                      <p className="text-xs text-slate-500 mt-1">{t('common:qrDesigner.sampleText')}</p>
                     </button>
                   ))}
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">{t('common:qrDesigner.logoUpload')}</label>
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
-                  <Upload className="h-8 w-8 mx-auto text-gray-400 mb-2" />
-                  <p className="text-sm text-gray-600 mb-2">{t('common:qrDesigner.uploadLogo')}</p>
+                <label className="block text-sm font-medium text-slate-700 mb-3">{t('common:qrDesigner.logoUpload')}</label>
+                <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-slate-400 transition-colors">
+                  <Upload className="h-8 w-8 mx-auto text-slate-400 mb-2" />
+                  <p className="text-sm text-slate-600 mb-2">{t('common:qrDesigner.uploadLogo')}</p>
                   <input
                     type="file"
                     accept="image/*"
@@ -478,7 +478,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
             </CardHeader>
             <CardContent className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">{t('common:qrDesigner.layoutStyle')}</label>
+                <label className="block text-sm font-medium text-slate-700 mb-3">{t('common:qrDesigner.layoutStyle')}</label>
                 <div className="grid grid-cols-3 gap-3">
                   {[
                     { value: 'GRID', label: t('common:qrDesigner.gridView'), description: t('common:qrDesigner.gridDesc') },
@@ -492,11 +492,11 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                       className={`p-4 rounded-lg border-2 text-left transition-all ${
                         formData.layoutStyle === style.value
                           ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                          : 'border-slate-200 hover:border-slate-300'
                       }`}
                     >
-                      <p className="font-medium text-gray-900">{style.label}</p>
-                      <p className="text-xs text-gray-500 mt-1">{style.description}</p>
+                      <p className="font-medium text-slate-900">{style.label}</p>
+                      <p className="text-xs text-slate-500 mt-1">{style.description}</p>
                     </button>
                   ))}
                 </div>
@@ -504,7 +504,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
 
               {formData.layoutStyle === 'GRID' && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">{t('common:qrDesigner.itemsPerRow')}</label>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">{t('common:qrDesigner.itemsPerRow')}</label>
                   <div className="flex gap-2">
                     {[1, 2, 3, 4].map((num) => (
                       <button
@@ -514,7 +514,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                         className={`px-6 py-2 rounded-lg font-medium transition-all ${
                           formData.itemsPerRow === num
                             ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                         }`}
                       >
                         {num}
@@ -525,7 +525,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
               )}
 
               <div className="space-y-3">
-                <p className="text-sm font-medium text-gray-700">{t('common:qrDesigner.displayOptions')}</p>
+                <p className="text-sm font-medium text-slate-700">{t('common:qrDesigner.displayOptions')}</p>
                 <div className="space-y-2">
                   {[
                     { key: 'showRestaurantInfo', label: t('common:qrDesigner.showRestaurantInfo') },
@@ -533,14 +533,14 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                     { key: 'showDescription', label: t('common:qrDesigner.showDescriptions') },
                     { key: 'showImages', label: t('common:qrDesigner.showImages') }
                   ].map((option) => (
-                    <label key={option.key} className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
+                    <label key={option.key} className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50">
                       <input
                         type="checkbox"
                         checked={formData[option.key as keyof typeof formData] as boolean}
                         onChange={(e) => setFormData({ ...formData, [option.key]: e.target.checked })}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                       />
-                      <span className="text-sm text-gray-700">{option.label}</span>
+                      <span className="text-sm text-slate-700">{option.label}</span>
                     </label>
                   ))}
                 </div>
@@ -557,17 +557,17 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-4">
-                <p className="text-sm font-medium text-gray-700">{t('admin.tableQRCodes')}</p>
-                <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-gray-50">
+                <p className="text-sm font-medium text-slate-700">{t('admin.tableQRCodes')}</p>
+                <label className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50">
                   <input
                     type="checkbox"
                     checked={formData.enableTableQR}
                     onChange={(e) => setFormData({ ...formData, enableTableQR: e.target.checked })}
-                    className="rounded border-gray-300 text-blue-600"
+                    className="rounded border-slate-300 text-blue-600"
                   />
                   <div>
-                    <span className="text-sm font-medium text-gray-700">{t('admin.enableTableQR')}</span>
-                    <p className="text-xs text-gray-500">{t('admin.enableTableQRDesc')}</p>
+                    <span className="text-sm font-medium text-slate-700">{t('admin.enableTableQR')}</span>
+                    <p className="text-xs text-slate-500">{t('admin.enableTableQRDesc')}</p>
                   </div>
                 </label>
 
@@ -590,24 +590,24 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                 )}
               </div>
 
-              <div className="pt-4 border-t border-gray-200">
-                <p className="text-sm font-medium text-gray-700 mb-3">{t('common:qrDesigner.qrCodePreview')}</p>
-                <div className="bg-gray-50 rounded-lg p-4 text-center">
-                  <p className="text-xs text-gray-500 mb-2">{t('common:qrDesigner.qrWillUseColors')}</p>
+              <div className="pt-4 border-t border-slate-200">
+                <p className="text-sm font-medium text-slate-700 mb-3">{t('common:qrDesigner.qrCodePreview')}</p>
+                <div className="bg-slate-50 rounded-lg p-4 text-center">
+                  <p className="text-xs text-slate-500 mb-2">{t('common:qrDesigner.qrWillUseColors')}</p>
                   <div className="flex justify-center gap-4">
                     <div className="text-center">
                       <div 
-                        className="w-16 h-16 rounded-lg border-2 border-gray-300 mb-1" 
+                        className="w-16 h-16 rounded-lg border-2 border-slate-300 mb-1" 
                         style={{ backgroundColor: formData.primaryColor }}
                       />
-                      <p className="text-xs text-gray-600">{t('common:qrDesigner.qrPattern')}</p>
+                      <p className="text-xs text-slate-600">{t('common:qrDesigner.qrPattern')}</p>
                     </div>
                     <div className="text-center">
                       <div 
-                        className="w-16 h-16 rounded-lg border-2 border-gray-300 mb-1" 
+                        className="w-16 h-16 rounded-lg border-2 border-slate-300 mb-1" 
                         style={{ backgroundColor: formData.backgroundColor }}
                       />
-                      <p className="text-xs text-gray-600">{t('common:qrDesigner.background')}</p>
+                      <p className="text-xs text-slate-600">{t('common:qrDesigner.background')}</p>
                     </div>
                   </div>
                 </div>
@@ -616,7 +616,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
           </Card>
         )}
 
-            <div className="flex gap-3 sticky bottom-0 bg-white pt-4 pb-2 border-t border-gray-200">
+            <div className="flex gap-3 sticky bottom-0 bg-white pt-4 pb-2 border-t border-slate-200">
               <Button
                 type="submit"
                 variant="primary"
@@ -652,7 +652,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="bg-gradient-to-br from-gray-50 to-white p-4 rounded-xl border-2 border-gray-200 shadow-inner text-center">
+                  <div className="bg-gradient-to-br from-gray-50 to-white p-4 rounded-xl border-2 border-slate-200 shadow-inner text-center">
                     <QrCodeDisplay
                       qrCode={{
                         id: 'preview',
@@ -670,8 +670,8 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                     />
                   </div>
                   <div className="text-center">
-                    <p className="text-xs text-gray-500">{t('common:qrDesigner.liveQRCodePreview')}</p>
-                    <p className="text-xs text-gray-400">{t('common:qrDesigner.updatesAutomatically')}</p>
+                    <p className="text-xs text-slate-500">{t('common:qrDesigner.liveQRCodePreview')}</p>
+                    <p className="text-xs text-slate-400">{t('common:qrDesigner.updatesAutomatically')}</p>
                   </div>
                 </div>
               </CardContent>
@@ -688,12 +688,12 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                   <button
                     type="button"
                     onClick={() => setIsPreviewExpanded(!isPreviewExpanded)}
-                    className="p-1 hover:bg-gray-100 rounded transition-colors"
+                    className="p-1 hover:bg-slate-100 rounded transition-colors"
                   >
                     {isPreviewExpanded ? (
-                      <ChevronUp className="h-4 w-4 text-gray-600" />
+                      <ChevronUp className="h-4 w-4 text-slate-600" />
                     ) : (
-                      <ChevronDown className="h-4 w-4 text-gray-600" />
+                      <ChevronDown className="h-4 w-4 text-slate-600" />
                     )}
                   </button>
                 </div>
@@ -709,7 +709,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                         className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                           previewMode === 'mobile'
                             ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                         }`}
                       >
                         Mobile
@@ -720,7 +720,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                         className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                           previewMode === 'tablet'
                             ? 'bg-blue-600 text-white'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                         }`}
                       >
                         Tablet
@@ -728,12 +728,12 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                     </div>
 
                     {/* Preview Container */}
-                    <div className="border-2 border-gray-300 rounded-lg overflow-hidden">
+                    <div className="border-2 border-slate-300 rounded-lg overflow-hidden">
                       <div
                         className="text-xs text-center py-1"
                         style={{ backgroundColor: formData.backgroundColor }}
                       >
-                        <p className="text-gray-600">{t('common:qrDesigner.livePreview')}</p>
+                        <p className="text-slate-600">{t('common:qrDesigner.livePreview')}</p>
                       </div>
 
                       {/* Actual Menu Preview */}
@@ -814,7 +814,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                                 <div key={product.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
                                   <div className="flex gap-2">
                                     {formData.showImages && (
-                                      <div className="w-20 h-20 bg-gray-200 flex-shrink-0" />
+                                      <div className="w-20 h-20 bg-slate-200 flex-shrink-0" />
                                     )}
                                     <div className="flex-1 p-2">
                                       <h3
@@ -824,7 +824,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                                         {product.name}
                                       </h3>
                                       {formData.showDescription && (
-                                        <p className="text-xs text-gray-600 mt-0.5 line-clamp-1">
+                                        <p className="text-xs text-slate-600 mt-0.5 line-clamp-1">
                                           {product.description}
                                         </p>
                                       )}
@@ -853,7 +853,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                               {filteredPreviewProducts.map((product) => (
                                 <div key={product.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
                                   {formData.showImages && (
-                                    <div className="w-full h-20 bg-gray-200" />
+                                    <div className="w-full h-20 bg-slate-200" />
                                   )}
                                   <div className="p-2">
                                     <h3
@@ -863,7 +863,7 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                                       {product.name}
                                     </h3>
                                     {formData.showDescription && (
-                                      <p className="text-xs text-gray-600 mt-0.5 line-clamp-2">
+                                      <p className="text-xs text-slate-600 mt-0.5 line-clamp-2">
                                         {product.description}
                                       </p>
                                     )}
@@ -908,8 +908,8 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                     </div>
 
                     <div className="text-center">
-                      <p className="text-xs text-gray-500">{t('common:qrDesigner.liveMenuPreview')}</p>
-                      <p className="text-xs text-gray-400">{t('common:qrDesigner.updatesAutomaticallyWithChanges')}</p>
+                      <p className="text-xs text-slate-500">{t('common:qrDesigner.liveMenuPreview')}</p>
+                      <p className="text-xs text-slate-400">{t('common:qrDesigner.updatesAutomaticallyWithChanges')}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -928,32 +928,32 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
                     <div 
-                      className="w-8 h-8 rounded-lg border-2 border-gray-300 shadow-sm" 
+                      className="w-8 h-8 rounded-lg border-2 border-slate-300 shadow-sm" 
                       style={{ backgroundColor: formData.primaryColor }}
                     />
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{t('common:qrDesigner.primary')}</p>
-                      <p className="text-xs text-gray-500 font-mono">{formData.primaryColor}</p>
+                      <p className="text-sm font-medium text-slate-900">{t('common:qrDesigner.primary')}</p>
+                      <p className="text-xs text-slate-500 font-mono">{formData.primaryColor}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <div 
-                      className="w-8 h-8 rounded-lg border-2 border-gray-300 shadow-sm" 
+                      className="w-8 h-8 rounded-lg border-2 border-slate-300 shadow-sm" 
                       style={{ backgroundColor: formData.secondaryColor }}
                     />
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{t('common:qrDesigner.secondary')}</p>
-                      <p className="text-xs text-gray-500 font-mono">{formData.secondaryColor}</p>
+                      <p className="text-sm font-medium text-slate-900">{t('common:qrDesigner.secondary')}</p>
+                      <p className="text-xs text-slate-500 font-mono">{formData.secondaryColor}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <div 
-                      className="w-8 h-8 rounded-lg border-2 border-gray-300 shadow-sm" 
+                      className="w-8 h-8 rounded-lg border-2 border-slate-300 shadow-sm" 
                       style={{ backgroundColor: formData.backgroundColor }}
                     />
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{t('common:qrDesigner.background')}</p>
-                      <p className="text-xs text-gray-500 font-mono">{formData.backgroundColor}</p>
+                      <p className="text-sm font-medium text-slate-900">{t('common:qrDesigner.background')}</p>
+                      <p className="text-xs text-slate-500 font-mono">{formData.backgroundColor}</p>
                     </div>
                   </div>
                 </div>

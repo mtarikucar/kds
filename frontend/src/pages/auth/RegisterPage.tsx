@@ -151,10 +151,10 @@ const RegisterPage = () => {
       >
         {/* Header */}
         <motion.div variants={itemVariants} className="text-center mb-6">
-          <h1 className="text-3xl font-heading font-bold text-gray-900 mb-2">
+          <h1 className="text-3xl font-heading font-bold text-slate-900 mb-2">
             {t('auth:register.createAccount', 'Create Account')}
           </h1>
-          <p className="text-gray-600">
+          <p className="text-slate-600">
             {t('auth:register.subtitle', 'Start managing your restaurant smarter')}
           </p>
         </motion.div>
@@ -187,7 +187,7 @@ const RegisterPage = () => {
             <PasswordStrength password={password} showRequirements={true} />
           </motion.div>
 
-          <motion.div variants={itemVariants} className="grid grid-cols-2 gap-4">
+          <motion.div variants={itemVariants} className="grid grid-cols-2 gap-3">
             <Input
               label={t('auth:register.firstName')}
               placeholder={t('auth:profile.firstNamePlaceholder', 'John')}
@@ -283,7 +283,7 @@ const RegisterPage = () => {
 
           <motion.div
             variants={itemVariants}
-            className="text-center text-sm text-gray-600 pt-2"
+            className="text-center text-sm text-slate-600 pt-2"
           >
             {t('auth:register.haveAccount')}{' '}
             <Link

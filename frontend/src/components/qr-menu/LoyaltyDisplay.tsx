@@ -84,7 +84,7 @@ const LoyaltyDisplay = ({
       case 'GOLD':
         return <Award className="h-6 w-6 text-yellow-500" />;
       case 'SILVER':
-        return <Star className="h-6 w-6 text-gray-400" />;
+        return <Star className="h-6 w-6 text-slate-400" />;
       default:
         return <Award className="h-6 w-6 text-amber-700" />;
     }
@@ -114,8 +114,8 @@ const LoyaltyDisplay = ({
   if (!loyaltyData?.identified) {
     return (
       <div className="bg-white rounded-2xl shadow-md p-6 text-center">
-        <Gift className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-        <p className="text-gray-600">
+        <Gift className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+        <p className="text-slate-600">
           {t('loyalty.notIdentified')}
         </p>
       </div>
@@ -172,10 +172,10 @@ const LoyaltyDisplay = ({
         <div className="bg-white rounded-2xl shadow-md p-6 animate-in fade-in slide-in-from-bottom delay-100">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="text-lg font-bold text-gray-900">
+              <h3 className="text-lg font-bold text-slate-900">
                 {t('loyalty.tierStatus')}
               </h3>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-slate-600">
                 {tierData.currentTierInfo?.name} {t('loyalty.member')}
               </p>
             </div>
@@ -192,14 +192,14 @@ const LoyaltyDisplay = ({
             <>
               <div className="mb-2">
                 <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600">
+                  <span className="text-slate-600">
                     {t('loyalty.progressToNextTier', { tier: tierData.nextTierInfo?.name })}
                   </span>
                   <span className="font-semibold" style={{ color: primaryColor }}>
                     {Math.round(tierData.progressPercentage)}%
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
                   <div
                     className="h-full rounded-full transition-all duration-500"
                     style={{
@@ -209,14 +209,14 @@ const LoyaltyDisplay = ({
                   />
                 </div>
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-slate-500">
                 {t('loyalty.pointsToNextTier', { points: tierData.pointsToNextTier, tier: tierData.nextTierInfo?.name })}
               </p>
             </>
           )}
 
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <div className="flex items-center gap-2 text-sm text-gray-600">
+          <div className="mt-4 pt-4 border-t border-slate-200/60">
+            <div className="flex items-center gap-2 text-sm text-slate-600">
               <TrendingUp className="h-4 w-4" />
               <span>
                 {t('loyalty.lifetimePoints', { points: tierData.lifetimePoints })}
@@ -237,10 +237,10 @@ const LoyaltyDisplay = ({
               <Users className="h-6 w-6" style={{ color: secondaryColor }} />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-900">
+              <h3 className="text-lg font-bold text-slate-900">
                 {t('loyalty.referralProgram')}
               </h3>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-slate-600">
                 {t('loyalty.shareAndEarn')}
               </p>
             </div>
@@ -248,12 +248,12 @@ const LoyaltyDisplay = ({
 
           {referralData.referralCode ? (
             <>
-              <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                <p className="text-xs text-gray-600 mb-2">
+              <div className="bg-slate-50 rounded-lg p-4 mb-4">
+                <p className="text-xs text-slate-600 mb-2">
                   {t('loyalty.yourReferralCode')}
                 </p>
                 <div className="flex items-center gap-2">
-                  <code className="flex-1 text-2xl font-bold tracking-wider text-center py-2 bg-white rounded border-2 border-gray-300">
+                  <code className="flex-1 text-2xl font-bold tracking-wider text-center py-2 bg-white rounded border-2 border-slate-300">
                     {referralData.referralCode}
                   </code>
                   <button
@@ -271,26 +271,26 @@ const LoyaltyDisplay = ({
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-gray-50 rounded-lg p-3 text-center">
+                <div className="bg-slate-50 rounded-lg p-3 text-center">
                   <p className="text-2xl font-bold" style={{ color: secondaryColor }}>
                     {referralData.totalReferrals || 0}
                   </p>
-                  <p className="text-xs text-gray-600">
+                  <p className="text-xs text-slate-600">
                     {t('loyalty.referrals')}
                   </p>
                 </div>
-                <div className="bg-gray-50 rounded-lg p-3 text-center">
+                <div className="bg-slate-50 rounded-lg p-3 text-center">
                   <p className="text-2xl font-bold" style={{ color: secondaryColor }}>
                     {referralData.totalPointsEarned || 0}
                   </p>
-                  <p className="text-xs text-gray-600">
+                  <p className="text-xs text-slate-600">
                     {t('loyalty.pointsEarned')}
                   </p>
                 </div>
               </div>
             </>
           ) : (
-            <p className="text-sm text-gray-600 text-center py-4">
+            <p className="text-sm text-slate-600 text-center py-4">
               {t('loyalty.noReferralCode')}
             </p>
           )}

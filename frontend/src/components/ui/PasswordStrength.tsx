@@ -83,7 +83,7 @@ const PasswordStrength: React.FC<PasswordStrengthProps> = ({
               key={level}
               className={cn(
                 'h-1.5 flex-1 rounded-full transition-colors duration-300',
-                level <= strength.level ? strength.color : 'bg-gray-200'
+                level <= strength.level ? strength.color : 'bg-slate-200'
               )}
             />
           ))}
@@ -101,8 +101,8 @@ const PasswordStrength: React.FC<PasswordStrengthProps> = ({
 
       {/* Requirements List */}
       {showRequirements && (
-        <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-          <p className="text-xs font-medium text-gray-600 mb-2">
+        <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+          <p className="text-xs font-medium text-slate-600 mb-2">
             {t('auth:passwordStrength.requirements', 'Password must contain:')}
           </p>
           <ul className="space-y-1">
@@ -113,7 +113,7 @@ const PasswordStrength: React.FC<PasswordStrengthProps> = ({
                   key={req.key}
                   className={cn(
                     'flex items-center gap-2 text-xs transition-colors duration-200',
-                    passed ? 'text-green-600' : 'text-gray-500'
+                    passed ? 'text-green-600' : 'text-slate-500'
                   )}
                 >
                   {passed ? (

@@ -1,5 +1,14 @@
 {
   "title": "Ayarlar",
+  "autoSave": {
+    "idle": "Değişiklik yok",
+    "saving": "Kaydediliyor...",
+    "saved": "Kaydedildi",
+    "savedSuccess": "Değişiklikler otomatik olarak kaydedildi",
+    "error": "Kaydetme başarısız",
+    "retry": "Tekrar dene",
+    "currencyWarning": "Para birimi değişiklikleri sisteminizdeki tüm fiyatları etkiler. Kaydetmeden önce doğrulayın."
+  },
   "general": "Genel",
   "restaurant": "Restoran",
   "pos": "POS",

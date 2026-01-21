@@ -1,11 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { useGetTenantSettings, useUpdateTenantSettings } from '../../hooks/useCurrency';
-import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
-import Button from '../ui/Button';
+import { useAutoSave, type AutoSaveStatus } from '../../hooks/useAutoSave';
+import { SettingsSection, SettingsDivider, SettingsGroup } from './SettingsSection';
+import { SettingsToggle, SettingsSelect, SettingsInput } from './SettingsToggle';
 import Input from '../ui/Input';
-import { Clock, Mail, Plus, X, Globe } from 'lucide-react';
+import Button from '../ui/Button';
+import { Mail, Plus, X } from 'lucide-react';
 
 // Common timezones for restaurant businesses
 const TIMEZONES = [
@@ -23,28 +25,77 @@ const TIMEZONES = [
   { value: 'Australia/Sydney', label: 'Australia/Sydney (GMT+10/+11)' },
 ];
 
+interface ReportSettingsState {
+  closingTime: string;
+  timezone: string;
+  reportEmailEnabled: boolean;
+}
+
 const ReportSettings = () => {
   const { t } = useTranslation('settings');
   const { data: tenantSettings, isLoading } = useGetTenantSettings();
-  const { mutate: updateSettings, isPending: isUpdating } = useUpdateTenantSettings();
+  const { mutateAsync: updateSettings, mutate: updateSettingsSync, isPending: isUpdating } =
+    useUpdateTenantSettings();
 
-  const [closingTime, setClosingTime] = useState('23:00');
-  const [timezone, setTimezone] = useState('UTC');
-  const [reportEmailEnabled, setReportEmailEnabled] = useState(false);
+  // Auto-save settings
+  const [settings, setSettings] = useState<ReportSettingsState>({
+    closingTime: '23:00',
+    timezone: 'UTC',
+    reportEmailEnabled: false,
+  });
+
+  // Email recipients (manual save)
   const [reportEmails, setReportEmails] = useState<string[]>([]);
   const [newEmail, setNewEmail] = useState('');
   const [emailError, setEmailError] = useState('');
+  const [emailStatus, setEmailStatus] = useState<AutoSaveStatus>('idle');
 
   // Load settings when data arrives
   useEffect(() => {
     if (tenantSettings) {
-      setClosingTime(tenantSettings.closingTime || '23:00');
-      setTimezone(tenantSettings.timezone || 'UTC');
-      setReportEmailEnabled(tenantSettings.reportEmailEnabled || false);
+      setSettings({
+        closingTime: tenantSettings.closingTime || '23:00',
+        timezone: tenantSettings.timezone || 'UTC',
+        reportEmailEnabled: tenantSettings.reportEmailEnabled || false,
+      });
       setReportEmails(tenantSettings.reportEmails || []);
     }
   }, [tenantSettings]);
 
+  // Save function for report settings (auto-save)
+  const saveReportSettings = useCallback(
+    async (newSettings: ReportSettingsState) => {
+      await updateSettings(newSettings);
+    },
+    [updateSettings]
+  );
+
+  // Auto-save hook
+  const {
+    status: autoSaveStatus,
+    setValue: triggerAutoSave,
+    retry: retryAutoSave,
+  } = useAutoSave(settings, saveReportSettings, {
+    debounceMs: 800,
+    onSuccess: () => {
+      toast.success(t('autoSave.savedSuccess'), { duration: 2000 });
+    },
+    onError: () => {
+      toast.error(t('reportSettings.settingsFailed'));
+    },
+  });
+
+  // Handle auto-save field changes
+  const handleFieldChange = <K extends keyof ReportSettingsState>(
+    field: K,
+    value: ReportSettingsState[K]
+  ) => {
+    const newSettings = { ...settings, [field]: value };
+    setSettings(newSettings);
+    triggerAutoSave(newSettings);
+  };
+
+  // Email validation
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
@@ -75,199 +126,177 @@ const ReportSettings = () => {
     toast.success(t('reportSettings.emailRemoved'));
   };
 
-  const handleSave = () => {
-    updateSettings(
-      {
-        closingTime,
-        timezone,
-        reportEmailEnabled,
-        reportEmails,
-      },
+  // Save email list (manual)
+  const handleSaveEmails = () => {
+    setEmailStatus('saving');
+    updateSettingsSync(
+      { reportEmails },
       {
         onSuccess: () => {
+          setEmailStatus('saved');
           toast.success(t('reportSettings.settingsSaved'));
+          setTimeout(() => setEmailStatus('idle'), 2000);
         },
-        onError: (error: any) => {
-          toast.error(error.response?.data?.message || t('reportSettings.settingsFailed'));
+        onError: () => {
+          setEmailStatus('error');
+          toast.error(t('reportSettings.settingsFailed'));
         },
       }
     );
   };
 
-  const hasChanges =
+  const hasEmailChanges =
     tenantSettings &&
-    (closingTime !== (tenantSettings.closingTime || '23:00') ||
-      timezone !== (tenantSettings.timezone || 'UTC') ||
-      reportEmailEnabled !== (tenantSettings.reportEmailEnabled || false) ||
-      JSON.stringify(reportEmails) !== JSON.stringify(tenantSettings.reportEmails || []));
+    JSON.stringify(reportEmails) !== JSON.stringify(tenantSettings.reportEmails || []);
 
   if (isLoading) {
     return (
-      <Card>
-        <CardContent className="pt-6">
-          <p className="text-gray-500 text-center">{t('common:app.loading')}</p>
-        </CardContent>
-      </Card>
+      <SettingsSection
+        title={t('reportSettings.title')}
+        icon={<Mail className="w-4 h-4" />}
+      >
+        <p className="text-slate-500 text-center py-4">{t('common:app.loading')}</p>
+      </SettingsSection>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Mail className="h-5 w-5" />
-          {t('reportSettings.title')}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <p className="text-sm text-gray-600">{t('reportSettings.description')}</p>
-
+    <SettingsSection
+      title={t('reportSettings.title')}
+      description={t('reportSettings.description')}
+      icon={<Mail className="w-4 h-4" />}
+      saveStatus={autoSaveStatus}
+      onRetry={retryAutoSave}
+    >
+      <SettingsGroup>
         {/* Closing Time */}
-        <div>
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-            <Clock className="h-4 w-4" />
-            {t('reportSettings.closingTime')}
-          </label>
-          <Input
-            type="time"
-            value={closingTime}
-            onChange={(e) => setClosingTime(e.target.value)}
-            className="w-48"
-          />
-          <p className="text-xs text-gray-500 mt-1">
-            {t('reportSettings.closingTimeDescription')}
-          </p>
-        </div>
+        <SettingsInput
+          label={t('reportSettings.closingTime')}
+          description={t('reportSettings.closingTimeDescription')}
+          type="time"
+          value={settings.closingTime}
+          onChange={(value) => handleFieldChange('closingTime', value)}
+          inputClassName="w-28"
+        />
+
+        <SettingsDivider />
 
         {/* Timezone */}
-        <div>
-          <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
-            <Globe className="h-4 w-4" />
-            {t('reportSettings.timezone')}
-          </label>
-          <select
-            value={timezone}
-            onChange={(e) => setTimezone(e.target.value)}
-            className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            {TIMEZONES.map((tz) => (
-              <option key={tz.value} value={tz.value}>
-                {tz.label}
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-gray-500 mt-1">
-            {t('reportSettings.timezoneDescription')}
-          </p>
-        </div>
+        <SettingsSelect
+          label={t('reportSettings.timezone')}
+          description={t('reportSettings.timezoneDescription')}
+          value={settings.timezone}
+          onChange={(value) => handleFieldChange('timezone', value)}
+          options={TIMEZONES}
+        />
 
-        <div className="border-t pt-6">
-          {/* Enable Automated Reports */}
-          <div className="flex items-start gap-3 mb-6">
-            <input
-              type="checkbox"
-              id="reportEmailEnabled"
-              checked={reportEmailEnabled}
-              onChange={(e) => setReportEmailEnabled(e.target.checked)}
-              className="w-5 h-5 mt-0.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <div>
-              <label htmlFor="reportEmailEnabled" className="font-semibold text-gray-900 cursor-pointer">
-                {t('reportSettings.enableEmailReports')}
-              </label>
-              <p className="text-sm text-gray-600">
-                {t('reportSettings.enableEmailReportsDescription')}
-              </p>
-            </div>
-          </div>
+        <SettingsDivider />
 
-          {/* Email Recipients */}
-          <div className={reportEmailEnabled ? '' : 'opacity-50 pointer-events-none'}>
-            <label className="text-sm font-medium text-gray-700 mb-2 block">
+        {/* Enable Automated Reports */}
+        <SettingsToggle
+          label={t('reportSettings.enableEmailReports')}
+          description={t('reportSettings.enableEmailReportsDescription')}
+          checked={settings.reportEmailEnabled}
+          onChange={(checked) => handleFieldChange('reportEmailEnabled', checked)}
+        />
+      </SettingsGroup>
+
+      {/* Email Recipients Section (Manual Save) */}
+      <div
+        className={`mt-4 pt-4 border-t border-slate-100 ${
+          settings.reportEmailEnabled ? '' : 'opacity-50 pointer-events-none'
+        }`}
+      >
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <p className="text-sm font-medium text-slate-900">
               {t('reportSettings.emailRecipients')}
-            </label>
-            <p className="text-xs text-gray-500 mb-3">
+            </p>
+            <p className="text-xs text-slate-500">
               {t('reportSettings.emailRecipientsDescription')}
             </p>
-
-            {/* Email List */}
-            <div className="space-y-2 mb-4">
-              {reportEmails.length === 0 ? (
-                <p className="text-sm text-gray-400 italic py-2">
-                  {t('reportSettings.noEmails')}
-                </p>
-              ) : (
-                reportEmails.map((email) => (
-                  <div
-                    key={email}
-                    className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg"
-                  >
-                    <span className="text-sm">{email}</span>
-                    <button
-                      onClick={() => handleRemoveEmail(email)}
-                      className="text-gray-400 hover:text-red-500 transition-colors"
-                      title={t('reportSettings.removeEmail')}
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-
-            {/* Add Email Form */}
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <Input
-                  type="email"
-                  value={newEmail}
-                  onChange={(e) => {
-                    setNewEmail(e.target.value);
-                    setEmailError('');
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddEmail();
-                    }
-                  }}
-                  placeholder="admin@example.com"
-                  error={emailError}
-                />
-              </div>
-              <Button
-                variant="outline"
-                onClick={handleAddEmail}
-                disabled={!newEmail.trim()}
-              >
-                <Plus className="h-4 w-4 mr-1" />
-                {t('reportSettings.addEmail')}
-              </Button>
-            </div>
           </div>
         </div>
 
-        {/* Info box */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <p className="text-sm text-blue-800">
-            <strong>{t('info.noteLabel')}</strong> {t('reportSettings.emailReportInfo')}
-          </p>
+        {/* Email List */}
+        <div className="space-y-2 mb-3">
+          {reportEmails.length === 0 ? (
+            <p className="text-sm text-slate-400 italic py-2">
+              {t('reportSettings.noEmails')}
+            </p>
+          ) : (
+            reportEmails.map((email) => (
+              <div
+                key={email}
+                className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-lg"
+              >
+                <span className="text-sm">{email}</span>
+                <button
+                  onClick={() => handleRemoveEmail(email)}
+                  className="text-slate-400 hover:text-red-500 transition-colors"
+                  title={t('reportSettings.removeEmail')}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))
+          )}
         </div>
 
-        {/* Save button */}
-        <div className="flex justify-end pt-4">
+        {/* Add Email Form */}
+        <div className="flex gap-2">
+          <div className="flex-1">
+            <Input
+              type="email"
+              value={newEmail}
+              onChange={(e) => {
+                setNewEmail(e.target.value);
+                setEmailError('');
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  handleAddEmail();
+                }
+              }}
+              placeholder="admin@example.com"
+              error={emailError}
+              className="text-sm"
+            />
+          </div>
           <Button
-            variant="primary"
-            size="lg"
-            onClick={handleSave}
-            isLoading={isUpdating}
-            disabled={!hasChanges}
+            variant="outline"
+            size="sm"
+            onClick={handleAddEmail}
+            disabled={!newEmail.trim()}
           >
-            {t('saveChanges')}
+            <Plus className="h-4 w-4 mr-1" />
+            {t('reportSettings.addEmail')}
           </Button>
         </div>
-      </CardContent>
-    </Card>
+
+        {/* Save Email List Button */}
+        {hasEmailChanges && (
+          <div className="mt-3 flex justify-end">
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleSaveEmails}
+              isLoading={isUpdating}
+            >
+              {t('saveChanges')}
+            </Button>
+          </div>
+        )}
+      </div>
+
+      {/* Info box */}
+      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <p className="text-sm text-blue-800">
+          <strong>{t('info.noteLabel')}</strong> {t('reportSettings.emailReportInfo')}
+        </p>
+      </div>
+    </SettingsSection>
   );
 };
 

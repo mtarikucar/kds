@@ -1,8 +1,10 @@
 {
   "menu": {
     "title": "Menü Yönetimi",
+    "menuTab": "Menü",
     "categories": "Kategoriler",
     "items": "Ürünler",
+    "item": "ürün",
     "addCategory": "Kategori Ekle",
     "addItem": "Ürün Ekle",
     "editCategory": "Kategoriyi Düzenle",
@@ -86,6 +88,15 @@
     "noModifierGroupsAvailable": "Kullanılabilir seçenek grubu yok",
     "confirmDeleteModifierGroup": "Bu seçenek grubunu silmek istiyor musunuz?",
     "confirmDeleteModifier": "Bu seçeneği silmek istiyor musunuz?",
+    "dragToReorder": "Kategorileri ve ürünleri sıralamak için sürükleyin",
+    "addProductToCategory": "Bu kategoriye ürün ekle",
+    "noProductsInCategory": "Bu kategoride ürün yok",
+    "noCategories": "Henüz kategori yok",
+    "noCategoriesDesc": "Menü öğelerinizi düzenlemek için kategoriler oluşturun",
+    "uncategorized": "Kategorisiz",
+    "uncategorizedDesc": "Bu ürünlerin geçerli bir kategorisi yok. Kategori atamak için düzenleyin.",
+    "collapseAll": "Tümünü Daralt",
+    "expandAll": "Tümünü Genişlet",
     "validation": {
       "nameRequired": "İsim gereklidir",
       "pricePositive": "Fiyat pozitif olmalıdır",

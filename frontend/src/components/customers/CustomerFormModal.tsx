@@ -182,7 +182,7 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         />
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-slate-700 mb-1">
             {t('customers.tags')}
           </label>
           <div className="flex gap-2 mb-2">
@@ -191,7 +191,7 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
               value={tagInput}
               onChange={(e) => setTagInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder={t('customers.tagsPlaceholder')}
             />
             <Button type="button" size="sm" onClick={handleAddTag}>
@@ -220,13 +220,13 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-sm font-medium text-slate-700 mb-1">
             {t('customers.notes')}
           </label>
           <textarea
             {...register('notes')}
             rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
             placeholder={t('customers.notes')}
           />
         </div>

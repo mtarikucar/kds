@@ -26,17 +26,17 @@ export function InvoiceCard({ invoice }: InvoiceCardProps) {
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow">
+    <div className="bg-white rounded-lg border border-slate-200 p-6 hover:shadow-md transition-shadow">
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-indigo-50 rounded-lg">
             <FileText className="w-5 h-5 text-indigo-600" />
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900">
+            <h3 className="font-semibold text-slate-900">
               {invoice.invoiceNumber}
             </h3>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-slate-500">
               {format(new Date(invoice.createdAt), 'MMM dd, yyyy')}
             </p>
           </div>
@@ -65,8 +65,8 @@ export function InvoiceCard({ invoice }: InvoiceCardProps) {
 
       <div className="space-y-2 mb-4">
         <div className="flex justify-between text-sm">
-          <span className="text-gray-600">Period</span>
-          <span className="text-gray-900">
+          <span className="text-slate-600">Period</span>
+          <span className="text-slate-900">
             {format(new Date(invoice.periodStart), 'MMM dd')} -{' '}
             {format(new Date(invoice.periodEnd), 'MMM dd, yyyy')}
           </span>
@@ -74,16 +74,16 @@ export function InvoiceCard({ invoice }: InvoiceCardProps) {
 
         {invoice.paidAt && (
           <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Paid on</span>
-            <span className="text-gray-900">
+            <span className="text-slate-600">Paid on</span>
+            <span className="text-slate-900">
               {format(new Date(invoice.paidAt), 'MMM dd, yyyy')}
             </span>
           </div>
         )}
 
-        <div className="flex justify-between text-sm pt-2 border-t border-gray-100">
-          <span className="font-medium text-gray-900">Total</span>
-          <span className="font-bold text-gray-900">
+        <div className="flex justify-between text-sm pt-2 border-t border-slate-100">
+          <span className="font-medium text-slate-900">Total</span>
+          <span className="font-bold text-slate-900">
             {invoice.currency} {Number(invoice.total).toFixed(2)}
           </span>
         </div>
@@ -91,7 +91,7 @@ export function InvoiceCard({ invoice }: InvoiceCardProps) {
 
       <button
         onClick={handleDownload}
-        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-50 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors text-sm font-medium"
+        className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-slate-50 text-slate-700 rounded-lg hover:bg-slate-100 transition-colors text-sm font-medium"
       >
         <Download className="w-4 h-4" />
         Download Invoice

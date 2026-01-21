@@ -45,7 +45,7 @@ const CustomersPage = () => {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-screen">
-        <div className="text-gray-600">{t('app:app.loading')}</div>
+        <div className="text-slate-600">{t('app:app.loading')}</div>
       </div>
     );
   }
@@ -67,7 +67,7 @@ const CustomersPage = () => {
             placeholder={t('customers.search')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-3 md:px-4 py-2 text-sm md:text-base border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 md:px-4 py-2 text-sm md:text-base border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
         </CardContent>
       </Card>
@@ -76,7 +76,7 @@ const CustomersPage = () => {
       <div className="grid gap-3 md:gap-4">
         {filteredCustomers.length === 0 ? (
           <Card>
-            <CardContent className="py-12 text-center text-gray-500">
+            <CardContent className="py-12 text-center text-slate-500">
               {searchTerm ? t('customers.noCustomers') : t('customers.noCustomers')}
             </CardContent>
           </Card>
@@ -89,7 +89,7 @@ const CustomersPage = () => {
                     <div className="flex items-center gap-3">
                       <div className="min-w-0 flex-1">
                         <h3 className="font-semibold text-base md:text-lg truncate">{customer.name}</h3>
-                        <div className="flex flex-col sm:flex-row sm:gap-4 text-xs md:text-sm text-gray-600 mt-1">
+                        <div className="flex flex-col sm:flex-row sm:gap-4 text-xs md:text-sm text-slate-600 mt-1">
                           {customer.email && <span className="truncate">{customer.email}</span>}
                           {customer.phone && <span>{customer.phone}</span>}
                         </div>
@@ -99,15 +99,15 @@ const CustomersPage = () => {
                     {/* Stats */}
                     <div className="flex flex-wrap gap-3 md:gap-6 mt-2 md:mt-3 text-xs md:text-sm">
                       <div>
-                        <span className="text-gray-600">{t('customers.totalOrders')}:</span>
+                        <span className="text-slate-600">{t('customers.totalOrders')}:</span>
                         <span className="ml-1 font-medium">{customer.totalOrders || 0}</span>
                       </div>
                       <div>
-                        <span className="text-gray-600">{t('customers.totalSpent')}:</span>
+                        <span className="text-slate-600">{t('customers.totalSpent')}:</span>
                         <span className="ml-1 font-medium">${customer.totalSpent || '0.00'}</span>
                       </div>
                       <div>
-                        <span className="text-gray-600">{t('customers.loyaltyPoints', 'Points')}:</span>
+                        <span className="text-slate-600">{t('customers.loyaltyPoints', 'Points')}:</span>
                         <span className="ml-1 font-medium">{customer.loyaltyPoints || 0}</span>
                       </div>
                     </div>
@@ -171,19 +171,19 @@ const CustomersPage = () => {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 text-center">
               <div className="p-3 bg-blue-50 rounded-lg sm:bg-transparent sm:p-0">
                 <p className="text-xl md:text-2xl font-bold text-blue-600">{customers.length}</p>
-                <p className="text-xs md:text-sm text-gray-600">{t('customers.title')}</p>
+                <p className="text-xs md:text-sm text-slate-600">{t('customers.title')}</p>
               </div>
               <div className="p-3 bg-green-50 rounded-lg sm:bg-transparent sm:p-0">
                 <p className="text-xl md:text-2xl font-bold text-green-600">
                   ${customers.reduce((sum: number, c: Customer) => sum + (parseFloat(String(c.totalSpent)) || 0), 0).toFixed(2)}
                 </p>
-                <p className="text-xs md:text-sm text-gray-600">{t('customers.totalSpent')}</p>
+                <p className="text-xs md:text-sm text-slate-600">{t('customers.totalSpent')}</p>
               </div>
               <div className="p-3 bg-purple-50 rounded-lg sm:bg-transparent sm:p-0">
                 <p className="text-xl md:text-2xl font-bold text-purple-600">
                   {customers.reduce((sum: number, c: Customer) => sum + (c.totalOrders || 0), 0)}
                 </p>
-                <p className="text-xs md:text-sm text-gray-600">{t('customers.totalOrders')}</p>
+                <p className="text-xs md:text-sm text-slate-600">{t('customers.totalOrders')}</p>
               </div>
             </div>
           </CardContent>

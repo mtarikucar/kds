@@ -10,7 +10,7 @@ interface CartDrawerProps {
 
 const CartDrawer = ({ isOpen, onClose, children }: CartDrawerProps) => {
   const { t } = useTranslation('pos');
-  // Prevent body scroll when drawer is open
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -22,7 +22,6 @@ const CartDrawer = ({ isOpen, onClose, children }: CartDrawerProps) => {
     };
   }, [isOpen]);
 
-  // Close on escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -39,7 +38,7 @@ const CartDrawer = ({ isOpen, onClose, children }: CartDrawerProps) => {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity lg:hidden"
+        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-40 transition-opacity lg:hidden"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -53,14 +52,14 @@ const CartDrawer = ({ isOpen, onClose, children }: CartDrawerProps) => {
       >
         <div className="bg-white rounded-t-2xl shadow-2xl h-full flex flex-col">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-            <h2 className="text-lg font-bold text-gray-900">{t('cart.yourOrder')}</h2>
+          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+            <h2 className="text-lg font-heading font-bold text-slate-900">{t('cart.yourOrder')}</h2>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              className="p-2 hover:bg-slate-100 rounded-xl transition-colors text-slate-500 hover:text-slate-700"
               aria-label={t('cart.closeCart')}
             >
-              <X className="h-5 w-5 text-gray-600" />
+              <X className="h-5 w-5" />
             </button>
           </div>
 

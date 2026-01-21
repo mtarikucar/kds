@@ -77,20 +77,20 @@ const TransferTableModal = ({
           <div className="bg-blue-50 p-4 rounded-lg">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">{t('transfer.sourceTable')}</p>
+                <p className="text-sm text-slate-600">{t('transfer.sourceTable')}</p>
                 <p className="text-2xl font-bold text-blue-600">
                   {t('table')} {sourceTable.number}
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-sm text-gray-600">{t('transfer.activeOrders')}</p>
-                <p className="text-xl font-semibold text-gray-900">{orderCount}</p>
+                <p className="text-sm text-slate-600">{t('transfer.activeOrders')}</p>
+                <p className="text-xl font-semibold text-slate-900">{orderCount}</p>
               </div>
             </div>
           </div>
 
           {/* Instruction */}
-          <p className="text-sm text-gray-600">{t('transfer.selectTarget')}</p>
+          <p className="text-sm text-slate-600">{t('transfer.selectTarget')}</p>
 
           {/* Table Grid */}
           {isLoadingTables ? (
@@ -98,7 +98,7 @@ const TransferTableModal = ({
               <Spinner />
             </div>
           ) : availableTables.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
+            <div className="text-center py-8 text-slate-500">
               {t('transfer.noAvailableTables')}
             </div>
           ) : (
@@ -114,7 +114,7 @@ const TransferTableModal = ({
                   onClick={() => handleSelectTable(table)}
                 >
                   <div className="text-center">
-                    <div className="text-2xl font-bold mb-2 text-gray-900">
+                    <div className="text-2xl font-bold mb-2 text-slate-900">
                       {table.number}
                     </div>
                     <Badge variant={getTableVariant(table.status)} className="text-xs">
@@ -148,11 +148,11 @@ const TransferTableModal = ({
               <div className="w-20 h-20 rounded-lg bg-blue-100 flex items-center justify-center mb-2">
                 <span className="text-2xl font-bold text-blue-600">{sourceTable.number}</span>
               </div>
-              <p className="text-sm text-gray-600">{t('transfer.from')}</p>
+              <p className="text-sm text-slate-600">{t('transfer.from')}</p>
             </div>
 
             {/* Arrow */}
-            <ArrowRight className="h-8 w-8 text-gray-400" />
+            <ArrowRight className="h-8 w-8 text-slate-400" />
 
             {/* Target */}
             <div className="text-center">
@@ -169,14 +169,14 @@ const TransferTableModal = ({
                   {selectedTarget?.number}
                 </span>
               </div>
-              <p className="text-sm text-gray-600">{t('transfer.to')}</p>
+              <p className="text-sm text-slate-600">{t('transfer.to')}</p>
             </div>
           </div>
 
           {/* Transfer Details */}
-          <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+          <div className="bg-slate-50 p-4 rounded-lg space-y-2">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-600">{t('transfer.ordersToTransfer')}</span>
+              <span className="text-slate-600">{t('transfer.ordersToTransfer')}</span>
               <span className="font-semibold">{orderCount}</span>
             </div>
           </div>
@@ -193,7 +193,7 @@ const TransferTableModal = ({
           )}
 
           {/* Confirmation Text */}
-          <p className="text-center text-gray-600">
+          <p className="text-center text-slate-600">
             {t('transfer.confirmText', {
               count: orderCount,
               sourceTable: sourceTable.number,

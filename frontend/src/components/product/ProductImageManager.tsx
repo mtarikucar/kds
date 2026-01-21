@@ -113,11 +113,11 @@ const ProductImageManager: React.FC<ProductImageManagerProps> = ({
       {images.length > 0 && (
         <div>
           <div className="mb-3">
-            <p className="text-sm font-medium text-gray-700 flex items-center gap-2">
+            <p className="text-sm font-medium text-slate-700 flex items-center gap-2">
               <Star className="h-4 w-4 text-yellow-500" />
               First image is the primary image
             </p>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-slate-500 mt-1">
               Drag and drop to reorder images
             </p>
           </div>
@@ -132,7 +132,7 @@ const ProductImageManager: React.FC<ProductImageManagerProps> = ({
                     'grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-lg border-2 border-dashed transition-colors',
                     snapshot.isDraggingOver
                       ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-300'
+                      : 'border-slate-300'
                   )}
                 >
                   {images.map((image, index) => (
@@ -150,7 +150,7 @@ const ProductImageManager: React.FC<ProductImageManagerProps> = ({
                             'relative group rounded-lg border overflow-hidden bg-white transition-all',
                             snapshot.isDragging
                               ? 'shadow-2xl ring-2 ring-blue-500 scale-105'
-                              : 'shadow-sm hover:shadow-md border-gray-200'
+                              : 'shadow-sm hover:shadow-md border-slate-200'
                           )}
                         >
                           {/* Drag Handle */}
@@ -158,7 +158,7 @@ const ProductImageManager: React.FC<ProductImageManagerProps> = ({
                             {...provided.dragHandleProps}
                             className="absolute top-2 left-2 z-10 bg-white bg-opacity-90 rounded p-1.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
                           >
-                            <GripVertical className="h-4 w-4 text-gray-600" />
+                            <GripVertical className="h-4 w-4 text-slate-600" />
                           </div>
 
                           {/* Primary Badge */}
@@ -181,7 +181,7 @@ const ProductImageManager: React.FC<ProductImageManagerProps> = ({
                           )}
 
                           {/* Image */}
-                          <div className="aspect-square flex items-center justify-center bg-gray-100">
+                          <div className="aspect-square flex items-center justify-center bg-slate-100">
                             {image.url ? (
                               <img
                                 src={getImageUrl(image.url)}
@@ -189,22 +189,22 @@ const ProductImageManager: React.FC<ProductImageManagerProps> = ({
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <ImageIcon className="h-12 w-12 text-gray-400" />
+                              <ImageIcon className="h-12 w-12 text-slate-400" />
                             )}
                           </div>
 
                           {/* Info */}
-                          <div className="p-2 bg-gray-50">
-                            <p className="text-xs truncate font-medium text-gray-900">
+                          <div className="p-2 bg-slate-50">
+                            <p className="text-xs truncate font-medium text-slate-900">
                               {image.filename}
                             </p>
-                            <p className="text-xs text-gray-500">
+                            <p className="text-xs text-slate-500">
                               {(image.size / 1024).toFixed(1)} KB
                             </p>
                           </div>
 
                           {/* Order Badge */}
-                          <div className="absolute bottom-14 left-2 bg-gray-900 bg-opacity-75 text-white text-xs font-bold px-2 py-1 rounded">
+                          <div className="absolute bottom-14 left-2 bg-slate-900 bg-opacity-75 text-white text-xs font-bold px-2 py-1 rounded">
                             #{index + 1}
                           </div>
                         </div>
@@ -221,10 +221,10 @@ const ProductImageManager: React.FC<ProductImageManagerProps> = ({
 
       {/* Empty State */}
       {images.length === 0 && (
-        <div className="text-center py-8 px-4 border-2 border-dashed border-gray-300 rounded-lg">
-          <ImageIcon className="mx-auto h-12 w-12 text-gray-400" />
-          <p className="mt-2 text-sm font-medium text-gray-900">No images added</p>
-          <p className="mt-1 text-xs text-gray-500">
+        <div className="text-center py-8 px-4 border-2 border-dashed border-slate-300 rounded-lg">
+          <ImageIcon className="mx-auto h-12 w-12 text-slate-400" />
+          <p className="mt-2 text-sm font-medium text-slate-900">No images added</p>
+          <p className="mt-1 text-xs text-slate-500">
             Upload images or choose from library to get started
           </p>
         </div>

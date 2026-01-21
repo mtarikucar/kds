@@ -88,19 +88,19 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
       <div className="space-y-4">
         {/* Search Bar */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
           <input
             type="text"
             placeholder={t('menu.searchImages')}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           />
         </div>
 
         {/* Selection Counter */}
         <div className="flex items-center justify-between text-sm">
-          <span className="text-gray-600">
+          <span className="text-slate-600">
             {localSelection.size} {t('menu.selected')}
             {maxSelection && ` (${t('menu.max')} ${maxSelection})`}
           </span>
@@ -118,16 +118,16 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
         <div className="max-h-[60vh] overflow-y-auto">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center py-12">
-              <Loader2 className="h-12 w-12 text-gray-400 animate-spin" />
-              <p className="mt-4 text-sm text-gray-500">{t('menu.loadingImages')}</p>
+              <Loader2 className="h-12 w-12 text-slate-400 animate-spin" />
+              <p className="mt-4 text-sm text-slate-500">{t('menu.loadingImages')}</p>
             </div>
           ) : filteredImages.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12">
-              <ImageIcon className="h-12 w-12 text-gray-400" />
-              <p className="mt-4 text-sm font-medium text-gray-900">
+              <ImageIcon className="h-12 w-12 text-slate-400" />
+              <p className="mt-4 text-sm font-medium text-slate-900">
                 {searchTerm ? t('menu.noImagesFoundSearch') : t('menu.noImagesInLibrary')}
               </p>
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-slate-500">
                 {searchTerm
                   ? t('menu.tryDifferentSearch')
                   : t('menu.uploadSomeImages')}
@@ -145,7 +145,7 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
                       'relative group rounded-lg border-2 overflow-hidden cursor-pointer transition-all',
                       isSelected
                         ? 'border-blue-500 ring-2 ring-blue-500'
-                        : 'border-gray-200 hover:border-gray-300'
+                        : 'border-slate-200 hover:border-slate-300'
                     )}
                   >
                     {/* Selection Checkbox */}
@@ -154,7 +154,7 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
                         'absolute top-2 left-2 z-10 w-6 h-6 rounded-full flex items-center justify-center transition-all',
                         isSelected
                           ? 'bg-blue-500 text-white'
-                          : 'bg-white bg-opacity-80 border-2 border-gray-300 group-hover:bg-opacity-100'
+                          : 'bg-white bg-opacity-80 border-2 border-slate-300 group-hover:bg-opacity-100'
                       )}
                     >
                       {isSelected && <Check className="h-4 w-4" />}
@@ -170,7 +170,7 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
                     </button>
 
                     {/* Image */}
-                    <div className="aspect-square flex items-center justify-center bg-gray-100">
+                    <div className="aspect-square flex items-center justify-center bg-slate-100">
                       <img
                         src={getImageUrl(image.url)}
                         alt={image.filename}
@@ -180,10 +180,10 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
 
                     {/* Info */}
                     <div className="p-2 bg-white">
-                      <p className="text-xs truncate font-medium text-gray-900">
+                      <p className="text-xs truncate font-medium text-slate-900">
                         {image.filename}
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-slate-500">
                         {(image.size / 1024).toFixed(1)} KB
                       </p>
                     </div>
@@ -195,7 +195,7 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+        <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
           <Button type="button" variant="secondary" onClick={onClose}>
             {t('menu.cancel')}
           </Button>

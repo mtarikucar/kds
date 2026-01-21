@@ -217,11 +217,11 @@ const IntegrationsSettingsPage = () => {
 
   return (
     <div className="h-full p-6">
-      <div className="mb-6">
+      <div className="mb-8">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">{t('integrationsLabel')}</h1>
-            <p className="text-gray-600 mt-1">
+            <h1 className="text-2xl font-heading font-bold text-slate-900">{t('integrationsLabel')}</h1>
+            <p className="text-slate-500 mt-1">
               {t('integrationsDescription')}
             </p>
           </div>
@@ -280,7 +280,7 @@ const IntegrationsSettingsPage = () => {
                       />
                     ))
                   ) : (
-                    <div className="col-span-full text-center py-8 text-gray-500">
+                    <div className="col-span-full text-center py-8 text-slate-500">
                       {t('noPrintersConfigured')}
                     </div>
                   )}
@@ -300,7 +300,7 @@ const IntegrationsSettingsPage = () => {
                       />
                     ))
                   ) : (
-                    <div className="col-span-full text-center py-8 text-gray-500">
+                    <div className="col-span-full text-center py-8 text-slate-500">
                       {t('noCashDrawersConfigured')}
                     </div>
                   )}
@@ -320,7 +320,7 @@ const IntegrationsSettingsPage = () => {
                       />
                     ))
                   ) : (
-                    <div className="col-span-full text-center py-8 text-gray-500">
+                    <div className="col-span-full text-center py-8 text-slate-500">
                       {t('noPagersConfigured')}
                     </div>
                   )}
@@ -340,7 +340,7 @@ const IntegrationsSettingsPage = () => {
                       />
                     ))
                   ) : (
-                    <div className="col-span-full text-center py-8 text-gray-500">
+                    <div className="col-span-full text-center py-8 text-slate-500">
                       {t('noBarcodeScanners')}
                     </div>
                   )}
@@ -368,35 +368,35 @@ const IntegrationsSettingsPage = () => {
         <CardContent>
           {isLoading ? (
             <div className="text-center py-12">
-              <p className="text-gray-600">{t('integrations.loading')}</p>
+              <p className="text-slate-500">{t('integrations.loading')}</p>
             </div>
           ) : regularIntegrations && regularIntegrations.length === 0 ? (
             <div className="text-center py-12">
-              <Plug className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600 mb-4">{t('integrations.none')}</p>
+              <Plug className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+              <p className="text-slate-500 mb-4">{t('integrations.none')}</p>
             </div>
           ) : (
             <div className="space-y-4">
               {regularIntegrations?.map((integration) => (
                 <div
                   key={integration.id}
-                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:border-gray-300 transition-colors"
+                  className="flex items-center justify-between px-6 py-5 border border-slate-200/60 rounded-xl hover:shadow-md transition-shadow duration-200"
                 >
                   <div className="flex items-center gap-4 flex-1">
                     <div
                       className={`p-3 rounded-lg ${
-                        integration.isEnabled ? 'bg-green-100' : 'bg-gray-100'
+                        integration.isEnabled ? 'bg-green-100' : 'bg-slate-100'
                       }`}
                     >
                       <Plug
                         className={`h-5 w-5 ${
-                          integration.isEnabled ? 'text-green-600' : 'text-gray-400'
+                          integration.isEnabled ? 'text-green-600' : 'text-slate-400'
                         }`}
                       />
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-gray-900">
+                        <h3 className="font-semibold text-slate-900">
                           {integration.provider}
                         </h3>
                         {integration.isEnabled ? (
@@ -405,7 +405,7 @@ const IntegrationsSettingsPage = () => {
                           <Badge variant="default">{t('common:statuses.inactive')}</Badge>
                         )}
                       </div>
-                      <p className="text-sm text-gray-600">
+                      <p className="text-sm text-slate-500">
                         {getIntegrationTypeLabel(integration.integrationType)} •{' '}
                         {integration.provider}
                         {integration.lastSyncedAt && (

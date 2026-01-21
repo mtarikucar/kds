@@ -42,11 +42,14 @@ const DropdownMenuTrigger = React.forwardRef<HTMLButtonElement, DropdownMenuTrig
     const { open, setOpen } = useDropdownMenuContext();
 
     if (asChild && React.isValidElement(children)) {
-      return React.cloneElement(children as React.ReactElement<any>, {
+      return React.cloneElement(children as React.ReactElement<React.HTMLAttributes<HTMLElement>>, {
         onClick: (e: React.MouseEvent) => {
           e.stopPropagation();
           setOpen(!open);
-          (children as React.ReactElement<any>).props.onClick?.(e);
+          const childProps = (children as React.ReactElement<React.HTMLAttributes<HTMLElement>>).props;
+          if (childProps.onClick) {
+            childProps.onClick(e as React.MouseEvent<HTMLElement>);
+          }
         },
       });
     }
@@ -106,8 +109,8 @@ const DropdownMenuContent = React.forwardRef<HTMLDivElement, DropdownMenuContent
       <div
         ref={contentRef}
         className={cn(
-          'absolute z-50 min-w-[8rem] overflow-hidden rounded-md border border-gray-200 bg-white p-1 text-gray-950 shadow-md',
-          'animate-in fade-in-0 zoom-in-95',
+          'absolute z-50 min-w-[8rem] overflow-hidden rounded-xl border border-slate-200/60 bg-white p-1.5 text-slate-700 shadow-lg',
+          'animate-in fade-in-0 zoom-in-95 duration-150',
           alignmentClasses[align],
           className
         )}
@@ -125,10 +128,11 @@ DropdownMenuContent.displayName = 'DropdownMenuContent';
 interface DropdownMenuItemProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
   inset?: boolean;
+  destructive?: boolean;
 }
 
 const DropdownMenuItem = React.forwardRef<HTMLButtonElement, DropdownMenuItemProps>(
-  ({ className, children, inset, onClick, ...props }, ref) => {
+  ({ className, children, inset, destructive, onClick, ...props }, ref) => {
     const { setOpen } = useDropdownMenuContext();
 
     return (
@@ -136,9 +140,10 @@ const DropdownMenuItem = React.forwardRef<HTMLButtonElement, DropdownMenuItemPro
         ref={ref}
         type="button"
         className={cn(
-          'relative flex w-full cursor-pointer select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none transition-colors',
-          'hover:bg-gray-100 focus:bg-gray-100',
+          'relative flex w-full cursor-pointer select-none items-center rounded-lg px-3 py-2 text-sm outline-none transition-colors duration-150',
+          'hover:bg-slate-50 focus:bg-slate-50',
           'disabled:pointer-events-none disabled:opacity-50',
+          destructive && 'text-red-600 hover:bg-red-50 focus:bg-red-50',
           inset && 'pl-8',
           className
         )}
@@ -166,7 +171,7 @@ const DropdownMenuLabel = React.forwardRef<HTMLDivElement, DropdownMenuLabelProp
     return (
       <div
         ref={ref}
-        className={cn('px-2 py-1.5 text-sm font-semibold', inset && 'pl-8', className)}
+        className={cn('px-3 py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider', inset && 'pl-8', className)}
         {...props}
       >
         {children}
@@ -183,7 +188,7 @@ const DropdownMenuSeparator = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn('-mx-1 my-1 h-px bg-gray-200', className)}
+    className={cn('-mx-1.5 my-1.5 h-px bg-slate-100', className)}
     {...props}
   />
 ));

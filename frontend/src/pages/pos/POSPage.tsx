@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
-import TableGrid from '../../components/pos/TableGrid';
+import { ArrowLeft, ShoppingBag, ArrowRight, Users, Clock, User, Receipt } from 'lucide-react';
 import MenuPanel from '../../components/pos/MenuPanel';
 import OrderCart from '../../components/pos/OrderCart';
 import PaymentModal from '../../components/pos/PaymentModal';
@@ -13,14 +13,18 @@ import PendingOrdersPanel from '../../components/pos/PendingOrdersPanel';
 import WaiterRequestsPanel from '../../components/pos/WaiterRequestsPanel';
 import BillRequestsPanel from '../../components/pos/BillRequestsPanel';
 import { useCreateOrder, useUpdateOrder, useOrders, useTransferTableOrders } from '../../features/orders/ordersApi';
-import { useCreatePayment } from '../../features/orders/ordersApi';
+import { useCreatePayment, usePendingOrders, useWaiterRequests, useBillRequests } from '../../features/orders/ordersApi';
 import TransferTableModal from '../../components/pos/TransferTableModal';
-import { useUpdateTableStatus } from '../../features/tables/tablesApi';
+import { useTables, useUpdateTableStatus } from '../../features/tables/tablesApi';
 import { useGetPosSettings } from '../../features/pos/posApi';
 import { usePosSocket } from '../../features/pos/usePosSocket';
 import { Product, Table, TableStatus, OrderType, OrderStatus } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { useResponsive } from '../../hooks/useResponsive';
+import Spinner from '../../components/ui/Spinner';
+
+// View state type
+type POSView = 'table-selection' | 'order';
 
 interface CartItem extends Product {
   quantity: number;
@@ -30,6 +34,10 @@ interface CartItem extends Product {
 
 const POSPage = () => {
   const { t } = useTranslation('pos');
+
+  // View state: table-selection or order
+  const [currentView, setCurrentView] = useState<POSView>('table-selection');
+
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState(0);
@@ -47,13 +55,27 @@ const POSPage = () => {
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
 
   // Responsive hook
-  const { isDesktop, isMobile, isTablet } = useResponsive();
+  const { isDesktop } = useResponsive();
 
   // Socket.IO for real-time updates
   usePosSocket();
 
   // Fetch POS settings
   const { data: posSettings } = useGetPosSettings();
+
+  // Fetch tables and notifications for table selection screen
+  const { data: tables, isLoading: isLoadingTables } = useTables();
+  const { data: pendingOrders = [] } = usePendingOrders();
+  const { data: waiterRequests = [] } = useWaiterRequests();
+  const { data: billRequests = [] } = useBillRequests();
+
+  // Get notifications for a specific table
+  const getTableNotifications = useCallback((tableId: string) => {
+    const orders = pendingOrders.filter(order => order.tableId === tableId).length;
+    const waiter = waiterRequests.filter(req => req.tableId === tableId).length;
+    const bill = billRequests.filter(req => req.tableId === tableId).length;
+    return { orders, waiter, bill };
+  }, [pendingOrders, waiterRequests, billRequests]);
 
   const { mutate: createOrder, isPending: isCreatingOrder } = useCreateOrder();
   const { mutate: updateOrder, isPending: isUpdatingOrder } = useUpdateOrder();
@@ -64,6 +86,14 @@ const POSPage = () => {
   // Determine if tableless mode is enabled
   const isTablelessMode = posSettings?.enableTablelessMode ?? false;
   const isTwoStepCheckout = posSettings?.enableTwoStepCheckout ?? false;
+
+  // Auto-enable takeaway mode when tableless mode is active
+  useEffect(() => {
+    if (isTablelessMode) {
+      setSelectedTable(null);
+      setCurrentView('order');
+    }
+  }, [isTablelessMode]);
 
   // Fetch active orders for selected table (exclude pending approval, paid, and cancelled)
   const { data: tableOrders, refetch: refetchOrders } = useOrders(
@@ -127,6 +157,7 @@ const POSPage = () => {
       setOrderNotes('');
       setCurrentOrderId(null);
       setCurrentOrderAmount(null);
+      setCurrentView('order');
     } else if (table.status === TableStatus.OCCUPIED) {
       setSelectedTable(table);
       // Clear cart first - useEffect will load existing orders
@@ -134,10 +165,29 @@ const POSPage = () => {
       setDiscount(0);
       setCustomerName('');
       setOrderNotes('');
-  toast.info(t('loadingExistingOrder'));
+      setCurrentView('order');
+      toast.info(t('loadingExistingOrder'));
     } else {
-  toast.warning(t('tableReserved'));
+      toast.warning(t('tableReserved'));
     }
+  };
+
+  // Handle back to table selection (preserves cart)
+  const handleBackToTables = () => {
+    setCurrentView('table-selection');
+    // Cart is preserved - user can select different table
+  };
+
+  // Handle takeaway mode (no table needed)
+  const handleTakeawayMode = () => {
+    setSelectedTable(null);
+    setCartItems([]);
+    setDiscount(0);
+    setCustomerName('');
+    setOrderNotes('');
+    setCurrentOrderId(null);
+    setCurrentOrderAmount(null);
+    setCurrentView('order');
   };
 
   const handleAddItem = (product: Product) => {
@@ -439,6 +489,33 @@ const POSPage = () => {
   const total = subtotal - discount;
   const hasCartItems = cartItems.length > 0;
 
+  // Table card status styles
+  const getStatusStyles = (status: TableStatus) => {
+    switch (status) {
+      case TableStatus.AVAILABLE:
+        return 'border-green-200 hover:border-green-300 hover:shadow-green-100/50';
+      case TableStatus.OCCUPIED:
+        return 'border-amber-200 hover:border-amber-300 hover:shadow-amber-100/50';
+      case TableStatus.RESERVED:
+        return 'border-slate-300 hover:border-slate-400';
+      default:
+        return 'border-slate-200';
+    }
+  };
+
+  const getStatusBadgeStyles = (status: TableStatus) => {
+    switch (status) {
+      case TableStatus.AVAILABLE:
+        return 'bg-green-100 text-green-700';
+      case TableStatus.OCCUPIED:
+        return 'bg-amber-100 text-amber-700';
+      case TableStatus.RESERVED:
+        return 'bg-slate-100 text-slate-600';
+      default:
+        return 'bg-slate-100 text-slate-600';
+    }
+  };
+
   return (
     <div className="h-full pb-20 lg:pb-0">
       {/* Notification Bar */}
@@ -448,130 +525,253 @@ const POSPage = () => {
         onShowBillRequests={() => setIsBillRequestsPanelOpen(true)}
       />
 
-      {/* Header */}
-      <div className="mb-4 md:mb-6">
-  <h1 className="text-2xl md:text-3xl font-bold text-gray-900">{t('title')}</h1>
-        <p className="text-sm md:text-base text-gray-600">
-          {isTablelessMode
-            ? t('startTakingOrdersTableless')
-            : t('selectTableAndStart')}
-        </p>
-        {/* Selected Table Indicator - Mobile/Tablet */}
-        {selectedTable && !isDesktop && (
-          <div className="mt-2 inline-flex items-center gap-2 bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-medium">
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-            </svg>
-            {t('table')} {selectedTable.number}
+      {/* ========== STEP 1: TABLE SELECTION SCREEN ========== */}
+      {currentView === 'table-selection' && !isTablelessMode && (
+        <div className="h-[calc(100vh-12rem)] flex flex-col">
+          {/* Header */}
+          <div className="mb-6">
+            <h1 className="text-2xl md:text-3xl font-heading font-bold text-slate-900">
+              {t('tableSelection.title')}
+            </h1>
+            <p className="text-sm md:text-base text-slate-500 mt-1">
+              {t('tableSelection.description')}
+            </p>
           </div>
-        )}
-      </div>
 
-      {/* DESKTOP LAYOUT (≥1024px) - 3-Panel */}
-      {isDesktop && (
-        <div className="flex gap-6 h-[calc(100vh-200px)]">
-          {/* Tables Section - hidden in tableless mode */}
-          {!isTablelessMode && (
-            <div className="w-1/4">
-              <Card className="h-full">
-                <CardHeader>
-                  <CardTitle>{t('common:navigation.tables')}</CardTitle>
-                </CardHeader>
-                <CardContent className="overflow-y-auto">
-                  <TableGrid
-                    selectedTable={selectedTable}
-                    onSelectTable={handleSelectTable}
+          {/* Takeaway Hero Card (if tableless mode enabled) */}
+          {isTablelessMode && (
+            <button
+              onClick={handleTakeawayMode}
+              className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-5 md:p-6 mb-6 shadow-lg hover:shadow-xl transition-all duration-300 text-left w-full"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-primary-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <div className="relative flex items-center gap-4">
+                <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm">
+                  <ShoppingBag className="h-7 w-7 md:h-8 md:w-8 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-lg md:text-xl font-bold text-white">
+                    {t('tableSelection.takeawayOrder')}
+                  </h2>
+                  <p className="text-slate-400 text-sm">
+                    {t('tableSelection.takeawayDescription')}
+                  </p>
+                </div>
+                <ArrowRight className="h-5 w-5 text-slate-400 group-hover:text-white group-hover:translate-x-1 transition-all" />
+              </div>
+            </button>
+          )}
+
+          {/* Loading State */}
+          {isLoadingTables && (
+            <div className="flex-1 flex items-center justify-center">
+              <Spinner />
+            </div>
+          )}
+
+          {/* Tables Grid */}
+          {!isLoadingTables && tables && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-4 flex-1 min-h-0 overflow-auto pb-4">
+              {tables.map((table) => {
+                const notifications = getTableNotifications(table.id);
+                const hasNotifications = notifications.orders > 0 || notifications.waiter > 0 || notifications.bill > 0;
+
+                return (
+                  <button
+                    key={table.id}
+                    onClick={() => handleSelectTable(table)}
+                    className={`group relative flex flex-col p-4 md:p-5 bg-white rounded-xl border-2 transition-all duration-200 hover:shadow-lg focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2 outline-none ${getStatusStyles(table.status)}`}
+                  >
+                    {/* Notification Badges - Top Right Corner */}
+                    {hasNotifications && (
+                      <div className="absolute -top-2 -right-2 flex gap-1">
+                        {notifications.orders > 0 && (
+                          <div className="bg-amber-500 text-white rounded-full h-6 w-6 flex items-center justify-center shadow-lg ring-2 ring-white">
+                            <Clock className="h-3 w-3" />
+                          </div>
+                        )}
+                        {notifications.waiter > 0 && (
+                          <div className="bg-blue-500 text-white rounded-full h-6 w-6 flex items-center justify-center shadow-lg ring-2 ring-white">
+                            <User className="h-3 w-3" />
+                          </div>
+                        )}
+                        {notifications.bill > 0 && (
+                          <div className="bg-purple-500 text-white rounded-full h-6 w-6 flex items-center justify-center shadow-lg ring-2 ring-white">
+                            <Receipt className="h-3 w-3" />
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Table Number & Status */}
+                    <div className="flex items-start justify-between mb-3">
+                      <span className="text-2xl md:text-3xl font-bold text-slate-900">
+                        {table.number}
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadgeStyles(table.status)}`}>
+                        {t(`tableGrid.status.${table.status}`)}
+                      </span>
+                    </div>
+
+                    {/* Capacity */}
+                    <div className="flex items-center gap-1.5 text-slate-500 text-sm">
+                      <Users className="h-4 w-4" />
+                      <span>{t('tableSelection.seats', { count: table.capacity })}</span>
+                    </div>
+
+                    {/* Notification Details */}
+                    {hasNotifications && (
+                      <div className="mt-3 pt-3 border-t border-slate-100 space-y-1">
+                        {notifications.orders > 0 && (
+                          <div className="text-xs font-medium text-amber-600 flex items-center gap-1">
+                            <Clock className="h-3 w-3" />
+                            {notifications.orders} {t('tableSelection.pendingOrders', { count: notifications.orders })}
+                          </div>
+                        )}
+                        {notifications.waiter > 0 && (
+                          <div className="text-xs font-medium text-blue-600 flex items-center gap-1">
+                            <User className="h-3 w-3" />
+                            {notifications.waiter} {t('tableSelection.waiterCalls', { count: notifications.waiter })}
+                          </div>
+                        )}
+                        {notifications.bill > 0 && (
+                          <div className="text-xs font-medium text-purple-600 flex items-center gap-1">
+                            <Receipt className="h-3 w-3" />
+                            {notifications.bill} {t('tableSelection.billRequests', { count: notifications.bill })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========== STEP 2: ORDER SCREEN ========== */}
+      {currentView === 'order' && (
+        <div className="h-[calc(100vh-12rem)] flex flex-col">
+          {/* Header with Back Button and Table Info */}
+          <div className="flex items-center gap-4 mb-4 pb-4 border-b border-slate-200">
+            {/* Back button - only show when tableless mode is NOT active */}
+            {!isTablelessMode && (
+              <button
+                onClick={handleBackToTables}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                aria-label={t('tableSelection.backToTables')}
+              >
+                <ArrowLeft className="h-5 w-5 text-slate-600" />
+              </button>
+            )}
+            <div className="flex-1">
+              <h1 className="text-xl md:text-2xl font-bold text-slate-900">
+                {selectedTable ? (
+                  <>
+                    {t('table')} {selectedTable.number}
+                  </>
+                ) : (
+                  t('tableSelection.takeawayOrder')
+                )}
+              </h1>
+              <p className="text-sm text-slate-500">
+                {selectedTable ? (
+                  <>
+                    {t('tableSelection.seats', { count: selectedTable.capacity })} • {t(`tableGrid.status.${selectedTable.status}`)}
+                  </>
+                ) : (
+                  t('tableSelection.takeawayDescription')
+                )}
+              </p>
+            </div>
+            {/* Cart indicator for mobile */}
+            {!isDesktop && hasCartItems && (
+              <button
+                onClick={() => setIsCartDrawerOpen(true)}
+                className="relative p-2 bg-primary-50 text-primary-700 rounded-lg"
+                aria-label={t('cart.yourOrder')}
+              >
+                <ShoppingBag className="h-5 w-5" />
+                <span className="absolute -top-1 -right-1 bg-primary-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {cartItems.length}
+                </span>
+              </button>
+            )}
+          </div>
+
+          {/* DESKTOP: 2/3 Menu + 1/3 Cart Layout */}
+          {isDesktop && (
+            <div className="flex-1 grid grid-cols-3 gap-6 min-h-0">
+              {/* Menu Panel - 2/3 width */}
+              <div className="col-span-2">
+                <Card className="h-full">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">{t('common:navigation.menu')}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="h-[calc(100%-70px)] overflow-y-auto">
+                    <MenuPanel onAddItem={handleAddItem} />
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Order Cart - 1/3 width */}
+              <div className="col-span-1">
+                <div className="sticky top-0 h-full">
+                  <OrderCart
+                    items={cartItems}
+                    discount={discount}
+                    customerName={customerName}
+                    orderNotes={orderNotes}
+                    onUpdateQuantity={handleUpdateQuantity}
+                    onRemoveItem={handleRemoveItem}
+                    onUpdateDiscount={setDiscount}
+                    onUpdateCustomerName={setCustomerName}
+                    onUpdateOrderNotes={setOrderNotes}
+                    onClearCart={handleClearCart}
+                    onCheckout={handleCheckout}
+                    onCreateOrder={handleCreateOrder}
+                    onTransferTable={handleTransferTable}
+                    isCheckingOut={isCreatingOrder || isUpdatingOrder}
+                    isTwoStepCheckout={isTwoStepCheckout}
+                    hasActiveOrder={!!currentOrderId}
+                    hasSelectedTable={!!selectedTable}
                   />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MOBILE/TABLET: Full-screen Menu */}
+          {!isDesktop && (
+            <div className="flex-1 min-h-0">
+              <Card className="h-full">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">{t('common:navigation.menu')}</CardTitle>
+                </CardHeader>
+                <CardContent className="h-[calc(100%-70px)] overflow-y-auto">
+                  <MenuPanel onAddItem={handleAddItem} />
                 </CardContent>
               </Card>
             </div>
           )}
-
-          {/* Menu Section */}
-          <div className={`flex-1 ${isTablelessMode ? 'w-3/4' : 'w-1/2'}`}>
-            <Card className="h-full">
-              <CardHeader>
-                <CardTitle>
-                  {t('common:navigation.menu')} {selectedTable && `- ${t('tableLabel')} ${selectedTable.number}`}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="h-[calc(100%-80px)] overflow-y-auto">
-                <MenuPanel onAddItem={handleAddItem} />
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Order Cart Section */}
-          <div className="w-1/4">
-            <div className="sticky top-0">
-              <OrderCart
-                items={cartItems}
-                discount={discount}
-                customerName={customerName}
-                orderNotes={orderNotes}
-                onUpdateQuantity={handleUpdateQuantity}
-                onRemoveItem={handleRemoveItem}
-                onUpdateDiscount={setDiscount}
-                onUpdateCustomerName={setCustomerName}
-                onUpdateOrderNotes={setOrderNotes}
-                onClearCart={handleClearCart}
-                onCheckout={handleCheckout}
-                onCreateOrder={handleCreateOrder}
-                onTransferTable={handleTransferTable}
-                isCheckingOut={isCreatingOrder || isUpdatingOrder}
-                isTwoStepCheckout={isTwoStepCheckout}
-                hasActiveOrder={!!currentOrderId}
-                hasSelectedTable={!!selectedTable}
-              />
-            </div>
-          </div>
         </div>
       )}
 
-      {/* TABLET/MOBILE LAYOUT (<1024px) - Full-screen Menu + Sticky Bar */}
-      {!isDesktop && (
-        <div className="h-[calc(100vh-220px)]">
-          {/* Tables Section - Collapsible on mobile/tablet */}
-          {!isTablelessMode && !selectedTable && (
-            <Card className="mb-4">
-              <CardHeader>
-                <CardTitle className="text-lg">{t('selectTableTitle')}</CardTitle>
-              </CardHeader>
-              <CardContent className="max-h-[300px] overflow-y-auto">
-                <TableGrid
-                  selectedTable={selectedTable}
-                  onSelectTable={handleSelectTable}
-                />
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Menu Section - Full Screen */}
-          <Card className="h-full">
-            <CardHeader>
-              <CardTitle className="text-lg">
-                {t('common:navigation.menu')} {selectedTable && `- ${t('tableLabel')} ${selectedTable.number}`}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="h-[calc(100%-70px)] overflow-y-auto">
-              <MenuPanel onAddItem={handleAddItem} />
-            </CardContent>
-          </Card>
-        </div>
+      {/* STICKY BOTTOM CART BAR - Mobile/Tablet only (order view) */}
+      {currentView === 'order' && (
+        <StickyCartBar
+          itemCount={cartItems.length}
+          total={total}
+          onViewCart={() => setIsCartDrawerOpen(true)}
+          onCheckout={handleCheckout}
+          onCreateOrder={handleCreateOrder}
+          isCheckingOut={isCreatingOrder || isUpdatingOrder}
+          hasItems={hasCartItems}
+          isTwoStepCheckout={isTwoStepCheckout}
+          hasActiveOrder={!!currentOrderId}
+        />
       )}
-
-      {/* STICKY BOTTOM CART BAR - Mobile/Tablet only */}
-      <StickyCartBar
-        itemCount={cartItems.length}
-        total={total}
-        onViewCart={() => setIsCartDrawerOpen(true)}
-        onCheckout={handleCheckout}
-        onCreateOrder={handleCreateOrder}
-        isCheckingOut={isCreatingOrder || isUpdatingOrder}
-        hasItems={hasCartItems}
-        isTwoStepCheckout={isTwoStepCheckout}
-        hasActiveOrder={!!currentOrderId}
-      />
 
       {/* CART DRAWER - Mobile only */}
       <CartDrawer
