@@ -12,7 +12,7 @@ on:
         type: string
 
 permissions:
-  contents: write  # Required for creating releases
+  contents: write
   pull-requests: read
 
 env:
@@ -27,20 +27,20 @@ jobs:
     steps:
       - name: Check production API availability
         run: |
-          echo "🔍 Checking if production API is accessible..."
+          echo "Checking if production API is accessible..."
           if ! curl -sf https://hummytummy.com/api/health > /dev/null; then
-            echo "⚠️ Warning: API health check failed, but continuing..."
+            echo "Warning: API health check failed, but continuing..."
           else
-            echo "✅ Production API is healthy"
+            echo "Production API is healthy"
           fi
 
       - name: Check production frontend availability
         run: |
-          echo "🔍 Checking if production frontend is accessible..."
+          echo "Checking if production frontend is accessible..."
           if ! curl -sf https://hummytummy.com > /dev/null; then
-            echo "⚠️ Warning: Frontend check failed, but continuing..."
+            echo "Warning: Frontend check failed, but continuing..."
           else
-            echo "✅ Production frontend is accessible"
+            echo "Production frontend is accessible"
           fi
 
       - name: Setup SSH (for connection test)
@@ -56,43 +56,24 @@ jobs:
 
       - name: Validate SSH key format
         run: |
-          echo "🔑 Validating SSH key format..."
+          echo "Validating SSH key format..."
           if ! ssh-keygen -l -f ~/.ssh/id_ed25519 2>/dev/null; then
-            echo "❌ SSH key validation failed!"
-            echo ""
-            echo "The SSH_PRIVATE_KEY secret is not in the correct format."
+            echo "SSH key validation failed!"
             echo "Please check .github/SECRETS_SETUP.md for instructions."
-            echo ""
-            echo "Common issues:"
-            echo "  - Key must include '-----BEGIN OPENSSH PRIVATE KEY-----' header"
-            echo "  - Key must include '-----END OPENSSH PRIVATE KEY-----' footer"
-            echo "  - All lines must be copied exactly as-is"
-            echo "  - No extra spaces or newlines should be added"
             exit 1
           fi
-          echo "✅ SSH key format is valid"
+          echo "SSH key format is valid"
 
       - name: Test SSH connection to production server
         run: |
-          echo "🔌 Testing SSH connection to ${{ env.SERVER_HOST }}..."
+          echo "Testing SSH connection to ${{ env.SERVER_HOST }}..."
           if ! ssh -o ConnectTimeout=10 -o BatchMode=yes -o StrictHostKeyChecking=yes root@${{ env.SERVER_HOST }} "echo 'SSH connection successful'" 2>&1; then
-            echo ""
-            echo "❌ SSH connection to production server failed!"
-            echo ""
-            echo "Please verify:"
-            echo "  1. SSH_PRIVATE_KEY secret is correctly set (see .github/SECRETS_SETUP.md)"
-            echo "  2. SSH_KNOWN_HOSTS secret is correctly set (no # comment lines)"
-            echo "  3. Server ${{ env.SERVER_HOST }} is accessible"
-            echo "  4. Public key is in server's ~/.ssh/authorized_keys"
-            echo ""
-            echo "To fix SSH_KNOWN_HOSTS, run locally:"
-            echo "  ssh-keyscan -H ${{ env.SERVER_HOST }}"
-            echo "  (Copy only lines starting with |1|, exclude lines with #)"
+            echo "SSH connection to production server failed!"
             exit 1
           fi
-          echo "✅ SSH connection test passed"
+          echo "SSH connection test passed"
 
-  # Build and deploy to production using Blue-Green strategy
+  # Build and deploy to production
   deploy-production:
     name: Build and Deploy to Production
     runs-on: ubuntu-latest
@@ -169,33 +150,13 @@ jobs:
           echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
           chmod 644 ~/.ssh/known_hosts
 
-      - name: Create database backup
-        run: |
-          ssh root@${{ env.SERVER_HOST }} << 'EOF'
-            cd /root/kds
-            # Ensure correct database name for backup
-            sed -i 's/POSTGRES_DB=restaurant_pos$/POSTGRES_DB=restaurant_pos_prod/' .env.production 2>/dev/null || true
-            sed -i 's|/restaurant_pos?|/restaurant_pos_prod?|' .env.production 2>/dev/null || true
-            ./scripts/backup-database.sh
-          EOF
-
       - name: Transfer Docker images
         run: |
           scp backend-${{ steps.version.outputs.VERSION }}.tar.gz root@${{ env.SERVER_HOST }}:/root/kds/
           scp frontend-${{ steps.version.outputs.VERSION }}.tar.gz root@${{ env.SERVER_HOST }}:/root/kds/
           scp landing-${{ steps.version.outputs.VERSION }}.tar.gz root@${{ env.SERVER_HOST }}:/root/kds/
 
-      - name: Load Docker images on server
-        run: |
-          ssh root@${{ env.SERVER_HOST }} << EOF
-            cd /root/kds
-            docker load < backend-${{ steps.version.outputs.VERSION }}.tar.gz
-            docker load < frontend-${{ steps.version.outputs.VERSION }}.tar.gz
-            docker load < landing-${{ steps.version.outputs.VERSION }}.tar.gz
-            rm -f backend-${{ steps.version.outputs.VERSION }}.tar.gz frontend-${{ steps.version.outputs.VERSION }}.tar.gz landing-${{ steps.version.outputs.VERSION }}.tar.gz
-          EOF
-
-      - name: Deploy with Blue-Green strategy
+      - name: Deploy to production
         id: deploy
         env:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
@@ -222,10 +183,26 @@ jobs:
             git reset --hard HEAD
             git checkout ${{ steps.version.outputs.VERSION }}
 
-            # Create .env.production with all required variables
+            # Load Docker images
+            echo "Loading Docker images..."
+            docker load < backend-${{ steps.version.outputs.VERSION }}.tar.gz
+            docker load < frontend-${{ steps.version.outputs.VERSION }}.tar.gz
+            docker load < landing-${{ steps.version.outputs.VERSION }}.tar.gz
+
+            # Tag images for deployment
+            docker tag kds-backend:${{ steps.version.outputs.VERSION }} kds-backend:latest
+            docker tag kds-frontend:${{ steps.version.outputs.VERSION }} kds-frontend:latest
+            docker tag kds-landing:${{ steps.version.outputs.VERSION }} kds-landing:latest
+
+            # Clean up tar files
+            rm -f backend-${{ steps.version.outputs.VERSION }}.tar.gz
+            rm -f frontend-${{ steps.version.outputs.VERSION }}.tar.gz
+            rm -f landing-${{ steps.version.outputs.VERSION }}.tar.gz
+
+            # Create .env.production
             cat > .env.production << ENVFILE
           # Production Environment Configuration
-          # Auto-generated by GitHub Actions
+          # Auto-generated by GitHub Actions - ${{ steps.version.outputs.VERSION }}
 
           # Database
           POSTGRES_DB=restaurant_pos_prod
@@ -285,8 +262,8 @@ jobs:
           DESKTOP_RELEASE_API_KEY=${DESKTOP_RELEASE_API_KEY}
           ENVFILE
 
-            # Run Blue-Green deployment
-            ./scripts/blue-green-deploy.sh deploy
+            # Run deployment
+            ./scripts/deploy-production.sh deploy
 
             if [ \$? -ne 0 ]; then
               echo "Deployment failed!"
@@ -315,23 +292,22 @@ jobs:
 
       - name: Create GitHub Release
         if: success() && github.event_name == 'push'
-        continue-on-error: true  # Don't fail deployment if release creation fails
+        continue-on-error: true
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ steps.version.outputs.VERSION }}
           name: Release ${{ steps.version.outputs.VERSION }}
           body: |
-            ## 🚀 Release ${{ steps.version.outputs.VERSION }}
+            ## Release ${{ steps.version.outputs.VERSION }}
 
             **Deployed at:** ${{ github.event.head_commit.timestamp }}
             **Commit:** ${{ github.sha }}
             **Environment:** https://hummytummy.com
 
-            ### Deployment Strategy
-            - ✅ Blue-Green deployment
-            - ✅ Zero-downtime deployment
-            - ✅ Automatic health checks
-            - ✅ Database backup created
+            ### Deployment
+            - Database backup created
+            - Migrations applied
+            - Health checks passed
 
             ### Changes
             See commit history for details.
@@ -341,23 +317,23 @@ jobs:
       - name: Notify success
         if: success()
         run: |
-          echo "🎉 Production deployment successful!"
+          echo "Production deployment successful!"
           echo "Version: ${{ steps.version.outputs.VERSION }}"
           echo "URL: https://hummytummy.com"
 
       - name: Rollback on failure
         if: failure() && steps.deploy.outcome == 'failure'
         run: |
-          echo "⚠️ Deployment failed, initiating rollback..."
+          echo "Deployment failed, initiating rollback..."
           ssh root@${{ env.SERVER_HOST }} << 'EOF'
             cd /root/kds
-            ./scripts/blue-green-deploy.sh rollback
+            ./scripts/deploy-production.sh rollback
           EOF
 
       - name: Cleanup on failure
         if: failure()
         run: |
-          echo "🧹 Cleaning up failed deployment..."
+          echo "Cleaning up failed deployment..."
           ssh root@${{ env.SERVER_HOST }} << EOF
             cd /root/kds
             rm -f backend-${{ steps.version.outputs.VERSION }}.tar.gz
@@ -389,7 +365,7 @@ jobs:
           echo | openssl s_client -servername hummytummy.com -connect hummytummy.com:443 2>/dev/null | \
             openssl x509 -noout -dates || exit 1
 
-          echo "✅ All verification checks passed!"
+          echo "All verification checks passed!"
 
       - name: Performance check
         run: |
@@ -403,7 +379,7 @@ jobs:
           echo "API response time: ${response_time}ms"
 
           if [ $response_time -gt 5000 ]; then
-            echo "⚠️ Warning: Response time is high (${response_time}ms)"
+            echo "Warning: Response time is high (${response_time}ms)"
           else
-            echo "✅ Response time is good (${response_time}ms)"
+            echo "Response time is good (${response_time}ms)"
           fi
