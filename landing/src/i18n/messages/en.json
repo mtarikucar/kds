@@ -281,6 +281,16 @@
     "trustBadge2": "14-day free trial",
     "trustBadge3": "Cancel anytime"
   },
+  "mascot": {
+    "welcome": "Welcome! 👋",
+    "welcomeMessage": "I'm HummyTummy's chef. I'm here to help you!",
+    "greeting": "Hello! 👋 I'm HummyTummy's chef!",
+    "subtitle": "What we can do for you:",
+    "feature1": "Contactless ordering with QR Menu",
+    "feature2": "Real-time kitchen tracking",
+    "feature3": "Multi-branch management",
+    "feature4": "Easy payment systems"
+  },
   "footer": {
     "description": "The modern restaurant management platform. Streamline operations, delight customers.",
     "contact": "Contact",

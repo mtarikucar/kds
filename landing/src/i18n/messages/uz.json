@@ -281,6 +281,16 @@
     "trustBadge2": "14 kunlik bepul sinov",
     "trustBadge3": "Istalgan vaqtda bekor qilish"
   },
+  "mascot": {
+    "welcome": "Xush kelibsiz! 👋",
+    "welcomeMessage": "Men HummyTummy oshpaziman. Sizga yordam berish uchun shu yerdaman!",
+    "greeting": "Salom! 👋 Men HummyTummy oshpaziman!",
+    "subtitle": "Siz uchun nima qila olamiz:",
+    "feature1": "QR Menyu bilan kontaktsiz buyurtma",
+    "feature2": "Real vaqtda oshxona kuzatuvi",
+    "feature3": "Ko'p filial boshqaruvi",
+    "feature4": "Oson to'lov tizimlari"
+  },
   "footer": {
     "description": "Zamonaviy restoran boshqaruv platformasi. Operatsiyalarni soddalashtiring, mijozlarni mamnun qiling.",
     "contact": "Aloqa",

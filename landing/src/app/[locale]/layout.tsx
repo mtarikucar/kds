@@ -5,6 +5,7 @@ import { getMessages, setRequestLocale } from 'next-intl/server';
 import { Inter } from 'next/font/google';
 import { locales, localeConfig, type Locale } from '@/i18n/config';
 import { SmoothScroll } from '@/components/SmoothScroll';
+import { FloatingMascot } from '@/components/FloatingMascot';
 import '../globals.css';
 
 const inter = Inter({ subsets: ['latin', 'cyrillic'] });
@@ -101,6 +102,7 @@ export default async function LocaleLayout({ children, params }: Props) {
           <SmoothScroll>
             {children}
           </SmoothScroll>
+          <FloatingMascot />
         </NextIntlClientProvider>
       </body>
     </html>

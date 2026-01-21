@@ -1,7 +1,6 @@
 'use client';
 
 import { useRef } from 'react';
-import Image from 'next/image';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { Container } from '@/components/ui/Container';
 import { ArrowRight, MessageCircle, Sparkles } from 'lucide-react';
@@ -9,7 +8,6 @@ import { useTranslations } from 'next-intl';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { getStats } from '@/lib/api';
 import { GradientOrb } from '@/components/animations/FloatingElement';
-import { ParallaxLayer } from '@/components/animations/ParallaxLayer';
 import { TextReveal } from '@/components/animations/TextReveal';
 
 export default function FinalCTA() {
@@ -24,7 +22,6 @@ export default function FinalCTA() {
   });
 
   const backgroundY = useTransform(scrollYProgress, [0, 1], [50, -50]);
-  const chefY = useTransform(scrollYProgress, [0, 1], [30, -30]);
 
   return (
     <section
@@ -71,14 +68,14 @@ export default function FinalCTA() {
       />
 
       <Container className="relative">
-        <div className="grid lg:grid-cols-[1fr,auto] gap-8 lg:gap-16 items-center">
+        <div className="max-w-3xl mx-auto">
           {/* Content */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ duration: 0.6 }}
-            className="text-center lg:text-left"
+            className="text-center"
           >
             {/* Badge */}
             <motion.div
@@ -118,7 +115,7 @@ export default function FinalCTA() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.4 }}
-              className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-12"
+              className="flex flex-col sm:flex-row gap-4 justify-center mb-12"
             >
               <motion.a
                 href="/app/register"
@@ -146,7 +143,7 @@ export default function FinalCTA() {
               whileInView={{ opacity: 1 }}
               viewport={{ once: true }}
               transition={{ delay: 0.5 }}
-              className="flex flex-wrap items-center justify-center lg:justify-start gap-8 text-sm text-slate-400"
+              className="flex flex-wrap items-center justify-center gap-8 text-sm text-slate-400"
             >
               {['trustBadge1', 'trustBadge2', 'trustBadge3'].map((badge, index) => (
                 <motion.div
@@ -175,55 +172,6 @@ export default function FinalCTA() {
                   {t(badge)}
                 </motion.div>
               ))}
-            </motion.div>
-          </motion.div>
-
-          {/* Chef Mascot with parallax */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8, rotate: -5 }}
-            whileInView={{ opacity: 1, scale: 1, rotate: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.6, delay: 0.2, type: 'spring' }}
-            style={prefersReducedMotion ? {} : { y: chefY }}
-            className="hidden lg:block relative"
-          >
-            {/* Glow effect behind chef */}
-            <div className="absolute inset-0 bg-gradient-to-br from-orange-500/20 to-amber-500/10 rounded-full blur-3xl scale-150" />
-
-            <motion.div
-              animate={prefersReducedMotion ? {} : {
-                y: [0, -10, 0],
-                rotate: [-2, 2, -2],
-              }}
-              transition={{
-                duration: 4,
-                repeat: Infinity,
-                ease: 'easeInOut',
-              }}
-            >
-              <Image
-                src="/voxel-chef.png"
-                alt="HummyTummy Chef"
-                width={320}
-                height={320}
-                className="drop-shadow-2xl relative z-10"
-              />
-            </motion.div>
-
-            {/* Decorative sparkles */}
-            <motion.div
-              animate={prefersReducedMotion ? {} : { scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
-              transition={{ duration: 2, repeat: Infinity }}
-              className="absolute top-10 right-10"
-            >
-              <Sparkles className="w-6 h-6 text-orange-400" />
-            </motion.div>
-            <motion.div
-              animate={prefersReducedMotion ? {} : { scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
-              transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
-              className="absolute bottom-20 left-5"
-            >
-              <Sparkles className="w-4 h-4 text-amber-400" />
             </motion.div>
           </motion.div>
         </div>

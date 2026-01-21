@@ -281,6 +281,16 @@
     "trustBadge2": "14 günlük ücretsiz deneme",
     "trustBadge3": "İstediğiniz zaman iptal"
   },
+  "mascot": {
+    "welcome": "Hoş geldiniz! 👋",
+    "welcomeMessage": "Ben HummyTummy'nin şefiyim. Size yardımcı olmak için buradayım!",
+    "greeting": "Merhaba! 👋 Ben HummyTummy'nin şefi!",
+    "subtitle": "Sizin için neler yapabiliriz:",
+    "feature1": "QR Menü ile temassız sipariş",
+    "feature2": "Anlık mutfak takibi",
+    "feature3": "Çoklu şube yönetimi",
+    "feature4": "Kolay ödeme sistemleri"
+  },
   "footer": {
     "description": "Modern restoran yönetim platformu. Operasyonları kolaylaştırın, müşterileri memnun edin.",
     "contact": "İletişim",
