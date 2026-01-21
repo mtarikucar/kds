@@ -1,6 +1,7 @@
 {
-  "restaurantCount": "8+",
-  "orderCount": "500+",
+  "restaurantCount": "500+",
+  "orderCount": "10K+",
   "totalRevenue": "₺1M+",
-  "fetchedAt": "2026-01-14T18:54:18.174Z"
+  "fetchedAt": "2026-01-20T19:42:45.538Z",
+  "fallback": true
 }

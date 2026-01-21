@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, setRequestLocale } from 'next-intl/server';
 import { Inter } from 'next/font/google';
 import { locales, localeConfig, type Locale } from '@/i18n/config';
+import { SmoothScroll } from '@/components/SmoothScroll';
 import '../globals.css';
 
 const inter = Inter({ subsets: ['latin', 'cyrillic'] });
@@ -97,7 +98,9 @@ export default async function LocaleLayout({ children, params }: Props) {
       </head>
       <body className="antialiased">
         <NextIntlClientProvider messages={messages}>
-          {children}
+          <SmoothScroll>
+            {children}
+          </SmoothScroll>
         </NextIntlClientProvider>
       </body>
     </html>
