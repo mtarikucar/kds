@@ -45,9 +45,9 @@ export function FloatingMascot() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="absolute bottom-full right-0 mb-3 w-64 md:w-72"
+            className="absolute bottom-full right-0 mb-2 w-52 sm:mb-3 sm:w-64 md:w-72"
           >
-            <div className="relative rounded-2xl bg-white p-4 shadow-lg ring-1 ring-black/5">
+            <div className="relative rounded-xl bg-white p-3 shadow-lg ring-1 ring-black/5 sm:rounded-2xl sm:p-4">
               {/* Content */}
               {isFirstVisit && showWelcome ? (
                 <>
@@ -97,13 +97,13 @@ export function FloatingMascot() {
       {/* Mascot */}
       <motion.div
         whileHover={{ scale: 1.05 }}
-        className="relative h-40 w-60 cursor-pointer md:h-40 md:w-60"
+        className="relative h-24 w-36 cursor-pointer sm:h-32 sm:w-48 md:h-40 md:w-60"
       >
         <Image
           src="/voxel_chef_bottom.png"
           alt="HummyTummy Chef Mascot"
           fill
-          className=" drop-shadow-lg"
+          className="drop-shadow-lg"
           priority
         />
       </motion.div>
