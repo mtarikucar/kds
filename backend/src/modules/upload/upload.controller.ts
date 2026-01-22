@@ -36,6 +36,39 @@ import { UploadResponseDto, MultipleUploadResponseDto } from './dto/upload-respo
 export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
+  @Post('logo')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @UseInterceptors(FileInterceptor('logo'))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Upload restaurant logo' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        logo: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Logo uploaded successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid file or file too large' })
+  async uploadLogo(
+    @UploadedFile() file: Express.Multer.File,
+    @Request() req,
+  ): Promise<{ url: string }> {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    const tenantId = req.tenantId;
+    return this.uploadService.uploadLogo(file, tenantId);
+  }
+
   @Post('product-image')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @UseInterceptors(FileInterceptor('image'))

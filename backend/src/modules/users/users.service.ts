@@ -303,7 +303,7 @@ export class UsersService {
         status: 'ACTIVE',
         approvedAt: new Date(),
         approvedById: approverId,
-      },
+      } as any,
       select: {
         id: true,
         email: true,
@@ -316,7 +316,7 @@ export class UsersService {
         tenantId: true,
         createdAt: true,
         updatedAt: true,
-      },
+      } as any,
     });
   }
 

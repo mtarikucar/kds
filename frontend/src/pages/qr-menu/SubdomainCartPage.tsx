@@ -41,6 +41,9 @@ const SubdomainCartPage: React.FC<SubdomainCartPageProps> = ({ subdomain }) => {
   }, [locationRequested, getCurrentPosition]);
 
   const handleSubmitOrder = async () => {
+    // Prevent double submission
+    if (isSubmitting) return;
+
     if (!sessionId || !menuData) {
       toast.error(t('cart.sessionExpired'));
       return;
@@ -107,6 +110,9 @@ const SubdomainCartPage: React.FC<SubdomainCartPageProps> = ({ subdomain }) => {
             onSubmitOrder={handleSubmitOrder}
             onShowTableSelection={() => setIsShowingTableSelection(true)}
             isSubmitting={isSubmitting}
+            tenantId={menuData.tenant.id}
+            tableId={tableId}
+            subdomain={subdomain}
           />
           {isShowingTableSelection && (
             <TableSelectionModal

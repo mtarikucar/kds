@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, ChefHat, CheckCircle2, Utensils, User, Receipt, RefreshCcw, ChevronDown, ChevronUp, ShoppingBag } from 'lucide-react';
+import { Clock, ChefHat, CheckCircle2, Utensils, User, Receipt, RefreshCcw, ChevronDown, ChevronUp, ShoppingBag, ArrowLeft } from 'lucide-react';
 import { Order, OrderItem } from '../../types';
 import { formatCurrency, cn } from '../../lib/utils';
 import { MenuSettings } from '../../pages/qr-menu/QRMenuLayout';
@@ -141,6 +141,16 @@ const OrdersContent: React.FC<OrdersContentProps> = ({
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 lg:py-8 mb-20 md:mb-0">
       <div className="max-w-2xl mx-auto">
+        {/* Back to Menu Button */}
+        <motion.button
+          onClick={onBrowseMenu}
+          className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 mb-4 transition-colors"
+          whileTap={{ scale: 0.98 }}
+        >
+          <ArrowLeft className="h-4 w-4" />
+          {t('cart.continueShopping', 'Continue Shopping')}
+        </motion.button>
+
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-4 mb-6">
           <motion.button

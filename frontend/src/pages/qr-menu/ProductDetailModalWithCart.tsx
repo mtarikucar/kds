@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { motion, AnimatePresence, useDragControls, PanInfo } from 'framer-motion';
-import { X, UtensilsCrossed, Plus, Minus, ShoppingCart, Check } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, UtensilsCrossed, Plus, Minus, ShoppingCart, Check, ChevronDown } from 'lucide-react';
 import { Product, ModifierGroup, Modifier, CartModifier, SelectionType } from '../../types';
 import { formatCurrency, cn } from '../../lib/utils';
 import { useCartStore } from '../../store/cartStore';
 import ProductImageGallery from '../../components/qr-menu/ProductImageGallery';
+import BottomSheet from '../../components/qr-menu/BottomSheet';
 
 interface ProductDetailModalWithCartProps {
   isOpen: boolean;
@@ -34,54 +35,29 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
 }) => {
   const { t } = useTranslation('common');
   const addItem = useCartStore(state => state.addItem);
-  const dragControls = useDragControls();
-  const contentRef = useRef<HTMLDivElement>(null);
 
   const [quantity, setQuantity] = useState(1);
   const [notes, setNotes] = useState('');
   const [selectedModifiers, setSelectedModifiers] = useState<Map<string, CartModifier[]>>(new Map());
   const [showSuccess, setShowSuccess] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-
-  // Check if mobile
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
-    };
-  }, [isOpen, onClose]);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (isOpen && product) {
-      // Reset state when modal opens
       setQuantity(1);
       setNotes('');
       setSelectedModifiers(new Map());
       setShowSuccess(false);
+      const requiredGroups = new Set(
+        product.modifierGroups
+          ?.filter(g => g.isRequired || g.minSelections > 0)
+          .map(g => g.id) || []
+      );
+      setExpandedGroups(requiredGroups);
     }
   }, [isOpen, product]);
 
-  if (!isOpen || !product) return null;
+  if (!product) return null;
 
   const normalizeImageUrl = (url: string | null | undefined): string | null => {
     if (!url) return null;
@@ -95,17 +71,27 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
     return `${BASE_URL}/${path}`;
   };
 
-  // Prepare images for gallery
   const productImages = product.images?.length
     ? product.images.map(img => ({ url: img.url, alt: product.name }))
     : product.image
       ? [{ url: product.image, alt: product.name }]
       : [];
 
+  const toggleGroupExpanded = (groupId: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(groupId)) {
+        next.delete(groupId);
+      } else {
+        next.add(groupId);
+      }
+      return next;
+    });
+  };
+
   const handleModifierToggle = (group: ModifierGroup, modifier: Modifier) => {
     const newSelectedModifiers = new Map(selectedModifiers);
     const groupModifiers = newSelectedModifiers.get(group.id) || [];
-
     const existingIndex = groupModifiers.findIndex(m => m.id === modifier.id);
 
     if (group.selectionType === SelectionType.SINGLE) {
@@ -147,6 +133,10 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
   const isModifierSelected = (groupId: string, modifierId: string): boolean => {
     const groupModifiers = selectedModifiers.get(groupId) || [];
     return groupModifiers.some(m => m.id === modifierId);
+  };
+
+  const getGroupSelectionCount = (groupId: string): number => {
+    return (selectedModifiers.get(groupId) || []).length;
   };
 
   const canAddToCart = (): boolean => {
@@ -192,341 +182,289 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
     }, 1200);
   };
 
-  const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
-    if (info.offset.y > 100) {
-      onClose();
-    }
-  };
-
-  // Desktop modal variants
-  const desktopVariants = {
-    hidden: { scale: 0.95, opacity: 0 },
-    visible: { scale: 1, opacity: 1 },
-    exit: { scale: 0.95, opacity: 0 },
-  };
-
-  // Mobile drawer variants
-  const mobileVariants = {
-    hidden: { y: '100%' },
-    visible: { y: 0 },
-    exit: { y: '100%' },
-  };
-
   return (
-    <AnimatePresence>
-      {isOpen && (
-        <div className="fixed inset-0 z-50 overflow-hidden">
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm"
+    <BottomSheet isOpen={isOpen} onClose={onClose}>
+      {/* Product Image */}
+      {showImages && (
+        <div className="relative w-full aspect-[4/3] bg-gradient-to-br from-slate-100 to-slate-200">
+          {productImages.length > 0 ? (
+            <ProductImageGallery
+              images={productImages}
+              className="h-full"
+              showThumbnails={productImages.length > 1}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <UtensilsCrossed className="h-16 w-16 text-slate-300" />
+            </div>
+          )}
+
+          {/* Close Button */}
+          <motion.button
             onClick={onClose}
-          />
+            className="absolute top-4 right-4 z-10 p-2 rounded-full bg-white/90 hover:bg-white shadow-lg transition-all"
+            whileTap={{ scale: 0.9 }}
+          >
+            <X className="h-5 w-5 text-slate-600" />
+          </motion.button>
+        </div>
+      )}
 
-          {/* Modal Container */}
-          <div className={cn(
-            'fixed inset-0 flex',
-            isMobile ? 'items-end' : 'items-center justify-center p-4'
-          )}>
-            <motion.div
-              ref={contentRef}
-              variants={isMobile ? mobileVariants : desktopVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              transition={{
-                type: isMobile ? 'spring' : 'tween',
-                damping: 25,
-                stiffness: 300,
-                duration: isMobile ? undefined : 0.2,
-              }}
-              drag={isMobile ? 'y' : false}
-              dragControls={dragControls}
-              dragConstraints={{ top: 0, bottom: 0 }}
-              dragElastic={{ top: 0, bottom: 0.5 }}
-              onDragEnd={handleDragEnd}
-              className={cn(
-                'relative bg-white shadow-2xl overflow-hidden',
-                isMobile
-                  ? 'w-full rounded-t-3xl max-h-[95vh]'
-                  : 'w-full max-w-2xl rounded-3xl max-h-[90vh]'
-              )}
-              style={{
-                paddingBottom: isMobile ? 'env(safe-area-inset-bottom, 0px)' : undefined,
-              }}
+      {/* Content */}
+      <div className="p-5">
+        {/* Close button when no image */}
+        {!showImages && (
+          <motion.button
+            onClick={onClose}
+            className="absolute top-4 right-4 z-10 p-2 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors"
+            whileTap={{ scale: 0.9 }}
+          >
+            <X className="h-5 w-5 text-slate-600" />
+          </motion.button>
+        )}
+
+        {/* Product Name & Price */}
+        <div className="mb-4">
+          <h2
+            className="text-xl font-bold leading-tight mb-2 pr-10"
+            style={{ color: secondaryColor }}
+          >
+            {product.name}
+          </h2>
+
+          {showPrices && (
+            <p
+              className="text-2xl font-black"
+              style={{ color: primaryColor }}
             >
-              {/* Gradient accent */}
-              <div
-                className="absolute top-0 left-0 right-0 h-1 z-10"
-                style={{
-                  background: `linear-gradient(90deg, ${primaryColor}, ${secondaryColor})`,
-                }}
-              />
+              {formatCurrency(product.price, currency)}
+            </p>
+          )}
+        </div>
 
-              {/* Drag Handle (Mobile) */}
-              {isMobile && (
+        {/* Description */}
+        {showDescription && product.description && (
+          <p className="text-slate-600 text-sm leading-relaxed mb-5">
+            {product.description}
+          </p>
+        )}
+
+        {/* Modifier Groups - Accordion Style */}
+        {product.modifierGroups && product.modifierGroups.length > 0 && (
+          <div className="space-y-3 mb-5">
+            {product.modifierGroups.map(group => {
+              const isExpanded = expandedGroups.has(group.id);
+              const selectionCount = getGroupSelectionCount(group.id);
+
+              return (
                 <div
-                  className="sticky top-0 z-20 bg-white pt-3 pb-2 cursor-grab active:cursor-grabbing"
-                  onPointerDown={(e) => dragControls.start(e)}
+                  key={group.id}
+                  className="border border-slate-200 rounded-2xl overflow-hidden"
                 >
-                  <div className="w-12 h-1.5 bg-slate-300 rounded-full mx-auto" />
-                </div>
-              )}
-
-              {/* Scrollable Content */}
-              <div className="overflow-y-auto max-h-[calc(95vh-80px)] md:max-h-[calc(90vh-20px)]">
-                {/* Image */}
-                {showImages && (
-                  <div className={cn(
-                    'relative bg-gradient-to-br from-slate-100 to-slate-200 overflow-hidden',
-                    isMobile ? 'h-56' : 'h-64'
-                  )}>
-                    {productImages.length > 0 ? (
-                      <ProductImageGallery
-                        images={productImages}
-                        className="h-full"
-                        showThumbnails={!isMobile && productImages.length > 1}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 via-slate-150 to-slate-200">
-                        <UtensilsCrossed className="h-20 w-20 text-slate-300" />
-                      </div>
-                    )}
-
-                    {/* Close Button (Desktop) */}
-                    {!isMobile && (
-                      <button
-                        onClick={onClose}
-                        className="absolute top-4 right-4 z-10 p-2.5 rounded-full bg-white/95 hover:bg-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-110 active:scale-95"
-                        style={{ color: primaryColor }}
-                      >
-                        <X className="h-5 w-5" />
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Content */}
-                <div className="p-6">
-                  {/* Close Button (Mobile - when no image) */}
-                  {isMobile && !showImages && (
-                    <button
-                      onClick={onClose}
-                      className="absolute top-4 right-4 z-10 p-2 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors"
-                    >
-                      <X className="h-5 w-5 text-slate-600" />
-                    </button>
-                  )}
-
-                  {/* Product Name */}
-                  <h2
-                    className="text-2xl font-bold mb-2 leading-tight pr-10"
-                    style={{ color: secondaryColor }}
+                  {/* Accordion Header */}
+                  <button
+                    onClick={() => toggleGroupExpanded(group.id)}
+                    className="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors"
                   >
-                    {product.name}
-                  </h2>
+                    <div className="text-left">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-slate-900">
+                          {group.displayName}
+                        </h3>
+                        {group.isRequired && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600">
+                            {t('qrMenu.required', 'Required')}
+                          </span>
+                        )}
+                        {selectionCount > 0 && (
+                          <span
+                            className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white"
+                            style={{ backgroundColor: primaryColor }}
+                          >
+                            {selectionCount}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {group.selectionType === SelectionType.SINGLE
+                          ? t('qrMenu.selectOne', 'Select one')
+                          : group.maxSelections
+                            ? t('qrMenu.selectUpTo', `Select up to ${group.maxSelections}`, { max: group.maxSelections })
+                            : t('qrMenu.selectMultiple', 'Select multiple')}
+                      </p>
+                    </div>
+                    <motion.div
+                      animate={{ rotate: isExpanded ? 180 : 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <ChevronDown className="h-5 w-5 text-slate-400" />
+                    </motion.div>
+                  </button>
 
-                  {/* Price */}
-                  {showPrices && (
-                    <div className="mb-4">
-                      <p
-                        className="text-3xl font-black"
-                        style={{ color: primaryColor }}
+                  {/* Accordion Content - Chips */}
+                  <AnimatePresence>
+                    {isExpanded && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="overflow-hidden"
                       >
-                        {formatCurrency(product.price, currency)}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Description */}
-                  {showDescription && product.description && (
-                    <div className="mb-6">
-                      <p className="text-slate-700 leading-relaxed text-sm">
-                        {product.description}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Modifiers */}
-                  {product.modifierGroups && product.modifierGroups.length > 0 && (
-                    <div className="mb-6 space-y-6">
-                      {product.modifierGroups.map(group => (
-                        <div key={group.id} className="border-t pt-4">
-                          <div className="mb-3">
-                            <h3 className="text-lg font-semibold text-slate-900">
-                              {group.displayName}
-                              {group.isRequired && (
-                                <span className="ml-2 text-xs text-red-500">*</span>
-                              )}
-                            </h3>
-                            {group.description && (
-                              <p className="text-sm text-slate-500 mt-1">{group.description}</p>
-                            )}
-                            <p className="text-xs text-slate-400 mt-1">
-                              {group.selectionType === SelectionType.SINGLE
-                                ? t('qrMenu.selectOne', 'Select one')
-                                : group.maxSelections
-                                  ? t('qrMenu.selectUpTo', `Select up to ${group.maxSelections}`, { max: group.maxSelections })
-                                  : t('qrMenu.selectMultiple', 'Select multiple')}
-                            </p>
-                          </div>
-
-                          <div className="space-y-2">
-                            {group.modifiers.map(modifier => {
-                              const selected = isModifierSelected(group.id, modifier.id);
-                              return (
-                                <motion.button
-                                  key={modifier.id}
-                                  onClick={() => handleModifierToggle(group, modifier)}
-                                  className={cn(
-                                    'w-full flex items-center justify-between p-3 rounded-xl border-2 transition-all',
-                                    selected
-                                      ? 'border-green-500 bg-green-50'
-                                      : 'border-slate-200/60 hover:border-slate-300 bg-white'
-                                  )}
-                                  whileTap={{ scale: 0.98 }}
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <div
-                                      className={cn(
-                                        'w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all',
-                                        selected
-                                          ? 'border-green-500 bg-green-500'
-                                          : 'border-slate-300'
-                                      )}
-                                    >
-                                      {selected && <Check className="w-3 h-3 text-white" />}
-                                    </div>
-                                    <div className="text-left">
-                                      <p className="font-medium text-slate-900">
-                                        {modifier.displayName}
-                                      </p>
-                                      {modifier.description && (
-                                        <p className="text-xs text-slate-500">{modifier.description}</p>
-                                      )}
-                                    </div>
-                                  </div>
+                        <div className="p-4 pt-2 flex flex-wrap gap-2">
+                          {group.modifiers.map(modifier => {
+                            const selected = isModifierSelected(group.id, modifier.id);
+                            return (
+                              <motion.button
+                                key={modifier.id}
+                                onClick={() => handleModifierToggle(group, modifier)}
+                                className={cn(
+                                  'px-4 py-2 rounded-full text-sm font-medium transition-all border-2',
+                                  selected
+                                    ? 'border-transparent text-white'
+                                    : 'border-slate-200 text-slate-700 hover:border-slate-300 bg-white'
+                                )}
+                                style={{
+                                  backgroundColor: selected ? primaryColor : undefined,
+                                }}
+                                whileTap={{ scale: 0.95 }}
+                              >
+                                <span className="flex items-center gap-2">
+                                  {selected && <Check className="h-3.5 w-3.5" />}
+                                  {modifier.displayName}
                                   {modifier.priceAdjustment > 0 && (
-                                    <span className="text-sm font-semibold text-green-600">
+                                    <span className={cn(
+                                      'text-xs',
+                                      selected ? 'text-white/80' : 'text-green-600'
+                                    )}>
                                       +{formatCurrency(modifier.priceAdjustment, currency)}
                                     </span>
                                   )}
-                                </motion.button>
-                              );
-                            })}
-                          </div>
+                                </span>
+                              </motion.button>
+                            );
+                          })}
                         </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Notes */}
-                  {enableCustomerOrdering && (
-                    <div className="mb-6">
-                      <label className="block text-sm font-medium text-slate-700 mb-2">
-                        {t('qrMenu.specialInstructions', 'Special Instructions')}
-                      </label>
-                      <textarea
-                        value={notes}
-                        onChange={(e) => setNotes(e.target.value)}
-                        placeholder={t('qrMenu.notesPlaceholder', 'E.g., No onions, extra sauce...')}
-                        className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-opacity-50 focus:border-transparent resize-none transition-all"
-                        style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
-                        rows={3}
-                      />
-                    </div>
-                  )}
-
-                  {/* Quantity and Add to Cart */}
-                  {enableCustomerOrdering ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between gap-4">
-                        {/* Quantity */}
-                        <div className="flex items-center gap-2 border-2 border-slate-200 rounded-xl p-1">
-                          <motion.button
-                            onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                            className="p-2.5 rounded-lg hover:bg-slate-100 transition-colors disabled:opacity-50"
-                            disabled={quantity <= 1}
-                            whileTap={{ scale: 0.9 }}
-                          >
-                            <Minus className="w-5 h-5 text-slate-600" />
-                          </motion.button>
-                          <span className="w-12 text-center font-semibold text-lg">{quantity}</span>
-                          <motion.button
-                            onClick={() => setQuantity(quantity + 1)}
-                            className="p-2.5 rounded-lg hover:bg-slate-100 transition-colors"
-                            whileTap={{ scale: 0.9 }}
-                          >
-                            <Plus className="w-5 h-5 text-slate-600" />
-                          </motion.button>
-                        </div>
-
-                        {/* Add to Cart Button */}
-                        <motion.button
-                          onClick={handleAddToCart}
-                          disabled={!canAddToCart() || showSuccess}
-                          className={cn(
-                            'flex-1 py-4 px-6 rounded-xl font-semibold text-white transition-all duration-300 flex items-center justify-center gap-2',
-                            canAddToCart() && !showSuccess
-                              ? 'shadow-lg hover:shadow-xl'
-                              : 'opacity-50 cursor-not-allowed'
-                          )}
-                          style={{
-                            backgroundColor: showSuccess ? '#10b981' : (canAddToCart() ? primaryColor : '#9ca3af'),
-                          }}
-                          whileTap={{ scale: 0.98 }}
-                          whileHover={canAddToCart() && !showSuccess ? { scale: 1.02 } : {}}
-                        >
-                          <AnimatePresence mode="wait">
-                            {showSuccess ? (
-                              <motion.div
-                                key="success"
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                exit={{ scale: 0 }}
-                                className="flex items-center gap-2"
-                              >
-                                <Check className="w-5 h-5" />
-                                <span>{t('qrMenu.added', 'Added!')}</span>
-                              </motion.div>
-                            ) : (
-                              <motion.div
-                                key="add"
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                exit={{ scale: 0 }}
-                                className="flex items-center gap-2"
-                              >
-                                <ShoppingCart className="w-5 h-5" />
-                                <span>{formatCurrency(calculateTotal(), currency)}</span>
-                              </motion.div>
-                            )}
-                          </AnimatePresence>
-                        </motion.button>
-                      </div>
-
-                      {!canAddToCart() && (
-                        <p className="text-sm text-red-500 text-center">
-                          {t('qrMenu.requiredModifiers', 'Please select required options')}
-                        </p>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="py-4 px-6 bg-yellow-50 rounded-xl border border-yellow-200">
-                      <p className="text-sm text-yellow-700 text-center">
-                        {t('qrMenu.viewOnlyMode', 'Menu viewing only - please order with staff assistance')}
-                      </p>
-                    </div>
-                  )}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
-              </div>
-            </motion.div>
+              );
+            })}
           </div>
+        )}
+
+        {/* Notes */}
+        {enableCustomerOrdering && (
+          <div className="mb-5">
+            <label className="block text-sm font-medium text-slate-700 mb-2">
+              {t('qrMenu.specialInstructions', 'Special Instructions')}
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder={t('qrMenu.notesPlaceholder', 'E.g., No onions, extra sauce...')}
+              className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-opacity-50 focus:border-transparent resize-none text-sm transition-all"
+              style={{ '--tw-ring-color': primaryColor } as React.CSSProperties}
+              rows={2}
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Sticky Footer - Quantity + Add to Cart */}
+      {enableCustomerOrdering && (
+        <div
+          className="sticky bottom-0 bg-white border-t border-slate-100 p-4"
+          style={{
+            paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))',
+          }}
+        >
+          <div className="flex items-center gap-3">
+            {/* Quantity Stepper */}
+            <div className="flex items-center bg-slate-100 rounded-xl">
+              <motion.button
+                onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                disabled={quantity <= 1}
+                className="p-3 disabled:opacity-40"
+                whileTap={{ scale: 0.9 }}
+              >
+                <Minus className="w-4 h-4 text-slate-600" />
+              </motion.button>
+              <span className="w-8 text-center font-bold text-slate-900">{quantity}</span>
+              <motion.button
+                onClick={() => setQuantity(quantity + 1)}
+                className="p-3"
+                whileTap={{ scale: 0.9 }}
+              >
+                <Plus className="w-4 h-4 text-slate-600" />
+              </motion.button>
+            </div>
+
+            {/* Add to Cart Button */}
+            <motion.button
+              onClick={handleAddToCart}
+              disabled={!canAddToCart() || showSuccess}
+              className={cn(
+                'flex-1 py-3.5 px-6 rounded-xl font-bold text-white transition-all duration-300 flex items-center justify-center gap-2'
+              )}
+              style={{
+                backgroundColor: showSuccess ? '#10b981' : (canAddToCart() ? primaryColor : '#9ca3af'),
+                boxShadow: canAddToCart() && !showSuccess ? `0 4px 15px ${primaryColor}40` : 'none',
+              }}
+              whileTap={{ scale: 0.98 }}
+            >
+              <AnimatePresence mode="wait">
+                {showSuccess ? (
+                  <motion.div
+                    key="success"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    exit={{ scale: 0 }}
+                    className="flex items-center gap-2"
+                  >
+                    <Check className="w-5 h-5" />
+                    <span>{t('qrMenu.added', 'Added!')}</span>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="add"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    exit={{ scale: 0 }}
+                    className="flex items-center gap-2"
+                  >
+                    <ShoppingCart className="w-5 h-5" />
+                    <span>{t('qrMenu.addToCart', 'Add')}</span>
+                    <span className="opacity-80">•</span>
+                    <span>{formatCurrency(calculateTotal(), currency)}</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.button>
+          </div>
+
+          {!canAddToCart() && (
+            <motion.p
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="text-xs text-red-500 text-center mt-2"
+            >
+              {t('qrMenu.requiredModifiers', 'Please select required options')}
+            </motion.p>
+          )}
         </div>
       )}
-    </AnimatePresence>
+
+      {/* View Only Mode Message */}
+      {!enableCustomerOrdering && (
+        <div className="p-4 bg-amber-50 border-t border-amber-100">
+          <p className="text-sm text-amber-700 text-center">
+            {t('qrMenu.viewOnlyMode', 'Menu viewing only - please order with staff assistance')}
+          </p>
+        </div>
+      )}
+    </BottomSheet>
   );
 };
 

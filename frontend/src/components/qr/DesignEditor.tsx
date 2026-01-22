@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HexColorPicker } from 'react-colorful';
+import { toast } from 'sonner';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
-import { Save, RotateCcw, Palette, Type, Layout, QrCode, Eye, Upload, Sparkles, ChevronDown, ChevronUp, UtensilsCrossed } from 'lucide-react';
+import { Save, RotateCcw, Palette, Type, Layout, QrCode, Eye, Upload, Sparkles, ChevronDown, ChevronUp, UtensilsCrossed, Loader2 } from 'lucide-react';
 import type { QrMenuSettings, UpdateQrSettingsDto } from '../../types';
 import QrCodeDisplay from './QrCodeDisplay';
+import api from '../../lib/api';
+
+// Max file size for logo upload (5MB)
+const MAX_LOGO_SIZE = 5 * 1024 * 1024;
 
 interface DesignEditorProps {
   settings: QrMenuSettings;
@@ -254,14 +259,45 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
     });
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setFormData({ ...formData, logoUrl: reader.result as string });
-      };
-      reader.readAsDataURL(file);
+      // Check file size
+      if (file.size > MAX_LOGO_SIZE) {
+        toast.error(t('common:qrDesigner.logoTooLarge', 'Logo file is too large. Maximum size is 5MB.'));
+        e.target.value = '';
+        return;
+      }
+
+      // Check file type
+      if (!file.type.startsWith('image/')) {
+        toast.error(t('common:qrDesigner.invalidFileType', 'Please upload an image file.'));
+        e.target.value = '';
+        return;
+      }
+
+      setIsUploadingLogo(true);
+      try {
+        const formDataUpload = new FormData();
+        formDataUpload.append('logo', file);
+
+        const response = await api.post('/upload/logo', formDataUpload, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
+        setFormData({ ...formData, logoUrl: response.data.url });
+        toast.success(t('common:qrDesigner.logoUploaded', 'Logo uploaded successfully'));
+      } catch (error: any) {
+        console.error('Logo upload failed:', error);
+        toast.error(error.response?.data?.message || t('common:qrDesigner.logoUploadFailed', 'Failed to upload logo'));
+      } finally {
+        setIsUploadingLogo(false);
+        e.target.value = '';
+      }
     }
   };
 
@@ -444,24 +480,35 @@ const DesignEditor = ({ settings, onUpdate, isUpdating, tenant }: DesignEditorPr
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-3">{t('common:qrDesigner.logoUpload')}</label>
                 <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-slate-400 transition-colors">
-                  <Upload className="h-8 w-8 mx-auto text-slate-400 mb-2" />
-                  <p className="text-sm text-slate-600 mb-2">{t('common:qrDesigner.uploadLogo')}</p>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleLogoUpload}
-                    className="hidden"
-                    id="logo-upload"
-                  />
-                  <label
-                    htmlFor="logo-upload"
-                    className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-700"
-                  >
-                    {t('common:qrDesigner.chooseFile')}
-                  </label>
+                  {isUploadingLogo ? (
+                    <div className="flex flex-col items-center">
+                      <Loader2 className="h-8 w-8 text-blue-600 animate-spin mb-2" />
+                      <p className="text-sm text-slate-600">{t('common:qrDesigner.uploadingLogo', 'Uploading...')}</p>
+                    </div>
+                  ) : (
+                    <>
+                      <Upload className="h-8 w-8 mx-auto text-slate-400 mb-2" />
+                      <p className="text-sm text-slate-600 mb-2">{t('common:qrDesigner.uploadLogo')}</p>
+                      <p className="text-xs text-slate-400 mb-3">{t('common:qrDesigner.maxFileSize', 'Max file size: 5MB')}</p>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoUpload}
+                        className="hidden"
+                        id="logo-upload"
+                        disabled={isUploadingLogo}
+                      />
+                      <label
+                        htmlFor="logo-upload"
+                        className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-700"
+                      >
+                        {t('common:qrDesigner.chooseFile')}
+                      </label>
+                    </>
+                  )}
                   {formData.logoUrl && (
                     <div className="mt-4">
-                      <img src={formData.logoUrl} alt={t('common:qrDesigner.logoPreview')} className="h-16 mx-auto" />
+                      <img src={formData.logoUrl} alt={t('common:qrDesigner.logoPreview')} className="h-16 mx-auto rounded-lg" />
                     </div>
                   )}
                 </div>

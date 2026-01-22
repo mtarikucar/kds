@@ -5,6 +5,7 @@ import { AppModule } from './app.module';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import helmet from 'helmet';
+import * as bodyParser from 'body-parser';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { initSentry } from './sentry.config';
 
@@ -13,6 +14,10 @@ initSentry();
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+  // Increase body parser limits for file uploads (e.g., logos)
+  app.use(bodyParser.json({ limit: '10mb' }));
+  app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
 
   // Security headers with Helmet
   app.use(

@@ -744,14 +744,16 @@ export class CustomerOrdersService {
   }
 
   private async generateOrderNumber(tenantId: string): Promise<string> {
-    const today = new Date();
-    const dateStr = today.toISOString().split('T')[0].replace(/-/g, '');
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0].replace(/-/g, '');
+    const orderPrefix = `ORD-${dateStr}-`;
 
+    // Find the last order with the same date prefix for this tenant
     const lastOrder = await this.prisma.order.findFirst({
       where: {
         tenantId,
-        createdAt: {
-          gte: new Date(today.setHours(0, 0, 0, 0)),
+        orderNumber: {
+          startsWith: orderPrefix,
         },
       },
       orderBy: {
@@ -765,6 +767,6 @@ export class CustomerOrdersService {
       sequence = lastSequence + 1;
     }
 
-    return `ORD-${dateStr}-${sequence.toString().padStart(4, '0')}`;
+    return `${orderPrefix}${sequence.toString().padStart(4, '0')}`;
   }
 }

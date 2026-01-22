@@ -29,6 +29,7 @@ export class UploadService {
                    this.configService.get('FRONTEND_URL') ||
                    'http://localhost:3000';
     this.ensureUploadDir();
+    this.ensureLogosDir();
   }
 
   private async ensureUploadDir() {
@@ -37,6 +38,65 @@ export class UploadService {
     } catch {
       await fs.mkdir(this.uploadsDir, { recursive: true });
       this.logger.log(`Created uploads directory: ${this.uploadsDir}`);
+    }
+  }
+
+  private async ensureLogosDir() {
+    const logosDir = path.join(process.cwd(), 'uploads', 'logos');
+    try {
+      await fs.access(logosDir);
+    } catch {
+      await fs.mkdir(logosDir, { recursive: true });
+      this.logger.log(`Created logos directory: ${logosDir}`);
+    }
+  }
+
+  async uploadLogo(
+    file: Express.Multer.File,
+    tenantId: string,
+  ): Promise<{ url: string }> {
+    // Validate file
+    if (!file) {
+      throw new BadRequestException('No file provided');
+    }
+
+    if (file.size > this.maxFileSize) {
+      throw new BadRequestException('File size exceeds 5MB limit');
+    }
+
+    if (!this.allowedMimeTypes.includes(file.mimetype)) {
+      throw new BadRequestException(
+        'Invalid file type. Only JPEG, PNG, and WebP are allowed',
+      );
+    }
+
+    // Generate unique filename
+    const uniqueFilename = `${tenantId}-logo-${Date.now()}.png`;
+    const logosDir = path.join(process.cwd(), 'uploads', 'logos');
+    const filePath = path.join(logosDir, uniqueFilename);
+    const relativePath = path.join('uploads', 'logos', uniqueFilename);
+
+    try {
+      // Optimize and save image using Sharp - resize for logo
+      const optimizedBuffer = await sharp(file.buffer)
+        .resize(512, 512, {
+          fit: 'inside',
+          withoutEnlargement: true,
+        })
+        .png({ quality: 90 })
+        .toBuffer();
+
+      await fs.writeFile(filePath, optimizedBuffer);
+
+      // Return the URL
+      const absoluteUrl = `${this.baseUrl}/${relativePath.replace(/\\/g, '/')}`;
+
+      this.logger.log(`Uploaded logo ${uniqueFilename} for tenant ${tenantId}`);
+
+      return { url: absoluteUrl };
+    } catch (error) {
+      this.logger.error(`Failed to upload logo: ${error.message}`);
+      throw new BadRequestException('Failed to upload logo');
     }
   }
 

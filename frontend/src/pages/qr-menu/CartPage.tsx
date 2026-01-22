@@ -40,6 +40,9 @@ const CartPage = () => {
   }, [locationRequested, getCurrentPosition]);
 
   const handleSubmitOrder = async () => {
+    // Prevent double submission
+    if (isSubmitting) return;
+
     if (!sessionId) {
       toast.error(t('cart.sessionExpired'));
       return;
@@ -104,6 +107,8 @@ const CartPage = () => {
             onSubmitOrder={handleSubmitOrder}
             onShowTableSelection={() => setIsShowingTableSelection(true)}
             isSubmitting={isSubmitting}
+            tenantId={tenantId}
+            tableId={tableId}
           />
           {isShowingTableSelection && (
             <TableSelectionModal
