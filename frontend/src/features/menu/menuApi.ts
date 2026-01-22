@@ -247,38 +247,13 @@ export const useReorderProducts = () => {
       console.log('All updates complete:', results);
     },
     // Optimistic update - immediately update the cache
-    onMutate: async (orderedIds: string[]) => {
-      // Cancel any outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['products'] });
-
-      // Snapshot the previous value
-      const previousProducts = queryClient.getQueryData<Product[]>(['products']);
-
-      // Optimistically update the cache
-      if (previousProducts) {
-        const updatedProducts = previousProducts.map(product => {
-          const newIndex = orderedIds.indexOf(product.id);
-          if (newIndex !== -1) {
-            return { ...product, displayOrder: newIndex };
-          }
-          return product;
-        });
-        queryClient.setQueryData(['products'], updatedProducts);
-      }
-
-      // Return context with the previous value
-      return { previousProducts };
+    onSuccess: () => {
+      // Invalidate all product queries to refetch with new order
+      queryClient.invalidateQueries({ queryKey: ['products'] });
     },
-    onError: (error: any, _variables, context) => {
+    onError: (error: any) => {
       console.error('Reorder products error:', error);
-      // Rollback to the previous value on error
-      if (context?.previousProducts) {
-        queryClient.setQueryData(['products'], context.previousProducts);
-      }
       toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
-    // NOTE: We intentionally do NOT invalidate queries here.
-    // The optimistic update is sufficient, and refetching would
-    // cause the UI to revert if backend doesn't return sorted data.
   });
 };

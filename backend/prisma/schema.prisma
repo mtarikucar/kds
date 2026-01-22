@@ -172,6 +172,7 @@ model Product {
   isAvailable  Boolean @default(true)
   stockTracked Boolean @default(false)
   currentStock Int     @default(0)
+  displayOrder Int     @default(0)
 
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)

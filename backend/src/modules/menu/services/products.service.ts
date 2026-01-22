@@ -119,7 +119,7 @@ export class ProductsService {
           orderBy: { displayOrder: 'asc' },
         },
       },
-      orderBy: { name: 'asc' },
+      orderBy: [{ displayOrder: 'asc' }, { name: 'asc' }],
     });
 
     return products.map(product => this.transformProductResponse(product));

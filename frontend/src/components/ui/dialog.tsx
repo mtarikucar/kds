@@ -63,11 +63,12 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
         />
 
         {/* Dialog */}
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
           <div
             ref={ref}
             className={cn(
-              'relative bg-white rounded-lg shadow-xl w-full max-w-md',
+              'relative bg-white rounded-xl shadow-2xl w-full max-w-sm sm:max-w-md md:max-w-lg',
+              'max-h-[90vh] flex flex-col',
               'animate-in fade-in-0 zoom-in-95 duration-200',
               className
             )}
@@ -77,7 +78,7 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
             {children}
             <button
               onClick={() => onOpenChange(false)}
-              className="absolute right-3 top-3 rounded-md p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:pointer-events-none"
+              className="absolute right-3 top-3 sm:right-4 sm:top-4 rounded-lg p-1.5 sm:p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:pointer-events-none"
             >
               <X className="h-4 w-4" />
               <span className="sr-only">Close</span>
@@ -100,7 +101,7 @@ const DialogHeader = React.forwardRef<HTMLDivElement, DialogHeaderProps>(
     return (
       <div
         ref={ref}
-        className={cn('flex flex-col space-y-1 px-4 pt-4', className)}
+        className={cn('flex flex-col space-y-1 sm:space-y-1.5 px-4 pt-4 sm:px-6 sm:pt-6 flex-shrink-0', className)}
         {...props}
       >
         {children}
@@ -121,7 +122,7 @@ const DialogFooter = React.forwardRef<HTMLDivElement, DialogFooterProps>(
       <div
         ref={ref}
         className={cn(
-          'flex flex-col-reverse sm:flex-row sm:justify-end gap-2 px-4 pb-4 pt-3',
+          'flex flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:gap-3 px-4 pb-4 pt-3 sm:px-6 sm:pb-6 sm:pt-4 flex-shrink-0',
           className
         )}
         {...props}
@@ -143,7 +144,7 @@ const DialogTitle = React.forwardRef<HTMLHeadingElement, DialogTitleProps>(
     return (
       <h2
         ref={ref}
-        className={cn('text-base font-heading font-semibold leading-none tracking-tight text-slate-900', className)}
+        className={cn('text-base sm:text-lg font-heading font-semibold leading-none tracking-tight text-slate-900 pr-8', className)}
         {...props}
       >
         {children}

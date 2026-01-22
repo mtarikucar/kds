@@ -38,11 +38,11 @@ const Modal: React.FC<ModalProps> = ({
   if (!isOpen) return null;
 
   const sizes = {
-    sm: 'max-w-sm',
-    md: 'max-w-md',
-    lg: 'max-w-lg',
-    xl: 'max-w-2xl',
-    full: 'max-w-[90vw] md:max-w-[80vw]',
+    sm: 'max-w-sm sm:max-w-md',
+    md: 'max-w-sm sm:max-w-md md:max-w-lg',
+    lg: 'max-w-sm sm:max-w-lg md:max-w-xl lg:max-w-2xl',
+    xl: 'max-w-sm sm:max-w-xl md:max-w-2xl lg:max-w-3xl',
+    full: 'max-w-[95vw] md:max-w-[85vw] lg:max-w-[80vw]',
   };
 
   return (
@@ -57,27 +57,27 @@ const Modal: React.FC<ModalProps> = ({
         {/* Modal */}
         <div
           className={cn(
-            'relative w-full bg-white rounded-lg shadow-xl',
-            'animate-in fade-in-0 zoom-in-95 duration-200',
+            'relative w-full bg-white rounded-xl shadow-2xl',
             'max-h-[90vh] flex flex-col',
+            'animate-in fade-in-0 zoom-in-95 duration-200',
             sizes[size]
           )}
         >
           {/* Header */}
           {title && (
-            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 flex-shrink-0">
-              <h2 className="text-sm font-heading font-semibold text-slate-900">{title}</h2>
+            <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex-shrink-0">
+              <h2 className="text-base sm:text-lg md:text-xl font-heading font-semibold text-slate-900">{title}</h2>
               <button
                 onClick={onClose}
-                className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-md p-1.5 transition-all duration-150"
+                className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 sm:p-2 transition-all duration-150"
               >
-                <X className="h-4 w-4" />
+                <X className="h-4 w-4 sm:h-5 sm:w-5" />
               </button>
             </div>
           )}
 
           {/* Content */}
-          <div className="px-4 py-3 overflow-y-auto flex-1">{children}</div>
+          <div className="px-4 py-4 sm:px-6 sm:py-5 overflow-y-auto flex-1">{children}</div>
         </div>
       </div>
     </div>

@@ -61,4 +61,10 @@ export class CreateProductDto {
   @IsString({ each: true })
   @IsOptional()
   imageIds?: string[];
+
+  @ApiProperty({ example: 0, default: 0, required: false })
+  @IsInt()
+  @Min(0)
+  @IsOptional()
+  displayOrder?: number;
 }
