@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
@@ -116,12 +117,40 @@ export class TenantsService {
     });
   }
 
+  private async validateSubdomainChangePermission(
+    tenantId: string,
+    currentSubdomain: string | null,
+    newSubdomain: string | null | undefined,
+  ): Promise<void> {
+    // Allow if not changing
+    if (newSubdomain === currentSubdomain) return;
+
+    // Allow removal (setting to null)
+    if (!newSubdomain) return;
+
+    // Check plan feature
+    const tenantWithPlan = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: { currentPlan: true },
+    });
+
+    const hasCustomBranding =
+      tenantWithPlan?.currentPlan?.customBranding ?? false;
+
+    if (!hasCustomBranding) {
+      throw new ForbiddenException(
+        'Custom subdomain is a Pro feature. Upgrade your plan to set or change your subdomain.',
+      );
+    }
+  }
+
   async findSettings(tenantId: string) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
       select: {
         id: true,
         name: true,
+        subdomain: true,
         currency: true,
         closingTime: true,
         timezone: true,
@@ -160,12 +189,33 @@ export class TenantsService {
       throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
     }
 
+    // Check subdomain change permission (Pro feature with grandfather rule)
+    if (updateDto.subdomain !== undefined) {
+      await this.validateSubdomainChangePermission(
+        tenantId,
+        tenant.subdomain,
+        updateDto.subdomain,
+      );
+
+      // Check uniqueness if subdomain is being set (not null/removed)
+      if (updateDto.subdomain) {
+        const existingTenant = await this.prisma.tenant.findUnique({
+          where: { subdomain: updateDto.subdomain },
+        });
+
+        if (existingTenant && existingTenant.id !== tenantId) {
+          throw new ConflictException('Subdomain already in use');
+        }
+      }
+    }
+
     return this.prisma.tenant.update({
       where: { id: tenantId },
       data: updateDto,
       select: {
         id: true,
         name: true,
+        subdomain: true,
         currency: true,
         closingTime: true,
         timezone: true,

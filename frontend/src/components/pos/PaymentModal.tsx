@@ -83,7 +83,7 @@ const PaymentModal = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={t('payment.title')} size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title={t('payment.title')} size="sm">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
         {/* Total Amount Card */}
         <div className="bg-gradient-to-br from-primary-50 to-primary-100/50 p-5 rounded-xl border border-primary-200/60 text-center">

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Settings, CreditCard, Monitor, Plug, Download, Menu, X } from 'lucide-react';
+import { Settings, CreditCard, Monitor, Plug, Download, Menu, X, QrCode, FileText, Palette } from 'lucide-react';
 
 const SettingsLayout = () => {
   const { t } = useTranslation('settings');
@@ -13,25 +13,36 @@ const SettingsLayout = () => {
       to: '/admin/settings/subscription',
       icon: CreditCard,
       label: t('subscription'),
-      description: t('subscriptionDesc'),
     },
     {
       to: '/admin/settings/pos',
       icon: Monitor,
       label: t('pos'),
-      description: t('posDesc'),
+    },
+    {
+      to: '/admin/settings/qr-menu',
+      icon: QrCode,
+      label: t('nav.qrMenu'),
+    },
+    {
+      to: '/admin/settings/reports',
+      icon: FileText,
+      label: t('nav.reports'),
+    },
+    {
+      to: '/admin/settings/branding',
+      icon: Palette,
+      label: t('nav.branding'),
     },
     {
       to: '/admin/settings/desktop',
       icon: Download,
       label: t('desktopApp'),
-      description: t('desktopAppMenuDesc'),
     },
     {
       to: '/admin/settings/integrations',
       icon: Plug,
       label: t('integrationsLabel'),
-      description: t('integrationsDesc'),
     },
   ];
 
@@ -41,51 +52,36 @@ const SettingsLayout = () => {
 
   const SidebarContent = () => (
     <>
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-2">
-          <Settings className="h-6 w-6 text-slate-700" />
-          <h2 className="text-xl font-heading font-bold text-slate-900">{t('title')}</h2>
+      <div className="mb-4">
+        <div className="flex items-center gap-2">
+          <Settings className="h-5 w-5 text-slate-600" />
+          <h2 className="text-base font-heading font-semibold text-slate-900">{t('title')}</h2>
         </div>
-        <p className="text-sm text-slate-500">
-          {t('manageConfiguration')}
-        </p>
       </div>
 
-      <nav className="space-y-1">
+      <nav className="space-y-0.5">
         {settingsNavItems.map((item) => {
-          const isActive = location.pathname === item.to;
+          const isActive = location.pathname === item.to ||
+            (item.to !== '/admin/settings/subscription' && location.pathname.startsWith(item.to));
           return (
             <NavLink
               key={item.to}
               to={item.to}
               onClick={handleNavClick}
-              className={`flex items-start gap-3 px-4 py-3 rounded-xl transition-all duration-150 ${
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
                 isActive
-                  ? 'bg-primary-50 text-primary-700 border border-primary-200/60 shadow-sm'
-                  : 'text-slate-700 hover:bg-slate-100/80'
+                  ? 'bg-primary-50 text-primary-700 font-medium'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
               }`}
             >
-              <item.icon className={`h-5 w-5 mt-0.5 flex-shrink-0 ${
+              <item.icon className={`h-4 w-4 flex-shrink-0 ${
                 isActive ? 'text-primary-600' : 'text-slate-400'
               }`} />
-              <div className="flex-1 min-w-0">
-                <div className={`font-medium ${isActive ? 'text-primary-700' : 'text-slate-900'}`}>
-                  {item.label}
-                </div>
-                <div className="text-xs text-slate-500 mt-0.5">
-                  {item.description}
-                </div>
-              </div>
+              <span>{item.label}</span>
             </NavLink>
           );
         })}
       </nav>
-
-      <div className="mt-8 p-4 bg-primary-50/50 border border-primary-200/60 rounded-xl">
-        <p className="text-sm text-primary-800">
-          <strong>{t('tip')}:</strong> {t('tipDescription')}
-        </p>
-      </div>
     </>
   );
 
@@ -139,7 +135,7 @@ const SettingsLayout = () => {
       </div>
 
       {/* Desktop Sidebar */}
-      <div className="hidden lg:block w-72 bg-slate-50/50 border-r border-slate-200/60 p-6 flex-shrink-0">
+      <div className="hidden lg:block w-52 bg-slate-50/50 border-r border-slate-200/60 p-4 flex-shrink-0">
         <SidebarContent />
       </div>
 

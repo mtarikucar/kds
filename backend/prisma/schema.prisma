@@ -88,7 +88,13 @@ model User {
   firstName String
   lastName  String
   role      String   // ADMIN, MANAGER, WAITER, KITCHEN, COURIER
-  status    String   @default("ACTIVE") // ACTIVE, INACTIVE
+  status    String   @default("ACTIVE") // ACTIVE, INACTIVE, PENDING_APPROVAL
+
+  // User approval (for non-ADMIN users joining existing restaurants)
+  approvedAt    DateTime?
+  approvedById  String?
+  approvedBy    User?     @relation("UserApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedUsers User[]    @relation("UserApprover")
 
   // Email verification (code-based)
   emailVerified                 Boolean   @default(false)
@@ -128,6 +134,7 @@ model User {
 
   @@index([tenantId])
   @@index([email])
+  @@index([approvedById])
   @@map("users")
 }
 

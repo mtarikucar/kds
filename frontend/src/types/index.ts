@@ -10,6 +10,7 @@ export enum UserRole {
 export enum UserStatus {
   ACTIVE = 'ACTIVE',
   INACTIVE = 'INACTIVE',
+  PENDING_APPROVAL = 'PENDING_APPROVAL',
 }
 
 export interface User {
@@ -20,6 +21,9 @@ export interface User {
   role: string;
   tenantId: string | null;
   status?: UserStatus | string;
+  approvedAt?: string;
+  approvedById?: string;
+  approvedBy?: { id: string; firstName: string; lastName: string };
   createdAt?: string;
   updatedAt?: string;
 }
@@ -36,6 +40,7 @@ export interface RegisterRequest {
   lastName: string;
   role?: UserRole;
   restaurantName?: string;
+  tenantId?: string;
 }
 
 export interface AuthResponse {

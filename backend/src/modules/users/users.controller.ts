@@ -111,4 +111,28 @@ export class UsersController {
   ) {
     return this.usersService.updateEmail(userId, updateEmailDto);
   }
+
+  @Patch(':id/approve')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Approve a pending user (ADMIN, MANAGER)' })
+  @ApiResponse({ status: 200, description: 'User approved successfully' })
+  @ApiResponse({ status: 404, description: 'User not found or not pending approval' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  approveUser(
+    @Param('id') id: string,
+    @CurrentUser('id') approverId: string,
+    @Request() req,
+  ) {
+    return this.usersService.approveUser(id, approverId, req.tenantId);
+  }
+
+  @Patch(':id/reject')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Reject a pending user (ADMIN, MANAGER)' })
+  @ApiResponse({ status: 200, description: 'User rejected successfully' })
+  @ApiResponse({ status: 404, description: 'User not found or not pending approval' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  rejectUser(@Param('id') id: string, @Request() req) {
+    return this.usersService.rejectUser(id, req.tenantId);
+  }
 }

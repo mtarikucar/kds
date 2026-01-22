@@ -169,6 +169,9 @@ export class AuthService {
     // Hash password
     const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
+    // Determine user status: ADMIN creating restaurant = ACTIVE, others = PENDING_APPROVAL
+    const userStatus = hasRestaurantName ? 'ACTIVE' : 'PENDING_APPROVAL';
+
     // Create user
     const user = await this.prisma.user.create({
       data: {
@@ -178,6 +181,7 @@ export class AuthService {
         lastName: registerDto.lastName,
         role: userRole,
         tenantId,
+        status: userStatus,
       },
       select: {
         id: true,
@@ -185,6 +189,7 @@ export class AuthService {
         firstName: true,
         lastName: true,
         role: true,
+        status: true,
         tenantId: true,
       },
     });
@@ -195,6 +200,39 @@ export class AuthService {
     } catch (error) {
       // Log error but don't fail registration if email sending fails
       console.error('Failed to send verification email:', error);
+    }
+
+    // If user is pending approval, notify admins and return without tokens
+    if (userStatus === 'PENDING_APPROVAL') {
+      try {
+        await this.notificationsService.notifyAdmins(tenantId, {
+          title: 'Yeni Kullanıcı Onay Bekliyor',
+          message: `${user.firstName} ${user.lastName} (${user.email}) hesap onayı bekliyor.`,
+          type: NotificationType.WARNING,
+          data: {
+            action: 'USER_APPROVAL_REQUIRED',
+            userId: user.id,
+          },
+        });
+      } catch (error) {
+        console.error('Failed to notify admins about pending user:', error);
+      }
+
+      // Return response without tokens - user needs approval
+      return {
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role,
+          tenantId: user.tenantId,
+        },
+        accessToken: null,
+        refreshToken: null,
+        pendingApproval: true,
+        message: 'Kayıt başarılı. Hesabınız yönetici onayı bekliyor.',
+      } as any;
     }
 
     return this.generateTokens(user);
@@ -227,6 +265,10 @@ export class AuthService {
 
     if (!user) {
       return null;
+    }
+
+    if (user.status === 'PENDING_APPROVAL') {
+      throw new UnauthorizedException('Hesabınız henüz onaylanmadı. Lütfen yönetici onayını bekleyin.');
     }
 
     if (user.status !== 'ACTIVE') {

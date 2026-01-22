@@ -1,10 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQrSettings, useUpdateQrSettings, useQrCodes } from '../../features/qr/qrApi';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/Spinner';
-import { QrCode, Download, Palette, Eye, DownloadCloud, FileArchive } from 'lucide-react';
+import { QrCode, Download, Palette, Eye, DownloadCloud, FileArchive, LayoutGrid, Store } from 'lucide-react';
 import DesignEditor from '../../components/qr/DesignEditor';
 import QrCodeDisplay from '../../components/qr/QrCodeDisplay';
 import type { UpdateQrSettingsDto } from '../../types';
@@ -246,6 +246,21 @@ const QRManagementPage = () => {
     });
   };
 
+  const settings = settingsData;
+  const qrCodes = qrCodesData?.qrCodes || [];
+  const tenant = qrCodesData?.tenant;
+
+  // Calculate statistics - must be before any early returns (Rules of Hooks)
+  const stats = useMemo(() => {
+    const tableQRs = qrCodes.filter(qr => qr.type === 'TABLE').length;
+    const tenantQRs = qrCodes.filter(qr => qr.type === 'TENANT').length;
+    return {
+      total: qrCodes.length,
+      tableQRs,
+      tenantQRs,
+    };
+  }, [qrCodes]);
+
   if (settingsLoading || codesLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -254,16 +269,56 @@ const QRManagementPage = () => {
     );
   }
 
-  const settings = settingsData;
-  const qrCodes = qrCodesData?.qrCodes || [];
-  const tenant = qrCodesData?.tenant;
-
   return (
     <div className="space-y-6">
-      <div className="mb-8">
-        <h1 className="text-2xl font-heading font-bold text-slate-900">{t('admin.qrCodeManagement')}</h1>
-        <p className="text-slate-500 mt-1">{t('admin.generateCustomizeQR')}</p>
+      {/* Page Header */}
+      <div className="flex items-center gap-4">
+        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20">
+          <QrCode className="w-7 h-7 text-white" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-heading font-bold text-slate-900">{t('admin.qrCodeManagement')}</h1>
+          <p className="text-slate-500 mt-0.5">{t('admin.generateCustomizeQR')}</p>
+        </div>
       </div>
+
+      {/* Statistics Overview */}
+      {qrCodes.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* Total QR Codes */}
+          <div className="bg-white rounded-xl border border-slate-200/60 p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center">
+              <QrCode className="w-6 h-6 text-slate-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
+              <p className="text-sm text-slate-500">{t('admin.totalQRCodes')}</p>
+            </div>
+          </div>
+
+          {/* Table QR Codes */}
+          <div className="bg-white rounded-xl border border-slate-200/60 p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
+              <LayoutGrid className="w-6 h-6 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-emerald-600">{stats.tableQRs}</p>
+              <p className="text-sm text-slate-500">{t('admin.tableQRCodes')}</p>
+            </div>
+          </div>
+
+          {/* Restaurant QR Code */}
+          <div className="bg-white rounded-xl border border-slate-200/60 p-4 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-primary-100 flex items-center justify-center">
+              <Store className="w-6 h-6 text-primary-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-primary-600">{stats.tenantQRs}</p>
+              <p className="text-sm text-slate-500">{t('admin.restaurantQRCode')}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="border-b border-slate-200/60">
@@ -273,7 +328,7 @@ const QRManagementPage = () => {
             className={`
               py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2
               ${activeTab === 'codes'
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-primary-500 text-primary-600'
                 : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
               }
             `}
@@ -286,7 +341,7 @@ const QRManagementPage = () => {
             className={`
               py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2
               ${activeTab === 'design'
-                ? 'border-blue-500 text-blue-600'
+                ? 'border-primary-500 text-primary-600'
                 : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
               }
             `}
@@ -332,9 +387,9 @@ const QRManagementPage = () => {
                   </Button>
                 )}
               </div>
-              <div className="mt-4 px-6 py-5 bg-blue-50 border border-blue-200 rounded-xl">
-                <p className="text-xs font-medium text-blue-900 mb-1">{t('admin.batchTips')}:</p>
-                <ul className="text-xs text-blue-800 space-y-1">
+              <div className="mt-4 px-6 py-5 bg-primary-50 border border-primary-200 rounded-xl">
+                <p className="text-xs font-medium text-primary-900 mb-1">{t('admin.batchTips')}:</p>
+                <ul className="text-xs text-primary-800 space-y-1">
                   <li>• {t('admin.batchTip1')}</li>
                   <li>• {t('admin.batchTip2')}</li>
                   <li>• {t('admin.batchTip3')}</li>
@@ -411,8 +466,14 @@ const QRManagementPage = () => {
                   ))}
                 </div>
                 {qrCodes.filter(qr => qr.type === 'TABLE').length === 0 && (
-                  <div className="text-center py-8 text-slate-500">
-                    <p>{t('admin.noTablesFound')}</p>
+                  <div className="col-span-full py-12 text-center">
+                    <div className="mx-auto w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
+                      <LayoutGrid className="w-8 h-8 text-slate-400" />
+                    </div>
+                    <h3 className="text-lg font-semibold text-slate-900">{t('admin.noTablesFound')}</h3>
+                    <p className="mt-2 text-sm text-slate-500 max-w-sm mx-auto">
+                      {t('admin.noTablesFoundDescription')}
+                    </p>
                   </div>
                 )}
               </CardContent>

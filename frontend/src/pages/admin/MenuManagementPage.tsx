@@ -1074,10 +1074,11 @@ const MenuManagementPage = () => {
         isOpen={categoryModalOpen}
         onClose={() => setCategoryModalOpen(false)}
         title={editingCategory ? t('menu.editCategory') : t('menu.addCategory')}
+        size="sm"
       >
         <form
           onSubmit={categoryForm.handleSubmit(handleCategorySubmit)}
-          className="space-y-4"
+          className="space-y-3"
         >
           <Input
             label={t('menu.categoryName')}
@@ -1113,11 +1114,11 @@ const MenuManagementPage = () => {
           setPreselectedCategoryId(null);
         }}
         title={editingProduct ? t('menu.editItem') : t('menu.addItem')}
-        size="lg"
+        size="md"
       >
         <form
           onSubmit={productForm.handleSubmit(handleProductSubmit)}
-          className="space-y-4"
+          className="space-y-3"
         >
           <Input
             label={t('menu.itemName')}
@@ -1172,8 +1173,8 @@ const MenuManagementPage = () => {
 
             {/* Show selected images */}
             {productImages.length > 0 ? (
-              <div className="mb-4">
-                <div className="grid grid-cols-4 gap-3">
+              <div className="mb-3">
+                <div className="grid grid-cols-4 gap-2">
                   {productImages.map((image, index) => (
                     <div key={image.id} className="relative group">
                       <div className="aspect-square rounded-lg overflow-hidden border-2 border-slate-200">

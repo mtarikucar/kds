@@ -6,7 +6,10 @@ export interface User {
   firstName: string;
   lastName: string;
   role: 'ADMIN' | 'MANAGER' | 'WAITER' | 'KITCHEN' | 'COURIER';
-  status: 'ACTIVE' | 'INACTIVE';
+  status: 'ACTIVE' | 'INACTIVE' | 'PENDING_APPROVAL';
+  approvedAt?: string;
+  approvedById?: string;
+  approvedBy?: { id: string; firstName: string; lastName: string };
   tenantId: string;
   createdAt: string;
   updatedAt: string;
@@ -52,5 +55,14 @@ export const usersApi = {
 
   async delete(id: string): Promise<void> {
     await api.delete(`/users/${id}`);
+  },
+
+  async approveUser(id: string): Promise<User> {
+    const response = await api.patch(`/users/${id}/approve`);
+    return response.data;
+  },
+
+  async rejectUser(id: string): Promise<void> {
+    await api.patch(`/users/${id}/reject`);
   },
 };

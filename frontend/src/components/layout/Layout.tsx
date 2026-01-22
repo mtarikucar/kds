@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import { useUiStore } from '../../store/uiStore';
 import { SubscriptionProvider } from '../../contexts/SubscriptionContext';
+import { RTL_LANGUAGES } from '../../i18n/config';
 
 const Layout = () => {
+  const { i18n } = useTranslation();
+  const isRTL = RTL_LANGUAGES.includes(i18n.language);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { isSidebarCollapsed } = useUiStore();
 
@@ -28,9 +32,9 @@ const Layout = () => {
           />
         )}
 
-        <Sidebar isOpen={isSidebarOpen} onClose={closeSidebar} />
+        <Sidebar isOpen={isSidebarOpen} onClose={closeSidebar} isRTL={isRTL} />
 
-        <div className="flex-1 flex flex-col overflow-hidden transition-all duration-300">
+        <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${isRTL ? 'md:order-1' : ''}`}>
           <Header onMenuClick={toggleSidebar} />
           <main className="flex-1 overflow-y-auto bg-slate-50/50 p-4 md:p-6 lg:p-8 relative">
             <Outlet />

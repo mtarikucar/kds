@@ -67,7 +67,7 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
           <div
             ref={ref}
             className={cn(
-              'relative bg-white rounded-xl shadow-2xl w-full max-w-lg',
+              'relative bg-white rounded-lg shadow-xl w-full max-w-md',
               'animate-in fade-in-0 zoom-in-95 duration-200',
               className
             )}
@@ -77,7 +77,7 @@ const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
             {children}
             <button
               onClick={() => onOpenChange(false)}
-              className="absolute right-4 top-4 rounded-lg p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:pointer-events-none"
+              className="absolute right-3 top-3 rounded-md p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:ring-offset-2 disabled:pointer-events-none"
             >
               <X className="h-4 w-4" />
               <span className="sr-only">Close</span>
@@ -100,7 +100,7 @@ const DialogHeader = React.forwardRef<HTMLDivElement, DialogHeaderProps>(
     return (
       <div
         ref={ref}
-        className={cn('flex flex-col space-y-1.5 px-6 pt-6', className)}
+        className={cn('flex flex-col space-y-1 px-4 pt-4', className)}
         {...props}
       >
         {children}
@@ -121,7 +121,7 @@ const DialogFooter = React.forwardRef<HTMLDivElement, DialogFooterProps>(
       <div
         ref={ref}
         className={cn(
-          'flex flex-col-reverse sm:flex-row sm:justify-end gap-3 px-6 pb-6 pt-4',
+          'flex flex-col-reverse sm:flex-row sm:justify-end gap-2 px-4 pb-4 pt-3',
           className
         )}
         {...props}
@@ -143,7 +143,7 @@ const DialogTitle = React.forwardRef<HTMLHeadingElement, DialogTitleProps>(
     return (
       <h2
         ref={ref}
-        className={cn('text-lg font-heading font-semibold leading-none tracking-tight text-slate-900', className)}
+        className={cn('text-base font-heading font-semibold leading-none tracking-tight text-slate-900', className)}
         {...props}
       >
         {children}

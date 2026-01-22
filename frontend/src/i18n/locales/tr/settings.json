@@ -1,5 +1,10 @@
 {
   "title": "Ayarlar",
+  "nav": {
+    "qrMenu": "QR Menü",
+    "reports": "Raporlar",
+    "branding": "Marka"
+  },
   "autoSave": {
     "idle": "Değişiklik yok",
     "saving": "Kaydediliyor...",
@@ -69,9 +74,18 @@
   "settingsSaved": "Ayarlar başarıyla kaydedildi",
   "settingsFailed": "Ayarlar kaydedilemedi",
   "posSettings": {
-    "loading": "POS ayarları yükleniyor...",
+    "loading": "Ayarlar yükleniyor...",
     "title": "POS Ayarları",
     "description": "Satış Noktası sisteminizin nasıl çalışacağını yapılandırın"
+  },
+  "qrMenuSettings": {
+    "title": "QR Menü Ayarları",
+    "description": "QR menü siparişi ve müşteriye yönelik bilgileri yapılandırın",
+    "orderingTitle": "Müşteri Siparişi"
+  },
+  "brandingSettings": {
+    "title": "Marka",
+    "description": "İşletmeniz için para birimi ve özel marka ayarlarını yapılandırın"
   },
   "twoStepCheckout": {
     "title": "İki Aşamalı Ödemeyi Etkinleştir",
@@ -304,6 +318,24 @@
     "whatsappPlaceholder": "+905551234567",
     "saved": "WiFi ve sosyal medya ayarları kaydedildi",
     "saveError": "Ayarlar kaydedilemedi"
+  },
+  "subdomain": {
+    "title": "Özel Alt Alan Adı",
+    "description": "QR menü URL'iniz için özel bir alt alan adı belirleyin",
+    "inputLabel": "Alt Alan Adı",
+    "inputPlaceholder": "restoranim",
+    "previewLabel": "QR Menü URL'iniz",
+    "proFeature": "Özel alt alan adı Pro özelliğidir",
+    "proFeatureDescription": "Müşterilerinizin kolayca hatırlayabileceği markalı bir QR menü URL'i oluşturmak için Pro'ya yükseltin.",
+    "upgradeToPro": "Pro'ya Yükselt",
+    "grandfathered": "Mevcut alt alan adınız aktif. Değiştirmek için Pro'ya yükseltin.",
+    "upgradeToChange": "Alt alan adını değiştirmek için yükseltin",
+    "helpText": "Küçük harf, rakam ve tire kullanın. Tire ile başlayamaz veya bitemez.",
+    "errorTooShort": "Alt alan adı en az 3 karakter olmalıdır",
+    "errorTooLong": "Alt alan adı 63 karakter veya daha kısa olmalıdır",
+    "errorInvalidFormat": "Sadece küçük harf, rakam ve tire kullanın (tire ile başlayamaz veya bitemez)",
+    "errorReserved": "Bu alt alan adı ayrılmıştır ve kullanılamaz",
+    "saveError": "Alt alan adı ayarları kaydedilemedi"
   },
   "printer": {
     "loadFailed": "Yazıcılar yüklenemedi",

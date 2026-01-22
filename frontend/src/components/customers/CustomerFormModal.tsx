@@ -148,9 +148,9 @@ const CustomerFormModal: React.FC<CustomerFormModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={isEditMode ? t('customers.editCustomer') : t('customers.addCustomer')}
-      size="md"
+      size="sm"
     >
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
         <Input
           label={`${t('customers.firstName')} *`}
           {...register('name')}

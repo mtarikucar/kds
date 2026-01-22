@@ -280,4 +280,64 @@ export class UsersService {
 
     return user;
   }
+
+  /**
+   * Approve a pending user
+   */
+  async approveUser(userId: string, approverId: string, tenantId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        tenantId,
+        status: 'PENDING_APPROVAL',
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Onay bekleyen kullanıcı bulunamadı');
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        status: 'ACTIVE',
+        approvedAt: new Date(),
+        approvedById: approverId,
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        status: true,
+        approvedAt: true,
+        approvedById: true,
+        tenantId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  /**
+   * Reject a pending user (delete them)
+   */
+  async rejectUser(userId: string, tenantId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        tenantId,
+        status: 'PENDING_APPROVAL',
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Onay bekleyen kullanıcı bulunamadı');
+    }
+
+    return this.prisma.user.delete({
+      where: { id: userId },
+    });
+  }
 }

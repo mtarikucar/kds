@@ -1,6 +1,6 @@
 import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { CreateNotificationDto } from './dto/create-notification.dto';
+import { CreateNotificationDto, NotificationType } from './dto/create-notification.dto';
 import { NotificationsGateway } from './notifications.gateway';
 
 @Injectable()
@@ -29,7 +29,15 @@ export class NotificationsService {
       where: {
         tenantId,
         OR: [{ userId }, { isGlobal: true }],
-        expiresAt: { gt: new Date() },
+        // Include notifications that never expire (expiresAt is null) or haven't expired yet
+        AND: [
+          {
+            OR: [
+              { expiresAt: null },
+              { expiresAt: { gt: new Date() } },
+            ],
+          },
+        ],
       },
       include: {
         readBy: { where: { userId } },
@@ -99,5 +107,44 @@ export class NotificationsService {
     }
 
     return notification;
+  }
+
+  /**
+   * Send notification to all ADMIN and MANAGER users in a tenant
+   */
+  async notifyAdmins(
+    tenantId: string,
+    notificationData: {
+      title: string;
+      message: string;
+      type: NotificationType;
+      data?: any;
+    },
+  ) {
+    // Find all ADMIN and MANAGER users in the tenant
+    const admins = await this.prisma.user.findMany({
+      where: {
+        tenantId,
+        role: { in: ['ADMIN', 'MANAGER'] },
+        status: 'ACTIVE',
+      },
+      select: { id: true },
+    });
+
+    // Create and send notification to each admin
+    const notifications = await Promise.all(
+      admins.map((admin) =>
+        this.createAndSend({
+          title: notificationData.title,
+          message: notificationData.message,
+          type: notificationData.type,
+          tenantId,
+          userId: admin.id,
+          data: notificationData.data,
+        }),
+      ),
+    );
+
+    return notifications;
   }
 }

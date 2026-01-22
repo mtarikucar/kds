@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
 import { useGoogleLogin } from '@react-oauth/google';
@@ -14,10 +14,18 @@ import Checkbox from '../../components/ui/Checkbox';
 import SocialLoginButtons from '../../components/ui/SocialLoginButtons';
 import AuthLayout from '../../components/auth/AuthLayout';
 import { useAuthStore } from '../../store/authStore';
+import { AlertCircle, CheckCircle } from 'lucide-react';
+
+interface LocationState {
+  pendingApproval?: boolean;
+  message?: string;
+}
 
 const LoginPage = () => {
   const { t } = useTranslation(['auth', 'validation']);
   const [rememberMe, setRememberMe] = useState(false);
+  const location = useLocation();
+  const locationState = location.state as LocationState | null;
 
   const loginSchema = z.object({
     email: z.string().email(t('validation:email')),
@@ -98,6 +106,22 @@ const LoginPage = () => {
         animate="visible"
         className="w-full"
       >
+        {/* Pending Approval Banner */}
+        {locationState?.pendingApproval && (
+          <motion.div
+            variants={itemVariants}
+            className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3"
+          >
+            <CheckCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-amber-800 font-medium">{t('auth:login.registrationSuccessful')}</p>
+              <p className="text-amber-700 text-sm mt-1">
+                {locationState.message || t('auth:login.pendingApprovalMessage')}
+              </p>
+            </div>
+          </motion.div>
+        )}
+
         {/* Header */}
         <motion.div variants={itemVariants} className="text-center mb-8">
           <h1 className="text-3xl font-heading font-bold text-slate-900 mb-2">

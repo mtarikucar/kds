@@ -72,7 +72,11 @@ function DraggableMarker({
   );
 }
 
-export default function LocationSettings() {
+interface LocationSettingsProps {
+  compact?: boolean;
+}
+
+export default function LocationSettings({ compact = false }: LocationSettingsProps) {
   const { t } = useTranslation('settings');
   const { data: settings, isLoading: settingsLoading } = useGetTenantSettings();
   const updateSettings = useUpdateTenantSettings();
@@ -162,6 +166,13 @@ export default function LocationSettings() {
   const hasLocation = latitude !== null && longitude !== null;
 
   if (settingsLoading) {
+    if (compact) {
+      return (
+        <div className="flex items-center justify-center py-4">
+          <Loader2 className="w-5 h-5 animate-spin text-primary-600" />
+        </div>
+      );
+    }
     return (
       <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
         <div className="flex items-center justify-center py-8">
@@ -171,35 +182,21 @@ export default function LocationSettings() {
     );
   }
 
-  return (
-    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="p-2 bg-indigo-100 rounded-lg">
-          <MapPin className="w-5 h-5 text-indigo-600" />
-        </div>
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900">
-            {t('locationSettings.title', 'Restoran Konumu')}
-          </h3>
-          <p className="text-sm text-slate-500">
-            {t('locationSettings.description', 'QR menü siparişleri için konum doğrulaması ayarlayın')}
-          </p>
-        </div>
-      </div>
-
+  const content = (
+    <>
       {/* Status indicator */}
-      <div className={`flex items-center gap-2 p-3 rounded-lg mb-4 ${hasLocation ? 'bg-green-50' : 'bg-yellow-50'}`}>
+      <div className={`flex items-center gap-2 p-2.5 rounded-lg mb-3 ${hasLocation ? 'bg-green-50' : 'bg-yellow-50'}`}>
         {hasLocation ? (
           <>
-            <CheckCircle2 className="w-5 h-5 text-green-600" />
-            <span className="text-sm text-green-800">
+            <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+            <span className="text-xs text-green-800">
               {t('locationSettings.locationEnabled', 'Konum doğrulaması aktif')}
             </span>
           </>
         ) : (
           <>
-            <AlertCircle className="w-5 h-5 text-yellow-600" />
-            <span className="text-sm text-yellow-800">
+            <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0" />
+            <span className="text-xs text-yellow-800">
               {t('locationSettings.locationDisabled', 'Konum doğrulaması kapalı (koordinat girilmedi)')}
             </span>
           </>
@@ -207,11 +204,11 @@ export default function LocationSettings() {
       </div>
 
       {/* Map */}
-      <div className="mb-4">
-        <p className="text-sm text-slate-600 mb-2">
+      <div className="mb-3">
+        <p className="text-xs text-slate-600 mb-2">
           {t('locationSettings.mapInstructions', 'Haritaya tıklayarak veya marker\'ı sürükleyerek konum seçin')}
         </p>
-        <div className="h-80 rounded-lg overflow-hidden border border-slate-200">
+        <div className={`${compact ? 'h-48' : 'h-80'} rounded-lg overflow-hidden border border-slate-200`}>
           <MapContainer
             center={mapCenter}
             zoom={currentZoom}
@@ -245,17 +242,17 @@ export default function LocationSettings() {
       </div>
 
       {/* Use my location button */}
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div className="flex flex-wrap gap-2 mb-3">
         <button
           type="button"
           onClick={handleUseMyLocation}
           disabled={geoLoading}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {geoLoading ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
           ) : (
-            <Navigation className="w-4 h-4" />
+            <Navigation className="w-3.5 h-3.5" />
           )}
           {t('locationSettings.useMyLocation', 'Konumumu Kullan')}
         </button>
@@ -263,24 +260,24 @@ export default function LocationSettings() {
           <button
             type="button"
             onClick={handleClearLocation}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
           >
-            <Trash2 className="w-4 h-4" />
+            <Trash2 className="w-3.5 h-3.5" />
             {t('locationSettings.clearLocation', 'Konumu Temizle')}
           </button>
         )}
       </div>
 
       {geoError && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-sm text-red-700">{geoError}</p>
+        <div className="mb-3 p-2.5 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-xs text-red-700">{geoError}</p>
         </div>
       )}
 
       {/* Coordinate inputs */}
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-2 gap-3 mb-3">
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label className="block text-xs font-medium text-slate-600 mb-1">
             {t('locationSettings.latitude', 'Enlem')}
           </label>
           <input
@@ -293,11 +290,11 @@ export default function LocationSettings() {
               setHasChanges(true);
             }}
             placeholder="39.9334"
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            className="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1">
+          <label className="block text-xs font-medium text-slate-600 mb-1">
             {t('locationSettings.longitude', 'Boylam')}
           </label>
           <input
@@ -310,14 +307,14 @@ export default function LocationSettings() {
               setHasChanges(true);
             }}
             placeholder="32.8597"
-            className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            className="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
           />
         </div>
       </div>
 
       {/* Radius slider */}
-      <div className="mb-6">
-        <label className="block text-sm font-medium text-slate-700 mb-1">
+      <div className="mb-4">
+        <label className="block text-xs font-medium text-slate-600 mb-1">
           {t('locationSettings.radius', 'Sipariş Yarıçapı')}: {radius} {t('locationSettings.meters', 'metre')}
         </label>
         <p className="text-xs text-slate-500 mb-2">
@@ -330,7 +327,7 @@ export default function LocationSettings() {
           step="10"
           value={radius}
           onChange={(e) => handleRadiusChange(parseInt(e.target.value))}
-          className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+          className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary-600"
         />
         <div className="flex justify-between text-xs text-slate-500 mt-1">
           <span>10m</span>
@@ -345,16 +342,39 @@ export default function LocationSettings() {
           type="button"
           onClick={handleSave}
           disabled={updateSettings.isPending || !hasChanges}
-          className="flex items-center gap-2 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="flex items-center gap-1.5 px-4 py-1.5 text-sm bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
         >
           {updateSettings.isPending ? (
-            <Loader2 className="w-4 h-4 animate-spin" />
+            <Loader2 className="w-3.5 h-3.5 animate-spin" />
           ) : (
-            <Save className="w-4 h-4" />
+            <Save className="w-3.5 h-3.5" />
           )}
           {t('common.save', 'Kaydet')}
         </button>
       </div>
+    </>
+  );
+
+  if (compact) {
+    return content;
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-6">
+      <div className="flex items-center gap-3 mb-4">
+        <div className="p-2 bg-indigo-100 rounded-lg">
+          <MapPin className="w-5 h-5 text-indigo-600" />
+        </div>
+        <div>
+          <h3 className="text-lg font-semibold text-slate-900">
+            {t('locationSettings.title', 'Restoran Konumu')}
+          </h3>
+          <p className="text-sm text-slate-500">
+            {t('locationSettings.description', 'QR menü siparişleri için konum doğrulaması ayarlayın')}
+          </p>
+        </div>
+      </div>
+      {content}
     </div>
   );
 }

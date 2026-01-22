@@ -31,7 +31,11 @@ interface ReportSettingsState {
   reportEmailEnabled: boolean;
 }
 
-const ReportSettings = () => {
+interface ReportSettingsProps {
+  compact?: boolean;
+}
+
+const ReportSettings = ({ compact = false }: ReportSettingsProps) => {
   const { t } = useTranslation('settings');
   const { data: tenantSettings, isLoading } = useGetTenantSettings();
   const { mutateAsync: updateSettings, mutate: updateSettingsSync, isPending: isUpdating } =
@@ -150,6 +154,11 @@ const ReportSettings = () => {
     JSON.stringify(reportEmails) !== JSON.stringify(tenantSettings.reportEmails || []);
 
   if (isLoading) {
+    if (compact) {
+      return (
+        <p className="text-slate-500 text-center py-4">{t('common:app.loading')}</p>
+      );
+    }
     return (
       <SettingsSection
         title={t('reportSettings.title')}
@@ -160,14 +169,8 @@ const ReportSettings = () => {
     );
   }
 
-  return (
-    <SettingsSection
-      title={t('reportSettings.title')}
-      description={t('reportSettings.description')}
-      icon={<Mail className="w-4 h-4" />}
-      saveStatus={autoSaveStatus}
-      onRetry={retryAutoSave}
-    >
+  const content = (
+    <>
       <SettingsGroup>
         {/* Closing Time */}
         <SettingsInput
@@ -203,13 +206,13 @@ const ReportSettings = () => {
 
       {/* Email Recipients Section (Manual Save) */}
       <div
-        className={`mt-4 pt-4 border-t border-slate-100 ${
+        className={`mt-3 pt-3 border-t border-slate-100 ${
           settings.reportEmailEnabled ? '' : 'opacity-50 pointer-events-none'
         }`}
       >
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-2">
           <div>
-            <p className="text-sm font-medium text-slate-900">
+            <p className="text-xs font-medium text-slate-900">
               {t('reportSettings.emailRecipients')}
             </p>
             <p className="text-xs text-slate-500">
@@ -219,24 +222,24 @@ const ReportSettings = () => {
         </div>
 
         {/* Email List */}
-        <div className="space-y-2 mb-3">
+        <div className="space-y-1.5 mb-2">
           {reportEmails.length === 0 ? (
-            <p className="text-sm text-slate-400 italic py-2">
+            <p className="text-xs text-slate-400 italic py-1">
               {t('reportSettings.noEmails')}
             </p>
           ) : (
             reportEmails.map((email) => (
               <div
                 key={email}
-                className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-lg"
+                className="flex items-center justify-between bg-slate-50 px-2.5 py-1.5 rounded-lg"
               >
-                <span className="text-sm">{email}</span>
+                <span className="text-xs">{email}</span>
                 <button
                   onClick={() => handleRemoveEmail(email)}
                   className="text-slate-400 hover:text-red-500 transition-colors"
                   title={t('reportSettings.removeEmail')}
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-3.5 w-3.5" />
                 </button>
               </div>
             ))
@@ -270,14 +273,14 @@ const ReportSettings = () => {
             onClick={handleAddEmail}
             disabled={!newEmail.trim()}
           >
-            <Plus className="h-4 w-4 mr-1" />
+            <Plus className="h-3.5 w-3.5 mr-1" />
             {t('reportSettings.addEmail')}
           </Button>
         </div>
 
         {/* Save Email List Button */}
         {hasEmailChanges && (
-          <div className="mt-3 flex justify-end">
+          <div className="mt-2 flex justify-end">
             <Button
               variant="primary"
               size="sm"
@@ -291,11 +294,29 @@ const ReportSettings = () => {
       </div>
 
       {/* Info box */}
-      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-        <p className="text-sm text-blue-800">
-          <strong>{t('info.noteLabel')}</strong> {t('reportSettings.emailReportInfo')}
-        </p>
-      </div>
+      {!compact && (
+        <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800">
+            <strong>{t('info.noteLabel')}</strong> {t('reportSettings.emailReportInfo')}
+          </p>
+        </div>
+      )}
+    </>
+  );
+
+  if (compact) {
+    return content;
+  }
+
+  return (
+    <SettingsSection
+      title={t('reportSettings.title')}
+      description={t('reportSettings.description')}
+      icon={<Mail className="w-4 h-4" />}
+      saveStatus={autoSaveStatus}
+      onRetry={retryAutoSave}
+    >
+      {content}
     </SettingsSection>
   );
 };

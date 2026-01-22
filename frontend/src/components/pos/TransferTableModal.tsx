@@ -70,7 +70,7 @@ const TransferTableModal = ({
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title={t('transfer.title')} size="lg">
+    <Modal isOpen={isOpen} onClose={handleClose} title={t('transfer.title')} size="md">
       {step === 'select' ? (
         <div className="space-y-4">
           {/* Source Table Info */}

@@ -80,11 +80,23 @@ const RegisterPage = () => {
 
     if (isAdmin && data.restaurantName) {
       payload.restaurantName = data.restaurantName;
+    } else if (data.tenantId) {
+      payload.tenantId = data.tenantId;
     }
 
     registerUser(payload, {
-      onSuccess: () => {
-        navigate('/login');
+      onSuccess: (response) => {
+        if (response.pendingApproval) {
+          // User needs admin approval - navigate to login with message
+          navigate('/login', {
+            state: {
+              pendingApproval: true,
+              message: response.message
+            }
+          });
+        } else {
+          navigate('/login');
+        }
       },
     });
   };

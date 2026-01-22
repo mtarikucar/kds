@@ -1,11 +1,58 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsIn, IsBoolean, IsArray, IsEmail, Matches, IsNumber, Min, Max, MaxLength, IsUrl } from 'class-validator';
+import { IsString, IsOptional, IsIn, IsBoolean, IsArray, IsEmail, Matches, IsNumber, Min, Max, MaxLength, IsUrl, ValidateIf, IsNotIn, MinLength } from 'class-validator';
 import {
   SUPPORTED_CURRENCIES,
   SupportedCurrency,
 } from '../../../common/constants/currencies.const';
 
+// Reserved subdomains that cannot be used by tenants
+const RESERVED_SUBDOMAINS = [
+  'www',
+  'app',
+  'api',
+  'admin',
+  'staging',
+  'mail',
+  'smtp',
+  'ftp',
+  'status',
+  'help',
+  'support',
+  'docs',
+  'dashboard',
+  'login',
+  'signup',
+  'register',
+  'auth',
+  'cdn',
+  'static',
+  'assets',
+  'beta',
+  'test',
+  'demo',
+];
+
 export class UpdateTenantSettingsDto {
+  @ApiPropertyOptional({
+    description: 'Custom subdomain for QR menu URL (Pro feature)',
+    example: 'my-restaurant',
+  })
+  @ValidateIf((o) => o.subdomain !== null)
+  @IsString()
+  @IsOptional()
+  @MinLength(3, {
+    message: 'Subdomain must be at least 3 characters',
+  })
+  @MaxLength(63)
+  @Matches(/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]{1,2}$/, {
+    message:
+      'Subdomain must contain only lowercase letters, numbers, and hyphens (cannot start or end with hyphen)',
+  })
+  @IsNotIn(RESERVED_SUBDOMAINS, {
+    message: 'This subdomain is reserved and cannot be used',
+  })
+  subdomain?: string | null;
+
   @ApiPropertyOptional({
     description: 'Tenant currency',
     enum: SUPPORTED_CURRENCIES,

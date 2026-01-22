@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChefHat, X } from 'lucide-react';
 import LanguageSwitcher from '../LanguageSwitcher';
+import { RTL_LANGUAGES } from '../../i18n/config';
 
 // Mascot message keys for i18n
 const mascotMessageKeys = [
@@ -60,7 +61,8 @@ const mascotConfig: Record<AuthVariant, { image: string; headlineKey: string; su
 };
 
 const AuthLayout: React.FC<AuthLayoutProps> = ({ children, variant = 'login' }) => {
-  const { t } = useTranslation(['auth']);
+  const { t, i18n } = useTranslation(['auth']);
+  const isRTL = RTL_LANGUAGES.includes(i18n.language);
   const config = mascotConfig[variant];
   const [showMessage, setShowMessage] = useState(false);
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
@@ -74,9 +76,9 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, variant = 'login' }) 
   }, []);
 
   return (
-    <div className="min-h-screen flex relative">
+    <div className="min-h-screen flex relative" dir="ltr">
       {/* Mascot Container - wraps mascot and speech bubble for relative positioning */}
-      <div className="hidden lg:block absolute bottom-0 left-[10%] lg:left-[15%] xl:left-[20%] z-30">
+      <div className="hidden lg:block absolute bottom-0 left-[10%] lg:left-[15%] xl:left-[20%] z-30" dir="ltr">
         {/* Speech Bubble - positioned relative to mascot */}
         <AnimatePresence>
           {showMessage && (
@@ -86,8 +88,9 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, variant = 'login' }) 
               exit={{ opacity: 0, scale: 0.8, y: 10 }}
               transition={{ duration: 0.3, ease: 'easeOut' }}
               className="absolute -top-4 right-0 translate-x-[70%] lg:translate-x-[75%] xl:translate-x-[80%] z-40 max-w-[280px] lg:max-w-[320px]"
+              dir="ltr"
             >
-              <div className="relative bg-white rounded-2xl shadow-2xl p-4 border border-orange-100">
+              <div className="relative bg-white rounded-2xl shadow-2xl p-4 border border-orange-100 text-left">
                 {/* Close button */}
                 <button
                   onClick={() => setShowMessage(false)}
@@ -142,8 +145,8 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, variant = 'login' }) 
       {/* Left Panel - Branding with Mascot (Desktop only) */}
       <div className="hidden lg:flex lg:w-[42%] xl:w-[40%] bg-gradient-to-br from-orange-400 via-primary-500 to-amber-600 relative overflow-hidden">
         {/* Top Section: Logo + Headline */}
-        <div className="absolute top-0 left-0 right-0 z-20 p-8 xl:p-12">
-          <Link to="/" className="flex items-center gap-3 text-white mb-6">
+        <div className={`absolute top-0 z-20 p-8 xl:p-12 ${isRTL ? 'right-0 text-right' : 'left-0'}`}>
+          <Link to="/" className={`inline-flex items-center gap-3 text-white mb-6 ${isRTL ? 'flex-row-reverse' : ''}`}>
             <div className="p-2 bg-white/20 rounded-xl backdrop-blur-sm">
               <ChefHat className="w-8 h-8" />
             </div>
@@ -324,7 +327,7 @@ const AuthLayout: React.FC<AuthLayoutProps> = ({ children, variant = 'login' }) 
       </div>
 
       {/* Right Panel - Form */}
-      <div className="flex-1 flex flex-col bg-gradient-to-br from-slate-50 to-orange-50/30">
+      <div className="flex-1 flex flex-col bg-gradient-to-br from-slate-50 to-orange-50/30" dir={isRTL ? 'rtl' : 'ltr'}>
         {/* Mobile Header */}
         <div className="lg:hidden relative bg-gradient-to-br from-orange-400 via-primary-500 to-amber-600 z-50">
           <div className="relative flex items-center justify-between p-4">

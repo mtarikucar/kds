@@ -4,6 +4,7 @@ import api from '../lib/api';
 export interface TenantSettings {
   id: string;
   name: string;
+  subdomain?: string | null;
   currency: string;
   closingTime?: string;
   timezone?: string;
@@ -25,6 +26,7 @@ export interface TenantSettings {
 }
 
 export interface UpdateTenantSettingsDto {
+  subdomain?: string | null;
   currency?: string;
   closingTime?: string;
   timezone?: string;

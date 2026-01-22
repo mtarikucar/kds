@@ -92,8 +92,9 @@ const ModifierItemModal = ({
       isOpen={isOpen}
       onClose={onClose}
       title={editingModifier ? t('menu.editModifier') : t('menu.addModifier')}
+      size="sm"
     >
-      <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-3">
         <Input
           label={t('menu.internalName')}
           placeholder="small, medium, large..."

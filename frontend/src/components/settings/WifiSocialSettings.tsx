@@ -91,7 +91,11 @@ function SocialInput({
   );
 }
 
-export default function WifiSocialSettings() {
+interface WifiSocialSettingsProps {
+  compact?: boolean;
+}
+
+export default function WifiSocialSettings({ compact = false }: WifiSocialSettingsProps) {
   const { t } = useTranslation('settings');
   const { data: settings, isLoading } = useGetTenantSettings();
   const { mutateAsync: updateSettings } = useUpdateTenantSettings();
@@ -165,6 +169,11 @@ export default function WifiSocialSettings() {
   };
 
   if (isLoading) {
+    if (compact) {
+      return (
+        <p className="text-slate-500 text-center py-4">{t('common:app.loading')}</p>
+      );
+    }
     return (
       <SettingsSection
         title={t('wifiSocialSettings.title')}
@@ -175,27 +184,18 @@ export default function WifiSocialSettings() {
     );
   }
 
-  return (
-    <SettingsSection
-      title={t('wifiSocialSettings.title')}
-      description={t('wifiSocialSettings.description')}
-      icon={<Wifi className="w-4 h-4" />}
-      saveStatus={autoSaveStatus}
-      onRetry={retryAutoSave}
-    >
+  const content = (
+    <>
       {/* WiFi Section */}
-      <div className="mb-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Wifi className="w-4 h-4 text-slate-500" />
-          <h4 className="text-sm font-medium text-slate-700">
+      <div className="mb-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Wifi className="w-3.5 h-3.5 text-slate-500" />
+          <h4 className="text-xs font-medium text-slate-700">
             {t('wifiSocialSettings.wifiSection')}
           </h4>
         </div>
-        <p className="text-xs text-slate-500 mb-3">
-          {t('wifiSocialSettings.wifiDescription')}
-        </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
           <div>
             <label className="block text-xs font-medium text-slate-600 mb-1">
               {t('wifiSocialSettings.ssid')}
@@ -206,7 +206,7 @@ export default function WifiSocialSettings() {
               onChange={(e) => handleChange('wifiSsid', e.target.value)}
               placeholder={t('wifiSocialSettings.ssidPlaceholder')}
               maxLength={64}
-              className="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+              className="w-full px-2.5 py-1.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
             />
           </div>
           <div>
@@ -220,12 +220,12 @@ export default function WifiSocialSettings() {
                 onChange={(e) => handleChange('wifiPassword', e.target.value)}
                 placeholder={t('wifiSocialSettings.passwordPlaceholder')}
                 maxLength={128}
-                className="w-full px-3 py-1.5 pr-9 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
+                className="w-full px-2.5 py-1.5 pr-8 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-slate-600"
+                className="absolute inset-y-0 right-0 flex items-center pr-2 text-slate-400 hover:text-slate-600"
                 title={
                   showPassword
                     ? t('wifiSocialSettings.hidePassword')
@@ -233,9 +233,9 @@ export default function WifiSocialSettings() {
                 }
               >
                 {showPassword ? (
-                  <EyeOff className="w-4 h-4" />
+                  <EyeOff className="w-3.5 h-3.5" />
                 ) : (
-                  <Eye className="w-4 h-4" />
+                  <Eye className="w-3.5 h-3.5" />
                 )}
               </button>
             </div>
@@ -243,21 +243,18 @@ export default function WifiSocialSettings() {
         </div>
       </div>
 
-      <SettingsDivider />
+      <SettingsDivider className="my-3" />
 
       {/* Social Media Section */}
       <div>
-        <div className="flex items-center gap-2 mb-3">
-          <Share2 className="w-4 h-4 text-slate-500" />
-          <h4 className="text-sm font-medium text-slate-700">
+        <div className="flex items-center gap-2 mb-2">
+          <Share2 className="w-3.5 h-3.5 text-slate-500" />
+          <h4 className="text-xs font-medium text-slate-700">
             {t('wifiSocialSettings.socialSection')}
           </h4>
         </div>
-        <p className="text-xs text-slate-500 mb-3">
-          {t('wifiSocialSettings.socialDescription')}
-        </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-1">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-0.5">
           <SocialInput
             icon={<InstagramIcon />}
             iconColor="text-pink-600"
@@ -309,6 +306,22 @@ export default function WifiSocialSettings() {
           />
         </div>
       </div>
+    </>
+  );
+
+  if (compact) {
+    return content;
+  }
+
+  return (
+    <SettingsSection
+      title={t('wifiSocialSettings.title')}
+      description={t('wifiSocialSettings.description')}
+      icon={<Wifi className="w-4 h-4" />}
+      saveStatus={autoSaveStatus}
+      onRetry={retryAutoSave}
+    >
+      {content}
     </SettingsSection>
   );
 }

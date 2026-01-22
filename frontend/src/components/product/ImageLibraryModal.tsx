@@ -84,7 +84,7 @@ const ImageLibraryModal: React.FC<ImageLibraryModalProps> = ({
   );
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={t('menu.imageLibraryTitle')} size="xl">
+    <Modal isOpen={isOpen} onClose={onClose} title={t('menu.imageLibraryTitle')} size="lg">
       <div className="space-y-4">
         {/* Search Bar */}
         <div className="relative">

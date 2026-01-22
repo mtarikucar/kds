@@ -106,8 +106,9 @@ const ModifierGroupModal = ({
       isOpen={isOpen}
       onClose={onClose}
       title={editingGroup ? t('menu.editModifierGroup') : t('menu.addModifierGroup')}
+      size="sm"
     >
-      <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-4">
+      <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-3">
         <Input
           label={t('menu.internalName')}
           placeholder="size, sauces, extras..."

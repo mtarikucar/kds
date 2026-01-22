@@ -23,14 +23,23 @@ export const useLogin = () => {
   });
 };
 
+interface RegisterResponse extends AuthResponse {
+  pendingApproval?: boolean;
+  message?: string;
+}
+
 export const useRegister = () => {
   return useMutation({
-    mutationFn: async (data: RegisterRequest): Promise<AuthResponse> => {
+    mutationFn: async (data: RegisterRequest): Promise<RegisterResponse> => {
       const response = await api.post('/auth/register', data);
       return response.data;
     },
-    onSuccess: () => {
-      toast.success(i18n.t('common:notifications.registrationSuccessful'));
+    onSuccess: (data) => {
+      if (data.pendingApproval) {
+        toast.success(data.message || i18n.t('common:notifications.registrationPendingApproval'));
+      } else {
+        toast.success(i18n.t('common:notifications.registrationSuccessful'));
+      }
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || i18n.t('common:notifications.registrationFailed'));

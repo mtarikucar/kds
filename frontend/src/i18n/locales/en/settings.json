@@ -1,5 +1,10 @@
 {
   "title": "Settings",
+  "nav": {
+    "qrMenu": "QR Menu",
+    "reports": "Reports",
+    "branding": "Branding"
+  },
   "autoSave": {
     "idle": "No changes",
     "saving": "Saving...",
@@ -69,9 +74,18 @@
   "settingsSaved": "Settings saved successfully",
   "settingsFailed": "Failed to save settings",
   "posSettings": {
-    "loading": "Loading POS settings...",
+    "loading": "Loading settings...",
     "title": "POS Settings",
     "description": "Configure how your Point of Sale system operates"
+  },
+  "qrMenuSettings": {
+    "title": "QR Menu Settings",
+    "description": "Configure QR menu ordering and customer-facing information",
+    "orderingTitle": "Customer Ordering"
+  },
+  "brandingSettings": {
+    "title": "Branding",
+    "description": "Configure currency and custom branding for your business"
   },
   "twoStepCheckout": {
     "title": "Enable Two-Step Checkout",
@@ -304,6 +318,24 @@
     "whatsappPlaceholder": "+1234567890",
     "saved": "WiFi and social media settings saved",
     "saveError": "Failed to save settings"
+  },
+  "subdomain": {
+    "title": "Custom Subdomain",
+    "description": "Set a custom subdomain for your QR menu URL",
+    "inputLabel": "Subdomain",
+    "inputPlaceholder": "my-restaurant",
+    "previewLabel": "Your QR Menu URL",
+    "proFeature": "Custom subdomain is a Pro feature",
+    "proFeatureDescription": "Upgrade to Pro to create a branded URL for your QR menu that customers can easily remember.",
+    "upgradeToPro": "Upgrade to Pro",
+    "grandfathered": "Your current subdomain is active. Upgrade to Pro to change it.",
+    "upgradeToChange": "Upgrade to change subdomain",
+    "helpText": "Use lowercase letters, numbers, and hyphens. Cannot start or end with a hyphen.",
+    "errorTooShort": "Subdomain must be at least 3 characters",
+    "errorTooLong": "Subdomain must be 63 characters or less",
+    "errorInvalidFormat": "Use only lowercase letters, numbers, and hyphens (cannot start or end with hyphen)",
+    "errorReserved": "This subdomain is reserved and cannot be used",
+    "saveError": "Failed to save subdomain settings"
   },
   "printer": {
     "loadFailed": "Failed to load printers",
