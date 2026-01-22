@@ -9,6 +9,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import App from './App';
 import i18n from './i18n/config';
 import { initSentry } from './sentry.config';
+import { detectSubdomain } from './utils/subdomain';
 import './index.css';
 
 // Initialize Sentry as early as possible
@@ -17,8 +18,13 @@ initSentry();
 // Google OAuth Client ID
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
-// Router basename - use /app for web builds, empty for Tauri desktop
-const routerBasename = import.meta.env.BASE_URL === '/' ? undefined : import.meta.env.BASE_URL.replace(/\/$/, '');
+// Detect if we're accessing via subdomain
+const subdomainInfo = detectSubdomain();
+
+// Router basename - subdomain access uses root path, normal access uses /app
+const routerBasename = subdomainInfo.isSubdomainAccess
+  ? undefined
+  : (import.meta.env.BASE_URL === '/' ? undefined : import.meta.env.BASE_URL.replace(/\/$/, ''));
 
 const queryClient = new QueryClient({
   defaultOptions: {
