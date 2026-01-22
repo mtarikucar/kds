@@ -38,13 +38,36 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix('api');
 
-  // CORS - properly configured
+  // CORS - properly configured with wildcard subdomain support
   const allowedOrigins = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',')
     : ['http://localhost:5173'];
 
   app.enableCors({
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, Postman, etc.)
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      // Check if origin matches allowed origins list
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // Allow any *.hummytummy.com subdomain (production)
+      if (/^https:\/\/[a-z0-9-]+\.hummytummy\.com$/.test(origin)) {
+        return callback(null, true);
+      }
+
+      // Allow any *.staging.hummytummy.com subdomain (staging)
+      if (/^https:\/\/[a-z0-9-]+\.staging\.hummytummy\.com$/.test(origin)) {
+        return callback(null, true);
+      }
+
+      // Reject other origins
+      return callback(new Error('Not allowed by CORS'), false);
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
