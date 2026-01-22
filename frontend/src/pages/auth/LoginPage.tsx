@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -14,10 +14,12 @@ import Checkbox from '../../components/ui/Checkbox';
 import SocialLoginButtons from '../../components/ui/SocialLoginButtons';
 import AuthLayout from '../../components/auth/AuthLayout';
 import { useAuthStore } from '../../store/authStore';
+import { isGoogleAuthAvailable } from '../../utils/googleAuth';
 
 const LoginPage = () => {
   const { t } = useTranslation(['auth', 'validation']);
   const [rememberMe, setRememberMe] = useState(false);
+  const googleAuthAvailable = useMemo(() => isGoogleAuthAvailable(), []);
 
   const loginSchema = z.object({
     email: z.string().email(t('validation:email')),
@@ -163,14 +165,16 @@ const LoginPage = () => {
             </Button>
           </motion.div>
 
-          <motion.div variants={itemVariants}>
-            <SocialLoginButtons
-              variant="login"
-              onGoogleClick={() => handleGoogleLogin()}
-              disabled={isPending}
-              isLoading={isGooglePending}
-            />
-          </motion.div>
+          {googleAuthAvailable && (
+            <motion.div variants={itemVariants}>
+              <SocialLoginButtons
+                variant="login"
+                onGoogleClick={() => handleGoogleLogin()}
+                disabled={isPending}
+                isLoading={isGooglePending}
+              />
+            </motion.div>
+          )}
 
           <motion.div
             variants={itemVariants}
