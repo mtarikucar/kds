@@ -14,8 +14,16 @@ import './index.css';
 // Initialize Sentry as early as possible
 initSentry();
 
-// Google OAuth Client ID
-const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+// Google OAuth Client ID - validate format (should not contain @ and should end with .apps.googleusercontent.com)
+const rawGoogleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
+const isValidGoogleClientId = rawGoogleClientId &&
+  !rawGoogleClientId.includes('@') &&
+  rawGoogleClientId.endsWith('.apps.googleusercontent.com');
+const googleClientId = isValidGoogleClientId ? rawGoogleClientId : '';
+
+if (!isValidGoogleClientId && rawGoogleClientId) {
+  console.warn('Invalid Google Client ID format detected. Google Sign-In will be disabled.');
+}
 
 // Router basename - use /app for web builds, empty for Tauri desktop
 const routerBasename = import.meta.env.BASE_URL === '/' ? undefined : import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -30,10 +38,18 @@ const queryClient = new QueryClient({
   },
 });
 
+// Wrapper component that conditionally includes Google OAuth
+const AppWithProviders = ({ children }: { children: React.ReactNode }) => {
+  if (googleClientId) {
+    return <GoogleOAuthProvider clientId={googleClientId}>{children}</GoogleOAuthProvider>;
+  }
+  return <>{children}</>;
+};
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <I18nextProvider i18n={i18n}>
-      <GoogleOAuthProvider clientId={googleClientId}>
+      <AppWithProviders>
         <ErrorBoundary>
           <QueryClientProvider client={queryClient}>
             <BrowserRouter basename={routerBasename}>
@@ -42,7 +58,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
             </BrowserRouter>
           </QueryClientProvider>
         </ErrorBoundary>
-      </GoogleOAuthProvider>
+      </AppWithProviders>
     </I18nextProvider>
   </React.StrictMode>
 );

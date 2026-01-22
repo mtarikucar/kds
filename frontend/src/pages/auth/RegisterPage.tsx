@@ -17,6 +17,7 @@ import FormSelect from '../../components/ui/FormSelect';
 import SocialLoginButtons from '../../components/ui/SocialLoginButtons';
 import AuthLayout from '../../components/auth/AuthLayout';
 import { UserRole, RegisterRequest } from '../../types';
+import { isGoogleAuthAvailable } from '../../utils/googleAuth';
 
 const RegisterPage = () => {
   const { t } = useTranslation(['auth', 'validation']);
@@ -25,6 +26,7 @@ const RegisterPage = () => {
   const { mutate: googleAuth, isPending: isGooglePending } = useGoogleAuth();
   const { data: tenants, isLoading: tenantsLoading } = useGetPublicTenants();
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const googleAuthAvailable = useMemo(() => isGoogleAuthAvailable(), []);
 
   const registerSchema = z.object({
     email: z.string().email(t('validation:email')),
@@ -272,14 +274,16 @@ const RegisterPage = () => {
             </Button>
           </motion.div>
 
-          <motion.div variants={itemVariants}>
-            <SocialLoginButtons
-              variant="register"
-              onGoogleClick={() => handleGoogleLogin()}
-              disabled={isPending}
-              isLoading={isGooglePending}
-            />
-          </motion.div>
+          {googleAuthAvailable && (
+            <motion.div variants={itemVariants}>
+              <SocialLoginButtons
+                variant="register"
+                onGoogleClick={() => handleGoogleLogin()}
+                disabled={isPending}
+                isLoading={isGooglePending}
+              />
+            </motion.div>
+          )}
 
           <motion.div
             variants={itemVariants}
