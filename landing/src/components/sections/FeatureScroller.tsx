@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { motion, useScroll, useTransform, AnimatePresence, useMotionValueEvent } from 'framer-motion';
 import { Container } from '@/components/ui/Container';
 import { QrCode, LayoutGrid, CreditCard, ChefHat, Building2 } from 'lucide-react';
@@ -17,8 +17,14 @@ import { GradientOrb } from '@/components/animations/FloatingElement';
 export default function FeatureScroller() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [isMobile, setIsMobile] = useState(false);
   const prefersReducedMotion = useReducedMotion();
   const t = useTranslations('features');
+
+  // Check for mobile on mount
+  useEffect(() => {
+    setIsMobile(window.matchMedia('(max-width: 768px)').matches);
+  }, []);
 
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -162,8 +168,8 @@ export default function FeatureScroller() {
 
   const colors = colorVariants[activeFeature.color];
 
-  // Reduced motion fallback
-  if (prefersReducedMotion) {
+  // Reduced motion or mobile fallback - show simple list view
+  if (prefersReducedMotion || isMobile) {
     return (
       <section id="features" className="section-padding bg-slate-50">
         <Container>
@@ -297,11 +303,11 @@ export default function FeatureScroller() {
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={activeFeature.id}
-                    initial={{ opacity: 0, y: 30, filter: 'blur(10px)' }}
-                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                    exit={{ opacity: 0, y: -30, filter: 'blur(10px)' }}
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -30 }}
                     transition={{ duration: 0.5, ease: [0.25, 0.4, 0.25, 1] }}
-                    className="bg-white/80 backdrop-blur-xl rounded-3xl p-6 lg:p-8 shadow-2xl shadow-slate-900/5 border border-white/50"
+                    className="bg-white/90 rounded-3xl p-6 lg:p-8 shadow-2xl shadow-slate-900/5 border border-white/50"
                   >
                     {/* Feature header */}
                     <div className="flex items-start gap-4 mb-6">

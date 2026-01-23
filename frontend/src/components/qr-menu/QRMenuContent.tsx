@@ -70,29 +70,69 @@ const QRMenuContent: React.FC<QRMenuContentProps> = ({
     return acc;
   }, [] as { category: Category; products: Product[] }[]);
 
-  // Scroll spy effect
+  // Scroll spy effect using IntersectionObserver for reliability
   useEffect(() => {
+    // Don't run scroll spy when a specific category is selected
     if (selectedCategory) return;
 
-    const handleScroll = () => {
-      const offset = 180;
-      let currentSection = '';
+    // Wait for next frame to ensure refs are populated
+    const timeoutId = setTimeout(() => {
+      const visibleSections = new Map<string, number>();
+      const observers: IntersectionObserver[] = [];
 
       categoryRefs.current.forEach((element, categoryId) => {
-        const rect = element.getBoundingClientRect();
-        if (rect.top <= offset && rect.bottom > offset) {
-          currentSection = categoryId;
-        }
+        const observer = new IntersectionObserver(
+          (entries) => {
+            entries.forEach((entry) => {
+              if (entry.isIntersecting) {
+                visibleSections.set(categoryId, entry.intersectionRatio);
+              } else {
+                visibleSections.delete(categoryId);
+              }
+
+              // Find the most visible section
+              let maxRatio = 0;
+              let mostVisibleSection = '';
+              visibleSections.forEach((ratio, id) => {
+                if (ratio > maxRatio) {
+                  maxRatio = ratio;
+                  mostVisibleSection = id;
+                }
+              });
+
+              // Only update if we have a visible section
+              if (mostVisibleSection) {
+                setActiveSection((prev) => {
+                  // Only update if different to prevent unnecessary re-renders
+                  return prev !== mostVisibleSection ? mostVisibleSection : prev;
+                });
+              }
+            });
+          },
+          {
+            root: null,
+            rootMargin: '-15% 0px -70% 0px',
+            threshold: [0, 0.1, 0.2, 0.3],
+          }
+        );
+
+        observer.observe(element);
+        observers.push(observer);
       });
 
-      if (currentSection && currentSection !== activeSection) {
-        setActiveSection(currentSection);
+      // Store cleanup function
+      (window as any).__qrMenuObservers = observers;
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      const observers = (window as any).__qrMenuObservers;
+      if (observers) {
+        observers.forEach((observer: IntersectionObserver) => observer.disconnect());
+        delete (window as any).__qrMenuObservers;
       }
     };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [selectedCategory, activeSection]);
+  }, [selectedCategory, productsByCategory.length]);
 
   const handleProductClick = (product: Product) => {
     setSelectedProduct(product);
@@ -107,7 +147,13 @@ const QRMenuContent: React.FC<QRMenuContentProps> = ({
   const handleCategoryClick = (categoryId: string) => {
     setSelectedCategory(categoryId);
 
+    // Clear activeSection when a specific category is selected
+    if (categoryId) {
+      setActiveSection('');
+    }
+
     if (!categoryId) {
+      // Scroll to top smoothly when "All" is clicked
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, ReactNode } from 'react';
+import { useRef, ReactNode, useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useParallax } from '@/hooks/useParallax';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
@@ -22,6 +22,11 @@ export function ParallaxLayer({
 }: ParallaxLayerProps) {
   const ref = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    setIsMobile(window.matchMedia('(max-width: 768px)').matches);
+  }, []);
 
   const { y, x } = useParallax({
     target: ref,
@@ -29,8 +34,8 @@ export function ParallaxLayer({
     direction,
   });
 
-  // Skip parallax if user prefers reduced motion
-  if (prefersReducedMotion) {
+  // Skip parallax if user prefers reduced motion or on mobile
+  if (prefersReducedMotion || isMobile) {
     const Component = as as any;
     return <Component className={className}>{children}</Component>;
   }

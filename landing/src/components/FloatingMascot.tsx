@@ -100,11 +100,11 @@ export function FloatingMascot() {
         className="relative h-24 w-36 cursor-pointer sm:h-32 sm:w-48 md:h-40 md:w-60"
       >
         <Image
-          src="/voxel_chef_bottom.png"
+          src="/voxel_chef_bottom.webp"
           alt="HummyTummy Chef Mascot"
           fill
           className="drop-shadow-lg"
-          priority
+          loading="lazy"
         />
       </motion.div>
     </div>

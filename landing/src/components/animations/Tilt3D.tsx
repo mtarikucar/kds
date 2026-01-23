@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, ReactNode } from 'react';
+import { useRef, ReactNode, useState, useEffect } from 'react';
 import { motion, useTransform } from 'framer-motion';
 import { useMousePosition } from '@/hooks/useMousePosition';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
@@ -24,6 +24,11 @@ export function Tilt3D({
 }: Tilt3DProps) {
   const ref = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    setIsMobile(window.matchMedia('(max-width: 768px)').matches);
+  }, []);
 
   const { x, y, isHovering } = useMousePosition(ref, {
     smoothing: 150,
@@ -38,8 +43,8 @@ export function Tilt3D({
   const glareX = useTransform(x, [-1, 1], ['0%', '100%']);
   const glareY = useTransform(y, [-1, 1], ['0%', '100%']);
 
-  // Skip 3D effect if user prefers reduced motion
-  if (prefersReducedMotion) {
+  // Skip 3D effect if user prefers reduced motion or on mobile
+  if (prefersReducedMotion || isMobile) {
     return <div className={className}>{children}</div>;
   }
 

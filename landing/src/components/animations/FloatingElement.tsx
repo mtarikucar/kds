@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { motion, Variants } from 'framer-motion';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 
@@ -24,6 +24,11 @@ export function FloatingElement({
   rotation = 0,
 }: FloatingElementProps) {
   const prefersReducedMotion = useReducedMotion();
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    setIsMobile(window.matchMedia('(max-width: 768px)').matches);
+  }, []);
 
   const getAnimation = () => {
     switch (direction) {
@@ -42,7 +47,8 @@ export function FloatingElement({
     }
   };
 
-  if (prefersReducedMotion) {
+  // Skip animations if user prefers reduced motion or on mobile
+  if (prefersReducedMotion || isMobile) {
     return <div className={className}>{children}</div>;
   }
 

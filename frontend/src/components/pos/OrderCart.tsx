@@ -56,8 +56,8 @@ const OrderCart = ({
   const total = subtotal - discount;
 
   return (
-    <Card className="h-full flex flex-col">
-      <CardHeader className="flex flex-row items-center justify-between border-b border-slate-100">
+    <Card className="h-full flex flex-col overflow-hidden">
+      <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between border-b border-slate-100">
         <CardTitle className="flex items-center gap-2">
           <ShoppingCart className="h-5 w-5 text-slate-500" />
           {t('currentOrder')}
@@ -83,7 +83,7 @@ const OrderCart = ({
         </div>
       </CardHeader>
 
-      <CardContent className="flex-1 flex flex-col p-0">
+      <CardContent className="flex-1 flex flex-col p-0 min-h-0 overflow-hidden">
         {items.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-slate-400 p-6">
             <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
@@ -93,8 +93,8 @@ const OrderCart = ({
           </div>
         ) : (
           <>
-            {/* Cart Items */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+            {/* Cart Items - Scrollable area */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-2">
               {items.map((item) => (
                 <div
                   key={item.id}
@@ -137,8 +137,8 @@ const OrderCart = ({
               ))}
             </div>
 
-            {/* Order Details & Checkout */}
-            <div className="p-4 space-y-4 border-t border-slate-100 bg-slate-50/30">
+            {/* Order Details & Checkout - Always visible at bottom */}
+            <div className="flex-shrink-0 p-4 space-y-4 border-t border-slate-100 bg-slate-50/30">
               <Input
                 label={t('customerNameLabel')}
                 type="text"

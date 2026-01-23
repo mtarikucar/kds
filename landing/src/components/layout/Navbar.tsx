@@ -42,7 +42,7 @@ export default function Navbar() {
             className="flex items-center gap-2"
           >
             <Image
-              src="/logo.png"
+              src="/logo.webp"
               alt="HummyTummy"
               width={48}
               height={48}

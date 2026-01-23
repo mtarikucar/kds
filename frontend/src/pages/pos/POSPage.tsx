@@ -571,7 +571,7 @@ const POSPage = () => {
 
           {/* Tables Grid */}
           {!isLoadingTables && tables && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-4 flex-1 min-h-0 overflow-auto pb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-4 auto-rows-max overflow-auto pb-4">
               {tables.map((table) => {
                 const notifications = getTableNotifications(table.id);
                 const hasNotifications = notifications.orders > 0 || notifications.waiter > 0 || notifications.bill > 0;

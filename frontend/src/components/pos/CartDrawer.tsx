@@ -48,11 +48,11 @@ const CartDrawer = ({ isOpen, onClose, children }: CartDrawerProps) => {
         className={`fixed inset-x-0 bottom-0 z-50 lg:hidden transform transition-transform duration-300 ease-out ${
           isOpen ? 'translate-y-0' : 'translate-y-full'
         }`}
-        style={{ maxHeight: '90vh' }}
+        style={{ height: '85vh', maxHeight: '85vh' }}
       >
-        <div className="bg-white rounded-t-2xl shadow-2xl h-full flex flex-col">
+        <div className="bg-white rounded-t-2xl shadow-2xl h-full flex flex-col overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <div className="flex-shrink-0 flex items-center justify-between px-5 py-4 border-b border-slate-100">
             <h2 className="text-lg font-heading font-bold text-slate-900">{t('cart.yourOrder')}</h2>
             <button
               onClick={onClose}
@@ -63,8 +63,8 @@ const CartDrawer = ({ isOpen, onClose, children }: CartDrawerProps) => {
             </button>
           </div>
 
-          {/* Content - Scrollable */}
-          <div className="flex-1 overflow-y-auto">
+          {/* Content - Takes remaining space */}
+          <div className="flex-1 min-h-0 overflow-hidden">
             {children}
           </div>
         </div>

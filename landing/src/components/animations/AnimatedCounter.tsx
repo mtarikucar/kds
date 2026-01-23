@@ -31,6 +31,11 @@ export function AnimatedCounter({
   const isInView = useInView(ref, { once, margin: '-100px' });
   const prefersReducedMotion = useReducedMotion();
   const [hasAnimated, setHasAnimated] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    setIsMobile(window.matchMedia('(max-width: 768px)').matches);
+  }, []);
 
   const spring = useSpring(0, {
     duration: duration * 1000,
@@ -66,8 +71,8 @@ export function AnimatedCounter({
     }
   }, [isInView, hasAnimated, value, spring, delay]);
 
-  // Skip animation if user prefers reduced motion
-  if (prefersReducedMotion) {
+  // Skip animation if user prefers reduced motion or on mobile
+  if (prefersReducedMotion || isMobile) {
     const formattedValue = (() => {
       switch (format) {
         case 'currency':

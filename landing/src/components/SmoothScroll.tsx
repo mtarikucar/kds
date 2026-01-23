@@ -19,8 +19,9 @@ export function SmoothScroll({ children }: SmoothScrollProps) {
   const prefersReducedMotion = useReducedMotion();
 
   useEffect(() => {
-    // Don't use smooth scroll if user prefers reduced motion
-    if (prefersReducedMotion) return;
+    // Don't use smooth scroll if user prefers reduced motion or on mobile
+    const isMobile = window.matchMedia('(max-width: 768px)').matches;
+    if (prefersReducedMotion || isMobile) return;
 
     const lenis = new Lenis({
       duration: 1.0,
