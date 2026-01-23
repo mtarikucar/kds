@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ShoppingCart, Check, UtensilsCrossed, Plus } from 'lucide-react';
 import { Product } from '../../types';
@@ -34,6 +35,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
   layoutStyle,
   isAdded = false,
 }) => {
+  const { t } = useTranslation('common');
+
   const normalizeImageUrl = (url: string | null | undefined): string | null => {
     if (!url) return null;
     const normalizedPath = url.replace(/\\/g, '/');
@@ -91,7 +94,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           {isUnavailable && (
             <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
               <span className="text-white font-semibold text-xs px-3 py-1.5 bg-black/50 rounded-full backdrop-blur-sm">
-                Unavailable
+                {t('qrMenu.unavailable', 'Unavailable')}
               </span>
             </div>
           )}
@@ -99,7 +102,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           {/* Price Badge - Only for grid layout */}
           {showPrices && layoutStyle !== 'LIST' && (
             <div
-              className="absolute bottom-2 right-2 px-2.5 py-1 rounded-lg font-bold text-sm text-white shadow-lg"
+              className="absolute bottom-2 right-2 rtl:right-auto rtl:left-2 px-2.5 py-1 rounded-lg font-bold text-sm text-white shadow-lg"
               style={{
                 backgroundColor: primaryColor,
                 boxShadow: `0 2px 10px ${primaryColor}50`,
@@ -183,7 +186,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
         <motion.button
           onClick={handleQuickAdd}
           disabled={isUnavailable}
-          className="absolute bottom-3 right-3 p-2.5 rounded-xl shadow-lg transition-all duration-200"
+          className="absolute bottom-3 right-3 rtl:right-auto rtl:left-3 p-2.5 rounded-xl shadow-lg transition-all duration-200"
           style={{
             backgroundColor: isAdded ? '#10b981' : primaryColor,
             opacity: isUnavailable ? 0.5 : 1,

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Trash2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -13,6 +14,7 @@ const SwipeableCartItem: React.FC<SwipeableCartItemProps> = ({
   onDelete,
   deleteThreshold = 100,
 }) => {
+  const { t } = useTranslation('common');
   const [translateX, setTranslateX] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -93,7 +95,7 @@ const SwipeableCartItem: React.FC<SwipeableCartItemProps> = ({
           className="flex flex-col items-center justify-center h-full px-6 text-white"
         >
           <Trash2 className="h-6 w-6" />
-          <span className="text-xs font-medium mt-1">Delete</span>
+          <span className="text-xs font-medium mt-1">{t('common.delete', 'Delete')}</span>
         </button>
       </div>
 

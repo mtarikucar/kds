@@ -662,7 +662,8 @@
     "copyPassword": "Copy Password",
     "passwordCopied": "Password copied!",
     "socialMedia": "Follow Us",
-    "connectWithUs": "Connect with us"
+    "connectWithUs": "Connect with us",
+    "productImage": "Product image"
   },
   "qr": {
     "shareText": "Check out our menu",

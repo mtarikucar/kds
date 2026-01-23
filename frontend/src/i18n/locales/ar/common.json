@@ -639,7 +639,8 @@
     "selectOne": "اختر واحداً",
     "selectUpTo": "اختر حتى {{max}}",
     "selectMultiple": "اختر متعدد",
-    "specialInstructions": "تعليمات خاصة"
+    "specialInstructions": "تعليمات خاصة",
+    "productImage": "صورة المنتج"
   },
   "qr": {
     "shareText": "اطلع على قائمتنا",

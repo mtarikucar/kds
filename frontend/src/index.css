@@ -635,3 +635,125 @@
 [dir="rtl"] .qr-menu-categories {
   direction: rtl;
 }
+
+/* RTL: Tailwind utility overrides for RTL positioning */
+[dir="rtl"] .rtl\:right-auto {
+  right: auto !important;
+}
+
+[dir="rtl"] .rtl\:left-auto {
+  left: auto !important;
+}
+
+[dir="rtl"] .rtl\:left-2 {
+  left: 0.5rem !important;
+}
+
+[dir="rtl"] .rtl\:right-2 {
+  right: 0.5rem !important;
+}
+
+[dir="rtl"] .rtl\:left-3 {
+  left: 0.75rem !important;
+}
+
+[dir="rtl"] .rtl\:right-3 {
+  right: 0.75rem !important;
+}
+
+[dir="rtl"] .rtl\:left-4 {
+  left: 1rem !important;
+}
+
+[dir="rtl"] .rtl\:right-4 {
+  right: 1rem !important;
+}
+
+[dir="rtl"] .rtl\:pl-4 {
+  padding-left: 1rem !important;
+}
+
+[dir="rtl"] .rtl\:pr-4 {
+  padding-right: 1rem !important;
+}
+
+[dir="rtl"] .rtl\:pl-10 {
+  padding-left: 2.5rem !important;
+}
+
+[dir="rtl"] .rtl\:pr-10 {
+  padding-right: 2.5rem !important;
+}
+
+[dir="rtl"] .rtl\:pl-12 {
+  padding-left: 3rem !important;
+}
+
+[dir="rtl"] .rtl\:pr-12 {
+  padding-right: 3rem !important;
+}
+
+/* RTL: Border flip utilities */
+[dir="rtl"] .rtl\:border-l-0 {
+  border-left-width: 0 !important;
+}
+
+[dir="rtl"] .rtl\:border-r-4 {
+  border-right-width: 4px !important;
+}
+
+[dir="rtl"] .rtl\:border-l-4 {
+  border-left-width: 4px !important;
+}
+
+/* RTL: Text alignment */
+[dir="rtl"] .rtl\:text-left {
+  text-align: left !important;
+}
+
+[dir="rtl"] .rtl\:text-right {
+  text-align: right !important;
+}
+
+/* RTL: Negative positioning */
+[dir="rtl"] .rtl\:-right-auto {
+  right: auto !important;
+}
+
+[dir="rtl"] .rtl\:-left-auto {
+  left: auto !important;
+}
+
+[dir="rtl"] .rtl\:-left-2 {
+  left: -0.5rem !important;
+}
+
+[dir="rtl"] .rtl\:-right-2 {
+  right: -0.5rem !important;
+}
+
+[dir="rtl"] .rtl\:-left-3 {
+  left: -0.75rem !important;
+}
+
+[dir="rtl"] .rtl\:-right-3 {
+  right: -0.75rem !important;
+}
+
+/* RTL: Padding override */
+[dir="rtl"] .rtl\:pr-0 {
+  padding-right: 0 !important;
+}
+
+[dir="rtl"] .rtl\:pl-0 {
+  padding-left: 0 !important;
+}
+
+/* RTL: Border utilities */
+[dir="rtl"] .rtl\:border-l-0 {
+  border-left-width: 0 !important;
+}
+
+[dir="rtl"] .rtl\:border-r-0 {
+  border-right-width: 0 !important;
+}

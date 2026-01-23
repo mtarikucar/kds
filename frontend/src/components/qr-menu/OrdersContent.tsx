@@ -147,7 +147,7 @@ const OrdersContent: React.FC<OrdersContentProps> = ({
           className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 mb-4 transition-colors"
           whileTap={{ scale: 0.98 }}
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-4 w-4 rtl-flip" />
           {t('cart.continueShopping', 'Continue Shopping')}
         </motion.button>
 

@@ -624,7 +624,8 @@
     "selectOne": "Выберите один",
     "selectUpTo": "Выберите до {{max}}",
     "selectMultiple": "Выберите несколько",
-    "specialInstructions": "Особые пожелания"
+    "specialInstructions": "Особые пожелания",
+    "productImage": "Изображение продукта"
   },
   "qr": {
     "shareText": "Посмотрите наше меню",

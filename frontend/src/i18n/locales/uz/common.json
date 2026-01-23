@@ -619,7 +619,8 @@
     "selectOne": "Birini tanlang",
     "selectUpTo": "{{max}} tagacha tanlang",
     "selectMultiple": "Bir nechtasini tanlang",
-    "specialInstructions": "Maxsus ko'rsatmalar"
+    "specialInstructions": "Maxsus ko'rsatmalar",
+    "productImage": "Mahsulot rasmi"
   },
   "qr": {
     "shareText": "Menyumizni ko'ring",

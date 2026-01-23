@@ -39,13 +39,13 @@ const EmptyCart: React.FC<EmptyCartProps> = ({
 
         {/* Decorative circles */}
         <motion.div
-          className="absolute -top-2 -right-2 w-6 h-6 rounded-full"
+          className="absolute -top-2 -right-2 rtl:-right-auto rtl:-left-2 w-6 h-6 rounded-full"
           style={{ backgroundColor: `${secondaryColor}30` }}
           animate={{ scale: [1, 1.2, 1] }}
           transition={{ repeat: Infinity, duration: 2, delay: 0.3 }}
         />
         <motion.div
-          className="absolute -bottom-1 -left-3 w-4 h-4 rounded-full"
+          className="absolute -bottom-1 -left-3 rtl:-left-auto rtl:-right-3 w-4 h-4 rounded-full"
           style={{ backgroundColor: `${primaryColor}40` }}
           animate={{ scale: [1, 1.3, 1] }}
           transition={{ repeat: Infinity, duration: 2, delay: 0.6 }}
@@ -79,7 +79,7 @@ const EmptyCart: React.FC<EmptyCartProps> = ({
         style={{ backgroundColor: primaryColor }}
       >
         {t('common.browseMenu', 'Browse Menu')}
-        <ArrowRight className="h-4 w-4" />
+        <ArrowRight className="h-4 w-4 rtl-flip" />
       </motion.button>
     </div>
   );

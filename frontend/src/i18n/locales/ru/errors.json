@@ -13,6 +13,7 @@
     "timeoutError": "Время запроса истекло",
     "connectionError": "Ошибка подключения",
     "loadingError": "Не удалось загрузить данные",
+    "failedToLoadTables": "Не удалось загрузить столы",
     "savingError": "Не удалось сохранить данные",
     "deletingError": "Не удалось удалить элемент",
     "updatingError": "Не удалось обновить элемент",

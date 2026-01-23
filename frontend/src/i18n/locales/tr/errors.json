@@ -13,6 +13,7 @@
     "timeoutError": "İstek zaman aşımı",
     "connectionError": "Bağlantı hatası",
     "loadingError": "Veri yükleme başarısız",
+    "failedToLoadTables": "Masalar yüklenemedi",
     "savingError": "Veri kaydetme başarısız",
     "deletingError": "Öğe silme başarısız",
     "updatingError": "Öğe güncelleme başarısız",

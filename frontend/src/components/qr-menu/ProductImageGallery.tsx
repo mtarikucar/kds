@@ -1,8 +1,10 @@
 import React, { useState, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, UtensilsCrossed } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import ProgressiveImage from './ui/ProgressiveImage';
+import { useIsRTL } from './RTLIcon';
 
 interface ProductImageGalleryProps {
   images: { url: string; alt?: string }[];
@@ -17,6 +19,8 @@ const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({
   showThumbnails = true,
   autoPlay = false,
 }) => {
+  const { t } = useTranslation('common');
+  const isRTL = useIsRTL();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [direction, setDirection] = useState(0);
   const touchStartX = useRef(0);
@@ -80,7 +84,7 @@ const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({
       <div className={cn('relative overflow-hidden', className)}>
         <ProgressiveImage
           src={normalizeImageUrl(images[0].url)}
-          alt={images[0].alt || 'Product image'}
+          alt={images[0].alt || t('qrMenu.productImage', 'Product image')}
           className="w-full h-full object-cover"
         />
       </div>
@@ -124,7 +128,7 @@ const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({
           >
             <ProgressiveImage
               src={normalizeImageUrl(images[currentIndex].url)}
-              alt={images[currentIndex].alt || `Product image ${currentIndex + 1}`}
+              alt={images[currentIndex].alt || t('qrMenu.productImage', 'Product image')}
               className="w-full h-full object-cover"
             />
           </motion.div>
@@ -132,16 +136,16 @@ const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({
 
         {/* Navigation Arrows (desktop) */}
         <button
-          onClick={goToPrev}
-          className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 shadow-lg flex items-center justify-center opacity-0 hover:opacity-100 focus:opacity-100 transition-opacity md:opacity-70"
+          onClick={isRTL ? goToNext : goToPrev}
+          className="absolute left-2 rtl:left-auto rtl:right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 shadow-lg flex items-center justify-center opacity-0 hover:opacity-100 focus:opacity-100 transition-opacity md:opacity-70"
         >
-          <ChevronLeft className="h-6 w-6 text-slate-700" />
+          <ChevronLeft className="h-6 w-6 text-slate-700 rtl-flip" />
         </button>
         <button
-          onClick={goToNext}
-          className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 shadow-lg flex items-center justify-center opacity-0 hover:opacity-100 focus:opacity-100 transition-opacity md:opacity-70"
+          onClick={isRTL ? goToPrev : goToNext}
+          className="absolute right-2 rtl:right-auto rtl:left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/90 shadow-lg flex items-center justify-center opacity-0 hover:opacity-100 focus:opacity-100 transition-opacity md:opacity-70"
         >
-          <ChevronRight className="h-6 w-6 text-slate-700" />
+          <ChevronRight className="h-6 w-6 text-slate-700 rtl-flip" />
         </button>
 
         {/* Dots Indicator */}
@@ -177,7 +181,7 @@ const ProductImageGallery: React.FC<ProductImageGalleryProps> = ({
             >
               <img
                 src={normalizeImageUrl(image.url)}
-                alt={image.alt || `Thumbnail ${index + 1}`}
+                alt={image.alt || t('qrMenu.productImage', 'Product image')}
                 className="w-full h-full object-cover"
               />
             </button>

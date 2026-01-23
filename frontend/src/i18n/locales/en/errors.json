@@ -13,6 +13,7 @@
     "timeoutError": "Request timeout",
     "connectionError": "Connection error",
     "loadingError": "Failed to load data",
+    "failedToLoadTables": "Failed to load tables",
     "savingError": "Failed to save data",
     "deletingError": "Failed to delete item",
     "updatingError": "Failed to update item",

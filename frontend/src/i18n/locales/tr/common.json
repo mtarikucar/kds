@@ -662,7 +662,8 @@
     "copyPassword": "Şifreyi Kopyala",
     "passwordCopied": "Şifre kopyalandı!",
     "socialMedia": "Bizi Takip Edin",
-    "connectWithUs": "Bizimle bağlantı kurun"
+    "connectWithUs": "Bizimle bağlantı kurun",
+    "productImage": "Ürün görseli"
   },
   "qr": {
     "shareText": "Menümüze göz atın",

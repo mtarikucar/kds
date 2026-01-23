@@ -329,7 +329,7 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({
               <div className="relative">
                 <ShoppingCart className="h-6 w-6 text-white" />
                 <span
-                  className="absolute -top-2 -right-2 min-w-[20px] h-5 flex items-center justify-center px-1.5 rounded-full text-xs font-bold"
+                  className="absolute -top-2 -right-2 rtl:-right-auto rtl:-left-2 min-w-[20px] h-5 flex items-center justify-center px-1.5 rounded-full text-xs font-bold"
                   style={{
                     backgroundColor: settings.secondaryColor,
                     color: 'white',

@@ -202,7 +202,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
           {/* Close Button */}
           <motion.button
             onClick={onClose}
-            className="absolute top-4 right-4 z-10 p-2 rounded-full bg-white/90 hover:bg-white shadow-lg transition-all"
+            className="absolute top-4 right-4 rtl:right-auto rtl:left-4 z-10 p-2 rounded-full bg-white/90 hover:bg-white shadow-lg transition-all"
             whileTap={{ scale: 0.9 }}
           >
             <X className="h-5 w-5 text-slate-600" />
@@ -216,7 +216,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
         {!showImages && (
           <motion.button
             onClick={onClose}
-            className="absolute top-4 right-4 z-10 p-2 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors"
+            className="absolute top-4 right-4 rtl:right-auto rtl:left-4 z-10 p-2 rounded-full bg-slate-100 hover:bg-slate-200 transition-colors"
             whileTap={{ scale: 0.9 }}
           >
             <X className="h-5 w-5 text-slate-600" />
@@ -226,7 +226,7 @@ const ProductDetailModalWithCart: React.FC<ProductDetailModalWithCartProps> = ({
         {/* Product Name & Price */}
         <div className="mb-4">
           <h2
-            className="text-xl font-bold leading-tight mb-2 pr-10"
+            className="text-xl font-bold leading-tight mb-2 pr-10 rtl:pr-0 rtl:pl-10"
             style={{ color: secondaryColor }}
           >
             {product.name}

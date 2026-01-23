@@ -13,6 +13,7 @@
     "timeoutError": "So'rov vaqti tugadi",
     "connectionError": "Ulanish xatosi",
     "loadingError": "Ma'lumotlarni yuklab bo'lmadi",
+    "failedToLoadTables": "Stollarni yuklab bo'lmadi",
     "savingError": "Ma'lumotlarni saqlab bo'lmadi",
     "deletingError": "Elementni o'chirib bo'lmadi",
     "updatingError": "Elementni yangilab bo'lmadi",

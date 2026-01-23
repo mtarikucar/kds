@@ -25,6 +25,7 @@ import { buildQRMenuUrl } from '../../utils/subdomain';
 import SortableCartItem from './SortableCartItem';
 import SwipeableCartItem from './SwipeableCartItem';
 import EmptyCart from './EmptyCart';
+import { useIsRTL } from './RTLIcon';
 
 interface CartContentProps {
   settings: MenuSettings;
@@ -80,6 +81,7 @@ const CartContent: React.FC<CartContentProps> = ({
 }) => {
   const { t } = useTranslation('common');
   const navigate = useNavigate();
+  const isRTL = useIsRTL();
   const { items, updateItemQuantity, removeItem, reorderItems, getSubtotal, getTotal, sessionId } = useCartStore();
   const [specialNotes, setSpecialNotes] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -161,7 +163,7 @@ const CartContent: React.FC<CartContentProps> = ({
           className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 mb-4 transition-colors"
           whileTap={{ scale: 0.98 }}
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-4 w-4 rtl-flip" />
           {t('cart.continueShopping', 'Continue Shopping')}
         </motion.button>
 
@@ -218,9 +220,9 @@ const CartContent: React.FC<CartContentProps> = ({
                   <motion.div
                     key={item.id}
                     layout
-                    initial={{ opacity: 0, x: -20 }}
+                    initial={{ opacity: 0, x: isRTL ? 20 : -20 }}
                     animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 100, transition: { duration: 0.2 } }}
+                    exit={{ opacity: 0, x: isRTL ? -100 : 100, transition: { duration: 0.2 } }}
                     transition={{ delay: index * 0.05 }}
                   >
                     {isMobile ? (

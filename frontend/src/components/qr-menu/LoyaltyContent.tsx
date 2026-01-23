@@ -143,8 +143,8 @@ const LoyaltyContent: React.FC<LoyaltyContentProps> = ({
                 {transactions.map((transaction) => (
                   <div
                     key={transaction.id}
-                    className="bg-white rounded-lg p-4 flex items-center justify-between border-l-4"
-                    style={{ borderLeftColor: settings.primaryColor }}
+                    className="bg-white rounded-lg p-4 flex items-center justify-between border-l-4 rtl:border-l-0 rtl:border-r-4"
+                    style={{ borderLeftColor: settings.primaryColor, borderRightColor: settings.primaryColor }}
                   >
                     <div className="flex items-center gap-3 flex-1">
                       <span className="text-2xl">

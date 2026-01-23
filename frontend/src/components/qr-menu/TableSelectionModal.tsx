@@ -42,7 +42,7 @@ export default function TableSelectionModal({
       setTables(response.data);
     } catch (err: any) {
       console.error('Failed to fetch tables:', err);
-      setError(err.response?.data?.message || 'Failed to load tables');
+      setError(err.response?.data?.message || t('errors.failedToLoadTables', 'Failed to load tables'));
     } finally {
       setLoading(false);
     }
@@ -129,13 +129,13 @@ export default function TableSelectionModal({
               {/* Search (only for dropdown layout) */}
               {!useGridLayout && (
                 <div className="mb-4 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
+                  <Search className="absolute left-3 rtl:left-auto rtl:right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-slate-400" />
                   <input
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder={t('tableSelection.searchPlaceholder')}
-                    className="w-full pl-10 pr-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2"
+                    className="w-full pl-10 pr-4 rtl:pl-4 rtl:pr-10 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2"
                     style={{ focusRingColor: primaryColor }}
                   />
                 </div>

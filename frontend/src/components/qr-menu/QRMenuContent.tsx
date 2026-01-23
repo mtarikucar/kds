@@ -236,13 +236,13 @@ const QRMenuContent: React.FC<QRMenuContentProps> = ({
       {/* Search Bar */}
       <div className="px-4 sm:px-6 py-4 bg-white border-b border-slate-100">
         <div className="relative">
-          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
+          <Search className="absolute left-4 rtl:left-auto rtl:right-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
           <input
             type="text"
             placeholder={t('qrMenu.searchPlaceholder', 'Search menu...')}
             value={localSearchQuery}
             onChange={(e) => setLocalSearchQuery(e.target.value)}
-            className="w-full pl-12 pr-10 py-3 bg-slate-100 text-slate-900 placeholder-slate-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-opacity-50 transition-all"
+            className="w-full pl-12 pr-10 rtl:pl-10 rtl:pr-12 py-3 bg-slate-100 text-slate-900 placeholder-slate-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-opacity-50 transition-all"
             style={{ '--tw-ring-color': settings.primaryColor } as React.CSSProperties}
           />
           <AnimatePresence>
@@ -252,7 +252,7 @@ const QRMenuContent: React.FC<QRMenuContentProps> = ({
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.8 }}
                 onClick={handleClearSearch}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 p-1 rounded-full bg-slate-200 hover:bg-slate-300 transition-colors"
+                className="absolute right-3 rtl:right-auto rtl:left-3 top-1/2 transform -translate-y-1/2 p-1 rounded-full bg-slate-200 hover:bg-slate-300 transition-colors"
               >
                 <X className="h-4 w-4 text-slate-500" />
               </motion.button>

@@ -45,9 +45,13 @@ const SortableCartItem: React.FC<SortableCartItemProps> = ({
   return (
     <div
       ref={setNodeRef}
-      style={style}
+      style={{
+        ...style,
+        borderLeftColor: primaryColor,
+        borderRightColor: primaryColor,
+      }}
       className={cn(
-        'bg-white rounded-2xl shadow-lg p-4 transition-all duration-200 border-l-4',
+        'bg-white rounded-2xl shadow-lg p-4 transition-all duration-200 border-l-4 rtl:border-l-0 rtl:border-r-4',
         isCurrentlyDragging && 'shadow-2xl scale-[1.02] opacity-90 ring-2 ring-offset-2',
         !isCurrentlyDragging && 'hover:shadow-xl'
       )}

@@ -19,6 +19,8 @@ import { toast } from 'sonner';
 import { WifiInfo, SocialMedia } from '../../pages/qr-menu/QRMenuLayout';
 import { buildQRMenuUrl } from '../../utils/subdomain';
 import { localeMap } from '../../i18n/localeMap';
+import { RTL_LANGUAGES } from '../../i18n/config';
+import { cn } from '../../lib/utils';
 
 // Social media icons type
 interface IconProps {
@@ -118,6 +120,7 @@ const MenuDrawer: React.FC<MenuDrawerProps> = ({
   const { t, i18n } = useTranslation('common');
   const navigate = useNavigate();
   const [passwordCopied, setPasswordCopied] = useState(false);
+  const isRTL = RTL_LANGUAGES.includes(i18n.language);
 
   // Available languages with flags
   const languages = [
@@ -205,11 +208,14 @@ const MenuDrawer: React.FC<MenuDrawerProps> = ({
 
           {/* Drawer */}
           <motion.div
-            initial={{ x: '-100%' }}
+            initial={{ x: isRTL ? '100%' : '-100%' }}
             animate={{ x: 0 }}
-            exit={{ x: '-100%' }}
+            exit={{ x: isRTL ? '100%' : '-100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 400 }}
-            className="fixed left-0 top-0 bottom-0 w-[85%] max-w-sm bg-white z-50 shadow-2xl overflow-y-auto"
+            className={cn(
+              "fixed top-0 bottom-0 w-[85%] max-w-sm bg-white z-50 shadow-2xl overflow-y-auto",
+              isRTL ? "right-0" : "left-0"
+            )}
           >
             {/* Header */}
             <div
@@ -318,7 +324,7 @@ const MenuDrawer: React.FC<MenuDrawerProps> = ({
                       <p className="text-sm text-slate-500">{t('loyalty.viewRewards', 'View your rewards')}</p>
                     </div>
                   </div>
-                  <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
+                  <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-slate-600 transition-colors rtl-flip" />
                 </motion.button>
               )}
 
@@ -395,7 +401,7 @@ const MenuDrawer: React.FC<MenuDrawerProps> = ({
                   </div>
                   <span className="font-semibold text-slate-900">{t('cart.cart', 'Cart')}</span>
                 </div>
-                <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
+                <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-slate-600 transition-colors rtl-flip" />
               </motion.button>
 
               {/* Orders Link */}
@@ -414,7 +420,7 @@ const MenuDrawer: React.FC<MenuDrawerProps> = ({
                     </div>
                     <span className="font-semibold text-slate-900">{t('orders.myOrders', 'My Orders')}</span>
                   </div>
-                  <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-slate-600 transition-colors" />
+                  <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-slate-600 transition-colors rtl-flip" />
                 </motion.button>
               )}
             </div>

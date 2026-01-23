@@ -13,6 +13,7 @@
     "timeoutError": "انتهت مهلة الطلب",
     "connectionError": "خطأ في الاتصال",
     "loadingError": "فشل تحميل البيانات",
+    "failedToLoadTables": "فشل تحميل الطاولات",
     "savingError": "فشل حفظ البيانات",
     "deletingError": "فشل حذف العنصر",
     "updatingError": "فشل تحديث العنصر",
