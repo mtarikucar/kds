@@ -9,6 +9,7 @@ import MenuDrawer from '../../components/qr-menu/MenuDrawer';
 import { useCartStore } from '../../store/cartStore';
 import { buildQRMenuUrl } from '../../utils/subdomain';
 import { formatCurrency } from '../../lib/utils';
+import { RTL_LANGUAGES } from '../../i18n/config';
 
 // Helper to normalize image URLs
 const normalizeImageUrl = (url: string | null | undefined): string | null => {
@@ -85,7 +86,7 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({
   onSessionIdChange,
   subdomain,
 }) => {
-  const { t } = useTranslation('common');
+  const { t, i18n } = useTranslation('common');
   const navigate = useNavigate();
   const { tenantId: urlTenantId } = useParams<{ tenantId: string }>();
   const [searchParams] = useSearchParams();
@@ -161,6 +162,9 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({
     }
   }, [sessionId, onSessionIdChange]);
 
+  // Check if current language is RTL
+  const isRTL = RTL_LANGUAGES.includes(i18n.language);
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -214,6 +218,7 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({
   return (
     <div
       className="flex flex-col min-h-screen"
+      dir={isRTL ? 'rtl' : 'ltr'}
       style={{
         backgroundColor: settings.backgroundColor,
         fontFamily: settings.fontFamily,

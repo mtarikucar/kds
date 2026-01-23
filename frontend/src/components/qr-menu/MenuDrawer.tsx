@@ -18,6 +18,7 @@ import {
 import { toast } from 'sonner';
 import { WifiInfo, SocialMedia } from '../../pages/qr-menu/QRMenuLayout';
 import { buildQRMenuUrl } from '../../utils/subdomain';
+import { localeMap } from '../../i18n/localeMap';
 
 // Social media icons type
 interface IconProps {
@@ -118,6 +119,15 @@ const MenuDrawer: React.FC<MenuDrawerProps> = ({
   const navigate = useNavigate();
   const [passwordCopied, setPasswordCopied] = useState(false);
 
+  // Available languages with flags
+  const languages = [
+    { code: 'en', name: 'English', nativeName: 'English', flag: '🇺🇸' },
+    { code: 'tr', name: 'Turkish', nativeName: 'Türkçe', flag: '🇹🇷' },
+    { code: 'ru', name: 'Russian', nativeName: 'Русский', flag: '🇷🇺' },
+    { code: 'uz', name: 'Uzbek', nativeName: "O'zbek", flag: '🇺🇿' },
+    { code: 'ar', name: 'Arabic', nativeName: 'العربية', flag: '🇸🇦' },
+  ];
+
   const handleCopyPassword = async () => {
     if (tenant.wifi?.password) {
       try {
@@ -131,9 +141,8 @@ const MenuDrawer: React.FC<MenuDrawerProps> = ({
     }
   };
 
-  const toggleLanguage = () => {
-    const newLang = i18n.language === 'en' ? 'tr' : 'en';
-    i18n.changeLanguage(newLang);
+  const handleLanguageChange = (langCode: string) => {
+    i18n.changeLanguage(langCode);
   };
 
   const handleNavigateToCart = () => {
@@ -334,49 +343,40 @@ const MenuDrawer: React.FC<MenuDrawerProps> = ({
                 </div>
               )}
 
-              {/* Language Toggle */}
+              {/* Language Selector */}
               <div className="p-4 bg-slate-50 rounded-2xl">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="p-2 rounded-xl"
-                      style={{ backgroundColor: `${settings.primaryColor}15` }}
-                    >
-                      <Globe className="h-5 w-5" style={{ color: settings.primaryColor }} />
-                    </div>
-                    <span className="font-semibold text-slate-900">{t('common.language', 'Language')}</span>
+                <div className="flex items-center gap-3 mb-3">
+                  <div
+                    className="p-2 rounded-xl"
+                    style={{ backgroundColor: `${settings.primaryColor}15` }}
+                  >
+                    <Globe className="h-5 w-5" style={{ color: settings.primaryColor }} />
                   </div>
+                  <span className="font-semibold text-slate-900">{t('common.language', 'Language')}</span>
+                </div>
 
-                  <div className="flex items-center gap-1 bg-white rounded-xl p-1">
-                    <motion.button
-                      onClick={() => i18n.changeLanguage('tr')}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                        i18n.language === 'tr'
-                          ? 'text-white'
-                          : 'text-slate-500 hover:text-slate-700'
-                      }`}
-                      style={{
-                        backgroundColor: i18n.language === 'tr' ? settings.primaryColor : 'transparent',
-                      }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      TR
-                    </motion.button>
-                    <motion.button
-                      onClick={() => i18n.changeLanguage('en')}
-                      className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
-                        i18n.language === 'en'
-                          ? 'text-white'
-                          : 'text-slate-500 hover:text-slate-700'
-                      }`}
-                      style={{
-                        backgroundColor: i18n.language === 'en' ? settings.primaryColor : 'transparent',
-                      }}
-                      whileTap={{ scale: 0.95 }}
-                    >
-                      EN
-                    </motion.button>
-                  </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {languages.map((lang) => {
+                    const isSelected = i18n.language === lang.code;
+                    return (
+                      <motion.button
+                        key={lang.code}
+                        onClick={() => handleLanguageChange(lang.code)}
+                        className={`flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                          isSelected
+                            ? 'text-white shadow-md'
+                            : 'bg-white text-slate-700 hover:bg-slate-100'
+                        }`}
+                        style={{
+                          backgroundColor: isSelected ? settings.primaryColor : undefined,
+                        }}
+                        whileTap={{ scale: 0.95 }}
+                      >
+                        <span className="text-lg">{lang.flag}</span>
+                        <span className="truncate">{lang.nativeName}</span>
+                      </motion.button>
+                    );
+                  })}
                 </div>
               </div>
 

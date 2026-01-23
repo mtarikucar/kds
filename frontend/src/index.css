@@ -624,3 +624,14 @@
   border-radius: 9999px;
   margin: 12px auto 8px;
 }
+
+/* QR Menu RTL Support */
+[dir="rtl"] .qr-menu-search-icon {
+  left: auto;
+  right: 1rem;
+}
+
+/* RTL: Flip scroll direction for QR menu category bar */
+[dir="rtl"] .qr-menu-categories {
+  direction: rtl;
+}
