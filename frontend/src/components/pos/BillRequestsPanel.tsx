@@ -110,13 +110,18 @@ const BillRequestsPanel = ({ isOpen, onClose }: BillRequestsPanelProps) => {
                   }`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        {request.table && (
+                        {request.table ? (
                           <div className="flex items-center gap-1.5 font-bold text-slate-900">
                             <MapPin className="h-4 w-4" />
                             <span>{t('tableLabel')} {request.table.number}</span>
                             {request.table.section && (
                               <span className="text-sm text-slate-500">({request.table.section})</span>
                             )}
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                            <Receipt className="h-4 w-4" />
+                            <span>{t('billRequests.tablelessOrder')}</span>
                           </div>
                         )}
                       </div>

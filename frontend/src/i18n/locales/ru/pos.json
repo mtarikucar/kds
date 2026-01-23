@@ -147,7 +147,8 @@
     "complete": "Завершить",
     "acknowledgedBy": "Принял",
     "customerRequestedNote": "Примечание к заказу",
-    "unknownProduct": "Неизвестный продукт"
+    "unknownProduct": "Неизвестный продукт",
+    "tablelessOrder": "Заказ без стола"
   },
   "tableSelection": {
     "title": "Выберите стол",

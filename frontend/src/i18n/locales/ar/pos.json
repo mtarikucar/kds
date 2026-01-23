@@ -147,7 +147,8 @@
     "complete": "إكمال",
     "acknowledgedBy": "تم الاستلام بواسطة",
     "customerRequestedNote": "ملاحظة الطلب",
-    "unknownProduct": "منتج غير معروف"
+    "unknownProduct": "منتج غير معروف",
+    "tablelessOrder": "طلب بدون طاولة"
   },
   "tableSelection": {
     "title": "اختر طاولة",

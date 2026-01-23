@@ -808,7 +808,7 @@ export interface CreateWaiterRequestDto {
 
 export interface BillRequest {
   id: string;
-  tableId: string;
+  tableId?: string | null;
   sessionId: string;
   status: 'PENDING' | 'ACKNOWLEDGED' | 'COMPLETED';
   acknowledgedAt?: string;
@@ -826,7 +826,7 @@ export interface BillRequest {
 
 export interface CreateBillRequestDto {
   tenantId: string;
-  tableId: string;
+  tableId?: string | null;
   sessionId: string;
 }
 

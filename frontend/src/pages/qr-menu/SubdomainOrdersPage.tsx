@@ -65,7 +65,7 @@ const SubdomainOrdersPage: React.FC<SubdomainOrdersPageProps> = ({ subdomain }) 
   };
 
   const handleRequestBill = async () => {
-    if (!sessionId || !menuData || !tableId) {
+    if (!sessionId || !menuData) {
       toast.error(t('messages.operationFailed'));
       return;
     }
@@ -76,7 +76,7 @@ const SubdomainOrdersPage: React.FC<SubdomainOrdersPageProps> = ({ subdomain }) 
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
       await axios.post(`${API_URL}/customer-orders/bill-requests`, {
         tenantId,
-        tableId,
+        tableId: tableId || null,
         sessionId,
       });
       toast.success(t('bill.requestSuccess'));

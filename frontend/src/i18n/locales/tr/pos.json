@@ -147,7 +147,8 @@
     "complete": "Tamamla",
     "acknowledgedBy": "Kabul eden",
     "customerRequestedNote": "Sipariş Notu",
-    "unknownProduct": "Bilinmeyen Ürün"
+    "unknownProduct": "Bilinmeyen Ürün",
+    "tablelessOrder": "Masasız Sipariş"
   },
   "tableSelection": {
     "title": "Masa Seçin",

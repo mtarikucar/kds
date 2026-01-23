@@ -147,7 +147,8 @@
     "complete": "Yakunlash",
     "acknowledgedBy": "Qabul qilgan",
     "customerRequestedNote": "Buyurtma eslatmasi",
-    "unknownProduct": "Noma'lum mahsulot"
+    "unknownProduct": "Noma'lum mahsulot",
+    "tablelessOrder": "Stolsiz buyurtma"
   },
   "tableSelection": {
     "title": "Stol tanlang",

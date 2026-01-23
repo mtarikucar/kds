@@ -57,7 +57,7 @@ const OrderTrackingPage = () => {
   };
 
   const handleRequestBill = async () => {
-    if (!sessionId || !tenantId || !tableId) {
+    if (!sessionId || !tenantId) {
       toast.error(t('messages.operationFailed'));
       return;
     }
@@ -66,7 +66,7 @@ const OrderTrackingPage = () => {
       const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
       await axios.post(`${API_URL}/customer-orders/bill-requests`, {
         tenantId,
-        tableId,
+        tableId: tableId || null,
         sessionId,
       });
       toast.success(t('bill.requestSuccess'));

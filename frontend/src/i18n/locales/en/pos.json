@@ -147,7 +147,8 @@
     "complete": "Complete",
     "acknowledgedBy": "Acknowledged by",
     "customerRequestedNote": "Order Note",
-    "unknownProduct": "Unknown Product"
+    "unknownProduct": "Unknown Product",
+    "tablelessOrder": "Tableless Order"
   },
   "tableSelection": {
     "title": "Select a Table",
