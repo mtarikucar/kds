@@ -110,7 +110,8 @@
     "call": "Çağrı",
     "calls": "Çağrı",
     "bill": "Hesap",
-    "bills": "Hesap"
+    "bills": "Hesap",
+    "newRequest": "Yeni {{type}} İsteği"
   },
   "pendingOrders": {
     "title": "Bekleyen Siparişler",

@@ -279,6 +279,110 @@ export const usePosSocket = () => {
       });
     };
 
+    // ========================================
+    // BILL REQUEST HANDLERS
+    // ========================================
+
+    const handleBillRequestNew = (event: any) => {
+      console.log('[POS Socket] New bill request received:', event);
+
+      // Add to bill requests cache
+      const billRequests = queryClient.getQueryData<any[]>(['billRequests', 'active']) || [];
+      queryClient.setQueryData(['billRequests', 'active'], [event, ...billRequests]);
+      console.log('[POS Socket] Added bill request to cache');
+
+      // Invalidate tables to update bill request indicator
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+
+      // Play notification sound
+      playNotificationSound();
+
+      // Show toast notification
+      toast.warning(i18n.t('pos:notifications.newRequest', { type: i18n.t('pos:notifications.bill') }), {
+        description: event.table ? `${i18n.t('pos:table')} ${event.table.number}` : undefined,
+        duration: 8000,
+        position: 'top-right',
+      });
+    };
+
+    const handleBillRequestUpdated = (event: any) => {
+      console.log('[POS Socket] Bill request updated:', event);
+
+      // Update or remove from bill requests cache based on status
+      const billRequests = queryClient.getQueryData<any[]>(['billRequests', 'active']) || [];
+
+      if (event.status === 'COMPLETED') {
+        // Remove from active requests
+        const updated = billRequests.filter(req => req.id !== event.id);
+        queryClient.setQueryData(['billRequests', 'active'], updated);
+        console.log('[POS Socket] Removed completed bill request from cache');
+      } else {
+        // Update the request in cache
+        const existingIndex = billRequests.findIndex(req => req.id === event.id);
+        if (existingIndex >= 0) {
+          const updated = [...billRequests];
+          updated[existingIndex] = event;
+          queryClient.setQueryData(['billRequests', 'active'], updated);
+          console.log('[POS Socket] Updated bill request in cache');
+        }
+      }
+
+      // Invalidate tables to update bill request indicator
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+    };
+
+    // ========================================
+    // WAITER REQUEST HANDLERS
+    // ========================================
+
+    const handleWaiterRequestNew = (event: any) => {
+      console.log('[POS Socket] New waiter request received:', event);
+
+      // Add to waiter requests cache
+      const waiterRequests = queryClient.getQueryData<any[]>(['waiterRequests', 'active']) || [];
+      queryClient.setQueryData(['waiterRequests', 'active'], [event, ...waiterRequests]);
+      console.log('[POS Socket] Added waiter request to cache');
+
+      // Invalidate tables to update waiter call indicator
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+
+      // Play notification sound
+      playNotificationSound();
+
+      // Show toast notification
+      toast.warning(i18n.t('pos:notifications.newRequest', { type: i18n.t('pos:notifications.call') }), {
+        description: event.table ? `${i18n.t('pos:table')} ${event.table.number}` : undefined,
+        duration: 8000,
+        position: 'top-right',
+      });
+    };
+
+    const handleWaiterRequestUpdated = (event: any) => {
+      console.log('[POS Socket] Waiter request updated:', event);
+
+      // Update or remove from waiter requests cache based on status
+      const waiterRequests = queryClient.getQueryData<any[]>(['waiterRequests', 'active']) || [];
+
+      if (event.status === 'COMPLETED') {
+        // Remove from active requests
+        const updated = waiterRequests.filter(req => req.id !== event.id);
+        queryClient.setQueryData(['waiterRequests', 'active'], updated);
+        console.log('[POS Socket] Removed completed waiter request from cache');
+      } else {
+        // Update the request in cache
+        const existingIndex = waiterRequests.findIndex(req => req.id === event.id);
+        if (existingIndex >= 0) {
+          const updated = [...waiterRequests];
+          updated[existingIndex] = event;
+          queryClient.setQueryData(['waiterRequests', 'active'], updated);
+          console.log('[POS Socket] Updated waiter request in cache');
+        }
+      }
+
+      // Invalidate tables to update waiter call indicator
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+    };
+
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('order:new', handleNewOrder);
@@ -286,6 +390,10 @@ export const usePosSocket = () => {
     socket.on('order:status-changed', handleOrderStatusChanged);
     socket.on('order:item-status-changed', handleOrderItemStatusChanged);
     socket.on('table:orders-transferred', handleTableTransfer);
+    socket.on('bill-request:new', handleBillRequestNew);
+    socket.on('bill-request:updated', handleBillRequestUpdated);
+    socket.on('waiter-request:new', handleWaiterRequestNew);
+    socket.on('waiter-request:updated', handleWaiterRequestUpdated);
 
     // Join POS room
     socket.emit('join-pos');
@@ -298,6 +406,10 @@ export const usePosSocket = () => {
       socket.off('order:status-changed', handleOrderStatusChanged);
       socket.off('order:item-status-changed', handleOrderItemStatusChanged);
       socket.off('table:orders-transferred', handleTableTransfer);
+      socket.off('bill-request:new', handleBillRequestNew);
+      socket.off('bill-request:updated', handleBillRequestUpdated);
+      socket.off('waiter-request:new', handleWaiterRequestNew);
+      socket.off('waiter-request:updated', handleWaiterRequestUpdated);
       socket.emit('leave-pos');
       disconnectSocket();
     };

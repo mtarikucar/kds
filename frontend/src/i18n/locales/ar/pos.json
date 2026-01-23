@@ -110,7 +110,8 @@
     "call": "استدعاء",
     "calls": "استدعاءات",
     "bill": "فاتورة",
-    "bills": "فواتير"
+    "bills": "فواتير",
+    "newRequest": "طلب {{type}} جديد"
   },
   "pendingOrders": {
     "title": "الطلبات المعلقة",

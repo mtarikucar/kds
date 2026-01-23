@@ -277,7 +277,7 @@ export class CustomerOrdersService {
       throw new NotFoundException('Table not found');
     }
 
-    return this.prisma.waiterRequest.create({
+    const waiterRequest = await this.prisma.waiterRequest.create({
       data: {
         tableId: dto.tableId,
         sessionId: dto.sessionId,
@@ -288,6 +288,11 @@ export class CustomerOrdersService {
         table: true,
       },
     });
+
+    // Emit Socket.IO event to POS
+    this.kdsGateway.emitWaiterRequest(dto.tenantId, waiterRequest);
+
+    return waiterRequest;
   }
 
   async getSessionWaiterRequests(sessionId: string, tenantId: string) {
@@ -374,7 +379,7 @@ export class CustomerOrdersService {
       throw new BadRequestException('Waiter request is not pending');
     }
 
-    return this.prisma.waiterRequest.update({
+    const updatedRequest = await this.prisma.waiterRequest.update({
       where: { id },
       data: {
         status: 'ACKNOWLEDGED',
@@ -392,6 +397,11 @@ export class CustomerOrdersService {
         },
       },
     });
+
+    // Emit Socket.IO event to POS
+    this.kdsGateway.emitWaiterRequestUpdated(tenantId, updatedRequest);
+
+    return updatedRequest;
   }
 
   async completeWaiterRequest(id: string, userId: string, tenantId: string) {
@@ -412,7 +422,7 @@ export class CustomerOrdersService {
       throw new BadRequestException('Waiter request is already completed');
     }
 
-    return this.prisma.waiterRequest.update({
+    const updatedRequest = await this.prisma.waiterRequest.update({
       where: { id },
       data: {
         status: 'COMPLETED',
@@ -431,6 +441,11 @@ export class CustomerOrdersService {
         },
       },
     });
+
+    // Emit Socket.IO event to POS
+    this.kdsGateway.emitWaiterRequestUpdated(tenantId, updatedRequest);
+
+    return updatedRequest;
   }
 
   // ========================================
@@ -456,13 +471,16 @@ export class CustomerOrdersService {
         sessionId: dto.sessionId,
         status: 'PENDING',
       },
+      include: {
+        table: true,
+      },
     });
 
     if (existingRequest) {
       return existingRequest;
     }
 
-    return this.prisma.billRequest.create({
+    const billRequest = await this.prisma.billRequest.create({
       data: {
         tableId: dto.tableId,
         sessionId: dto.sessionId,
@@ -472,6 +490,11 @@ export class CustomerOrdersService {
         table: true,
       },
     });
+
+    // Emit Socket.IO event to POS
+    this.kdsGateway.emitBillRequest(dto.tenantId, billRequest);
+
+    return billRequest;
   }
 
   async getSessionBillRequests(sessionId: string, tenantId: string) {
@@ -558,7 +581,7 @@ export class CustomerOrdersService {
       throw new BadRequestException('Bill request is not pending');
     }
 
-    return this.prisma.billRequest.update({
+    const updatedRequest = await this.prisma.billRequest.update({
       where: { id },
       data: {
         status: 'ACKNOWLEDGED',
@@ -576,6 +599,11 @@ export class CustomerOrdersService {
         },
       },
     });
+
+    // Emit Socket.IO event to POS
+    this.kdsGateway.emitBillRequestUpdated(tenantId, updatedRequest);
+
+    return updatedRequest;
   }
 
   async completeBillRequest(id: string, userId: string, tenantId: string) {
@@ -596,7 +624,7 @@ export class CustomerOrdersService {
       throw new BadRequestException('Bill request is already completed');
     }
 
-    return this.prisma.billRequest.update({
+    const updatedRequest = await this.prisma.billRequest.update({
       where: { id },
       data: {
         status: 'COMPLETED',
@@ -615,6 +643,11 @@ export class CustomerOrdersService {
         },
       },
     });
+
+    // Emit Socket.IO event to POS
+    this.kdsGateway.emitBillRequestUpdated(tenantId, updatedRequest);
+
+    return updatedRequest;
   }
 
   // ========================================

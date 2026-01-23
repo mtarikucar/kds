@@ -318,4 +318,86 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       `Table transfer emitted: ${data.transferredCount} order(s) from table ${data.sourceTableNumber} to table ${data.targetTableNumber}`
     );
   }
+
+  // ========================================
+  // BILL REQUEST EVENTS
+  // ========================================
+
+  emitBillRequest(tenantId: string, billRequest: any) {
+    this.server.to(`pos-${tenantId}`).emit('bill-request:new', {
+      id: billRequest.id,
+      tableId: billRequest.tableId,
+      table: billRequest.table,
+      sessionId: billRequest.sessionId,
+      status: billRequest.status,
+      createdAt: billRequest.createdAt,
+      timestamp: new Date(),
+    });
+
+    this.logger.log(
+      `New bill request emitted for table ${billRequest.table?.number || billRequest.tableId} to pos-${tenantId}`
+    );
+  }
+
+  emitBillRequestUpdated(tenantId: string, billRequest: any) {
+    this.server.to(`pos-${tenantId}`).emit('bill-request:updated', {
+      id: billRequest.id,
+      tableId: billRequest.tableId,
+      table: billRequest.table,
+      sessionId: billRequest.sessionId,
+      status: billRequest.status,
+      acknowledgedById: billRequest.acknowledgedById,
+      acknowledgedBy: billRequest.acknowledgedBy,
+      acknowledgedAt: billRequest.acknowledgedAt,
+      completedAt: billRequest.completedAt,
+      createdAt: billRequest.createdAt,
+      timestamp: new Date(),
+    });
+
+    this.logger.log(
+      `Bill request ${billRequest.id} updated (status: ${billRequest.status}) and emitted to pos-${tenantId}`
+    );
+  }
+
+  // ========================================
+  // WAITER REQUEST EVENTS
+  // ========================================
+
+  emitWaiterRequest(tenantId: string, waiterRequest: any) {
+    this.server.to(`pos-${tenantId}`).emit('waiter-request:new', {
+      id: waiterRequest.id,
+      tableId: waiterRequest.tableId,
+      table: waiterRequest.table,
+      sessionId: waiterRequest.sessionId,
+      message: waiterRequest.message,
+      status: waiterRequest.status,
+      createdAt: waiterRequest.createdAt,
+      timestamp: new Date(),
+    });
+
+    this.logger.log(
+      `New waiter request emitted for table ${waiterRequest.table?.number || waiterRequest.tableId} to pos-${tenantId}`
+    );
+  }
+
+  emitWaiterRequestUpdated(tenantId: string, waiterRequest: any) {
+    this.server.to(`pos-${tenantId}`).emit('waiter-request:updated', {
+      id: waiterRequest.id,
+      tableId: waiterRequest.tableId,
+      table: waiterRequest.table,
+      sessionId: waiterRequest.sessionId,
+      message: waiterRequest.message,
+      status: waiterRequest.status,
+      acknowledgedById: waiterRequest.acknowledgedById,
+      acknowledgedBy: waiterRequest.acknowledgedBy,
+      acknowledgedAt: waiterRequest.acknowledgedAt,
+      completedAt: waiterRequest.completedAt,
+      createdAt: waiterRequest.createdAt,
+      timestamp: new Date(),
+    });
+
+    this.logger.log(
+      `Waiter request ${waiterRequest.id} updated (status: ${waiterRequest.status}) and emitted to pos-${tenantId}`
+    );
+  }
 }

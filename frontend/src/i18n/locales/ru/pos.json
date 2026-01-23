@@ -110,7 +110,8 @@
     "call": "Вызов",
     "calls": "Вызовы",
     "bill": "Счет",
-    "bills": "Счета"
+    "bills": "Счета",
+    "newRequest": "Новый запрос: {{type}}"
   },
   "pendingOrders": {
     "title": "Ожидающие заказы",

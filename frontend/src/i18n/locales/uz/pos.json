@@ -110,7 +110,8 @@
     "call": "Qo'ng'iroq",
     "calls": "Qo'ng'iroqlar",
     "bill": "Hisob",
-    "bills": "Hisoblar"
+    "bills": "Hisoblar",
+    "newRequest": "Yangi {{type}} so'rovi"
   },
   "pendingOrders": {
     "title": "Kutilayotgan buyurtmalar",

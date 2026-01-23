@@ -110,7 +110,8 @@
     "call": "Call",
     "calls": "Calls",
     "bill": "Bill",
-    "bills": "Bills"
+    "bills": "Bills",
+    "newRequest": "New {{type}} Request"
   },
   "pendingOrders": {
     "title": "Pending Orders",
