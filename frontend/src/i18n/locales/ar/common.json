@@ -680,7 +680,10 @@
     "redirecting": "جاري التحويل لتتبع الطلب...",
     "sessionExpired": "انتهت الجلسة. يرجى تحديث الصفحة.",
     "orderSubmitted": "تم إرسال الطلب بنجاح!",
-    "specialNotes": "ملاحظات خاصة"
+    "specialNotes": "ملاحظات خاصة",
+    "continueShopping": "مواصلة التسوق",
+    "viewCart": "عرض السلة",
+    "cart": "السلة"
   },
   "orders": {
     "title": "طلباتي",

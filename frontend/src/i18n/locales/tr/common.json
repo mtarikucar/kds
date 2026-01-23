@@ -703,7 +703,10 @@
     "redirecting": "Sipariş takibine yönlendiriliyorsunuz...",
     "sessionExpired": "Oturum süresi doldu. Lütfen sayfayı yenileyin.",
     "orderSubmitted": "Sipariş başarıyla gönderildi!",
-    "specialNotes": "Özel Notlar"
+    "specialNotes": "Özel Notlar",
+    "continueShopping": "Alışverişe Devam Et",
+    "viewCart": "Sepeti Görüntüle",
+    "cart": "Sepet"
   },
   "orders": {
     "title": "Siparişlerim",

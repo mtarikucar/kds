@@ -660,7 +660,10 @@
     "redirecting": "Buyurtma kuzatuviga yo'naltirilmoqda...",
     "sessionExpired": "Sessiya muddati tugadi. Iltimos, sahifani yangilang.",
     "orderSubmitted": "Buyurtma muvaffaqiyatli yuborildi!",
-    "specialNotes": "Maxsus eslatmalar"
+    "specialNotes": "Maxsus eslatmalar",
+    "continueShopping": "Xaridni davom ettirish",
+    "viewCart": "Savatni ko'rish",
+    "cart": "Savat"
   },
   "orders": {
     "title": "Mening buyurtmalarim",

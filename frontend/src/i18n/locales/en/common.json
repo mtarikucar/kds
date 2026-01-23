@@ -705,7 +705,10 @@
     "redirecting": "Redirecting to order tracking...",
     "sessionExpired": "Session expired. Please refresh the page.",
     "orderSubmitted": "Order submitted successfully!",
-    "specialNotes": "Special Notes"
+    "specialNotes": "Special Notes",
+    "continueShopping": "Continue Shopping",
+    "viewCart": "View Cart",
+    "cart": "Cart"
   },
   "orders": {
     "title": "My Orders",
