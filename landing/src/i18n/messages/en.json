@@ -318,5 +318,125 @@
       "cookies": "Cookie Policy"
     },
     "copyright": "HummyTummy. All rights reserved."
+  },
+  "privacy": {
+    "title": "Privacy Policy",
+    "backToHome": "Back to Home",
+    "lastUpdated": "Last Updated",
+    "lastUpdatedDate": "January 2025",
+    "sections": {
+      "introduction": {
+        "title": "Introduction",
+        "content": "HummyTummy (\"we\", \"our\", or \"us\") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our restaurant management platform."
+      },
+      "dataCollection": {
+        "title": "Information We Collect",
+        "content": "We collect information that you provide directly to us, including:",
+        "items": {
+          "name": "Name and contact information",
+          "email": "Email address",
+          "phone": "Phone number",
+          "business": "Business information (restaurant name, address)",
+          "usage": "Usage data and analytics"
+        }
+      },
+      "dataUsage": {
+        "title": "How We Use Your Information",
+        "content": "We use the information we collect to:",
+        "items": {
+          "service": "Provide, maintain, and improve our services",
+          "improve": "Develop new features and functionality",
+          "communicate": "Communicate with you about updates and promotions",
+          "security": "Ensure security and prevent fraud"
+        }
+      },
+      "dataSecurity": {
+        "title": "Data Security",
+        "content": "We implement appropriate technical and organizational security measures to protect your personal data against unauthorized access, alteration, disclosure, or destruction. All data is encrypted in transit and at rest using industry-standard AES-256 encryption."
+      },
+      "cookies": {
+        "title": "Cookies and Tracking",
+        "content": "We use cookies and similar tracking technologies to track activity on our platform and hold certain information. You can instruct your browser to refuse all cookies or to indicate when a cookie is being sent."
+      },
+      "thirdParty": {
+        "title": "Third-Party Services",
+        "content": "We may employ third-party companies and individuals to facilitate our service, provide the service on our behalf, or assist us in analyzing how our service is used. These third parties have access to your personal data only to perform these tasks on our behalf and are obligated not to disclose or use it for any other purpose."
+      },
+      "rights": {
+        "title": "Your Rights",
+        "content": "Under GDPR and KVKK regulations, you have the following rights:",
+        "items": {
+          "access": "Right to access your personal data",
+          "rectification": "Right to rectification of inaccurate data",
+          "erasure": "Right to erasure (right to be forgotten)",
+          "restriction": "Right to restriction of processing",
+          "portability": "Right to data portability"
+        }
+      },
+      "contact": {
+        "title": "Contact Us",
+        "content": "If you have any questions about this Privacy Policy, please contact us:"
+      }
+    }
+  },
+  "terms": {
+    "title": "Terms of Service",
+    "backToHome": "Back to Home",
+    "lastUpdated": "Last Updated",
+    "lastUpdatedDate": "January 2025",
+    "sections": {
+      "acceptance": {
+        "title": "Acceptance of Terms",
+        "content": "By accessing or using HummyTummy's services, you agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our services."
+      },
+      "description": {
+        "title": "Service Description",
+        "content": "HummyTummy provides a cloud-based restaurant management platform that includes point of sale (POS), kitchen display system (KDS), QR menu, table management, and related services."
+      },
+      "account": {
+        "title": "Account Responsibilities",
+        "content": "When you create an account with us, you must:",
+        "items": {
+          "accurate": "Provide accurate and complete information",
+          "security": "Maintain the security of your account credentials",
+          "notify": "Notify us immediately of any unauthorized access",
+          "responsible": "Be responsible for all activities under your account"
+        }
+      },
+      "usage": {
+        "title": "Acceptable Use",
+        "content": "You agree to use our services only for lawful purposes. You must not:",
+        "items": {
+          "lawful": "Use the service for any unlawful purpose",
+          "noHarm": "Attempt to harm or disrupt the service",
+          "noViolate": "Violate any applicable laws or regulations",
+          "noReverse": "Attempt to reverse engineer the software"
+        }
+      },
+      "payment": {
+        "title": "Payment Terms",
+        "content": "Paid plans are billed in advance on a monthly or annual basis. All fees are non-refundable except as expressly set forth in these terms. We reserve the right to change our prices with 30 days notice."
+      },
+      "intellectual": {
+        "title": "Intellectual Property",
+        "content": "The service and its original content, features, and functionality are owned by HummyTummy and are protected by international copyright, trademark, and other intellectual property laws."
+      },
+      "termination": {
+        "title": "Termination",
+        "content": "We may terminate or suspend your account immediately, without prior notice, for any breach of these Terms of Service. Upon termination, your right to use the service will cease immediately."
+      },
+      "liability": {
+        "title": "Limitation of Liability",
+        "content": "In no event shall HummyTummy be liable for any indirect, incidental, special, consequential, or punitive damages, including loss of profits, data, or business opportunities, arising from your use of the service."
+      },
+      "changes": {
+        "title": "Changes to Terms",
+        "content": "We reserve the right to modify these terms at any time. We will notify you of any changes by posting the new terms on this page and updating the 'Last Updated' date."
+      },
+      "contact": {
+        "title": "Contact Us",
+        "content": "If you have any questions about these Terms of Service, please contact us:"
+      }
+    }
   }
 }

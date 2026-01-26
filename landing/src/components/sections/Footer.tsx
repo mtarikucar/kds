@@ -21,8 +21,8 @@ export default function Footer() {
   ];
 
   const legalLinks = [
-    { label: t('links.privacy'), href: '#' },
-    { label: t('links.terms'), href: '#' },
+    { label: t('links.privacy'), href: '/privacy' },
+    { label: t('links.terms'), href: '/terms' },
     { label: t('links.cookies'), href: '#' },
   ];
 
@@ -116,12 +116,21 @@ export default function Footer() {
             <ul className="space-y-3">
               {legalLinks.map((link) => (
                 <li key={link.label}>
-                  <a
-                    href={link.href}
-                    className="text-sm text-slate-500 hover:text-slate-900 transition-colors"
-                  >
-                    {link.label}
-                  </a>
+                  {link.href.startsWith('/') && !link.href.startsWith('/#') ? (
+                    <Link
+                      href={link.href}
+                      className="text-sm text-slate-500 hover:text-slate-900 transition-colors"
+                    >
+                      {link.label}
+                    </Link>
+                  ) : (
+                    <a
+                      href={link.href}
+                      className="text-sm text-slate-500 hover:text-slate-900 transition-colors"
+                    >
+                      {link.label}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>

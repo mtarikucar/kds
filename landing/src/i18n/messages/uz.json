@@ -318,5 +318,125 @@
       "cookies": "Cookie siyosati"
     },
     "copyright": "HummyTummy. Barcha huquqlar himoyalangan."
+  },
+  "privacy": {
+    "title": "Maxfiylik siyosati",
+    "backToHome": "Bosh sahifaga qaytish",
+    "lastUpdated": "Oxirgi yangilanish",
+    "lastUpdatedDate": "2025-yil yanvar",
+    "sections": {
+      "introduction": {
+        "title": "Kirish",
+        "content": "HummyTummy (\"biz\", \"bizning\" yoki \"bizga\") sizning maxfiyligingizni himoya qilishga intiladi. Ushbu Maxfiylik siyosati restoran boshqaruv platformamizdan foydalanganingizda ma'lumotlaringizni qanday to'plashimiz, ishlatishimiz, oshkor qilishimiz va himoya qilishimizni tushuntiradi."
+      },
+      "dataCollection": {
+        "title": "Biz to'playdigan ma'lumotlar",
+        "content": "Biz sizdan to'g'ridan-to'g'ri oladigan ma'lumotlarni to'playmiz, jumladan:",
+        "items": {
+          "name": "Ism va aloqa ma'lumotlari",
+          "email": "Elektron pochta manzili",
+          "phone": "Telefon raqami",
+          "business": "Biznes ma'lumotlari (restoran nomi, manzil)",
+          "usage": "Foydalanish ma'lumotlari va tahlillar"
+        }
+      },
+      "dataUsage": {
+        "title": "Ma'lumotlaringizni qanday ishlatamiz",
+        "content": "Biz to'plagan ma'lumotlarni quyidagi maqsadlarda ishlatamiz:",
+        "items": {
+          "service": "Xizmatlarimizni taqdim etish, saqlash va yaxshilash",
+          "improve": "Yangi xususiyatlar va funksiyalarni ishlab chiqish",
+          "communicate": "Yangilanishlar va aksiyalar haqida siz bilan bog'lanish",
+          "security": "Xavfsizlikni ta'minlash va firibgarlikni oldini olish"
+        }
+      },
+      "dataSecurity": {
+        "title": "Ma'lumotlar xavfsizligi",
+        "content": "Biz shaxsiy ma'lumotlaringizni ruxsatsiz kirish, o'zgartirish, oshkor qilish yoki yo'q qilishdan himoya qilish uchun tegishli texnik va tashkiliy xavfsizlik choralarini qo'llaymiz. Barcha ma'lumotlar uzatish va saqlash paytida sanoat standartidagi AES-256 shifrlash yordamida shifrlanadi."
+      },
+      "cookies": {
+        "title": "Cookie va kuzatish",
+        "content": "Biz platformamizdagi faoliyatni kuzatish va ma'lum ma'lumotlarni saqlash uchun cookie va shunga o'xshash kuzatish texnologiyalaridan foydalanamiz. Siz brauzeringizni barcha cookie-larni rad etish yoki cookie yuborilganda xabar berish uchun sozlashingiz mumkin."
+      },
+      "thirdParty": {
+        "title": "Uchinchi tomon xizmatlari",
+        "content": "Biz xizmatimizni osonlashtirish, bizning nomimizdan xizmat ko'rsatish yoki xizmatimizdan qanday foydalanilishini tahlil qilishda yordam berish uchun uchinchi tomon kompaniyalari va shaxslarni jalb qilishimiz mumkin. Bu uchinchi tomonlar sizning shaxsiy ma'lumotlaringizga faqat bu vazifalarni bizning nomimizdan bajarish uchun kirish huquqiga ega va ularni boshqa maqsadlar uchun oshkor qilmaslik yoki ishlatmaslikka majburdirlar."
+      },
+      "rights": {
+        "title": "Sizning huquqlaringiz",
+        "content": "GDPR va KVKK qoidalariga muvofiq, siz quyidagi huquqlarga egasiz:",
+        "items": {
+          "access": "Shaxsiy ma'lumotlaringizga kirish huquqi",
+          "rectification": "Noto'g'ri ma'lumotlarni tuzatish huquqi",
+          "erasure": "O'chirish huquqi (unutilish huquqi)",
+          "restriction": "Ishlov berishni cheklash huquqi",
+          "portability": "Ma'lumotlarni ko'chirish huquqi"
+        }
+      },
+      "contact": {
+        "title": "Biz bilan bog'laning",
+        "content": "Ushbu Maxfiylik siyosati bo'yicha savollaringiz bo'lsa, biz bilan bog'laning:"
+      }
+    }
+  },
+  "terms": {
+    "title": "Xizmat shartlari",
+    "backToHome": "Bosh sahifaga qaytish",
+    "lastUpdated": "Oxirgi yangilanish",
+    "lastUpdatedDate": "2025-yil yanvar",
+    "sections": {
+      "acceptance": {
+        "title": "Shartlarni qabul qilish",
+        "content": "HummyTummy xizmatlariga kirish yoki ulardan foydalanish orqali siz ushbu Xizmat shartlariga rioya qilishga rozilik bildirasiz. Agar siz ushbu shartlarga rozi bo'lmasangiz, iltimos, xizmatlarimizdan foydalanmang."
+      },
+      "description": {
+        "title": "Xizmat tavsifi",
+        "content": "HummyTummy sotish nuqtasi (POS), oshxona displey tizimi (KDS), QR menyu, stol boshqaruvi va tegishli xizmatlarni o'z ichiga olgan bulutga asoslangan restoran boshqaruv platformasini taqdim etadi."
+      },
+      "account": {
+        "title": "Hisob mas'uliyatlari",
+        "content": "Biz bilan hisob yaratganingizda, siz:",
+        "items": {
+          "accurate": "To'g'ri va to'liq ma'lumot taqdim etishingiz kerak",
+          "security": "Hisob hisob ma'lumotlarining xavfsizligini saqlashingiz kerak",
+          "notify": "Ruxsatsiz kirishni darhol bizga xabar berishingiz kerak",
+          "responsible": "Hisobingiz ostidagi barcha faoliyat uchun javobgar bo'lishingiz kerak"
+        }
+      },
+      "usage": {
+        "title": "Maqbul foydalanish",
+        "content": "Siz xizmatlarimizdan faqat qonuniy maqsadlarda foydalanishga rozilik bildirasiz. Siz quyidagilarni qilmasligingiz kerak:",
+        "items": {
+          "lawful": "Xizmatdan har qanday noqonuniy maqsadda foydalanish",
+          "noHarm": "Xizmatga zarar yetkazish yoki buzishga urinish",
+          "noViolate": "Amaldagi qonunlar yoki qoidalarni buzish",
+          "noReverse": "Dasturiy ta'minotni teskari muhandislik qilishga urinish"
+        }
+      },
+      "payment": {
+        "title": "To'lov shartlari",
+        "content": "Pullik rejalar oylik yoki yillik asosda oldindan hisob-kitob qilinadi. Ushbu shartlarda aniq ko'rsatilgan holatlardan tashqari, barcha to'lovlar qaytarilmaydi. Biz narxlarimizni 30 kun oldindan xabar berish bilan o'zgartirish huquqini saqlab qolamiz."
+      },
+      "intellectual": {
+        "title": "Intellektual mulk",
+        "content": "Xizmat va uning asl kontenti, xususiyatlari va funksiyalari HummyTummy'ga tegishli bo'lib, xalqaro mualliflik huquqi, savdo belgisi va boshqa intellektual mulk qonunlari bilan himoyalangan."
+      },
+      "termination": {
+        "title": "Bekor qilish",
+        "content": "Biz ushbu Xizmat shartlarini buzganingiz uchun hisobingizni darhol, oldindan xabar bermasdan tugatishimiz yoki to'xtatib turishimiz mumkin. Bekor qilingandan so'ng, xizmatdan foydalanish huquqingiz darhol tugaydi."
+      },
+      "liability": {
+        "title": "Javobgarlikni cheklash",
+        "content": "Hech qanday holatda HummyTummy xizmatdan foydalanishingizdan kelib chiqadigan foyda, ma'lumotlar yoki biznes imkoniyatlarini yo'qotish, shu jumladan har qanday bilvosita, tasodifiy, maxsus, oqibatli yoki jazo zararlar uchun javobgar bo'lmaydi."
+      },
+      "changes": {
+        "title": "Shartlardagi o'zgarishlar",
+        "content": "Biz ushbu shartlarni istalgan vaqtda o'zgartirish huquqini saqlab qolamiz. Biz har qanday o'zgarishlar haqida ushbu sahifada yangi shartlarni e'lon qilish va 'Oxirgi yangilanish' sanasini yangilash orqali sizga xabar beramiz."
+      },
+      "contact": {
+        "title": "Biz bilan bog'laning",
+        "content": "Ushbu Xizmat shartlari bo'yicha savollaringiz bo'lsa, biz bilan bog'laning:"
+      }
+    }
   }
 }

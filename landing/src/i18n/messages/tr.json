@@ -318,5 +318,125 @@
       "cookies": "Çerez Politikası"
     },
     "copyright": "HummyTummy. Tüm hakları saklıdır."
+  },
+  "privacy": {
+    "title": "Gizlilik Politikası",
+    "backToHome": "Ana Sayfaya Dön",
+    "lastUpdated": "Son Güncelleme",
+    "lastUpdatedDate": "Ocak 2025",
+    "sections": {
+      "introduction": {
+        "title": "Giriş",
+        "content": "HummyTummy (\"biz\", \"bizim\" veya \"bize\") gizliliğinizi korumaya kararlıdır. Bu Gizlilik Politikası, restoran yönetim platformumuzu kullandığınızda bilgilerinizi nasıl topladığımızı, kullandığımızı, ifşa ettiğimizi ve koruduğumuzu açıklar."
+      },
+      "dataCollection": {
+        "title": "Topladığımız Bilgiler",
+        "content": "Bize doğrudan sağladığınız bilgileri topluyoruz, bunlar:",
+        "items": {
+          "name": "İsim ve iletişim bilgileri",
+          "email": "E-posta adresi",
+          "phone": "Telefon numarası",
+          "business": "İşletme bilgileri (restoran adı, adres)",
+          "usage": "Kullanım verileri ve analizler"
+        }
+      },
+      "dataUsage": {
+        "title": "Bilgilerinizi Nasıl Kullanıyoruz",
+        "content": "Topladığımız bilgileri şu amaçlarla kullanıyoruz:",
+        "items": {
+          "service": "Hizmetlerimizi sağlamak, sürdürmek ve geliştirmek",
+          "improve": "Yeni özellikler ve işlevler geliştirmek",
+          "communicate": "Güncellemeler ve promosyonlar hakkında sizinle iletişim kurmak",
+          "security": "Güvenliği sağlamak ve dolandırıcılığı önlemek"
+        }
+      },
+      "dataSecurity": {
+        "title": "Veri Güvenliği",
+        "content": "Kişisel verilerinizi yetkisiz erişim, değiştirme, ifşa veya imhaya karşı korumak için uygun teknik ve organizasyonel güvenlik önlemleri uyguluyoruz. Tüm veriler, endüstri standardı AES-256 şifreleme kullanılarak aktarımda ve depolamada şifrelenir."
+      },
+      "cookies": {
+        "title": "Çerezler ve İzleme",
+        "content": "Platformumuzdaki etkinliği izlemek ve belirli bilgileri tutmak için çerezler ve benzer izleme teknolojileri kullanıyoruz. Tarayıcınıza tüm çerezleri reddetmesini veya bir çerez gönderildiğinde bildirmesini söyleyebilirsiniz."
+      },
+      "thirdParty": {
+        "title": "Üçüncü Taraf Hizmetleri",
+        "content": "Hizmetimizi kolaylaştırmak, hizmeti bizim adımıza sağlamak veya hizmetimizin nasıl kullanıldığını analiz etmemize yardımcı olmak için üçüncü taraf şirketler ve bireyler görevlendirebiliriz. Bu üçüncü taraflar, kişisel verilerinize yalnızca bu görevleri bizim adımıza yerine getirmek için erişebilir ve başka herhangi bir amaçla ifşa etmemek veya kullanmamakla yükümlüdürler."
+      },
+      "rights": {
+        "title": "Haklarınız",
+        "content": "GDPR ve KVKK düzenlemeleri kapsamında aşağıdaki haklara sahipsiniz:",
+        "items": {
+          "access": "Kişisel verilerinize erişim hakkı",
+          "rectification": "Yanlış verilerin düzeltilmesi hakkı",
+          "erasure": "Silme hakkı (unutulma hakkı)",
+          "restriction": "İşlemenin kısıtlanması hakkı",
+          "portability": "Veri taşınabilirliği hakkı"
+        }
+      },
+      "contact": {
+        "title": "Bize Ulaşın",
+        "content": "Bu Gizlilik Politikası hakkında sorularınız varsa, lütfen bizimle iletişime geçin:"
+      }
+    }
+  },
+  "terms": {
+    "title": "Kullanım Şartları",
+    "backToHome": "Ana Sayfaya Dön",
+    "lastUpdated": "Son Güncelleme",
+    "lastUpdatedDate": "Ocak 2025",
+    "sections": {
+      "acceptance": {
+        "title": "Şartların Kabulü",
+        "content": "HummyTummy'nin hizmetlerine erişerek veya kullanarak, bu Kullanım Şartlarına bağlı olmayı kabul edersiniz. Bu şartları kabul etmiyorsanız, lütfen hizmetlerimizi kullanmayın."
+      },
+      "description": {
+        "title": "Hizmet Açıklaması",
+        "content": "HummyTummy, satış noktası (POS), mutfak ekran sistemi (KDS), QR menü, masa yönetimi ve ilgili hizmetleri içeren bulut tabanlı bir restoran yönetim platformu sağlar."
+      },
+      "account": {
+        "title": "Hesap Sorumlulukları",
+        "content": "Bizimle bir hesap oluşturduğunuzda:",
+        "items": {
+          "accurate": "Doğru ve eksiksiz bilgi sağlamalısınız",
+          "security": "Hesap kimlik bilgilerinizin güvenliğini korumalısınız",
+          "notify": "Yetkisiz erişimi derhal bize bildirmelisiniz",
+          "responsible": "Hesabınız altındaki tüm faaliyetlerden sorumlu olmalısınız"
+        }
+      },
+      "usage": {
+        "title": "Kabul Edilebilir Kullanım",
+        "content": "Hizmetlerimizi yalnızca yasal amaçlarla kullanmayı kabul edersiniz. Şunları yapmamalısınız:",
+        "items": {
+          "lawful": "Hizmeti herhangi bir yasadışı amaç için kullanmak",
+          "noHarm": "Hizmete zarar vermeye veya bozmaya çalışmak",
+          "noViolate": "Geçerli yasaları veya düzenlemeleri ihlal etmek",
+          "noReverse": "Yazılımı tersine mühendislik yapmaya çalışmak"
+        }
+      },
+      "payment": {
+        "title": "Ödeme Şartları",
+        "content": "Ücretli planlar aylık veya yıllık olarak peşin faturalandırılır. Bu şartlarda açıkça belirtilenler dışında tüm ücretler iade edilmez. 30 gün önceden bildirimde bulunarak fiyatlarımızı değiştirme hakkını saklı tutarız."
+      },
+      "intellectual": {
+        "title": "Fikri Mülkiyet",
+        "content": "Hizmet ve orijinal içeriği, özellikleri ve işlevselliği HummyTummy'ye aittir ve uluslararası telif hakkı, ticari marka ve diğer fikri mülkiyet yasaları tarafından korunmaktadır."
+      },
+      "termination": {
+        "title": "Fesih",
+        "content": "Bu Kullanım Şartlarının herhangi bir ihlali durumunda, önceden bildirimde bulunmaksızın hesabınızı derhal askıya alabilir veya feshedebiliriz. Fesih üzerine, hizmeti kullanma hakkınız derhal sona erecektir."
+      },
+      "liability": {
+        "title": "Sorumluluk Sınırlaması",
+        "content": "Hiçbir durumda HummyTummy, hizmeti kullanımınızdan kaynaklanan kâr kaybı, veri veya iş fırsatları dahil olmak üzere herhangi bir dolaylı, tesadüfi, özel, sonuç olarak ortaya çıkan veya cezai zararlardan sorumlu tutulamaz."
+      },
+      "changes": {
+        "title": "Şartlardaki Değişiklikler",
+        "content": "Bu şartları herhangi bir zamanda değiştirme hakkını saklı tutarız. Değişiklikleri bu sayfada yeni şartları yayınlayarak ve 'Son Güncelleme' tarihini güncelleyerek size bildireceğiz."
+      },
+      "contact": {
+        "title": "Bize Ulaşın",
+        "content": "Bu Kullanım Şartları hakkında sorularınız varsa, lütfen bizimle iletişime geçin:"
+      }
+    }
   }
 }
