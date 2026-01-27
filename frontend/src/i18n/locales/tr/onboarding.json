@@ -1,0 +1,126 @@
+{
+  "mascot": {
+    "restartTour": "Turu Tekrarla",
+    "help": "Yardım",
+    "greeting": "Merhaba! Ben HummyTummy şefi.",
+    "tourCompleted": "Tur tamamlandı! Tekrar görmek ister misin?",
+    "altText": "HummyTummy Şef Maskotu"
+  },
+  "welcome": {
+    "title": "HummyTummy'ye Hoşgeldiniz!",
+    "subtitle": "Sistemle tanışmak için hızlı bir tur yapalım",
+    "startTour": "Tura Başla",
+    "skipTour": "Şimdilik Geç",
+    "close": "Kapat",
+    "features": {
+      "pos": {
+        "title": "POS Sistemi",
+        "description": "Hızlı sipariş yönetimi"
+      },
+      "menu": {
+        "title": "Menü Yönetimi",
+        "description": "Ürünler & kategoriler"
+      },
+      "tables": {
+        "title": "Masa Yönetimi",
+        "description": "2D & 3D kat planı"
+      },
+      "reports": {
+        "title": "Raporlar",
+        "description": "Analiz & istatistikler"
+      }
+    }
+  },
+  "tour": {
+    "next": "İleri",
+    "back": "Geri",
+    "skip": "Turu Geç",
+    "finish": "Bitir",
+    "close": "Kapat",
+    "progress": "Adım {{current}} / {{total}}"
+  },
+  "steps": {
+    "dashboard": {
+      "welcome": {
+        "title": "Kontrol Merkezinize Hoşgeldiniz!",
+        "content": "Burası kontrol merkeziniz. Tüm özelliklere buradan hızlıca erişebilir ve restoranınızın performansını takip edebilirsiniz."
+      },
+      "quickActions": {
+        "title": "Hızlı Erişim",
+        "content": "Bu kartları kullanarak POS açma, siparişleri kontrol etme veya menüyü yönetme gibi en sık kullanılan işlemlere hızlıca erişebilirsiniz."
+      }
+    },
+    "pos": {
+      "tableGrid": {
+        "title": "Masa Seçimi",
+        "content": "Sipariş almak için bir masa seçin. Yeşil masalar boş, turuncu masalar dolu. Siparişleri görmek veya eklemek için masaya tıklayın."
+      },
+      "menuPanel": {
+        "title": "Ürün Menüsü",
+        "content": "Ürünlere kategoriye göre göz atın. Siparişe eklemek için herhangi bir ürüne tıklayın. Arama ve filtreleme yapabilirsiniz."
+      },
+      "orderCart": {
+        "title": "Sipariş Sepeti",
+        "content": "Mevcut siparişin detaylarını görüntüleyin. Miktarları ayarlayabilir, notlar ekleyebilir ve ödeme işlemlerini buradan yapabilirsiniz."
+      }
+    },
+    "menu": {
+      "productList": {
+        "title": "Ürün Yönetimi",
+        "content": "Ürün ve kategorilerinizi buradan yönetin. Yeni ürünler ekleyin, fiyatları güncelleyin, stok durumunu değiştirin ve menünüzü düzenleyin."
+      },
+      "addCategory": {
+        "title": "Kategori ve Ürün Ekle",
+        "content": "Yeni kategoriler eklemek için buraya tıklayın. Her kategori birden fazla ürün içerebilir. Ayrıca her kategori kartından doğrudan ürün ekleyebilirsiniz."
+      }
+    },
+    "qr": {
+      "management": {
+        "title": "QR Kod Yönetimi",
+        "content": "Restoranınız için QR kodları oluşturun ve özelleştirin. Masada sipariş için masaya özel QR kodlar veya paket servis için genel restoran QR kodu oluşturun."
+      },
+      "download": {
+        "title": "QR Kodları İndir ve Yazdır",
+        "content": "Tüm QR kodlarınızı tek seferde indirin veya masa QR kodları sayfası yazdırın. Masalara yerleştirmek veya girişte sergilemek için idealdir."
+      }
+    },
+    "tables": {
+      "viewToggle": {
+        "title": "Görünüm Seçenekleri",
+        "content": "Grid görünümü ve 3D Kat Planı görünümü arasında geçiş yapın. 3D görünüm ile restoran düzeninizi görsel olarak tasarlayabilirsiniz."
+      },
+      "floorPlan3d": {
+        "title": "3D Kat Planı",
+        "content": "YENİ! Restoran düzeninizi 3D olarak tasarlayın. Masaları sürükleyip bırakın, mobilya ekleyin ve mekanınızın sanal bir temsilini oluşturun."
+      }
+    },
+    "settings": {
+      "navigation": {
+        "title": "Ayarlar Menüsü",
+        "content": "Restoran ayarlarınızı buradan yapılandırın. Marka özelleştirme, QR menü görünümü, POS ayarları ve abonelik yönetimi."
+      }
+    },
+    "notifications": {
+      "title": "Bildirimler",
+      "content": "Gerçek zamanlı bildirimlerle güncel kalın. Yeni siparişler, garson çağrıları ve müşteri hesap istekleri için uyarılar alacaksınız."
+    },
+    "kitchen": {
+      "stats": {
+        "title": "Sipariş İstatistikleri",
+        "content": "Sipariş sayılarını bir bakışta takip edin. Bekleyen, hazırlanan ve hazır olan sipariş sayılarını görün."
+      },
+      "orderQueues": {
+        "title": "Sipariş Kuyrukları",
+        "content": "Siparişler üç sütunda düzenlenir: Bekleyen, Hazırlanıyor ve Hazır. Durumlarını güncellemek için siparişleri sürükleyin veya aksiyon butonlarını kullanın."
+      },
+      "orderActions": {
+        "title": "Hızlı Aksiyonlar",
+        "content": "Sipariş durumunu tek tıkla güncelleyin. Siparişleri beklemeden hazıra verimli bir şekilde taşıyın."
+      }
+    },
+    "completion": {
+      "title": "Hazırsınız!",
+      "content": "Tebrikler! Turu tamamladınız. Artık restoranınızı yönetmeye hazırsınız. Yardıma ihtiyacınız olursa dokümantasyona göz atın veya destek ekibiyle iletişime geçin."
+    }
+  }
+}

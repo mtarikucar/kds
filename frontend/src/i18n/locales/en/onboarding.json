@@ -1,0 +1,126 @@
+{
+  "mascot": {
+    "restartTour": "Restart Tour",
+    "help": "Help",
+    "greeting": "Hi! I'm the HummyTummy chef.",
+    "tourCompleted": "Tour completed! Want to see it again?",
+    "altText": "HummyTummy Chef Mascot"
+  },
+  "welcome": {
+    "title": "Welcome to HummyTummy!",
+    "subtitle": "Let's take a quick tour to get you started",
+    "startTour": "Start Tour",
+    "skipTour": "Skip for Now",
+    "close": "Close",
+    "features": {
+      "pos": {
+        "title": "POS System",
+        "description": "Fast order management"
+      },
+      "menu": {
+        "title": "Menu Management",
+        "description": "Products & categories"
+      },
+      "tables": {
+        "title": "Table Management",
+        "description": "2D & 3D floor plans"
+      },
+      "reports": {
+        "title": "Reports",
+        "description": "Analytics & insights"
+      }
+    }
+  },
+  "tour": {
+    "next": "Next",
+    "back": "Back",
+    "skip": "Skip Tour",
+    "finish": "Finish",
+    "close": "Close",
+    "progress": "Step {{current}} of {{total}}"
+  },
+  "steps": {
+    "dashboard": {
+      "welcome": {
+        "title": "Welcome to Your Dashboard!",
+        "content": "This is your control center. From here, you can quickly access all features and see an overview of your restaurant's performance."
+      },
+      "quickActions": {
+        "title": "Quick Actions",
+        "content": "Use these cards to quickly navigate to the most common tasks like opening POS, checking orders, or managing your menu."
+      }
+    },
+    "pos": {
+      "tableGrid": {
+        "title": "Table Selection",
+        "content": "Select a table to start an order. Green tables are available, orange tables have active orders. Click on a table to view or add orders."
+      },
+      "menuPanel": {
+        "title": "Product Menu",
+        "content": "Browse products by category. Click on any product to add it to the current order. You can search and filter products here."
+      },
+      "orderCart": {
+        "title": "Order Cart",
+        "content": "View and manage items in the current order. You can adjust quantities, add notes, and process payments from here."
+      }
+    },
+    "menu": {
+      "productList": {
+        "title": "Product Management",
+        "content": "Manage your products and categories here. Add new items, update prices, toggle availability, and organize your menu."
+      },
+      "addCategory": {
+        "title": "Add Category & Products",
+        "content": "Click here to add new categories. Each category can contain multiple products. You can also add products directly within each category card."
+      }
+    },
+    "qr": {
+      "management": {
+        "title": "QR Code Management",
+        "content": "Generate and customize QR codes for your restaurant. Create table-specific QR codes for dine-in ordering or a general restaurant QR for takeaway."
+      },
+      "download": {
+        "title": "Download & Print QR Codes",
+        "content": "Download all your QR codes at once or print a sheet of table QR codes. Perfect for placing on tables or displaying at your entrance."
+      }
+    },
+    "tables": {
+      "viewToggle": {
+        "title": "View Options",
+        "content": "Switch between Grid view and 3D Floor Plan view. The 3D view lets you design your restaurant layout visually."
+      },
+      "floorPlan3d": {
+        "title": "3D Floor Plan",
+        "content": "NEW! Design your restaurant layout in 3D. Drag and drop tables, add furniture, and create a virtual representation of your space."
+      }
+    },
+    "settings": {
+      "navigation": {
+        "title": "Settings Menu",
+        "content": "Configure your restaurant settings here. Customize branding, QR menu appearance, POS settings, and manage your subscription."
+      }
+    },
+    "notifications": {
+      "title": "Notifications",
+      "content": "Stay updated with real-time notifications. You'll receive alerts for new orders, waiter calls, and bill requests from customers."
+    },
+    "kitchen": {
+      "stats": {
+        "title": "Order Statistics",
+        "content": "Track order counts at a glance. See how many orders are pending, being prepared, and ready for service."
+      },
+      "orderQueues": {
+        "title": "Order Queues",
+        "content": "Orders are organized into three columns: Pending, Preparing, and Ready. Drag orders or use action buttons to update their status."
+      },
+      "orderActions": {
+        "title": "Quick Actions",
+        "content": "Update order status with a single click. Move orders through the workflow efficiently from pending to ready."
+      }
+    },
+    "completion": {
+      "title": "You're All Set!",
+      "content": "Congratulations! You've completed the tour. You're now ready to start managing your restaurant. If you need help, check the documentation or contact support."
+    }
+  }
+}

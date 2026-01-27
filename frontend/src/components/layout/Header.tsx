@@ -6,6 +6,7 @@ import { useLogout } from '../../features/auth/authApi';
 import Button from '../ui/Button';
 import NotificationCenter from '../NotificationCenter';
 import LanguageSwitcher from '../LanguageSwitcher';
+import { MascotButton } from '../../features/onboarding';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -39,7 +40,12 @@ const Header = ({ onMenuClick }: HeaderProps) => {
           <LanguageSwitcher />
 
           {/* Notification Center */}
-          <NotificationCenter />
+          <div data-tour="notifications">
+            <NotificationCenter />
+          </div>
+
+          {/* Mascot Button - Tour Guide */}
+          <MascotButton />
 
           {/* User Profile */}
           <Link

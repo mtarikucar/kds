@@ -1,0 +1,126 @@
+{
+  "mascot": {
+    "restartTour": "Sayohatni takrorlash",
+    "help": "Yordam",
+    "greeting": "Salom! Men HummyTummy oshpaziman.",
+    "tourCompleted": "Sayohat tugadi! Yana ko'rishni xohlaysizmi?",
+    "altText": "HummyTummy Oshpaz Maskoti"
+  },
+  "welcome": {
+    "title": "HummyTummy'ga xush kelibsiz!",
+    "subtitle": "Boshlash uchun tezkor sayohatni o'tkazamiz",
+    "startTour": "Sayohatni boshlash",
+    "skipTour": "Hozircha o'tkazib yuborish",
+    "close": "Yopish",
+    "features": {
+      "pos": {
+        "title": "POS tizimi",
+        "description": "Tez buyurtma boshqaruvi"
+      },
+      "menu": {
+        "title": "Menyu boshqaruvi",
+        "description": "Mahsulotlar va kategoriyalar"
+      },
+      "tables": {
+        "title": "Stol boshqaruvi",
+        "description": "2D va 3D qavat rejalari"
+      },
+      "reports": {
+        "title": "Hisobotlar",
+        "description": "Tahlil va statistika"
+      }
+    }
+  },
+  "tour": {
+    "next": "Keyingi",
+    "back": "Orqaga",
+    "skip": "Sayohatni o'tkazib yuborish",
+    "finish": "Tugatish",
+    "close": "Yopish",
+    "progress": "{{current}} / {{total}} qadam"
+  },
+  "steps": {
+    "dashboard": {
+      "welcome": {
+        "title": "Boshqaruv panelingizga xush kelibsiz!",
+        "content": "Bu sizning boshqaruv markazingiz. Bu yerdan barcha xususiyatlarga tezda kirishingiz va restoraningiz ishlashini ko'rishingiz mumkin."
+      },
+      "quickActions": {
+        "title": "Tezkor harakatlar",
+        "content": "Ushbu kartalardan POS ochish, buyurtmalarni tekshirish yoki menyuni boshqarish kabi eng keng tarqalgan vazifalar uchun foydalaning."
+      }
+    },
+    "pos": {
+      "tableGrid": {
+        "title": "Stol tanlash",
+        "content": "Buyurtma boshlash uchun stol tanlang. Yashil stollar bo'sh, to'q sariq stollar faol buyurtmalarga ega. Buyurtmalarni ko'rish yoki qo'shish uchun stolga bosing."
+      },
+      "menuPanel": {
+        "title": "Mahsulot menyusi",
+        "content": "Mahsulotlarni kategoriya bo'yicha ko'ring. Joriy buyurtmaga qo'shish uchun istalgan mahsulotga bosing. Bu yerda mahsulotlarni qidirish va filtrlash mumkin."
+      },
+      "orderCart": {
+        "title": "Buyurtma savati",
+        "content": "Joriy buyurtmadagi mahsulotlarni ko'ring va boshqaring. Miqdorlarni sozlash, izohlar qo'shish va to'lovlarni bu yerdan amalga oshirish mumkin."
+      }
+    },
+    "menu": {
+      "productList": {
+        "title": "Mahsulot boshqaruvi",
+        "content": "Mahsulot va kategoriyalaringizni bu yerda boshqaring. Yangi mahsulotlar qo'shing, narxlarni yangilang, mavjudlikni o'zgartiring va menyungizni tartibga soling."
+      },
+      "addCategory": {
+        "title": "Kategoriya va mahsulot qo'shish",
+        "content": "Yangi kategoriyalar qo'shish uchun bu yerga bosing. Har bir kategoriya bir nechta mahsulotni o'z ichiga olishi mumkin. Shuningdek, har bir kategoriya kartasidan to'g'ridan-to'g'ri mahsulot qo'shishingiz mumkin."
+      }
+    },
+    "qr": {
+      "management": {
+        "title": "QR kod boshqaruvi",
+        "content": "Restoraningiz uchun QR kodlarini yarating va sozlang. Joyida buyurtma berish uchun stolga xos QR kodlar yoki olib ketish uchun umumiy restoran QR kodi yarating."
+      },
+      "download": {
+        "title": "QR kodlarni yuklab olish va chop etish",
+        "content": "Barcha QR kodlaringizni bir vaqtning o'zida yuklab oling yoki stol QR kodlari varag'ini chop eting. Stollarga joylashtirish yoki kirish joyida ko'rsatish uchun ideal."
+      }
+    },
+    "tables": {
+      "viewToggle": {
+        "title": "Ko'rish parametrlari",
+        "content": "Grid ko'rinishi va 3D qavat rejasi ko'rinishi o'rtasida almashing. 3D ko'rinish restoraningiz joylashuvini vizual loyihalash imkonini beradi."
+      },
+      "floorPlan3d": {
+        "title": "3D Qavat rejasi",
+        "content": "YANGI! Restoraningiz joylashuvini 3D da loyihalang. Stollarni sudrab tashlang, mebel qo'shing va makoningizning virtual tasvirini yarating."
+      }
+    },
+    "settings": {
+      "navigation": {
+        "title": "Sozlamalar menyusi",
+        "content": "Restoran sozlamalaringizni bu yerda sozlang. Brendlash, QR menyu ko'rinishi, POS sozlamalari va obuna boshqaruvi."
+      }
+    },
+    "notifications": {
+      "title": "Bildirishnomalar",
+      "content": "Real vaqtdagi bildirishnomalar bilan xabardor bo'ling. Yangi buyurtmalar, ofitsiant chaqiruvlari va mijozlardan hisob so'rovlari haqida ogohlantirishlar olasiz."
+    },
+    "kitchen": {
+      "stats": {
+        "title": "Buyurtma statistikasi",
+        "content": "Buyurtma sonlarini bir qarashda kuzating. Qancha buyurtma kutilayotgan, tayyorlanayotgan va xizmat ko'rsatishga tayyor ekanligini ko'ring."
+      },
+      "orderQueues": {
+        "title": "Buyurtma navbatlari",
+        "content": "Buyurtmalar uch ustunda tashkil etilgan: Kutilayotgan, Tayyorlanayotgan va Tayyor. Ularning holatini yangilash uchun buyurtmalarni sudrab tashlang yoki harakat tugmalaridan foydalaning."
+      },
+      "orderActions": {
+        "title": "Tezkor harakatlar",
+        "content": "Buyurtma holatini bir bosish bilan yangilang. Buyurtmalarni kutishdan tayyorga samarali o'tkazing."
+      }
+    },
+    "completion": {
+      "title": "Hammasi tayyor!",
+      "content": "Tabriklaymiz! Sayohatni tugatdingiz. Endi restoraningizni boshqarishga tayyorsiz. Yordam kerak bo'lsa, hujjatlarga murojaat qiling yoki qo'llab-quvvatlash xizmati bilan bog'laning."
+    }
+  }
+}
