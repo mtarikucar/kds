@@ -1,35 +1,48 @@
-import { EffectComposer, Bloom, Vignette, ToneMapping } from '@react-three/postprocessing'
+import { EffectComposer, Bloom, Vignette, ToneMapping, BrightnessContrast, HueSaturation } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
 
 interface PostprocessingEffectsProps {
   bloomIntensity?: number
   vignetteOffset?: number
   vignetteDarkness?: number
+  isExterior?: boolean
 }
 
 export function PostprocessingEffects({
-  bloomIntensity = 0.3,
-  vignetteOffset = 0.1,
-  vignetteDarkness = 0.4,
+  bloomIntensity = 0.4,
+  vignetteOffset = 0.3,
+  vignetteDarkness = 0.3,
+  isExterior = false,
 }: PostprocessingEffectsProps) {
   return (
     <EffectComposer>
-      {/* Bloom - subtle glow effect for lights and bright areas */}
+      {/* Bloom - soft glow effect */}
       <Bloom
-        intensity={bloomIntensity}
-        luminanceThreshold={0.9}
-        luminanceSmoothing={0.025}
+        intensity={isExterior ? 0.5 : bloomIntensity}
+        luminanceThreshold={0.8}
+        luminanceSmoothing={0.05}
         mipmapBlur
       />
 
-      {/* Vignette - darkens the corners for a more cinematic look */}
+      {/* Brightness/Contrast - make it pop */}
+      <BrightnessContrast
+        brightness={isExterior ? 0.05 : 0}
+        contrast={isExterior ? 0.1 : 0.05}
+      />
+
+      {/* Saturation boost for vibrant colors */}
+      <HueSaturation
+        saturation={isExterior ? 0.15 : 0.1}
+      />
+
+      {/* Subtle vignette for focus */}
       <Vignette
         offset={vignetteOffset}
-        darkness={vignetteDarkness}
+        darkness={isExterior ? 0.2 : vignetteDarkness}
         eskil={false}
       />
 
-      {/* Tone mapping - improves overall color balance */}
+      {/* Tone mapping - natural color balance */}
       <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
     </EffectComposer>
   )

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import * as THREE from 'three'
 import { VOXEL_COLORS, type VoxelPosition, type VoxelRotation } from '../../types/voxel'
 
@@ -6,7 +6,6 @@ interface VoxelDecorProps {
   position: VoxelPosition
   rotation: VoxelRotation
   isSelected: boolean
-  isHovered: boolean
   isEditorMode: boolean
   onClick?: () => void
   onPointerEnter?: () => void
@@ -17,34 +16,16 @@ export function VoxelDecor({
   position,
   rotation,
   isSelected,
-  isHovered,
   isEditorMode,
   onClick,
   onPointerEnter,
   onPointerLeave,
 }: VoxelDecorProps) {
   const groupRef = useRef<THREE.Group>(null)
-  const [hoverLocal, setHoverLocal] = useState(false)
 
   const potRadius = 0.25
   const potHeight = 0.3
   const plantHeight = 1.2
-
-  const highlightColor = isSelected
-    ? VOXEL_COLORS.selected
-    : isHovered || hoverLocal
-    ? VOXEL_COLORS.hovered
-    : null
-
-  const handlePointerEnter = () => {
-    setHoverLocal(true)
-    onPointerEnter?.()
-  }
-
-  const handlePointerLeave = () => {
-    setHoverLocal(false)
-    onPointerLeave?.()
-  }
 
   return (
     <group
@@ -52,8 +33,16 @@ export function VoxelDecor({
       position={[position.x + 0.5, position.y, position.z + 0.5]}
       rotation={[0, (rotation.y * Math.PI) / 180, 0]}
       onClick={onClick}
-      onPointerEnter={handlePointerEnter}
-      onPointerLeave={handlePointerLeave}
+      onPointerOver={(e) => {
+        e.stopPropagation()
+        document.body.style.cursor = 'pointer'
+        onPointerEnter?.()
+      }}
+      onPointerOut={(e) => {
+        e.stopPropagation()
+        document.body.style.cursor = 'auto'
+        onPointerLeave?.()
+      }}
     >
       {/* Pot */}
       <mesh position={[0, potHeight / 2, 0]} castShadow receiveShadow>
@@ -114,12 +103,12 @@ export function VoxelDecor({
         />
       </mesh>
 
-      {/* Selection/hover highlight */}
-      {highlightColor && isEditorMode && (
+      {/* Selection highlight */}
+      {isSelected && isEditorMode && (
         <mesh position={[0, (potHeight + plantHeight) / 2, 0]}>
           <cylinderGeometry args={[0.4, 0.4, potHeight + plantHeight + 0.1, 16]} />
           <meshBasicMaterial
-            color={highlightColor}
+            color={VOXEL_COLORS.selected}
             transparent
             opacity={0.3}
             wireframe

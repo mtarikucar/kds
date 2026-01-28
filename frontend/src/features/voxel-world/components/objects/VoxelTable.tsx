@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import { Text } from '@react-three/drei'
 import * as THREE from 'three'
 import type { TableStatus } from '@/types'
@@ -11,7 +11,6 @@ interface VoxelTableProps {
   tableNumber: string
   capacity: number
   isSelected: boolean
-  isHovered: boolean
   isEditorMode: boolean
   onClick?: () => void
   onPointerEnter?: () => void
@@ -45,14 +44,12 @@ export function VoxelTableObject({
   tableNumber,
   capacity,
   isSelected,
-  isHovered,
   isEditorMode,
   onClick,
   onPointerEnter,
   onPointerLeave,
 }: VoxelTableProps) {
   const groupRef = useRef<THREE.Group>(null)
-  const [hoverLocal, setHoverLocal] = useState(false)
 
   const { width, depth } = getTableSize(capacity)
   const tableHeight = 0.8
@@ -60,21 +57,6 @@ export function VoxelTableObject({
   const topThickness = 0.1
 
   const statusColor = getStatusColor(status)
-  const highlightColor = isSelected
-    ? VOXEL_COLORS.selected
-    : isHovered || hoverLocal
-    ? VOXEL_COLORS.hovered
-    : null
-
-  const handlePointerEnter = () => {
-    setHoverLocal(true)
-    onPointerEnter?.()
-  }
-
-  const handlePointerLeave = () => {
-    setHoverLocal(false)
-    onPointerLeave?.()
-  }
 
   return (
     <group
@@ -82,8 +64,16 @@ export function VoxelTableObject({
       position={[position.x + width / 2, position.y, position.z + depth / 2]}
       rotation={[0, (rotation.y * Math.PI) / 180, 0]}
       onClick={onClick}
-      onPointerEnter={handlePointerEnter}
-      onPointerLeave={handlePointerLeave}
+      onPointerOver={(e) => {
+        e.stopPropagation()
+        document.body.style.cursor = 'pointer'
+        onPointerEnter?.()
+      }}
+      onPointerOut={(e) => {
+        e.stopPropagation()
+        document.body.style.cursor = 'auto'
+        onPointerLeave?.()
+      }}
     >
       {/* Table top */}
       <mesh
@@ -161,12 +151,12 @@ export function VoxelTableObject({
         {capacity} seats
       </Text>
 
-      {/* Selection/hover highlight */}
-      {highlightColor && isEditorMode && (
+      {/* Selection highlight */}
+      {isSelected && isEditorMode && (
         <mesh position={[0, tableHeight / 2, 0]}>
           <boxGeometry args={[width + 0.1, tableHeight + 0.1, depth + 0.1]} />
           <meshBasicMaterial
-            color={highlightColor}
+            color={VOXEL_COLORS.selected}
             transparent
             opacity={0.3}
             wireframe

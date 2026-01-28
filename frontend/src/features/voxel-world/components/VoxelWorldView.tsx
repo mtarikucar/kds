@@ -1,10 +1,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Box, Edit3, RotateCcw, Layers, Map, Save, DoorOpen } from 'lucide-react'
+import { Box, Edit3, RotateCcw, Layers, Map, DoorOpen } from 'lucide-react'
 import { VoxelCanvas } from './VoxelCanvas'
 import { VoxelWorld } from './VoxelWorld'
-import { EditorToolbar } from './editor/EditorToolbar'
-import { ObjectLibrary } from './editor/ObjectLibrary'
+import { EditorDrawer } from './editor/EditorDrawer'
 import { Map2DView } from './map-2d'
 import { ExteriorScene } from '../scenes/ExteriorScene'
 import { InteriorScene } from '../scenes/InteriorScene'
@@ -86,7 +85,7 @@ export function VoxelWorldView({ tables, tenantId, onTableClick }: VoxelWorldVie
 
           <VoxelCanvas>
             <ExteriorScene onEnterBuilding={handleEnterBuilding} />
-            <PostprocessingEffects />
+            <PostprocessingEffects isExterior />
           </VoxelCanvas>
         </>
       )}
@@ -148,27 +147,14 @@ export function VoxelWorldView({ tables, tenantId, onTableClick }: VoxelWorldVie
                 {isEditorMode ? 'Exit Editor' : 'Edit Layout'}
               </button>
             )}
-
-            {/* Editor tools (only in 3D view and editor mode) */}
-            {viewMode === '3d' && isEditorMode && (
-              <>
-                <EditorToolbar />
-                <ObjectLibrary />
-              </>
-            )}
           </div>
 
-          {/* Right side controls (only in 3D view) */}
-          {viewMode === '3d' && (
-            <div className="absolute right-4 top-4 z-10 flex flex-col gap-2">
-              {/* Saving indicator */}
-              {isEditorMode && isSaving && (
-                <div className="flex items-center gap-1.5 rounded-lg bg-amber-500/90 px-3 py-2 text-sm text-white">
-                  <Save className="h-4 w-4 animate-pulse" />
-                  <span>Saving...</span>
-                </div>
-              )}
+          {/* Editor drawer (only in 3D view and editor mode) */}
+          {viewMode === '3d' && isEditorMode && <EditorDrawer isSaving={isSaving} tables={tables} />}
 
+          {/* Right side controls (only in 3D view, not in editor mode) */}
+          {viewMode === '3d' && !isEditorMode && (
+            <div className="absolute right-4 top-4 z-10 flex flex-col gap-2">
               {/* Reset camera */}
               <button
                 onClick={resetCamera}

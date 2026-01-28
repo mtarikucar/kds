@@ -42,50 +42,54 @@ export function ExteriorScene({ onEnterBuilding }: ExteriorSceneProps) {
     <>
       {/* Camera - fixed isometric angle */}
       <IsometricCamera
-        target={[0, 2, 0]}
-        distance={35}
+        target={[0, 3, 0]}
+        distance={40}
         enablePan={true}
         enableZoom={true}
       />
 
-      {/* Lighting */}
-      <ambientLight intensity={0.5} />
+      {/* Lighting - soft and bright for white background */}
+      <ambientLight intensity={0.8} />
       <directionalLight
-        position={[20, 30, 20]}
-        intensity={1}
+        position={[30, 50, 30]}
+        intensity={1.2}
         castShadow
         shadow-mapSize={[2048, 2048]}
-        shadow-camera-far={100}
-        shadow-camera-left={-30}
-        shadow-camera-right={30}
-        shadow-camera-top={30}
-        shadow-camera-bottom={-30}
+        shadow-camera-far={150}
+        shadow-camera-left={-40}
+        shadow-camera-right={40}
+        shadow-camera-top={40}
+        shadow-camera-bottom={-40}
       />
       <directionalLight
-        position={[-10, 15, -10]}
+        position={[-20, 30, -20]}
+        intensity={0.4}
+      />
+      {/* Fill light from front */}
+      <directionalLight
+        position={[0, 20, 40]}
         intensity={0.3}
       />
 
-      {/* Sky / Background */}
-      <color attach="background" args={['#1a1a2e']} />
-      <fog attach="fog" args={['#1a1a2e', 40, 120]} />
+      {/* Pure white background */}
+      <color attach="background" args={['#ffffff']} />
 
-      {/* Ground */}
-      <Ground size={60} />
+      {/* Ground - light gray */}
+      <Ground size={100} />
 
-      {/* Building */}
+      {/* Building - auto-positioned on ground */}
       <Building3D
         position={[0, 0, 0]}
-        scale={2}
+        scale={8}
         isClickable={true}
         onClick={handleBuildingClick}
       />
 
-      {/* Mascot - positioned in front of the building */}
+      {/* Mascot - in the garden area */}
       <Mascot3D
-        position={[5, 0, 10]}
-        rotation={[0, -Math.PI / 4, 0]} // Face towards camera
-        scale={1.5}
+        position={[6, 0, 8]}
+        rotation={[0, -Math.PI / 4, 0]}
+        scale={1}
         animation={mascotAnimation}
         isClickable={true}
         onClick={handleMascotClick}
@@ -95,27 +99,7 @@ export function ExteriorScene({ onEnterBuilding }: ExteriorSceneProps) {
       <SpeechBubble3D
         text={currentText}
         visible={isVisible}
-        position={[5, 4, 10]}
-      />
-
-      {/* Decorative lights */}
-      <pointLight
-        position={[0, 5, 8]}
-        color="#fff5e6"
-        intensity={0.5}
-        distance={15}
-      />
-      <pointLight
-        position={[-5, 3, 0]}
-        color="#ffd6a5"
-        intensity={0.3}
-        distance={10}
-      />
-      <pointLight
-        position={[5, 3, 0]}
-        color="#ffd6a5"
-        intensity={0.3}
-        distance={10}
+        position={[6, 4, 8]}
       />
     </>
   )

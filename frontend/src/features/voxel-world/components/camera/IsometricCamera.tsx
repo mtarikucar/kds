@@ -24,8 +24,8 @@ export function IsometricCamera({
     // Standard isometric angle from top-right corner
     // Azimuth: 45 degrees (π/4) - looking from corner
     // Polar: ~35.264 degrees (arctan(1/√2)) - standard isometric
-    const azimuth = Math.PI / 4 // 45 degrees
-    const polar = Math.atan(1 / Math.sqrt(2)) // ~35.264 degrees
+    const azimuth = Math.PI / 1.5 // 45 degrees
+    const polar = Math.atan(1 / Math.sqrt(0.2)) // ~35.264 degrees
 
     const x = target[0] + distance * Math.sin(polar) * Math.cos(azimuth)
     const y = target[1] + distance * Math.cos(polar)

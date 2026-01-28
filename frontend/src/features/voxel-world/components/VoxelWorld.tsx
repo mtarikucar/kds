@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { useVoxelStore } from '../store/voxelStore'
-import { DEFAULT_WORLD_DIMENSIONS, VOXEL_COLORS, type VoxelTable, type VoxelModelObject as VoxelModelObjectType } from '../types/voxel'
-import { OrbitCamera } from './camera/OrbitCamera'
+import { DEFAULT_WORLD_DIMENSIONS, type VoxelTable, type VoxelModelObject as VoxelModelObjectType } from '../types/voxel'
+import { IsometricCamera } from './camera/IsometricCamera'
 import { VoxelFloor } from './VoxelFloor'
 import { VoxelWalls } from './VoxelWalls'
 import { VoxelTableObject } from './objects/VoxelTable'
@@ -18,10 +18,8 @@ interface VoxelWorldProps {
 export function VoxelWorld({ isometric = false }: VoxelWorldProps) {
   const layout = useVoxelStore((state) => state.layout)
   const selectedObjectId = useVoxelStore((state) => state.selectedObjectId)
-  const hoveredObjectId = useVoxelStore((state) => state.hoveredObjectId)
   const isEditorMode = useVoxelStore((state) => state.isEditorMode)
   const selectObject = useVoxelStore((state) => state.selectObject)
-  const hoverObject = useVoxelStore((state) => state.hoverObject)
 
   const dimensions = layout?.dimensions ?? DEFAULT_WORLD_DIMENSIONS
   const objects = layout?.objects ?? []
@@ -29,18 +27,14 @@ export function VoxelWorld({ isometric = false }: VoxelWorldProps) {
   const renderedObjects = useMemo(() => {
     return objects.map((obj) => {
       const isSelected = obj.id === selectedObjectId
-      const isHovered = obj.id === hoveredObjectId
 
       const commonProps = {
         key: obj.id,
         position: obj.position,
         rotation: obj.rotation,
         isSelected,
-        isHovered,
         isEditorMode,
         onClick: () => isEditorMode && selectObject(obj.id),
-        onPointerEnter: () => isEditorMode && hoverObject(obj.id),
-        onPointerLeave: () => isEditorMode && hoverObject(null),
       }
 
       switch (obj.type) {
@@ -72,11 +66,8 @@ export function VoxelWorld({ isometric = false }: VoxelWorldProps) {
               position={obj.position}
               rotation={obj.rotation}
               isSelected={isSelected}
-              isHovered={isHovered}
               isEditorMode={isEditorMode}
               onClick={() => isEditorMode && selectObject(obj.id)}
-              onPointerEnter={() => isEditorMode && hoverObject(obj.id)}
-              onPointerLeave={() => isEditorMode && hoverObject(null)}
               modelConfig={modelObj.modelConfig}
             />
           )
@@ -85,48 +76,55 @@ export function VoxelWorld({ isometric = false }: VoxelWorldProps) {
           return null
       }
     })
-  }, [objects, selectedObjectId, hoveredObjectId, isEditorMode, selectObject, hoverObject])
+  }, [objects, selectedObjectId, isEditorMode, selectObject])
 
   return (
     <>
-      {/* Lighting */}
-      <ambientLight intensity={0.6} />
+      {/* Lighting - bright for white theme */}
+      <ambientLight intensity={0.9} />
       <directionalLight
-        position={[dimensions.width, dimensions.height * 2, dimensions.depth]}
-        intensity={0.8}
+        position={[dimensions.width * 1.5, dimensions.height * 3, dimensions.depth * 1.5]}
+        intensity={1}
         castShadow
         shadow-mapSize={[2048, 2048]}
-        shadow-camera-far={100}
+        shadow-camera-far={150}
         shadow-camera-left={-dimensions.width}
         shadow-camera-right={dimensions.width}
         shadow-camera-top={dimensions.depth}
         shadow-camera-bottom={-dimensions.depth}
       />
       <directionalLight
-        position={[-dimensions.width, dimensions.height, -dimensions.depth]}
+        position={[-dimensions.width, dimensions.height * 2, dimensions.depth]}
+        intensity={0.4}
+      />
+      {/* Fill light */}
+      <directionalLight
+        position={[dimensions.width, dimensions.height, dimensions.depth * 2]}
         intensity={0.3}
       />
 
-      {/* Sky / Background */}
-      <color attach="background" args={['#1a1a2e']} />
-      <fog attach="fog" args={['#1a1a2e', 30, 100]} />
+      {/* White background */}
+      <color attach="background" args={['#ffffff']} />
 
-      {/* Camera Controls */}
-      <OrbitCamera isometric={isometric} />
+      {/* Camera Controls - Isometric */}
+      <IsometricCamera
+        target={[dimensions.width / 2, 0, dimensions.depth / 2]}
+        distance={Math.max(dimensions.width, dimensions.depth) * 1.5}
+      />
 
-      {/* Floor */}
+      {/* Floor - light wood color */}
       <VoxelFloor
         width={dimensions.width}
         depth={dimensions.depth}
-        color={VOXEL_COLORS.floorTile}
+        color="#e8dcc8"
       />
 
-      {/* Walls */}
+      {/* Walls - only 2 walls (back and left) */}
       <VoxelWalls
         width={dimensions.width}
         height={dimensions.height}
         depth={dimensions.depth}
-        wallColor={VOXEL_COLORS.wallBrick}
+        wallColor="#f5f5f5"
       />
 
       {/* Objects */}
@@ -135,7 +133,7 @@ export function VoxelWorld({ isometric = false }: VoxelWorldProps) {
       {/* Grid helper for editor mode */}
       {isEditorMode && (
         <gridHelper
-          args={[dimensions.width, dimensions.width, '#444', '#333']}
+          args={[dimensions.width, dimensions.width, '#ddd', '#eee']}
           position={[dimensions.width / 2, 0.01, dimensions.depth / 2]}
         />
       )}

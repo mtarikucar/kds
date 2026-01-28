@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import type { Group, Mesh } from 'three'
@@ -25,8 +25,16 @@ export function Building3D({
 
   const { scene } = useGLTF(MODEL_PATH)
 
-  // Clone the scene to avoid sharing state
-  const clonedScene = scene.clone()
+  // Clone the scene and calculate Y offset to sit on ground
+  const { clonedScene, yOffset } = useMemo(() => {
+    const cloned = scene.clone()
+
+    // Calculate bounding box to find the bottom of the model
+    const box = new THREE.Box3().setFromObject(cloned)
+    const offset = -box.min.y // Offset to bring bottom to y=0
+
+    return { clonedScene: cloned, yOffset: offset }
+  }, [scene])
 
   // Enable shadows and setup materials
   useEffect(() => {
@@ -83,10 +91,17 @@ export function Building3D({
     }
   })
 
+  // Calculate final position with Y offset for ground placement
+  const finalPosition: [number, number, number] = [
+    position[0],
+    position[1] + yOffset * scale, // Apply scaled offset
+    position[2],
+  ]
+
   return (
     <group
       ref={groupRef}
-      position={position}
+      position={finalPosition}
       scale={scale}
       onClick={handleClick}
       onPointerEnter={() => isClickable && setIsHovered(true)}

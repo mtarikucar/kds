@@ -16,6 +16,8 @@ import {
   DEFAULT_CAMERA_ZOOM,
   DEFAULT_WORLD_DIMENSIONS,
 } from '../types/voxel'
+import { getSampleLayout } from '../data/sampleLayouts'
+import { autoArrange } from '../utils/placementEngine'
 
 const createDefaultLayout = (): RestaurantLayout => ({
   id: 'default',
@@ -189,6 +191,25 @@ export const useVoxelStore = create<VoxelStore>()(
           }
         }),
 
+      removeTableFromLayout: (linkedTableId: string) =>
+        set((state) => {
+          if (!state.layout) return state
+          // Find the voxel table with the given linkedTableId
+          const tableToRemove = state.layout.objects.find(
+            (obj) => obj.type === 'table' && (obj as VoxelTable).linkedTableId === linkedTableId
+          )
+          if (!tableToRemove) return state
+          return {
+            layout: {
+              ...state.layout,
+              objects: state.layout.objects.filter((obj) => obj.id !== tableToRemove.id),
+              updatedAt: new Date().toISOString(),
+            },
+            selectedObjectId:
+              state.selectedObjectId === tableToRemove.id ? null : state.selectedObjectId,
+          }
+        }),
+
       // Camera actions
       setCameraPosition: (position: VoxelPosition) =>
         set({ cameraPosition: position }),
@@ -200,6 +221,90 @@ export const useVoxelStore = create<VoxelStore>()(
         set({
           cameraPosition: DEFAULT_CAMERA_POSITION,
           cameraZoom: DEFAULT_CAMERA_ZOOM,
+        }),
+
+      // Layout management actions
+      loadSampleLayout: () =>
+        set((state) => {
+          const sample = getSampleLayout()
+          const currentLayout = state.layout ?? createDefaultLayout()
+          return {
+            layout: {
+              ...currentLayout,
+              objects: sample.objects,
+              updatedAt: new Date().toISOString(),
+            },
+          }
+        }),
+
+      clearAllObjects: () =>
+        set((state) => {
+          if (!state.layout) return state
+          return {
+            layout: {
+              ...state.layout,
+              objects: [],
+              updatedAt: new Date().toISOString(),
+            },
+            selectedObjectId: null,
+          }
+        }),
+
+      autoArrangeObjects: () =>
+        set((state) => {
+          if (!state.layout || state.layout.objects.length === 0) return state
+          const arranged = autoArrange(
+            state.layout.objects,
+            state.layout.dimensions,
+          )
+          return {
+            layout: {
+              ...state.layout,
+              objects: arranged,
+              updatedAt: new Date().toISOString(),
+            },
+          }
+        }),
+
+      setLayoutDimensions: (width: number, depth: number) =>
+        set((state) => {
+          // Clamp values to valid range
+          const clampedWidth = Math.max(16, Math.min(64, width))
+          const clampedDepth = Math.max(16, Math.min(64, depth))
+
+          const currentLayout = state.layout ?? createDefaultLayout()
+          const newDimensions = {
+            width: clampedWidth,
+            height: currentLayout.dimensions.height,
+            depth: clampedDepth,
+          }
+
+          // Filter out objects that would be outside new bounds
+          const filteredObjects = currentLayout.objects.filter((obj) => {
+            const objWidth = obj.metadata?.width as number ?? 1
+            const objDepth = obj.metadata?.depth as number ?? 1
+            return (
+              obj.position.x >= 0 &&
+              obj.position.x + objWidth <= clampedWidth &&
+              obj.position.z >= 0 &&
+              obj.position.z + objDepth <= clampedDepth
+            )
+          })
+
+          return {
+            layout: {
+              ...currentLayout,
+              dimensions: newDimensions,
+              objects: filteredObjects,
+              updatedAt: new Date().toISOString(),
+            },
+            // Deselect if selected object was removed
+            selectedObjectId: filteredObjects.some(
+              (obj) => obj.id === state.selectedObjectId
+            )
+              ? state.selectedObjectId
+              : null,
+          }
         }),
 
       // Story mode actions

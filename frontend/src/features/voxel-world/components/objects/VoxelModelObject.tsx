@@ -13,7 +13,6 @@ interface VoxelModelObjectProps {
   rotation: VoxelRotation
   modelConfig: ModelConfig
   isSelected: boolean
-  isHovered: boolean
   isEditorMode: boolean
   onClick?: () => void
   onPointerEnter?: () => void
@@ -75,14 +74,12 @@ export function VoxelModelObject({
   rotation,
   modelConfig,
   isSelected,
-  isHovered,
   isEditorMode,
   onClick,
   onPointerEnter,
   onPointerLeave,
 }: VoxelModelObjectProps) {
   const groupRef = useRef<THREE.Group>(null)
-  const [hoverLocal, setHoverLocal] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const dragStart = useRef<{ x: number; z: number } | null>(null)
 
@@ -93,24 +90,19 @@ export function VoxelModelObject({
 
   const scale = modelConfig.scale ?? 1
 
-  const highlightColor = isSelected
-    ? VOXEL_COLORS.selected
-    : isHovered || hoverLocal
-    ? VOXEL_COLORS.hovered
-    : null
-
   const handlePointerEnter = () => {
-    setHoverLocal(true)
     if (isEditorMode && editorTool === 'move') {
       gl.domElement.style.cursor = 'grab'
+    } else {
+      document.body.style.cursor = 'pointer'
     }
     onPointerEnter?.()
   }
 
   const handlePointerLeave = () => {
-    setHoverLocal(false)
     if (!isDragging) {
       gl.domElement.style.cursor = 'auto'
+      document.body.style.cursor = 'auto'
     }
     onPointerLeave?.()
   }
@@ -181,11 +173,11 @@ export function VoxelModelObject({
         />
       </Suspense>
 
-      {highlightColor && isEditorMode && (
+      {isSelected && isEditorMode && (
         <mesh position={[0, scale * 0.5, 0]}>
           <boxGeometry args={[highlightSize.width, highlightSize.height, highlightSize.depth]} />
           <meshBasicMaterial
-            color={highlightColor}
+            color={VOXEL_COLORS.selected}
             transparent
             opacity={0.3}
             wireframe

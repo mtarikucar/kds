@@ -1,6 +1,7 @@
-import { useRef, useState, useEffect } from 'react'
+import { useRef, useState, useEffect, useMemo } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
+import * as THREE from 'three'
 import type { Group } from 'three'
 import type { MascotAnimation } from '../../types/voxel'
 
@@ -26,12 +27,22 @@ export function Mascot3D({
   const groupRef = useRef<Group>(null)
   const [isHovered, setIsHovered] = useState(false)
   const [bounceTime, setBounceTime] = useState(0)
-  const baseY = position[1]
 
   const { scene } = useGLTF(MODEL_PATH)
 
-  // Clone the scene to avoid sharing state between instances
-  const clonedScene = scene.clone()
+  // Clone the scene and calculate Y offset to sit on ground
+  const { clonedScene, yOffset } = useMemo(() => {
+    const cloned = scene.clone()
+
+    // Calculate bounding box to find the bottom of the model
+    const box = new THREE.Box3().setFromObject(cloned)
+    const offset = -box.min.y // Offset to bring bottom to y=0
+
+    return { clonedScene: cloned, yOffset: offset }
+  }, [scene])
+
+  // Base Y position including offset for animations
+  const baseY = position[1] + yOffset * scale
 
   // Enable shadows on all meshes
   useEffect(() => {
@@ -92,10 +103,17 @@ export function Mascot3D({
     groupRef.current.scale.setScalar(newScale)
   })
 
+  // Calculate final position with Y offset for ground placement
+  const finalPosition: [number, number, number] = [
+    position[0],
+    baseY,
+    position[2],
+  ]
+
   return (
     <group
       ref={groupRef}
-      position={position}
+      position={finalPosition}
       rotation={rotation}
       scale={scale}
       onClick={handleClick}

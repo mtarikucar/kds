@@ -15,7 +15,8 @@ import {
   Upload,
 } from 'lucide-react'
 import { useVoxelStore } from '../../store/voxelStore'
-import { FURNITURE_LIBRARY, type LibraryItem, type VoxelObject, type VoxelTable, type VoxelModelObject, type ModelLibraryItem, type ModelCategory } from '../../types/voxel'
+import { FURNITURE_LIBRARY, DEFAULT_WORLD_DIMENSIONS, type LibraryItem, type VoxelObject, type VoxelTable, type VoxelModelObject, type ModelLibraryItem, type ModelCategory } from '../../types/voxel'
+import { suggestPosition } from '../../utils/placementEngine'
 import { MODEL_LIBRARY, MODEL_CATEGORIES, getModelsByCategory } from '../../data/modelLibrary'
 import { TableStatus } from '@/types'
 import { cn } from '@/lib/utils'
@@ -71,34 +72,20 @@ export function ObjectLibrary({ onObjectSelect }: ObjectLibraryProps) {
     (item: LibraryItem) => {
       if (!layout) return
 
-      // Find a free spot to place the object
-      const existingPositions = new Set(
-        layout.objects.map((obj) => `${Math.floor(obj.position.x)},${Math.floor(obj.position.z)}`)
+      const worldDims = layout.dimensions ?? DEFAULT_WORLD_DIMENSIONS
+      const suggested = suggestPosition(
+        item.type,
+        item.dimensions,
+        layout.objects,
+        worldDims,
       )
 
-      let x = 5
-      let z = 5
-      const gridSize = 30
-      const step = item.dimensions.width + 1
-
-      // Search for free spot
-      outer: for (let row = 0; row < gridSize; row += step) {
-        for (let col = 0; col < gridSize; col += step) {
-          const testX = 2 + col
-          const testZ = 2 + row
-          const key = `${testX},${testZ}`
-          if (!existingPositions.has(key)) {
-            x = testX
-            z = testZ
-            break outer
-          }
-        }
-      }
+      const position = suggested ?? { x: 5, y: 0, z: 5 }
 
       const newObject: VoxelObject = {
         id: `${item.type}-${Date.now()}`,
         type: item.type,
-        position: { x, y: 0, z },
+        position,
         rotation: { y: 0 },
         metadata: {
           libraryItemId: item.id,
@@ -138,32 +125,20 @@ export function ObjectLibrary({ onObjectSelect }: ObjectLibraryProps) {
     (item: ModelLibraryItem) => {
       if (!layout) return
 
-      const existingPositions = new Set(
-        layout.objects.map((obj) => `${Math.floor(obj.position.x)},${Math.floor(obj.position.z)}`)
+      const worldDims = layout.dimensions ?? DEFAULT_WORLD_DIMENSIONS
+      const suggested = suggestPosition(
+        'model',
+        item.dimensions,
+        layout.objects,
+        worldDims,
       )
 
-      let x = 5
-      let z = 5
-      const gridSize = 30
-      const step = item.dimensions.width + 1
-
-      outer: for (let row = 0; row < gridSize; row += step) {
-        for (let col = 0; col < gridSize; col += step) {
-          const testX = 2 + col
-          const testZ = 2 + row
-          const key = `${testX},${testZ}`
-          if (!existingPositions.has(key)) {
-            x = testX
-            z = testZ
-            break outer
-          }
-        }
-      }
+      const position = suggested ?? { x: 5, y: 0, z: 5 }
 
       const newObject: VoxelModelObject = {
         id: `model-${Date.now()}`,
         type: 'model',
-        position: { x, y: 0, z },
+        position,
         rotation: { y: 0 },
         modelConfig: {
           modelUrl: item.modelUrl,

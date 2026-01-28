@@ -125,10 +125,17 @@ export interface VoxelWorldActions {
   setObjectRotation: (id: string, rotation: number) => void
 
   updateTableStatus: (tableId: string, status: TableStatus) => void
+  removeTableFromLayout: (linkedTableId: string) => void
 
   setCameraPosition: (position: VoxelPosition) => void
   setCameraZoom: (zoom: number) => void
   resetCamera: () => void
+
+  // Layout management actions
+  loadSampleLayout: () => void
+  clearAllObjects: () => void
+  autoArrangeObjects: () => void
+  setLayoutDimensions: (width: number, depth: number) => void
 
   // Story mode actions
   setStoryPhase: (phase: StoryPhase) => void

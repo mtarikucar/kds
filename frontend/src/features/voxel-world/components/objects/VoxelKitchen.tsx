@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef } from 'react'
 import * as THREE from 'three'
 import { VOXEL_COLORS, type VoxelPosition, type VoxelRotation } from '../../types/voxel'
 
@@ -6,7 +6,6 @@ interface VoxelKitchenProps {
   position: VoxelPosition
   rotation: VoxelRotation
   isSelected: boolean
-  isHovered: boolean
   isEditorMode: boolean
   onClick?: () => void
   onPointerEnter?: () => void
@@ -17,35 +16,17 @@ export function VoxelKitchen({
   position,
   rotation,
   isSelected,
-  isHovered,
   isEditorMode,
   onClick,
   onPointerEnter,
   onPointerLeave,
 }: VoxelKitchenProps) {
   const groupRef = useRef<THREE.Group>(null)
-  const [hoverLocal, setHoverLocal] = useState(false)
 
   const width = 3
   const depth = 2
   const counterHeight = 0.9
   const shelfHeight = 1.5
-
-  const highlightColor = isSelected
-    ? VOXEL_COLORS.selected
-    : isHovered || hoverLocal
-    ? VOXEL_COLORS.hovered
-    : null
-
-  const handlePointerEnter = () => {
-    setHoverLocal(true)
-    onPointerEnter?.()
-  }
-
-  const handlePointerLeave = () => {
-    setHoverLocal(false)
-    onPointerLeave?.()
-  }
 
   return (
     <group
@@ -53,8 +34,16 @@ export function VoxelKitchen({
       position={[position.x + width / 2, position.y, position.z + depth / 2]}
       rotation={[0, (rotation.y * Math.PI) / 180, 0]}
       onClick={onClick}
-      onPointerEnter={handlePointerEnter}
-      onPointerLeave={handlePointerLeave}
+      onPointerOver={(e) => {
+        e.stopPropagation()
+        document.body.style.cursor = 'pointer'
+        onPointerEnter?.()
+      }}
+      onPointerOut={(e) => {
+        e.stopPropagation()
+        document.body.style.cursor = 'auto'
+        onPointerLeave?.()
+      }}
     >
       {/* Counter base */}
       <mesh position={[0, counterHeight / 2, 0]} castShadow receiveShadow>
@@ -115,12 +104,12 @@ export function VoxelKitchen({
         </mesh>
       ))}
 
-      {/* Selection/hover highlight */}
-      {highlightColor && isEditorMode && (
+      {/* Selection highlight */}
+      {isSelected && isEditorMode && (
         <mesh position={[0, (counterHeight + shelfHeight) / 2, 0]}>
           <boxGeometry args={[width + 0.1, counterHeight + shelfHeight + 0.1, depth + 0.1]} />
           <meshBasicMaterial
-            color={highlightColor}
+            color={VOXEL_COLORS.selected}
             transparent
             opacity={0.3}
             wireframe
