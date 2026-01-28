@@ -14,6 +14,10 @@ export type VoxelObjectType =
 
 export type EditorTool = 'select' | 'move' | 'rotate' | 'delete'
 
+// Story mode types
+export type StoryPhase = 'exterior' | 'transition' | 'interior'
+export type MascotAnimation = 'idle' | 'bounce' | 'nod'
+
 export interface VoxelPosition {
   x: number
   y: number
@@ -99,6 +103,10 @@ export interface VoxelWorldState {
   isDragging: boolean
   cameraPosition: VoxelPosition
   cameraZoom: number
+  // Story mode state
+  storyPhase: StoryPhase
+  dialogueIndex: number
+  mascotAnimation: MascotAnimation
 }
 
 export interface VoxelWorldActions {
@@ -121,6 +129,12 @@ export interface VoxelWorldActions {
   setCameraPosition: (position: VoxelPosition) => void
   setCameraZoom: (zoom: number) => void
   resetCamera: () => void
+
+  // Story mode actions
+  setStoryPhase: (phase: StoryPhase) => void
+  nextDialogue: () => void
+  resetDialogue: () => void
+  setMascotAnimation: (animation: MascotAnimation) => void
 }
 
 export type VoxelStore = VoxelWorldState & VoxelWorldActions

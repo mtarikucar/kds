@@ -8,6 +8,8 @@ import type {
   RestaurantLayout,
   EditorTool,
   VoxelTable,
+  StoryPhase,
+  MascotAnimation,
 } from '../types/voxel'
 import {
   DEFAULT_CAMERA_POSITION,
@@ -37,6 +39,10 @@ export const useVoxelStore = create<VoxelStore>()(
       isDragging: false,
       cameraPosition: DEFAULT_CAMERA_POSITION,
       cameraZoom: DEFAULT_CAMERA_ZOOM,
+      // Story mode state
+      storyPhase: 'exterior' as const,
+      dialogueIndex: 0,
+      mascotAnimation: 'idle' as const,
 
       // Layout actions
       setLayout: (layout: RestaurantLayout) =>
@@ -195,6 +201,21 @@ export const useVoxelStore = create<VoxelStore>()(
           cameraPosition: DEFAULT_CAMERA_POSITION,
           cameraZoom: DEFAULT_CAMERA_ZOOM,
         }),
+
+      // Story mode actions
+      setStoryPhase: (phase) =>
+        set({ storyPhase: phase }),
+
+      nextDialogue: () =>
+        set((state) => ({
+          dialogueIndex: state.dialogueIndex + 1,
+        })),
+
+      resetDialogue: () =>
+        set({ dialogueIndex: 0 }),
+
+      setMascotAnimation: (animation) =>
+        set({ mascotAnimation: animation }),
     }),
     {
       name: 'voxel-world-storage',
