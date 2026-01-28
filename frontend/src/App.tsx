@@ -28,9 +28,7 @@ import QRManagementPage from './pages/admin/QRManagementPage';
 import ReportsPage from './pages/admin/ReportsPage';
 import SubscriptionPlansPage from './pages/subscription/SubscriptionPlansPage';
 import ChangePlanPage from './pages/subscription/ChangePlanPage';
-import SubscriptionPaymentPage from './pages/subscription/SubscriptionPaymentPage';
-import PaymentSuccessPage from './pages/subscription/PaymentSuccessPage';
-import PaymentFailedPage from './pages/subscription/PaymentFailedPage';
+import SubscriptionContactPage from './pages/subscription/SubscriptionContactPage';
 import SettingsLayout from './pages/settings/SettingsLayout';
 import POSSettingsPage from './pages/settings/POSSettingsPage';
 import QRMenuSettingsPage from './pages/settings/QRMenuSettingsPage';
@@ -151,9 +149,11 @@ function App() {
         {/* Subscription pages */}
         <Route path="/subscription/plans" element={<SubscriptionPlansPage />} />
         <Route path="/subscription/change-plan" element={<ChangePlanPage />} />
-        <Route path="/subscription/payment" element={<SubscriptionPaymentPage />} />
-        <Route path="/subscription/payment/success" element={<PaymentSuccessPage />} />
-        <Route path="/subscription/payment/failed" element={<PaymentFailedPage />} />
+        <Route path="/subscription/contact" element={<SubscriptionContactPage />} />
+        {/* Legacy redirect for old payment URLs */}
+        <Route path="/subscription/payment" element={<Navigate to="/subscription/plans" replace />} />
+        <Route path="/subscription/payment/success" element={<Navigate to="/admin/settings/subscription" replace />} />
+        <Route path="/subscription/payment/failed" element={<Navigate to="/subscription/plans" replace />} />
       </Route>
     </Routes>
 

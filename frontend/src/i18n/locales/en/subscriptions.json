@@ -189,6 +189,25 @@
     "featureApiAccess": "API Access",
     "featurePrioritySupport": "Priority Support",
     "featureInventoryTracking": "Inventory Tracking",
-    "featureKdsIntegration": "KDS Integration"
+    "featureKdsIntegration": "KDS Integration",
+    "contact": {
+      "title": "Contact Us",
+      "subtitle": "Get in touch with us for your subscription request",
+      "whatsapp": "Contact via WhatsApp",
+      "email": "Send Email",
+      "phone": "Phone",
+      "selectedPlan": "Selected Plan",
+      "planDetails": "Plan Details",
+      "contactUs": "Contact Us",
+      "thankYou": "Thank You!",
+      "thankYouMessage": "Your request has been received. We will contact you as soon as possible.",
+      "note": "When you contact us via WhatsApp or email, our team will reach out to you shortly and help you complete your payment process.",
+      "back": "Back",
+      "backToContact": "Back to Contact",
+      "loading": "Loading...",
+      "error": "An error occurred",
+      "missingInfo": "Missing information",
+      "upgradeFrom": "Upgrade from:"
+    }
   }
 }

@@ -97,16 +97,16 @@ const ChangePlanPage = () => {
       setSelectedPlan(null);
 
       if (result.type === 'upgrade' && result.requiresPayment && result.paymentInfo) {
-        const { subscriptionId, newPlanId, billingCycle: cycle, prorationAmount, currency } = result.paymentInfo;
+        const { subscriptionId, newPlanId, billingCycle: cycle } = result.paymentInfo;
         navigate(
-          `/subscription/payment?type=upgrade&subscriptionId=${subscriptionId}&newPlanId=${newPlanId}&billingCycle=${cycle}&amount=${prorationAmount}&currency=${currency}`
+          `/subscription/contact?type=upgrade&subscriptionId=${subscriptionId}&newPlanId=${newPlanId}&billingCycle=${cycle}`
         );
       } else if (result.type === 'downgrade') {
         // Downgrade scheduled - go back to settings
         navigate('/admin/settings/subscription');
       }
-    } catch (error) {
-      console.error('Failed to change plan:', error);
+    } catch {
+      // Error handled by mutation
     }
   };
 

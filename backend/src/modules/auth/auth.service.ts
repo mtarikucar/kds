@@ -129,7 +129,7 @@ export class AuthService {
           planId: freePlan.id,
           status: 'ACTIVE',
           billingCycle: 'MONTHLY',
-          paymentProvider: registerDto.paymentRegion === 'TURKEY' ? 'PAYTR' : 'EMAIL',
+          paymentProvider: 'EMAIL', // All subscriptions use contact-based flow
           startDate: now,
           currentPeriodStart: now,
           currentPeriodEnd: currentPeriodEnd,

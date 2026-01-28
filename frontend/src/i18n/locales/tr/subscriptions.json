@@ -189,6 +189,25 @@
     "featureApiAccess": "API Erişimi",
     "featurePrioritySupport": "Öncelikli Destek",
     "featureInventoryTracking": "Stok Takibi",
-    "featureKdsIntegration": "KDS Entegrasyonu"
+    "featureKdsIntegration": "KDS Entegrasyonu",
+    "contact": {
+      "title": "Iletisime Gecin",
+      "subtitle": "Abonelik talebiniz icin bizimle iletisime gecin",
+      "whatsapp": "WhatsApp ile Iletisim",
+      "email": "E-posta Gonder",
+      "phone": "Telefon",
+      "selectedPlan": "Secilen Plan",
+      "planDetails": "Plan Detaylari",
+      "contactUs": "Bizimle Iletisime Gecin",
+      "thankYou": "Tesekkurler!",
+      "thankYouMessage": "Talebiniz alindi. En kisa surede sizinle iletisime gecilecektir.",
+      "note": "WhatsApp veya e-posta ile iletisime gectiginizde, ekibimiz en kisa surede sizinle iletisime gececek ve odeme islemlerinizi tamamlamaniza yardimci olacaktir.",
+      "back": "Geri",
+      "backToContact": "Iletisime Geri Don",
+      "loading": "Yukleniyor...",
+      "error": "Bir hata olustu",
+      "missingInfo": "Eksik bilgi",
+      "upgradeFrom": "Yukseltme:"
+    }
   }
 }

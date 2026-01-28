@@ -1,6 +1,5 @@
 import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { PaymentProviderFactory } from './payment-provider.factory';
 import { BillingService } from './billing.service';
 import { NotificationService } from './notification.service';
 import {
@@ -21,7 +20,6 @@ export class SubscriptionService {
 
   constructor(
     private prisma: PrismaService,
-    private paymentProviderFactory: PaymentProviderFactory,
     private billingService: BillingService,
     private notificationService: NotificationService,
   ) {}
@@ -151,8 +149,9 @@ export class SubscriptionService {
     // Determine amount
     const amount = dto.billingCycle === BillingCycle.MONTHLY ? plan.monthlyPrice : plan.yearlyPrice;
 
-    // Get payment provider based on region
-    const paymentProvider = this.paymentProviderFactory.getProviderType(tenant.paymentRegion as PaymentRegion);
+    // Determine payment provider based on region
+    // Since PayTR is removed, all subscriptions now use manual/contact-based payment
+    const paymentProvider = PaymentProvider.EMAIL;
 
     // Create subscription in database
     const subscription = await this.prisma.subscription.create({
@@ -198,6 +197,7 @@ export class SubscriptionService {
 
   /**
    * Setup subscription with payment provider
+   * All subscriptions now use contact-based flow (WhatsApp/Email)
    */
   private async setupPaymentProviderSubscription(
     subscriptionId: string,
@@ -206,15 +206,9 @@ export class SubscriptionService {
     dto: CreateSubscriptionDto,
     adminUser: any,
   ) {
-    if (tenant.paymentRegion === PaymentRegion.TURKEY) {
-      // For PayTR, we don't create subscription upfront
-      // Payment will be handled when user provides card details via iframe
-      this.logger.log('PayTR subscription setup deferred to payment confirmation');
-    } else {
-      // For international customers, payment is handled via email-based flow
-      // Admin will manually activate subscription after receiving payment
-      this.logger.log('International subscription - email-based payment flow');
-    }
+    // All payments are now handled via contact-based flow (WhatsApp/Email)
+    // Admin will manually activate subscription after receiving payment
+    this.logger.log(`Subscription ${subscriptionId} - contact-based payment flow initiated`);
   }
 
   /**

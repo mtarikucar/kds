@@ -1,37 +1,31 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
 
-export interface CreatePaymentIntentRequest {
+export interface SubscriptionInquiryRequest {
   planId: string;
   billingCycle: 'MONTHLY' | 'YEARLY';
+  preferredMethod?: 'WHATSAPP' | 'EMAIL';
 }
 
-export interface CreateUpgradeIntentRequest {
+export interface UpgradeInquiryRequest {
   subscriptionId: string;
   newPlanId: string;
+  billingCycle: 'MONTHLY' | 'YEARLY';
+  preferredMethod?: 'WHATSAPP' | 'EMAIL';
+}
+
+export interface ContactLinksResponse {
+  planName: string;
   billingCycle: string;
   amount: number;
-}
-
-export interface CreatePaymentIntentResponse {
-  provider: 'PAYTR' | 'EMAIL';
-  paymentLink?: string;        // PayTR
-  merchantOid?: string;        // PayTR
-  message?: string;            // EMAIL provider
-  amount: number;
   currency: string;
-}
-
-export interface ConfirmPaymentRequest {
-  paymentIntentId: string;
-  paymentMethodId?: string;
-}
-
-export interface ConfirmPaymentResponse {
-  success: boolean;
+  whatsappLink: string;
+  emailLink: string;
+  whatsappNumber: string;
+  email: string;
   message: string;
-  subscriptionId?: string;
-  invoiceId?: string;
+  currentPlanName?: string;
+  newPlanName?: string;
 }
 
 export interface Invoice {
@@ -53,42 +47,28 @@ export interface Invoice {
 }
 
 /**
- * Create payment intent for a subscription
+ * Get contact links for subscription inquiry
  */
-export function useCreatePaymentIntent() {
+export function useGetContactLinks() {
   return useMutation({
     mutationFn: async (
-      data: CreatePaymentIntentRequest
-    ): Promise<CreatePaymentIntentResponse> => {
-      const response = await api.post('/payments/create-intent', data);
+      data: SubscriptionInquiryRequest
+    ): Promise<ContactLinksResponse> => {
+      const response = await api.post('/contact/subscription-inquiry', data);
       return response.data;
     },
   });
 }
 
 /**
- * Create payment intent for upgrade
+ * Get contact links for upgrade inquiry
  */
-export function useCreateUpgradeIntent() {
+export function useGetUpgradeContactLinks() {
   return useMutation({
     mutationFn: async (
-      data: CreateUpgradeIntentRequest
-    ): Promise<CreatePaymentIntentResponse> => {
-      const response = await api.post('/payments/create-upgrade-intent', data);
-      return response.data;
-    },
-  });
-}
-
-/**
- * Confirm payment (PayTR uses redirect flow and webhook for confirmation)
- */
-export function useConfirmPayment() {
-  return useMutation({
-    mutationFn: async (
-      data: ConfirmPaymentRequest
-    ): Promise<ConfirmPaymentResponse> => {
-      const response = await api.post('/payments/confirm-payment', data);
+      data: UpgradeInquiryRequest
+    ): Promise<ContactLinksResponse> => {
+      const response = await api.post('/contact/upgrade-inquiry', data);
       return response.data;
     },
   });

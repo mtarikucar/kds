@@ -21,23 +21,13 @@ const SubscriptionPlansPage = () => {
   const { data: currentSubscription } = useGetCurrentSubscription();
   const createSubscription = useCreateSubscription();
 
-  // Handle plan selection - directly create subscription and navigate to payment
+  // Handle plan selection - navigate to contact page
   const handleSelectPlan = async (planId: string) => {
     // Don't process if already processing or user has active subscription
     if (processingPlanId || currentSubscription) return;
 
-    setProcessingPlanId(planId);
-    try {
-      const subscription = await createSubscription.mutateAsync({
-        planId,
-        billingCycle,
-      });
-      // Redirect to payment page with subscription ID
-      navigate(`/subscription/payment?subscriptionId=${subscription.id}`);
-    } catch (error) {
-      console.error('Failed to create subscription:', error);
-      setProcessingPlanId(null);
-    }
+    // Redirect to contact page with plan details
+    navigate(`/subscription/contact?planId=${planId}&billingCycle=${billingCycle}`);
   };
 
   if (plansLoading) {

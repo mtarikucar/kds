@@ -409,4 +409,36 @@ export class NotificationService {
       },
     });
   }
+
+  /**
+   * Send contact inquiry notification to admin
+   * Notifies admin when a customer initiates contact via WhatsApp or Email
+   */
+  async sendContactInquiryNotification(
+    customerEmail: string,
+    customerName: string,
+    tenantName: string,
+    tenantId: string,
+    planName: string,
+    billingCycle: string,
+    contactMethod: string,
+  ) {
+    const adminEmail = this.configService.get('ADMIN_EMAIL', 'admin@hummytummy.com');
+
+    return this.sendEmail({
+      to: adminEmail,
+      subject: `Subscription Inquiry - ${tenantName} (${contactMethod})`,
+      template: 'contact-inquiry',
+      context: {
+        customerEmail,
+        customerName,
+        tenantName,
+        tenantId,
+        planName,
+        billingCycle: billingCycle === 'MONTHLY' ? 'Aylik' : 'Yillik',
+        contactMethod,
+        requestDate: new Date().toLocaleString(),
+      },
+    });
+  }
 }

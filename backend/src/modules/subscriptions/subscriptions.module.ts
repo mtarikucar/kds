@@ -5,8 +5,7 @@ import { PublicStatsModule } from '../public-stats/public-stats.module';
 
 // Services
 import { SubscriptionService } from './services/subscription.service';
-import { PaytrService } from './services/paytr.service';
-import { PaymentProviderFactory } from './services/payment-provider.factory';
+import { ContactService } from './services/contact.service';
 import { BillingService } from './services/billing.service';
 import { SubscriptionSchedulerService } from './services/subscription-scheduler.service';
 import { NotificationService } from './services/notification.service';
@@ -14,9 +13,8 @@ import { InvoicePdfService } from './services/invoice-pdf.service';
 
 // Controllers
 import { SubscriptionController } from './controllers/subscription.controller';
-import { PaymentController } from './controllers/payment.controller';
+import { ContactController } from './controllers/contact.controller';
 import { InvoiceController } from './controllers/invoice.controller';
-import { PaytrWebhookController } from './webhooks/paytr-webhook.controller';
 
 // Guards
 import { SubscriptionGuard } from './guards/subscription.guard';
@@ -30,15 +28,13 @@ import { PlanFeatureGuard } from './guards/plan-feature.guard';
   ],
   controllers: [
     SubscriptionController,
-    PaymentController,
+    ContactController,
     InvoiceController,
-    PaytrWebhookController,
   ],
   providers: [
     // Services
     SubscriptionService,
-    PaytrService,
-    PaymentProviderFactory,
+    ContactService,
     BillingService,
     NotificationService,
     InvoicePdfService,

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #10b981; color: white; padding: 20px; text-align: center; }
+    .content { padding: 20px; background: #f9f9f9; }
+    .info-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+    .info-table td { padding: 10px; border-bottom: 1px solid #ddd; }
+    .info-table td:first-child { font-weight: bold; width: 40%; }
+    .footer { padding: 20px; text-align: center; color: #666; font-size: 12px; }
+    .highlight { background: #d1fae5; padding: 15px; border-radius: 5px; margin: 15px 0; }
+    .whatsapp { background: #25d366; color: white; padding: 3px 8px; border-radius: 3px; font-size: 12px; }
+    .email-badge { background: #6366f1; color: white; padding: 3px 8px; border-radius: 3px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Subscription Inquiry</h1>
+    </div>
+    <div class="content">
+      <div class="highlight">
+        <strong>New Contact Inquiry:</strong> A customer has initiated contact regarding a subscription via
+        {{#if (eq contactMethod "WHATSAPP")}}<span class="whatsapp">WhatsApp</span>{{else}}<span class="email-badge">Email</span>{{/if}}.
+      </div>
+
+      <h3>Customer Details</h3>
+      <table class="info-table">
+        <tr>
+          <td>Customer Name:</td>
+          <td>{{customerName}}</td>
+        </tr>
+        <tr>
+          <td>Email:</td>
+          <td><a href="mailto:{{customerEmail}}">{{customerEmail}}</a></td>
+        </tr>
+        <tr>
+          <td>Business Name:</td>
+          <td>{{tenantName}}</td>
+        </tr>
+        <tr>
+          <td>Tenant ID:</td>
+          <td>{{tenantId}}</td>
+        </tr>
+      </table>
+
+      <h3>Requested Plan</h3>
+      <table class="info-table">
+        <tr>
+          <td>Plan:</td>
+          <td>{{planName}}</td>
+        </tr>
+        <tr>
+          <td>Billing Cycle:</td>
+          <td>{{billingCycle}}</td>
+        </tr>
+        <tr>
+          <td>Contact Method:</td>
+          <td>{{contactMethod}}</td>
+        </tr>
+        <tr>
+          <td>Request Date:</td>
+          <td>{{requestDate}}</td>
+        </tr>
+      </table>
+
+      <p>The customer may reach out shortly. Please be ready to assist with their subscription request.</p>
+    </div>
+    <div class="footer">
+      <p>HummyTummy Restaurant Management System</p>
+    </div>
+  </div>
+</body>
+</html>
