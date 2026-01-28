@@ -43,12 +43,14 @@ ENV VITE_COMMIT_SHA=$VITE_COMMIT_SHA
 ENV SENTRY_AUTH_TOKEN=$SENTRY_AUTH_TOKEN
 ENV SENTRY_ORG=$SENTRY_ORG
 ENV SENTRY_PROJECT_FRONTEND=$SENTRY_PROJECT_FRONTEND
-ENV NODE_ENV=production
 
 COPY package*.json ./
+# Install all dependencies including devDependencies for build
 RUN npm ci --legacy-peer-deps
 
 COPY . .
+# Build the application
+ENV NODE_ENV=production
 RUN npm run build
 
 # Production stage with Nginx
