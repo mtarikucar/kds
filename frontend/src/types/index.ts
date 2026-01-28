@@ -181,6 +181,11 @@ export interface Table {
   section?: string;
   status: string;
   tenantId: string;
+  // Voxel position fields (null = not yet placed on floor plan)
+  voxelX?: number | null;
+  voxelY?: number | null;
+  voxelZ?: number | null;
+  voxelRotation?: number | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -625,6 +630,7 @@ export interface PosSettings {
   enableTwoStepCheckout: boolean;
   showProductImages: boolean;
   enableCustomerOrdering: boolean;
+  defaultMapView: '2d' | '3d';
   createdAt: string;
   updatedAt: string;
 }
@@ -634,6 +640,7 @@ export interface UpdatePosSettingsDto {
   enableTwoStepCheckout?: boolean;
   showProductImages?: boolean;
   enableCustomerOrdering?: boolean;
+  defaultMapView?: '2d' | '3d';
 }
 
 // Modifier Types

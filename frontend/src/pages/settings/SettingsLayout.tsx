@@ -59,7 +59,7 @@ const SettingsLayout = () => {
         </div>
       </div>
 
-      <nav className="space-y-0.5">
+      <nav className="space-y-0.5" data-tour="settings-nav">
         {settingsNavItems.map((item) => {
           const isActive = location.pathname === item.to ||
             (item.to !== '/admin/settings/subscription' && location.pathname.startsWith(item.to));

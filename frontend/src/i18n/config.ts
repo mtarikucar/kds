@@ -16,6 +16,7 @@ import enSubscriptions from './locales/en/subscriptions.json';
 import enReports from './locales/en/reports.json';
 import enValidation from './locales/en/validation.json';
 import enErrors from './locales/en/errors.json';
+import enOnboarding from './locales/en/onboarding.json';
 
 import trCommon from './locales/tr/common.json';
 import trAuth from './locales/tr/auth.json';
@@ -29,6 +30,7 @@ import trSubscriptions from './locales/tr/subscriptions.json';
 import trReports from './locales/tr/reports.json';
 import trValidation from './locales/tr/validation.json';
 import trErrors from './locales/tr/errors.json';
+import trOnboarding from './locales/tr/onboarding.json';
 
 import ruCommon from './locales/ru/common.json';
 import ruAuth from './locales/ru/auth.json';
@@ -42,6 +44,7 @@ import ruSubscriptions from './locales/ru/subscriptions.json';
 import ruReports from './locales/ru/reports.json';
 import ruValidation from './locales/ru/validation.json';
 import ruErrors from './locales/ru/errors.json';
+import ruOnboarding from './locales/ru/onboarding.json';
 
 import uzCommon from './locales/uz/common.json';
 import uzAuth from './locales/uz/auth.json';
@@ -55,6 +58,7 @@ import uzSubscriptions from './locales/uz/subscriptions.json';
 import uzReports from './locales/uz/reports.json';
 import uzValidation from './locales/uz/validation.json';
 import uzErrors from './locales/uz/errors.json';
+import uzOnboarding from './locales/uz/onboarding.json';
 
 import arCommon from './locales/ar/common.json';
 import arAuth from './locales/ar/auth.json';
@@ -68,6 +72,7 @@ import arSubscriptions from './locales/ar/subscriptions.json';
 import arReports from './locales/ar/reports.json';
 import arValidation from './locales/ar/validation.json';
 import arErrors from './locales/ar/errors.json';
+import arOnboarding from './locales/ar/onboarding.json';
 
 // Define resources
 const resources = {
@@ -84,6 +89,7 @@ const resources = {
     reports: enReports,
     validation: enValidation,
     errors: enErrors,
+    onboarding: enOnboarding,
   },
   tr: {
     common: trCommon,
@@ -98,6 +104,7 @@ const resources = {
     reports: trReports,
     validation: trValidation,
     errors: trErrors,
+    onboarding: trOnboarding,
   },
   ru: {
     common: ruCommon,
@@ -112,6 +119,7 @@ const resources = {
     reports: ruReports,
     validation: ruValidation,
     errors: ruErrors,
+    onboarding: ruOnboarding,
   },
   uz: {
     common: uzCommon,
@@ -126,6 +134,7 @@ const resources = {
     reports: uzReports,
     validation: uzValidation,
     errors: uzErrors,
+    onboarding: uzOnboarding,
   },
   ar: {
     common: arCommon,
@@ -140,6 +149,7 @@ const resources = {
     reports: arReports,
     validation: arValidation,
     errors: arErrors,
+    onboarding: arOnboarding,
   },
 };
 
@@ -224,7 +234,7 @@ i18next
     lng: getInitialLanguage(),
     fallbackLng: 'en',
     defaultNS: 'common',
-    ns: ['common', 'auth', 'pos', 'kitchen', 'menu', 'orders', 'customers', 'settings', 'subscriptions', 'reports', 'validation', 'errors'],
+    ns: ['common', 'auth', 'pos', 'kitchen', 'menu', 'orders', 'customers', 'settings', 'subscriptions', 'reports', 'validation', 'errors', 'onboarding'],
     interpolation: {
       escapeValue: false, // React already escapes values
     },

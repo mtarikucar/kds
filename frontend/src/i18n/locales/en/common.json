@@ -378,7 +378,55 @@
     "noQRCodesToDownload": "No QR codes found to download",
     "noTables": "No tables yet",
     "noTablesDescription": "Add your first table to start managing your restaurant seating",
-    "addFirstTable": "Add First Table"
+    "addFirstTable": "Add First Table",
+    "gridView": "Grid View",
+    "floorPlan": "Floor Plan"
+  },
+  "voxel": {
+    "layoutSaved": "Floor plan saved successfully",
+    "layoutSaveError": "Failed to save floor plan",
+    "positionUpdateError": "Failed to update table position",
+    "saving": "Saving...",
+    "save": "Save",
+    "tools": {
+      "select": "Select",
+      "move": "Move",
+      "rotate": "Rotate",
+      "delete": "Delete",
+      "undo": "Undo",
+      "redo": "Redo"
+    },
+    "library": {
+      "title": "Furniture Library"
+    },
+    "map2d": {
+      "zoomIn": "Zoom In",
+      "zoomOut": "Zoom Out",
+      "toggleGrid": "Toggle Grid",
+      "toggleSnap": "Snap to Grid",
+      "resetView": "Reset View",
+      "properties": "Properties",
+      "rotation": "Rotation",
+      "units": "units",
+      "helpText": "Scroll to zoom • Shift+drag to pan • Click to select"
+    }
+  },
+  "pos": {
+    "floorPlan": {
+      "title": "Floor Plan",
+      "available": "Available",
+      "occupied": "Occupied",
+      "reserved": "Reserved",
+      "fullscreen": "Fullscreen",
+      "exitFullscreen": "Exit Fullscreen",
+      "helpText2d": "Click a table to select • Scroll to zoom • Shift+drag to pan",
+      "helpText3d": "Click a table to select • Drag to rotate view • Scroll to zoom"
+    },
+    "minimap": {
+      "switchTo2D": "Switch to 2D view",
+      "switchTo3D": "Switch to 3D view",
+      "clickToSwitch": "Click to switch"
+    }
   },
   "qrDesigner": {
     "quickColorThemes": "Quick Color Themes",

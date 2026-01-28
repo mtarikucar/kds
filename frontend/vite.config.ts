@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 import path from 'path';
 
 const host = process.env.TAURI_DEV_HOST;
@@ -8,7 +9,24 @@ const host = process.env.TAURI_DEV_HOST;
 export default defineConfig({
   // Use /app/ base path for web builds, but keep root for Tauri desktop
   base: process.env.TAURI_PLATFORM ? '/' : '/app/',
-  plugins: [react()],
+  plugins: [
+    react(),
+    // Sentry plugin for source map upload (production builds only)
+    process.env.SENTRY_AUTH_TOKEN && process.env.NODE_ENV === 'production'
+      ? sentryVitePlugin({
+          org: process.env.SENTRY_ORG,
+          project: process.env.SENTRY_PROJECT_FRONTEND || 'restaurant-pos-frontend',
+          authToken: process.env.SENTRY_AUTH_TOKEN,
+          release: {
+            name: `restaurant-pos-frontend@${process.env.VITE_APP_VERSION || 'dev'}`,
+          },
+          sourcemaps: {
+            filesToDeleteAfterUpload: ['./dist/**/*.map'],
+          },
+          telemetry: false,
+        })
+      : null,
+  ].filter(Boolean),
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

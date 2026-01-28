@@ -1,0 +1,21 @@
+# 3D Models Directory
+
+Place GLTF/GLB models in the appropriate subdirectory:
+
+- furniture/    - Tables, chairs, bar stools, booths
+- equipment/    - Coffee machines, refrigerators, displays
+- decoration/   - Plants, lamps, wall art
+- custom/       - User-uploaded custom models
+
+## Recommended Model Sources (Free)
+
+- Sketchfab: https://sketchfab.com/3d-models?features=downloadable
+- Poly Pizza: https://poly.pizza/
+- Kenney Assets: https://kenney.nl/assets
+
+## Model Requirements
+
+- Format: GLTF or GLB
+- Optimized for web (< 5MB per model recommended)
+- Draco compression supported
+- Animations supported (named clips)

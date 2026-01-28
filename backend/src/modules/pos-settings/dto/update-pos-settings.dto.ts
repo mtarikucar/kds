@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdatePosSettingsDto {
@@ -21,4 +21,10 @@ export class UpdatePosSettingsDto {
   @IsBoolean()
   @IsOptional()
   enableCustomerOrdering?: boolean;
+
+  @ApiPropertyOptional({ description: 'Default floor plan view mode', enum: ['2d', '3d'] })
+  @IsString()
+  @IsIn(['2d', '3d'])
+  @IsOptional()
+  defaultMapView?: '2d' | '3d';
 }

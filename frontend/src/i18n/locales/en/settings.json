@@ -76,7 +76,11 @@
   "posSettings": {
     "loading": "Loading settings...",
     "title": "POS Settings",
-    "description": "Configure how your Point of Sale system operates"
+    "description": "Configure how your Point of Sale system operates",
+    "defaultMapView": "Default Map View",
+    "defaultMapViewDesc": "Choose the default view when opening the floor plan",
+    "mapView2D": "2D View",
+    "mapView3D": "3D View"
   },
   "qrMenuSettings": {
     "title": "QR Menu Settings",

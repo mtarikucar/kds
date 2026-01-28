@@ -115,6 +115,9 @@ model User {
   appleId      String?  @unique
   authProvider String   @default("local") // local, google, apple
 
+  // Onboarding data (persisted for cross-device sync)
+  onboardingData Json? // { hasSeenWelcome, tourProgress, skipAllTours }
+
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -320,6 +323,12 @@ model Table {
   section  String?
   status   String  @default("AVAILABLE") // AVAILABLE, OCCUPIED, RESERVED
 
+  // Voxel world position
+  voxelX        Int?
+  voxelY        Int?     @default(0)
+  voxelZ        Int?
+  voxelRotation Int?     @default(0) // 0, 90, 180, 270 degrees
+
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -334,6 +343,23 @@ model Table {
   @@unique([tenantId, number])
   @@index([tenantId])
   @@map("tables")
+}
+
+model RestaurantLayout {
+  id        String   @id @default(uuid())
+  name      String   @default("Main Floor")
+  width     Int      @default(32)
+  height    Int      @default(8)
+  depth     Int      @default(32)
+  worldData Json     // Compressed voxel data including all objects
+
+  tenantId  String   @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("restaurant_layouts")
 }
 
 // ========================================
@@ -750,6 +776,7 @@ model PosSettings {
   enableTwoStepCheckout  Boolean @default(false)  // Separate "Create Order" and "Payment" buttons
   showProductImages      Boolean @default(true)   // Show product images in POS menu
   enableCustomerOrdering Boolean @default(true)   // Allow customers to place orders from QR menu
+  defaultMapView         String  @default("2d")   // Default floor plan view: "2d" or "3d"
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

@@ -25,7 +25,24 @@ export function initSentry() {
     profilesSampleRate: parseFloat(process.env.SENTRY_PROFILES_SAMPLE_RATE || '0.1'),
     integrations: [
       nodeProfilingIntegration() as any,
+      // Prisma integration for database query monitoring
+      Sentry.prismaIntegration(),
     ],
+
+    // Slow query threshold for database operations (log queries > 100ms)
+    beforeSendTransaction(event) {
+      // Add slow query warning tag
+      if (event.contexts?.trace?.data) {
+        const dbDuration = event.contexts.trace.data['db.duration'];
+        if (typeof dbDuration === 'number' && dbDuration > 100) {
+          event.tags = {
+            ...event.tags,
+            slow_query: 'true',
+          };
+        }
+      }
+      return event;
+    },
 
     // Release tracking
     release: `restaurant-pos-backend@${process.env.npm_package_version || 'unknown'}`,

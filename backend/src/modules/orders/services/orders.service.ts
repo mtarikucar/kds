@@ -14,6 +14,7 @@ import { OrderStatus, StockMovementType } from '../../../common/constants/order-
 import { validateTransition } from '../../../common/utils/order-state-machine';
 import { TableStatus } from '../../tables/dto/create-table.dto';
 import { KdsGateway } from '../../kds/kds.gateway';
+import { withTransaction, addBreadcrumb } from '../../../common/utils/tracing';
 
 @Injectable()
 export class OrdersService {
@@ -32,19 +33,39 @@ export class OrdersService {
   }
 
   async create(createOrderDto: CreateOrderDto, userId: string, tenantId: string) {
-    // Validate table if provided
-    if (createOrderDto.tableId) {
-      const table = await this.prisma.table.findFirst({
-        where: {
-          id: createOrderDto.tableId,
-          tenantId,
+    return withTransaction(
+      {
+        name: 'order.create',
+        op: 'order',
+        tags: {
+          'order.type': createOrderDto.type,
+          'tenant.id': tenantId,
+          'user.id': userId,
+          'has_table': String(!!createOrderDto.tableId),
         },
-      });
+        data: {
+          itemCount: createOrderDto.items.length,
+        },
+      },
+      async () => {
+        addBreadcrumb('Starting order creation', 'order', {
+          type: createOrderDto.type,
+          itemCount: createOrderDto.items.length,
+        });
 
-      if (!table) {
-        throw new BadRequestException('Invalid table or table does not belong to your tenant');
-      }
-    }
+        // Validate table if provided
+        if (createOrderDto.tableId) {
+          const table = await this.prisma.table.findFirst({
+            where: {
+              id: createOrderDto.tableId,
+              tenantId,
+            },
+          });
+
+          if (!table) {
+            throw new BadRequestException('Invalid table or table does not belong to your tenant');
+          }
+        }
 
     // Validate all products exist and belong to tenant
     const productIds = createOrderDto.items.map((item) => item.productId);
@@ -192,10 +213,13 @@ export class OrdersService {
       },
     });
 
-    // Emit new order to kitchen via WebSocket
-    this.kdsGateway.emitNewOrder(tenantId, createdOrder);
+        // Emit new order to kitchen via WebSocket
+        this.kdsGateway.emitNewOrder(tenantId, createdOrder);
 
-    return createdOrder;
+        addBreadcrumb('Order created successfully', 'order', { orderId: createdOrder.id, orderNumber: createdOrder.orderNumber });
+        return createdOrder;
+      }
+    );
   }
 
   async findAll(

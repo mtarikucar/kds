@@ -5,13 +5,14 @@ import { Monitor } from 'lucide-react';
 import { useGetPosSettings, useUpdatePosSettings } from '../../features/pos/posApi';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { SettingsSection, SettingsDivider, SettingsGroup } from '../../components/settings/SettingsSection';
-import { SettingsToggle } from '../../components/settings/SettingsToggle';
+import { SettingsToggle, SettingsSelect } from '../../components/settings/SettingsToggle';
 
 interface PosSettingsState {
   enableTablelessMode: boolean;
   enableTwoStepCheckout: boolean;
   showProductImages: boolean;
   enableCustomerOrdering: boolean;
+  defaultMapView: '2d' | '3d';
 }
 
 const POSSettingsPage = () => {
@@ -24,6 +25,7 @@ const POSSettingsPage = () => {
     enableTwoStepCheckout: false,
     showProductImages: true,
     enableCustomerOrdering: true,
+    defaultMapView: '2d',
   });
 
   useEffect(() => {
@@ -33,6 +35,7 @@ const POSSettingsPage = () => {
         enableTwoStepCheckout: posSettings.enableTwoStepCheckout,
         showProductImages: posSettings.showProductImages,
         enableCustomerOrdering: posSettings.enableCustomerOrdering,
+        defaultMapView: posSettings.defaultMapView ?? '2d',
       });
     }
   }, [posSettings]);
@@ -69,6 +72,13 @@ const POSSettingsPage = () => {
     }
 
     const newSettings = { ...settings, [field]: value };
+    setSettings(newSettings);
+    triggerPosSave(newSettings);
+  };
+
+  const handleMapViewChange = (value: string) => {
+    if (value !== '2d' && value !== '3d') return;
+    const newSettings: PosSettingsState = { ...settings, defaultMapView: value };
     setSettings(newSettings);
     triggerPosSave(newSettings);
   };
@@ -129,6 +139,19 @@ const POSSettingsPage = () => {
               description={t('showProductImages.description')}
               checked={settings.showProductImages}
               onChange={(checked) => handleToggleChange('showProductImages', checked)}
+            />
+
+            <SettingsDivider />
+
+            <SettingsSelect
+              label={t('posSettings.defaultMapView')}
+              description={t('posSettings.defaultMapViewDesc')}
+              value={settings.defaultMapView}
+              onChange={handleMapViewChange}
+              options={[
+                { value: '2d', label: t('posSettings.mapView2D') },
+                { value: '3d', label: t('posSettings.mapView3D') },
+              ]}
             />
           </SettingsGroup>
         </SettingsSection>

@@ -90,15 +90,17 @@ const KitchenDisplayPage = () => {
   return (
     <div className="h-full flex flex-col">
       {/* Stats Header */}
-      <KitchenStatsHeader
-        orders={orders || []}
-        isConnected={isConnected}
-        onRefresh={handleRefresh}
-        isLoading={isLoading}
-      />
+      <div data-tour="kitchen-stats">
+        <KitchenStatsHeader
+          orders={orders || []}
+          isConnected={isConnected}
+          onRefresh={handleRefresh}
+          isLoading={isLoading}
+        />
+      </div>
 
       {/* Desktop: 3-Column Grid */}
-      <div className="hidden lg:grid lg:grid-cols-3 gap-4 md:gap-6 flex-1 min-h-0">
+      <div className="hidden lg:grid lg:grid-cols-3 gap-4 md:gap-6 flex-1 min-h-0" data-tour="order-queues">
         <OrderQueue
           title={t('kitchen.pending')}
           status={OrderStatus.PENDING}

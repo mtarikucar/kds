@@ -270,7 +270,7 @@ const QRManagementPage = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6" data-tour="qr-management">
       {/* Page Header */}
       <div className="flex items-center gap-4">
         <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20">
@@ -354,9 +354,9 @@ const QRManagementPage = () => {
 
       {/* Tab Content */}
       {activeTab === 'codes' && (
-        <div className="space-y-6">
+        <div className="space-y-6" data-tour="qr-codes-list">
           {/* Batch Operations */}
-          <Card>
+          <Card data-tour="qr-download">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <FileArchive className="h-5 w-5" />

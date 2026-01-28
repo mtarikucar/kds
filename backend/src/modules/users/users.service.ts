@@ -11,6 +11,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateProfileDto, UpdateEmailDto } from './dto/update-profile.dto';
+import { UpdateOnboardingDto } from './dto/update-onboarding.dto';
 import { AuthService } from '../auth/auth.service';
 
 @Injectable()
@@ -339,5 +340,65 @@ export class UsersService {
     return this.prisma.user.delete({
       where: { id: userId },
     });
+  }
+
+  /**
+   * Get user's onboarding data
+   */
+  async getOnboarding(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { onboardingData: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Return default onboarding data if not set
+    const defaultOnboarding = {
+      hasSeenWelcome: false,
+      tourProgress: {},
+      skipAllTours: false,
+    };
+
+    return user.onboardingData || defaultOnboarding;
+  }
+
+  /**
+   * Update user's onboarding data
+   */
+  async updateOnboarding(userId: string, updateOnboardingDto: UpdateOnboardingDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { onboardingData: true },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // Merge with existing data
+    const currentData = (user.onboardingData as any) || {
+      hasSeenWelcome: false,
+      tourProgress: {},
+      skipAllTours: false,
+    };
+
+    const updatedData = {
+      hasSeenWelcome: updateOnboardingDto.hasSeenWelcome ?? currentData.hasSeenWelcome ?? false,
+      skipAllTours: updateOnboardingDto.skipAllTours ?? currentData.skipAllTours ?? false,
+      tourProgress: {
+        ...(currentData.tourProgress || {}),
+        ...(updateOnboardingDto.tourProgress || {}),
+      },
+    };
+
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { onboardingData: updatedData as any },
+    });
+
+    return updatedData;
   }
 }

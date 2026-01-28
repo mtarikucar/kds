@@ -107,7 +107,7 @@ const DashboardPage = () => {
   const secondaryActions = filteredQuickActions.filter((a) => !a.isPrimary);
 
   return (
-    <div className="h-[calc(100vh-10rem)] flex flex-col">
+    <div className="h-[calc(100vh-10rem)] flex flex-col" data-tour="dashboard-container">
       {/* POS Hero Card */}
       {primaryAction && (
         <Link
@@ -134,7 +134,7 @@ const DashboardPage = () => {
       )}
 
       {/* Secondary Actions Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1 min-h-0">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1 min-h-0" data-tour="quick-actions">
         {secondaryActions.map((action) => {
           const Icon = action.icon;
           return (

@@ -571,7 +571,7 @@ const POSPage = () => {
 
           {/* Tables Grid */}
           {!isLoadingTables && tables && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-4 auto-rows-max overflow-auto pb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-4 auto-rows-max overflow-auto pb-4" data-tour="table-grid">
               {tables.map((table) => {
                 const notifications = getTableNotifications(table.id);
                 const hasNotifications = notifications.orders > 0 || notifications.waiter > 0 || notifications.bill > 0;
@@ -704,7 +704,7 @@ const POSPage = () => {
           {isDesktop && (
             <div className="flex-1 grid grid-cols-3 gap-6 min-h-0">
               {/* Menu Panel - 2/3 width */}
-              <div className="col-span-2">
+              <div className="col-span-2" data-tour="menu-panel">
                 <Card className="h-full">
                   <CardHeader className="pb-3">
                     <CardTitle className="text-lg">{t('common:navigation.menu')}</CardTitle>
@@ -716,7 +716,7 @@ const POSPage = () => {
               </div>
 
               {/* Order Cart - 1/3 width */}
-              <div className="col-span-1">
+              <div className="col-span-1" data-tour="order-cart">
                 <div className="sticky top-0 h-full">
                   <OrderCart
                     items={cartItems}

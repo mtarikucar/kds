@@ -12,6 +12,7 @@ import * as bcrypt from 'bcryptjs';
 import { v4 as uuidv4 } from 'uuid';
 import { OAuth2Client } from 'google-auth-library';
 import * as appleSignin from 'apple-signin-auth';
+import * as Sentry from '@sentry/node';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -235,6 +236,23 @@ export class AuthService {
       } as any;
     }
 
+    // Track successful registration in Sentry
+    Sentry.captureMessage(`New user registered: ${user.email}`, {
+      level: 'info',
+      tags: {
+        event: 'user.register',
+        role: user.role,
+        isNewRestaurant: String(hasRestaurantName),
+      },
+      extra: {
+        userId: user.id,
+        tenantId: user.tenantId,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+      },
+    });
+
     return this.generateTokens(user);
   }
 
@@ -242,8 +260,38 @@ export class AuthService {
     const user = await this.validateUser(loginDto.email, loginDto.password);
 
     if (!user) {
+      // Track failed login attempt
+      Sentry.captureMessage(`Failed login attempt: ${loginDto.email}`, {
+        level: 'warning',
+        tags: {
+          event: 'user.login.failed',
+        },
+        extra: {
+          email: loginDto.email,
+        },
+      });
       throw new InvalidCredentialsException();
     }
+
+    // Track successful login in Sentry
+    Sentry.captureMessage(`User logged in: ${user.email}`, {
+      level: 'info',
+      tags: {
+        event: 'user.login',
+        role: user.role,
+      },
+      extra: {
+        userId: user.id,
+        tenantId: user.tenantId,
+        email: user.email,
+      },
+    });
+
+    // Set user context for future errors
+    Sentry.setUser({
+      id: user.id,
+      email: user.email,
+    });
 
     return this.generateTokens(user);
   }
@@ -693,6 +741,21 @@ export class AuthService {
         if (user.status !== 'ACTIVE') {
           throw new UnauthorizedException('User account is inactive');
         }
+
+        // Track Google login in Sentry
+        Sentry.captureMessage(`User logged in via Google: ${user.email}`, {
+          level: 'info',
+          tags: {
+            event: 'user.login.google',
+            role: user.role,
+          },
+          extra: {
+            userId: user.id,
+            tenantId: user.tenantId,
+            email: user.email,
+          },
+        });
+
         return this.generateTokens(user);
       }
 
@@ -732,6 +795,20 @@ export class AuthService {
             role: true,
             status: true,
             tenantId: true,
+          },
+        });
+
+        // Track Google account linking in Sentry
+        Sentry.captureMessage(`Google account linked: ${user.email}`, {
+          level: 'info',
+          tags: {
+            event: 'user.link.google',
+            role: user.role,
+          },
+          extra: {
+            userId: user.id,
+            tenantId: user.tenantId,
+            email: user.email,
           },
         });
 
@@ -794,6 +871,21 @@ export class AuthService {
         if (user.status !== 'ACTIVE') {
           throw new UnauthorizedException('User account is inactive');
         }
+
+        // Track Apple login in Sentry
+        Sentry.captureMessage(`User logged in via Apple: ${user.email}`, {
+          level: 'info',
+          tags: {
+            event: 'user.login.apple',
+            role: user.role,
+          },
+          extra: {
+            userId: user.id,
+            tenantId: user.tenantId,
+            email: user.email,
+          },
+        });
+
         return this.generateTokens(user);
       }
 
@@ -833,6 +925,20 @@ export class AuthService {
             role: true,
             status: true,
             tenantId: true,
+          },
+        });
+
+        // Track Apple account linking in Sentry
+        Sentry.captureMessage(`Apple account linked: ${user.email}`, {
+          level: 'info',
+          tags: {
+            event: 'user.link.apple',
+            role: user.role,
+          },
+          extra: {
+            userId: user.id,
+            tenantId: user.tenantId,
+            email: user.email,
           },
         });
 
@@ -954,6 +1060,24 @@ export class AuthService {
         lastName: true,
         role: true,
         tenantId: true,
+      },
+    });
+
+    // Track new social auth registration in Sentry
+    Sentry.captureMessage(`New user registered via ${authProvider}: ${email}`, {
+      level: 'info',
+      tags: {
+        event: 'user.register.social',
+        provider: authProvider,
+        role: user.role,
+      },
+      extra: {
+        userId: user.id,
+        tenantId: user.tenantId,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        restaurantName,
       },
     });
 

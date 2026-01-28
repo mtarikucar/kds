@@ -76,7 +76,11 @@
   "posSettings": {
     "loading": "Ayarlar yükleniyor...",
     "title": "POS Ayarları",
-    "description": "Satış Noktası sisteminizin nasıl çalışacağını yapılandırın"
+    "description": "Satış Noktası sisteminizin nasıl çalışacağını yapılandırın",
+    "defaultMapView": "Varsayılan Harita Görünümü",
+    "defaultMapViewDesc": "Kat planını açarken kullanılacak varsayılan görünümü seçin",
+    "mapView2D": "2D Görünüm",
+    "mapView3D": "3D Görünüm"
   },
   "qrMenuSettings": {
     "title": "QR Menü Ayarları",

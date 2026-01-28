@@ -378,7 +378,55 @@
     "noQRCodesToDownload": "İndirilecek QR kod bulunamadı",
     "noTables": "Henüz masa yok",
     "noTablesDescription": "Restoran oturma düzeninizi yönetmeye başlamak için ilk masanızı ekleyin",
-    "addFirstTable": "İlk Masayı Ekle"
+    "addFirstTable": "İlk Masayı Ekle",
+    "gridView": "Liste Görünümü",
+    "floorPlan": "Kat Planı"
+  },
+  "voxel": {
+    "layoutSaved": "Kat planı başarıyla kaydedildi",
+    "layoutSaveError": "Kat planı kaydedilemedi",
+    "positionUpdateError": "Masa konumu güncellenemedi",
+    "saving": "Kaydediliyor...",
+    "save": "Kaydet",
+    "tools": {
+      "select": "Seç",
+      "move": "Taşı",
+      "rotate": "Döndür",
+      "delete": "Sil",
+      "undo": "Geri Al",
+      "redo": "Yinele"
+    },
+    "library": {
+      "title": "Mobilya Kütüphanesi"
+    },
+    "map2d": {
+      "zoomIn": "Yakınlaştır",
+      "zoomOut": "Uzaklaştır",
+      "toggleGrid": "Izgarayı Aç/Kapat",
+      "toggleSnap": "Izgaraya Yapış",
+      "resetView": "Görünümü Sıfırla",
+      "properties": "Özellikler",
+      "rotation": "Döndürme",
+      "units": "birim",
+      "helpText": "Kaydır ile yakınlaştır • Shift+sürükle ile kaydır • Tıkla ile seç"
+    }
+  },
+  "pos": {
+    "floorPlan": {
+      "title": "Kat Planı",
+      "available": "Müsait",
+      "occupied": "Dolu",
+      "reserved": "Rezerve",
+      "fullscreen": "Tam Ekran",
+      "exitFullscreen": "Tam Ekrandan Çık",
+      "helpText2d": "Masa seçmek için tıklayın • Yakınlaştırmak için kaydırın • Shift+sürükle ile kaydırın",
+      "helpText3d": "Masa seçmek için tıklayın • Görünümü döndürmek için sürükleyin • Yakınlaştırmak için kaydırın"
+    },
+    "minimap": {
+      "switchTo2D": "2D görünüme geç",
+      "switchTo3D": "3D görünüme geç",
+      "clickToSwitch": "Geçiş için tıklayın"
+    }
   },
   "qrDesigner": {
     "quickColorThemes": "Hızlı Renk Temaları",

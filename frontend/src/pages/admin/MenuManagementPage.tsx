@@ -594,7 +594,7 @@ const MenuManagementPage = () => {
 
         {/* Add Category button (only on menu tab) */}
         {activeTab === 'menu' && (
-          <Button onClick={() => handleOpenCategoryModal()} disabled={!canAddCategory}>
+          <Button onClick={() => handleOpenCategoryModal()} disabled={!canAddCategory} data-tour="add-category">
             {canAddCategory ? (
               <Plus className="h-4 w-4 mr-2" />
             ) : (
@@ -711,6 +711,7 @@ const MenuManagementPage = () => {
                     ref={provided.innerRef}
                     {...provided.droppableProps}
                     className="space-y-4"
+                    data-tour="product-list"
                   >
                     {sortedCategories.map((category, index) => (
                       <DraggableCategoryCard

@@ -5,6 +5,7 @@ import Header from './Header';
 import Sidebar from './Sidebar';
 import { useUiStore } from '../../store/uiStore';
 import { SubscriptionProvider } from '../../contexts/SubscriptionContext';
+import { OnboardingProvider } from '../../features/onboarding';
 import { RTL_LANGUAGES } from '../../i18n/config';
 
 const Layout = () => {
@@ -23,6 +24,7 @@ const Layout = () => {
 
   return (
     <SubscriptionProvider>
+      <OnboardingProvider>
       <div className="flex h-screen overflow-hidden bg-slate-50">
         {/* Mobile overlay */}
         {isSidebarOpen && (
@@ -56,6 +58,7 @@ const Layout = () => {
           </main>
         </div>
       </div>
+      </OnboardingProvider>
     </SubscriptionProvider>
   );
 };

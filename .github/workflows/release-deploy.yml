@@ -109,6 +109,9 @@ jobs:
       - name: Build frontend image
         env:
           VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT_FRONTEND: ${{ secrets.SENTRY_PROJECT_FRONTEND }}
         run: |
           docker build \
             --target production \
@@ -120,15 +123,25 @@ jobs:
             --build-arg VITE_APP_VERSION=${{ steps.version.outputs.VERSION }} \
             --build-arg VITE_BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
             --build-arg VITE_COMMIT_SHA=$(git rev-parse --short HEAD) \
+            --build-arg SENTRY_AUTH_TOKEN="${SENTRY_AUTH_TOKEN}" \
+            --build-arg SENTRY_ORG="${SENTRY_ORG}" \
+            --build-arg SENTRY_PROJECT_FRONTEND="${SENTRY_PROJECT_FRONTEND}" \
             --tag kds-frontend:${{ steps.version.outputs.VERSION }} \
             --tag kds-frontend:latest \
             ./frontend
 
       - name: Build landing image
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT_LANDING: ${{ secrets.SENTRY_PROJECT_LANDING }}
         run: |
           docker build \
             --build-arg NEXT_PUBLIC_API_URL=https://hummytummy.com/api \
             --build-arg NEXT_PUBLIC_SITE_URL=https://hummytummy.com \
+            --build-arg SENTRY_AUTH_TOKEN="${SENTRY_AUTH_TOKEN}" \
+            --build-arg SENTRY_ORG="${SENTRY_ORG}" \
+            --build-arg SENTRY_PROJECT="${SENTRY_PROJECT_LANDING}" \
             --tag kds-landing:${{ steps.version.outputs.VERSION }} \
             --tag kds-landing:latest \
             ./landing
@@ -289,6 +302,38 @@ jobs:
           fi
 
           echo "All health checks passed!"
+
+      - name: Create Sentry release
+        if: success()
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+        run: |
+          # Install sentry-cli
+          curl -sL https://sentry.io/get-cli/ | bash
+
+          VERSION="${{ steps.version.outputs.VERSION }}"
+
+          # Create releases for all projects
+          for PROJECT in "${{ secrets.SENTRY_PROJECT_BACKEND }}" "${{ secrets.SENTRY_PROJECT_FRONTEND }}" "${{ secrets.SENTRY_PROJECT_LANDING }}"; do
+            if [ -n "$PROJECT" ]; then
+              echo "Creating Sentry release for ${PROJECT}..."
+
+              # Create release
+              sentry-cli releases new "${PROJECT}@${VERSION}" --project "${PROJECT}" || true
+
+              # Associate commits
+              sentry-cli releases set-commits "${PROJECT}@${VERSION}" --auto --project "${PROJECT}" || true
+
+              # Create deployment
+              sentry-cli releases deploys "${PROJECT}@${VERSION}" new --env production --project "${PROJECT}" || true
+
+              # Finalize release
+              sentry-cli releases finalize "${PROJECT}@${VERSION}" --project "${PROJECT}" || true
+            fi
+          done
+
+          echo "Sentry releases created successfully!"
 
       - name: Create GitHub Release
         if: success() && github.event_name == 'push'
