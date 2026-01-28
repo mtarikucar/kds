@@ -4,6 +4,8 @@ import { useGLTF } from '@react-three/drei'
 import type { Group } from 'three'
 import type { MascotAnimation } from '../../types/voxel'
 
+const MODEL_PATH = `${import.meta.env.BASE_URL}models/mascot/chef.glb`
+
 interface Mascot3DProps {
   position: [number, number, number]
   rotation?: [number, number, number]
@@ -26,7 +28,7 @@ export function Mascot3D({
   const [bounceTime, setBounceTime] = useState(0)
   const baseY = position[1]
 
-  const { scene } = useGLTF('/models/mascot/chef.glb')
+  const { scene } = useGLTF(MODEL_PATH)
 
   // Clone the scene to avoid sharing state between instances
   const clonedScene = scene.clone()
@@ -116,4 +118,4 @@ export function Mascot3D({
 }
 
 // Preload the model
-useGLTF.preload('/models/mascot/chef.glb')
+useGLTF.preload(MODEL_PATH)

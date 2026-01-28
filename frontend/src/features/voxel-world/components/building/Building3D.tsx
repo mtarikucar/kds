@@ -4,6 +4,8 @@ import { useGLTF } from '@react-three/drei'
 import type { Group, Mesh } from 'three'
 import * as THREE from 'three'
 
+const MODEL_PATH = `${import.meta.env.BASE_URL}models/building/japanic_restaurant.glb`
+
 interface Building3DProps {
   position: [number, number, number]
   scale?: number
@@ -21,7 +23,7 @@ export function Building3D({
   const [isHovered, setIsHovered] = useState(false)
   const emissiveIntensityRef = useRef(0)
 
-  const { scene } = useGLTF('/models/building/japanic_restaurant.glb')
+  const { scene } = useGLTF(MODEL_PATH)
 
   // Clone the scene to avoid sharing state
   const clonedScene = scene.clone()
@@ -106,4 +108,4 @@ export function Building3D({
 }
 
 // Preload the model
-useGLTF.preload('/models/building/japanic_restaurant.glb')
+useGLTF.preload(MODEL_PATH)
