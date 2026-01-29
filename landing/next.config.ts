@@ -7,12 +7,6 @@ const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 const nextConfig: NextConfig = {
   output: 'standalone',
 
-  // Required for Sentry to properly instrument the app
-  experimental: {
-    // Enable instrumentation hook for server-side monitoring
-    instrumentationHook: true,
-  },
-
   images: {
     remotePatterns: [
       {
