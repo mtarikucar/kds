@@ -29,6 +29,8 @@ interface OrderCartProps {
   isTwoStepCheckout?: boolean;
   hasActiveOrder?: boolean;
   hasSelectedTable?: boolean;
+  canProceedToPayment?: boolean;
+  paymentBlockedReason?: string | null;
 }
 
 const OrderCart = ({
@@ -49,6 +51,8 @@ const OrderCart = ({
   isTwoStepCheckout = false,
   hasActiveOrder = false,
   hasSelectedTable = false,
+  canProceedToPayment = true,
+  paymentBlockedReason = null,
 }: OrderCartProps) => {
   const { t } = useTranslation('pos');
   const formatPrice = useFormatCurrency();
@@ -195,16 +199,23 @@ const OrderCart = ({
                     {hasActiveOrder ? t('updateOrder') : t('createOrder')}
                   </Button>
 
-                  {/* Payment button */}
+                  {/* Payment button - uses canProceedToPayment for eligibility */}
                   <Button
                     variant="primary"
                     className="w-full"
                     size="lg"
                     onClick={onCheckout}
-                    disabled={!hasActiveOrder}
+                    disabled={!hasActiveOrder || !canProceedToPayment}
                   >
                     {t('proceedToPayment')}
                   </Button>
+
+                  {/* Show blocked reason when payment not allowed */}
+                  {hasActiveOrder && !canProceedToPayment && paymentBlockedReason && (
+                    <p className="text-sm text-amber-600 text-center">
+                      {t(paymentBlockedReason)}
+                    </p>
+                  )}
                 </div>
               ) : (
                 /* Single-step checkout button */

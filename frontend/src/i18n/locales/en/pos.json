@@ -162,6 +162,11 @@
     "waiterCalls": "waiter",
     "billRequests": "bill"
   },
+  "awaitingPayment": {
+    "title": "Awaiting Payment",
+    "collectPayment": "Collect Payment",
+    "orderTotal": "Order Total"
+  },
   "tableGrid": {
     "selected": "Selected",
     "pendingOrder": "Pending Order",
@@ -185,6 +190,8 @@
     "payment": "Payment"
   },
   "newCustomerOrder": "New Customer Order: #{{orderNumber}}",
+  "dineInPaymentRequiresServed": "Dine-in orders can only be paid after being served",
+  "noActiveOrder": "Create an order first",
   "transfer": {
     "title": "Transfer Table Orders",
     "buttonTitle": "Transfer orders to another table",

@@ -772,11 +772,12 @@ model PosSettings {
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // POS operation modes
-  enableTablelessMode    Boolean @default(false)  // Allow orders without table selection
-  enableTwoStepCheckout  Boolean @default(false)  // Separate "Create Order" and "Payment" buttons
-  showProductImages      Boolean @default(true)   // Show product images in POS menu
-  enableCustomerOrdering Boolean @default(true)   // Allow customers to place orders from QR menu
-  defaultMapView         String  @default("2d")   // Default floor plan view: "2d" or "3d"
+  enableTablelessMode            Boolean @default(false)  // Allow orders without table selection
+  enableTwoStepCheckout          Boolean @default(false)  // Separate "Create Order" and "Payment" buttons
+  showProductImages              Boolean @default(true)   // Show product images in POS menu
+  enableCustomerOrdering         Boolean @default(true)   // Allow customers to place orders from QR menu
+  defaultMapView                 String  @default("2d")   // Default floor plan view: "2d" or "3d"
+  requireServedForDineInPayment  Boolean @default(false)  // Require SERVED status for dine-in payment in two-step checkout
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

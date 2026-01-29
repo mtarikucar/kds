@@ -13,6 +13,7 @@ interface PosSettingsState {
   showProductImages: boolean;
   enableCustomerOrdering: boolean;
   defaultMapView: '2d' | '3d';
+  requireServedForDineInPayment: boolean;
 }
 
 const POSSettingsPage = () => {
@@ -26,6 +27,7 @@ const POSSettingsPage = () => {
     showProductImages: true,
     enableCustomerOrdering: true,
     defaultMapView: '2d',
+    requireServedForDineInPayment: false,
   });
 
   useEffect(() => {
@@ -36,6 +38,7 @@ const POSSettingsPage = () => {
         showProductImages: posSettings.showProductImages,
         enableCustomerOrdering: posSettings.enableCustomerOrdering,
         defaultMapView: posSettings.defaultMapView ?? '2d',
+        requireServedForDineInPayment: posSettings.requireServedForDineInPayment ?? false,
       });
     }
   }, [posSettings]);
@@ -131,6 +134,20 @@ const POSSettingsPage = () => {
                   : undefined
               }
             />
+
+            {/* Only show this option when two-step checkout is enabled */}
+            {settings.enableTwoStepCheckout && (
+              <>
+                <SettingsDivider />
+
+                <SettingsToggle
+                  label={t('requireServedForDineInPayment.title')}
+                  description={t('requireServedForDineInPayment.description')}
+                  checked={settings.requireServedForDineInPayment}
+                  onChange={(checked) => handleToggleChange('requireServedForDineInPayment', checked)}
+                />
+              </>
+            )}
 
             <SettingsDivider />
 

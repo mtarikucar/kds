@@ -98,6 +98,10 @@
     "requiredForQRMenu": "QR menü siparişi için gereklidir",
     "autoEnabled": "İki aşamalı ödeme otomatik olarak etkinleştirildi"
   },
+  "requireServedForDineInPayment": {
+    "title": "Masa Siparişlerinde Servis Sonrası Ödeme",
+    "description": "Aktif olduğunda, masa siparişlerinde ödeme butonu sadece yemek servis edildikten sonra aktif olur. Paket ve teslimat siparişlerini etkilemez."
+  },
   "info": {
     "noteLabel": "Not:",
     "noteBody": "Değişiklikler POS sisteminde hemen etkili olur. Operasyonel değişiklikler hakkında personelin bilgilendirildiğinden emin olun."

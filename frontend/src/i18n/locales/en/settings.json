@@ -98,6 +98,10 @@
     "requiredForQRMenu": "Required for QR menu ordering",
     "autoEnabled": "Two-step checkout has been automatically enabled"
   },
+  "requireServedForDineInPayment": {
+    "title": "Require Served for Dine-In Payment",
+    "description": "When enabled, payment button is only active for dine-in orders after food is served. Does not affect takeaway or delivery orders."
+  },
   "info": {
     "noteLabel": "Note:",
     "noteBody": "Changes will take effect immediately in the POS system. Make sure staff are informed of any operational changes."

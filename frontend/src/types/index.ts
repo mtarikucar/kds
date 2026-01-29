@@ -631,6 +631,7 @@ export interface PosSettings {
   showProductImages: boolean;
   enableCustomerOrdering: boolean;
   defaultMapView: '2d' | '3d';
+  requireServedForDineInPayment: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -641,6 +642,7 @@ export interface UpdatePosSettingsDto {
   showProductImages?: boolean;
   enableCustomerOrdering?: boolean;
   defaultMapView?: '2d' | '3d';
+  requireServedForDineInPayment?: boolean;
 }
 
 // Modifier Types

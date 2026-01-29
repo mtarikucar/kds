@@ -27,4 +27,9 @@ export class UpdatePosSettingsDto {
   @IsIn(['2d', '3d'])
   @IsOptional()
   defaultMapView?: '2d' | '3d';
+
+  @ApiPropertyOptional({ description: 'Require SERVED status for dine-in payment in two-step checkout' })
+  @IsBoolean()
+  @IsOptional()
+  requireServedForDineInPayment?: boolean;
 }

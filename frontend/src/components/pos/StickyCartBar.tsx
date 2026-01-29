@@ -13,6 +13,7 @@ interface StickyCartBarProps {
   hasItems: boolean;
   isTwoStepCheckout?: boolean;
   hasActiveOrder?: boolean;
+  canProceedToPayment?: boolean;
 }
 
 const StickyCartBar = ({
@@ -25,6 +26,7 @@ const StickyCartBar = ({
   hasItems,
   isTwoStepCheckout = false,
   hasActiveOrder = false,
+  canProceedToPayment = true,
 }: StickyCartBarProps) => {
   const { t } = useTranslation('pos');
   if (!hasItems) return null;
@@ -72,12 +74,12 @@ const StickyCartBar = ({
                   {hasActiveOrder ? t('stickyCart.update') : t('stickyCart.create')}
                 </Button>
 
-                {/* Payment Button */}
+                {/* Payment Button - uses canProceedToPayment for eligibility */}
                 <Button
                   variant="primary"
                   size="lg"
                   onClick={onCheckout}
-                  disabled={!hasActiveOrder}
+                  disabled={!hasActiveOrder || !canProceedToPayment}
                   className="min-w-[100px] h-12 text-sm font-semibold"
                 >
                   {t('stickyCart.payment')}

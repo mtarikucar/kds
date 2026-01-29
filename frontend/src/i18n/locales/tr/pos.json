@@ -162,6 +162,11 @@
     "waiterCalls": "garson",
     "billRequests": "hesap"
   },
+  "awaitingPayment": {
+    "title": "Ödeme Bekleyen",
+    "collectPayment": "Ödeme Al",
+    "orderTotal": "Sipariş Toplamı"
+  },
   "tableGrid": {
     "selected": "Seçili",
     "pendingOrder": "Bekleyen Sipariş",
@@ -185,6 +190,8 @@
     "payment": "Ödeme"
   },
   "newCustomerOrder": "Yeni Müşteri Siparişi: #{{orderNumber}}",
+  "dineInPaymentRequiresServed": "Masa siparişlerinde ödeme ancak servis edildikten sonra alınabilir",
+  "noActiveOrder": "Önce sipariş oluşturun",
   "transfer": {
     "title": "Masa Siparişlerini Aktar",
     "buttonTitle": "Siparişleri başka bir masaya aktar",

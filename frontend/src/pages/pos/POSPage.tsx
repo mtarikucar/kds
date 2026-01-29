@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ShoppingBag, ArrowRight, Users, Clock, User, Receipt } from 'lucide-react';
@@ -9,6 +9,7 @@ import ProductOptionsModal, { SelectedModifier } from '../../components/pos/Prod
 import StickyCartBar from '../../components/pos/StickyCartBar';
 import CartDrawer from '../../components/pos/CartDrawer';
 import NotificationBar from '../../components/pos/NotificationBar';
+import AwaitingPaymentSection from '../../components/pos/AwaitingPaymentSection';
 import PendingOrdersPanel from '../../components/pos/PendingOrdersPanel';
 import WaiterRequestsPanel from '../../components/pos/WaiterRequestsPanel';
 import BillRequestsPanel from '../../components/pos/BillRequestsPanel';
@@ -46,6 +47,8 @@ const POSPage = () => {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
   const [currentOrderAmount, setCurrentOrderAmount] = useState<number | null>(null);
+  const [payingOrderId, setPayingOrderId] = useState<string | null>(null);
+  const [payingOrderAmount, setPayingOrderAmount] = useState<number | null>(null);
   const [isCartDrawerOpen, setIsCartDrawerOpen] = useState(false);
   const [isPendingOrdersPanelOpen, setIsPendingOrdersPanelOpen] = useState(false);
   const [isWaiterRequestsPanelOpen, setIsWaiterRequestsPanelOpen] = useState(false);
@@ -110,6 +113,51 @@ const POSPage = () => {
       : undefined
   );
 
+  // Filter SERVED orders awaiting payment
+  const servedOrders = tableOrders?.filter(
+    (order) => order.status === OrderStatus.SERVED
+  ) || [];
+
+  // Find the current order for payment eligibility check
+  const currentOrder = useMemo(() => {
+    if (!currentOrderId || !tableOrders) return null;
+    return tableOrders.find((o) => o.id === currentOrderId) || null;
+  }, [currentOrderId, tableOrders]);
+
+  // Payment eligibility calculation for two-step checkout
+  const canProceedToPayment = useMemo(() => {
+    // Must have an active order to proceed to payment
+    if (!currentOrderId || !currentOrder) return false;
+
+    // Takeaway and delivery orders can always proceed to payment
+    const orderType = currentOrder.type || OrderType.DINE_IN;
+    if (orderType === OrderType.TAKEAWAY || orderType === OrderType.DELIVERY) {
+      return true;
+    }
+
+    // For dine-in, check if SERVED status is required
+    if (posSettings?.requireServedForDineInPayment) {
+      return currentOrder.status === OrderStatus.SERVED;
+    }
+
+    // Setting is off - allow payment anytime
+    return true;
+  }, [currentOrderId, currentOrder, posSettings?.requireServedForDineInPayment]);
+
+  // Reason why payment is blocked (for user feedback)
+  const paymentBlockedReason = useMemo(() => {
+    if (canProceedToPayment) return null;
+    if (!currentOrderId) return 'noActiveOrder';
+    if (
+      posSettings?.requireServedForDineInPayment &&
+      currentOrder?.type === OrderType.DINE_IN &&
+      currentOrder?.status !== OrderStatus.SERVED
+    ) {
+      return 'dineInPaymentRequiresServed';
+    }
+    return null;
+  }, [canProceedToPayment, currentOrderId, currentOrder, posSettings?.requireServedForDineInPayment]);
+
   // Load existing orders when an occupied table is selected
   useEffect(() => {
     if (selectedTable?.status === TableStatus.OCCUPIED && tableOrders) {
@@ -141,10 +189,11 @@ const POSPage = () => {
         toast.info(
           t('loadedExistingOrder', { orderNumber: activeOrder.orderNumber, count: items.length })
         );
-      } else {
-        // Table is marked occupied but no active orders found
-  toast.warning(t('tableOccupiedNoOrders'));
+      } else if (tableOrders.length === 0) {
+        // Table is marked occupied but no orders found at all - this is unusual
+        toast.warning(t('tableOccupiedNoOrders'));
       }
+      // If there are only SERVED orders, we don't show a warning - the AwaitingPaymentSection will handle them
     }
   }, [selectedTable, tableOrders]);
 
@@ -406,39 +455,75 @@ const POSPage = () => {
     }
   };
 
-  const handlePaymentConfirm = (data: { method: string; transactionId?: string; customerPhone?: string }) => {
-    if (!currentOrderId || currentOrderAmount === null) return;
+  // Handle collecting payment from SERVED orders
+  const handleCollectPayment = (orderId: string, amount: number) => {
+    setPayingOrderId(orderId);
+    setPayingOrderAmount(amount);
+    setIsPaymentModalOpen(true);
+  };
 
-    // Use the order's actual finalAmount, not recalculated from cart
-    const total = currentOrderAmount;
+  const handlePaymentConfirm = (data: { method: string; transactionId?: string; customerPhone?: string }) => {
+    // Determine which order to pay: SERVED order (payingOrderId) or cart order (currentOrderId)
+    const orderIdToPay = payingOrderId || currentOrderId;
+    const amountToPay = payingOrderId ? payingOrderAmount : currentOrderAmount;
+
+    if (!orderIdToPay || amountToPay === null) return;
 
     createPayment(
       {
-        orderId: currentOrderId,
-        amount: total,
+        orderId: orderIdToPay,
+        amount: amountToPay,
         method: data.method as any,
         transactionId: data.transactionId,
         customerPhone: data.customerPhone || undefined,
       },
       {
         onSuccess: () => {
-          // Update table status to available
-          if (selectedTable) {
-            updateTableStatus({
-              id: selectedTable.id,
-              status: TableStatus.AVAILABLE,
-            });
-          }
+          // Refetch orders to update the list
+          refetchOrders();
 
-          // Reset state
+          // Check if this was a SERVED order payment
+          const wasServedOrderPayment = !!payingOrderId;
+
+          // Reset payment state
           setIsPaymentModalOpen(false);
-          setCurrentOrderId(null);
-          setCurrentOrderAmount(null);
-          setSelectedTable(null);
-          setCartItems([]);
-          setDiscount(0);
-          setCustomerName('');
-          setOrderNotes('');
+          setPayingOrderId(null);
+          setPayingOrderAmount(null);
+
+          if (wasServedOrderPayment) {
+            // For SERVED orders, check if there are remaining unpaid orders
+            const remainingOrders = tableOrders?.filter(
+              (order) =>
+                order.id !== orderIdToPay &&
+                order.status !== OrderStatus.PAID &&
+                order.status !== OrderStatus.CANCELLED
+            );
+
+            if (!remainingOrders || remainingOrders.length === 0) {
+              // No more orders - mark table as available
+              if (selectedTable) {
+                updateTableStatus({
+                  id: selectedTable.id,
+                  status: TableStatus.AVAILABLE,
+                });
+              }
+            }
+          } else {
+            // For cart orders, reset full state
+            if (selectedTable) {
+              updateTableStatus({
+                id: selectedTable.id,
+                status: TableStatus.AVAILABLE,
+              });
+            }
+            setCurrentOrderId(null);
+            setCurrentOrderAmount(null);
+            setSelectedTable(null);
+            setCartItems([]);
+            setDiscount(0);
+            setCustomerName('');
+            setOrderNotes('');
+          }
 
           toast.success(t('orderCompletedSuccess'));
         },
@@ -700,6 +785,14 @@ const POSPage = () => {
             )}
           </div>
 
+          {/* Awaiting Payment Section - SERVED orders that need payment */}
+          {selectedTable && servedOrders.length > 0 && (
+            <AwaitingPaymentSection
+              orders={servedOrders}
+              onCollectPayment={handleCollectPayment}
+            />
+          )}
+
           {/* DESKTOP: 2/3 Menu + 1/3 Cart Layout */}
           {isDesktop && (
             <div className="flex-1 grid grid-cols-3 gap-6 min-h-0">
@@ -736,6 +829,8 @@ const POSPage = () => {
                     isTwoStepCheckout={isTwoStepCheckout}
                     hasActiveOrder={!!currentOrderId}
                     hasSelectedTable={!!selectedTable}
+                    canProceedToPayment={canProceedToPayment}
+                    paymentBlockedReason={paymentBlockedReason}
                   />
                 </div>
               </div>
@@ -770,6 +865,7 @@ const POSPage = () => {
           hasItems={hasCartItems}
           isTwoStepCheckout={isTwoStepCheckout}
           hasActiveOrder={!!currentOrderId}
+          canProceedToPayment={canProceedToPayment}
         />
       )}
 
@@ -802,14 +898,20 @@ const POSPage = () => {
           isTwoStepCheckout={isTwoStepCheckout}
           hasActiveOrder={!!currentOrderId}
           hasSelectedTable={!!selectedTable}
+          canProceedToPayment={canProceedToPayment}
+          paymentBlockedReason={paymentBlockedReason}
         />
       </CartDrawer>
 
       {/* Payment Modal */}
       <PaymentModal
         isOpen={isPaymentModalOpen}
-        onClose={() => setIsPaymentModalOpen(false)}
-        total={currentOrderAmount ?? total}
+        onClose={() => {
+          setIsPaymentModalOpen(false);
+          setPayingOrderId(null);
+          setPayingOrderAmount(null);
+        }}
+        total={payingOrderAmount ?? currentOrderAmount ?? total}
         onConfirm={handlePaymentConfirm}
         isLoading={isCreatingPayment}
       />
