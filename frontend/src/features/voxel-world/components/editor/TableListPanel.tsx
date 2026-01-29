@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import {
   ChevronDown,
   ChevronUp,
@@ -23,12 +23,6 @@ const STATUS_COLORS: Record<string, string> = {
   AVAILABLE: 'bg-green-500',
   OCCUPIED: 'bg-red-500',
   RESERVED: 'bg-amber-500',
-}
-
-const STATUS_ICONS: Record<string, string> = {
-  AVAILABLE: '🟢',
-  OCCUPIED: '🔴',
-  RESERVED: '🟡',
 }
 
 /**
@@ -142,8 +136,10 @@ export function TableListPanel({ tables }: TableListPanelProps) {
     })
   }, [layout, tables, isPlaced, addObject])
 
-  const placedCount = tables.filter((t) => isPlaced(t.id)).length
-  const unplacedCount = tables.length - placedCount
+  const { placedCount, unplacedCount } = useMemo(() => {
+    const placed = tables.filter((t) => isPlaced(t.id)).length
+    return { placedCount: placed, unplacedCount: tables.length - placed }
+  }, [tables, isPlaced])
 
   return (
     <div className="rounded-lg bg-gray-800">
@@ -183,7 +179,6 @@ export function TableListPanel({ tables }: TableListPanelProps) {
           <div className="max-h-48 space-y-1 overflow-y-auto">
             {tables.map((table) => {
               const placed = isPlaced(table.id)
-              const voxelTable = getVoxelTable(table.id)
 
               return (
                 <div
