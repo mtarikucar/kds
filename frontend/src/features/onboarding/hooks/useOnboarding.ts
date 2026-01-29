@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CallBackProps, STATUS, EVENTS, ACTIONS, LIFECYCLE } from 'react-joyride';
+import { CallBackProps, STATUS, EVENTS, ACTIONS } from 'react-joyride';
 import { useUiStore } from '../../../store/uiStore';
 import { useAuthStore } from '../../../store/authStore';
 import { useTourSteps } from './useTourSteps';
@@ -114,8 +114,9 @@ export function useOnboarding(): UseOnboardingReturn {
         return;
       }
 
-      // Handle tour completion (LIFECYCLE.COMPLETE or STATUS.FINISHED)
-      if (lifecycle === LIFECYCLE.COMPLETE || status === STATUS.FINISHED) {
+      // Handle tour completion (only STATUS.FINISHED)
+      // Note: LIFECYCLE.COMPLETE fires after each step animation, not tour completion
+      if (status === STATUS.FINISHED) {
         setIsTourRunning(false);
         setCurrentStep(0);
         if (tourId) {
@@ -160,6 +161,13 @@ export function useOnboarding(): UseOnboardingReturn {
           // Update progress
           if (tourId) {
             updateTourProgress(tourId, nextIndex, false);
+          }
+        } else if (nextIndex >= steps.length) {
+          // Tour completed - clicked "Finish" on last step
+          setIsTourRunning(false);
+          setCurrentStep(0);
+          if (tourId) {
+            updateTourProgress(tourId, steps.length - 1, true);
           }
         }
       }
