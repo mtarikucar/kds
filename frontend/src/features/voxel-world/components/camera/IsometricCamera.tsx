@@ -49,10 +49,14 @@ export function IsometricCamera({
       enabled={true}
       enablePan={enablePan}
       enableZoom={enableZoom}
-      enableRotate={false} // No rotation - fixed isometric angle
+      enableRotate={true}
+      // Limit vertical angle to maintain good viewing perspective (20° to 70° from vertical)
+      minPolarAngle={0.35}
+      maxPolarAngle={1.2}
       minDistance={15}
       maxDistance={80}
       panSpeed={0.8}
+      rotateSpeed={0.5}
       zoomSpeed={1}
       target={target}
       makeDefault

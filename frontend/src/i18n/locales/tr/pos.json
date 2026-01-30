@@ -191,6 +191,7 @@
   },
   "newCustomerOrder": "Yeni Müşteri Siparişi: #{{orderNumber}}",
   "dineInPaymentRequiresServed": "Masa siparişlerinde ödeme ancak servis edildikten sonra alınabilir",
+  "dineInPaymentRequiresReadyOrServed": "Masa siparişlerinde ödeme ancak hazır veya servis edildikten sonra alınabilir",
   "noActiveOrder": "Önce sipariş oluşturun",
   "transfer": {
     "title": "Masa Siparişlerini Aktar",

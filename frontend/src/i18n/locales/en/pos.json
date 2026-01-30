@@ -191,6 +191,7 @@
   },
   "newCustomerOrder": "New Customer Order: #{{orderNumber}}",
   "dineInPaymentRequiresServed": "Dine-in orders can only be paid after being served",
+  "dineInPaymentRequiresReadyOrServed": "Dine-in orders can only be paid when ready or served",
   "noActiveOrder": "Create an order first",
   "transfer": {
     "title": "Transfer Table Orders",

@@ -46,7 +46,7 @@ export function OrbitCamera({ enabled = true, isometric = false }: OrbitCameraPr
     }
   }, [centerX, centerZ])
 
-  // Isometric mode: fixed angle, only zoom and pan allowed
+  // Isometric mode: full rotation with vertical limits
   if (isometric) {
     return (
       <OrbitControls
@@ -54,10 +54,15 @@ export function OrbitCamera({ enabled = true, isometric = false }: OrbitCameraPr
         enabled={enabled && !isDragging}
         enablePan={true}
         enableZoom={true}
-        enableRotate={false}
+        enableRotate={true}
+        // Allow full 360° horizontal rotation (no azimuth limits)
+        // Limit vertical angle to prevent going below floor or directly overhead
+        minPolarAngle={0.3}
+        maxPolarAngle={Math.PI / 2.5}
         minDistance={10}
         maxDistance={150}
         panSpeed={0.8}
+        rotateSpeed={0.5}
         zoomSpeed={1}
         target={[centerX, 0, centerZ]}
         makeDefault

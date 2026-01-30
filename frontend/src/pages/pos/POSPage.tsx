@@ -113,9 +113,9 @@ const POSPage = () => {
       : undefined
   );
 
-  // Filter SERVED orders awaiting payment
-  const servedOrders = tableOrders?.filter(
-    (order) => order.status === OrderStatus.SERVED
+  // Filter READY or SERVED orders awaiting payment
+  const readyOrServedOrders = tableOrders?.filter(
+    (order) => order.status === OrderStatus.SERVED || order.status === OrderStatus.READY
   ) || [];
 
   // Find the current order for payment eligibility check
@@ -135,9 +135,9 @@ const POSPage = () => {
       return true;
     }
 
-    // For dine-in, check if SERVED status is required
+    // For dine-in, check if SERVED/READY status is required
     if (posSettings?.requireServedForDineInPayment) {
-      return currentOrder.status === OrderStatus.SERVED;
+      return currentOrder.status === OrderStatus.SERVED || currentOrder.status === OrderStatus.READY;
     }
 
     // Setting is off - allow payment anytime
@@ -151,9 +151,10 @@ const POSPage = () => {
     if (
       posSettings?.requireServedForDineInPayment &&
       currentOrder?.type === OrderType.DINE_IN &&
-      currentOrder?.status !== OrderStatus.SERVED
+      currentOrder?.status !== OrderStatus.SERVED &&
+      currentOrder?.status !== OrderStatus.READY
     ) {
-      return 'dineInPaymentRequiresServed';
+      return 'dineInPaymentRequiresReadyOrServed';
     }
     return null;
   }, [canProceedToPayment, currentOrderId, currentOrder, posSettings?.requireServedForDineInPayment]);
@@ -193,7 +194,7 @@ const POSPage = () => {
         // Table is marked occupied but no orders found at all - this is unusual
         toast.warning(t('tableOccupiedNoOrders'));
       }
-      // If there are only SERVED orders, we don't show a warning - the AwaitingPaymentSection will handle them
+      // If there are only READY/SERVED orders, we don't show a warning - the AwaitingPaymentSection will handle them
     }
   }, [selectedTable, tableOrders]);
 
@@ -482,35 +483,35 @@ const POSPage = () => {
           // Refetch orders to update the list
           refetchOrders();
 
-          // Check if this was a SERVED order payment
-          const wasServedOrderPayment = !!payingOrderId;
+          // Check if this was an existing order payment (from AwaitingPayment section)
+          const wasExistingOrderPayment = !!payingOrderId;
 
           // Reset payment state
           setIsPaymentModalOpen(false);
           setPayingOrderId(null);
           setPayingOrderAmount(null);
 
-          if (wasServedOrderPayment) {
-            // For SERVED orders, check if there are remaining unpaid orders
-            const remainingOrders = tableOrders?.filter(
-              (order) =>
-                order.id !== orderIdToPay &&
-                order.status !== OrderStatus.PAID &&
-                order.status !== OrderStatus.CANCELLED
-            );
+          // Always check for remaining unpaid orders before marking table as available
+          const remainingOrders = tableOrders?.filter(
+            (order) =>
+              order.id !== orderIdToPay &&
+              order.status !== OrderStatus.PAID &&
+              order.status !== OrderStatus.CANCELLED
+          );
 
-            if (!remainingOrders || remainingOrders.length === 0) {
-              // No more orders - mark table as available
-              if (selectedTable) {
-                updateTableStatus({
-                  id: selectedTable.id,
-                  status: TableStatus.AVAILABLE,
-                });
-              }
+          const hasRemainingOrders = remainingOrders && remainingOrders.length > 0;
+
+          if (wasExistingOrderPayment) {
+            // For existing order payments (READY/SERVED), only mark available if no remaining orders
+            if (!hasRemainingOrders && selectedTable) {
+              updateTableStatus({
+                id: selectedTable.id,
+                status: TableStatus.AVAILABLE,
+              });
             }
           } else {
-            // For cart orders, reset full state
-            if (selectedTable) {
+            // For cart orders (single-step checkout), check remaining orders before resetting
+            if (!hasRemainingOrders && selectedTable) {
               updateTableStatus({
                 id: selectedTable.id,
                 status: TableStatus.AVAILABLE,
@@ -785,10 +786,10 @@ const POSPage = () => {
             )}
           </div>
 
-          {/* Awaiting Payment Section - SERVED orders that need payment */}
-          {selectedTable && servedOrders.length > 0 && (
+          {/* Awaiting Payment Section - READY or SERVED orders that need payment */}
+          {selectedTable && readyOrServedOrders.length > 0 && (
             <AwaitingPaymentSection
-              orders={servedOrders}
+              orders={readyOrServedOrders}
               onCollectPayment={handleCollectPayment}
             />
           )}

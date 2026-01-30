@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronDown, ChevronUp, CreditCard, Clock } from 'lucide-react';
 import { Order } from '../../types';
-import { formatCurrency } from '../../lib/utils';
+import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 
 interface AwaitingPaymentSectionProps {
   orders: Order[];
@@ -14,6 +14,7 @@ const AwaitingPaymentSection = ({
   onCollectPayment,
 }: AwaitingPaymentSectionProps) => {
   const { t } = useTranslation('pos');
+  const formatPrice = useFormatCurrency();
   const [isExpanded, setIsExpanded] = useState(true);
 
   if (orders.length === 0) {
@@ -85,7 +86,7 @@ const AwaitingPaymentSection = ({
                       {t('awaitingPayment.orderTotal')}
                     </div>
                     <div className="font-semibold text-slate-900">
-                      {formatCurrency(Number(order.finalAmount))}
+                      {formatPrice(Number(order.finalAmount))}
                     </div>
                   </div>
 
