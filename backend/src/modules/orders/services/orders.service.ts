@@ -501,6 +501,44 @@ export class OrdersService {
       },
     });
 
+    // Ensure table status is synced with order status
+    if (updatedOrder.tableId) {
+      const activeStatuses = [
+        OrderStatus.PENDING,
+        OrderStatus.PREPARING,
+        OrderStatus.READY,
+        OrderStatus.SERVED,
+      ];
+
+      if (activeStatuses.includes(updateStatusDto.status as OrderStatus)) {
+        // Order is active - ensure table is OCCUPIED
+        await this.prisma.table.update({
+          where: { id: updatedOrder.tableId },
+          data: { status: TableStatus.OCCUPIED },
+        });
+      } else if (
+        updateStatusDto.status === OrderStatus.PAID ||
+        updateStatusDto.status === OrderStatus.CANCELLED
+      ) {
+        // Order is completed - check if there are other active orders on this table
+        const activeOrdersCount = await this.prisma.order.count({
+          where: {
+            tableId: updatedOrder.tableId,
+            id: { not: id },
+            status: { in: activeStatuses },
+          },
+        });
+
+        if (activeOrdersCount === 0) {
+          // No other active orders - mark table as AVAILABLE
+          await this.prisma.table.update({
+            where: { id: updatedOrder.tableId },
+            data: { status: TableStatus.AVAILABLE },
+          });
+        }
+      }
+    }
+
     // Emit status change via WebSocket
     this.kdsGateway.emitOrderStatusChange(tenantId, id, updateStatusDto.status);
 
@@ -785,6 +823,64 @@ export class OrdersService {
       transferredOrders: result,
       sourceTable: { id: sourceTableId, number: sourceTable.number, newStatus: TableStatus.AVAILABLE },
       targetTable: { id: targetTableId, number: targetTable.number, newStatus: TableStatus.OCCUPIED },
+    };
+  }
+
+  /**
+   * Sync all table statuses based on their active orders.
+   * Tables with active orders (PENDING, PREPARING, READY, SERVED) should be OCCUPIED.
+   * Tables with no active orders should be AVAILABLE (unless RESERVED).
+   */
+  async syncTableStatuses(tenantId: string) {
+    const activeStatuses = [
+      OrderStatus.PENDING,
+      OrderStatus.PREPARING,
+      OrderStatus.READY,
+      OrderStatus.SERVED,
+    ];
+
+    // Get all tables for this tenant
+    const tables = await this.prisma.table.findMany({
+      where: { tenantId },
+      select: { id: true, number: true, status: true },
+    });
+
+    const updates: { tableId: string; tableNumber: string; oldStatus: string; newStatus: string }[] = [];
+
+    for (const table of tables) {
+      // Skip reserved tables
+      if (table.status === TableStatus.RESERVED) {
+        continue;
+      }
+
+      // Count active orders for this table
+      const activeOrdersCount = await this.prisma.order.count({
+        where: {
+          tableId: table.id,
+          status: { in: activeStatuses },
+        },
+      });
+
+      const expectedStatus = activeOrdersCount > 0 ? TableStatus.OCCUPIED : TableStatus.AVAILABLE;
+
+      if (table.status !== expectedStatus) {
+        await this.prisma.table.update({
+          where: { id: table.id },
+          data: { status: expectedStatus },
+        });
+
+        updates.push({
+          tableId: table.id,
+          tableNumber: table.number,
+          oldStatus: table.status,
+          newStatus: expectedStatus,
+        });
+      }
+    }
+
+    return {
+      message: `Synced ${updates.length} table(s)`,
+      updates,
     };
   }
 }

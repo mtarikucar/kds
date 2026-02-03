@@ -136,4 +136,13 @@ export class OrdersController {
   remove(@Param('id') id: string, @Request() req) {
     return this.ordersService.remove(id, req.tenantId);
   }
+
+  @Post('sync-table-statuses')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Sync all table statuses based on their active orders (ADMIN, MANAGER)' })
+  @ApiResponse({ status: 200, description: 'Table statuses synced successfully' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  syncTableStatuses(@Request() req) {
+    return this.ordersService.syncTableStatuses(req.tenantId);
+  }
 }
