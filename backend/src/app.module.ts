@@ -29,6 +29,7 @@ import { CustomerOrdersModule } from './modules/customer-orders/customer-orders.
 import { DesktopAppModule } from './modules/desktop-app/desktop-app.module';
 import { PublicStatsModule } from './modules/public-stats/public-stats.module';
 import { LayoutsModule } from './modules/layouts/layouts.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './common/middleware/input-sanitizer.middleware';
 
@@ -81,6 +82,7 @@ import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './co
     DesktopAppModule,
     PublicStatsModule,
     LayoutsModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -1,0 +1,63 @@
+export enum PersonState {
+  STANDING = 'STANDING',
+  SITTING = 'SITTING',
+  MOVING = 'MOVING',
+  WAITING = 'WAITING',
+}
+
+export enum CameraStatus {
+  ONLINE = 'ONLINE',
+  OFFLINE = 'OFFLINE',
+  ERROR = 'ERROR',
+  CALIBRATING = 'CALIBRATING',
+}
+
+export enum CameraStreamType {
+  RTSP = 'RTSP',
+  ONVIF = 'ONVIF',
+  HLS = 'HLS',
+  WEBRTC = 'WEBRTC',
+}
+
+export enum InsightType {
+  SPACE_OPTIMIZATION = 'SPACE_OPTIMIZATION',
+  TRAFFIC_BOTTLENECK = 'TRAFFIC_BOTTLENECK',
+  TABLE_UNDERUTILIZATION = 'TABLE_UNDERUTILIZATION',
+  CUSTOMER_BEHAVIOR = 'CUSTOMER_BEHAVIOR',
+  REVENUE_OPPORTUNITY = 'REVENUE_OPPORTUNITY',
+  STAFFING_SUGGESTION = 'STAFFING_SUGGESTION',
+}
+
+export enum InsightCategory {
+  OPERATIONAL = 'OPERATIONAL',
+  REVENUE = 'REVENUE',
+  CUSTOMER = 'CUSTOMER',
+  LAYOUT = 'LAYOUT',
+}
+
+export enum InsightSeverity {
+  INFO = 'INFO',
+  WARNING = 'WARNING',
+  CRITICAL = 'CRITICAL',
+}
+
+export enum InsightStatus {
+  NEW = 'NEW',
+  REVIEWED = 'REVIEWED',
+  IN_PROGRESS = 'IN_PROGRESS',
+  IMPLEMENTED = 'IMPLEMENTED',
+  DISMISSED = 'DISMISSED',
+}
+
+export enum HeatmapMetric {
+  OCCUPANCY = 'OCCUPANCY',
+  DWELL_TIME = 'DWELL_TIME',
+  TRAFFIC = 'TRAFFIC',
+  REVENUE = 'REVENUE',
+}
+
+export enum HeatmapGranularity {
+  HOURLY = 'HOURLY',
+  DAILY = 'DAILY',
+  WEEKLY = 'WEEKLY',
+}

@@ -1,0 +1,79 @@
+# KDS Edge Device Configuration
+# C++ TensorRT Edition
+
+# Device identification
+device_id: "edge-001"
+log_level: "info"           # debug, info, warn, error
+# log_file: "/var/log/kds-edge/edge-device.log"
+
+# Camera configuration
+camera:
+  url: "rtsp://admin:admin@192.168.1.100:554/stream1"
+  width: 1280
+  height: 720
+  fps: 30
+  reconnect_delay_ms: 5000
+  buffer_size: 3
+
+# Detection configuration (YOLOv8 + TensorRT)
+detection:
+  model_path: "models/yolov8n.onnx"
+  engine_path: "models/yolov8n.engine"
+  input_size: 640
+  confidence_threshold: 0.5
+  nms_threshold: 0.45
+  use_fp16: true            # FP16 precision (faster on Jetson)
+  use_int8: false           # INT8 quantization (requires calibration)
+  max_batch_size: 1
+
+# Tracker configuration
+tracker:
+  max_age: 30               # Max frames to keep track without detection
+  min_hits: 3               # Min hits before track is confirmed
+  iou_threshold: 0.3
+  use_kalman: true
+
+# Calibration configuration
+calibration:
+  floor_plan_width: 20.0    # meters
+  floor_plan_height: 20.0   # meters
+  grid_size: 20             # 20x20 grid for heatmap
+
+  # Calibration points (image coords -> floor coords)
+  # These should be set via the web UI calibration tool
+  # points:
+  #   - image_x: 100
+  #     image_y: 200
+  #     floor_x: 0.0
+  #     floor_z: 0.0
+  #   - image_x: 1180
+  #     image_y: 200
+  #     floor_x: 20.0
+  #     floor_z: 0.0
+  #   - image_x: 1180
+  #     image_y: 680
+  #     floor_x: 20.0
+  #     floor_z: 20.0
+  #   - image_x: 100
+  #     image_y: 680
+  #     floor_x: 0.0
+  #     floor_z: 20.0
+
+  # Pre-computed homography matrix (optional, computed from points if not set)
+  # homography_matrix:
+  #   - [1.0, 0.0, 0.0]
+  #   - [0.0, 1.0, 0.0]
+  #   - [0.0, 0.0, 1.0]
+
+# Backend WebSocket configuration
+backend:
+  url: "wss://api.example.com/analytics-edge"
+  # For development:
+  # url: "ws://localhost:3000/analytics-edge"
+  auth_token: ""            # Set via environment: KDS_AUTH_TOKEN
+  tenant_id: ""             # Set via environment: KDS_TENANT_ID
+  device_id: ""             # Uses main device_id if not set
+  camera_id: ""             # Set via environment: KDS_CAMERA_ID
+  heartbeat_interval_ms: 30000
+  reconnect_delay_ms: 5000
+  health_report_interval_ms: 60000

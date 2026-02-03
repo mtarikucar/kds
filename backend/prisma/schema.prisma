@@ -77,6 +77,15 @@ model Tenant {
   zReports            ZReport[]
   currentPlan         SubscriptionPlan?  @relation("CurrentPlan", fields: [currentPlanId], references: [id], onDelete: SetNull)
 
+  // Analytics relations
+  cameras             Camera[]
+  occupancyRecords    OccupancyRecord[]
+  trafficFlowRecords  TrafficFlowRecord[]
+  tableAnalytics      TableAnalytics[]
+  analyticsInsights   AnalyticsInsight[]
+  heatmapCache        AnalyticsHeatmapCache[]
+  edgeDevices         EdgeDevice[]
+
   @@index([currentPlanId])
   @@map("tenants")
 }
@@ -336,9 +345,13 @@ model Table {
   updatedAt DateTime @updatedAt
 
   // Relations
-  orders         Order[]
-  waiterRequests WaiterRequest[]
-  billRequests   BillRequest[]
+  orders             Order[]
+  waiterRequests     WaiterRequest[]
+  billRequests       BillRequest[]
+
+  // Analytics relations
+  occupancyRecords   OccupancyRecord[]
+  tableAnalytics     TableAnalytics[]
 
   @@unique([tenantId, number])
   @@index([tenantId])
@@ -1425,4 +1438,284 @@ model PublicStatsCache {
   lastUpdated DateTime @default(now())
 
   @@map("public_stats_cache")
+}
+
+// ========================================
+// RESTAURANT ANALYTICS (AI-POWERED)
+// ========================================
+
+model Camera {
+  id              String   @id @default(uuid())
+  name            String
+  description     String?
+  streamUrl       String   // Encrypted RTSP/ONVIF URL
+  streamType      String   @default("RTSP") // RTSP, ONVIF, HLS, WEBRTC
+
+  // Floor plan calibration
+  calibrationData Json?    // {corners: [{imageX, imageY, floorX, floorZ}], homographyMatrix: [...]}
+
+  // Camera position in voxel world (for 3D visualization)
+  voxelX          Float?
+  voxelY          Float?   @default(2.5)  // Camera height (meters)
+  voxelZ          Float?
+  rotationY       Float?   @default(0)    // Horizontal rotation (degrees)
+  fov             Float?   @default(90)   // Field of view (degrees)
+
+  // Status and health
+  status          String   @default("OFFLINE") // ONLINE, OFFLINE, ERROR, CALIBRATING
+  lastSeenAt      DateTime?
+  errorMessage    String?
+
+  // Edge device assignment
+  edgeDeviceId    String?
+  edgeDevice      EdgeDevice? @relation(fields: [edgeDeviceId], references: [id], onDelete: SetNull)
+
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@index([status])
+  @@index([edgeDeviceId])
+  @@map("cameras")
+}
+
+model OccupancyRecord {
+  id              String   @id @default(uuid())
+  timestamp       DateTime @default(now())
+
+  // Anonymous tracking ID (per session, not personally identifiable)
+  trackingId      String   // e.g., "track_abc123" - assigned by edge device
+
+  // Position in floor plan coordinates (meters from origin)
+  positionX       Float
+  positionZ       Float
+  positionY       Float    @default(0) // Height estimation (0 = floor level)
+
+  // Person state classification
+  state           String   // STANDING, SITTING, MOVING, WAITING
+
+  // Confidence score from ML model (0-1)
+  confidence      Float    @default(0.9)
+
+  // Optional table association
+  tableId         String?
+  table           Table?   @relation(fields: [tableId], references: [id], onDelete: SetNull)
+
+  // Source camera
+  cameraId        String?
+
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, timestamp])
+  @@index([tableId])
+  @@index([trackingId, timestamp])
+  @@index([state])
+  @@map("occupancy_records")
+}
+
+model TrafficFlowRecord {
+  id              String   @id @default(uuid())
+  hourBucket      DateTime // Rounded to hour for aggregation
+
+  // Grid cell coordinates (floor plan divided into cells)
+  cellX           Int      // Grid X coordinate
+  cellZ           Int      // Grid Z coordinate
+  cellSize        Float    @default(1.0) // Cell size in meters
+
+  // Traffic metrics
+  personCount     Int      // Number of unique persons passing through
+  avgDwellTime    Float?   // Average time spent in cell (seconds)
+  entrances       Int      @default(0) // People entering cell
+  exits           Int      @default(0) // People exiting cell
+
+  // Direction flow (JSON for flexibility)
+  flowDirections  Json?    // {north: 10, south: 5, east: 3, west: 8}
+
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, hourBucket, cellX, cellZ])
+  @@index([tenantId, hourBucket])
+  @@index([cellX, cellZ])
+  @@map("traffic_flow_records")
+}
+
+model TableAnalytics {
+  id                      String   @id @default(uuid())
+  date                    DateTime @db.Date
+
+  tableId                 String
+  table                   Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  // Occupancy metrics (in minutes)
+  totalOccupiedMinutes    Int      @default(0)
+  totalDiningMinutes      Int      @default(0)  // When orders are active
+  totalIdleMinutes        Int      @default(0)  // Occupied but no orders
+  totalEmptyMinutes       Int      @default(0)  // Table unoccupied
+
+  // Session metrics
+  totalSessions           Int      @default(0)  // Number of table turns
+  avgSessionDuration      Float?   // Average session length (minutes)
+  avgDiningDuration       Float?   // Average dining time (minutes)
+  avgIdleDuration         Float?   // Average idle time after dining (minutes)
+
+  // Revenue metrics
+  revenueGenerated        Decimal  @default(0) @db.Decimal(10, 2)
+  ordersCount             Int      @default(0)
+  avgOrderValue           Decimal? @db.Decimal(10, 2)
+  revenuePerMinute        Decimal? @db.Decimal(10, 4) // Revenue efficiency
+
+  // Utilization score (0-100)
+  utilizationScore        Float?   // Calculated: (occupiedMinutes / operatingMinutes) * 100
+
+  // Peak hours (JSON for flexibility)
+  peakHours               Json?    // {hour: occupancyPercentage}
+
+  tenantId                String
+  tenant                  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@unique([tableId, date])
+  @@index([tenantId, date])
+  @@index([tableId])
+  @@map("table_analytics")
+}
+
+model AnalyticsInsight {
+  id              String   @id @default(uuid())
+
+  // Insight classification
+  type            String   // SPACE_OPTIMIZATION, TRAFFIC_BOTTLENECK, TABLE_UNDERUTILIZATION,
+                           // CUSTOMER_BEHAVIOR, REVENUE_OPPORTUNITY, STAFFING_SUGGESTION
+  category        String   @default("OPERATIONAL") // OPERATIONAL, REVENUE, CUSTOMER, LAYOUT
+  severity        String   @default("INFO") // INFO, WARNING, CRITICAL
+
+  // Content
+  title           String   // e.g., "Table 7 is underutilized"
+  description     String   @db.Text // Detailed explanation
+  recommendation  String   @db.Text // Actionable suggestion
+
+  // Affected entities
+  affectedTableIds String[] @default([])
+  affectedAreaData Json?    // {x: number, z: number, width: number, depth: number}
+
+  // Supporting data
+  supportingData  Json?    // Charts, metrics, evidence
+
+  // Impact estimation
+  potentialImpact String?  // "Could increase revenue by 15%"
+  confidenceScore Float    @default(0.8) // ML confidence (0-1)
+
+  // Status tracking
+  status          String   @default("NEW") // NEW, REVIEWED, IN_PROGRESS, IMPLEMENTED, DISMISSED
+  reviewedAt      DateTime?
+  reviewedBy      String?
+  implementedAt   DateTime?
+  dismissedReason String?
+
+  // Validity period
+  validFrom       DateTime @default(now())
+  validUntil      DateTime? // Insight may expire
+
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, type])
+  @@index([tenantId, createdAt])
+  @@index([severity])
+  @@map("analytics_insights")
+}
+
+model AnalyticsHeatmapCache {
+  id              String   @id @default(uuid())
+
+  // Time range
+  startTime       DateTime
+  endTime         DateTime
+  granularity     String   // HOURLY, DAILY, WEEKLY
+
+  // Grid configuration
+  gridWidth       Int      // Number of cells in X direction
+  gridDepth       Int      // Number of cells in Z direction
+  cellSize        Float    // Cell size in meters
+
+  // Heatmap data (2D array as JSON)
+  heatmapData     Json     // [[value, value, ...], [...], ...]
+  maxValue        Float    // For normalization
+  minValue        Float
+
+  // Metadata
+  metric          String   // OCCUPANCY, DWELL_TIME, TRAFFIC, REVENUE
+
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime // Cache expiration
+
+  @@unique([tenantId, startTime, endTime, granularity, metric])
+  @@index([tenantId, metric])
+  @@index([expiresAt])
+  @@map("analytics_heatmap_cache")
+}
+
+model EdgeDevice {
+  id              String   @id @default(uuid())
+  deviceId        String   // Unique device identifier (e.g., "edge-001")
+  name            String   // Human-readable name
+  description     String?
+
+  // Hardware info
+  hardwareType    String?  // "JETSON_ORIN", "RASPBERRY_PI_5", "CUSTOM"
+  firmwareVersion String?
+  ipAddress       String?
+  macAddress      String?
+
+  // Connection status
+  status          String   @default("OFFLINE") // ONLINE, OFFLINE, ERROR, UPDATING
+  lastHeartbeat   DateTime?
+  lastSeenAt      DateTime?
+  errorMessage    String?
+
+  // Capabilities
+  capabilities    Json?    // {yolov8: true, pose: true, tracking: true, gpuAccel: true}
+
+  // Configuration
+  config          Json?    // Device-specific configuration
+
+  // Assigned cameras
+  cameras         Camera[]
+
+  // Health metrics
+  cpuUsage        Float?   // Last reported CPU usage (0-100)
+  memoryUsage     Float?   // Last reported memory usage (0-100)
+  gpuUsage        Float?   // Last reported GPU usage (0-100)
+  temperature     Float?   // Last reported temperature (Celsius)
+  uptime          Int?     // Uptime in seconds
+
+  // Statistics
+  framesProcessed BigInt   @default(0)
+  detectionsTotal BigInt   @default(0)
+
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, deviceId])
+  @@index([tenantId])
+  @@index([status])
+  @@map("edge_devices")
 }

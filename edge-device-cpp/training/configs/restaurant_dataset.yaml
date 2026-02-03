@@ -1,0 +1,62 @@
+# Restaurant Person Detection Dataset Configuration
+# For use with YOLOv8 training
+
+# Dataset paths
+path: /home/tarik/projects/kds/edge-device/training/data
+train: labeled/train/images
+val: labeled/val/images
+test: labeled/test/images
+
+# Number of classes
+nc: 1
+
+# Class names
+names:
+  0: person
+
+# Dataset description
+description: |
+  Custom dataset for restaurant person detection.
+  Focuses on:
+  - Seated customers at tables
+  - Standing customers (waiting, ordering)
+  - Walking customers
+  - Crowded scenarios
+  - Various lighting conditions
+  - Multiple camera angles
+
+# Annotation format
+annotation_format: yolo  # YOLO format: class x_center y_center width height
+
+# Data collection guidelines
+collection_guidelines:
+  camera_angles:
+    - overhead (ceiling mounted)
+    - corner mounted (45-60 degree angle)
+    - wall mounted (eye level)
+
+  scenarios:
+    - empty restaurant
+    - light traffic (1-5 people)
+    - medium traffic (5-15 people)
+    - busy periods (15+ people)
+    - peak hours
+
+  lighting:
+    - daylight (natural)
+    - artificial (evening)
+    - mixed (transitional)
+    - low light
+    - spot lighting
+
+  occlusion:
+    - clear view
+    - partial occlusion (tables, chairs)
+    - heavy occlusion (crowded)
+
+# Quality requirements
+quality:
+  min_resolution: [640, 480]
+  min_fps: 15
+  max_motion_blur: 0.1
+  min_contrast: 0.3
