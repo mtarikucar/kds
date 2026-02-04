@@ -145,8 +145,19 @@ export class UsersService {
     // Check if user exists and belongs to tenant
     await this.findOne(id, tenantId);
 
-    return this.prisma.user.delete({
+    // Soft delete: set status to INACTIVE instead of hard delete
+    // This preserves referential integrity with orders, notifications, etc.
+    return this.prisma.user.update({
       where: { id },
+      data: { status: 'INACTIVE' },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        status: true,
+      },
     });
   }
 
