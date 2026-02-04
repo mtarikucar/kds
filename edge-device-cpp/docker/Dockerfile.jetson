@@ -1,0 +1,107 @@
+# KDS Edge Device - Jetson Build Container
+# Based on NVIDIA L4T (Linux for Tegra) with TensorRT
+
+# Use NVIDIA's official L4T container as base
+# JetPack 5.x includes TensorRT 8.5+, CUDA 11.4+, cuDNN 8.6+
+ARG L4T_VERSION=r35.2.1
+FROM nvcr.io/nvidia/l4t-tensorrt:${L4T_VERSION}-runtime
+
+LABEL maintainer="KDS Team"
+LABEL description="KDS Edge Device C++ application for NVIDIA Jetson"
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+ENV CUDA_HOME=/usr/local/cuda
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:${LD_LIBRARY_PATH}
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    git \
+    pkg-config \
+    # OpenCV
+    libopencv-dev \
+    # GStreamer
+    libgstreamer1.0-dev \
+    libgstreamer-plugins-base1.0-dev \
+    libgstreamer-plugins-good1.0-dev \
+    gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-plugins-ugly \
+    gstreamer1.0-libav \
+    gstreamer1.0-tools \
+    # SSL for WebSocket
+    libssl-dev \
+    libboost-system-dev \
+    # Other
+    libyaml-cpp-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create working directory
+WORKDIR /app
+
+# Copy source code
+COPY CMakeLists.txt .
+COPY src/ ./src/
+COPY config/ ./config/
+COPY models/ ./models/
+
+# Build the application
+RUN mkdir -p build && cd build && \
+    cmake .. \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DTENSORRT_ROOT=/usr/lib/aarch64-linux-gnu && \
+    make -j$(nproc)
+
+# Runtime stage
+FROM nvcr.io/nvidia/l4t-tensorrt:${L4T_VERSION}-runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libopencv-core4.2 \
+    libopencv-imgproc4.2 \
+    libopencv-imgcodecs4.2 \
+    libopencv-videoio4.2 \
+    libopencv-calib3d4.2 \
+    gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-plugins-ugly \
+    gstreamer1.0-libav \
+    libssl1.1 \
+    libyaml-cpp0.6 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/edge-device
+
+# Copy built binary
+COPY --from=0 /app/build/kds_edge_device .
+
+# Copy configuration and models
+COPY --from=0 /app/config ./config
+COPY --from=0 /app/models ./models
+
+# Create volume mount points
+VOLUME ["/opt/edge-device/config", "/opt/edge-device/models"]
+
+# Environment variables for configuration
+ENV KDS_DEVICE_ID=""
+ENV KDS_CAMERA_URL=""
+ENV KDS_BACKEND_URL=""
+ENV KDS_AUTH_TOKEN=""
+ENV KDS_TENANT_ID=""
+ENV KDS_CAMERA_ID=""
+ENV KDS_LOG_LEVEL="info"
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD pgrep -x kds_edge_device || exit 1
+
+# Run the application
+ENTRYPOINT ["./kds_edge_device"]
+CMD ["--config", "config/config.yaml"]

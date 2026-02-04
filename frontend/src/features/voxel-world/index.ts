@@ -5,6 +5,8 @@ export { VoxelWorldView } from './components/VoxelWorldView'
 export { VoxelFloor } from './components/VoxelFloor'
 export { VoxelWalls } from './components/VoxelWalls'
 export { OrbitCamera } from './components/camera/OrbitCamera'
+export { HeatmapOverlay, createHeatmapFromPoints, createOccupancyHeatmap } from './components/HeatmapOverlay'
+export type { HeatmapOverlayProps, HeatmapColorScheme } from './components/HeatmapOverlay'
 
 // Editor
 export { EditorToolbar } from './components/editor/EditorToolbar'

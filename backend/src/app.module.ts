@@ -30,6 +30,7 @@ import { DesktopAppModule } from './modules/desktop-app/desktop-app.module';
 import { PublicStatsModule } from './modules/public-stats/public-stats.module';
 import { LayoutsModule } from './modules/layouts/layouts.module';
 import { SuperAdminModule } from './modules/superadmin/superadmin.module';
+import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './common/middleware/input-sanitizer.middleware';
 
@@ -83,6 +84,7 @@ import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './co
     PublicStatsModule,
     LayoutsModule,
     SuperAdminModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [

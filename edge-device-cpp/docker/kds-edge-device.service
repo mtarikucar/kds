@@ -1,0 +1,64 @@
+# KDS Edge Device systemd service file
+# Install to: /etc/systemd/system/kds-edge-device.service
+#
+# Setup:
+#   sudo cp kds-edge-device.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable kds-edge-device
+#   sudo systemctl start kds-edge-device
+#
+# Status:
+#   sudo systemctl status kds-edge-device
+#   sudo journalctl -u kds-edge-device -f
+
+[Unit]
+Description=KDS Edge Device - Restaurant Analytics Person Detection
+Documentation=https://github.com/your-org/kds
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+
+# Working directory
+WorkingDirectory=/opt/kds-edge-device
+
+# Environment variables
+Environment="KDS_LOG_LEVEL=info"
+# These should be set in /etc/kds-edge-device.env
+EnvironmentFile=-/etc/kds-edge-device.env
+
+# Main executable
+ExecStart=/opt/kds-edge-device/kds_edge_device --config /opt/kds-edge-device/config/config.yaml
+
+# Restart policy
+Restart=always
+RestartSec=10
+StartLimitInterval=300
+StartLimitBurst=5
+
+# Resource limits
+# Jetson Nano has 4GB RAM, allow up to 2GB for the application
+MemoryMax=2G
+# Allow access to NVIDIA GPU
+PrivateDevices=false
+
+# Security hardening (optional, comment out if causing issues)
+# NoNewPrivileges=true
+# ProtectSystem=strict
+# ProtectHome=true
+# ReadWritePaths=/opt/kds-edge-device/logs
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kds-edge-device
+
+# Watchdog (optional)
+WatchdogSec=60
+NotifyAccess=all
+
+[Install]
+WantedBy=multi-user.target

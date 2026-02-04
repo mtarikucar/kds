@@ -7,6 +7,7 @@ import {
   UtensilsCrossed,
   Table,
   BarChart3,
+  Activity,
   Settings,
   Users,
   QrCode,
@@ -95,6 +96,12 @@ const Sidebar = ({ isOpen, onClose, isRTL: isRTLProp }: SidebarProps) => {
       label: t('navigation.reports'),
       roles: [UserRole.ADMIN, UserRole.MANAGER],
       requiredFeature: 'advancedReports' as keyof PlanFeatures,
+    },
+    {
+      to: '/admin/analytics',
+      icon: Activity,
+      label: t('navigation.analytics'),
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
     {
       to: '/admin/settings',
