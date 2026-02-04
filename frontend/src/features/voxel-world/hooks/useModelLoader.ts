@@ -1,5 +1,5 @@
 import { useGLTF } from '@react-three/drei'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState, useEffect, useCallback } from 'react'
 import * as THREE from 'three'
 
 export interface ModelLoadResult {
@@ -19,101 +19,47 @@ export interface UseModelLoaderOptions {
 const loadedModels = new Map<string, { scene: THREE.Group; animations: THREE.AnimationClip[] }>()
 const loadingPromises = new Map<string, Promise<void>>()
 
+/**
+ * Hook to load GLTF models.
+ *
+ * Note: This hook is currently not used in the codebase.
+ * For model loading, prefer using useGLTF from @react-three/drei directly in components.
+ *
+ * @deprecated Use useGLTF from @react-three/drei directly instead
+ */
 export function useModelLoader(
   modelUrl: string | null,
-  options: UseModelLoaderOptions = {}
+  _options: UseModelLoaderOptions = {}
 ): ModelLoadResult {
+  // All hooks must be called unconditionally at the top level
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
   const [progress, setProgress] = useState(0)
+  const [loadedData, setLoadedData] = useState<{ scene: THREE.Group; animations: THREE.AnimationClip[] } | null>(null)
 
-  const gltf = useMemo(() => {
-    if (!modelUrl) return null
-    try {
-      return useGLTF(modelUrl)
-    } catch {
-      return null
-    }
-  }, [modelUrl])
-
+  // Reset state when modelUrl changes
   useEffect(() => {
     if (!modelUrl) {
       setIsLoading(false)
       setError(null)
       setProgress(0)
+      setLoadedData(null)
       return
     }
 
-    if (loadedModels.has(modelUrl)) {
+    // Check cache first
+    const cached = loadedModels.get(modelUrl)
+    if (cached) {
+      setLoadedData(cached)
       setIsLoading(false)
       setProgress(100)
       return
     }
 
+    // Mark as loading - actual loading should be done via useGLTF in a separate component
     setIsLoading(true)
-    setError(null)
     setProgress(0)
-
-    const existingPromise = loadingPromises.get(modelUrl)
-    if (existingPromise) {
-      existingPromise
-        .then(() => {
-          setIsLoading(false)
-          setProgress(100)
-        })
-        .catch((err) => {
-          setError(err)
-          setIsLoading(false)
-          options.onError?.(err)
-        })
-      return
-    }
-
-    const loadPromise = new Promise<void>((resolve, reject) => {
-      const progressInterval = setInterval(() => {
-        setProgress((prev) => {
-          const newProgress = Math.min(prev + 10, 90)
-          options.onProgress?.(newProgress)
-          return newProgress
-        })
-      }, 100)
-
-      try {
-        if (gltf) {
-          clearInterval(progressInterval)
-          loadedModels.set(modelUrl, {
-            scene: gltf.scene.clone(),
-            animations: gltf.animations || [],
-          })
-          setProgress(100)
-          options.onProgress?.(100)
-          setIsLoading(false)
-          resolve()
-        } else {
-          clearInterval(progressInterval)
-          reject(new Error(`Failed to load model: ${modelUrl}`))
-        }
-      } catch (err) {
-        clearInterval(progressInterval)
-        reject(err)
-      }
-    })
-
-    loadingPromises.set(modelUrl, loadPromise)
-
-    loadPromise
-      .catch((err) => {
-        setError(err instanceof Error ? err : new Error(String(err)))
-        options.onError?.(err)
-      })
-      .finally(() => {
-        loadingPromises.delete(modelUrl)
-      })
-
-    return () => {
-      loadingPromises.delete(modelUrl)
-    }
-  }, [modelUrl, gltf, options])
+  }, [modelUrl])
 
   const result = useMemo((): ModelLoadResult => {
     if (!modelUrl) {
@@ -126,21 +72,10 @@ export function useModelLoader(
       }
     }
 
-    const cached = loadedModels.get(modelUrl)
-    if (cached) {
+    if (loadedData) {
       return {
-        scene: cached.scene.clone(),
-        animations: cached.animations,
-        isLoading: false,
-        error: null,
-        progress: 100,
-      }
-    }
-
-    if (gltf) {
-      return {
-        scene: gltf.scene.clone(),
-        animations: gltf.animations || [],
+        scene: loadedData.scene.clone(),
+        animations: loadedData.animations,
         isLoading: false,
         error: null,
         progress: 100,
@@ -154,7 +89,7 @@ export function useModelLoader(
       error,
       progress,
     }
-  }, [modelUrl, gltf, isLoading, error, progress])
+  }, [modelUrl, loadedData, isLoading, error, progress])
 
   return result
 }

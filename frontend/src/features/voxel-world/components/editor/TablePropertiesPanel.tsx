@@ -36,46 +36,48 @@ export function TablePropertiesPanel() {
   const removeTableFromLayout = useVoxelStore((state) => state.removeTableFromLayout)
   const selectObject = useVoxelStore((state) => state.selectObject)
 
-  // Only show if selected object is a table
-  if (!selectedObject || selectedObject.type !== 'table') {
-    return null
-  }
+  // Cast to table if it's a table (for use in callbacks below)
+  const table = selectedObject?.type === 'table' ? (selectedObject as VoxelTable) : null
 
-  const table = selectedObject as VoxelTable
-
+  // All hooks must be called before any conditional returns
   const handlePositionChange = useCallback(
     (axis: 'x' | 'z', value: number) => {
+      if (!table) return
       const newPosition = {
         ...table.position,
         [axis]: Math.max(0, Math.min(31, value)),
       }
       moveObject(table.id, newPosition)
     },
-    [table.id, table.position, moveObject]
+    [table, moveObject]
   )
 
   const handleRotationChange = useCallback(
     (rotation: number) => {
+      if (!table) return
       setObjectRotation(table.id, rotation)
     },
-    [table.id, setObjectRotation]
+    [table, setObjectRotation]
   )
 
   const handleStatusChange = useCallback(
     (status: TableStatus) => {
-      if (table.linkedTableId) {
-        updateTableStatus(table.linkedTableId, status)
-      }
+      if (!table?.linkedTableId) return
+      updateTableStatus(table.linkedTableId, status)
     },
-    [table.linkedTableId, updateTableStatus]
+    [table, updateTableStatus]
   )
 
   const handleRemoveFromLayout = useCallback(() => {
-    if (table.linkedTableId) {
-      removeTableFromLayout(table.linkedTableId)
-      selectObject(null)
-    }
-  }, [table.linkedTableId, removeTableFromLayout, selectObject])
+    if (!table?.linkedTableId) return
+    removeTableFromLayout(table.linkedTableId)
+    selectObject(null)
+  }, [table, removeTableFromLayout, selectObject])
+
+  // Only show if selected object is a table
+  if (!table) {
+    return null
+  }
 
   return (
     <div className="rounded-lg bg-gray-800">
