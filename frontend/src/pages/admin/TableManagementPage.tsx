@@ -27,7 +27,7 @@ import { Table, TableStatus } from '../../types';
 import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Input from '../../components/ui/Input';
-import Select from '../../components/ui/Select';
+import FormSelect from '../../components/ui/FormSelect';
 import Spinner from '../../components/ui/Spinner';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import UpgradePrompt from '../../components/subscriptions/UpgradePrompt';
@@ -455,14 +455,11 @@ const TableManagementPage = () => {
             error={form.formState.errors.capacity?.message}
             {...form.register('capacity', { valueAsNumber: true })}
           />
-          {/* @ts-ignore: Pass props via any spread to avoid TS mismatch with custom Select */}
-          <Select
-            {...({
-              label: t('admin.status'),
-              options: statusOptions,
-              error: form.formState.errors.status?.message,
-              ...form.register('status'),
-            } as any)}
+          <FormSelect
+            label={t('admin.status')}
+            options={statusOptions}
+            error={form.formState.errors.status?.message}
+            {...form.register('status')}
           />
           <div className="flex gap-3">
             <Button

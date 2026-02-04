@@ -65,4 +65,9 @@ export const usersApi = {
   async rejectUser(id: string): Promise<void> {
     await api.patch(`/users/${id}/reject`);
   },
+
+  async reactivateUser(id: string): Promise<User> {
+    const response = await api.patch(`/users/${id}/reactivate`);
+    return response.data;
+  },
 };
