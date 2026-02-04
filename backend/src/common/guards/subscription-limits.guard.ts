@@ -49,8 +49,9 @@ export class SubscriptionLimitsGuard implements CanActivate {
         const maxUsers = plan.maxUsers;
         if (maxUsers === -1) return true; // Unlimited
 
+        // Only count ACTIVE users (not INACTIVE or PENDING_APPROVAL)
         const currentCount = await this.prisma.user.count({
-          where: { tenantId },
+          where: { tenantId, status: 'ACTIVE' },
         });
 
         if (currentCount >= maxUsers) {

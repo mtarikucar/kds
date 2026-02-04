@@ -115,7 +115,8 @@ export class PlanFeatureGuard implements CanActivate {
 
     switch (limitType) {
       case LimitType.USERS:
-        currentCount = await this.prisma.user.count({ where: { tenantId } });
+        // Only count ACTIVE users (not INACTIVE or PENDING_APPROVAL)
+        currentCount = await this.prisma.user.count({ where: { tenantId, status: 'ACTIVE' } });
         break;
 
       case LimitType.TABLES:

@@ -390,7 +390,8 @@ export class SubscriptionService {
    */
   private async getCurrentUsage(tenantId: string) {
     const [users, tables, products, categories] = await Promise.all([
-      this.prisma.user.count({ where: { tenantId } }),
+      // Only count ACTIVE users (not INACTIVE or PENDING_APPROVAL)
+      this.prisma.user.count({ where: { tenantId, status: 'ACTIVE' } }),
       this.prisma.table.count({ where: { tenantId } }),
       this.prisma.product.count({ where: { tenantId } }),
       this.prisma.category.count({ where: { tenantId } }),

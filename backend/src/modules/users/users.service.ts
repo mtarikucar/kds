@@ -333,6 +333,39 @@ export class UsersService {
   }
 
   /**
+   * Reactivate an inactive user
+   */
+  async reactivateUser(userId: string, tenantId: string) {
+    const user = await this.prisma.user.findFirst({
+      where: {
+        id: userId,
+        tenantId,
+        status: 'INACTIVE',
+      },
+    });
+
+    if (!user) {
+      throw new NotFoundException('Pasif kullanıcı bulunamadı');
+    }
+
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { status: 'ACTIVE' },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        status: true,
+        tenantId: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+  }
+
+  /**
    * Reject a pending user (delete them)
    */
   async rejectUser(userId: string, tenantId: string) {

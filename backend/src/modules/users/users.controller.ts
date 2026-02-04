@@ -137,6 +137,18 @@ export class UsersController {
     return this.usersService.rejectUser(id, req.tenantId);
   }
 
+  @Patch(':id/reactivate')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @UseGuards(SubscriptionLimitsGuard)
+  @CheckLimit({ resource: 'users', action: 'create' })
+  @ApiOperation({ summary: 'Reactivate an inactive user (ADMIN, MANAGER)' })
+  @ApiResponse({ status: 200, description: 'User reactivated successfully' })
+  @ApiResponse({ status: 404, description: 'User not found or not inactive' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions or user limit reached' })
+  reactivateUser(@Param('id') id: string, @Request() req) {
+    return this.usersService.reactivateUser(id, req.tenantId);
+  }
+
   // Onboarding endpoints
   @Get('me/onboarding')
   @ApiOperation({ summary: 'Get current user onboarding data' })
