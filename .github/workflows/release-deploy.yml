@@ -229,6 +229,7 @@ jobs:
           JWT_EXPIRES_IN=7d
           JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
           JWT_REFRESH_EXPIRES_IN=30d
+          SUPERADMIN_JWT_SECRET=${JWT_SECRET}
 
           # CORS
           CORS_ORIGIN=https://hummytummy.com,http://tauri.localhost,tauri://localhost,https://tauri.localhost
