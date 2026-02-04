@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { UsersRound, UserPlus, Edit2, Trash2, AlertTriangle, Lock, Users, UserCheck, Shield, Briefcase, Clock, Check, X } from 'lucide-react';
+import { UsersRound, UserPlus, Edit2, Trash2, AlertTriangle, Lock, Users, UserCheck, Shield, Briefcase, Clock, Check, X, UserX, RotateCcw } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { usersApi, User, CreateUserData, UpdateUserData } from '../../api/usersApi';
 import { UserRole, UserStatus } from '../../types';
@@ -48,6 +48,7 @@ const UserManagementPage = () => {
     return {
       total: users.length,
       active: users.filter(u => u.status === UserStatus.ACTIVE).length,
+      inactive: users.filter(u => u.status === UserStatus.INACTIVE).length,
       pending: users.filter(u => u.status === UserStatus.PENDING_APPROVAL).length,
       admins: users.filter(u => u.role === UserRole.ADMIN).length,
       managers: users.filter(u => u.role === UserRole.MANAGER).length,
@@ -190,6 +191,7 @@ const UserManagementPage = () => {
   const getStatusBadgeColor = (status: UserStatus | string) => {
     if (status === UserStatus.ACTIVE) return 'bg-green-100 text-green-800';
     if (status === UserStatus.PENDING_APPROVAL || status === 'PENDING_APPROVAL') return 'bg-amber-100 text-amber-800';
+    if (status === UserStatus.INACTIVE || status === 'INACTIVE') return 'bg-red-100 text-red-800';
     return 'bg-slate-100 text-slate-800';
   };
 
@@ -210,6 +212,16 @@ const UserManagementPage = () => {
       fetchUsers();
     } catch (error: any) {
       toast.error(error.response?.data?.message || t('admin.userRejectFailed'));
+    }
+  };
+
+  const handleReactivateUser = async (user: User) => {
+    try {
+      await usersApi.reactivateUser(user.id);
+      toast.success(t('admin.userReactivated', 'Kullanıcı aktif edildi'));
+      fetchUsers();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || t('admin.userReactivateFailed', 'Kullanıcı aktif edilemedi'));
     }
   };
 
@@ -288,7 +300,7 @@ const UserManagementPage = () => {
 
       {/* Statistics Overview */}
       {users.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
           {/* Total Users */}
           <div className="bg-white rounded-xl border border-slate-200/60 p-4 flex items-center gap-4">
             <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center">
@@ -324,6 +336,22 @@ const UserManagementPage = () => {
             <div>
               <p className="text-2xl font-bold text-amber-600">{stats.pending}</p>
               <p className="text-sm text-slate-500">{t('admin.pendingApproval')}</p>
+            </div>
+          </div>
+
+          {/* Inactive Users */}
+          <div
+            className={`bg-white rounded-xl border p-4 flex items-center gap-4 cursor-pointer transition-all ${
+              stats.inactive > 0 ? 'border-red-300 bg-red-50/50' : 'border-slate-200/60'
+            }`}
+            onClick={() => stats.inactive > 0 && setStatusFilter(statusFilter === 'INACTIVE' ? 'all' : 'INACTIVE')}
+          >
+            <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
+              <UserX className="w-6 h-6 text-red-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-red-600">{stats.inactive}</p>
+              <p className="text-sm text-slate-500">{t('statuses.inactive', 'Pasif')}</p>
             </div>
           </div>
 
@@ -383,6 +411,18 @@ const UserManagementPage = () => {
             }`}
           >
             {t('admin.pendingApproval')} ({stats.pending})
+          </button>
+        )}
+        {stats.inactive > 0 && (
+          <button
+            onClick={() => setStatusFilter('INACTIVE')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              statusFilter === 'INACTIVE'
+                ? 'bg-red-600 text-white'
+                : 'bg-white text-red-600 border border-red-300 hover:bg-red-50'
+            }`}
+          >
+            {t('statuses.inactive', 'Pasif')} ({stats.inactive})
           </button>
         )}
       </div>
@@ -464,6 +504,23 @@ const UserManagementPage = () => {
                           title={t('admin.rejectUser')}
                         >
                           <X className="h-4 w-4" />
+                        </button>
+                      </>
+                    ) : user.status === 'INACTIVE' ? (
+                      <>
+                        <button
+                          onClick={() => handleReactivateUser(user)}
+                          className="p-2 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors"
+                          title={t('admin.reactivateUser', 'Kullanıcıyı aktif et')}
+                          disabled={!canAddUser}
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleOpenModal(user)}
+                          className="p-2 text-slate-500 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                        >
+                          <Edit2 className="h-4 w-4" />
                         </button>
                       </>
                     ) : (
