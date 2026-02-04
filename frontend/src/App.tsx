@@ -5,6 +5,19 @@ import RegisterPage from './pages/auth/RegisterPage';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import VerifyEmailPage from './pages/auth/VerifyEmailPage';
+
+// SuperAdmin Pages
+import SuperAdminLoginPage from './pages/superadmin/SuperAdminLoginPage';
+import SuperAdmin2FAPage from './pages/superadmin/SuperAdmin2FAPage';
+import SuperAdminDashboardPage from './pages/superadmin/SuperAdminDashboardPage';
+import TenantsPage from './pages/superadmin/TenantsPage';
+import TenantDetailPage from './pages/superadmin/TenantDetailPage';
+import AllUsersPage from './pages/superadmin/AllUsersPage';
+import PlansPage from './pages/superadmin/PlansPage';
+import SubscriptionsPage from './pages/superadmin/SubscriptionsPage';
+import AuditLogsPage from './pages/superadmin/AuditLogsPage';
+import SuperAdminSettingsPage from './pages/superadmin/SuperAdminSettingsPage';
+import { SuperAdminLayout, SuperAdminProtectedRoute } from './features/superadmin/components';
 import ProfilePage from './pages/profile/ProfilePage';
 import CustomersPage from './pages/customers/CustomersPage';
 import CustomerDetailPage from './pages/customers/CustomerDetailPage';
@@ -154,6 +167,23 @@ function App() {
         <Route path="/subscription/payment" element={<Navigate to="/subscription/plans" replace />} />
         <Route path="/subscription/payment/success" element={<Navigate to="/admin/settings/subscription" replace />} />
         <Route path="/subscription/payment/failed" element={<Navigate to="/subscription/plans" replace />} />
+      </Route>
+
+      {/* SuperAdmin Routes */}
+      <Route path="/superadmin/login" element={<SuperAdminLoginPage />} />
+      <Route path="/superadmin/2fa" element={<SuperAdmin2FAPage />} />
+      <Route element={<SuperAdminProtectedRoute />}>
+        <Route element={<SuperAdminLayout />}>
+          <Route path="/superadmin" element={<Navigate to="/superadmin/dashboard" replace />} />
+          <Route path="/superadmin/dashboard" element={<SuperAdminDashboardPage />} />
+          <Route path="/superadmin/tenants" element={<TenantsPage />} />
+          <Route path="/superadmin/tenants/:id" element={<TenantDetailPage />} />
+          <Route path="/superadmin/users" element={<AllUsersPage />} />
+          <Route path="/superadmin/plans" element={<PlansPage />} />
+          <Route path="/superadmin/subscriptions" element={<SubscriptionsPage />} />
+          <Route path="/superadmin/audit-logs" element={<AuditLogsPage />} />
+          <Route path="/superadmin/settings" element={<SuperAdminSettingsPage />} />
+        </Route>
       </Route>
     </Routes>
 

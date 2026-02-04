@@ -256,7 +256,7 @@ export class AuthService {
     return this.generateTokens(user);
   }
 
-  async login(loginDto: LoginDto): Promise<AuthResponseDto> {
+  async login(loginDto: LoginDto, ip?: string, userAgent?: string): Promise<AuthResponseDto> {
     const user = await this.validateUser(loginDto.email, loginDto.password);
 
     if (!user) {
@@ -270,6 +270,16 @@ export class AuthService {
           email: loginDto.email,
         },
       });
+
+      // Log failed login attempt if we can identify the user
+      const existingUser = await this.prisma.user.findUnique({
+        where: { email: loginDto.email },
+        select: { id: true, tenantId: true },
+      });
+      if (existingUser) {
+        await this.logUserActivity(existingUser.id, existingUser.tenantId, 'LOGIN_FAILED', ip, userAgent);
+      }
+
       throw new InvalidCredentialsException();
     }
 
@@ -287,6 +297,15 @@ export class AuthService {
       },
     });
 
+    // Log successful login activity
+    await this.logUserActivity(user.id, user.tenantId, 'LOGIN', ip, userAgent);
+
+    // Update last login timestamp
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLogin: new Date() },
+    });
+
     // Set user context for future errors
     Sentry.setUser({
       id: user.id,
@@ -294,6 +313,30 @@ export class AuthService {
     });
 
     return this.generateTokens(user);
+  }
+
+  private async logUserActivity(
+    userId: string,
+    tenantId: string,
+    action: string,
+    ip?: string,
+    userAgent?: string,
+    metadata?: any,
+  ): Promise<void> {
+    try {
+      await this.prisma.userActivity.create({
+        data: {
+          userId,
+          tenantId,
+          action,
+          ip,
+          userAgent,
+          metadata,
+        },
+      });
+    } catch (error) {
+      console.error('Failed to log user activity:', error);
+    }
   }
 
   async validateUser(email: string, password: string): Promise<any> {

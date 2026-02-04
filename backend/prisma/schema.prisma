@@ -1426,3 +1426,71 @@ model PublicStatsCache {
 
   @@map("public_stats_cache")
 }
+
+// ========================================
+// SUPER ADMIN MANAGEMENT
+// ========================================
+
+model SuperAdmin {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  password          String
+  firstName         String
+  lastName          String
+  status            String    @default("ACTIVE") // ACTIVE, INACTIVE
+  twoFactorSecret   String?
+  twoFactorEnabled  Boolean   @default(false)
+  lastLogin         DateTime?
+  lastLoginIp       String?
+  failedLogins      Int       @default(0)
+  lockedUntil       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@map("super_admins")
+}
+
+// ========================================
+// AUDIT LOG SYSTEM
+// ========================================
+
+model AuditLog {
+  id               String   @id @default(uuid())
+  action           String   // LOGIN, LOGOUT, VIEW, CREATE, UPDATE, DELETE, SUSPEND
+  entityType       String   // TENANT, USER, SUBSCRIPTION, PLAN
+  entityId         String?
+  actorId          String
+  actorEmail       String
+  previousData     Json?
+  newData          Json?
+  metadata         Json?    // {ip, userAgent, requestId}
+  targetTenantId   String?
+  targetTenantName String?
+  createdAt        DateTime @default(now())
+
+  @@index([actorId])
+  @@index([entityType])
+  @@index([targetTenantId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ========================================
+// USER ACTIVITY TRACKING
+// ========================================
+
+model UserActivity {
+  id        String   @id @default(uuid())
+  userId    String
+  tenantId  String
+  action    String   // LOGIN, LOGOUT, LOGIN_FAILED
+  ip        String?
+  userAgent String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([tenantId])
+  @@index([createdAt])
+  @@map("user_activities")
+}
