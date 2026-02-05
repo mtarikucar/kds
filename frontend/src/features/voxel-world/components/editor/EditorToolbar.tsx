@@ -9,6 +9,7 @@ import {
   Save,
   Grid3X3,
   Table,
+  TrendingUp,
 } from 'lucide-react'
 import { useVoxelStore } from '../../store/voxelStore'
 import type { EditorTool } from '../../types/voxel'
@@ -26,6 +27,7 @@ interface EditorToolbarProps {
 const TOOLS: { tool: EditorTool; icon: typeof MousePointer2; labelKey: string; group?: 'primary' | 'action' }[] = [
   { tool: 'floor', icon: Grid3X3, labelKey: 'voxel.tools.floor', group: 'primary' },
   { tool: 'table', icon: Table, labelKey: 'voxel.tools.table', group: 'primary' },
+  { tool: 'stair', icon: TrendingUp, labelKey: 'voxel.tools.stair', group: 'primary' },
   { tool: 'select', icon: MousePointer2, labelKey: 'voxel.tools.select', group: 'primary' },
   { tool: 'move', icon: Move, labelKey: 'voxel.tools.move', group: 'primary' },
   { tool: 'rotate', icon: RotateCcw, labelKey: 'voxel.tools.rotate', group: 'action' },

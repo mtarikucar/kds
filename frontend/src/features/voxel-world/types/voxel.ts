@@ -12,7 +12,7 @@ export type VoxelObjectType =
   | 'window'
   | 'model'
 
-export type EditorTool = 'select' | 'move' | 'rotate' | 'delete' | 'floor' | 'table'
+export type EditorTool = 'select' | 'move' | 'rotate' | 'delete' | 'floor' | 'table' | 'stair'
 
 // Handle system types for TinyGlade-style manipulation
 export type HandleId = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw' | 'rotate' | 'center'
@@ -384,6 +384,22 @@ export const FURNITURE_LIBRARY: LibraryItem[] = [
     icon: 'tree-pine',
     dimensions: { width: 1, height: 2, depth: 1 },
     description: 'Decorative plant',
+  },
+  {
+    id: 'door-single',
+    name: 'Door',
+    type: 'door',
+    icon: 'door-open',
+    dimensions: { width: 1, height: 2, depth: 1 },
+    description: 'Single door',
+  },
+  {
+    id: 'window-standard',
+    name: 'Window',
+    type: 'window',
+    icon: 'square-dashed-bottom',
+    dimensions: { width: 1, height: 1, depth: 1 },
+    description: 'Standard window',
   },
   {
     id: 'wall-segment',

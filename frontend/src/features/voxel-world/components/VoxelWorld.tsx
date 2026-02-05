@@ -12,11 +12,14 @@ import { VoxelChair } from './objects/VoxelChair'
 import { VoxelKitchen } from './objects/VoxelKitchen'
 import { VoxelBar } from './objects/VoxelBar'
 import { VoxelDecor } from './objects/VoxelDecor'
+import { VoxelDoor } from './objects/VoxelDoor'
+import { VoxelWindow } from './objects/VoxelWindow'
 import { VoxelModelObject } from './objects/VoxelModelObject'
 import { ManipulationHandles } from './interaction/ManipulationHandles'
 import { GhostPreview } from './interaction/GhostPreview'
 import { SnapGuides } from './interaction/SnapGuide'
 import { PointerCapturePlane } from './interaction/PointerCapturePlane'
+import { StairPlacementGrid } from './interaction/StairPlacementGrid'
 import { useManipulationGestures } from '../hooks/useManipulationGestures'
 import { getFloorBounds } from '../utils/procedural/floorCellManager'
 
@@ -130,6 +133,10 @@ export function VoxelWorld({ isometric = false }: VoxelWorldProps) {
           return <VoxelBar {...commonProps} />
         case 'decor':
           return <VoxelDecor {...commonProps} />
+        case 'door':
+          return <VoxelDoor {...commonProps} />
+        case 'window':
+          return <VoxelWindow {...commonProps} />
         case 'model': {
           const modelObj = obj as VoxelModelObjectType
           return (
@@ -211,6 +218,9 @@ export function VoxelWorld({ isometric = false }: VoxelWorldProps) {
           showGridLines={true}
         />
       )}
+
+      {/* Stair Placement Grid - shows indicators for stair placement when stair tool is active */}
+      {isEditorMode && <StairPlacementGrid enabled={true} />}
 
       {/* Objects */}
       {renderedObjects}

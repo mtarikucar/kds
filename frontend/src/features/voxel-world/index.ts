@@ -19,9 +19,11 @@ export { EditorToolbar } from './components/editor/EditorToolbar'
 export { ObjectLibrary } from './components/editor/ObjectLibrary'
 export { MinimalToolbar } from './components/editor/MinimalToolbar'
 export { SimplifiedDrawer } from './components/editor/SimplifiedDrawer'
+export { ProceduralGenerationPanel } from './components/editor/ProceduralGenerationPanel'
+export { EditorDrawer } from './components/editor/EditorDrawer'
 
 // Interaction (TinyGlade-style)
-export { ManipulationHandles, HandleMesh, GhostPreview, SnapGuides, SnapGuide } from './components/interaction'
+export { ManipulationHandles, HandleMesh, GhostPreview, SnapGuides, SnapGuide, StairPlacementGrid } from './components/interaction'
 
 // Shaders (Stylized rendering)
 export {
@@ -53,6 +55,8 @@ export { VoxelChair } from './components/objects/VoxelChair'
 export { VoxelKitchen } from './components/objects/VoxelKitchen'
 export { VoxelBar } from './components/objects/VoxelBar'
 export { VoxelDecor } from './components/objects/VoxelDecor'
+export { VoxelDoor } from './components/objects/VoxelDoor'
+export { VoxelWindow } from './components/objects/VoxelWindow'
 export { VoxelModelObject } from './components/objects/VoxelModelObject'
 export { ModelLoadingPlaceholder } from './components/objects/ModelLoadingPlaceholder'
 export { InstancedModels, GroupedInstancedModels, shouldUseInstancing } from './components/objects/InstancedModels'
@@ -67,6 +71,7 @@ export { useModelAnimation } from './hooks/useModelAnimation'
 export { useHistory } from './hooks/useHistory'
 export { useManipulationGestures } from './hooks/useManipulationGestures'
 export { useFloorEditor } from './hooks/useFloorEditor'
+export { useStairEditor } from './hooks/useStairEditor'
 
 // Utils
 export { serializeLayout, deserializeLayout, compressWorldData, decompressWorldData, calculateLayoutChecksum } from './utils/worldSerializer'

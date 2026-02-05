@@ -398,10 +398,32 @@
       "rotate": "Rotate",
       "delete": "Delete",
       "undo": "Undo",
-      "redo": "Redo"
+      "redo": "Redo",
+      "floor": "Floor",
+      "table": "Table",
+      "stair": "Stair"
     },
     "library": {
       "title": "Furniture Library"
+    },
+    "procgen": {
+      "tableStyle": "Table Style",
+      "casual": "Casual",
+      "casualDesc": "Light wood, modern style",
+      "formal": "Formal",
+      "formalDesc": "Dark wood, classic legs",
+      "modern": "Modern",
+      "modernDesc": "Metal, round tops",
+      "bistro": "Bistro",
+      "bistroDesc": "Dark wood, pedestal",
+      "autoGenerate": "Auto-Generate",
+      "generateChairs": "Generate Chairs",
+      "generateDecor": "Generate Decor",
+      "snapSettings": "Snap Settings",
+      "enableSnap": "Enable Snap",
+      "showGuides": "Show Guides",
+      "gridSize": "Grid Size",
+      "units": "units"
     },
     "map2d": {
       "zoomIn": "Zoom In",

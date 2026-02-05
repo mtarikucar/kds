@@ -398,10 +398,32 @@
       "rotate": "Döndür",
       "delete": "Sil",
       "undo": "Geri Al",
-      "redo": "Yinele"
+      "redo": "Yinele",
+      "floor": "Zemin",
+      "table": "Masa",
+      "stair": "Merdiven"
     },
     "library": {
       "title": "Mobilya Kütüphanesi"
+    },
+    "procgen": {
+      "tableStyle": "Masa Stili",
+      "casual": "Günlük",
+      "casualDesc": "Açık ahşap, modern stil",
+      "formal": "Resmi",
+      "formalDesc": "Koyu ahşap, klasik ayaklar",
+      "modern": "Modern",
+      "modernDesc": "Metal, yuvarlak üstler",
+      "bistro": "Bistro",
+      "bistroDesc": "Koyu ahşap, sütun",
+      "autoGenerate": "Otomatik Oluştur",
+      "generateChairs": "Sandalye Oluştur",
+      "generateDecor": "Dekor Oluştur",
+      "snapSettings": "Yapışma Ayarları",
+      "enableSnap": "Yapışmayı Etkinleştir",
+      "showGuides": "Kılavuzları Göster",
+      "gridSize": "Izgara Boyutu",
+      "units": "birim"
     },
     "map2d": {
       "zoomIn": "Yakınlaştır",

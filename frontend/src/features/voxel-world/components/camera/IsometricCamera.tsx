@@ -227,6 +227,12 @@ export function IsometricCamera({
       zoomSpeed={1.2}
       target={target}
       makeDefault
+      // Disable all mouse buttons - we handle pan/rotate manually, zoom via scroll only
+      mouseButtons={{
+        LEFT: THREE.MOUSE.ROTATE, // Will be blocked by enableRotate=false
+        MIDDLE: undefined as unknown as THREE.MOUSE, // Disable middle button (we handle pan manually)
+        RIGHT: THREE.MOUSE.PAN, // Will be blocked by enablePan=false
+      }}
     />
   )
 }

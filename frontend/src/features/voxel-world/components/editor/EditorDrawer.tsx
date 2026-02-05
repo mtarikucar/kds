@@ -5,6 +5,7 @@ import { DimensionsEditor } from './DimensionsEditor'
 import { ObjectLibrary } from './ObjectLibrary'
 import { TableListPanel } from './TableListPanel'
 import { TablePropertiesPanel } from './TablePropertiesPanel'
+import { ProceduralGenerationPanel } from './ProceduralGenerationPanel'
 import { useVoxelStore } from '../../store/voxelStore'
 import type { Table } from '@/types'
 import { cn } from '@/lib/utils'
@@ -104,6 +105,9 @@ export function EditorDrawer({ isSaving = false, tables = [] }: EditorDrawerProp
           <div className="flex flex-col gap-2">
             {/* Editor Tools */}
             <EditorToolbar />
+
+            {/* Procedural Generation */}
+            <ProceduralGenerationPanel />
 
             {/* Table List Panel */}
             {tables.length > 0 && <TableListPanel tables={tables} />}
