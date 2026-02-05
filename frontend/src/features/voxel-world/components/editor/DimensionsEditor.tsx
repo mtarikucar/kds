@@ -18,13 +18,25 @@ const PRESETS: Preset[] = [
 
 const MIN_SIZE = 16
 const MAX_SIZE = 64
+const MIN_HEIGHT = 3
+const MAX_HEIGHT = 16
+
+const WALL_LABELS: Record<string, string> = {
+  back: 'Arka',
+  right: 'Sag',
+  front: 'On',
+  left: 'Sol',
+}
 
 export function DimensionsEditor() {
   const layout = useVoxelStore((state) => state.layout)
   const setLayoutDimensions = useVoxelStore((state) => state.setLayoutDimensions)
+  const wallVisibility = useVoxelStore((state) => state.wallVisibility)
+  const toggleWall = useVoxelStore((state) => state.toggleWall)
 
   const currentWidth = layout?.dimensions.width ?? 32
   const currentDepth = layout?.dimensions.depth ?? 32
+  const currentHeight = layout?.dimensions.height ?? 8
 
   const [isExpanded, setIsExpanded] = useState(false)
   const [isLinked, setIsLinked] = useState(currentWidth === currentDepth)
@@ -51,6 +63,14 @@ export function DimensionsEditor() {
       }
     },
     [isLinked, currentWidth, setLayoutDimensions]
+  )
+
+  const handleHeightChange = useCallback(
+    (value: number) => {
+      const clampedValue = Math.max(MIN_HEIGHT, Math.min(MAX_HEIGHT, value))
+      setLayoutDimensions(currentWidth, currentDepth, clampedValue)
+    },
+    [currentWidth, currentDepth, setLayoutDimensions]
   )
 
   const handlePresetClick = useCallback(
@@ -80,7 +100,7 @@ export function DimensionsEditor() {
           <Maximize2 className="h-4 w-4" />
           <span>Boyutlar</span>
           <span className="text-xs text-gray-400">
-            ({currentWidth}x{currentDepth})
+            ({currentWidth}x{currentDepth}x{currentHeight})
           </span>
         </span>
         {isExpanded ? (
@@ -151,6 +171,43 @@ export function DimensionsEditor() {
                 isLinked && 'cursor-not-allowed opacity-50'
               )}
             />
+          </div>
+
+          {/* Height slider */}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <label className="text-xs text-gray-400">Duvar Yuksekligi</label>
+              <span className="text-xs font-medium text-gray-300">{currentHeight}m</span>
+            </div>
+            <input
+              type="range"
+              min={MIN_HEIGHT}
+              max={MAX_HEIGHT}
+              value={currentHeight}
+              onChange={(e) => handleHeightChange(Number(e.target.value))}
+              className="h-2 w-full cursor-pointer appearance-none rounded-lg bg-gray-700 accent-primary"
+            />
+          </div>
+
+          {/* Wall visibility toggles */}
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs text-gray-400">Duvarlar</span>
+            <div className="grid grid-cols-2 gap-1">
+              {(['back', 'right', 'front', 'left'] as const).map((wall) => (
+                <button
+                  key={wall}
+                  onClick={() => toggleWall(wall)}
+                  className={cn(
+                    'rounded px-2 py-1 text-xs transition-colors',
+                    wallVisibility[wall]
+                      ? 'bg-primary text-white'
+                      : 'bg-gray-700 text-gray-400 hover:bg-gray-600 hover:text-gray-300'
+                  )}
+                >
+                  {WALL_LABELS[wall]}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Presets */}

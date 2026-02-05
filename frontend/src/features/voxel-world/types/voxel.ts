@@ -12,7 +12,96 @@ export type VoxelObjectType =
   | 'window'
   | 'model'
 
-export type EditorTool = 'select' | 'move' | 'rotate' | 'delete'
+export type EditorTool = 'select' | 'move' | 'rotate' | 'delete' | 'floor' | 'table'
+
+// Handle system types for TinyGlade-style manipulation
+export type HandleId = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw' | 'rotate' | 'center'
+
+export type ManipulationMode = 'none' | 'resize' | 'rotate' | 'move'
+
+export interface ManipulationState {
+  mode: ManipulationMode
+  activeHandle: HandleId | null
+  ghostPreview: VoxelObject | null
+  startPosition: VoxelPosition | null
+  startSize: { width: number; depth: number } | null
+}
+
+// Size constraints for resizable objects
+export interface SizeConstraints {
+  minWidth: number
+  maxWidth: number
+  minDepth: number
+  maxDepth: number
+}
+
+// Resizable object interface
+export interface ResizableObject extends VoxelObject {
+  constraints: SizeConstraints
+  currentSize: { width: number; depth: number }
+}
+
+// Table variation types
+export type TableLegStyle = 'modern' | 'classic' | 'pedestal'
+export type TableTopShape = 'square' | 'round' | 'rounded-square'
+export type TableMaterial = 'wood-light' | 'wood-dark' | 'metal'
+
+export interface TableVariation {
+  legStyle: TableLegStyle
+  topShape: TableTopShape
+  material: TableMaterial
+}
+
+// Snap system configuration
+export interface SnapConfig {
+  gridSize: number
+  edgeThreshold: number
+  enabled: boolean
+  showGuides: boolean
+}
+
+export interface SnapResult {
+  position: VoxelPosition
+  snappedAxes: { x: boolean; z: boolean }
+  guides: SnapGuide[]
+}
+
+export interface SnapGuide {
+  type: 'grid' | 'edge' | 'center'
+  axis: 'x' | 'z'
+  position: number
+  sourceObjectId?: string
+}
+
+// Wall visibility configuration
+export interface WallVisibility {
+  back: boolean
+  right: boolean
+  front: boolean
+  left: boolean
+}
+
+// Stair system types
+export type StairSide = 'n' | 's' | 'e' | 'w'
+
+export interface StairSegment {
+  id: string
+  x: number           // Cell position
+  z: number
+  level: number       // Lower level (stair connects level to level+1)
+  side: StairSide     // Which edge of the cell
+  steps: number       // Number of steps (typically 4-5)
+}
+
+// Railing system types
+export interface RailingSegment {
+  id: string
+  x: number
+  z: number
+  level: number       // Which level the railing is on
+  side: StairSide     // Which edge
+  length: number      // Length in cells (for merged railings)
+}
 
 // Story mode types
 export type StoryPhase = 'exterior' | 'transition' | 'interior'
@@ -103,10 +192,25 @@ export interface VoxelWorldState {
   isDragging: boolean
   cameraPosition: VoxelPosition
   cameraZoom: number
+  // Procedural floor cells (Townscaper-style) - value is height (number of levels)
+  floorCells: Map<string, number>
+  // Procedural stairs - key: "x,z,level,side"
+  stairs: Map<string, StairSegment>
   // Story mode state
   storyPhase: StoryPhase
   dialogueIndex: number
   mascotAnimation: MascotAnimation
+  // History state (undo/redo)
+  historyIndex: number
+  historyLength: number
+  canUndo: boolean
+  canRedo: boolean
+  // Manipulation state (TinyGlade-style)
+  manipulation: ManipulationState
+  snapConfig: SnapConfig
+  snapGuides: SnapGuide[]
+  // Wall visibility (kept for backwards compatibility)
+  wallVisibility: WallVisibility
 }
 
 export interface VoxelWorldActions {
@@ -135,13 +239,51 @@ export interface VoxelWorldActions {
   loadSampleLayout: () => void
   clearAllObjects: () => void
   autoArrangeObjects: () => void
-  setLayoutDimensions: (width: number, depth: number) => void
+  setLayoutDimensions: (width: number, depth: number, height?: number) => void
+
+  // Procedural floor actions (Townscaper-style)
+  incrementFloorHeight: (x: number, z: number) => void
+  decrementFloorHeight: (x: number, z: number) => void
+  toggleFloorCell: (x: number, z: number) => void
+  setFloorCell: (x: number, z: number, active: boolean) => void
+  setFloorHeight: (x: number, z: number, height: number) => void
+  clearAllFloor: () => void
+  resetFloorToDefault: () => void
+  setFloorCells: (cells: Map<string, number>) => void
+
+  // Procedural stairs actions
+  addStair: (x: number, z: number, level: number, side: StairSide) => void
+  removeStair: (x: number, z: number, level: number, side: StairSide) => void
+  toggleStair: (x: number, z: number, level: number, side: StairSide) => void
+  clearAllStairs: () => void
 
   // Story mode actions
   setStoryPhase: (phase: StoryPhase) => void
   nextDialogue: () => void
   resetDialogue: () => void
   setMascotAnimation: (animation: MascotAnimation) => void
+
+  // History actions (undo/redo)
+  undo: () => void
+  redo: () => void
+  pushHistory: () => void
+  clearHistory: () => void
+
+  // Manipulation actions (TinyGlade-style)
+  setManipulationMode: (mode: ManipulationMode) => void
+  setActiveHandle: (handle: HandleId | null) => void
+  setGhostPreview: (preview: VoxelObject | null) => void
+  startManipulation: (position: VoxelPosition, size?: { width: number; depth: number }) => void
+  endManipulation: () => void
+  resizeObject: (id: string, newSize: { width: number; depth: number }) => void
+
+  // Snap configuration
+  setSnapConfig: (config: Partial<SnapConfig>) => void
+  toggleSnap: () => void
+  setSnapGuides: (guides: SnapGuide[]) => void
+
+  // Wall visibility
+  toggleWall: (wall: 'back' | 'right' | 'front' | 'left') => void
 }
 
 export type VoxelStore = VoxelWorldState & VoxelWorldActions

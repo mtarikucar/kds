@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Box, Edit3, RotateCcw, Layers, Map, DoorOpen } from 'lucide-react'
+import { Box, Edit3, RotateCcw, Layers, Map, DoorOpen, Undo2, Redo2, Grid3X3, Smartphone } from 'lucide-react'
 import { VoxelCanvas } from './VoxelCanvas'
 import { VoxelWorld } from './VoxelWorld'
 import { EditorDrawer } from './editor/EditorDrawer'
@@ -22,10 +22,23 @@ interface VoxelWorldViewProps {
   onTableClick?: (tableId: string) => void
 }
 
+const MOBILE_BREAKPOINT = 768 // Tablet starts at 768px
+
 export function VoxelWorldView({ tables, tenantId, onTableClick }: VoxelWorldViewProps) {
   const { t } = useTranslation()
   const [isLoading, setIsLoading] = useState(true)
   const [viewMode, setViewMode] = useState<ViewMode>('3d')
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < MOBILE_BREAKPOINT)
+    }
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
 
   const isEditorMode = useVoxelStore((state) => state.isEditorMode)
   const toggleEditorMode = useVoxelStore((state) => state.toggleEditorMode)
@@ -33,6 +46,12 @@ export function VoxelWorldView({ tables, tenantId, onTableClick }: VoxelWorldVie
   const storyPhase = useVoxelStore((state) => state.storyPhase)
   const setStoryPhase = useVoxelStore((state) => state.setStoryPhase)
   const resetDialogue = useVoxelStore((state) => state.resetDialogue)
+  const canUndo = useVoxelStore((state) => state.canUndo)
+  const canRedo = useVoxelStore((state) => state.canRedo)
+  const undo = useVoxelStore((state) => state.undo)
+  const redo = useVoxelStore((state) => state.redo)
+  const snapConfig = useVoxelStore((state) => state.snapConfig)
+  const toggleSnap = useVoxelStore((state) => state.toggleSnap)
 
   const handleEnterBuilding = useCallback(() => {
     setStoryPhase('interior')
@@ -132,8 +151,8 @@ export function VoxelWorldView({ tables, tenantId, onTableClick }: VoxelWorldVie
               </button>
             </div>
 
-            {/* Editor mode toggle (only in 3D view) */}
-            {viewMode === '3d' && (
+            {/* Editor mode toggle (only in 3D view, not on mobile) */}
+            {viewMode === '3d' && !isMobile && (
               <button
                 onClick={toggleEditorMode}
                 className={cn(
@@ -147,13 +166,57 @@ export function VoxelWorldView({ tables, tenantId, onTableClick }: VoxelWorldVie
                 {isEditorMode ? 'Exit Editor' : 'Edit Layout'}
               </button>
             )}
+
+            {/* Editor tools (only in 3D view and editor mode, not on mobile) */}
+            {viewMode === '3d' && isEditorMode && !isMobile && (
+              <div className="flex gap-1 rounded-lg bg-gray-800 p-1">
+                <button
+                  onClick={undo}
+                  disabled={!canUndo}
+                  className={cn(
+                    'rounded p-2 transition-colors',
+                    canUndo
+                      ? 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                      : 'cursor-not-allowed text-gray-600'
+                  )}
+                  title="Undo (Ctrl+Z)"
+                >
+                  <Undo2 className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={redo}
+                  disabled={!canRedo}
+                  className={cn(
+                    'rounded p-2 transition-colors',
+                    canRedo
+                      ? 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                      : 'cursor-not-allowed text-gray-600'
+                  )}
+                  title="Redo (Ctrl+Y)"
+                >
+                  <Redo2 className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={toggleSnap}
+                  className={cn(
+                    'rounded p-2 transition-colors',
+                    snapConfig.enabled
+                      ? 'bg-primary text-white'
+                      : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                  )}
+                  title="Toggle Snap Grid"
+                >
+                  <Grid3X3 className="h-4 w-4" />
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Editor drawer (only in 3D view and editor mode) */}
-          {viewMode === '3d' && isEditorMode && <EditorDrawer isSaving={isSaving} tables={tables} />}
+          {/* Editor drawer (only in 3D view and editor mode, not on mobile) */}
+          {viewMode === '3d' && isEditorMode && !isMobile && <EditorDrawer isSaving={isSaving} tables={tables} />}
 
-          {/* Right side controls (only in 3D view, not in editor mode) */}
-          {viewMode === '3d' && !isEditorMode && (
+          {/* Right side controls (only in 3D view, not in editor mode, not on mobile) */}
+          {viewMode === '3d' && !isEditorMode && !isMobile && (
             <div className="absolute right-4 top-4 z-10 flex flex-col gap-2">
               {/* Reset camera */}
               <button
@@ -177,8 +240,8 @@ export function VoxelWorldView({ tables, tenantId, onTableClick }: VoxelWorldVie
             </div>
           )}
 
-          {/* Status legend (only in 3D view) */}
-          {viewMode === '3d' && (
+          {/* Status legend (only in 3D view, not on mobile) */}
+          {viewMode === '3d' && !isMobile && (
             <div className="absolute bottom-4 left-4 z-10 flex gap-3 rounded-lg bg-gray-800/90 px-4 py-2">
               <div className="flex items-center gap-1.5">
                 <div className="h-3 w-3 rounded-full bg-green-500" />
@@ -195,19 +258,42 @@ export function VoxelWorldView({ tables, tenantId, onTableClick }: VoxelWorldVie
             </div>
           )}
 
-          {/* Help text (only in 3D view) */}
-          {viewMode === '3d' && (
+          {/* Help text (only in 3D view, not on mobile) */}
+          {viewMode === '3d' && !isMobile && (
             <div className="absolute bottom-4 right-4 z-10 text-xs text-gray-500">
-              Scroll to zoom • Shift+drag to pan
+              {isEditorMode
+                ? 'R: Rotate • Del: Delete • Ctrl+Z/Y: Undo/Redo • Escape: Deselect • Shift+drag: Rotate'
+                : 'Scroll to zoom • Shift+drag to rotate • Middle-drag to pan'}
             </div>
           )}
 
-          {/* 3D Canvas */}
-          {viewMode === '3d' && (
+          {/* 3D Canvas - only on tablet/desktop */}
+          {viewMode === '3d' && !isMobile && (
             <VoxelCanvas>
               <InteriorScene />
               <PostprocessingEffects />
             </VoxelCanvas>
+          )}
+
+          {/* Mobile warning */}
+          {viewMode === '3d' && isMobile && (
+            <div className="flex h-full flex-col items-center justify-center gap-4 bg-gray-900 p-6 text-center">
+              <Smartphone className="h-16 w-16 text-gray-500" />
+              <h3 className="text-lg font-semibold text-gray-300">
+                3D Düzenleyici Mobilde Kullanılamıyor
+              </h3>
+              <p className="max-w-sm text-sm text-gray-500">
+                3D masa düzenleme özelliği sadece tablet ve bilgisayarda kullanılabilir.
+                Lütfen daha büyük bir ekrandan erişin veya 2D harita görünümünü kullanın.
+              </p>
+              <button
+                onClick={() => setViewMode('2d')}
+                className="mt-2 flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90"
+              >
+                <Map className="h-4 w-4" />
+                2D Haritaya Geç
+              </button>
+            </div>
           )}
 
           {/* 2D Map View */}

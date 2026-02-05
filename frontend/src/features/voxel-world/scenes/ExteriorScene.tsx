@@ -44,7 +44,6 @@ export function ExteriorScene({ onEnterBuilding }: ExteriorSceneProps) {
       <IsometricCamera
         target={[0, 3, 0]}
         distance={40}
-        enablePan={true}
         enableZoom={true}
       />
 

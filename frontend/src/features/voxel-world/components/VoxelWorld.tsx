@@ -2,17 +2,76 @@ import { useMemo } from 'react'
 import { useVoxelStore } from '../store/voxelStore'
 import { DEFAULT_WORLD_DIMENSIONS, type VoxelTable, type VoxelModelObject as VoxelModelObjectType } from '../types/voxel'
 import { IsometricCamera } from './camera/IsometricCamera'
-import { VoxelFloor } from './VoxelFloor'
-import { VoxelWalls } from './VoxelWalls'
+import { ProceduralFloor } from './ProceduralFloor'
+import { ProceduralWalls } from './ProceduralWalls'
+import { ProceduralStairs } from './ProceduralStairs'
+import { ProceduralRailings } from './ProceduralRailings'
+import { InteractiveGrid } from './InteractiveGrid'
 import { VoxelTableObject } from './objects/VoxelTable'
 import { VoxelChair } from './objects/VoxelChair'
 import { VoxelKitchen } from './objects/VoxelKitchen'
 import { VoxelBar } from './objects/VoxelBar'
 import { VoxelDecor } from './objects/VoxelDecor'
 import { VoxelModelObject } from './objects/VoxelModelObject'
+import { ManipulationHandles } from './interaction/ManipulationHandles'
+import { GhostPreview } from './interaction/GhostPreview'
+import { SnapGuides } from './interaction/SnapGuide'
+import { PointerCapturePlane } from './interaction/PointerCapturePlane'
+import { useManipulationGestures } from '../hooks/useManipulationGestures'
+import { getFloorBounds } from '../utils/procedural/floorCellManager'
 
 interface VoxelWorldProps {
   isometric?: boolean
+}
+
+/**
+ * Separate component for manipulation features to isolate hooks
+ * This prevents "Rendered more hooks than previous render" errors
+ */
+function ManipulationLayer({ dimensions }: { dimensions: { width: number; height: number; depth: number } }) {
+  const manipulation = useVoxelStore((state) => state.manipulation)
+  const snapConfig = useVoxelStore((state) => state.snapConfig)
+  const snapGuides = useVoxelStore((state) => state.snapGuides)
+
+  const {
+    selectedObject,
+    handleHandlePointerDown,
+    handleHandlePointerUp,
+    handleWorldPointerMove,
+  } = useManipulationGestures({ enabled: true })
+
+  return (
+    <>
+      {/* Pointer Capture Plane - active during manipulation */}
+      <PointerCapturePlane
+        width={dimensions.width}
+        depth={dimensions.depth}
+        onPointerMove={handleWorldPointerMove}
+        onPointerUp={() => handleHandlePointerUp()}
+        enabled={manipulation.mode !== 'none'}
+      />
+
+      {/* Ghost Preview - manipulation sırasında */}
+      {manipulation.ghostPreview && (
+        <GhostPreview object={manipulation.ghostPreview} />
+      )}
+
+      {/* Manipulation Handles - seçili obje için */}
+      {selectedObject && (
+        <ManipulationHandles
+          object={selectedObject}
+          onHandlePointerDown={handleHandlePointerDown}
+          onHandlePointerUp={handleHandlePointerUp}
+          activeHandle={manipulation.activeHandle}
+        />
+      )}
+
+      {/* Snap Guides */}
+      {snapConfig.showGuides && snapGuides.length > 0 && (
+        <SnapGuides guides={snapGuides} worldDimensions={dimensions} />
+      )}
+    </>
+  )
 }
 
 export function VoxelWorld({ isometric = false }: VoxelWorldProps) {
@@ -20,9 +79,23 @@ export function VoxelWorld({ isometric = false }: VoxelWorldProps) {
   const selectedObjectId = useVoxelStore((state) => state.selectedObjectId)
   const isEditorMode = useVoxelStore((state) => state.isEditorMode)
   const selectObject = useVoxelStore((state) => state.selectObject)
+  const floorCells = useVoxelStore((state) => state.floorCells)
 
   const dimensions = layout?.dimensions ?? DEFAULT_WORLD_DIMENSIONS
   const objects = layout?.objects ?? []
+
+  // Calculate effective dimensions based on floor cells or layout
+  const effectiveDimensions = useMemo(() => {
+    const bounds = getFloorBounds(floorCells)
+    if (bounds) {
+      return {
+        width: Math.max(bounds.maxX + 2, 16),
+        height: dimensions.height,
+        depth: Math.max(bounds.maxZ + 2, 16),
+      }
+    }
+    return dimensions
+  }, [floorCells, dimensions])
 
   const renderedObjects = useMemo(() => {
     return objects.map((obj) => {
@@ -78,28 +151,31 @@ export function VoxelWorld({ isometric = false }: VoxelWorldProps) {
     })
   }, [objects, selectedObjectId, isEditorMode, selectObject])
 
+  // Use effectiveDimensions for camera and lighting calculations
+  const viewDimensions = effectiveDimensions
+
   return (
     <>
       {/* Lighting - bright for white theme */}
       <ambientLight intensity={0.9} />
       <directionalLight
-        position={[dimensions.width * 1.5, dimensions.height * 3, dimensions.depth * 1.5]}
+        position={[viewDimensions.width * 1.5, viewDimensions.height * 3, viewDimensions.depth * 1.5]}
         intensity={1}
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-camera-far={150}
-        shadow-camera-left={-dimensions.width}
-        shadow-camera-right={dimensions.width}
-        shadow-camera-top={dimensions.depth}
-        shadow-camera-bottom={-dimensions.depth}
+        shadow-camera-left={-viewDimensions.width}
+        shadow-camera-right={viewDimensions.width}
+        shadow-camera-top={viewDimensions.depth}
+        shadow-camera-bottom={-viewDimensions.depth}
       />
       <directionalLight
-        position={[-dimensions.width, dimensions.height * 2, dimensions.depth]}
+        position={[-viewDimensions.width, viewDimensions.height * 2, viewDimensions.depth]}
         intensity={0.4}
       />
       {/* Fill light */}
       <directionalLight
-        position={[dimensions.width, dimensions.height, dimensions.depth * 2]}
+        position={[viewDimensions.width, viewDimensions.height, viewDimensions.depth * 2]}
         intensity={0.3}
       />
 
@@ -108,35 +184,39 @@ export function VoxelWorld({ isometric = false }: VoxelWorldProps) {
 
       {/* Camera Controls - Isometric */}
       <IsometricCamera
-        target={[dimensions.width / 2, 0, dimensions.depth / 2]}
-        distance={Math.max(dimensions.width, dimensions.depth) * 1.5}
+        target={[viewDimensions.width / 2, 0, viewDimensions.depth / 2]}
+        distance={Math.max(viewDimensions.width, viewDimensions.depth) * 1.5}
       />
 
-      {/* Floor - light wood color */}
-      <VoxelFloor
-        width={dimensions.width}
-        depth={dimensions.depth}
-        color="#e8dcc8"
-      />
+      {/* Procedural Floor - Townscaper-style */}
+      <ProceduralFloor color="#e8dcc8" />
 
-      {/* Walls - only 2 walls (back and left) */}
-      <VoxelWalls
-        width={dimensions.width}
-        height={dimensions.height}
-        depth={dimensions.depth}
+      {/* Procedural Walls - auto-generated at floor edges */}
+      <ProceduralWalls
         wallColor="#f5f5f5"
+        wallHeight={1}
       />
+
+      {/* Procedural Stairs - manually placed between levels */}
+      <ProceduralStairs />
+
+      {/* Procedural Railings - auto-generated at upper level edges */}
+      <ProceduralRailings />
+
+      {/* Interactive Grid for floor editing */}
+      {isEditorMode && (
+        <InteractiveGrid
+          size={64}
+          enabled={true}
+          showGridLines={true}
+        />
+      )}
 
       {/* Objects */}
       {renderedObjects}
 
-      {/* Grid helper for editor mode */}
-      {isEditorMode && (
-        <gridHelper
-          args={[dimensions.width, dimensions.width, '#ddd', '#eee']}
-          position={[dimensions.width / 2, 0.01, dimensions.depth / 2]}
-        />
-      )}
+      {/* Manipulation Layer - only in editor mode */}
+      {isEditorMode && <ManipulationLayer dimensions={viewDimensions} />}
     </>
   )
 }

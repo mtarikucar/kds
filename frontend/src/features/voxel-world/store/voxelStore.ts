@@ -10,6 +10,13 @@ import type {
   VoxelTable,
   StoryPhase,
   MascotAnimation,
+  ManipulationState,
+  ManipulationMode,
+  HandleId,
+  SnapConfig,
+  SnapGuide,
+  StairSegment,
+  StairSide,
 } from '../types/voxel'
 import {
   DEFAULT_CAMERA_POSITION,
@@ -18,6 +25,46 @@ import {
 } from '../types/voxel'
 import { getSampleLayout } from '../data/sampleLayouts'
 import { autoArrange } from '../utils/placementEngine'
+import {
+  createHistoryManager,
+  pushState,
+  undo as historyUndo,
+  redo as historyRedo,
+  canUndo as historyCanUndo,
+  canRedo as historyCanRedo,
+  clearHistory as historyClear,
+  type HistoryManager,
+} from '../utils/historyManager'
+import {
+  generateDefaultFloor,
+  MAX_BUILDING_HEIGHT,
+  cellKey,
+} from '../utils/procedural/floorCellManager'
+
+// Utility function to generate stair keys
+function stairKey(x: number, z: number, level: number, side: StairSide): string {
+  return `${x},${z},${level},${side}`
+}
+
+// Default manipulation state
+const DEFAULT_MANIPULATION_STATE: ManipulationState = {
+  mode: 'none',
+  activeHandle: null,
+  ghostPreview: null,
+  startPosition: null,
+  startSize: null,
+}
+
+// Default snap configuration
+const DEFAULT_SNAP_CONFIG: SnapConfig = {
+  gridSize: 0.5,
+  edgeThreshold: 0.3,
+  enabled: true,
+  showGuides: true,
+}
+
+// History manager instance (not persisted)
+let historyManager: HistoryManager = createHistoryManager(50)
 
 const createDefaultLayout = (): RestaurantLayout => ({
   id: 'default',
@@ -41,10 +88,30 @@ export const useVoxelStore = create<VoxelStore>()(
       isDragging: false,
       cameraPosition: DEFAULT_CAMERA_POSITION,
       cameraZoom: DEFAULT_CAMERA_ZOOM,
+      // Procedural floor cells (Townscaper-style) - value is height
+      floorCells: generateDefaultFloor(),
+      // Procedural stairs (manual placement)
+      stairs: new Map<string, StairSegment>(),
       // Story mode state
       storyPhase: 'exterior' as const,
       dialogueIndex: 0,
       mascotAnimation: 'idle' as const,
+      // History state
+      historyIndex: -1,
+      historyLength: 0,
+      canUndo: false,
+      canRedo: false,
+      // Manipulation state
+      manipulation: DEFAULT_MANIPULATION_STATE,
+      snapConfig: DEFAULT_SNAP_CONFIG,
+      snapGuides: [],
+      // Wall visibility state (kept for backwards compatibility)
+      wallVisibility: {
+        back: true,
+        right: true,
+        front: false,
+        left: false,
+      },
 
       // Layout actions
       setLayout: (layout: RestaurantLayout) =>
@@ -266,16 +333,20 @@ export const useVoxelStore = create<VoxelStore>()(
           }
         }),
 
-      setLayoutDimensions: (width: number, depth: number) =>
+      setLayoutDimensions: (width: number, depth: number, height?: number) =>
         set((state) => {
           // Clamp values to valid range
           const clampedWidth = Math.max(16, Math.min(64, width))
           const clampedDepth = Math.max(16, Math.min(64, depth))
 
           const currentLayout = state.layout ?? createDefaultLayout()
+          const clampedHeight = height !== undefined
+            ? Math.max(3, Math.min(16, height))
+            : currentLayout.dimensions.height
+
           const newDimensions = {
             width: clampedWidth,
-            height: currentLayout.dimensions.height,
+            height: clampedHeight,
             depth: clampedDepth,
           }
 
@@ -307,6 +378,132 @@ export const useVoxelStore = create<VoxelStore>()(
           }
         }),
 
+      // Procedural floor cell actions (Townscaper-style)
+      // Left click: increment height (add level)
+      incrementFloorHeight: (x: number, z: number) =>
+        set((state) => {
+          const key = cellKey(x, z)
+          const newCells = new Map(state.floorCells)
+          const currentHeight = newCells.get(key) ?? 0
+          if (currentHeight < MAX_BUILDING_HEIGHT) {
+            newCells.set(key, currentHeight + 1)
+          }
+          return { floorCells: newCells }
+        }),
+
+      // Right click: decrement height (remove level)
+      decrementFloorHeight: (x: number, z: number) =>
+        set((state) => {
+          const key = cellKey(x, z)
+          const newCells = new Map(state.floorCells)
+          const currentHeight = newCells.get(key) ?? 0
+          if (currentHeight > 1) {
+            newCells.set(key, currentHeight - 1)
+          } else {
+            newCells.delete(key)
+          }
+          return { floorCells: newCells }
+        }),
+
+      // Legacy toggle - kept for compatibility, increments if 0, otherwise removes
+      toggleFloorCell: (x: number, z: number) =>
+        set((state) => {
+          const key = cellKey(x, z)
+          const newCells = new Map(state.floorCells)
+          const currentHeight = newCells.get(key) ?? 0
+          if (currentHeight > 0) {
+            newCells.delete(key)
+          } else {
+            newCells.set(key, 1)
+          }
+          return { floorCells: newCells }
+        }),
+
+      setFloorCell: (x: number, z: number, active: boolean) =>
+        set((state) => {
+          const key = cellKey(x, z)
+          const newCells = new Map(state.floorCells)
+          if (active) {
+            const currentHeight = newCells.get(key) ?? 0
+            if (currentHeight === 0) {
+              newCells.set(key, 1)
+            }
+          } else {
+            newCells.delete(key)
+          }
+          return { floorCells: newCells }
+        }),
+
+      setFloorHeight: (x: number, z: number, height: number) =>
+        set((state) => {
+          const key = cellKey(x, z)
+          const newCells = new Map(state.floorCells)
+          const clampedHeight = Math.max(0, Math.min(MAX_BUILDING_HEIGHT, height))
+          if (clampedHeight > 0) {
+            newCells.set(key, clampedHeight)
+          } else {
+            newCells.delete(key)
+          }
+          return { floorCells: newCells }
+        }),
+
+      clearAllFloor: () =>
+        set({ floorCells: new Map<string, number>() }),
+
+      resetFloorToDefault: () =>
+        set({ floorCells: generateDefaultFloor() }),
+
+      setFloorCells: (cells: Map<string, number>) =>
+        set({ floorCells: new Map(cells) }),
+
+      // Procedural stairs actions
+      addStair: (x: number, z: number, level: number, side: StairSide) =>
+        set((state) => {
+          const key = stairKey(x, z, level, side)
+          const newStairs = new Map(state.stairs)
+          const stair: StairSegment = {
+            id: key,
+            x,
+            z,
+            level,
+            side,
+            steps: 4, // Default 4 steps per level
+          }
+          newStairs.set(key, stair)
+          return { stairs: newStairs }
+        }),
+
+      removeStair: (x: number, z: number, level: number, side: StairSide) =>
+        set((state) => {
+          const key = stairKey(x, z, level, side)
+          const newStairs = new Map(state.stairs)
+          newStairs.delete(key)
+          return { stairs: newStairs }
+        }),
+
+      toggleStair: (x: number, z: number, level: number, side: StairSide) =>
+        set((state) => {
+          const key = stairKey(x, z, level, side)
+          const newStairs = new Map(state.stairs)
+          if (newStairs.has(key)) {
+            newStairs.delete(key)
+          } else {
+            const stair: StairSegment = {
+              id: key,
+              x,
+              z,
+              level,
+              side,
+              steps: 4,
+            }
+            newStairs.set(key, stair)
+          }
+          return { stairs: newStairs }
+        }),
+
+      clearAllStairs: () =>
+        set({ stairs: new Map<string, StairSegment>() }),
+
       // Story mode actions
       setStoryPhase: (phase) =>
         set({ storyPhase: phase }),
@@ -321,6 +518,146 @@ export const useVoxelStore = create<VoxelStore>()(
 
       setMascotAnimation: (animation) =>
         set({ mascotAnimation: animation }),
+
+      // History actions (undo/redo)
+      undo: () => {
+        const result = historyUndo(historyManager)
+        if (result.objects) {
+          historyManager = result.manager
+          set((state) => {
+            if (!state.layout) return state
+            return {
+              layout: {
+                ...state.layout,
+                objects: result.objects!,
+                updatedAt: new Date().toISOString(),
+              },
+              historyIndex: historyManager.currentIndex,
+              canUndo: historyCanUndo(historyManager),
+              canRedo: historyCanRedo(historyManager),
+            }
+          })
+        }
+      },
+
+      redo: () => {
+        const result = historyRedo(historyManager)
+        if (result.objects) {
+          historyManager = result.manager
+          set((state) => {
+            if (!state.layout) return state
+            return {
+              layout: {
+                ...state.layout,
+                objects: result.objects!,
+                updatedAt: new Date().toISOString(),
+              },
+              historyIndex: historyManager.currentIndex,
+              canUndo: historyCanUndo(historyManager),
+              canRedo: historyCanRedo(historyManager),
+            }
+          })
+        }
+      },
+
+      pushHistory: () => {
+        const state = get()
+        if (state.layout) {
+          historyManager = pushState(historyManager, state.layout.objects)
+          set({
+            historyIndex: historyManager.currentIndex,
+            historyLength: historyManager.states.length,
+            canUndo: historyCanUndo(historyManager),
+            canRedo: historyCanRedo(historyManager),
+          })
+        }
+      },
+
+      clearHistory: () => {
+        historyManager = historyClear(historyManager)
+        set({
+          historyIndex: -1,
+          historyLength: 0,
+          canUndo: false,
+          canRedo: false,
+        })
+      },
+
+      // Manipulation actions (TinyGlade-style)
+      setManipulationMode: (mode: ManipulationMode) =>
+        set((state) => ({
+          manipulation: { ...state.manipulation, mode },
+        })),
+
+      setActiveHandle: (handle: HandleId | null) =>
+        set((state) => ({
+          manipulation: { ...state.manipulation, activeHandle: handle },
+        })),
+
+      setGhostPreview: (preview: VoxelObject | null) =>
+        set((state) => ({
+          manipulation: { ...state.manipulation, ghostPreview: preview },
+        })),
+
+      startManipulation: (position: VoxelPosition, size?: { width: number; depth: number }) =>
+        set((state) => ({
+          manipulation: {
+            ...state.manipulation,
+            startPosition: position,
+            startSize: size ?? null,
+          },
+        })),
+
+      endManipulation: () =>
+        set({
+          manipulation: DEFAULT_MANIPULATION_STATE,
+        }),
+
+      resizeObject: (id: string, newSize: { width: number; depth: number }) =>
+        set((state) => {
+          if (!state.layout) return state
+          return {
+            layout: {
+              ...state.layout,
+              objects: state.layout.objects.map((obj) =>
+                obj.id === id
+                  ? {
+                      ...obj,
+                      metadata: {
+                        ...obj.metadata,
+                        width: newSize.width,
+                        depth: newSize.depth,
+                      },
+                    }
+                  : obj
+              ),
+              updatedAt: new Date().toISOString(),
+            },
+          }
+        }),
+
+      // Snap configuration
+      setSnapConfig: (config: Partial<SnapConfig>) =>
+        set((state) => ({
+          snapConfig: { ...state.snapConfig, ...config },
+        })),
+
+      toggleSnap: () =>
+        set((state) => ({
+          snapConfig: { ...state.snapConfig, enabled: !state.snapConfig.enabled },
+        })),
+
+      setSnapGuides: (guides: SnapGuide[]) =>
+        set({ snapGuides: guides }),
+
+      // Wall visibility actions
+      toggleWall: (wall: 'back' | 'right' | 'front' | 'left') =>
+        set((state) => ({
+          wallVisibility: {
+            ...state.wallVisibility,
+            [wall]: !state.wallVisibility[wall],
+          },
+        })),
     }),
     {
       name: 'voxel-world-storage',
@@ -328,7 +665,44 @@ export const useVoxelStore = create<VoxelStore>()(
         layout: state.layout,
         cameraPosition: state.cameraPosition,
         cameraZoom: state.cameraZoom,
+        // Convert Map to array for JSON serialization (now stores height values)
+        floorCellsArray: Array.from(state.floorCells.entries()),
+        // Persist stairs as array
+        stairsArray: Array.from(state.stairs.entries()),
       }),
+      merge: (persistedState: unknown, currentState: VoxelStore) => {
+        const persisted = persistedState as Partial<VoxelStore> & {
+          floorCellsArray?: Array<[string, number | boolean]>
+          stairsArray?: Array<[string, StairSegment]>
+        }
+        let floorCells = currentState.floorCells
+        let stairs = currentState.stairs
+
+        if (persisted.floorCellsArray) {
+          // Convert old boolean format to new height format if needed
+          floorCells = new Map<string, number>()
+          for (const [key, value] of persisted.floorCellsArray) {
+            if (typeof value === 'boolean') {
+              // Old format: boolean -> convert to height 1
+              if (value) floorCells.set(key, 1)
+            } else {
+              // New format: number (height)
+              if (value > 0) floorCells.set(key, value)
+            }
+          }
+        }
+
+        if (persisted.stairsArray) {
+          stairs = new Map<string, StairSegment>(persisted.stairsArray)
+        }
+
+        return {
+          ...currentState,
+          ...persisted,
+          floorCells,
+          stairs,
+        }
+      },
     }
   )
 )
@@ -346,3 +720,5 @@ export const selectSelectedObject = (state: VoxelStore) => {
 }
 export const selectIsEditorMode = (state: VoxelStore) => state.isEditorMode
 export const selectEditorTool = (state: VoxelStore) => state.editorTool
+export const selectFloorCells = (state: VoxelStore) => state.floorCells
+export const selectStairs = (state: VoxelStore) => state.stairs
