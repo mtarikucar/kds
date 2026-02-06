@@ -18,8 +18,6 @@ export function IsometricCamera({
   const controlsRef = useRef<OrbitControlsImpl>(null)
   const { camera, gl } = useThree()
   const isInitializedRef = useRef(false)
-  const prevTargetRef = useRef<string>('')
-  const prevDistanceRef = useRef<number>(0)
 
   // Drag state refs (not state to avoid re-renders)
   const isDraggingRef = useRef(false)
@@ -30,29 +28,24 @@ export function IsometricCamera({
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const capturedPointerIdRef = useRef<number | null>(null)
 
-  // Set up isometric camera position
+  // Set up isometric camera position ONCE on mount only
   useEffect(() => {
-    const targetKey = `${target[0]}-${target[1]}-${target[2]}`
-    const hasTargetChanged = prevTargetRef.current !== targetKey
-    const hasDistanceChanged = prevDistanceRef.current !== distance
+    if (isInitializedRef.current) return
 
-    if (!isInitializedRef.current || hasTargetChanged || hasDistanceChanged) {
-      const azimuth = Math.PI / 1.5
-      const polar = Math.atan(1 / Math.sqrt(0.2))
+    const azimuth = Math.PI / 1.5
+    const polar = Math.atan(1 / Math.sqrt(0.2))
 
-      const x = target[0] + distance * Math.sin(polar) * Math.cos(azimuth)
-      const y = target[1] + distance * Math.cos(polar)
-      const z = target[2] + distance * Math.sin(polar) * Math.sin(azimuth)
+    const x = target[0] + distance * Math.sin(polar) * Math.cos(azimuth)
+    const y = target[1] + distance * Math.cos(polar)
+    const z = target[2] + distance * Math.sin(polar) * Math.sin(azimuth)
 
-      camera.position.set(x, y, z)
-      camera.lookAt(target[0], target[1], target[2])
-      camera.updateProjectionMatrix()
+    camera.position.set(x, y, z)
+    camera.lookAt(target[0], target[1], target[2])
+    camera.updateProjectionMatrix()
 
-      prevTargetRef.current = targetKey
-      prevDistanceRef.current = distance
-      isInitializedRef.current = true
-    }
-  }, [camera, target, distance])
+    isInitializedRef.current = true
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [camera])
 
   // Update controls target
   useEffect(() => {

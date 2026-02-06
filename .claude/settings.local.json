@@ -3,7 +3,10 @@
     "allow": [
       "Bash(git fetch:*)",
       "Bash(git checkout:*)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Bash(xargs -I {} sh -c 'echo \"\"=== {} ===\"\" && head -30 {}')",
+      "Bash(xargs -I {} sh -c 'echo \"\"=== {} ===\"\" && ls -la {} | head -15')",
+      "Bash(xargs -I {} sh -c 'echo \"\"=== {} ===\"\" && head -25 {}')"
     ]
   }
 }

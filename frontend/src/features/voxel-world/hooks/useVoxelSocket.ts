@@ -4,6 +4,7 @@ import { initializeSocket, getSocket } from '@/lib/socket'
 import { useVoxelStore } from '../store/voxelStore'
 import type { TableStatus } from '@/types'
 import type { Socket } from 'socket.io-client'
+import type { AnyCommand } from '../types/commandLog'
 
 interface TableStatusUpdate {
   tableId: string
@@ -23,6 +24,29 @@ interface TablePositionUpdate {
 interface LayoutUpdate {
   tenantId: string
   worldData: Record<string, unknown>
+}
+
+/**
+ * Command event payload for multiplayer sync.
+ * Commands include userId and operationId for conflict resolution.
+ *
+ * NOTE: The actual sync/application of remote commands is deferred.
+ * When implementing multiplayer, consider OT (Operational Transform) or
+ * CRDT strategies for concurrent command resolution:
+ *
+ * - OT: Transform incoming commands against local uncommitted commands.
+ *   Simpler for sequential operations (cell height changes).
+ * - CRDT: Last-writer-wins for edge overrides, max-height-wins for cells.
+ *   Better for eventual consistency without a central server.
+ *
+ * Recommended approach: OT with server-side sequencing.
+ * The server assigns monotonic sequence numbers to commands.
+ * Clients rebase local commands on top of server-confirmed commands.
+ */
+interface CommandEvent {
+  tenantId: string
+  command: AnyCommand
+  sequenceNumber?: number
 }
 
 export function useVoxelSocket(tenantId?: string) {
@@ -108,8 +132,29 @@ export function useVoxelSocket(tenantId?: string) {
     [tenantId]
   )
 
+  /**
+   * Emit a command event for multiplayer sync.
+   * This only emits; remote application is deferred to future implementation.
+   */
+  const emitCommand = useCallback(
+    (command: AnyCommand) => {
+      if (!tenantId || !socketRef.current) return
+      const event: CommandEvent = {
+        tenantId,
+        command: {
+          ...command,
+          userId: command.userId ?? tenantId,
+          operationId: command.operationId ?? command.id,
+        },
+      }
+      socketRef.current.emit('voxel:command', event)
+    },
+    [tenantId]
+  )
+
   return {
     emitTablePositionUpdate,
     emitLayoutUpdate,
+    emitCommand,
   }
 }

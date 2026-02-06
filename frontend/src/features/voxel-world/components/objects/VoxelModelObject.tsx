@@ -107,7 +107,7 @@ export function VoxelModelObject({
     onPointerLeave?.()
   }
 
-  const handlePointerDown = (e: THREE.Event) => {
+  const handlePointerDown = (e: any) => {
     if (!isEditorMode || editorTool !== 'move' || !isSelected) return
     e.stopPropagation()
     setIsDragging(true)
@@ -125,7 +125,7 @@ export function VoxelModelObject({
     }
   }
 
-  const handlePointerMove = (e: THREE.Event) => {
+  const handlePointerMove = (e: any) => {
     if (!isDragging || !dragStart.current) return
     e.stopPropagation()
 

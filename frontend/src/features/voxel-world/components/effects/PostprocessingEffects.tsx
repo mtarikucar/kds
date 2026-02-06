@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, Fragment } from 'react'
 import { EffectComposer, Bloom, Vignette, ToneMapping, BrightnessContrast, HueSaturation, Outline } from '@react-three/postprocessing'
 import { ToneMappingMode, BlendFunction } from 'postprocessing'
 import type { Object3D } from 'three'
@@ -23,54 +23,50 @@ export function PostprocessingEffects({
   stylizedMode = false,
 }: PostprocessingEffectsProps) {
   // Stylized mode has different settings for TinyGlade-like appearance
-  const effectiveBloom = stylizedMode ? 0.2 : (isExterior ? 0.5 : bloomIntensity)
-  const effectiveSaturation = stylizedMode ? 0.2 : (isExterior ? 0.15 : 0.1)
-  const effectiveContrast = stylizedMode ? 0.15 : (isExterior ? 0.1 : 0.05)
+  const effectiveBloom = stylizedMode ? 0.15 : (isExterior ? 0.5 : bloomIntensity)
+  const effectiveSaturation = stylizedMode ? 0.15 : (isExterior ? 0.15 : 0.05)
+  const effectiveContrast = stylizedMode ? 0.1 : (isExterior ? 0.1 : 0.08)
 
   return (
     <EffectComposer>
-      {/* Outline effect for selected objects - TinyGlade style */}
-      {selectedObjects.length > 0 && (
-        <Outline
-          selection={selectedObjects}
-          edgeStrength={stylizedMode ? 3 : 2.5}
-          pulseSpeed={0}
-          visibleEdgeColor={0x000000}
-          hiddenEdgeColor={0x333333}
-          blur
-          xRay={false}
-          blendFunction={BlendFunction.ALPHA}
+      <>
+        {selectedObjects.length > 0 && (
+          <Outline
+            selection={selectedObjects}
+            edgeStrength={stylizedMode ? 3 : 2.5}
+            pulseSpeed={0}
+            visibleEdgeColor={0x000000}
+            hiddenEdgeColor={0x333333}
+            blur
+            xRay={false}
+            blendFunction={BlendFunction.ALPHA}
+          />
+        )}
+
+        <Bloom
+          intensity={effectiveBloom}
+          luminanceThreshold={0.85}
+          luminanceSmoothing={0.03}
+          mipmapBlur
         />
-      )}
 
-      {/* Bloom - soft glow effect (reduced in stylized mode) */}
-      <Bloom
-        intensity={effectiveBloom}
-        luminanceThreshold={stylizedMode ? 0.9 : 0.8}
-        luminanceSmoothing={0.05}
-        mipmapBlur
-      />
+        <BrightnessContrast
+          brightness={isExterior ? 0.05 : 0.02}
+          contrast={effectiveContrast}
+        />
 
-      {/* Brightness/Contrast - make it pop */}
-      <BrightnessContrast
-        brightness={isExterior ? 0.05 : 0}
-        contrast={effectiveContrast}
-      />
+        <HueSaturation
+          saturation={effectiveSaturation}
+        />
 
-      {/* Saturation boost for vibrant colors */}
-      <HueSaturation
-        saturation={effectiveSaturation}
-      />
+        <Vignette
+          offset={vignetteOffset}
+          darkness={isExterior ? 0.2 : 0.25}
+          eskil={false}
+        />
 
-      {/* Subtle vignette for focus */}
-      <Vignette
-        offset={vignetteOffset}
-        darkness={isExterior ? 0.2 : vignetteDarkness}
-        eskil={false}
-      />
-
-      {/* Tone mapping - natural color balance */}
-      <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+        <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+      </>
     </EffectComposer>
   )
 }

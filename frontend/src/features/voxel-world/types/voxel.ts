@@ -1,4 +1,6 @@
 import type { TableStatus } from '@/types'
+import type { EdgeClassification } from './worldModel'
+import type { StructuralRule } from './ruleEngine'
 
 export type VoxelObjectType =
   | 'table'
@@ -190,7 +192,9 @@ export interface VoxelWorldState {
   editorTool: EditorTool
   isEditorMode: boolean
   isDragging: boolean
+  /** @deprecated Camera state is managed by OrbitControls, not the store */
   cameraPosition: VoxelPosition
+  /** @deprecated Camera state is managed by OrbitControls, not the store */
   cameraZoom: number
   // Procedural floor cells (Townscaper-style) - value is height (number of levels)
   floorCells: Map<string, number>
@@ -211,6 +215,11 @@ export interface VoxelWorldState {
   snapGuides: SnapGuide[]
   // Wall visibility (kept for backwards compatibility)
   wallVisibility: WallVisibility
+  // Edge overrides (user-placed doors/windows)
+  overrides: Map<string, EdgeClassification>
+  // Rule engine configuration
+  rules: ReadonlyArray<StructuralRule>
+  enablePatternMatching: boolean
 }
 
 export interface VoxelWorldActions {
@@ -231,9 +240,10 @@ export interface VoxelWorldActions {
   updateTableStatus: (tableId: string, status: TableStatus) => void
   removeTableFromLayout: (linkedTableId: string) => void
 
+  /** @deprecated Camera state is managed by OrbitControls, not the store */
   setCameraPosition: (position: VoxelPosition) => void
+  /** @deprecated Camera state is managed by OrbitControls, not the store */
   setCameraZoom: (zoom: number) => void
-  resetCamera: () => void
 
   // Layout management actions
   loadSampleLayout: () => void
@@ -281,6 +291,15 @@ export interface VoxelWorldActions {
   setSnapConfig: (config: Partial<SnapConfig>) => void
   toggleSnap: () => void
   setSnapGuides: (guides: SnapGuide[]) => void
+
+  // Edge override actions
+  setEdgeOverride: (edgeKey: string, classification: EdgeClassification) => void
+  clearEdgeOverride: (edgeKey: string) => void
+  clearAllOverrides: () => void
+
+  // Rule engine actions
+  setRules: (rules: ReadonlyArray<StructuralRule>) => void
+  setEnablePatternMatching: (enabled: boolean) => void
 
   // Wall visibility
   toggleWall: (wall: 'back' | 'right' | 'front' | 'left') => void
@@ -408,5 +427,21 @@ export const FURNITURE_LIBRARY: LibraryItem[] = [
     icon: 'square',
     dimensions: { width: 1, height: 3, depth: 1 },
     description: 'Wall section',
+  },
+  {
+    id: 'cashier',
+    name: 'Cashier',
+    type: 'decor',
+    icon: 'banknote',
+    dimensions: { width: 2, height: 1, depth: 1 },
+    description: 'Cashier station (max 1 per layout)',
+  },
+  {
+    id: 'reception',
+    name: 'Reception',
+    type: 'decor',
+    icon: 'concierge-bell',
+    dimensions: { width: 2, height: 1, depth: 1 },
+    description: 'Reception desk (max 1 per layout)',
   },
 ]

@@ -337,3 +337,34 @@ export function generateDefaultFloor(): Map<string, number> {
  * Maximum allowed height for buildings
  */
 export const MAX_BUILDING_HEIGHT = 10
+
+/**
+ * Generate a unique edge key from cell coordinates, level, and side.
+ * Format: "x,z,level,side"
+ */
+export function edgeKey(
+  x: number,
+  z: number,
+  level: number,
+  side: 'n' | 'e' | 's' | 'w'
+): string {
+  return `${x},${z},${level},${side}`
+}
+
+/**
+ * Parse an edge key back to its components.
+ */
+export function parseEdgeKey(key: string): {
+  x: number
+  z: number
+  level: number
+  side: 'n' | 'e' | 's' | 'w'
+} {
+  const parts = key.split(',')
+  return {
+    x: parseInt(parts[0], 10),
+    z: parseInt(parts[1], 10),
+    level: parseInt(parts[2], 10),
+    side: parts[3] as 'n' | 'e' | 's' | 'w',
+  }
+}

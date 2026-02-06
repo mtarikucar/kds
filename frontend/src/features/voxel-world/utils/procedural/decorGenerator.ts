@@ -1,5 +1,6 @@
 import type { VoxelObject, VoxelPosition, WorldDimensions } from '../../types/voxel'
 import { checkCollision } from '../placementEngine'
+import { cellKey, getNeighborMask, NEIGHBOR_MASKS } from './floorCellManager'
 
 // Use native crypto.randomUUID() for generating unique IDs
 const generateId = (): string => {
@@ -51,7 +52,84 @@ const DECOR_CONFIGS: Record<DecorType, DecorConfig> = {
 }
 
 /**
- * Find corner positions in the world
+ * Find corner positions based on actual floor cells.
+ * A "corner" is a floor cell with only 2 cardinal neighbors at a right angle.
+ */
+function findCornerPositionsFromCells(
+  floorCells: Map<string, number>
+): VoxelPosition[] {
+  const positions: VoxelPosition[] = []
+
+  for (const [key, height] of floorCells) {
+    if (height <= 0) continue
+    const [xStr, zStr] = key.split(',')
+    const x = Number(xStr)
+    const z = Number(zStr)
+    const mask = getNeighborMask(floorCells, x, z)
+
+    // Check cardinal neighbors only
+    const hasN = (mask & NEIGHBOR_MASKS.N) !== 0
+    const hasS = (mask & NEIGHBOR_MASKS.S) !== 0
+    const hasE = (mask & NEIGHBOR_MASKS.E) !== 0
+    const hasW = (mask & NEIGHBOR_MASKS.W) !== 0
+    const cardinals = [hasN, hasS, hasE, hasW].filter(Boolean).length
+
+    // Corner: exactly 2 adjacent cardinal neighbors (not opposite)
+    if (cardinals === 2 && !(hasN && hasS) && !(hasE && hasW)) {
+      positions.push({ x, y: 0, z })
+    }
+  }
+
+  return positions
+}
+
+/**
+ * Find edge/wall positions based on actual floor cells.
+ * An "edge" cell has at least one missing cardinal neighbor (it's on the border).
+ */
+function findEdgePositionsFromCells(
+  floorCells: Map<string, number>,
+  spacing: number
+): VoxelPosition[] {
+  const edgeCells: VoxelPosition[] = []
+
+  for (const [key, height] of floorCells) {
+    if (height <= 0) continue
+    const [xStr, zStr] = key.split(',')
+    const x = Number(xStr)
+    const z = Number(zStr)
+    const mask = getNeighborMask(floorCells, x, z)
+
+    const hasN = (mask & NEIGHBOR_MASKS.N) !== 0
+    const hasS = (mask & NEIGHBOR_MASKS.S) !== 0
+    const hasE = (mask & NEIGHBOR_MASKS.E) !== 0
+    const hasW = (mask & NEIGHBOR_MASKS.W) !== 0
+    const cardinals = [hasN, hasS, hasE, hasW].filter(Boolean).length
+
+    // Edge cell: has 2-3 cardinal neighbors (not a corner with only 2, not fully surrounded)
+    if (cardinals >= 2 && cardinals < 4) {
+      edgeCells.push({ x, y: 0, z })
+    }
+  }
+
+  // Space them out by the requested spacing
+  if (spacing <= 1) return edgeCells
+
+  const selected: VoxelPosition[] = []
+  for (const pos of edgeCells) {
+    const tooClose = selected.some(
+      (s) => Math.abs(s.x - pos.x) + Math.abs(s.z - pos.z) < spacing
+    )
+    if (!tooClose) {
+      selected.push(pos)
+    }
+  }
+
+  return selected
+}
+
+/**
+ * Fallback: Find corner positions from world dimensions (when no floor cells available)
  */
 function findCornerPositions(
   dimensions: WorldDimensions,
@@ -66,7 +144,7 @@ function findCornerPositions(
 }
 
 /**
- * Find wall positions (along edges, not corners)
+ * Fallback: Find wall positions from world dimensions (when no floor cells available)
  */
 function findWallPositions(
   dimensions: WorldDimensions,
@@ -103,10 +181,13 @@ function findWallPositions(
  */
 export function generateCornerPlants(
   dimensions: WorldDimensions,
-  existingObjects: VoxelObject[]
+  existingObjects: VoxelObject[],
+  floorCells?: Map<string, number>
 ): VoxelObject[] {
   const plants: VoxelObject[] = []
-  const cornerPositions = findCornerPositions(dimensions)
+  const cornerPositions = floorCells && floorCells.size > 0
+    ? findCornerPositionsFromCells(floorCells)
+    : findCornerPositions(dimensions)
   const plantConfig = DECOR_CONFIGS.plant
 
   for (const position of cornerPositions) {
@@ -119,9 +200,7 @@ export function generateCornerPlants(
       metadata: plantConfig.dimensions,
     }
 
-    const hasCollision = existingObjects.some((obj) =>
-      checkCollision(testObject, obj, dimensions)
-    )
+    const hasCollision = checkCollision(testObject, existingObjects)
 
     if (!hasCollision) {
       plants.push({
@@ -186,11 +265,14 @@ export function generateTableLamps(
 export function generateWallDecor(
   dimensions: WorldDimensions,
   existingObjects: VoxelObject[],
-  decorType: 'art' | 'plant' = 'art'
+  decorType: 'art' | 'plant' = 'art',
+  floorCells?: Map<string, number>
 ): VoxelObject[] {
   const decor: VoxelObject[] = []
   const config = DECOR_CONFIGS[decorType]
-  const wallPositions = findWallPositions(dimensions, config.spacing)
+  const wallPositions = floorCells && floorCells.size > 0
+    ? findEdgePositionsFromCells(floorCells, config.spacing)
+    : findWallPositions(dimensions, config.spacing)
 
   // Randomly select some positions
   const selectedPositions = wallPositions
@@ -206,9 +288,7 @@ export function generateWallDecor(
       metadata: config.dimensions,
     }
 
-    const hasCollision = existingObjects.some((obj) =>
-      checkCollision(testObject, obj, dimensions)
-    )
+    const hasCollision = checkCollision(testObject, existingObjects)
 
     if (!hasCollision) {
       // Determine rotation based on wall
@@ -245,7 +325,8 @@ export function generateAllDecor(
     plants?: boolean
     lamps?: boolean
     art?: boolean
-  } = { plants: true, lamps: true, art: true }
+  } = { plants: true, lamps: true, art: true },
+  floorCells?: Map<string, number>
 ): VoxelObject[] {
   let allDecor: VoxelObject[] = []
   const tables = objects.filter((obj) => obj.type === 'table')
@@ -261,7 +342,7 @@ export function generateAllDecor(
     const plants = generateCornerPlants(dimensions, [
       ...nonDecorObjects,
       ...manualDecor,
-    ])
+    ], floorCells)
     allDecor = [...allDecor, ...plants]
   }
 
@@ -275,7 +356,7 @@ export function generateAllDecor(
       ...nonDecorObjects,
       ...manualDecor,
       ...allDecor,
-    ])
+    ], 'art', floorCells)
     allDecor = [...allDecor, ...art]
   }
 

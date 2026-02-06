@@ -178,18 +178,22 @@ const TableManagementPage = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className={viewMode === 'voxel' ? 'flex flex-col h-full gap-4' : 'space-y-6'}>
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-shrink-0 items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20">
-            <LayoutGrid className="w-7 h-7 text-white" />
-          </div>
+          {viewMode === 'grid' && (
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20">
+              <LayoutGrid className="w-7 h-7 text-white" />
+            </div>
+          )}
           <div>
-            <h1 className="text-2xl font-heading font-bold text-slate-900">
+            <h1 className={`font-heading font-bold text-slate-900 ${viewMode === 'voxel' ? 'text-lg' : 'text-2xl'}`}>
               {t('admin.tableManagement')}
             </h1>
-            <p className="text-slate-500 mt-0.5">{t('admin.manageTablesSeating')}</p>
+            {viewMode === 'grid' && (
+              <p className="text-slate-500 mt-0.5">{t('admin.manageTablesSeating')}</p>
+            )}
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -219,19 +223,21 @@ const TableManagementPage = () => {
             </button>
           </div>
 
-          <Button onClick={() => handleOpenModal()} disabled={!canAddTable}>
-            {canAddTable ? (
-              <Plus className="h-4 w-4 mr-2" />
-            ) : (
-              <Lock className="h-4 w-4 mr-2" />
-            )}
-            {t('admin.addTable')}
-          </Button>
+          {viewMode === 'grid' && (
+            <Button onClick={() => handleOpenModal()} disabled={!canAddTable}>
+              {canAddTable ? (
+                <Plus className="h-4 w-4 mr-2" />
+              ) : (
+                <Lock className="h-4 w-4 mr-2" />
+              )}
+              {t('admin.addTable')}
+            </Button>
+          )}
         </div>
       </div>
 
-      {/* Limit Info Banner */}
-      {tableLimit.limit !== -1 && (
+      {/* Limit Info Banner (hidden in voxel mode) */}
+      {viewMode === 'grid' && tableLimit.limit !== -1 && (
         <div
           className={`rounded-xl px-6 py-4 flex items-start gap-3 ${
             canAddTable
@@ -263,8 +269,8 @@ const TableManagementPage = () => {
         </div>
       )}
 
-      {/* Upgrade Prompt when limit reached */}
-      {!canAddTable && (
+      {/* Upgrade Prompt when limit reached (hidden in voxel mode) */}
+      {viewMode === 'grid' && !canAddTable && (
         <UpgradePrompt
           limitType="maxTables"
           currentCount={tables?.length ?? 0}
@@ -272,54 +278,6 @@ const TableManagementPage = () => {
         />
       )}
 
-      {/* Statistics Overview */}
-      {tables && tables.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {/* Total Tables */}
-          <div className="bg-white rounded-xl border border-slate-200/60 p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-slate-100 flex items-center justify-center">
-              <LayoutGrid className="w-6 h-6 text-slate-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900">{stats.total}</p>
-              <p className="text-sm text-slate-500">{t('admin.tables')}</p>
-            </div>
-          </div>
-
-          {/* Available */}
-          <div className="bg-white rounded-xl border border-slate-200/60 p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
-              <CheckCircle className="w-6 h-6 text-emerald-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-emerald-600">{stats.available}</p>
-              <p className="text-sm text-slate-500">{t('admin.available')}</p>
-            </div>
-          </div>
-
-          {/* Occupied */}
-          <div className="bg-white rounded-xl border border-slate-200/60 p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-red-100 flex items-center justify-center">
-              <XCircle className="w-6 h-6 text-red-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-red-600">{stats.occupied}</p>
-              <p className="text-sm text-slate-500">{t('admin.occupied')}</p>
-            </div>
-          </div>
-
-          {/* Reserved */}
-          <div className="bg-white rounded-xl border border-slate-200/60 p-4 flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
-              <Clock className="w-6 h-6 text-amber-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-amber-600">{stats.reserved}</p>
-              <p className="text-sm text-slate-500">{t('admin.reserved')}</p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Main Content */}
       {isLoading ? (
@@ -328,10 +286,10 @@ const TableManagementPage = () => {
         </div>
       ) : viewMode === 'voxel' ? (
         /* 3D Voxel Floor Plan View */
-        <div data-tour="floor-plan-3d">
+        <div className="flex-1 min-h-0" data-tour="floor-plan-3d">
         <Suspense
           fallback={
-            <div className="flex h-[600px] items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
+            <div className="flex h-full items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
               <div className="flex flex-col items-center gap-3">
                 <Box className="h-12 w-12 animate-pulse text-primary" />
                 <span className="text-sm text-slate-500">Loading 3D View...</span>

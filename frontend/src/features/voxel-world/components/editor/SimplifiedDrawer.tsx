@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   LayoutGrid,
   Wand2,
-  RotateCcw,
   Save,
   Sparkles,
   Palette,
@@ -42,7 +41,6 @@ export function SimplifiedDrawer({
   const layout = useVoxelStore((state) => state.layout)
   const loadSampleLayout = useVoxelStore((state) => state.loadSampleLayout)
   const autoArrangeObjects = useVoxelStore((state) => state.autoArrangeObjects)
-  const resetCamera = useVoxelStore((state) => state.resetCamera)
   const snapConfig = useVoxelStore((state) => state.snapConfig)
   const setSnapConfig = useVoxelStore((state) => state.setSnapConfig)
 
@@ -121,13 +119,6 @@ export function SimplifiedDrawer({
           >
             <Wand2 className="h-3.5 w-3.5" />
             <span>Arrange</span>
-          </button>
-          <button
-            onClick={resetCamera}
-            className="flex items-center justify-center rounded bg-gray-700 px-2 py-1.5 text-gray-300 hover:bg-gray-600"
-            title="Reset camera"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
           </button>
         </div>
 

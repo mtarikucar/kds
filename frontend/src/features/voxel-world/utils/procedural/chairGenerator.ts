@@ -111,24 +111,24 @@ export function generateChairsForTable(table: TableInfo): GeneratedChair[] {
   const rad = (rotation * Math.PI) / 180
 
   // Define edges (before rotation transform)
-  // North edge (front of table, chairs face south toward table)
+  // North edge (front of table, chairs face toward table)
   if (depth >= CHAIR_CONFIG.minSpacing) {
     const northChairs = calculateEdgeChairs(
       { x: position.x + 0.3, y: 0, z: position.z - CHAIR_CONFIG.distanceFromTable },
       { x: position.x + width - 0.3, y: 0, z: position.z - CHAIR_CONFIG.distanceFromTable },
-      180, // Face south (toward table)
+      0, // Face toward table (south)
       id,
       tableCenter
     )
     chairs.push(...northChairs)
   }
 
-  // South edge (back of table, chairs face north toward table)
+  // South edge (back of table, chairs face toward table)
   if (depth >= CHAIR_CONFIG.minSpacing) {
     const southChairs = calculateEdgeChairs(
       { x: position.x + 0.3, y: 0, z: position.z + depth + CHAIR_CONFIG.distanceFromTable },
       { x: position.x + width - 0.3, y: 0, z: position.z + depth + CHAIR_CONFIG.distanceFromTable },
-      0, // Face north (toward table)
+      180, // Face toward table (north)
       id,
       tableCenter
     )
@@ -141,7 +141,7 @@ export function generateChairsForTable(table: TableInfo): GeneratedChair[] {
     const eastChairs = calculateEdgeChairs(
       { x: position.x + width + CHAIR_CONFIG.distanceFromTable, y: 0, z: position.z + 0.3 },
       { x: position.x + width + CHAIR_CONFIG.distanceFromTable, y: 0, z: position.z + depth - 0.3 },
-      270, // Face west (toward table)
+      90, // Face toward table (west)
       id,
       tableCenter
     )
@@ -151,7 +151,7 @@ export function generateChairsForTable(table: TableInfo): GeneratedChair[] {
     const westChairs = calculateEdgeChairs(
       { x: position.x - CHAIR_CONFIG.distanceFromTable, y: 0, z: position.z + 0.3 },
       { x: position.x - CHAIR_CONFIG.distanceFromTable, y: 0, z: position.z + depth - 0.3 },
-      90, // Face east (toward table)
+      270, // Face toward table (east)
       id,
       tableCenter
     )

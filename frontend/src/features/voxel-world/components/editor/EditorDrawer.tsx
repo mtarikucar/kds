@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Settings, X, ChevronRight, ChevronLeft, LayoutGrid, Wand2, RotateCcw, Save } from 'lucide-react'
+import { Settings, X, ChevronRight, ChevronLeft, LayoutGrid, Wand2, Save } from 'lucide-react'
 import { EditorToolbar } from './EditorToolbar'
 import { DimensionsEditor } from './DimensionsEditor'
 import { ObjectLibrary } from './ObjectLibrary'
@@ -21,7 +21,6 @@ export function EditorDrawer({ isSaving = false, tables = [] }: EditorDrawerProp
   const layout = useVoxelStore((state) => state.layout)
   const loadSampleLayout = useVoxelStore((state) => state.loadSampleLayout)
   const autoArrangeObjects = useVoxelStore((state) => state.autoArrangeObjects)
-  const resetCamera = useVoxelStore((state) => state.resetCamera)
 
   const hasObjects = (layout?.objects?.length ?? 0) > 0
 
@@ -90,13 +89,6 @@ export function EditorDrawer({ isSaving = false, tables = [] }: EditorDrawerProp
           >
             <Wand2 className="h-3.5 w-3.5" />
             <span>Duzenle</span>
-          </button>
-          <button
-            onClick={resetCamera}
-            className="flex items-center justify-center rounded bg-gray-700 px-2 py-1.5 text-gray-300 hover:bg-gray-600"
-            title="Kamerayi sifirla"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
           </button>
         </div>
 

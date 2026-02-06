@@ -1,5 +1,6 @@
-import type { VoxelObject, RestaurantLayout, WorldDimensions, VoxelTable, VoxelModelObject, ModelConfig } from '../types/voxel'
+import type { VoxelObject, RestaurantLayout, WorldDimensions, VoxelTable, VoxelModelObject, ModelConfig, StairSegment } from '../types/voxel'
 import { DEFAULT_WORLD_DIMENSIONS } from '../types/voxel'
+import type { EdgeClassification } from '../types/worldModel'
 
 interface SerializedModelConfig {
   u: string      // modelUrl
@@ -21,17 +22,89 @@ interface SerializedObject {
   m?: Record<string, unknown>  // metadata
 }
 
-interface SerializedLayout {
-  v: number      // version
-  d: [number, number, number]  // dimensions [width, height, depth]
-  o: SerializedObject[]        // objects
+interface SerializedStair {
+  x: number
+  z: number
+  l: number      // level
+  s: string      // side
 }
 
-export function serializeLayout(layout: RestaurantLayout): SerializedLayout {
+interface SerializedOverride {
+  k: string      // edgeKey
+  c: EdgeClassification
+}
+
+/**
+ * v1: objects only
+ * v2: objects + floor cells + stairs + overrides
+ */
+interface SerializedLayoutV1 {
+  v: 1
+  d: [number, number, number]
+  o: SerializedObject[]
+}
+
+interface SerializedLayoutV2 {
+  v: 2
+  d: [number, number, number]
+  o: SerializedObject[]
+  fc: Array<[number, number, number]>  // [x, z, height]
+  st: SerializedStair[]
+  ov: SerializedOverride[]
+}
+
+type SerializedLayout = SerializedLayoutV1 | SerializedLayoutV2
+
+/**
+ * World data for v2 serialization.
+ */
+export interface WorldData {
+  floorCells: Map<string, number>
+  stairs: Map<string, StairSegment>
+  overrides: Map<string, EdgeClassification>
+}
+
+/**
+ * Serialize a layout to v1 format (backwards compatible).
+ */
+export function serializeLayout(layout: RestaurantLayout): SerializedLayoutV1 {
   return {
     v: 1,
     d: [layout.dimensions.width, layout.dimensions.height, layout.dimensions.depth],
     o: layout.objects.map((obj) => serializeObject(obj)),
+  }
+}
+
+/**
+ * Serialize a layout with world data to v2 format.
+ */
+export function serializeLayoutV2(
+  layout: RestaurantLayout,
+  worldData: WorldData
+): SerializedLayoutV2 {
+  const fc: Array<[number, number, number]> = []
+  for (const [key, height] of worldData.floorCells) {
+    const [x, z] = key.split(',').map(Number)
+    fc.push([x, z, height])
+  }
+
+  const st: SerializedStair[] = []
+  for (const stair of worldData.stairs.values()) {
+    st.push({ x: stair.x, z: stair.z, l: stair.level, s: stair.side })
+  }
+
+  const ov: SerializedOverride[] = []
+  for (const [key, classification] of worldData.overrides) {
+    ov.push({ k: key, c: classification })
+  }
+
+  return {
+    v: 2,
+    d: [layout.dimensions.width, layout.dimensions.height, layout.dimensions.depth],
+    o: layout.objects.map((obj) => serializeObject(obj)),
+    fc,
+    st,
+    ov,
   }
 }
 
@@ -94,6 +167,47 @@ export function deserializeLayout(
     createdAt: layoutMeta.createdAt,
     updatedAt: layoutMeta.updatedAt,
   }
+}
+
+/**
+ * Deserialize world data from v2 format.
+ * Returns empty world data for v1 layouts (backwards compatible).
+ */
+export function deserializeWorldData(data: SerializedLayout): WorldData {
+  if (data.v < 2 || !('fc' in data)) {
+    return {
+      floorCells: new Map(),
+      stairs: new Map(),
+      overrides: new Map(),
+    }
+  }
+
+  const v2 = data as SerializedLayoutV2
+
+  const floorCells = new Map<string, number>()
+  for (const [x, z, height] of v2.fc) {
+    floorCells.set(`${x},${z}`, height)
+  }
+
+  const stairs = new Map<string, StairSegment>()
+  for (const st of v2.st) {
+    const key = `${st.x},${st.z},${st.l},${st.s}`
+    stairs.set(key, {
+      id: key,
+      x: st.x,
+      z: st.z,
+      level: st.l,
+      side: st.s as StairSegment['side'],
+      steps: 4,
+    })
+  }
+
+  const overrides = new Map<string, EdgeClassification>()
+  for (const ov of v2.ov) {
+    overrides.set(ov.k, ov.c)
+  }
+
+  return { floorCells, stairs, overrides }
 }
 
 function deserializeModelConfig(config: SerializedModelConfig): ModelConfig {

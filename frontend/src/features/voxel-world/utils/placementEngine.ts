@@ -2,6 +2,7 @@ import type {
   VoxelObject,
   VoxelObjectType,
   VoxelPosition,
+  VoxelTable,
   WorldDimensions,
 } from '../types/voxel'
 
@@ -318,4 +319,108 @@ export function autoArrange(
   }
 
   return placed
+}
+
+// --- Entity Validation ---
+
+export type EntityType = 'cashier' | 'reception'
+
+const SINGLETON_ENTITIES: EntityType[] = ['cashier', 'reception']
+
+export interface ValidationError {
+  code: string
+  message: string
+  objectIds?: string[]
+  tableId?: string
+}
+
+export interface ValidationResult {
+  valid: boolean
+  errors: ValidationError[]
+}
+
+/**
+ * Get the entity type from a VoxelObject's metadata.
+ */
+function getEntityType(obj: VoxelObject): EntityType | null {
+  const entityType = obj.metadata?.entityType as string | undefined
+  if (entityType === 'cashier' || entityType === 'reception') {
+    return entityType
+  }
+  return null
+}
+
+/**
+ * Validate the layout against entity rules.
+ */
+export function validateLayout(
+  objects: readonly VoxelObject[],
+  floorCells: ReadonlyMap<string, number>,
+  dbTableIds?: string[]
+): ValidationResult {
+  const errors: ValidationError[] = []
+
+  // 1. Singleton check: max 1 cashier, 1 reception
+  for (const entityType of SINGLETON_ENTITIES) {
+    const matching = objects.filter((obj) => getEntityType(obj) === entityType)
+    if (matching.length > 1) {
+      errors.push({
+        code: `DUPLICATE_${entityType.toUpperCase()}`,
+        message: `Only one ${entityType} allowed per layout`,
+        objectIds: matching.map((obj) => obj.id),
+      })
+    }
+  }
+
+  // 2. AABB overlap check
+  for (let i = 0; i < objects.length; i++) {
+    for (let j = i + 1; j < objects.length; j++) {
+      const boundsA = getObjectBounds(objects[i])
+      const boundsB = getObjectBounds(objects[j])
+      if (aabbOverlaps(boundsA, boundsB)) {
+        errors.push({
+          code: 'OVERLAP',
+          message: `Objects ${objects[i].id} and ${objects[j].id} overlap`,
+          objectIds: [objects[i].id, objects[j].id],
+        })
+      }
+    }
+  }
+
+  // 3. Floor check: every object must be on an active floor cell
+  for (const obj of objects) {
+    const gridX = Math.floor(obj.position.x)
+    const gridZ = Math.floor(obj.position.z)
+    const cellHeight = floorCells.get(`${gridX},${gridZ}`) ?? 0
+    if (cellHeight <= 0) {
+      errors.push({
+        code: 'NOT_ON_FLOOR',
+        message: `Object ${obj.id} (${obj.type}) is not on an active floor cell`,
+        objectIds: [obj.id],
+      })
+    }
+  }
+
+  // 4. Table 1:1 mapping (if dbTableIds provided)
+  if (dbTableIds) {
+    const voxelTables = objects.filter(
+      (obj): obj is VoxelTable => obj.type === 'table'
+    )
+    const placedTableIds = new Set(voxelTables.map((t) => t.linkedTableId))
+
+    for (const tableId of dbTableIds) {
+      if (!placedTableIds.has(tableId)) {
+        errors.push({
+          code: 'TABLE_NOT_PLACED',
+          message: `Table ${tableId} not placed in layout`,
+          tableId,
+        })
+      }
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+  }
 }

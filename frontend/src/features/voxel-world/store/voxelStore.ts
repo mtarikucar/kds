@@ -23,6 +23,9 @@ import {
   DEFAULT_CAMERA_ZOOM,
   DEFAULT_WORLD_DIMENSIONS,
 } from '../types/voxel'
+import type { EdgeClassification } from '../types/worldModel'
+import type { StructuralRule } from '../types/ruleEngine'
+import { DEFAULT_RULES } from '../engine/rules'
 import { getSampleLayout } from '../data/sampleLayouts'
 import { autoArrange } from '../utils/placementEngine'
 import {
@@ -44,6 +47,20 @@ import {
 // Utility function to generate stair keys
 function stairKey(x: number, z: number, level: number, side: StairSide): string {
   return `${x},${z},${level},${side}`
+}
+
+// Remove all stairs associated with a given floor cell
+function removeStairsAtCell(stairs: Map<string, StairSegment>, x: number, z: number): Map<string, StairSegment> {
+  const prefix = `${x},${z},`
+  let changed = false
+  const newStairs = new Map(stairs)
+  for (const key of stairs.keys()) {
+    if (key.startsWith(prefix)) {
+      newStairs.delete(key)
+      changed = true
+    }
+  }
+  return changed ? newStairs : stairs
 }
 
 // Default manipulation state
@@ -112,6 +129,11 @@ export const useVoxelStore = create<VoxelStore>()(
         front: false,
         left: false,
       },
+      // Edge overrides (user-placed doors/windows)
+      overrides: new Map<string, EdgeClassification>(),
+      // Rule engine configuration
+      rules: DEFAULT_RULES as ReadonlyArray<StructuralRule>,
+      enablePatternMatching: true,
 
       // Layout actions
       setLayout: (layout: RestaurantLayout) =>
@@ -284,12 +306,6 @@ export const useVoxelStore = create<VoxelStore>()(
       setCameraZoom: (zoom: number) =>
         set({ cameraZoom: Math.max(0.1, Math.min(5, zoom)) }),
 
-      resetCamera: () =>
-        set({
-          cameraPosition: DEFAULT_CAMERA_POSITION,
-          cameraZoom: DEFAULT_CAMERA_ZOOM,
-        }),
-
       // Layout management actions
       loadSampleLayout: () =>
         set((state) => {
@@ -413,10 +429,13 @@ export const useVoxelStore = create<VoxelStore>()(
           const currentHeight = newCells.get(key) ?? 0
           if (currentHeight > 0) {
             newCells.delete(key)
+            // Clean up stairs on this cell
+            const newStairs = removeStairsAtCell(state.stairs, x, z)
+            return { floorCells: newCells, stairs: newStairs }
           } else {
             newCells.set(key, 1)
+            return { floorCells: newCells }
           }
-          return { floorCells: newCells }
         }),
 
       setFloorCell: (x: number, z: number, active: boolean) =>
@@ -428,10 +447,13 @@ export const useVoxelStore = create<VoxelStore>()(
             if (currentHeight === 0) {
               newCells.set(key, 1)
             }
+            return { floorCells: newCells }
           } else {
             newCells.delete(key)
+            // Clean up stairs on this cell
+            const newStairs = removeStairsAtCell(state.stairs, x, z)
+            return { floorCells: newCells, stairs: newStairs }
           }
-          return { floorCells: newCells }
         }),
 
       setFloorHeight: (x: number, z: number, height: number) =>
@@ -650,6 +672,31 @@ export const useVoxelStore = create<VoxelStore>()(
       setSnapGuides: (guides: SnapGuide[]) =>
         set({ snapGuides: guides }),
 
+      // Edge override actions
+      setEdgeOverride: (edgeKey: string, classification: EdgeClassification) =>
+        set((state) => {
+          const newOverrides = new Map(state.overrides)
+          newOverrides.set(edgeKey, classification)
+          return { overrides: newOverrides }
+        }),
+
+      clearEdgeOverride: (edgeKey: string) =>
+        set((state) => {
+          const newOverrides = new Map(state.overrides)
+          newOverrides.delete(edgeKey)
+          return { overrides: newOverrides }
+        }),
+
+      clearAllOverrides: () =>
+        set({ overrides: new Map<string, EdgeClassification>() }),
+
+      // Rule engine actions
+      setRules: (rules: ReadonlyArray<StructuralRule>) =>
+        set({ rules }),
+
+      setEnablePatternMatching: (enabled: boolean) =>
+        set({ enablePatternMatching: enabled }),
+
       // Wall visibility actions
       toggleWall: (wall: 'back' | 'right' | 'front' | 'left') =>
         set((state) => ({
@@ -669,14 +716,18 @@ export const useVoxelStore = create<VoxelStore>()(
         floorCellsArray: Array.from(state.floorCells.entries()),
         // Persist stairs as array
         stairsArray: Array.from(state.stairs.entries()),
+        // Persist edge overrides as array
+        overridesArray: Array.from(state.overrides.entries()),
       }),
       merge: (persistedState: unknown, currentState: VoxelStore) => {
         const persisted = persistedState as Partial<VoxelStore> & {
           floorCellsArray?: Array<[string, number | boolean]>
           stairsArray?: Array<[string, StairSegment]>
+          overridesArray?: Array<[string, EdgeClassification]>
         }
         let floorCells = currentState.floorCells
         let stairs = currentState.stairs
+        let overrides = currentState.overrides
 
         if (persisted.floorCellsArray) {
           // Convert old boolean format to new height format if needed
@@ -696,11 +747,16 @@ export const useVoxelStore = create<VoxelStore>()(
           stairs = new Map<string, StairSegment>(persisted.stairsArray)
         }
 
+        if (persisted.overridesArray) {
+          overrides = new Map<string, EdgeClassification>(persisted.overridesArray)
+        }
+
         return {
           ...currentState,
           ...persisted,
           floorCells,
           stairs,
+          overrides,
         }
       },
     }
@@ -722,3 +778,6 @@ export const selectIsEditorMode = (state: VoxelStore) => state.isEditorMode
 export const selectEditorTool = (state: VoxelStore) => state.editorTool
 export const selectFloorCells = (state: VoxelStore) => state.floorCells
 export const selectStairs = (state: VoxelStore) => state.stairs
+export const selectOverrides = (state: VoxelStore) => state.overrides
+export const selectRules = (state: VoxelStore) => state.rules
+export const selectEnablePatternMatching = (state: VoxelStore) => state.enablePatternMatching

@@ -3,9 +3,8 @@ import { useVoxelStore } from '../store/voxelStore'
 import { DEFAULT_WORLD_DIMENSIONS, type VoxelTable, type VoxelModelObject as VoxelModelObjectType } from '../types/voxel'
 import { IsometricCamera } from './camera/IsometricCamera'
 import { ProceduralFloor } from './ProceduralFloor'
-import { ProceduralWalls } from './ProceduralWalls'
+import { ProceduralStructure } from './ProceduralStructure'
 import { ProceduralStairs } from './ProceduralStairs'
-import { ProceduralRailings } from './ProceduralRailings'
 import { InteractiveGrid } from './InteractiveGrid'
 import { VoxelTableObject } from './objects/VoxelTable'
 import { VoxelChair } from './objects/VoxelChair'
@@ -163,11 +162,12 @@ export function VoxelWorld({ isometric = false }: VoxelWorldProps) {
 
   return (
     <>
-      {/* Lighting - bright for white theme */}
-      <ambientLight intensity={0.9} />
+      {/* Lighting - warm, soft interior lighting */}
+      <ambientLight intensity={0.7} color="#ffeedd" />
       <directionalLight
         position={[viewDimensions.width * 1.5, viewDimensions.height * 3, viewDimensions.depth * 1.5]}
-        intensity={1}
+        intensity={1.2}
+        color="#fff8f0"
         castShadow
         shadow-mapSize={[2048, 2048]}
         shadow-camera-far={150}
@@ -178,16 +178,18 @@ export function VoxelWorld({ isometric = false }: VoxelWorldProps) {
       />
       <directionalLight
         position={[-viewDimensions.width, viewDimensions.height * 2, viewDimensions.depth]}
-        intensity={0.4}
+        intensity={0.35}
+        color="#e8e0f0"
       />
-      {/* Fill light */}
+      {/* Fill light — subtle warm bounce */}
       <directionalLight
         position={[viewDimensions.width, viewDimensions.height, viewDimensions.depth * 2]}
-        intensity={0.3}
+        intensity={0.25}
+        color="#fff0e0"
       />
 
-      {/* White background */}
-      <color attach="background" args={['#ffffff']} />
+      {/* Soft off-white background */}
+      <color attach="background" args={['#faf8f5']} />
 
       {/* Camera Controls - Isometric */}
       <IsometricCamera
@@ -196,19 +198,17 @@ export function VoxelWorld({ isometric = false }: VoxelWorldProps) {
       />
 
       {/* Procedural Floor - Townscaper-style */}
-      <ProceduralFloor color="#e8dcc8" />
+      <ProceduralFloor color="#ddd0bc" />
 
-      {/* Procedural Walls - auto-generated at floor edges */}
-      <ProceduralWalls
-        wallColor="#f5f5f5"
+      {/* Procedural Structure - unified rule-engine-driven walls, windows, doors, railings */}
+      <ProceduralStructure
+        wallColor="#f0e6d6"
         wallHeight={1}
+        railingColor="#3a3a3a"
       />
 
       {/* Procedural Stairs - manually placed between levels */}
       <ProceduralStairs />
-
-      {/* Procedural Railings - auto-generated at upper level edges */}
-      <ProceduralRailings />
 
       {/* Interactive Grid for floor editing */}
       {isEditorMode && (

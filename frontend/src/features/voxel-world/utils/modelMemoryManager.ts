@@ -57,7 +57,7 @@ export function estimateObjectMemorySize(object: THREE.Object3D): number {
 
             textures.forEach((texture) => {
               if (texture instanceof THREE.Texture && texture.image) {
-                const img = texture.image
+                const img = texture.image as HTMLImageElement
                 if (img.width && img.height) {
                   totalBytes += img.width * img.height * 4
                 }
