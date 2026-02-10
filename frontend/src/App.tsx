@@ -17,6 +17,7 @@ import PlansPage from './pages/superadmin/PlansPage';
 import SubscriptionsPage from './pages/superadmin/SubscriptionsPage';
 import AuditLogsPage from './pages/superadmin/AuditLogsPage';
 import SuperAdminSettingsPage from './pages/superadmin/SuperAdminSettingsPage';
+import TerminalPage from './pages/superadmin/TerminalPage';
 import { SuperAdminLayout, SuperAdminProtectedRoute } from './features/superadmin/components';
 import ProfilePage from './pages/profile/ProfilePage';
 import CustomersPage from './pages/customers/CustomersPage';
@@ -184,6 +185,7 @@ function App() {
           <Route path="/superadmin/plans" element={<PlansPage />} />
           <Route path="/superadmin/subscriptions" element={<SubscriptionsPage />} />
           <Route path="/superadmin/audit-logs" element={<AuditLogsPage />} />
+          <Route path="/superadmin/terminal" element={<TerminalPage />} />
           <Route path="/superadmin/settings" element={<SuperAdminSettingsPage />} />
         </Route>
       </Route>
