@@ -140,7 +140,7 @@ export default function TerminalPage() {
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-hidden p-6">
+      <div className={`flex-1 overflow-hidden ${connectionStatus !== 'connected' ? 'p-6' : ''}`}>
         {connectionStatus !== 'connected' ? (
           <div className="max-w-lg mx-auto">
             <div className="bg-white border border-zinc-200 rounded-xl p-6 shadow-sm">
@@ -162,7 +162,7 @@ export default function TerminalPage() {
           </div>
         ) : (
           socketRef.current && (
-            <div className="h-full rounded-xl overflow-hidden border border-zinc-700 shadow-lg">
+            <div className="h-full">
               <TerminalView
                 socket={socketRef.current}
                 isConnected={connectionStatus === 'connected'}
