@@ -9,10 +9,12 @@ import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { getStats } from '@/lib/api';
 import { GradientOrb } from '@/components/animations/FloatingElement';
 import { TextReveal } from '@/components/animations/TextReveal';
+import { RamadanDecorSet } from '@/components/animations/RamadanDecorations';
 
 export default function FinalCTA() {
   const stats = getStats();
   const t = useTranslations('cta');
+  const tRamadan = useTranslations('ramadan');
   const sectionRef = useRef<HTMLElement>(null);
   const prefersReducedMotion = useReducedMotion();
 
@@ -26,7 +28,7 @@ export default function FinalCTA() {
   return (
     <section
       ref={sectionRef}
-      className="section-padding bg-slate-900 relative overflow-hidden"
+      className="section-padding relative overflow-hidden bg-gradient-to-br from-ramadan-deep via-[#16213e] to-[#0f3460]"
     >
       {/* Animated background */}
       <motion.div
@@ -34,14 +36,14 @@ export default function FinalCTA() {
         className="absolute inset-0"
       >
         <GradientOrb
-          color="rgba(249, 115, 22, 0.15)"
+          color="rgba(212, 160, 23, 0.15)"
           size={600}
           blur={150}
           className="absolute top-0 left-1/4"
           duration={15}
         />
         <GradientOrb
-          color="rgba(59, 130, 246, 0.1)"
+          color="rgba(107, 33, 168, 0.1)"
           size={500}
           blur={120}
           className="absolute bottom-0 right-1/4"
@@ -49,7 +51,7 @@ export default function FinalCTA() {
           delay={3}
         />
         <GradientOrb
-          color="rgba(139, 92, 246, 0.08)"
+          color="rgba(212, 160, 23, 0.08)"
           size={400}
           blur={100}
           className="absolute top-1/2 right-0"
@@ -67,6 +69,9 @@ export default function FinalCTA() {
         }}
       />
 
+      {/* Ramadan decorations */}
+      <RamadanDecorSet variant="cta" />
+
       <Container className="relative">
         <div className="max-w-3xl mx-auto">
           {/* Content */}
@@ -82,10 +87,10 @@ export default function FinalCTA() {
               initial={{ opacity: 0, scale: 0.9 }}
               whileInView={{ opacity: 1, scale: 1 }}
               viewport={{ once: true }}
-              className="inline-flex items-center gap-2 px-4 py-2 mb-6 bg-orange-500/10 rounded-full border border-orange-500/20"
+              className="inline-flex items-center gap-2 px-4 py-2 mb-6 bg-ramadan-gold/10 rounded-full border border-ramadan-gold/20"
             >
-              <Sparkles className="w-4 h-4 text-orange-400" />
-              <span className="text-sm font-medium text-orange-400">Ready to get started?</span>
+              <Sparkles className="w-4 h-4 text-ramadan-gold" />
+              <span className="text-sm font-medium text-ramadan-gold">{tRamadan('heroLabel')}</span>
             </motion.div>
 
             {prefersReducedMotion ? (
@@ -121,7 +126,7 @@ export default function FinalCTA() {
                 href="/app/register"
                 whileHover={prefersReducedMotion ? {} : { scale: 1.03, y: -2 }}
                 whileTap={prefersReducedMotion ? {} : { scale: 0.98 }}
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 text-lg font-semibold text-slate-900 bg-white rounded-2xl hover:bg-slate-100 transition-all shadow-lg shadow-white/10 group"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 text-lg font-semibold text-ramadan-deep bg-gradient-to-r from-ramadan-gold to-ramadan-star rounded-2xl hover:from-ramadan-star hover:to-ramadan-gold transition-all shadow-lg shadow-ramadan-gold/20 group"
               >
                 {t('primaryBtn')}
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -130,7 +135,7 @@ export default function FinalCTA() {
                 href="#contact"
                 whileHover={prefersReducedMotion ? {} : { scale: 1.03 }}
                 whileTap={prefersReducedMotion ? {} : { scale: 0.98 }}
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 text-lg font-semibold text-white border border-slate-700 rounded-2xl hover:bg-slate-800/50 hover:border-slate-600 transition-all backdrop-blur-sm"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 text-lg font-semibold text-white border border-white/20 rounded-2xl hover:bg-white/10 hover:border-white/30 transition-all backdrop-blur-sm"
               >
                 <MessageCircle className="w-5 h-5" />
                 {t('secondaryBtn')}
@@ -159,7 +164,7 @@ export default function FinalCTA() {
                     whileInView={{ scale: 1 }}
                     viewport={{ once: true }}
                     transition={{ delay: 0.7 + index * 0.1, type: 'spring' }}
-                    className="w-5 h-5 text-green-400"
+                    className="w-5 h-5 text-ramadan-gold"
                     fill="currentColor"
                     viewBox="0 0 20 20"
                   >

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsInt, Min, Max, IsNumber, IsBoolean } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsInt, Min, Max, IsNumber, IsBoolean, IsDateString } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class SubscriptionFilterDto {
@@ -138,6 +138,34 @@ export class CreatePlanDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean = true;
+
+  @ApiPropertyOptional({ description: 'Discount percentage (0-100)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  discountPercentage?: number;
+
+  @ApiPropertyOptional({ description: 'Discount label (e.g. "Ramazan Kampanyasi")' })
+  @IsOptional()
+  @IsString()
+  discountLabel?: string;
+
+  @ApiPropertyOptional({ description: 'Discount start date (ISO string)' })
+  @IsOptional()
+  @IsDateString()
+  discountStartDate?: string;
+
+  @ApiPropertyOptional({ description: 'Discount end date (ISO string)' })
+  @IsOptional()
+  @IsDateString()
+  discountEndDate?: string;
+
+  @ApiPropertyOptional({ description: 'Whether discount is active', default: false })
+  @IsOptional()
+  @IsBoolean()
+  isDiscountActive?: boolean;
 }
 
 export class UpdatePlanDto extends CreatePlanDto {}

@@ -16,6 +16,13 @@
   --gradient-start: #f8fafc;
   --gradient-end: #f1f5f9;
   --gradient-accent: #fef3c7;
+
+  /* Ramadan theme colors */
+  --ramadan-gold: #D4A017;
+  --ramadan-deep: #1a1a2e;
+  --ramadan-purple: #6B21A8;
+  --ramadan-teal: #0d7377;
+  --ramadan-star: #FFD700;
 }
 
 @theme inline {
@@ -26,6 +33,11 @@
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
   --color-border: var(--border);
+  --color-ramadan-gold: var(--ramadan-gold);
+  --color-ramadan-deep: var(--ramadan-deep);
+  --color-ramadan-purple: var(--ramadan-purple);
+  --color-ramadan-teal: var(--ramadan-teal);
+  --color-ramadan-star: var(--ramadan-star);
 }
 
 html {
@@ -397,6 +409,49 @@ body {
 .stagger-3 { animation-delay: 0.3s; }
 .stagger-4 { animation-delay: 0.4s; }
 .stagger-5 { animation-delay: 0.5s; }
+
+/* Ramadan glow effects */
+.glow-ramadan {
+  box-shadow: 0 0 20px rgba(212, 160, 23, 0.3),
+              0 0 40px rgba(212, 160, 23, 0.1);
+}
+
+.glow-ramadan-lg {
+  box-shadow: 0 0 30px rgba(212, 160, 23, 0.4),
+              0 0 60px rgba(212, 160, 23, 0.2),
+              0 0 90px rgba(212, 160, 23, 0.1);
+}
+
+/* Ramadan lantern swing */
+@keyframes lantern-swing {
+  0%, 100% {
+    transform: rotate(-5deg);
+  }
+  50% {
+    transform: rotate(5deg);
+  }
+}
+
+.animate-lantern-swing {
+  animation: lantern-swing 3s ease-in-out infinite;
+  transform-origin: top center;
+}
+
+/* Ramadan star twinkle */
+@keyframes star-twinkle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.4;
+    transform: scale(0.8);
+  }
+}
+
+.animate-star-twinkle {
+  animation: star-twinkle 2s ease-in-out infinite;
+}
 
 /* Lenis smooth scroll compatibility */
 html.lenis, html.lenis body {

@@ -281,6 +281,18 @@
     "trustBadge2": "14 kunlik bepul sinov",
     "trustBadge3": "Istalgan vaqtda bekor qilish"
   },
+  "ramadan": {
+    "bannerTitle": "Ramazon maxsus - 50% chegirma!",
+    "bannerCta": "Hozir boshlash",
+    "heroLabel": "Ramazon aksiyasi",
+    "discountBadge": "{percent}% CHEGIRMA",
+    "originalPrice": "Oddiy narx",
+    "campaignEnds": "Aksiya tugashi:",
+    "days": "kun",
+    "hours": "soat",
+    "minutes": "daq",
+    "seconds": "son"
+  },
   "mascot": {
     "welcome": "Xush kelibsiz! 👋",
     "welcomeMessage": "Men HummyTummy oshpaziman. Sizga yordam berish uchun shu yerdaman!",

@@ -170,6 +170,11 @@ export interface SubscriptionPlan {
   inventoryTracking: boolean;
   kdsIntegration: boolean;
   isActive: boolean;
+  discountPercentage?: number;
+  discountLabel?: string;
+  discountStartDate?: string;
+  discountEndDate?: string;
+  isDiscountActive?: boolean;
   _count?: {
     subscriptions: number;
   };

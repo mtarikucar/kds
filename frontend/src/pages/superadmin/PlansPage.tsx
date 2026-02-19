@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, Tag } from 'lucide-react';
 import { usePlans, useCreatePlan, useUpdatePlan, useDeletePlan } from '../../features/superadmin/api/superAdminApi';
 import { SubscriptionPlan } from '../../features/superadmin/types';
 
@@ -83,11 +83,32 @@ export default function PlansPage() {
               </div>
             </div>
 
+            {plan.isDiscountActive && plan.discountPercentage && (
+              <div className="mb-3 flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold bg-emerald-100 text-emerald-700 rounded-full">
+                  <Tag className="w-3 h-3" />
+                  %{plan.discountPercentage} {plan.discountLabel || 'INDIRIM'}
+                </span>
+              </div>
+            )}
+
             <div className="mb-4">
-              <p className="text-2xl font-semibold text-zinc-900">
-                ₺{Number(plan.monthlyPrice).toLocaleString()}
-                <span className="text-sm font-normal text-zinc-500">/mo</span>
-              </p>
+              {plan.isDiscountActive && plan.discountPercentage ? (
+                <>
+                  <p className="text-sm text-zinc-400 line-through">
+                    ₺{Number(plan.monthlyPrice).toLocaleString()}/mo
+                  </p>
+                  <p className="text-2xl font-semibold text-emerald-600">
+                    ₺{(Number(plan.monthlyPrice) * (1 - plan.discountPercentage / 100)).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                    <span className="text-sm font-normal text-zinc-500">/mo</span>
+                  </p>
+                </>
+              ) : (
+                <p className="text-2xl font-semibold text-zinc-900">
+                  ₺{Number(plan.monthlyPrice).toLocaleString()}
+                  <span className="text-sm font-normal text-zinc-500">/mo</span>
+                </p>
+              )}
               <p className="text-xs text-zinc-500">
                 ₺{Number(plan.yearlyPrice).toLocaleString()}/year
               </p>
@@ -130,7 +151,13 @@ export default function PlansPage() {
               )}
             </div>
 
-            <p className="text-xs text-zinc-400 mt-3">
+            {plan.isDiscountActive && plan.discountStartDate && plan.discountEndDate && (
+              <p className="text-xs text-emerald-600 mt-3">
+                {new Date(plan.discountStartDate).toLocaleDateString()} - {new Date(plan.discountEndDate).toLocaleDateString()}
+              </p>
+            )}
+
+            <p className="text-xs text-zinc-400 mt-1">
               {plan._count?.subscriptions || 0} active subscriptions
             </p>
           </div>
@@ -179,6 +206,11 @@ function PlanModal({
     apiAccess: plan?.apiAccess || false,
     prioritySupport: plan?.prioritySupport || false,
     isActive: plan?.isActive ?? true,
+    discountPercentage: plan?.discountPercentage || 0,
+    discountLabel: plan?.discountLabel || '',
+    discountStartDate: plan?.discountStartDate ? plan.discountStartDate.slice(0, 10) : '',
+    discountEndDate: plan?.discountEndDate ? plan.discountEndDate.slice(0, 10) : '',
+    isDiscountActive: plan?.isDiscountActive || false,
   });
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -322,6 +354,64 @@ function PlanModal({
                 />
                 <span className="text-sm text-zinc-700">Active</span>
               </label>
+            </div>
+
+            {/* Discount Settings */}
+            <div className="pt-4 border-t border-zinc-200">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-zinc-900">Discount Settings</h3>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={formData.isDiscountActive}
+                    onChange={(e) => setFormData({ ...formData, isDiscountActive: e.target.checked })}
+                    className="w-4 h-4 rounded border-zinc-300 text-emerald-600 focus:ring-emerald-600"
+                  />
+                  <span className="text-xs text-zinc-600">Active</span>
+                </label>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 mb-1.5">Discount %</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={formData.discountPercentage}
+                    onChange={(e) => setFormData({ ...formData, discountPercentage: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 mb-1.5">Label</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Ramazan Kampanyasi"
+                    value={formData.discountLabel}
+                    onChange={(e) => setFormData({ ...formData, discountLabel: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 mb-1.5">Start Date</label>
+                  <input
+                    type="date"
+                    value={formData.discountStartDate}
+                    onChange={(e) => setFormData({ ...formData, discountStartDate: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 mb-1.5">End Date</label>
+                  <input
+                    type="date"
+                    value={formData.discountEndDate}
+                    onChange={(e) => setFormData({ ...formData, discountEndDate: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-3 pt-4">

@@ -25,6 +25,14 @@ export default function Navbar() {
 
   const isHidden = scrollDirection === 'down' && !isAtTop && !isMenuOpen;
 
+  // When at top, we're over the dark Ramadan hero - use light text
+  // When scrolled, glass background is active - use dark text
+  const textPrimary = isAtTop ? 'text-white' : 'text-slate-900';
+  const textSecondary = isAtTop ? 'text-white/80 hover:text-white' : 'text-slate-600 hover:text-slate-900';
+  const mobileButtonStyle = isAtTop
+    ? 'text-white/80 hover:text-white hover:bg-white/10'
+    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100';
+
   return (
     <motion.header
       initial={{ y: 0 }}
@@ -48,7 +56,7 @@ export default function Navbar() {
               height={48}
               className="w-10 h-10 lg:w-12 lg:h-12"
             />
-            <span className="text-xl lg:text-2xl font-bold text-slate-900">HummyTummy</span>
+            <span className={`text-xl lg:text-2xl font-bold transition-colors duration-300 ${textPrimary}`}>HummyTummy</span>
           </Link>
 
           {/* Desktop Navigation */}
@@ -57,7 +65,7 @@ export default function Navbar() {
               <a
                 key={link.href}
                 href={link.href}
-                className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+                className={`text-sm font-medium transition-colors duration-300 ${textSecondary}`}
               >
                 {link.label}
               </a>
@@ -69,13 +77,17 @@ export default function Navbar() {
             <LanguageSwitcher />
             <a
               href="/app/login"
-              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+              className={`text-sm font-medium transition-colors duration-300 ${textSecondary}`}
             >
               {t('signIn')}
             </a>
             <a
               href="/app/register"
-              className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors"
+              className={`inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-300 ${
+                isAtTop
+                  ? 'text-ramadan-deep bg-ramadan-gold hover:bg-ramadan-star'
+                  : 'text-white bg-slate-900 hover:bg-slate-800'
+              }`}
             >
               {t('startFree')}
             </a>
@@ -84,7 +96,7 @@ export default function Navbar() {
           {/* Mobile Menu Button */}
           <button
             onClick={() => setIsMenuOpen(!isMenuOpen)}
-            className="lg:hidden p-2 text-slate-600 hover:text-slate-900 rounded-lg hover:bg-slate-100 transition-colors"
+            className={`lg:hidden p-2 rounded-lg transition-colors ${mobileButtonStyle}`}
             aria-label={isMenuOpen ? 'Close menu' : 'Open menu'}
             aria-expanded={isMenuOpen}
           >

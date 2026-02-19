@@ -281,6 +281,18 @@
     "trustBadge2": "14-day free trial",
     "trustBadge3": "Cancel anytime"
   },
+  "ramadan": {
+    "bannerTitle": "Ramadan Special - 50% Off!",
+    "bannerCta": "Start Now",
+    "heroLabel": "Ramadan Campaign",
+    "discountBadge": "{percent}% OFF",
+    "originalPrice": "Regular price",
+    "campaignEnds": "Campaign ends:",
+    "days": "days",
+    "hours": "hours",
+    "minutes": "min",
+    "seconds": "sec"
+  },
   "mascot": {
     "welcome": "Welcome! 👋",
     "welcomeMessage": "I'm HummyTummy's chef. I'm here to help you!",
