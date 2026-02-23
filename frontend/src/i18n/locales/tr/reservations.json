@@ -30,8 +30,25 @@
     "bannerTitle": "Banner Başlığı",
     "bannerDescription": "Banner Açıklaması",
     "bannerImage": "Banner Görseli",
+    "loading": "Rezervasyon ayarları yükleniyor...",
+    "general": "Genel",
+    "generalDescription": "Rezervasyonları ve onay ayarlarını etkinleştir veya devre dışı bırak",
+    "timeSettings": "Zaman Ayarları",
+    "timeSettingsDescription": "Zaman dilimleri ve rezervasyon pencerelerini yapılandır",
+    "capacity": "Kapasite",
+    "capacityDescription": "Kişi ve rezervasyon limitlerini ayarla",
+    "cancellation": "İptal",
+    "cancellationDescription": "İptal politikalarını yapılandır",
+    "unlimited": "Sınırsız",
     "customMessage": "Özel Mesaj",
     "customMessageDesc": "Herkese açık rezervasyon sayfasında gösterilen mesaj",
+    "customMessagePlaceholder": "Rezervasyon sayfanız için özel bir mesaj girin...",
+    "bannerTitleDesc": "Rezervasyon bannerında görüntülenen başlık",
+    "bannerTitlePlaceholder": "Restoranımıza hoş geldiniz",
+    "bannerDescriptionLabel": "Banner Açıklaması",
+    "bannerDescriptionHelp": "Banner başlığının altında görüntülenen açıklama metni",
+    "bannerDescriptionPlaceholder": "Masanızı ayırtın ve harika bir yemek deneyiminin tadını çıkarın...",
+    "minutesCount": "{{count}} dakika",
     "minutes": "dakika",
     "days": "gün",
     "closed": "Kapalı",
@@ -67,6 +84,7 @@
     "seated": "Oturmuş",
     "completed": "Tamamlanan",
     "cancelled": "İptal",
+    "date": "Tarih",
     "searchPlaceholder": "İsim veya telefon ile ara..."
   },
   "stats": {
@@ -76,20 +94,32 @@
     "seated": "Oturmuş"
   },
   "detail": {
+    "title": "Rezervasyon Detayları",
     "reservationNumber": "Rezervasyon #",
     "date": "Tarih",
     "time": "Saat",
+    "dateTime": "Tarih ve Saat",
     "guests": "Kişi",
+    "people": "kişi",
     "customer": "Müşteri",
     "phone": "Telefon",
     "email": "E-posta",
     "table": "Masa",
+    "assignedTable": "Atanan Masa",
+    "assignTable": "Masa Ata",
+    "seats": "kişilik",
     "notes": "Notlar",
+    "guestNotes": "Misafir Notları",
     "adminNotes": "Yönetici Notları",
+    "adminNotesPlaceholder": "Bu rezervasyon hakkında not ekleyin...",
     "status": "Durum",
     "rejectionReason": "Red Nedeni",
     "noTable": "Masa atanmadı",
-    "createdAt": "Oluşturulma"
+    "createdAt": "Oluşturulma",
+    "confirmedAt": "Onaylanma",
+    "seatedAt": "Oturma",
+    "completedAt": "Tamamlanma",
+    "cancelledAt": "İptal Edilme"
   },
   "public": {
     "title": "Rezervasyon Yap",
@@ -118,7 +148,13 @@
     "next": "İleri",
     "back": "Geri",
     "closed": "Bu gün kapalı",
-    "systemDisabled": "Rezervasyon sistemi şu anda kullanılamıyor"
+    "systemDisabled": "Rezervasyon sistemi şu anda kullanılamıyor",
+    "submitting": "Gönderiliyor...",
+    "submitError": "Bir şeyler yanlış gitti. Lütfen tekrar deneyin.",
+    "validation": {
+      "nameRequired": "İsim gereklidir",
+      "phoneRequired": "Telefon numarası gereklidir"
+    }
   },
   "lookup": {
     "title": "Rezervasyonunuzu Kontrol Edin",
@@ -156,8 +192,11 @@
     "customer": "Müşteri",
     "guests": "Kişi",
     "table": "Masa",
+    "tablePrefix": "Masa",
+    "unassigned": "Atanmamış",
     "status": "Durum",
     "actions": "İşlemler",
-    "noReservations": "Rezervasyon bulunamadı"
+    "noReservations": "Rezervasyon bulunamadı",
+    "noReservationsDescription": "Seçilen tarih ve filtreler için rezervasyon bulunamadı."
   }
 }

@@ -1,5 +1,11 @@
 {
   "title": "Настройки",
+  "nav": {
+    "qrMenu": "QR Menu",
+    "reports": "Reports",
+    "branding": "Branding",
+    "reservations": "Reservations"
+  },
   "autoSave": {
     "idle": "Нет изменений",
     "saving": "Сохранение...",

@@ -114,10 +114,10 @@ const PublicReservationPage: React.FC = () => {
   const validateCustomerInfo = (): boolean => {
     const errors: Record<string, string> = {};
     if (!customerInfo.name.trim()) {
-      errors.name = t('public.name') + ' is required';
+      errors.name = t('public.validation.nameRequired');
     }
     if (!customerInfo.phone.trim()) {
-      errors.phone = t('public.phone') + ' is required';
+      errors.phone = t('public.validation.phoneRequired');
     }
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
@@ -239,7 +239,7 @@ const PublicReservationPage: React.FC = () => {
           )}
         </div>
       ))}
-      <span className="ml-3 text-sm text-gray-500">
+      <span className="ms-3 text-sm text-gray-500">
         {t('public.step')} {step} {t('public.of')} {TOTAL_STEPS}
       </span>
     </div>
@@ -362,7 +362,7 @@ const PublicReservationPage: React.FC = () => {
       {/* Skip / Any table option */}
       <button
         onClick={() => setSelectedTable(null)}
-        className={`w-full px-4 py-3 rounded-xl text-sm font-medium transition-all text-left ${
+        className={`w-full px-4 py-3 rounded-xl text-sm font-medium transition-all text-start ${
           selectedTable === null
             ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
             : 'bg-white border-2 border-gray-200 text-gray-700 hover:border-blue-300'
@@ -386,7 +386,7 @@ const PublicReservationPage: React.FC = () => {
             <button
               key={table.id}
               onClick={() => setSelectedTable(table)}
-              className={`p-4 rounded-xl text-left transition-all ${
+              className={`p-4 rounded-xl text-start transition-all ${
                 selectedTable?.id === table.id
                   ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
                   : 'bg-white border-2 border-gray-200 hover:border-blue-300'
@@ -528,7 +528,7 @@ const PublicReservationPage: React.FC = () => {
             {isPending ? t('public.pendingMessage') : t('public.confirmedMessage')}
           </p>
 
-          <div className="bg-gray-50 rounded-xl p-6 mb-6 text-left max-w-sm mx-auto">
+          <div className="bg-gray-50 rounded-xl p-6 mb-6 text-start max-w-sm mx-auto">
             <p className="text-sm text-gray-500 mb-1">{t('public.successMessage')}</p>
             <p className="text-3xl font-bold text-blue-600 mb-4">
               {createdReservation.reservationNumber}
@@ -655,7 +655,7 @@ const PublicReservationPage: React.FC = () => {
             <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
             <p className="text-sm text-red-700">
               {(createReservation.error as any)?.response?.data?.message ||
-                'Something went wrong. Please try again.'}
+                t('public.submitError')}
             </p>
           </div>
         )}
@@ -668,7 +668,7 @@ const PublicReservationPage: React.FC = () => {
           {createReservation.isPending ? (
             <>
               <Loader2 className="w-5 h-5 animate-spin" />
-              <span>Submitting...</span>
+              <span>{t('public.submitting')}</span>
             </>
           ) : (
             <>

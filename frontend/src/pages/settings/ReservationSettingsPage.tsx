@@ -55,7 +55,7 @@ const DEFAULT_OPERATING_HOURS: Record<string, { open: string; close: string; clo
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] as const;
 
 const ReservationSettingsPage = () => {
-  const { t } = useTranslation('settings');
+  const { t } = useTranslation(['reservations', 'settings']);
   const { data: reservationSettings, isLoading } = useReservationSettings();
   const { mutateAsync: updateReservationSettings } = useUpdateReservationSettings();
 
@@ -114,10 +114,10 @@ const ReservationSettingsPage = () => {
   } = useAutoSave(settings, saveSettings, {
     debounceMs: 300,
     onSuccess: () => {
-      toast.success(t('autoSave.savedSuccess'), { duration: 2000 });
+      toast.success(t('settings:autoSave.savedSuccess'), { duration: 2000 });
     },
     onError: () => {
-      toast.error(t('settingsFailed'));
+      toast.error(t('settings:settingsFailed'));
     },
   });
 
@@ -176,7 +176,7 @@ const ReservationSettingsPage = () => {
   if (isLoading) {
     return (
       <div className="h-full flex items-center justify-center">
-        <p className="text-slate-500">{t('reservationSettings.loading')}</p>
+        <p className="text-slate-500">{t('reservations:settings.loading')}</p>
       </div>
     );
   }
@@ -185,26 +185,26 @@ const ReservationSettingsPage = () => {
     <div className="h-full p-4 md:p-6 overflow-auto">
       <div className="mb-6">
         <h1 className="text-xl font-heading font-bold text-slate-900">
-          {t('reservationSettings.title')}
+          {t('reservations:settings.title')}
         </h1>
         <p className="text-sm text-slate-500 mt-1">
-          {t('reservationSettings.description')}
+          {t('reservations:settings.description')}
         </p>
       </div>
 
       <div className="max-w-3xl space-y-6">
         {/* General Settings */}
         <SettingsSection
-          title={t('reservationSettings.general')}
-          description={t('reservationSettings.generalDescription')}
+          title={t('reservations:settings.general')}
+          description={t('reservations:settings.generalDescription')}
           icon={<Settings className="w-4 h-4" />}
           saveStatus={saveStatus}
           onRetry={retrySave}
         >
           <SettingsGroup>
             <SettingsToggle
-              label={t('reservationSettings.isEnabled')}
-              description={t('reservationSettings.isEnabledDescription')}
+              label={t('reservations:settings.enabled')}
+              description={t('reservations:settings.enabledDesc')}
               checked={settings.isEnabled}
               onChange={(checked) => handleToggleChange('isEnabled', checked)}
             />
@@ -212,8 +212,8 @@ const ReservationSettingsPage = () => {
             <SettingsDivider />
 
             <SettingsToggle
-              label={t('reservationSettings.requireApproval')}
-              description={t('reservationSettings.requireApprovalDescription')}
+              label={t('reservations:settings.requireApproval')}
+              description={t('reservations:settings.requireApprovalDesc')}
               checked={settings.requireApproval}
               onChange={(checked) => handleToggleChange('requireApproval', checked)}
             />
@@ -222,30 +222,30 @@ const ReservationSettingsPage = () => {
 
         {/* Time Settings */}
         <SettingsSection
-          title={t('reservationSettings.timeSettings')}
-          description={t('reservationSettings.timeSettingsDescription')}
+          title={t('reservations:settings.timeSettings')}
+          description={t('reservations:settings.timeSettingsDescription')}
           icon={<Clock className="w-4 h-4" />}
           saveStatus={saveStatus}
           onRetry={retrySave}
         >
           <SettingsGroup>
             <SettingsSelect
-              label={t('reservationSettings.timeSlotInterval')}
-              description={t('reservationSettings.timeSlotIntervalDescription')}
+              label={t('reservations:settings.timeSlotInterval')}
+              description={t('reservations:settings.timeSlotIntervalDesc')}
               value={String(settings.timeSlotInterval)}
               onChange={(value) => handleSelectChange('timeSlotInterval', value)}
               options={[
-                { value: '15', label: t('reservationSettings.minutes', { count: 15 }) },
-                { value: '30', label: t('reservationSettings.minutes', { count: 30 }) },
-                { value: '60', label: t('reservationSettings.minutes', { count: 60 }) },
+                { value: '15', label: t('reservations:settings.minutesCount', { count: 15 }) },
+                { value: '30', label: t('reservations:settings.minutesCount', { count: 30 }) },
+                { value: '60', label: t('reservations:settings.minutesCount', { count: 60 }) },
               ]}
             />
 
             <SettingsDivider />
 
             <SettingsInput
-              label={t('reservationSettings.minAdvanceBooking')}
-              description={t('reservationSettings.minAdvanceBookingDescription')}
+              label={t('reservations:settings.minAdvanceBooking')}
+              description={t('reservations:settings.minAdvanceBookingDesc')}
               type="number"
               value={String(settings.minAdvanceBooking)}
               onChange={(value) => handleNumberChange('minAdvanceBooking', value)}
@@ -254,8 +254,8 @@ const ReservationSettingsPage = () => {
             <SettingsDivider />
 
             <SettingsInput
-              label={t('reservationSettings.maxAdvanceDays')}
-              description={t('reservationSettings.maxAdvanceDaysDescription')}
+              label={t('reservations:settings.maxAdvanceDays')}
+              description={t('reservations:settings.maxAdvanceDaysDesc')}
               type="number"
               value={String(settings.maxAdvanceDays)}
               onChange={(value) => handleNumberChange('maxAdvanceDays', value)}
@@ -264,8 +264,8 @@ const ReservationSettingsPage = () => {
             <SettingsDivider />
 
             <SettingsInput
-              label={t('reservationSettings.defaultDuration')}
-              description={t('reservationSettings.defaultDurationDescription')}
+              label={t('reservations:settings.defaultDuration')}
+              description={t('reservations:settings.defaultDurationDesc')}
               type="number"
               value={String(settings.defaultDuration)}
               onChange={(value) => handleNumberChange('defaultDuration', value)}
@@ -275,16 +275,16 @@ const ReservationSettingsPage = () => {
 
         {/* Capacity Settings */}
         <SettingsSection
-          title={t('reservationSettings.capacity')}
-          description={t('reservationSettings.capacityDescription')}
+          title={t('reservations:settings.capacity')}
+          description={t('reservations:settings.capacityDescription')}
           icon={<Users className="w-4 h-4" />}
           saveStatus={saveStatus}
           onRetry={retrySave}
         >
           <SettingsGroup>
             <SettingsInput
-              label={t('reservationSettings.maxGuestsPerReservation')}
-              description={t('reservationSettings.maxGuestsPerReservationDescription')}
+              label={t('reservations:settings.maxGuests')}
+              description={t('reservations:settings.maxGuestsDesc')}
               type="number"
               value={String(settings.maxGuestsPerReservation)}
               onChange={(value) => handleNumberChange('maxGuestsPerReservation', value)}
@@ -293,28 +293,28 @@ const ReservationSettingsPage = () => {
             <SettingsDivider />
 
             <SettingsInput
-              label={t('reservationSettings.maxReservationsPerSlot')}
-              description={t('reservationSettings.maxReservationsPerSlotDescription')}
+              label={t('reservations:settings.maxReservationsPerSlot')}
+              description={t('reservations:settings.maxReservationsPerSlotDesc')}
               type="number"
               value={settings.maxReservationsPerSlot !== null ? String(settings.maxReservationsPerSlot) : ''}
               onChange={(value) => handleOptionalNumberChange('maxReservationsPerSlot', value)}
-              placeholder={t('reservationSettings.unlimited')}
+              placeholder={t('reservations:settings.unlimited')}
             />
           </SettingsGroup>
         </SettingsSection>
 
         {/* Cancellation Settings */}
         <SettingsSection
-          title={t('reservationSettings.cancellation')}
-          description={t('reservationSettings.cancellationDescription')}
+          title={t('reservations:settings.cancellation')}
+          description={t('reservations:settings.cancellationDescription')}
           icon={<Ban className="w-4 h-4" />}
           saveStatus={saveStatus}
           onRetry={retrySave}
         >
           <SettingsGroup>
             <SettingsToggle
-              label={t('reservationSettings.allowCancellation')}
-              description={t('reservationSettings.allowCancellationDescription')}
+              label={t('reservations:settings.allowCancellation')}
+              description={t('reservations:settings.allowCancellationDesc')}
               checked={settings.allowCancellation}
               onChange={(checked) => handleToggleChange('allowCancellation', checked)}
             />
@@ -324,8 +324,8 @@ const ReservationSettingsPage = () => {
                 <SettingsDivider />
 
                 <SettingsInput
-                  label={t('reservationSettings.cancellationDeadline')}
-                  description={t('reservationSettings.cancellationDeadlineDescription')}
+                  label={t('reservations:settings.cancellationDeadline')}
+                  description={t('reservations:settings.cancellationDeadlineDesc')}
                   type="number"
                   value={String(settings.cancellationDeadline)}
                   onChange={(value) => handleNumberChange('cancellationDeadline', value)}
@@ -337,8 +337,8 @@ const ReservationSettingsPage = () => {
 
         {/* Operating Hours */}
         <SettingsSection
-          title={t('reservationSettings.operatingHours')}
-          description={t('reservationSettings.operatingHoursDescription')}
+          title={t('reservations:settings.operatingHours')}
+          description={t('reservations:settings.operatingHoursDesc')}
           icon={<CalendarDays className="w-4 h-4" />}
           saveStatus={saveStatus}
           onRetry={retrySave}
@@ -353,7 +353,7 @@ const ReservationSettingsPage = () => {
                     <div className="flex items-center justify-between gap-4 py-2 px-1">
                       <div className="min-w-[100px]">
                         <p className="text-sm font-medium text-slate-900 capitalize">
-                          {t(`reservationSettings.days.${day}`)}
+                          {t(`reservations:days.${day}`)}
                         </p>
                       </div>
 
@@ -390,7 +390,7 @@ const ReservationSettingsPage = () => {
                             className="rounded border-slate-300 text-primary-500 focus:ring-primary-500/20"
                           />
                           <span className="text-xs text-slate-500 font-medium">
-                            {t('reservationSettings.closed')}
+                            {t('reservations:settings.closed')}
                           </span>
                         </label>
                       </div>
@@ -404,8 +404,8 @@ const ReservationSettingsPage = () => {
 
         {/* Banner & Messaging */}
         <SettingsSection
-          title={t('reservationSettings.banner')}
-          description={t('reservationSettings.bannerDescription')}
+          title={t('reservations:settings.banner')}
+          description={t('reservations:settings.bannerDescription')}
           icon={<Image className="w-4 h-4" />}
           saveStatus={saveStatus}
           onRetry={retrySave}
@@ -413,16 +413,16 @@ const ReservationSettingsPage = () => {
           <SettingsGroup>
             <div className="py-3 px-1">
               <p className="text-sm font-medium text-slate-900 mb-1.5">
-                {t('reservationSettings.bannerTitle')}
+                {t('reservations:settings.bannerTitle')}
               </p>
               <p className="text-sm text-slate-500 mb-2">
-                {t('reservationSettings.bannerTitleDescription')}
+                {t('reservations:settings.bannerTitleDesc')}
               </p>
               <input
                 type="text"
                 value={settings.bannerTitle}
                 onChange={(e) => handleTextChange('bannerTitle', e.target.value)}
-                placeholder={t('reservationSettings.bannerTitlePlaceholder')}
+                placeholder={t('reservations:settings.bannerTitlePlaceholder')}
                 className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 hover:border-slate-300 transition-all duration-200"
               />
             </div>
@@ -431,15 +431,15 @@ const ReservationSettingsPage = () => {
 
             <div className="py-3 px-1">
               <p className="text-sm font-medium text-slate-900 mb-1.5">
-                {t('reservationSettings.bannerDescriptionLabel')}
+                {t('reservations:settings.bannerDescriptionLabel')}
               </p>
               <p className="text-sm text-slate-500 mb-2">
-                {t('reservationSettings.bannerDescriptionHelp')}
+                {t('reservations:settings.bannerDescriptionHelp')}
               </p>
               <textarea
                 value={settings.bannerDescription}
                 onChange={(e) => handleTextChange('bannerDescription', e.target.value)}
-                placeholder={t('reservationSettings.bannerDescriptionPlaceholder')}
+                placeholder={t('reservations:settings.bannerDescriptionPlaceholder')}
                 rows={3}
                 className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 hover:border-slate-300 transition-all duration-200 resize-none"
               />
@@ -449,15 +449,15 @@ const ReservationSettingsPage = () => {
 
             <div className="py-3 px-1">
               <p className="text-sm font-medium text-slate-900 mb-1.5">
-                {t('reservationSettings.customMessage')}
+                {t('reservations:settings.customMessage')}
               </p>
               <p className="text-sm text-slate-500 mb-2">
-                {t('reservationSettings.customMessageDescription')}
+                {t('reservations:settings.customMessageDesc')}
               </p>
               <textarea
                 value={settings.customMessage}
                 onChange={(e) => handleTextChange('customMessage', e.target.value)}
-                placeholder={t('reservationSettings.customMessagePlaceholder')}
+                placeholder={t('reservations:settings.customMessagePlaceholder')}
                 rows={3}
                 className="w-full px-3.5 py-2.5 border border-slate-200 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 hover:border-slate-300 transition-all duration-200 resize-none"
               />

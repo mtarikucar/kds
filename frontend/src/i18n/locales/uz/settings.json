@@ -1,5 +1,11 @@
 {
   "title": "Sozlamalar",
+  "nav": {
+    "qrMenu": "QR Menu",
+    "reports": "Reports",
+    "branding": "Branding",
+    "reservations": "Reservations"
+  },
   "autoSave": {
     "idle": "O'zgarishlar yo'q",
     "saving": "Saqlanmoqda...",

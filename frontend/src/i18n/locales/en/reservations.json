@@ -30,8 +30,25 @@
     "bannerTitle": "Banner Title",
     "bannerDescription": "Banner Description",
     "bannerImage": "Banner Image",
+    "loading": "Loading reservation settings...",
+    "general": "General",
+    "generalDescription": "Enable or disable reservations and approval settings",
+    "timeSettings": "Time Settings",
+    "timeSettingsDescription": "Configure time slots and booking windows",
+    "capacity": "Capacity",
+    "capacityDescription": "Set guest and reservation limits",
+    "cancellation": "Cancellation",
+    "cancellationDescription": "Configure cancellation policies",
+    "unlimited": "Unlimited",
     "customMessage": "Custom Message",
     "customMessageDesc": "Message shown on the public reservation page",
+    "customMessagePlaceholder": "Enter a custom message for your reservation page...",
+    "bannerTitleDesc": "Title displayed on the reservation banner",
+    "bannerTitlePlaceholder": "Welcome to our restaurant",
+    "bannerDescriptionLabel": "Banner Description",
+    "bannerDescriptionHelp": "Description text displayed below the banner title",
+    "bannerDescriptionPlaceholder": "Book your table and enjoy a great dining experience...",
+    "minutesCount": "{{count}} minutes",
     "minutes": "minutes",
     "days": "days",
     "closed": "Closed",
@@ -67,6 +84,7 @@
     "seated": "Seated",
     "completed": "Completed",
     "cancelled": "Cancelled",
+    "date": "Date",
     "searchPlaceholder": "Search by name or phone..."
   },
   "stats": {
@@ -76,20 +94,32 @@
     "seated": "Seated"
   },
   "detail": {
+    "title": "Reservation Details",
     "reservationNumber": "Reservation #",
     "date": "Date",
     "time": "Time",
+    "dateTime": "Date & Time",
     "guests": "Guests",
+    "people": "people",
     "customer": "Customer",
     "phone": "Phone",
     "email": "Email",
     "table": "Table",
+    "assignedTable": "Assigned Table",
+    "assignTable": "Assign Table",
+    "seats": "seats",
     "notes": "Notes",
+    "guestNotes": "Guest Notes",
     "adminNotes": "Admin Notes",
+    "adminNotesPlaceholder": "Add notes about this reservation...",
     "status": "Status",
     "rejectionReason": "Rejection Reason",
     "noTable": "No table assigned",
-    "createdAt": "Created"
+    "createdAt": "Created",
+    "confirmedAt": "Confirmed",
+    "seatedAt": "Seated",
+    "completedAt": "Completed",
+    "cancelledAt": "Cancelled"
   },
   "public": {
     "title": "Make a Reservation",
@@ -118,7 +148,13 @@
     "next": "Next",
     "back": "Back",
     "closed": "Closed on this day",
-    "systemDisabled": "Reservation system is currently unavailable"
+    "systemDisabled": "Reservation system is currently unavailable",
+    "submitting": "Submitting...",
+    "submitError": "Something went wrong. Please try again.",
+    "validation": {
+      "nameRequired": "Name is required",
+      "phoneRequired": "Phone number is required"
+    }
   },
   "lookup": {
     "title": "Check Your Reservation",
@@ -156,8 +192,11 @@
     "customer": "Customer",
     "guests": "Guests",
     "table": "Table",
+    "tablePrefix": "Table",
+    "unassigned": "Unassigned",
     "status": "Status",
     "actions": "Actions",
-    "noReservations": "No reservations found"
+    "noReservations": "No reservations found",
+    "noReservationsDescription": "No reservations found for the selected date and filters."
   }
 }

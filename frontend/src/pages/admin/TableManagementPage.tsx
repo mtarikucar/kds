@@ -1,4 +1,4 @@
-import { useState, useMemo, lazy, Suspense } from 'react';
+import { useState, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -14,8 +14,6 @@ import {
   CheckCircle,
   Clock,
   XCircle,
-  Box,
-  Grid3X3,
 } from 'lucide-react';
 import {
   useTables,
@@ -31,20 +29,9 @@ import FormSelect from '../../components/ui/FormSelect';
 import Spinner from '../../components/ui/Spinner';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import UpgradePrompt from '../../components/subscriptions/UpgradePrompt';
-import { useAuthStore } from '../../store/authStore';
-
-const VoxelWorldView = lazy(() =>
-  import('../../features/voxel-world').then((mod) => ({
-    default: mod.VoxelWorldView,
-  }))
-);
-
-type ViewMode = 'grid' | 'voxel';
-
 const TableManagementPage = () => {
   const { t } = useTranslation(['common', 'subscriptions']);
   const { checkLimit } = useSubscription();
-  const user = useAuthStore((state) => state.user);
 
   const tableSchema = z.object({
     number: z.string().min(1, t('admin.tableNumberRequired')),
@@ -55,7 +42,6 @@ const TableManagementPage = () => {
   type TableFormData = z.infer<typeof tableSchema>;
   const [modalOpen, setModalOpen] = useState(false);
   const [editingTable, setEditingTable] = useState<Table | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
 
   const { data: tables, isLoading } = useTables();
   const { mutate: createTable } = useCreateTable();
@@ -178,66 +164,34 @@ const TableManagementPage = () => {
   };
 
   return (
-    <div className={viewMode === 'voxel' ? 'flex flex-col h-full gap-4' : 'space-y-6'}>
+    <div className="space-y-6">
       {/* Page Header */}
       <div className="flex flex-shrink-0 items-center justify-between">
         <div className="flex items-center gap-4">
-          {viewMode === 'grid' && (
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20">
-              <LayoutGrid className="w-7 h-7 text-white" />
-            </div>
-          )}
+          <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20">
+            <LayoutGrid className="w-7 h-7 text-white" />
+          </div>
           <div>
-            <h1 className={`font-heading font-bold text-slate-900 ${viewMode === 'voxel' ? 'text-lg' : 'text-2xl'}`}>
+            <h1 className="font-heading font-bold text-slate-900 text-2xl">
               {t('admin.tableManagement')}
             </h1>
-            {viewMode === 'grid' && (
-              <p className="text-slate-500 mt-0.5">{t('admin.manageTablesSeating')}</p>
-            )}
+            <p className="text-slate-500 mt-0.5">{t('admin.manageTablesSeating')}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {/* View Mode Toggle */}
-          <div className="flex rounded-lg bg-slate-100 p-1" data-tour="view-toggle">
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                viewMode === 'grid'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Grid3X3 className="h-4 w-4" />
-              <span className="hidden sm:inline">{t('admin.gridView')}</span>
-            </button>
-            <button
-              onClick={() => setViewMode('voxel')}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                viewMode === 'voxel'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Box className="h-4 w-4" />
-              <span className="hidden sm:inline">{t('admin.floorPlan')}</span>
-            </button>
-          </div>
-
-          {viewMode === 'grid' && (
-            <Button onClick={() => handleOpenModal()} disabled={!canAddTable}>
-              {canAddTable ? (
-                <Plus className="h-4 w-4 mr-2" />
-              ) : (
-                <Lock className="h-4 w-4 mr-2" />
-              )}
-              {t('admin.addTable')}
-            </Button>
-          )}
+          <Button onClick={() => handleOpenModal()} disabled={!canAddTable}>
+            {canAddTable ? (
+              <Plus className="h-4 w-4 mr-2" />
+            ) : (
+              <Lock className="h-4 w-4 mr-2" />
+            )}
+            {t('admin.addTable')}
+          </Button>
         </div>
       </div>
 
-      {/* Limit Info Banner (hidden in voxel mode) */}
-      {viewMode === 'grid' && tableLimit.limit !== -1 && (
+      {/* Limit Info Banner */}
+      {tableLimit.limit !== -1 && (
         <div
           className={`rounded-xl px-6 py-4 flex items-start gap-3 ${
             canAddTable
@@ -269,8 +223,8 @@ const TableManagementPage = () => {
         </div>
       )}
 
-      {/* Upgrade Prompt when limit reached (hidden in voxel mode) */}
-      {viewMode === 'grid' && !canAddTable && (
+      {/* Upgrade Prompt when limit reached */}
+      {!canAddTable && (
         <UpgradePrompt
           limitType="maxTables"
           currentCount={tables?.length ?? 0}
@@ -283,29 +237,6 @@ const TableManagementPage = () => {
       {isLoading ? (
         <div className="flex justify-center py-16">
           <Spinner />
-        </div>
-      ) : viewMode === 'voxel' ? (
-        /* 3D Voxel Floor Plan View */
-        <div className="flex-1 min-h-0" data-tour="floor-plan-3d">
-        <Suspense
-          fallback={
-            <div className="flex h-full items-center justify-center rounded-lg border border-slate-200 bg-slate-50">
-              <div className="flex flex-col items-center gap-3">
-                <Box className="h-12 w-12 animate-pulse text-primary" />
-                <span className="text-sm text-slate-500">Loading 3D View...</span>
-              </div>
-            </div>
-          }
-        >
-          <VoxelWorldView
-            tables={tables ?? []}
-            tenantId={user?.tenantId ?? undefined}
-            onTableClick={(tableId) => {
-              const table = tables?.find((t) => t.id === tableId);
-              if (table) handleOpenModal(table);
-            }}
-          />
-        </Suspense>
         </div>
       ) : !tables || tables.length === 0 ? (
         /* Empty State */

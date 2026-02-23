@@ -1,5 +1,11 @@
 {
   "title": "الإعدادات",
+  "nav": {
+    "qrMenu": "QR Menu",
+    "reports": "Reports",
+    "branding": "Branding",
+    "reservations": "Reservations"
+  },
   "autoSave": {
     "idle": "لا تغييرات",
     "saving": "جاري الحفظ...",

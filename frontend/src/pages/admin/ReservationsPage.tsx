@@ -85,19 +85,19 @@ const ReservationsPage = () => {
   const getStatusBadge = (status: ReservationStatus) => {
     switch (status) {
       case ReservationStatus.PENDING:
-        return { variant: 'warning' as const, label: t('reservations:status.pending') };
+        return { variant: 'warning' as const, label: t('reservations:status.PENDING') };
       case ReservationStatus.CONFIRMED:
-        return { variant: 'info' as const, label: t('reservations:status.confirmed') };
+        return { variant: 'info' as const, label: t('reservations:status.CONFIRMED') };
       case ReservationStatus.REJECTED:
-        return { variant: 'danger' as const, label: t('reservations:status.rejected') };
+        return { variant: 'danger' as const, label: t('reservations:status.REJECTED') };
       case ReservationStatus.SEATED:
-        return { variant: 'success' as const, label: t('reservations:status.seated') };
+        return { variant: 'success' as const, label: t('reservations:status.SEATED') };
       case ReservationStatus.COMPLETED:
-        return { variant: 'default' as const, label: t('reservations:status.completed') };
+        return { variant: 'default' as const, label: t('reservations:status.COMPLETED') };
       case ReservationStatus.CANCELLED:
-        return { variant: 'danger' as const, label: t('reservations:status.cancelled') };
+        return { variant: 'danger' as const, label: t('reservations:status.CANCELLED') };
       case ReservationStatus.NO_SHOW:
-        return { variant: 'warning' as const, label: t('reservations:status.noShow') };
+        return { variant: 'warning' as const, label: t('reservations:status.NO_SHOW') };
       default:
         return { variant: 'default' as const, label: String(status) };
     }
@@ -188,9 +188,9 @@ const ReservationsPage = () => {
           </div>
           <div>
             <h1 className="font-heading font-bold text-slate-900 text-2xl">
-              {t('reservations:page.title')}
+              {t('reservations:title')}
             </h1>
-            <p className="text-slate-500 mt-0.5">{t('reservations:page.description')}</p>
+            <p className="text-slate-500 mt-0.5">{t('reservations:description')}</p>
           </div>
         </div>
       </div>
@@ -235,13 +235,13 @@ const ReservationsPage = () => {
 
         {/* Search */}
         <div className="relative w-full sm:w-72">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <input
             type="text"
             placeholder={t('reservations:filters.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3.5 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 hover:border-slate-300 transition-all duration-200"
+            className="w-full ps-9 pe-3.5 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 hover:border-slate-300 transition-all duration-200"
           />
         </div>
       </div>
@@ -275,10 +275,10 @@ const ReservationsPage = () => {
             <CalendarDays className="w-10 h-10 text-slate-400" />
           </div>
           <h3 className="text-lg font-semibold text-slate-900">
-            {t('reservations:page.noReservations')}
+            {t('reservations:table.noReservations')}
           </h3>
           <p className="mt-2 text-sm text-slate-500 max-w-sm mx-auto">
-            {t('reservations:page.noReservationsDescription')}
+            {t('reservations:table.noReservationsDescription')}
           </p>
         </div>
       ) : (
@@ -288,22 +288,22 @@ const ReservationsPage = () => {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-100">
-                  <th className="text-left px-6 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th className="text-start px-6 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     {t('reservations:table.time')}
                   </th>
-                  <th className="text-left px-6 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th className="text-start px-6 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     {t('reservations:table.customer')}
                   </th>
-                  <th className="text-left px-6 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th className="text-start px-6 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     {t('reservations:table.guests')}
                   </th>
-                  <th className="text-left px-6 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th className="text-start px-6 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     {t('reservations:table.table')}
                   </th>
-                  <th className="text-left px-6 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th className="text-start px-6 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     {t('reservations:table.status')}
                   </th>
-                  <th className="text-right px-6 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                  <th className="text-end px-6 py-3.5 text-xs font-semibold text-slate-500 uppercase tracking-wider">
                     {t('reservations:table.actions')}
                   </th>
                 </tr>
@@ -372,7 +372,7 @@ const ReservationsPage = () => {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleViewDetail(reservation)}
-                            title={t('reservations:actions.viewDetail')}
+                            title={t('reservations:actions.view')}
                           >
                             <Eye className="h-4 w-4" />
                           </Button>
