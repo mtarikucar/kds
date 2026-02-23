@@ -6,6 +6,7 @@ import {
   Plan,
   Subscription,
   Invoice,
+  EffectiveFeatures,
   CreateSubscriptionDto,
   UpdateSubscriptionDto,
   ChangePlanDto,
@@ -16,6 +17,7 @@ export const subscriptionKeys = {
   all: ['subscriptions'] as const,
   plans: () => [...subscriptionKeys.all, 'plans'] as const,
   current: () => [...subscriptionKeys.all, 'current'] as const,
+  effectiveFeatures: () => [...subscriptionKeys.all, 'effective-features'] as const,
   detail: (id: string) => [...subscriptionKeys.all, 'detail', id] as const,
   invoices: (id: string) => [...subscriptionKeys.all, 'invoices', id] as const,
   tenantInvoices: () => [...subscriptionKeys.all, 'tenant-invoices'] as const,
@@ -28,6 +30,17 @@ export const useGetPlans = () => {
     queryKey: subscriptionKeys.plans(),
     queryFn: async (): Promise<Plan[]> => {
       const response = await api.get('/subscriptions/plans');
+      return response.data;
+    },
+  });
+};
+
+// Get effective features and limits for current tenant (plan + overrides)
+export const useGetEffectiveFeatures = () => {
+  return useQuery({
+    queryKey: subscriptionKeys.effectiveFeatures(),
+    queryFn: async (): Promise<EffectiveFeatures> => {
+      const response = await api.get('/subscriptions/effective-features');
       return response.data;
     },
   });

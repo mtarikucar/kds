@@ -44,6 +44,16 @@ export class SubscriptionController {
   }
 
   /**
+   * Get effective features and limits for current tenant (plan + overrides)
+   */
+  @Get('effective-features')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  async getEffectiveFeatures(@Request() req) {
+    const tenantId = req.user.tenantId;
+    return await this.subscriptionService.getEffectiveFeatures(tenantId);
+  }
+
+  /**
    * Get current tenant's subscription
    */
   @Get('current')

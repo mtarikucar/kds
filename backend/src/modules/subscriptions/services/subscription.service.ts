@@ -719,6 +719,7 @@ export class SubscriptionService {
           prioritySupport: plan.prioritySupport,
           inventoryTracking: plan.inventoryTracking,
           kdsIntegration: plan.kdsIntegration,
+          reservationSystem: plan.reservationSystem,
         },
         // Discount information
         discount: isDiscountActive ? {
@@ -733,6 +734,45 @@ export class SubscriptionService {
         updatedAt: plan.updatedAt.toISOString(),
       };
     });
+  }
+
+  /**
+   * Get effective features and limits for a tenant (plan merged with overrides)
+   */
+  async getEffectiveFeatures(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: { currentPlan: true },
+    });
+
+    if (!tenant || !tenant.currentPlan) {
+      throw new NotFoundException('Tenant or plan not found');
+    }
+
+    const plan = tenant.currentPlan;
+    const featureOverrides = (tenant.featureOverrides as Record<string, boolean>) || null;
+    const limitOverrides = (tenant.limitOverrides as Record<string, number>) || null;
+
+    const features = {
+      advancedReports: featureOverrides?.advancedReports ?? plan.advancedReports,
+      multiLocation: featureOverrides?.multiLocation ?? plan.multiLocation,
+      customBranding: featureOverrides?.customBranding ?? plan.customBranding,
+      apiAccess: featureOverrides?.apiAccess ?? plan.apiAccess,
+      prioritySupport: featureOverrides?.prioritySupport ?? plan.prioritySupport,
+      inventoryTracking: featureOverrides?.inventoryTracking ?? plan.inventoryTracking,
+      kdsIntegration: featureOverrides?.kdsIntegration ?? plan.kdsIntegration,
+      reservationSystem: featureOverrides?.reservationSystem ?? plan.reservationSystem,
+    };
+
+    const limits = {
+      maxUsers: limitOverrides?.maxUsers ?? plan.maxUsers,
+      maxTables: limitOverrides?.maxTables ?? plan.maxTables,
+      maxProducts: limitOverrides?.maxProducts ?? plan.maxProducts,
+      maxCategories: limitOverrides?.maxCategories ?? plan.maxCategories,
+      maxMonthlyOrders: limitOverrides?.maxMonthlyOrders ?? plan.maxMonthlyOrders,
+    };
+
+    return { features, limits };
   }
 
   /**

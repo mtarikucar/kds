@@ -85,6 +85,8 @@ export interface TenantListItem {
     orders: number;
     tables: number;
     products: number;
+    categories?: number;
+    customers?: number;
   };
 }
 
@@ -93,12 +95,32 @@ export interface TenantDetail extends TenantListItem {
   phone?: string;
   currency: string;
   paymentRegion: string;
+  featureOverrides?: Record<string, boolean> | null;
+  limitOverrides?: Record<string, number> | null;
   subscriptions: any[];
   stats: {
     totalRevenue: number;
     ordersToday: number;
     ordersThisMonth: number;
   };
+}
+
+export interface TenantOverridesResponse {
+  featureOverrides: Record<string, boolean> | null;
+  limitOverrides: Record<string, number> | null;
+  planDefaults: {
+    features: Record<string, boolean>;
+    limits: Record<string, number>;
+  };
+  effective: {
+    features: Record<string, boolean>;
+    limits: Record<string, number>;
+  };
+}
+
+export interface UpdateTenantOverridesDto {
+  featureOverrides?: Record<string, boolean | null>;
+  limitOverrides?: Record<string, number | null>;
 }
 
 export interface TenantFilter {
@@ -169,6 +191,7 @@ export interface SubscriptionPlan {
   prioritySupport: boolean;
   inventoryTracking: boolean;
   kdsIntegration: boolean;
+  reservationSystem: boolean;
   isActive: boolean;
   discountPercentage?: number;
   discountLabel?: string;

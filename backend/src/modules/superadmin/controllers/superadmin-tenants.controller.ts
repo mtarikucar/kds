@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Patch,
+  Delete,
   Param,
   Query,
   Body,
@@ -10,6 +11,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { SuperAdminTenantsService } from '../services/superadmin-tenants.service';
 import { TenantFilterDto, UpdateTenantStatusDto } from '../dto/tenant-filter.dto';
+import { UpdateTenantOverridesDto } from '../dto/update-tenant-overrides.dto';
 import { SuperAdminGuard } from '../guards/superadmin.guard';
 import { SuperAdminRoute } from '../decorators/superadmin.decorator';
 import { CurrentSuperAdmin } from '../decorators/current-superadmin.decorator';
@@ -69,5 +71,32 @@ export class SuperAdminTenantsController {
   @ApiOperation({ summary: 'Get tenant statistics' })
   async getTenantStats(@Param('id') id: string) {
     return this.tenantsService.getTenantStats(id);
+  }
+
+  @Get(':id/overrides')
+  @ApiOperation({ summary: 'Get tenant feature & limit overrides with plan defaults and effective values' })
+  async getOverrides(@Param('id') id: string) {
+    return this.tenantsService.getOverrides(id);
+  }
+
+  @Patch(':id/overrides')
+  @ApiOperation({ summary: 'Update tenant feature & limit overrides' })
+  async updateOverrides(
+    @Param('id') id: string,
+    @Body() dto: UpdateTenantOverridesDto,
+    @CurrentSuperAdmin('id') actorId: string,
+    @CurrentSuperAdmin('email') actorEmail: string,
+  ) {
+    return this.tenantsService.updateOverrides(id, dto, actorId, actorEmail);
+  }
+
+  @Delete(':id/overrides')
+  @ApiOperation({ summary: 'Reset all tenant overrides to plan defaults' })
+  async resetOverrides(
+    @Param('id') id: string,
+    @CurrentSuperAdmin('id') actorId: string,
+    @CurrentSuperAdmin('email') actorEmail: string,
+  ) {
+    return this.tenantsService.resetOverrides(id, actorId, actorEmail);
   }
 }

@@ -2,6 +2,7 @@ import { createContext, useContext, useMemo, ReactNode } from 'react';
 import {
   useGetCurrentSubscription,
   useGetPlans,
+  useGetEffectiveFeatures,
 } from '../features/subscriptions/subscriptionsApi';
 import { Plan, PlanFeatures, PlanLimits, Subscription } from '../types';
 
@@ -41,6 +42,7 @@ interface SubscriptionProviderProps {
 export const SubscriptionProvider = ({ children }: SubscriptionProviderProps) => {
   const { data: subscription, isLoading: subLoading } = useGetCurrentSubscription();
   const { data: plans, isLoading: plansLoading } = useGetPlans();
+  const { data: effectiveFeatures } = useGetEffectiveFeatures();
 
   const isLoading = subLoading || plansLoading;
 
@@ -50,19 +52,27 @@ export const SubscriptionProvider = ({ children }: SubscriptionProviderProps) =>
     return plans.find((p) => p.id === subscription.planId) || null;
   }, [subscription, plans]);
 
-  // Check if a feature is enabled in the current plan
+  // Check if a feature is enabled (effective features = plan + overrides)
   const hasFeature = (feature: keyof PlanFeatures): boolean => {
+    // Use effective features if available (includes overrides)
+    if (effectiveFeatures) {
+      return effectiveFeatures.features[feature] ?? false;
+    }
+    // Fallback to plan data while effective features are loading
     if (!plan) return false;
     return plan.features[feature] ?? false;
   };
 
-  // Check if a resource limit allows creating more items
+  // Check if a resource limit allows creating more items (effective limits = plan + overrides)
   const checkLimit = (resource: keyof PlanLimits, currentCount: number): LimitCheckResult => {
-    if (!plan) {
+    // Use effective limits if available (includes overrides)
+    const limit = effectiveFeatures
+      ? effectiveFeatures.limits[resource]
+      : plan?.limits[resource];
+
+    if (limit === undefined || limit === null) {
       return { allowed: false, current: currentCount, limit: 0, remaining: 0 };
     }
-
-    const limit = plan.limits[resource];
 
     // -1 means unlimited
     if (limit === -1) {
@@ -90,7 +100,7 @@ export const SubscriptionProvider = ({ children }: SubscriptionProviderProps) =>
       checkLimit,
       isSubscriptionActive,
     }),
-    [subscription, plan, isLoading, isSubscriptionActive]
+    [subscription, plan, isLoading, isSubscriptionActive, effectiveFeatures]
   );
 
   return (

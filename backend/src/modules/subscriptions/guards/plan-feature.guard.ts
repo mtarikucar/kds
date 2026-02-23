@@ -79,10 +79,14 @@ export class PlanFeatureGuard implements CanActivate {
       }
     }
 
-    // Check if required features are enabled
+    // Check if required features are enabled (override takes precedence over plan)
     if (requiredFeatures && requiredFeatures.length > 0) {
+      const featureOverrides = tenant.featureOverrides as Record<string, boolean> | null;
+
       for (const feature of requiredFeatures) {
-        const featureEnabled = currentPlan[feature];
+        const featureEnabled = featureOverrides?.[feature] !== undefined
+          ? featureOverrides[feature]
+          : currentPlan[feature];
 
         if (!featureEnabled) {
           throw new ForbiddenException(
@@ -92,9 +96,9 @@ export class PlanFeatureGuard implements CanActivate {
       }
     }
 
-    // Check usage limits
+    // Check usage limits (override takes precedence over plan)
     if (limitToCheck) {
-      await this.checkLimit(user.tenantId, currentPlan, limitToCheck);
+      await this.checkLimit(user.tenantId, currentPlan, limitToCheck, tenant.limitOverrides as Record<string, number> | null);
     }
 
     return true;
@@ -103,8 +107,10 @@ export class PlanFeatureGuard implements CanActivate {
   /**
    * Check if usage limit has been reached
    */
-  private async checkLimit(tenantId: string, plan: any, limitType: LimitType): Promise<void> {
-    const limit = plan[limitType];
+  private async checkLimit(tenantId: string, plan: any, limitType: LimitType, limitOverrides?: Record<string, number> | null): Promise<void> {
+    const limit = limitOverrides?.[limitType] !== undefined
+      ? limitOverrides[limitType]
+      : plan[limitType];
 
     // If unlimited, allow
     if (isUnlimited(limit)) {

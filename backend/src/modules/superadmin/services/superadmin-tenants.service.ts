@@ -1,10 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import {
   TenantFilterDto,
   UpdateTenantStatusDto,
   TenantStatus,
 } from '../dto/tenant-filter.dto';
+import { UpdateTenantOverridesDto } from '../dto/update-tenant-overrides.dto';
 import { SuperAdminAuditService } from './superadmin-audit.service';
 import { AuditAction, EntityType } from '../dto/audit-filter.dto';
 
@@ -341,5 +343,192 @@ export class SuperAdminTenantsService {
         customers: totalCustomers,
       },
     };
+  }
+
+  async getOverrides(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      include: { currentPlan: true },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+
+    const plan = tenant.currentPlan;
+    const featureOverrides = (tenant.featureOverrides as Record<string, boolean>) || null;
+    const limitOverrides = (tenant.limitOverrides as Record<string, number>) || null;
+
+    const planFeatures = plan ? {
+      advancedReports: plan.advancedReports,
+      multiLocation: plan.multiLocation,
+      customBranding: plan.customBranding,
+      apiAccess: plan.apiAccess,
+      prioritySupport: plan.prioritySupport,
+      inventoryTracking: plan.inventoryTracking,
+      kdsIntegration: plan.kdsIntegration,
+      reservationSystem: plan.reservationSystem,
+    } : {};
+
+    const planLimits = plan ? {
+      maxUsers: plan.maxUsers,
+      maxTables: plan.maxTables,
+      maxProducts: plan.maxProducts,
+      maxCategories: plan.maxCategories,
+      maxMonthlyOrders: plan.maxMonthlyOrders,
+    } : {};
+
+    // Merge: override takes precedence, otherwise plan default
+    const effectiveFeatures = { ...planFeatures };
+    if (featureOverrides) {
+      for (const [key, value] of Object.entries(featureOverrides)) {
+        if (value !== null && value !== undefined) {
+          (effectiveFeatures as any)[key] = value;
+        }
+      }
+    }
+
+    const effectiveLimits = { ...planLimits };
+    if (limitOverrides) {
+      for (const [key, value] of Object.entries(limitOverrides)) {
+        if (value !== null && value !== undefined) {
+          (effectiveLimits as any)[key] = value;
+        }
+      }
+    }
+
+    return {
+      featureOverrides,
+      limitOverrides,
+      planDefaults: {
+        features: planFeatures,
+        limits: planLimits,
+      },
+      effective: {
+        features: effectiveFeatures,
+        limits: effectiveLimits,
+      },
+    };
+  }
+
+  async updateOverrides(
+    tenantId: string,
+    dto: UpdateTenantOverridesDto,
+    actorId: string,
+    actorEmail: string,
+  ) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+
+    const previousFeatureOverrides = (tenant.featureOverrides as Record<string, boolean>) || {};
+    const previousLimitOverrides = (tenant.limitOverrides as Record<string, number>) || {};
+
+    // Merge feature overrides: null value = remove key (revert to plan default)
+    let newFeatureOverrides: Record<string, boolean> | null = { ...previousFeatureOverrides };
+    if (dto.featureOverrides) {
+      for (const [key, value] of Object.entries(dto.featureOverrides)) {
+        if (value === null || value === undefined) {
+          delete newFeatureOverrides[key];
+        } else {
+          newFeatureOverrides[key] = value;
+        }
+      }
+    }
+    if (Object.keys(newFeatureOverrides).length === 0) {
+      newFeatureOverrides = null;
+    }
+
+    // Merge limit overrides: null value = remove key (revert to plan default)
+    let newLimitOverrides: Record<string, number> | null = { ...previousLimitOverrides };
+    if (dto.limitOverrides) {
+      for (const [key, value] of Object.entries(dto.limitOverrides)) {
+        if (value === null || value === undefined) {
+          delete newLimitOverrides[key];
+        } else {
+          newLimitOverrides[key] = value;
+        }
+      }
+    }
+    if (Object.keys(newLimitOverrides).length === 0) {
+      newLimitOverrides = null;
+    }
+
+    const updated = await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        featureOverrides: newFeatureOverrides ?? Prisma.JsonNull,
+        limitOverrides: newLimitOverrides ?? Prisma.JsonNull,
+      },
+    });
+
+    await this.auditService.log({
+      action: AuditAction.UPDATE,
+      entityType: EntityType.TENANT,
+      entityId: tenantId,
+      actorId,
+      actorEmail,
+      previousData: {
+        featureOverrides: previousFeatureOverrides,
+        limitOverrides: previousLimitOverrides,
+      },
+      newData: {
+        featureOverrides: newFeatureOverrides,
+        limitOverrides: newLimitOverrides,
+      },
+      targetTenantId: tenantId,
+      targetTenantName: tenant.name,
+    });
+
+    return { featureOverrides: newFeatureOverrides, limitOverrides: newLimitOverrides };
+  }
+
+  async resetOverrides(
+    tenantId: string,
+    actorId: string,
+    actorEmail: string,
+  ) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+
+    const previousFeatureOverrides = tenant.featureOverrides;
+    const previousLimitOverrides = tenant.limitOverrides;
+
+    await this.prisma.tenant.update({
+      where: { id: tenantId },
+      data: {
+        featureOverrides: Prisma.JsonNull,
+        limitOverrides: Prisma.JsonNull,
+      },
+    });
+
+    await this.auditService.log({
+      action: AuditAction.UPDATE,
+      entityType: EntityType.TENANT,
+      entityId: tenantId,
+      actorId,
+      actorEmail,
+      previousData: {
+        featureOverrides: previousFeatureOverrides,
+        limitOverrides: previousLimitOverrides,
+      },
+      newData: {
+        featureOverrides: null,
+        limitOverrides: null,
+      },
+      targetTenantId: tenantId,
+      targetTenantName: tenant.name,
+    });
+
+    return { featureOverrides: null, limitOverrides: null };
   }
 }

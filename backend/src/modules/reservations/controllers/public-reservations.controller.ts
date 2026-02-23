@@ -8,7 +8,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam } from '@nestjs/swagger';
-import { Public } from '../../../common/decorators/public.decorator';
+import { Public } from '../../auth/decorators/public.decorator';
 import { ReservationsService } from '../services/reservations.service';
 import { ReservationSettingsService } from '../services/reservation-settings.service';
 import { CreateReservationDto } from '../dto/create-reservation.dto';

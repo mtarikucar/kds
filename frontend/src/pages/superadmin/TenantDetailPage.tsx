@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, X } from 'lucide-react';
+import { ArrowLeft, RefreshCw, X, RotateCcw, Save } from 'lucide-react';
 import {
   useTenant,
   useTenantUsers,
@@ -9,6 +9,9 @@ import {
   useUpdateTenantStatus,
   usePlans,
   useChangeSubscriptionPlan,
+  useTenantOverrides,
+  useUpdateTenantOverrides,
+  useResetTenantOverrides,
 } from '../../features/superadmin/api/superAdminApi';
 
 const statusStyles = {
@@ -16,6 +19,27 @@ const statusStyles = {
   SUSPENDED: 'bg-amber-50 text-amber-700 border-amber-100',
   DELETED: 'bg-red-50 text-red-700 border-red-100',
 };
+
+const FEATURE_LABELS: Record<string, string> = {
+  advancedReports: 'Advanced Reports',
+  multiLocation: 'Multi-Location',
+  customBranding: 'Custom Branding',
+  apiAccess: 'API Access',
+  prioritySupport: 'Priority Support',
+  inventoryTracking: 'Inventory Tracking',
+  kdsIntegration: 'KDS Integration',
+  reservationSystem: 'Reservation System',
+};
+
+const LIMIT_LABELS: Record<string, string> = {
+  maxUsers: 'Max Users',
+  maxTables: 'Max Tables',
+  maxProducts: 'Max Products',
+  maxCategories: 'Max Categories',
+  maxMonthlyOrders: 'Max Monthly Orders',
+};
+
+type FeatureOverrideState = 'default' | 'on' | 'off';
 
 export default function TenantDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -27,8 +51,44 @@ export default function TenantDetailPage() {
   const { data: orders } = useTenantOrders(id!, 1, 10);
   const { data: stats } = useTenantStats(id!);
   const { data: plans } = usePlans();
+  const { data: overridesData } = useTenantOverrides(id!);
   const updateStatusMutation = useUpdateTenantStatus();
   const changePlanMutation = useChangeSubscriptionPlan();
+  const updateOverridesMutation = useUpdateTenantOverrides();
+  const resetOverridesMutation = useResetTenantOverrides();
+
+  // Override form state
+  const [featureStates, setFeatureStates] = useState<Record<string, FeatureOverrideState>>({});
+  const [limitValues, setLimitValues] = useState<Record<string, string>>({});
+  const [hasOverrideChanges, setHasOverrideChanges] = useState(false);
+
+  // Initialize override form state from API data
+  useEffect(() => {
+    if (!overridesData) return;
+
+    const fStates: Record<string, FeatureOverrideState> = {};
+    for (const key of Object.keys(FEATURE_LABELS)) {
+      if (overridesData.featureOverrides?.[key] === true) {
+        fStates[key] = 'on';
+      } else if (overridesData.featureOverrides?.[key] === false) {
+        fStates[key] = 'off';
+      } else {
+        fStates[key] = 'default';
+      }
+    }
+    setFeatureStates(fStates);
+
+    const lValues: Record<string, string> = {};
+    for (const key of Object.keys(LIMIT_LABELS)) {
+      if (overridesData.limitOverrides?.[key] !== undefined && overridesData.limitOverrides?.[key] !== null) {
+        lValues[key] = String(overridesData.limitOverrides[key]);
+      } else {
+        lValues[key] = '';
+      }
+    }
+    setLimitValues(lValues);
+    setHasOverrideChanges(false);
+  }, [overridesData]);
 
   if (isLoading) {
     return (
@@ -75,6 +135,64 @@ export default function TenantDetailPage() {
   const openPlanModal = () => {
     setSelectedPlanId(tenant.currentPlan?.id || '');
     setShowPlanModal(true);
+  };
+
+  const cycleFeatureState = (key: string) => {
+    setFeatureStates((prev) => {
+      const current = prev[key] || 'default';
+      const next: FeatureOverrideState =
+        current === 'default' ? 'on' : current === 'on' ? 'off' : 'default';
+      return { ...prev, [key]: next };
+    });
+    setHasOverrideChanges(true);
+  };
+
+  const handleLimitChange = (key: string, value: string) => {
+    setLimitValues((prev) => ({ ...prev, [key]: value }));
+    setHasOverrideChanges(true);
+  };
+
+  const handleSaveOverrides = () => {
+    const featureOverrides: Record<string, boolean | null> = {};
+    for (const [key, state] of Object.entries(featureStates)) {
+      if (state === 'on') featureOverrides[key] = true;
+      else if (state === 'off') featureOverrides[key] = false;
+      else featureOverrides[key] = null; // Remove override
+    }
+
+    const limitOverrides: Record<string, number | null> = {};
+    for (const [key, value] of Object.entries(limitValues)) {
+      if (value === '' || value === undefined) {
+        limitOverrides[key] = null; // Remove override
+      } else {
+        limitOverrides[key] = Number(value);
+      }
+    }
+
+    updateOverridesMutation.mutate(
+      { tenantId: tenant.id, data: { featureOverrides, limitOverrides } },
+      { onSuccess: () => setHasOverrideChanges(false) }
+    );
+  };
+
+  const handleResetOverrides = () => {
+    if (!window.confirm('Reset all overrides to plan defaults?')) return;
+    resetOverridesMutation.mutate(tenant.id, {
+      onSuccess: () => setHasOverrideChanges(false),
+    });
+  };
+
+  const getEffectiveFeature = (key: string): boolean => {
+    const state = featureStates[key];
+    if (state === 'on') return true;
+    if (state === 'off') return false;
+    return overridesData?.planDefaults?.features?.[key] ?? false;
+  };
+
+  const getEffectiveLimit = (key: string): number => {
+    const val = limitValues[key];
+    if (val !== '' && val !== undefined) return Number(val);
+    return overridesData?.planDefaults?.limits?.[key] ?? 0;
   };
 
   return (
@@ -252,6 +370,149 @@ export default function TenantDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Feature & Limit Overrides */}
+      {overridesData && (
+        <div className="bg-white rounded-xl border border-zinc-200 p-5">
+          <div className="flex items-center justify-between mb-5">
+            <div>
+              <h3 className="text-sm font-medium text-zinc-900">Feature & Limit Overrides</h3>
+              <p className="text-xs text-zinc-500 mt-0.5">Override plan defaults for this tenant</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleResetOverrides}
+                disabled={resetOverridesMutation.isPending}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-600 bg-zinc-50 border border-zinc-200 rounded-lg hover:bg-zinc-100 disabled:opacity-50 transition-colors"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                Reset All
+              </button>
+              <button
+                onClick={handleSaveOverrides}
+                disabled={!hasOverrideChanges || updateOverridesMutation.isPending}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-zinc-900 rounded-lg hover:bg-zinc-800 disabled:opacity-50 transition-colors"
+              >
+                <Save className="w-3.5 h-3.5" />
+                {updateOverridesMutation.isPending ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </div>
+
+          {/* Feature Overrides */}
+          <div className="mb-6">
+            <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Features</h4>
+            <div className="border border-zinc-200 rounded-lg overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-zinc-50 border-b border-zinc-200">
+                    <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2">Feature</th>
+                    <th className="text-center text-xs font-medium text-zinc-500 px-4 py-2">Plan Default</th>
+                    <th className="text-center text-xs font-medium text-zinc-500 px-4 py-2">Override</th>
+                    <th className="text-center text-xs font-medium text-zinc-500 px-4 py-2">Effective</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {Object.entries(FEATURE_LABELS).map(([key, label]) => {
+                    const planDefault = overridesData.planDefaults?.features?.[key] ?? false;
+                    const state = featureStates[key] || 'default';
+                    const effective = getEffectiveFeature(key);
+
+                    return (
+                      <tr key={key}>
+                        <td className="px-4 py-2.5 text-sm text-zinc-900">{label}</td>
+                        <td className="px-4 py-2.5 text-center">
+                          <span className={`inline-flex px-1.5 py-0.5 text-xs font-medium rounded ${
+                            planDefault
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-zinc-100 text-zinc-500'
+                          }`}>
+                            {planDefault ? 'ON' : 'OFF'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          <button
+                            onClick={() => cycleFeatureState(key)}
+                            className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full border transition-colors ${
+                              state === 'default'
+                                ? 'bg-zinc-50 text-zinc-500 border-zinc-200 hover:bg-zinc-100'
+                                : state === 'on'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'
+                            }`}
+                          >
+                            {state === 'default' ? 'Default' : state === 'on' ? 'Force ON' : 'Force OFF'}
+                          </button>
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          <span className={`inline-flex w-5 h-5 items-center justify-center rounded-full text-xs font-bold ${
+                            effective
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-zinc-100 text-zinc-400'
+                          }`}>
+                            {effective ? '✓' : '✗'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Limit Overrides */}
+          <div>
+            <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Limits</h4>
+            <div className="border border-zinc-200 rounded-lg overflow-hidden">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-zinc-50 border-b border-zinc-200">
+                    <th className="text-left text-xs font-medium text-zinc-500 px-4 py-2">Limit</th>
+                    <th className="text-center text-xs font-medium text-zinc-500 px-4 py-2">Plan Default</th>
+                    <th className="text-center text-xs font-medium text-zinc-500 px-4 py-2">Override</th>
+                    <th className="text-center text-xs font-medium text-zinc-500 px-4 py-2">Effective</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-zinc-100">
+                  {Object.entries(LIMIT_LABELS).map(([key, label]) => {
+                    const planDefault = overridesData.planDefaults?.limits?.[key] ?? 0;
+                    const effective = getEffectiveLimit(key);
+
+                    return (
+                      <tr key={key}>
+                        <td className="px-4 py-2.5 text-sm text-zinc-900">{label}</td>
+                        <td className="px-4 py-2.5 text-center">
+                          <span className="text-sm text-zinc-600">
+                            {planDefault === -1 ? 'Unlimited' : planDefault}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          <input
+                            type="number"
+                            value={limitValues[key] || ''}
+                            onChange={(e) => handleLimitChange(key, e.target.value)}
+                            placeholder={String(planDefault === -1 ? '∞' : planDefault)}
+                            className="w-24 px-2.5 py-1 text-sm text-center bg-white border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
+                          />
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          <span className={`text-sm font-medium ${
+                            limitValues[key] !== '' ? 'text-blue-700' : 'text-zinc-600'
+                          }`}>
+                            {effective === -1 ? 'Unlimited' : effective}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-xs text-zinc-400 mt-2">Empty = use plan default. Enter -1 for unlimited.</p>
+          </div>
+        </div>
+      )}
 
       {/* Users Table */}
       <div className="bg-white rounded-xl border border-zinc-200 overflow-hidden">

@@ -54,6 +54,10 @@ model Tenant {
   socialYoutube   String?   // YouTube channel URL
   socialWhatsapp  String?   // WhatsApp business number
 
+  // Feature & limit overrides (SuperAdmin can override plan defaults per tenant)
+  featureOverrides  Json?   // { "advancedReports": true, "reservationSystem": false }
+  limitOverrides    Json?   // { "maxUsers": 50, "maxTables": 100 }
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

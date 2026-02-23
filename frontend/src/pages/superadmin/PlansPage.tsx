@@ -139,6 +139,16 @@ export default function PlansPage() {
                   Reports
                 </span>
               )}
+              {plan.multiLocation && (
+                <span className="px-2 py-0.5 text-xs bg-zinc-100 text-zinc-700 rounded">
+                  Multi-Location
+                </span>
+              )}
+              {plan.customBranding && (
+                <span className="px-2 py-0.5 text-xs bg-zinc-100 text-zinc-700 rounded">
+                  Custom Branding
+                </span>
+              )}
               {plan.apiAccess && (
                 <span className="px-2 py-0.5 text-xs bg-zinc-100 text-zinc-700 rounded">
                   API
@@ -147,6 +157,21 @@ export default function PlansPage() {
               {plan.prioritySupport && (
                 <span className="px-2 py-0.5 text-xs bg-zinc-100 text-zinc-700 rounded">
                   Priority
+                </span>
+              )}
+              {plan.inventoryTracking && (
+                <span className="px-2 py-0.5 text-xs bg-zinc-100 text-zinc-700 rounded">
+                  Inventory
+                </span>
+              )}
+              {plan.kdsIntegration && (
+                <span className="px-2 py-0.5 text-xs bg-zinc-100 text-zinc-700 rounded">
+                  KDS
+                </span>
+              )}
+              {plan.reservationSystem && (
+                <span className="px-2 py-0.5 text-xs bg-zinc-100 text-zinc-700 rounded">
+                  Reservations
                 </span>
               )}
             </div>
@@ -201,10 +226,16 @@ function PlanModal({
     maxUsers: plan?.maxUsers || 1,
     maxTables: plan?.maxTables || 5,
     maxProducts: plan?.maxProducts || 50,
+    maxCategories: plan?.maxCategories || 10,
     maxMonthlyOrders: plan?.maxMonthlyOrders || 100,
     advancedReports: plan?.advancedReports || false,
+    multiLocation: plan?.multiLocation || false,
+    customBranding: plan?.customBranding || false,
     apiAccess: plan?.apiAccess || false,
     prioritySupport: plan?.prioritySupport || false,
+    inventoryTracking: plan?.inventoryTracking || false,
+    kdsIntegration: plan?.kdsIntegration ?? true,
+    reservationSystem: plan?.reservationSystem || false,
     isActive: plan?.isActive ?? true,
     discountPercentage: plan?.discountPercentage || 0,
     discountLabel: plan?.discountLabel || '',
@@ -287,7 +318,7 @@ function PlanModal({
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-5 gap-3">
               <div>
                 <label className="block text-xs font-medium text-zinc-700 mb-1.5">Max Users</label>
                 <input
@@ -316,6 +347,15 @@ function PlanModal({
                 />
               </div>
               <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1.5">Categories</label>
+                <input
+                  type="number"
+                  value={formData.maxCategories}
+                  onChange={(e) => setFormData({ ...formData, maxCategories: Number(e.target.value) })}
+                  className="w-full px-3 py-2 bg-white border border-zinc-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-900 focus:border-transparent"
+                />
+              </div>
+              <div>
                 <label className="block text-xs font-medium text-zinc-700 mb-1.5">Orders/mo</label>
                 <input
                   type="number"
@@ -326,7 +366,7 @@ function PlanModal({
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-4 pt-2">
+            <div className="flex flex-wrap gap-x-4 gap-y-2 pt-2">
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -339,11 +379,65 @@ function PlanModal({
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
+                  checked={formData.multiLocation}
+                  onChange={(e) => setFormData({ ...formData, multiLocation: e.target.checked })}
+                  className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                />
+                <span className="text-sm text-zinc-700">Multi-Location</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formData.customBranding}
+                  onChange={(e) => setFormData({ ...formData, customBranding: e.target.checked })}
+                  className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                />
+                <span className="text-sm text-zinc-700">Custom Branding</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
                   checked={formData.apiAccess}
                   onChange={(e) => setFormData({ ...formData, apiAccess: e.target.checked })}
                   className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
                 />
                 <span className="text-sm text-zinc-700">API Access</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formData.prioritySupport}
+                  onChange={(e) => setFormData({ ...formData, prioritySupport: e.target.checked })}
+                  className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                />
+                <span className="text-sm text-zinc-700">Priority Support</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formData.inventoryTracking}
+                  onChange={(e) => setFormData({ ...formData, inventoryTracking: e.target.checked })}
+                  className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                />
+                <span className="text-sm text-zinc-700">Inventory Tracking</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formData.kdsIntegration}
+                  onChange={(e) => setFormData({ ...formData, kdsIntegration: e.target.checked })}
+                  className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                />
+                <span className="text-sm text-zinc-700">KDS Integration</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formData.reservationSystem}
+                  onChange={(e) => setFormData({ ...formData, reservationSystem: e.target.checked })}
+                  className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                />
+                <span className="text-sm text-zinc-700">Reservations</span>
               </label>
               <label className="flex items-center gap-2">
                 <input

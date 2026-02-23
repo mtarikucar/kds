@@ -19,6 +19,8 @@ import {
   AuditLog,
   AuditFilter,
   PaginatedResponse,
+  TenantOverridesResponse,
+  UpdateTenantOverridesDto,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
@@ -292,6 +294,48 @@ export const useTenantStats = (tenantId: string) => {
       return response.data;
     },
     enabled: !!tenantId,
+  });
+};
+
+// Tenant Overrides API
+export const useTenantOverrides = (tenantId: string) => {
+  return useQuery({
+    queryKey: ['superadmin', 'tenants', tenantId, 'overrides'],
+    queryFn: async (): Promise<TenantOverridesResponse> => {
+      const response = await superAdminApi.get(`/superadmin/tenants/${tenantId}/overrides`);
+      return response.data;
+    },
+    enabled: !!tenantId,
+  });
+};
+
+export const useUpdateTenantOverrides = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ tenantId, data }: { tenantId: string; data: UpdateTenantOverridesDto }) => {
+      const response = await superAdminApi.patch(`/superadmin/tenants/${tenantId}/overrides`, data);
+      return response.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['superadmin', 'tenants', variables.tenantId, 'overrides'] });
+      queryClient.invalidateQueries({ queryKey: ['superadmin', 'tenants', variables.tenantId] });
+    },
+  });
+};
+
+export const useResetTenantOverrides = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (tenantId: string) => {
+      const response = await superAdminApi.delete(`/superadmin/tenants/${tenantId}/overrides`);
+      return response.data;
+    },
+    onSuccess: (_, tenantId) => {
+      queryClient.invalidateQueries({ queryKey: ['superadmin', 'tenants', tenantId, 'overrides'] });
+      queryClient.invalidateQueries({ queryKey: ['superadmin', 'tenants', tenantId] });
+    },
   });
 };
 

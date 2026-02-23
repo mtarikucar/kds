@@ -510,6 +510,24 @@ export interface Plan {
   updatedAt: string;
 }
 
+export interface TenantOverrides {
+  featureOverrides: Partial<Record<keyof PlanFeatures, boolean>> | null;
+  limitOverrides: Partial<Record<keyof PlanLimits, number>> | null;
+  planDefaults: {
+    features: PlanFeatures;
+    limits: PlanLimits;
+  };
+  effective: {
+    features: PlanFeatures;
+    limits: PlanLimits;
+  };
+}
+
+export interface EffectiveFeatures {
+  features: PlanFeatures;
+  limits: PlanLimits;
+}
+
 export interface Subscription {
   id: string;
   tenantId: string;
