@@ -70,6 +70,8 @@ model Tenant {
   subscriptions       Subscription[]
   qrMenuSettings      QrMenuSettings?
   posSettings         PosSettings?
+  reservationSettings ReservationSettings?
+  reservations        Reservation[]
   integrationSettings IntegrationSettings[]
   apiKeys             ApiKey[]
   customers           Customer[]
@@ -352,6 +354,7 @@ model Table {
   // Analytics relations
   occupancyRecords   OccupancyRecord[]
   tableAnalytics     TableAnalytics[]
+  reservations       Reservation[]
 
   @@unique([tenantId, number])
   @@index([tenantId])
@@ -562,6 +565,7 @@ model SubscriptionPlan {
   prioritySupport    Boolean @default(false)
   inventoryTracking  Boolean @default(false)
   kdsIntegration     Boolean @default(true)
+  reservationSystem  Boolean @default(false)
 
   // Discount settings
   discountPercentage   Int?       // Discount percentage (e.g., 25 for 25%)
@@ -797,6 +801,87 @@ model PosSettings {
 
   @@index([tenantId])
   @@map("pos_settings")
+}
+
+// ========================================
+// RESERVATION SETTINGS
+// ========================================
+
+model ReservationSettings {
+  id        String   @id @default(uuid())
+  tenantId  String   @unique
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  isEnabled                Boolean @default(true)
+  requireApproval          Boolean @default(true)
+  timeSlotInterval         Int     @default(30)
+  minAdvanceBooking        Int     @default(60)
+  maxAdvanceDays           Int     @default(30)
+  defaultDuration          Int     @default(90)
+  operatingHours           Json?
+  maxGuestsPerReservation  Int     @default(20)
+  maxReservationsPerSlot   Int?
+
+  bannerImageUrl    String?
+  bannerTitle       String?
+  bannerDescription String?
+  customMessage     String?
+
+  allowCancellation    Boolean @default(true)
+  cancellationDeadline Int     @default(120)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("reservation_settings")
+}
+
+// ========================================
+// RESERVATION SYSTEM
+// ========================================
+
+model Reservation {
+  id                String   @id @default(uuid())
+  reservationNumber String
+
+  date      DateTime @db.Date
+  startTime String
+  endTime   String
+
+  guestCount Int
+  notes      String? @db.Text
+
+  status String @default("PENDING") // PENDING, CONFIRMED, REJECTED, SEATED, COMPLETED, CANCELLED, NO_SHOW
+
+  customerName  String
+  customerPhone String
+  customerEmail String?
+
+  adminNotes      String? @db.Text
+  confirmedAt     DateTime?
+  confirmedById   String?
+  rejectionReason String?
+  cancelledAt     DateTime?
+  cancelledBy     String?
+  seatedAt        DateTime?
+  completedAt     DateTime?
+
+  tableId  String?
+  table    Table?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, reservationNumber])
+  @@index([tenantId])
+  @@index([tenantId, date])
+  @@index([tenantId, status])
+  @@index([tableId])
+  @@map("reservations")
 }
 
 // ========================================

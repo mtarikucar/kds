@@ -32,6 +32,7 @@ import { LayoutsModule } from './modules/layouts/layouts.module';
 import { SuperAdminModule } from './modules/superadmin/superadmin.module';
 import { SuperAdminTerminalModule } from './modules/superadmin-terminal/superadmin-terminal.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
+import { ReservationsModule } from './modules/reservations/reservations.module';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './common/middleware/input-sanitizer.middleware';
 
@@ -87,6 +88,7 @@ import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './co
     SuperAdminModule,
     SuperAdminTerminalModule,
     AnalyticsModule,
+    ReservationsModule,
   ],
   controllers: [AppController],
   providers: [

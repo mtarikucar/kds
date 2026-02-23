@@ -3,7 +3,8 @@
   "nav": {
     "qrMenu": "QR Menu",
     "reports": "Reports",
-    "branding": "Branding"
+    "branding": "Branding",
+    "reservations": "Reservations"
   },
   "autoSave": {
     "idle": "No changes",

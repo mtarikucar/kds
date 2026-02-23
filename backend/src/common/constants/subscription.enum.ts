@@ -51,6 +51,7 @@ export enum PlanFeature {
   PRIORITY_SUPPORT = 'prioritySupport',
   INVENTORY_TRACKING = 'inventoryTracking',
   KDS_INTEGRATION = 'kdsIntegration',
+  RESERVATION_SYSTEM = 'reservationSystem',
 }
 
 export enum TenantStatus {

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
@@ -30,6 +30,8 @@ import SubdomainQRMenuPage from './pages/qr-menu/SubdomainQRMenuPage';
 import SubdomainCartPage from './pages/qr-menu/SubdomainCartPage';
 import SubdomainOrdersPage from './pages/qr-menu/SubdomainOrdersPage';
 import SubdomainLoyaltyPage from './pages/qr-menu/SubdomainLoyaltyPage';
+import PublicReservationPage from './pages/reservations/PublicReservationPage';
+import ReservationLookupPage from './pages/reservations/ReservationLookupPage';
 import TermsOfServicePage from './pages/legal/TermsOfServicePage';
 import PrivacyPolicyPage from './pages/legal/PrivacyPolicyPage';
 import DashboardPage from './pages/DashboardPage';
@@ -41,6 +43,7 @@ import UserManagementPage from './pages/admin/UserManagementPage';
 import QRManagementPage from './pages/admin/QRManagementPage';
 import ReportsPage from './pages/admin/ReportsPage';
 import AnalyticsPage from './pages/admin/AnalyticsPage';
+import ReservationsPage from './pages/admin/ReservationsPage';
 import SubscriptionPlansPage from './pages/subscription/SubscriptionPlansPage';
 import ChangePlanPage from './pages/subscription/ChangePlanPage';
 import SubscriptionContactPage from './pages/subscription/SubscriptionContactPage';
@@ -52,6 +55,7 @@ import BrandingSettingsPage from './pages/settings/BrandingSettingsPage';
 import SubscriptionSettingsPage from './pages/settings/SubscriptionSettingsPage';
 import IntegrationsSettingsPage from './pages/settings/IntegrationsSettingsPage';
 import DesktopAppSettingsPage from './pages/settings/DesktopAppSettingsPage';
+import ReservationSettingsPage from './pages/settings/ReservationSettingsPage';
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { UpdateDialog } from './components/UpdateDialog';
@@ -60,6 +64,11 @@ import { useNotificationSocket } from './features/notifications/notificationsApi
 import { useAuthStore } from './store/authStore';
 import { UserRole } from './types';
 import { detectSubdomain } from './utils/subdomain';
+
+// Dev-only pages
+const FloorPlan3DPage = import.meta.env.DEV
+  ? lazy(() => import('./pages/dev/FloorPlan3DPage'))
+  : null;
 
 function App() {
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
@@ -118,6 +127,8 @@ function App() {
       <Route path="/qr-menu/:tenantId/cart" element={<CartPage />} />
       <Route path="/qr-menu/:tenantId/orders" element={<OrderTrackingPage />} />
       <Route path="/qr-menu/:tenantId/loyalty" element={<LoyaltyPage />} />
+      <Route path="/reserve/:tenantId" element={<PublicReservationPage />} />
+      <Route path="/reserve/:tenantId/lookup" element={<ReservationLookupPage />} />
 
       {/* Protected Routes - All authenticated users */}
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
@@ -145,6 +156,7 @@ function App() {
         <Route path="/admin/qr-codes" element={<QRManagementPage />} />
         <Route path="/admin/reports" element={<ReportsPage />} />
         <Route path="/admin/analytics" element={<AnalyticsPage />} />
+        <Route path="/admin/reservations" element={<ReservationsPage />} />
 
         {/* Settings Routes - Nested */}
         <Route path="/admin/settings" element={<SettingsLayout />}>
@@ -156,7 +168,13 @@ function App() {
           <Route path="branding" element={<BrandingSettingsPage />} />
           <Route path="desktop" element={<DesktopAppSettingsPage />} />
           <Route path="integrations" element={<IntegrationsSettingsPage />} />
+          <Route path="reservations" element={<ReservationSettingsPage />} />
         </Route>
+
+        {/* Dev-only routes */}
+        {import.meta.env.DEV && FloorPlan3DPage && (
+          <Route path="/dev/floor-plan" element={<Suspense fallback={null}><FloorPlan3DPage /></Suspense>} />
+        )}
 
         {/* Legacy redirects */}
         <Route path="/admin/pos-settings" element={<Navigate to="/admin/settings/pos" replace />} />

@@ -23,6 +23,7 @@ export interface PlanConfig {
     prioritySupport: boolean;
     inventoryTracking: boolean;
     kdsIntegration: boolean;
+    reservationSystem: boolean;
   };
 }
 
@@ -50,6 +51,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       prioritySupport: false,
       inventoryTracking: false,
       kdsIntegration: true,
+      reservationSystem: false,
     },
   },
   [SubscriptionPlanType.BASIC]: {
@@ -75,6 +77,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       prioritySupport: false,
       inventoryTracking: true,
       kdsIntegration: true,
+      reservationSystem: false,
     },
   },
   [SubscriptionPlanType.PRO]: {
@@ -100,6 +103,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       prioritySupport: true,
       inventoryTracking: true,
       kdsIntegration: true,
+      reservationSystem: true,
     },
   },
   [SubscriptionPlanType.BUSINESS]: {
@@ -125,6 +129,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       prioritySupport: true,
       inventoryTracking: true,
       kdsIntegration: true,
+      reservationSystem: true,
     },
   },
 };

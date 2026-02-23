@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Settings, CreditCard, Monitor, Plug, Download, Menu, X, QrCode, FileText, Palette } from 'lucide-react';
+import { Settings, CreditCard, Monitor, Plug, Download, Menu, X, QrCode, FileText, Palette, CalendarClock } from 'lucide-react';
 
 const SettingsLayout = () => {
   const { t } = useTranslation('settings');
@@ -43,6 +43,11 @@ const SettingsLayout = () => {
       to: '/admin/settings/integrations',
       icon: Plug,
       label: t('integrationsLabel'),
+    },
+    {
+      to: '/admin/settings/reservations',
+      icon: CalendarClock,
+      label: t('nav.reservations'),
     },
   ];
 

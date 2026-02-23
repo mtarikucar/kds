@@ -15,6 +15,8 @@ import {
   ChevronRight,
   ChevronLeft,
   X,
+  Code,
+  CalendarCheck,
 } from 'lucide-react';
 import { UserRole, PlanFeatures } from '../../types';
 import { useAuthStore } from '../../store/authStore';
@@ -89,6 +91,13 @@ const Sidebar = ({ isOpen, onClose, isRTL: isRTLProp }: SidebarProps) => {
       icon: QrCode,
       label: t('navigation.qrCodes'),
       roles: [UserRole.ADMIN, UserRole.MANAGER],
+    },
+    {
+      to: '/admin/reservations',
+      icon: CalendarCheck,
+      label: t('navigation.reservations'),
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
+      requiredFeature: 'reservationSystem' as keyof PlanFeatures,
     },
     {
       to: '/admin/reports',
@@ -185,6 +194,32 @@ const Sidebar = ({ isOpen, onClose, isRTL: isRTLProp }: SidebarProps) => {
             </NavLink>
           ))}
         </div>
+
+        {/* Development section - only visible in dev mode for ADMIN */}
+        {import.meta.env.DEV && user?.role === UserRole.ADMIN && (
+          <div className="mt-6 pt-4 border-t border-slate-800/50">
+            {!isSidebarCollapsed && (
+              <p className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-amber-400">
+                Development
+              </p>
+            )}
+            <NavLink
+              to="/dev/floor-plan"
+              onClick={handleNavClick}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 ${
+                  isActive
+                    ? 'bg-white/10 text-white font-medium'
+                    : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
+                } ${isSidebarCollapsed ? 'md:justify-center' : ''}`
+              }
+              title={isSidebarCollapsed ? 'Floor Plan 3D' : undefined}
+            >
+              <Code className="h-5 w-5 flex-shrink-0" />
+              <span className={`text-sm ${isSidebarCollapsed ? 'md:hidden' : ''}`}>Floor Plan 3D</span>
+            </NavLink>
+          </div>
+        )}
       </nav>
     </aside>
   );

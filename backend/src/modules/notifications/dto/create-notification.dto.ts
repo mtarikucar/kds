@@ -9,6 +9,7 @@ export enum NotificationType {
   ORDER = 'ORDER',
   STOCK = 'STOCK',
   SYSTEM = 'SYSTEM',
+  RESERVATION = 'RESERVATION',
 }
 
 export enum NotificationPriority {

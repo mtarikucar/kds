@@ -491,6 +491,7 @@ export interface PlanFeatures {
   prioritySupport: boolean;
   inventoryTracking: boolean;
   kdsIntegration: boolean;
+  reservationSystem: boolean;
 }
 
 export interface Plan {
@@ -855,6 +856,133 @@ export interface CartItem {
   notes?: string;
   modifiers: CartModifier[];
   itemTotal: number; // Calculated: (product.price + sum(modifier.priceAdjustment * modifier.quantity)) * quantity
+}
+
+// ========================================
+// RESERVATION TYPES
+// ========================================
+
+export enum ReservationStatus {
+  PENDING = 'PENDING',
+  CONFIRMED = 'CONFIRMED',
+  REJECTED = 'REJECTED',
+  SEATED = 'SEATED',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+  NO_SHOW = 'NO_SHOW',
+}
+
+export interface Reservation {
+  id: string;
+  reservationNumber: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  guestCount: number;
+  notes?: string;
+  status: ReservationStatus;
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string;
+  adminNotes?: string;
+  confirmedAt?: string;
+  confirmedById?: string;
+  rejectionReason?: string;
+  cancelledAt?: string;
+  cancelledBy?: string;
+  seatedAt?: string;
+  completedAt?: string;
+  tableId?: string;
+  table?: { id: string; number: string; capacity: number; section?: string };
+  tenantId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReservationSettings {
+  id: string;
+  tenantId: string;
+  isEnabled: boolean;
+  requireApproval: boolean;
+  timeSlotInterval: number;
+  minAdvanceBooking: number;
+  maxAdvanceDays: number;
+  defaultDuration: number;
+  operatingHours?: Record<string, { open: string; close: string; closed: boolean }>;
+  maxGuestsPerReservation: number;
+  maxReservationsPerSlot?: number;
+  bannerImageUrl?: string;
+  bannerTitle?: string;
+  bannerDescription?: string;
+  customMessage?: string;
+  allowCancellation: boolean;
+  cancellationDeadline: number;
+}
+
+export interface CreateReservationDto {
+  date: string;
+  startTime: string;
+  endTime: string;
+  guestCount: number;
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string;
+  notes?: string;
+  tableId?: string;
+}
+
+export interface UpdateReservationDto {
+  date?: string;
+  startTime?: string;
+  endTime?: string;
+  guestCount?: number;
+  customerName?: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  notes?: string;
+  adminNotes?: string;
+  tableId?: string;
+}
+
+export interface UpdateReservationSettingsDto {
+  isEnabled?: boolean;
+  requireApproval?: boolean;
+  timeSlotInterval?: number;
+  minAdvanceBooking?: number;
+  maxAdvanceDays?: number;
+  defaultDuration?: number;
+  operatingHours?: Record<string, { open: string; close: string; closed: boolean }>;
+  maxGuestsPerReservation?: number;
+  maxReservationsPerSlot?: number;
+  bannerImageUrl?: string;
+  bannerTitle?: string;
+  bannerDescription?: string;
+  customMessage?: string;
+  allowCancellation?: boolean;
+  cancellationDeadline?: number;
+}
+
+export interface AvailableSlot {
+  time: string;
+  available: boolean;
+}
+
+export interface AvailableTable {
+  id: string;
+  number: string;
+  capacity: number;
+  section?: string;
+}
+
+export interface ReservationStats {
+  total: number;
+  pending: number;
+  confirmed: number;
+  seated: number;
+  completed: number;
+  cancelled: number;
+  noShow: number;
+  rejected: number;
 }
 
 // Re-export hardware types
