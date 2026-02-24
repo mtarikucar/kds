@@ -34,6 +34,7 @@ import Button from '../../components/ui/Button';
 import Modal from '../../components/ui/Modal';
 import Badge from '../../components/ui/Badge';
 import Spinner from '../../components/ui/Spinner';
+import FeatureGate from '../../components/subscriptions/FeatureGate';
 
 type StatusFilter = 'ALL' | ReservationStatus;
 
@@ -244,6 +245,7 @@ const ReservationsPage = () => {
   ];
 
   return (
+    <FeatureGate feature="reservationSystem">
     <div className="space-y-6">
       {/* Page Header */}
       <div className="flex flex-shrink-0 items-center justify-between">
@@ -826,6 +828,7 @@ const ReservationsPage = () => {
         </div>
       </Modal>
     </div>
+    </FeatureGate>
   );
 };
 

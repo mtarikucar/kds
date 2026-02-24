@@ -28,6 +28,7 @@ import {
   SettingsSelect,
   SettingsInput,
 } from '../../components/settings/SettingsToggle';
+import FeatureGate from '../../components/subscriptions/FeatureGate';
 
 interface ReservationSettingsState {
   isEnabled: boolean;
@@ -201,6 +202,7 @@ const ReservationSettingsPage = () => {
   }
 
   return (
+    <FeatureGate feature="reservationSystem">
     <div className="h-full p-4 md:p-6 overflow-auto">
       <div className="mb-6">
         <h1 className="text-xl font-heading font-bold text-slate-900">
@@ -528,6 +530,7 @@ const ReservationSettingsPage = () => {
         </SettingsSection>
       </div>
     </div>
+    </FeatureGate>
   );
 };
 

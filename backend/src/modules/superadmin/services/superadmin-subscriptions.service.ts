@@ -51,6 +51,7 @@ export class SuperAdminSubscriptionsService {
         prioritySupport: createDto.prioritySupport || false,
         inventoryTracking: createDto.inventoryTracking || false,
         kdsIntegration: createDto.kdsIntegration ?? true,
+        reservationSystem: createDto.reservationSystem || false,
         isActive: createDto.isActive ?? true,
       },
     });
@@ -103,6 +104,7 @@ export class SuperAdminSubscriptionsService {
         prioritySupport: updateDto.prioritySupport,
         inventoryTracking: updateDto.inventoryTracking,
         kdsIntegration: updateDto.kdsIntegration,
+        reservationSystem: updateDto.reservationSystem,
         isActive: updateDto.isActive,
       },
     });

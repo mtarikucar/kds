@@ -31,6 +31,7 @@ async function main() {
       prioritySupport: false,
       inventoryTracking: false,
       kdsIntegration: true,
+      reservationSystem: false,
       isActive: true,
     },
   });
@@ -58,6 +59,7 @@ async function main() {
       prioritySupport: false,
       inventoryTracking: true,
       kdsIntegration: true,
+      reservationSystem: false,
       isActive: true,
     },
   });
@@ -85,6 +87,7 @@ async function main() {
       prioritySupport: true,
       inventoryTracking: true,
       kdsIntegration: true,
+      reservationSystem: true,
       isActive: true,
     },
   });
@@ -112,6 +115,7 @@ async function main() {
       prioritySupport: true,
       inventoryTracking: true,
       kdsIntegration: true,
+      reservationSystem: true,
       isActive: true,
     },
   });

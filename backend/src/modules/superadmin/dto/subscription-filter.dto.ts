@@ -134,6 +134,11 @@ export class CreatePlanDto {
   @IsBoolean()
   kdsIntegration?: boolean = true;
 
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  reservationSystem?: boolean = false;
+
   @ApiPropertyOptional({ default: true })
   @IsOptional()
   @IsBoolean()
