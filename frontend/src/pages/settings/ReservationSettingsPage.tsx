@@ -65,8 +65,9 @@ const ReservationSettingsPage = () => {
   const user = useAuthStore((state) => state.user);
   const [linkCopied, setLinkCopied] = useState(false);
 
+  const basePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
   const reservationLink = user?.tenantId
-    ? `${window.location.origin}/reserve/${user.tenantId}`
+    ? `${window.location.origin}${basePath}/reserve/${user.tenantId}`
     : '';
 
   const handleCopyLink = async () => {
