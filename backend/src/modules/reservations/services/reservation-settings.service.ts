@@ -11,7 +11,7 @@ export class ReservationSettingsService {
     if (!tenant) {
       throw new NotFoundException('Tenant not found');
     }
-    if (tenant.status !== 'active') {
+    if (tenant.status !== 'ACTIVE') {
       throw new ForbiddenException('Tenant is not active');
     }
     return tenant;

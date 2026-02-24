@@ -51,7 +51,7 @@ const PublicReservationPage: React.FC = () => {
   const [createdReservation, setCreatedReservation] = useState<Reservation | null>(null);
 
   // API hooks
-  const { data: settings, isLoading: settingsLoading } = usePublicReservationSettings(
+  const { data: settings, isLoading: settingsLoading, error: settingsError } = usePublicReservationSettings(
     tenantId || ''
   );
   const { data: availableSlots, isLoading: slotsLoading } = useAvailableSlots(
@@ -222,8 +222,14 @@ const PublicReservationPage: React.FC = () => {
     );
   }
 
-  // Settings fetch error (tenant not found, etc.)
+  // Settings fetch error (tenant not found, not active, etc.)
   if (!settingsLoading && !settings) {
+    const errorStatus = (settingsError as any)?.response?.status;
+    const errorMessage = (settingsError as any)?.response?.data?.message;
+    let displayError = t('public.errors.tenantNotFound');
+    if (errorStatus === 403 || errorMessage === 'Tenant is not active') {
+      displayError = t('public.errors.tenantNotActive');
+    }
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-md w-full text-center">
@@ -231,7 +237,7 @@ const PublicReservationPage: React.FC = () => {
             <AlertCircle className="w-8 h-8 text-red-400" />
           </div>
           <h2 className="text-xl font-semibold text-gray-900 mb-2">
-            {t('public.errors.tenantNotFound')}
+            {displayError}
           </h2>
         </div>
       </div>
