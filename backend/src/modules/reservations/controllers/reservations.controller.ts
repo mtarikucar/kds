@@ -13,6 +13,9 @@ import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagg
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
+import { PlanFeatureGuard } from '../../subscriptions/guards/plan-feature.guard';
+import { RequiresFeature } from '../../subscriptions/decorators/requires-feature.decorator';
+import { PlanFeature } from '../../../common/constants/subscription.enum';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '../../../common/constants/roles.enum';
 import { ReservationsService } from '../services/reservations.service';
@@ -25,7 +28,8 @@ import { ReservationQueryDto } from '../dto/reservation-query.dto';
 @ApiTags('reservations')
 @ApiBearerAuth()
 @Controller('reservations')
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@RequiresFeature(PlanFeature.RESERVATION_SYSTEM)
 export class ReservationsController {
   constructor(
     private readonly reservationsService: ReservationsService,

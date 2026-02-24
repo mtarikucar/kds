@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { NotificationType } from '../../notifications/dto/create-notification.dto';
@@ -6,6 +6,7 @@ import { CreateReservationDto } from '../dto/create-reservation.dto';
 import { UpdateReservationDto } from '../dto/update-reservation.dto';
 import { ReservationQueryDto } from '../dto/reservation-query.dto';
 import { ReservationSettingsService } from './reservation-settings.service';
+import { ReservationStatus } from '../constants/reservation-status.enum';
 
 @Injectable()
 export class ReservationsService {
@@ -14,6 +15,17 @@ export class ReservationsService {
     private notificationsService: NotificationsService,
     private settingsService: ReservationSettingsService,
   ) {}
+
+  private async validateTenant(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+    if (tenant.status !== 'active') {
+      throw new ForbiddenException('Tenant is not active');
+    }
+    return tenant;
+  }
 
   private async generateReservationNumber(tenantId: string, date: string): Promise<string> {
     const dateStr = date.replace(/-/g, '').substring(0, 8);
@@ -37,10 +49,57 @@ export class ReservationsService {
   }
 
   async createPublicReservation(tenantId: string, dto: CreateReservationDto) {
+    await this.validateTenant(tenantId);
+
     const settings = await this.settingsService.getOrCreate(tenantId);
 
     if (!settings.isEnabled) {
       throw new BadRequestException('Reservation system is not enabled');
+    }
+
+    // Validate end time > start time
+    if (dto.endTime <= dto.startTime) {
+      throw new BadRequestException('End time must be after start time');
+    }
+
+    // Validate date is not in the past
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const reservationDate = new Date(dto.date);
+    reservationDate.setHours(0, 0, 0, 0);
+
+    if (reservationDate < today) {
+      throw new BadRequestException('Cannot book past dates');
+    }
+
+    // Validate maxAdvanceDays
+    if (settings.maxAdvanceDays) {
+      const maxDate = new Date();
+      maxDate.setHours(0, 0, 0, 0);
+      maxDate.setDate(maxDate.getDate() + settings.maxAdvanceDays);
+      if (reservationDate > maxDate) {
+        throw new BadRequestException(`Cannot book more than ${settings.maxAdvanceDays} days in advance`);
+      }
+    }
+
+    // Validate minAdvanceBooking (same day check)
+    if (settings.minAdvanceBooking) {
+      const now = new Date();
+      const [h, m] = dto.startTime.split(':').map(Number);
+      const slotDateTime = new Date(dto.date);
+      slotDateTime.setHours(h, m, 0, 0);
+      if (slotDateTime.getTime() - now.getTime() < settings.minAdvanceBooking * 60 * 1000) {
+        throw new BadRequestException('Reservation time is too soon. Please book further in advance.');
+      }
+    }
+
+    // Validate operating hours (closed day check)
+    if (settings.operatingHours) {
+      const dayOfWeek = new Date(dto.date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+      const hours = settings.operatingHours as any;
+      if (hours[dayOfWeek]?.closed) {
+        throw new BadRequestException('Restaurant is closed on this day');
+      }
     }
 
     if (dto.guestCount > settings.maxGuestsPerReservation) {
@@ -67,7 +126,7 @@ export class ReservationsService {
           tenantId,
           date: new Date(dto.date),
           startTime: dto.startTime,
-          status: { in: ['PENDING', 'CONFIRMED', 'SEATED'] },
+          status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED, ReservationStatus.SEATED] },
         },
       });
 
@@ -76,9 +135,24 @@ export class ReservationsService {
       }
     }
 
+    // Duplicate reservation check: same phone + same day + overlapping time
+    const existingDuplicate = await this.prisma.reservation.findFirst({
+      where: {
+        tenantId,
+        customerPhone: dto.customerPhone,
+        date: new Date(dto.date),
+        startTime: dto.startTime,
+        status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] },
+      },
+    });
+
+    if (existingDuplicate) {
+      throw new BadRequestException('You already have a reservation for this time slot');
+    }
+
     const reservationNumber = await this.generateReservationNumber(tenantId, dto.date);
 
-    const status = settings.requireApproval ? 'PENDING' : 'CONFIRMED';
+    const status = settings.requireApproval ? ReservationStatus.PENDING : ReservationStatus.CONFIRMED;
     const confirmedAt = settings.requireApproval ? undefined : new Date();
 
     const reservation = await this.prisma.reservation.create({
@@ -109,7 +183,7 @@ export class ReservationsService {
         data: { reservationId: reservation.id, type: 'new_reservation' },
       });
     } catch (e) {
-      // Don't fail reservation creation if notification fails
+      console.error('Failed to send reservation notification:', e.message);
     }
 
     return reservation;
@@ -138,11 +212,30 @@ export class ReservationsService {
       ];
     }
 
-    return this.prisma.reservation.findMany({
-      where,
-      include: { table: true },
-      orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
-    });
+    const page = query.page || 1;
+    const limit = query.limit || 50;
+    const skip = (page - 1) * limit;
+
+    const [data, total] = await Promise.all([
+      this.prisma.reservation.findMany({
+        where,
+        include: { table: true },
+        orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
+        skip,
+        take: limit,
+      }),
+      this.prisma.reservation.count({ where }),
+    ]);
+
+    return {
+      data,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 
   async findOne(id: string, tenantId: string) {
@@ -169,13 +262,13 @@ export class ReservationsService {
 
     return {
       total: reservations.length,
-      pending: reservations.filter(r => r.status === 'PENDING').length,
-      confirmed: reservations.filter(r => r.status === 'CONFIRMED').length,
-      seated: reservations.filter(r => r.status === 'SEATED').length,
-      completed: reservations.filter(r => r.status === 'COMPLETED').length,
-      cancelled: reservations.filter(r => r.status === 'CANCELLED').length,
-      noShow: reservations.filter(r => r.status === 'NO_SHOW').length,
-      rejected: reservations.filter(r => r.status === 'REJECTED').length,
+      pending: reservations.filter(r => r.status === ReservationStatus.PENDING).length,
+      confirmed: reservations.filter(r => r.status === ReservationStatus.CONFIRMED).length,
+      seated: reservations.filter(r => r.status === ReservationStatus.SEATED).length,
+      completed: reservations.filter(r => r.status === ReservationStatus.COMPLETED).length,
+      cancelled: reservations.filter(r => r.status === ReservationStatus.CANCELLED).length,
+      noShow: reservations.filter(r => r.status === ReservationStatus.NO_SHOW).length,
+      rejected: reservations.filter(r => r.status === ReservationStatus.REJECTED).length,
     };
   }
 
@@ -197,47 +290,75 @@ export class ReservationsService {
   async confirm(id: string, tenantId: string, userId: string) {
     const reservation = await this.findOne(id, tenantId);
 
-    if (reservation.status !== 'PENDING') {
+    if (reservation.status !== ReservationStatus.PENDING) {
       throw new BadRequestException('Only pending reservations can be confirmed');
     }
 
-    return this.prisma.reservation.update({
+    const updated = await this.prisma.reservation.update({
       where: { id: reservation.id },
       data: {
-        status: 'CONFIRMED',
+        status: ReservationStatus.CONFIRMED,
         confirmedAt: new Date(),
         confirmedById: userId,
       },
       include: { table: true },
     });
+
+    // Notify admins about confirmation
+    try {
+      await this.notificationsService.notifyAdmins(tenantId, {
+        title: 'Reservation Confirmed',
+        message: `${reservation.customerName}'s reservation for ${reservation.startTime} has been confirmed`,
+        type: NotificationType.RESERVATION,
+        data: { reservationId: reservation.id, type: 'reservation_confirmed' },
+      });
+    } catch (e) {
+      console.error('Failed to send confirmation notification:', e.message);
+    }
+
+    return updated;
   }
 
   async reject(id: string, tenantId: string, rejectionReason?: string) {
     const reservation = await this.findOne(id, tenantId);
 
-    if (!['PENDING', 'CONFIRMED'].includes(reservation.status)) {
+    if (![ReservationStatus.PENDING, ReservationStatus.CONFIRMED].includes(reservation.status as ReservationStatus)) {
       throw new BadRequestException('This reservation cannot be rejected');
     }
 
-    return this.prisma.reservation.update({
+    const updated = await this.prisma.reservation.update({
       where: { id: reservation.id },
       data: {
-        status: 'REJECTED',
+        status: ReservationStatus.REJECTED,
         rejectionReason,
       },
       include: { table: true },
     });
+
+    // Notify admins about rejection
+    try {
+      await this.notificationsService.notifyAdmins(tenantId, {
+        title: 'Reservation Rejected',
+        message: `${reservation.customerName}'s reservation for ${reservation.startTime} has been rejected`,
+        type: NotificationType.RESERVATION,
+        data: { reservationId: reservation.id, type: 'reservation_rejected' },
+      });
+    } catch (e) {
+      console.error('Failed to send rejection notification:', e.message);
+    }
+
+    return updated;
   }
 
   async seat(id: string, tenantId: string) {
     const reservation = await this.findOne(id, tenantId);
 
-    if (reservation.status !== 'CONFIRMED') {
+    if (reservation.status !== ReservationStatus.CONFIRMED) {
       throw new BadRequestException('Only confirmed reservations can be seated');
     }
 
     const updateData: any = {
-      status: 'SEATED',
+      status: ReservationStatus.SEATED,
       seatedAt: new Date(),
     };
 
@@ -259,7 +380,7 @@ export class ReservationsService {
   async complete(id: string, tenantId: string) {
     const reservation = await this.findOne(id, tenantId);
 
-    if (reservation.status !== 'SEATED') {
+    if (reservation.status !== ReservationStatus.SEATED) {
       throw new BadRequestException('Only seated reservations can be completed');
     }
 
@@ -274,7 +395,7 @@ export class ReservationsService {
     return this.prisma.reservation.update({
       where: { id: reservation.id },
       data: {
-        status: 'COMPLETED',
+        status: ReservationStatus.COMPLETED,
         completedAt: new Date(),
       },
       include: { table: true },
@@ -284,13 +405,13 @@ export class ReservationsService {
   async noShow(id: string, tenantId: string) {
     const reservation = await this.findOne(id, tenantId);
 
-    if (!['CONFIRMED', 'PENDING'].includes(reservation.status)) {
+    if (![ReservationStatus.CONFIRMED, ReservationStatus.PENDING].includes(reservation.status as ReservationStatus)) {
       throw new BadRequestException('This reservation cannot be marked as no-show');
     }
 
     return this.prisma.reservation.update({
       where: { id: reservation.id },
-      data: { status: 'NO_SHOW' },
+      data: { status: ReservationStatus.NO_SHOW },
       include: { table: true },
     });
   }
@@ -298,12 +419,12 @@ export class ReservationsService {
   async cancel(id: string, tenantId: string, cancelledBy?: string) {
     const reservation = await this.findOne(id, tenantId);
 
-    if (['COMPLETED', 'CANCELLED', 'NO_SHOW'].includes(reservation.status)) {
+    if ([ReservationStatus.COMPLETED, ReservationStatus.CANCELLED, ReservationStatus.NO_SHOW].includes(reservation.status as ReservationStatus)) {
       throw new BadRequestException('This reservation cannot be cancelled');
     }
 
     // Free up the table if seated
-    if (reservation.status === 'SEATED' && reservation.tableId) {
+    if (reservation.status === ReservationStatus.SEATED && reservation.tableId) {
       await this.prisma.table.update({
         where: { id: reservation.tableId },
         data: { status: 'AVAILABLE' },
@@ -313,7 +434,7 @@ export class ReservationsService {
     return this.prisma.reservation.update({
       where: { id: reservation.id },
       data: {
-        status: 'CANCELLED',
+        status: ReservationStatus.CANCELLED,
         cancelledAt: new Date(),
         cancelledBy,
       },
@@ -322,6 +443,8 @@ export class ReservationsService {
   }
 
   async cancelPublic(id: string, tenantId: string) {
+    await this.validateTenant(tenantId);
+
     const reservation = await this.findOne(id, tenantId);
     const settings = await this.settingsService.getOrCreate(tenantId);
 
@@ -329,7 +452,7 @@ export class ReservationsService {
       throw new BadRequestException('Cancellation is not allowed');
     }
 
-    if (!['PENDING', 'CONFIRMED'].includes(reservation.status)) {
+    if (![ReservationStatus.PENDING, ReservationStatus.CONFIRMED].includes(reservation.status as ReservationStatus)) {
       throw new BadRequestException('This reservation cannot be cancelled');
     }
 
@@ -345,15 +468,29 @@ export class ReservationsService {
       throw new BadRequestException('Cancellation deadline has passed');
     }
 
-    return this.prisma.reservation.update({
+    const updated = await this.prisma.reservation.update({
       where: { id: reservation.id },
       data: {
-        status: 'CANCELLED',
+        status: ReservationStatus.CANCELLED,
         cancelledAt: new Date(),
         cancelledBy: 'CUSTOMER',
       },
       include: { table: true },
     });
+
+    // Notify admins about customer cancellation
+    try {
+      await this.notificationsService.notifyAdmins(tenantId, {
+        title: 'Reservation Cancelled by Customer',
+        message: `${reservation.customerName} cancelled their reservation for ${reservation.startTime}`,
+        type: NotificationType.RESERVATION,
+        data: { reservationId: reservation.id, type: 'reservation_cancelled' },
+      });
+    } catch (e) {
+      console.error('Failed to send cancellation notification:', e.message);
+    }
+
+    return updated;
   }
 
   async remove(id: string, tenantId: string) {
@@ -365,6 +502,8 @@ export class ReservationsService {
   }
 
   async getAvailableSlots(tenantId: string, date: string, guestCount?: number) {
+    await this.validateTenant(tenantId);
+
     const settings = await this.settingsService.getOrCreate(tenantId);
 
     if (!settings.isEnabled) {
@@ -406,7 +545,7 @@ export class ReservationsService {
       where: {
         tenantId,
         date: new Date(date),
-        status: { in: ['PENDING', 'CONFIRMED', 'SEATED'] },
+        status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED, ReservationStatus.SEATED] },
       },
     });
 
@@ -441,6 +580,8 @@ export class ReservationsService {
   }
 
   async getAvailableTables(tenantId: string, date: string, startTime: string, endTime: string, guestCount?: number) {
+    await this.validateTenant(tenantId);
+
     // Get all tables for this tenant
     const tables = await this.prisma.table.findMany({
       where: { tenantId },
@@ -452,7 +593,7 @@ export class ReservationsService {
       where: {
         tenantId,
         date: new Date(date),
-        status: { in: ['PENDING', 'CONFIRMED', 'SEATED'] },
+        status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED, ReservationStatus.SEATED] },
         tableId: { not: null },
       },
     });
@@ -489,6 +630,8 @@ export class ReservationsService {
   }
 
   async lookupReservation(tenantId: string, phone: string, reservationNumber: string) {
+    await this.validateTenant(tenantId);
+
     const reservation = await this.prisma.reservation.findFirst({
       where: {
         tenantId,

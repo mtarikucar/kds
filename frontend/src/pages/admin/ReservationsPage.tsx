@@ -5,7 +5,6 @@ import {
   Clock,
   Users,
   CheckCircle,
-  XCircle,
   Search,
   Eye,
   UserCheck,
@@ -14,6 +13,8 @@ import {
   LogIn,
   CheckSquare,
   AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import {
   useReservations,
@@ -36,6 +37,8 @@ import Spinner from '../../components/ui/Spinner';
 
 type StatusFilter = 'ALL' | ReservationStatus;
 
+const PAGE_SIZE = 20;
+
 const ReservationsPage = () => {
   const { t } = useTranslation(['reservations', 'common']);
 
@@ -47,13 +50,26 @@ const ReservationsPage = () => {
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [editAdminNotes, setEditAdminNotes] = useState('');
   const [editTableId, setEditTableId] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Confirmation dialog state
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+  }>({ open: false, title: '', message: '', onConfirm: () => {} });
 
   // Queries
-  const { data: reservations, isLoading } = useReservations({
+  const { data: paginatedData, isLoading } = useReservations({
     date: selectedDate,
     status: statusFilter === 'ALL' ? undefined : statusFilter,
     search: searchQuery || undefined,
+    page: currentPage,
+    limit: PAGE_SIZE,
   });
+  const reservations = paginatedData?.data;
+  const meta = paginatedData?.meta;
   const { data: stats } = useReservationStats(selectedDate);
   const { data: tables } = useTables();
 
@@ -67,6 +83,55 @@ const ReservationsPage = () => {
   const { mutate: updateReservation, isPending: isUpdating } = useUpdateReservation();
 
   const isActionPending = isConfirming || isRejecting || isSeating || isCompleting || isMarkingNoShow || isCancelling;
+
+  // Reset page when filters change
+  const handleDateChange = (date: string) => {
+    setSelectedDate(date);
+    setCurrentPage(1);
+  };
+  const handleStatusChange = (status: StatusFilter) => {
+    setStatusFilter(status);
+    setCurrentPage(1);
+  };
+  const handleSearchChange = (search: string) => {
+    setSearchQuery(search);
+    setCurrentPage(1);
+  };
+
+  // Confirmation dialog helpers
+  const showConfirmDialog = (title: string, message: string, onConfirm: () => void) => {
+    setConfirmDialog({ open: true, title, message, onConfirm });
+  };
+
+  const handleConfirmDialogAction = () => {
+    confirmDialog.onConfirm();
+    setConfirmDialog({ open: false, title: '', message: '', onConfirm: () => {} });
+  };
+
+  // Action handlers with confirmation
+  const handleReject = (id: string) => {
+    showConfirmDialog(
+      t('reservations:actions.reject'),
+      t('reservations:confirmDialog.rejectMessage'),
+      () => rejectReservation({ id }),
+    );
+  };
+
+  const handleCancel = (id: string) => {
+    showConfirmDialog(
+      t('reservations:actions.cancel'),
+      t('reservations:confirmDialog.cancelMessage'),
+      () => cancelReservation(id),
+    );
+  };
+
+  const handleNoShow = (id: string) => {
+    showConfirmDialog(
+      t('reservations:actions.noShow'),
+      t('reservations:confirmDialog.noShowMessage'),
+      () => noShowReservation(id),
+    );
+  };
 
   // Status filter tabs
   const statusTabs: { value: StatusFilter; label: string }[] = useMemo(
@@ -228,7 +293,7 @@ const ReservationsPage = () => {
           <input
             type="date"
             value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
+            onChange={(e) => handleDateChange(e.target.value)}
             className="px-3.5 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 hover:border-slate-300 transition-all duration-200"
           />
         </div>
@@ -240,7 +305,7 @@ const ReservationsPage = () => {
             type="text"
             placeholder={t('reservations:filters.searchPlaceholder')}
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="w-full ps-9 pe-3.5 py-2 border border-slate-200 rounded-lg bg-white text-slate-900 placeholder:text-slate-400 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary-500/20 focus:border-primary-500 hover:border-slate-300 transition-all duration-200"
           />
         </div>
@@ -251,7 +316,7 @@ const ReservationsPage = () => {
         {statusTabs.map((tab) => (
           <button
             key={tab.value}
-            onClick={() => setStatusFilter(tab.value)}
+            onClick={() => handleStatusChange(tab.value)}
             className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all duration-200 ${
               statusFilter === tab.value
                 ? 'bg-white text-slate-900 shadow-sm'
@@ -394,9 +459,7 @@ const ReservationsPage = () => {
                                 variant="ghost"
                                 size="sm"
                                 className="text-red-500 hover:bg-red-50 hover:text-red-600"
-                                onClick={() =>
-                                  rejectReservation({ id: reservation.id })
-                                }
+                                onClick={() => handleReject(reservation.id)}
                                 disabled={isActionPending}
                                 title={t('reservations:actions.reject')}
                               >
@@ -406,7 +469,7 @@ const ReservationsPage = () => {
                                 variant="ghost"
                                 size="sm"
                                 className="text-slate-500 hover:bg-slate-100 hover:text-slate-600"
-                                onClick={() => cancelReservation(reservation.id)}
+                                onClick={() => handleCancel(reservation.id)}
                                 disabled={isActionPending}
                                 title={t('reservations:actions.cancel')}
                               >
@@ -432,7 +495,7 @@ const ReservationsPage = () => {
                                 variant="ghost"
                                 size="sm"
                                 className="text-slate-500 hover:bg-slate-100 hover:text-slate-600"
-                                onClick={() => cancelReservation(reservation.id)}
+                                onClick={() => handleCancel(reservation.id)}
                                 disabled={isActionPending}
                                 title={t('reservations:actions.cancel')}
                               >
@@ -442,7 +505,7 @@ const ReservationsPage = () => {
                                 variant="ghost"
                                 size="sm"
                                 className="text-amber-600 hover:bg-amber-50 hover:text-amber-700"
-                                onClick={() => noShowReservation(reservation.id)}
+                                onClick={() => handleNoShow(reservation.id)}
                                 disabled={isActionPending}
                                 title={t('reservations:actions.noShow')}
                               >
@@ -472,6 +535,62 @@ const ReservationsPage = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Pagination */}
+          {meta && meta.totalPages > 1 && (
+            <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100">
+              <p className="text-sm text-slate-500">
+                {t('reservations:pagination.showing', {
+                  from: (meta.page - 1) * meta.limit + 1,
+                  to: Math.min(meta.page * meta.limit, meta.total),
+                  total: meta.total,
+                })}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                {Array.from({ length: Math.min(meta.totalPages, 5) }, (_, i) => {
+                  let pageNum: number;
+                  if (meta.totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= meta.totalPages - 2) {
+                    pageNum = meta.totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`w-8 h-8 rounded-lg text-sm font-medium transition-all ${
+                        currentPage === pageNum
+                          ? 'bg-primary-500 text-white'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage((p) => Math.min(meta.totalPages, p + 1))}
+                  disabled={currentPage === meta.totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -675,6 +794,36 @@ const ReservationsPage = () => {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Confirmation Dialog */}
+      <Modal
+        isOpen={confirmDialog.open}
+        onClose={() => setConfirmDialog({ open: false, title: '', message: '', onConfirm: () => {} })}
+        title={confirmDialog.title}
+        size="sm"
+      >
+        <div className="space-y-6">
+          <p className="text-sm text-slate-600">{confirmDialog.message}</p>
+          <div className="flex gap-3">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={() => setConfirmDialog({ open: false, title: '', message: '', onConfirm: () => {} })}
+            >
+              {t('common:app.cancel')}
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              className="flex-1"
+              onClick={handleConfirmDialogAction}
+            >
+              {t('common:app.confirm')}
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

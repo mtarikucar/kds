@@ -154,6 +154,17 @@
     "validation": {
       "nameRequired": "İsim gereklidir",
       "phoneRequired": "Telefon numarası gereklidir"
+    },
+    "errors": {
+      "tenantNotFound": "Bu işletme bulunamadı",
+      "tenantNotActive": "Bu işletme şu anda aktif değil",
+      "systemDisabled": "Rezervasyon sistemi şu anda kapalı",
+      "invalidTime": "Bitiş saati başlangıç saatinden sonra olmalıdır",
+      "pastDate": "Geçmiş tarihe rezervasyon yapılamaz",
+      "duplicate": "Bu zaman diliminde zaten bir rezervasyonunuz var",
+      "slotFull": "Bu zaman dilimi tamamen dolu",
+      "closedDay": "Restoran bu gün kapalı",
+      "tooSoon": "Bu saat çok yakın. Lütfen daha ilerisi için rezervasyon yapın."
     }
   },
   "lookup": {
@@ -177,6 +188,15 @@
     "updated": "Rezervasyon güncellendi",
     "deleted": "Rezervasyon silindi",
     "created": "Rezervasyon başarıyla oluşturuldu"
+  },
+  "confirmDialog": {
+    "rejectMessage": "Bu rezervasyonu reddetmek istediğinizden emin misiniz?",
+    "cancelMessage": "Bu rezervasyonu iptal etmek istediğinizden emin misiniz?",
+    "noShowMessage": "Bu rezervasyonu gelmedi olarak işaretlemek istediğinizden emin misiniz?",
+    "deleteMessage": "Bu rezervasyonu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz."
+  },
+  "pagination": {
+    "showing": "{{from}}-{{to}} / {{total}} gösteriliyor"
   },
   "days": {
     "monday": "Pazartesi",

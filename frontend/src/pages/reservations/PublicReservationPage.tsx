@@ -193,11 +193,47 @@ const PublicReservationPage: React.FC = () => {
     return `${displayH}:${minutes} ${ampm}`;
   };
 
+  // Map backend error messages to i18n keys
+  const getErrorMessage = (error: any): string => {
+    const serverMessage = error?.response?.data?.message;
+    if (!serverMessage) return t('public.submitError');
+
+    const errorMap: Record<string, string> = {
+      'Tenant not found': t('public.errors.tenantNotFound'),
+      'Tenant is not active': t('public.errors.tenantNotActive'),
+      'Reservation system is not enabled': t('public.errors.systemDisabled'),
+      'End time must be after start time': t('public.errors.invalidTime'),
+      'Cannot book past dates': t('public.errors.pastDate'),
+      'You already have a reservation for this time slot': t('public.errors.duplicate'),
+      'This time slot is fully booked': t('public.errors.slotFull'),
+      'Restaurant is closed on this day': t('public.errors.closedDay'),
+      'Reservation time is too soon. Please book further in advance.': t('public.errors.tooSoon'),
+    };
+
+    return errorMap[serverMessage] || serverMessage;
+  };
+
   // Loading state
   if (settingsLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  // Settings fetch error (tenant not found, etc.)
+  if (!settingsLoading && !settings) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 max-w-md w-full text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <AlertCircle className="w-8 h-8 text-red-400" />
+          </div>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">
+            {t('public.errors.tenantNotFound')}
+          </h2>
+        </div>
       </div>
     );
   }
@@ -654,8 +690,7 @@ const PublicReservationPage: React.FC = () => {
           <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-center gap-3">
             <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
             <p className="text-sm text-red-700">
-              {(createReservation.error as any)?.response?.data?.message ||
-                t('public.submitError')}
+              {getErrorMessage(createReservation.error)}
             </p>
           </div>
         )}

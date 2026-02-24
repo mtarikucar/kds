@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsInt, IsOptional, IsDateString, Min, Max, IsEmail } from 'class-validator';
+import { IsString, IsInt, IsOptional, IsDateString, Min, Max, IsEmail, Matches } from 'class-validator';
 
 export class CreateReservationDto {
   @ApiProperty({ description: 'Reservation date', example: '2026-03-01' })
@@ -8,10 +8,12 @@ export class CreateReservationDto {
 
   @ApiProperty({ description: 'Start time', example: '19:00' })
   @IsString()
+  @Matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, { message: 'Start time must be in HH:mm format' })
   startTime: string;
 
   @ApiProperty({ description: 'End time', example: '20:30' })
   @IsString()
+  @Matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, { message: 'End time must be in HH:mm format' })
   endTime: string;
 
   @ApiProperty({ description: 'Number of guests', example: 4 })

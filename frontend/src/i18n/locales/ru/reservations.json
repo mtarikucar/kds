@@ -154,6 +154,17 @@
     "validation": {
       "nameRequired": "Name is required",
       "phoneRequired": "Phone number is required"
+    },
+    "errors": {
+      "tenantNotFound": "This restaurant was not found",
+      "tenantNotActive": "This restaurant is currently unavailable",
+      "systemDisabled": "Reservation system is currently disabled",
+      "invalidTime": "End time must be after start time",
+      "pastDate": "Cannot book reservations for past dates",
+      "duplicate": "You already have a reservation for this time slot",
+      "slotFull": "This time slot is fully booked",
+      "closedDay": "The restaurant is closed on this day",
+      "tooSoon": "This time is too soon. Please book further in advance."
     }
   },
   "lookup": {
@@ -177,6 +188,15 @@
     "updated": "Reservation updated",
     "deleted": "Reservation deleted",
     "created": "Reservation created successfully"
+  },
+  "confirmDialog": {
+    "rejectMessage": "Are you sure you want to reject this reservation?",
+    "cancelMessage": "Are you sure you want to cancel this reservation?",
+    "noShowMessage": "Are you sure you want to mark this reservation as no-show?",
+    "deleteMessage": "Are you sure you want to delete this reservation? This action cannot be undone."
+  },
+  "pagination": {
+    "showing": "Showing {{from}}-{{to}} of {{total}}"
   },
   "days": {
     "monday": "Monday",

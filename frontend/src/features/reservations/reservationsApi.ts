@@ -10,9 +10,19 @@ import type {
   UpdateReservationSettingsDto,
 } from '../../types';
 
+interface PaginatedResponse<T> {
+  data: T[];
+  meta: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
 // Reservation queries
-export const useReservations = (params?: { date?: string; status?: string; tableId?: string; search?: string }) => {
-  return useQuery<Reservation[]>({
+export const useReservations = (params?: { date?: string; status?: string; tableId?: string; search?: string; page?: number; limit?: number }) => {
+  return useQuery<PaginatedResponse<Reservation>>({
     queryKey: ['reservations', params],
     queryFn: async () => {
       const response = await api.get('/reservations', { params });

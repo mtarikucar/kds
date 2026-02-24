@@ -1,10 +1,21 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { UpdateReservationSettingsDto } from '../dto/update-reservation-settings.dto';
 
 @Injectable()
 export class ReservationSettingsService {
   constructor(private prisma: PrismaService) {}
+
+  private async validateTenant(tenantId: string) {
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+    if (tenant.status !== 'active') {
+      throw new ForbiddenException('Tenant is not active');
+    }
+    return tenant;
+  }
 
   async getOrCreate(tenantId: string) {
     let settings = await this.prisma.reservationSettings.findUnique({
@@ -40,6 +51,8 @@ export class ReservationSettingsService {
   }
 
   async getPublicSettings(tenantId: string) {
+    await this.validateTenant(tenantId);
+
     const settings = await this.getOrCreate(tenantId);
     return {
       isEnabled: settings.isEnabled,
