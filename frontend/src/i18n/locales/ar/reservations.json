@@ -53,7 +53,11 @@
     "days": "days",
     "closed": "Closed",
     "open": "Open",
-    "close": "Close"
+    "close": "Close",
+    "reservationLink": "رابط الحجز",
+    "reservationLinkDesc": "شارك هذا الرابط مع عملائك ليتمكنوا من إجراء الحجوزات",
+    "copyLink": "نسخ",
+    "linkCopied": "تم نسخ الرابط!"
   },
   "status": {
     "PENDING": "Pending",

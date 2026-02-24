@@ -53,7 +53,11 @@
     "days": "days",
     "closed": "Closed",
     "open": "Open",
-    "close": "Close"
+    "close": "Close",
+    "reservationLink": "Bron havolasi",
+    "reservationLinkDesc": "Mijozlaringiz bron qilishi uchun ushbu havolani ulashing",
+    "copyLink": "Nusxalash",
+    "linkCopied": "Havola nusxalandi!"
   },
   "status": {
     "PENDING": "Pending",

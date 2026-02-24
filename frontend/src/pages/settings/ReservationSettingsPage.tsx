@@ -8,11 +8,15 @@ import {
   Ban,
   Image,
   Settings,
+  Link,
+  Copy,
+  Check,
 } from 'lucide-react';
 import {
   useReservationSettings,
   useUpdateReservationSettings,
 } from '../../features/reservations/reservationsApi';
+import { useAuthStore } from '../../store/authStore';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import {
   SettingsSection,
@@ -58,6 +62,20 @@ const ReservationSettingsPage = () => {
   const { t } = useTranslation(['reservations', 'settings']);
   const { data: reservationSettings, isLoading } = useReservationSettings();
   const { mutateAsync: updateReservationSettings } = useUpdateReservationSettings();
+  const user = useAuthStore((state) => state.user);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const reservationLink = user?.tenantId
+    ? `${window.location.origin}/reserve/${user.tenantId}`
+    : '';
+
+  const handleCopyLink = async () => {
+    if (!reservationLink) return;
+    await navigator.clipboard.writeText(reservationLink);
+    setLinkCopied(true);
+    toast.success(t('reservations:settings.linkCopied'));
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
 
   const [settings, setSettings] = useState<ReservationSettingsState>({
     isEnabled: false,
@@ -191,6 +209,49 @@ const ReservationSettingsPage = () => {
           {t('reservations:settings.description')}
         </p>
       </div>
+
+      {/* Reservation Link */}
+      {reservationLink && (
+        <div className="max-w-3xl mb-6">
+          <div className="bg-gradient-to-r from-primary-50 to-blue-50 border border-primary-200/60 rounded-2xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-9 h-9 rounded-xl bg-primary-500 flex items-center justify-center shadow-sm">
+                <Link className="w-4.5 h-4.5 text-white" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900">
+                  {t('reservations:settings.reservationLink')}
+                </h3>
+                <p className="text-xs text-slate-500">
+                  {t('reservations:settings.reservationLinkDesc')}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex-1 min-w-0 bg-white border border-slate-200 rounded-lg px-3.5 py-2.5 shadow-sm">
+                <p className="text-sm text-slate-700 truncate font-mono">
+                  {reservationLink}
+                </p>
+              </div>
+              <button
+                onClick={handleCopyLink}
+                className={`flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 shadow-sm ${
+                  linkCopied
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-primary-500 text-white hover:bg-primary-600'
+                }`}
+              >
+                {linkCopied ? (
+                  <Check className="w-4 h-4" />
+                ) : (
+                  <Copy className="w-4 h-4" />
+                )}
+                {t('reservations:settings.copyLink')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="max-w-3xl space-y-6">
         {/* General Settings */}

@@ -53,7 +53,11 @@
     "days": "days",
     "closed": "Closed",
     "open": "Open",
-    "close": "Close"
+    "close": "Close",
+    "reservationLink": "Reservation Link",
+    "reservationLinkDesc": "Share this link with your customers so they can make reservations",
+    "copyLink": "Copy",
+    "linkCopied": "Link copied!"
   },
   "status": {
     "PENDING": "Pending",
