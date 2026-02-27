@@ -1,4 +1,4 @@
-FROM node:18 AS development
+FROM node:20 AS development
 
 # Install dependencies for Prisma, PDF generation, and native modules
 RUN apt-get update && apt-get install -y \
@@ -36,7 +36,7 @@ EXPOSE 3000
 CMD ["npm", "run", "start:dev"]
 
 # Production stage
-FROM node:18 AS production
+FROM node:20 AS production
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
