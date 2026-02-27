@@ -1,0 +1,48 @@
+export enum StockUnit {
+  KG = 'KG',
+  G = 'G',
+  L = 'L',
+  ML = 'ML',
+  PCS = 'PCS',
+  BOX = 'BOX',
+  BAG = 'BAG',
+  CAN = 'CAN',
+  BOTTLE = 'BOTTLE',
+  BUNCH = 'BUNCH',
+  SLICE = 'SLICE',
+  PORTION = 'PORTION',
+}
+
+export enum IngredientMovementType {
+  IN = 'IN',
+  OUT = 'OUT',
+  ADJUSTMENT = 'ADJUSTMENT',
+  WASTE = 'WASTE',
+  ORDER_DEDUCTION = 'ORDER_DEDUCTION',
+  PO_RECEIVE = 'PO_RECEIVE',
+  COUNT_ADJUSTMENT = 'COUNT_ADJUSTMENT',
+}
+
+export enum PurchaseOrderStatus {
+  DRAFT = 'DRAFT',
+  SUBMITTED = 'SUBMITTED',
+  PARTIALLY_RECEIVED = 'PARTIALLY_RECEIVED',
+  RECEIVED = 'RECEIVED',
+  CANCELLED = 'CANCELLED',
+}
+
+export enum WasteReason {
+  EXPIRED = 'EXPIRED',
+  SPOILED = 'SPOILED',
+  DAMAGED = 'DAMAGED',
+  OVERPRODUCTION = 'OVERPRODUCTION',
+  PREPARATION_WASTE = 'PREPARATION_WASTE',
+  CUSTOMER_RETURN = 'CUSTOMER_RETURN',
+  OTHER = 'OTHER',
+}
+
+export enum StockCountStatus {
+  IN_PROGRESS = 'IN_PROGRESS',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+}

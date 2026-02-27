@@ -139,6 +139,11 @@ export class CreatePlanDto {
   @IsBoolean()
   reservationSystem?: boolean = false;
 
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  personnelManagement?: boolean = false;
+
   @ApiPropertyOptional({ default: true })
   @IsOptional()
   @IsBoolean()

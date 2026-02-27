@@ -50,7 +50,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         // Refresh failed, logout user
         useAuthStore.getState().logout();
-        window.location.href = '/login';
+        window.location.href = import.meta.env.BASE_URL + 'login';
         return Promise.reject(refreshError);
       }
     }

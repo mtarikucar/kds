@@ -92,6 +92,29 @@ model Tenant {
   heatmapCache        AnalyticsHeatmapCache[]
   edgeDevices         EdgeDevice[]
 
+  // Delivery platform relations
+  deliveryPlatformConfigs DeliveryPlatformConfig[]
+  deliveryPlatformLogs    DeliveryPlatformLog[]
+  menuItemMappings        MenuItemMapping[]
+
+  // Stock management relations
+  stockItemCategories   StockItemCategory[]
+  stockItems            StockItem[]
+  stockBatches          StockBatch[]
+  recipes               Recipe[]
+  suppliers             Supplier[]
+  purchaseOrders        PurchaseOrder[]
+  ingredientMovements   IngredientMovement[]
+  wasteLogs             WasteLog[]
+  stockCounts           StockCount[]
+  stockSettings         StockSettings?
+
+  // Personnel management relations
+  attendances           Attendance[]
+  shiftTemplates        ShiftTemplate[]
+  shiftAssignments      ShiftAssignment[]
+  shiftSwapRequests     ShiftSwapRequest[]
+
   @@index([currentPlanId])
   @@map("tenants")
 }
@@ -150,6 +173,13 @@ model User {
   zReports                       ZReport[]
   cashDrawerMovements            CashDrawerMovement[]
 
+  // Personnel management relations
+  attendances                    Attendance[]
+  shiftAssignments               ShiftAssignment[]
+  swapRequestsMade               ShiftSwapRequest[] @relation("SwapRequester")
+  swapRequestsReceived           ShiftSwapRequest[] @relation("SwapTarget")
+  swapRequestsApproved           ShiftSwapRequest[] @relation("SwapApprover")
+
   @@index([tenantId])
   @@index([email])
   @@index([approvedById])
@@ -206,6 +236,8 @@ model Product {
   orderItems         OrderItem[]
   stockMovements     StockMovement[]
   modifierGroups     ProductModifierGroup[] // Many-to-many for modifiers
+  menuItemMappings   MenuItemMapping[]
+  recipe             Recipe?               // Ingredient-level recipe for stock deduction
 
   @@index([tenantId])
   @@index([categoryId])
@@ -399,6 +431,11 @@ model Order {
   notes        String?
   customerName String?
 
+  // Delivery platform fields
+  source          String?   // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS (NULL = internal/POS order)
+  externalOrderId String?   // Platform's order ID/token for status sync
+  externalData    Json?     // Raw platform payload for audit trail
+
   // Customer ordering fields
   sessionId        String? // UUID for customer session tracking
   customerPhone    String? // Optional customer phone
@@ -436,6 +473,8 @@ model Order {
   @@index([status])
   @@index([sessionId])
   @@index([approvedById])
+  @@index([source])
+  @@index([externalOrderId])
   @@map("orders")
 }
 
@@ -569,7 +608,8 @@ model SubscriptionPlan {
   prioritySupport    Boolean @default(false)
   inventoryTracking  Boolean @default(false)
   kdsIntegration     Boolean @default(true)
-  reservationSystem  Boolean @default(false)
+  reservationSystem      Boolean @default(false)
+  personnelManagement    Boolean @default(false)
 
   // Discount settings
   discountPercentage   Int?       // Discount percentage (e.g., 25 for 25%)
@@ -1875,4 +1915,568 @@ model EdgeDevice {
   @@index([tenantId])
   @@index([status])
   @@map("edge_devices")
+}
+
+// ========================================
+// DELIVERY PLATFORM INTEGRATION
+// ========================================
+
+model DeliveryPlatformConfig {
+  id        String   @id @default(uuid())
+
+  platform  String   // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS
+  isEnabled Boolean  @default(false)
+
+  // Authentication
+  credentials    Json?      // Platform-specific API keys/secrets (encrypted at app level)
+  accessToken    String?    // Current access token
+  tokenExpiresAt DateTime?  // Token expiration time
+
+  // Platform identifiers
+  remoteRestaurantId String?  // Platform's restaurant/vendor ID
+
+  // Restaurant status on platform
+  restaurantOpen Boolean @default(false)
+
+  // Sync tracking
+  lastOrderPollAt  DateTime?
+  lastMenuSyncAt   DateTime?
+
+  // Circuit breaker / error tracking
+  lastError    String?
+  lastErrorAt  DateTime?
+  errorCount   Int       @default(0)
+
+  // Configuration options
+  autoAccept   Boolean @default(true)  // Auto-accept incoming orders
+  notifySound  String? // Custom notification sound identifier
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, platform])
+  @@index([tenantId])
+  @@index([platform])
+  @@index([isEnabled])
+  @@map("delivery_platform_configs")
+}
+
+model DeliveryPlatformLog {
+  id        String   @id @default(uuid())
+
+  platform  String   // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS
+  direction String   // INBOUND, OUTBOUND
+  action    String   // e.g., ORDER_RECEIVED, ORDER_ACCEPTED, STATUS_UPDATE, AUTH_REFRESH
+
+  // Related entities
+  orderId    String?  // Internal order ID (if applicable)
+  externalId String?  // Platform's order/entity ID
+
+  // Request/response data
+  request    Json?
+  response   Json?
+  statusCode Int?
+
+  // Result
+  success    Boolean
+  error      String?
+
+  // Retry mechanism (dead letter queue)
+  retryCount  Int       @default(0)
+  maxRetries  Int       @default(3)
+  nextRetryAt DateTime?
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([platform])
+  @@index([orderId])
+  @@index([success])
+  @@index([nextRetryAt])
+  @@map("delivery_platform_logs")
+}
+
+model MenuItemMapping {
+  id        String   @id @default(uuid())
+
+  platform       String   // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS
+  externalItemId String   // Platform's product/item ID
+
+  // Sync data
+  externalData   Json?    // Platform-specific item metadata
+  isActive       Boolean  @default(true)
+  lastSyncedAt   DateTime?
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, platform, externalItemId])
+  @@index([tenantId])
+  @@index([productId])
+  @@index([platform])
+  @@map("menu_item_mappings")
+}
+
+// ========================================
+// INGREDIENT-LEVEL STOCK MANAGEMENT
+// ========================================
+
+model StockItemCategory {
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+  color       String? // For UI badge color
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  stockItems StockItem[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+  @@map("stock_item_categories")
+}
+
+model StockItem {
+  id          String  @id @default(uuid())
+  name        String
+  sku         String?
+  unit        String  // KG, G, L, ML, PCS, BOX, BAG, CAN, BOTTLE, BUNCH, SLICE, PORTION
+  description String?
+
+  currentStock Decimal @default(0) @db.Decimal(10, 3)
+  minStock     Decimal @default(0) @db.Decimal(10, 3)
+  costPerUnit  Decimal @default(0) @db.Decimal(10, 4)
+
+  trackExpiry Boolean @default(false)
+  isActive    Boolean @default(true)
+
+  categoryId String?
+  category   StockItemCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  batches              StockBatch[]
+  recipeIngredients    RecipeIngredient[]
+  supplierStockItems   SupplierStockItem[]
+  purchaseOrderItems   PurchaseOrderItem[]
+  ingredientMovements  IngredientMovement[]
+  wasteLogs            WasteLog[]
+  stockCountItems      StockCountItem[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId])
+  @@index([categoryId])
+  @@index([isActive])
+  @@map("stock_items")
+}
+
+model StockBatch {
+  id         String  @id @default(uuid())
+  batchNumber String?
+  quantity    Decimal @db.Decimal(10, 3) // Remaining quantity in this batch
+  costPerUnit Decimal @db.Decimal(10, 4)
+
+  receivedAt DateTime @default(now())
+  expiryDate DateTime?
+
+  stockItemId String
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+
+  purchaseOrderItemId String?
+  purchaseOrderItem   PurchaseOrderItem? @relation(fields: [purchaseOrderItemId], references: [id], onDelete: SetNull)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([stockItemId])
+  @@index([expiryDate])
+  @@map("stock_batches")
+}
+
+model Recipe {
+  id    String @id @default(uuid())
+  name  String?
+  notes String?
+  yield Int    @default(1) // How many portions this recipe makes
+
+  productId String  @unique
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  ingredients RecipeIngredient[]
+
+  @@index([tenantId])
+  @@map("recipes")
+}
+
+model RecipeIngredient {
+  id       String  @id @default(uuid())
+  quantity Decimal @db.Decimal(10, 3)
+
+  recipeId String
+  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+
+  stockItemId String
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+
+  @@unique([recipeId, stockItemId])
+  @@index([recipeId])
+  @@index([stockItemId])
+  @@map("recipe_ingredients")
+}
+
+model Supplier {
+  id           String  @id @default(uuid())
+  name         String
+  contactName  String?
+  email        String?
+  phone        String?
+  address      String?
+  paymentTerms String? // e.g., "Net 30", "COD"
+  notes        String?
+  isActive     Boolean @default(true)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  supplierStockItems SupplierStockItem[]
+  purchaseOrders     PurchaseOrder[]
+
+  @@index([tenantId])
+  @@index([isActive])
+  @@map("suppliers")
+}
+
+model SupplierStockItem {
+  id          String  @id @default(uuid())
+  supplierSku String?
+  unitPrice   Decimal @db.Decimal(10, 4)
+  isPreferred Boolean @default(false)
+
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  stockItemId String
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([supplierId, stockItemId])
+  @@index([supplierId])
+  @@index([stockItemId])
+  @@map("supplier_stock_items")
+}
+
+model PurchaseOrder {
+  id            String  @id @default(uuid())
+  orderNumber   String
+  status        String  @default("DRAFT") // DRAFT, SUBMITTED, PARTIALLY_RECEIVED, RECEIVED, CANCELLED
+  notes         String?
+  expectedDate  DateTime?
+
+  supplierId String
+  supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  submittedAt DateTime?
+  receivedAt  DateTime?
+
+  // Relations
+  items PurchaseOrderItem[]
+
+  @@unique([tenantId, orderNumber])
+  @@index([tenantId])
+  @@index([supplierId])
+  @@index([status])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id               String  @id @default(uuid())
+  quantityOrdered  Decimal @db.Decimal(10, 3)
+  quantityReceived Decimal @default(0) @db.Decimal(10, 3)
+  unitPrice        Decimal @db.Decimal(10, 4)
+
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  stockItemId String
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Restrict)
+
+  // Relations
+  batches StockBatch[]
+
+  @@index([purchaseOrderId])
+  @@index([stockItemId])
+  @@map("purchase_order_items")
+}
+
+model IngredientMovement {
+  id            String  @id @default(uuid())
+  type          String  // IN, OUT, ADJUSTMENT, WASTE, ORDER_DEDUCTION, PO_RECEIVE, COUNT_ADJUSTMENT
+  quantity      Decimal @db.Decimal(10, 3) // Positive for additions, negative for deductions
+  costPerUnit   Decimal? @db.Decimal(10, 4)
+  notes         String?
+  referenceType String? // ORDER, PURCHASE_ORDER, WASTE_LOG, STOCK_COUNT
+  referenceId   String?
+
+  stockItemId String
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([stockItemId])
+  @@index([type])
+  @@index([referenceType, referenceId])
+  @@index([createdAt])
+  @@map("ingredient_movements")
+}
+
+model WasteLog {
+  id       String  @id @default(uuid())
+  quantity Decimal @db.Decimal(10, 3)
+  reason   String  // EXPIRED, SPOILED, DAMAGED, OVERPRODUCTION, PREPARATION_WASTE, CUSTOMER_RETURN, OTHER
+  notes    String?
+  cost     Decimal? @db.Decimal(10, 4) // Calculated cost of waste
+
+  stockItemId String
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([stockItemId])
+  @@index([reason])
+  @@index([createdAt])
+  @@map("waste_logs")
+}
+
+model StockCount {
+  id     String @id @default(uuid())
+  name   String?
+  status String @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, CANCELLED
+  notes  String?
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  // Relations
+  items StockCountItem[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("stock_counts")
+}
+
+model StockCountItem {
+  id          String  @id @default(uuid())
+  expectedQty Decimal @db.Decimal(10, 3) // Snapshot of currentStock at count start
+  countedQty  Decimal? @db.Decimal(10, 3) // What was actually counted
+  variance    Decimal? @db.Decimal(10, 3) // countedQty - expectedQty
+
+  stockCountId String
+  stockCount   StockCount @relation(fields: [stockCountId], references: [id], onDelete: Cascade)
+
+  stockItemId String
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+
+  @@unique([stockCountId, stockItemId])
+  @@index([stockCountId])
+  @@index([stockItemId])
+  @@map("stock_count_items")
+}
+
+model StockSettings {
+  id       String @id @default(uuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  enableAutoDeduction Boolean @default(true)
+  deductOnStatus      String  @default("PREPARING") // Which order status triggers deduction
+  lowStockAlertDays   Int     @default(3) // Days before expiry to alert
+  poNumberPrefix      String  @default("PO")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("stock_settings")
+}
+
+// ========================================
+// PERSONNEL MANAGEMENT
+// ========================================
+
+model Attendance {
+  id        String   @id @default(uuid())
+
+  date      DateTime @db.Date
+  clockIn   DateTime
+  clockOut  DateTime?
+
+  breakStart DateTime?
+  breakEnd   DateTime?
+
+  totalWorkedMinutes Int @default(0)
+  totalBreakMinutes  Int @default(0)
+  overtimeMinutes    Int @default(0)
+
+  status    String   @default("CLOCKED_IN") // CLOCKED_IN, ON_BREAK, CLOCKED_OUT
+  isLate    Boolean  @default(false)
+  lateMinutes Int    @default(0)
+  notes     String?
+
+  shiftAssignmentId String?
+  shiftAssignment   ShiftAssignment? @relation(fields: [shiftAssignmentId], references: [id], onDelete: SetNull)
+
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, date])
+  @@index([tenantId])
+  @@index([tenantId, date])
+  @@index([userId])
+  @@index([status])
+  @@map("attendances")
+}
+
+model ShiftTemplate {
+  id        String  @id @default(uuid())
+  name      String
+  startTime String  // HH:mm format
+  endTime   String  // HH:mm format
+  color     String  @default("#3B82F6") // Hex color
+  gracePeriodMinutes Int @default(15)
+  isActive  Boolean @default(true)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  assignments ShiftAssignment[]
+
+  @@index([tenantId])
+  @@map("shift_templates")
+}
+
+model ShiftAssignment {
+  id        String   @id @default(uuid())
+  date      DateTime @db.Date
+  status    String   @default("SCHEDULED") // SCHEDULED, COMPLETED, MISSED, SWAPPED
+  notes     String?
+
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  shiftTemplateId String
+  shiftTemplate   ShiftTemplate @relation(fields: [shiftTemplateId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  attendances  Attendance[]
+  swapRequests ShiftSwapRequest[]
+
+  @@unique([userId, date])
+  @@index([tenantId])
+  @@index([tenantId, date])
+  @@index([userId])
+  @@index([shiftTemplateId])
+  @@map("shift_assignments")
+}
+
+model ShiftSwapRequest {
+  id        String @id @default(uuid())
+  status    String @default("PENDING") // PENDING, APPROVED, REJECTED
+  reason    String?
+
+  requesterId            String
+  requester              User            @relation("SwapRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+
+  targetId               String
+  target                 User            @relation("SwapTarget", fields: [targetId], references: [id], onDelete: Cascade)
+
+  requesterAssignmentId  String
+  requesterAssignment    ShiftAssignment @relation(fields: [requesterAssignmentId], references: [id], onDelete: Cascade)
+
+  targetAssignmentId     String
+
+  approvedById           String?
+  approvedBy             User?           @relation("SwapApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([requesterId])
+  @@index([targetId])
+  @@index([status])
+  @@map("shift_swap_requests")
 }

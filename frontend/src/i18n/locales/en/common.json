@@ -55,6 +55,8 @@
     "admin": "Admin",
     "subscription": "Subscription",
     "reservations": "Reservations",
+    "personnel": "Personnel",
+    "stock": "Stock",
     "expandSidebar": "Expand Sidebar",
     "collapseSidebar": "Collapse Sidebar"
   },

@@ -55,6 +55,8 @@
     "admin": "Админ",
     "subscription": "Подписка",
     "reservations": "Reservations",
+    "personnel": "Персонал",
+    "stock": "Склад",
     "expandSidebar": "Развернуть боковую панель",
     "collapseSidebar": "Свернуть боковую панель"
   },

@@ -52,6 +52,7 @@ export class SuperAdminSubscriptionsService {
         inventoryTracking: createDto.inventoryTracking || false,
         kdsIntegration: createDto.kdsIntegration ?? true,
         reservationSystem: createDto.reservationSystem || false,
+        personnelManagement: createDto.personnelManagement || false,
         isActive: createDto.isActive ?? true,
       },
     });
@@ -105,6 +106,7 @@ export class SuperAdminSubscriptionsService {
         inventoryTracking: updateDto.inventoryTracking,
         kdsIntegration: updateDto.kdsIntegration,
         reservationSystem: updateDto.reservationSystem,
+        personnelManagement: updateDto.personnelManagement,
         isActive: updateDto.isActive,
       },
     });

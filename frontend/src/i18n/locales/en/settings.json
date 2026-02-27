@@ -4,7 +4,72 @@
     "qrMenu": "QR Menu",
     "reports": "Reports",
     "branding": "Branding",
-    "reservations": "Reservations"
+    "reservations": "Reservations",
+    "onlineOrders": "Online Orders"
+  },
+  "onlineOrders": {
+    "title": "Online Order Platforms",
+    "description": "Connect your restaurant to delivery platforms to receive orders directly in your kitchen display system.",
+    "activityLog": "Activity Log",
+    "activityLogDescription": "View recent order sync activity and troubleshoot integration issues.",
+    "loadError": "Failed to load platform configurations.",
+    "status": {
+      "connecting": "Connecting",
+      "notConfigured": "Not Configured",
+      "disabled": "Disabled",
+      "missingCredentials": "Missing Credentials",
+      "circuitOpen": "Circuit Open",
+      "errors": "Errors ({{count}})",
+      "connected": "Connected"
+    },
+    "credentials": {
+      "restaurantId": "Restaurant ID (on platform)",
+      "restaurantIdPlaceholder": "Platform's restaurant/vendor ID"
+    },
+    "autoAccept": "Auto-accept orders",
+    "autoAcceptDescription": "Automatically accept incoming orders without staff approval",
+    "lastError": "Last Error",
+    "save": "Save",
+    "testConnection": "Test Connection",
+    "openRestaurant": "Open Restaurant",
+    "closeRestaurant": "Close Restaurant",
+    "lastPoll": "Last poll",
+    "lastMenuSync": "Last menu sync",
+    "never": "Never",
+    "fillCredentials": "Please fill in the required credentials before enabling.",
+    "fillCredentialsFirst": "Please fill in the required credentials first.",
+    "logs": {
+      "all": "All",
+      "success": "Success",
+      "failed": "Failed",
+      "loadingLogs": "Loading logs...",
+      "noEntries": "No log entries found",
+      "platform": "Platform",
+      "statusCode": "Status Code",
+      "orderId": "Order ID",
+      "error": "Error",
+      "retries": "Retries",
+      "showing": "Showing {{count}} of {{total}} entries",
+      "na": "N/A",
+      "previous": "Previous",
+      "next": "Next"
+    },
+    "toast": {
+      "configCreated": "Platform configuration created",
+      "configCreateFailed": "Failed to create platform configuration",
+      "configUpdated": "Platform configuration updated",
+      "configUpdateFailed": "Failed to update platform configuration",
+      "configDeleted": "Platform configuration deleted",
+      "configDeleteFailed": "Failed to delete platform configuration",
+      "connectionSuccess": "Connection successful",
+      "connectionFailed": "Connection failed",
+      "connectionTestFailed": "Connection test failed",
+      "restaurantOpened": "Restaurant opened on platform",
+      "restaurantClosed": "Restaurant closed on platform",
+      "toggleFailed": "Failed to toggle restaurant status",
+      "menuSyncStarted": "Menu sync initiated",
+      "menuSyncFailed": "Menu sync failed"
+    }
   },
   "autoSave": {
     "idle": "No changes",

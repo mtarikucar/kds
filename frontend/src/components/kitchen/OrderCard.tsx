@@ -113,6 +113,21 @@ const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating }: OrderCa
                 {t('kitchen.table')} {order.table.number}
               </span>
             )}
+            {/* Delivery Platform Badge */}
+            {order.source && (() => {
+              const PLATFORM_DISPLAY: Record<string, { label: string; className: string }> = {
+                GETIR: { label: 'Getir', className: 'bg-purple-100 text-purple-700' },
+                YEMEKSEPETI: { label: 'Yemeksepeti', className: 'bg-pink-100 text-pink-700' },
+                TRENDYOL: { label: 'Trendyol', className: 'bg-orange-100 text-orange-700' },
+                MIGROS: { label: 'Migros', className: 'bg-green-100 text-green-700' },
+              };
+              const display = PLATFORM_DISPLAY[order.source] || { label: order.source, className: 'bg-slate-100 text-slate-700' };
+              return (
+                <span className={cn('px-2 py-0.5 text-xs font-medium rounded-full whitespace-nowrap', display.className)}>
+                  {display.label}
+                </span>
+              );
+            })()}
           </div>
 
           <div className="flex items-center gap-1.5 flex-shrink-0">

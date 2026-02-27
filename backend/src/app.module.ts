@@ -33,6 +33,9 @@ import { SuperAdminModule } from './modules/superadmin/superadmin.module';
 import { SuperAdminTerminalModule } from './modules/superadmin-terminal/superadmin-terminal.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ReservationsModule } from './modules/reservations/reservations.module';
+import { DeliveryPlatformsModule } from './modules/delivery-platforms/delivery-platforms.module';
+import { PersonnelModule } from './modules/personnel/personnel.module';
+import { StockManagementModule } from './modules/stock-management/stock-management.module';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './common/middleware/input-sanitizer.middleware';
 
@@ -89,6 +92,9 @@ import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './co
     SuperAdminTerminalModule,
     AnalyticsModule,
     ReservationsModule,
+    DeliveryPlatformsModule,
+    PersonnelModule,
+    StockManagementModule,
   ],
   controllers: [AppController],
   providers: [
@@ -112,6 +118,9 @@ export class AppModule implements NestModule {
       .exclude(
         { path: 'desktop/ci/releases', method: RequestMethod.POST },
         { path: 'desktop/ci/releases/:id/publish', method: RequestMethod.POST },
+        // Delivery platform webhooks receive raw payloads from external platforms
+        { path: 'webhooks/delivery/(.*)', method: RequestMethod.POST },
+        { path: 'webhooks/delivery/(.*)', method: RequestMethod.PUT },
       )
       .forRoutes('*');
   }

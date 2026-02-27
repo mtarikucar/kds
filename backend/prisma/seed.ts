@@ -10,7 +10,17 @@ async function main() {
   // Create subscription plans
   const freePlan = await prisma.subscriptionPlan.upsert({
     where: { name: 'FREE' },
-    update: {},
+    update: {
+      advancedReports: false,
+      multiLocation: false,
+      customBranding: false,
+      apiAccess: false,
+      prioritySupport: false,
+      inventoryTracking: false,
+      kdsIntegration: true,
+      reservationSystem: false,
+      personnelManagement: false,
+    },
     create: {
       name: 'FREE',
       displayName: 'Free Plan',
@@ -38,7 +48,17 @@ async function main() {
 
   const basicPlan = await prisma.subscriptionPlan.upsert({
     where: { name: 'BASIC' },
-    update: {},
+    update: {
+      advancedReports: false,
+      multiLocation: false,
+      customBranding: false,
+      apiAccess: false,
+      prioritySupport: false,
+      inventoryTracking: true,
+      kdsIntegration: true,
+      reservationSystem: false,
+      personnelManagement: false,
+    },
     create: {
       name: 'BASIC',
       displayName: 'Basic Plan',
@@ -66,7 +86,17 @@ async function main() {
 
   const proPlan = await prisma.subscriptionPlan.upsert({
     where: { name: 'PRO' },
-    update: {},
+    update: {
+      advancedReports: true,
+      multiLocation: true,
+      customBranding: true,
+      apiAccess: false,
+      prioritySupport: true,
+      inventoryTracking: true,
+      kdsIntegration: true,
+      reservationSystem: true,
+      personnelManagement: true,
+    },
     create: {
       name: 'PRO',
       displayName: 'Pro Plan',
@@ -88,13 +118,24 @@ async function main() {
       inventoryTracking: true,
       kdsIntegration: true,
       reservationSystem: true,
+      personnelManagement: true,
       isActive: true,
     },
   });
 
   const businessPlan = await prisma.subscriptionPlan.upsert({
     where: { name: 'BUSINESS' },
-    update: {},
+    update: {
+      advancedReports: true,
+      multiLocation: true,
+      customBranding: true,
+      apiAccess: true,
+      prioritySupport: true,
+      inventoryTracking: true,
+      kdsIntegration: true,
+      reservationSystem: true,
+      personnelManagement: true,
+    },
     create: {
       name: 'BUSINESS',
       displayName: 'Business Plan',
@@ -116,6 +157,7 @@ async function main() {
       inventoryTracking: true,
       kdsIntegration: true,
       reservationSystem: true,
+      personnelManagement: true,
       isActive: true,
     },
   });

@@ -10,6 +10,8 @@ import { CustomersModule } from '../customers/customers.module';
   imports: [
     PrismaModule,
     forwardRef(() => import('../kds/kds.module').then(m => m.KdsModule)),
+    forwardRef(() => import('../delivery-platforms/delivery-platforms.module').then(m => m.DeliveryPlatformsModule)),
+    forwardRef(() => import('../stock-management/stock-management.module').then(m => m.StockManagementModule)),
     CustomersModule,
   ],
   controllers: [OrdersController, PaymentsController],

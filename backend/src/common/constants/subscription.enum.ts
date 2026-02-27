@@ -52,6 +52,7 @@ export enum PlanFeature {
   INVENTORY_TRACKING = 'inventoryTracking',
   KDS_INTEGRATION = 'kdsIntegration',
   RESERVATION_SYSTEM = 'reservationSystem',
+  PERSONNEL_MANAGEMENT = 'personnelManagement',
 }
 
 export enum TenantStatus {

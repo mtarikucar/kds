@@ -13,6 +13,7 @@ const featurePlanMap: Record<keyof PlanFeatures, SubscriptionPlanType> = {
   customBranding: SubscriptionPlanType.PRO,
   prioritySupport: SubscriptionPlanType.PRO,
   reservationSystem: SubscriptionPlanType.PRO,
+  personnelManagement: SubscriptionPlanType.PRO,
   apiAccess: SubscriptionPlanType.BUSINESS,
 };
 

@@ -22,7 +22,8 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
     "prisma:seed": "ts-node prisma/seed.ts",
-    "test:email": "ts-node scripts/test-email.ts"
+    "test:email": "ts-node scripts/test-email.ts",
+    "seed:demo": "ts-node prisma/seed-demo.ts"
   },
   "dependencies": {
     "@nestjs-modules/mailer": "^2.0.2",

@@ -260,6 +260,8 @@ export interface Order {
   items: OrderItem[];
   orderItems?: OrderItem[];
   payments?: Payment[];
+  source?: string | null; // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS (null = internal/POS)
+  externalOrderId?: string | null; // Platform's order ID
   tenantId: string;
   createdAt: string;
   updatedAt: string;
@@ -269,6 +271,53 @@ export enum OrderType {
   DINE_IN = 'DINE_IN',
   TAKEAWAY = 'TAKEAWAY',
   DELIVERY = 'DELIVERY',
+}
+
+export enum DeliveryPlatform {
+  YEMEKSEPETI = 'YEMEKSEPETI',
+  GETIR = 'GETIR',
+  TRENDYOL = 'TRENDYOL',
+  MIGROS = 'MIGROS',
+}
+
+export interface DeliveryPlatformConfig {
+  id: string;
+  platform: string;
+  isEnabled: boolean;
+  credentials?: Record<string, any>;
+  accessToken?: string;
+  tokenExpiresAt?: string;
+  remoteRestaurantId?: string;
+  restaurantOpen: boolean;
+  lastOrderPollAt?: string;
+  lastMenuSyncAt?: string;
+  lastError?: string;
+  lastErrorAt?: string;
+  errorCount: number;
+  autoAccept: boolean;
+  notifySound?: string;
+  tenantId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DeliveryPlatformLog {
+  id: string;
+  platform: string;
+  direction: string;
+  action: string;
+  orderId?: string;
+  externalId?: string;
+  request?: any;
+  response?: any;
+  statusCode?: number;
+  success: boolean;
+  error?: string;
+  retryCount: number;
+  maxRetries: number;
+  nextRetryAt?: string;
+  tenantId: string;
+  createdAt: string;
 }
 
 export interface CreateOrderItemDto {
@@ -492,6 +541,7 @@ export interface PlanFeatures {
   inventoryTracking: boolean;
   kdsIntegration: boolean;
   reservationSystem: boolean;
+  personnelManagement: boolean;
 }
 
 export interface Plan {
@@ -1001,6 +1051,153 @@ export interface ReservationStats {
   cancelled: number;
   noShow: number;
   rejected: number;
+}
+
+// ========================================
+// PERSONNEL MANAGEMENT TYPES
+// ========================================
+
+export enum AttendanceStatus {
+  CLOCKED_IN = 'CLOCKED_IN',
+  ON_BREAK = 'ON_BREAK',
+  CLOCKED_OUT = 'CLOCKED_OUT',
+}
+
+export enum ShiftAssignmentStatus {
+  SCHEDULED = 'SCHEDULED',
+  COMPLETED = 'COMPLETED',
+  MISSED = 'MISSED',
+  SWAPPED = 'SWAPPED',
+}
+
+export enum SwapRequestStatus {
+  PENDING = 'PENDING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+}
+
+export interface Attendance {
+  id: string;
+  date: string;
+  clockIn: string;
+  clockOut?: string;
+  breakStart?: string;
+  breakEnd?: string;
+  totalWorkedMinutes: number;
+  totalBreakMinutes: number;
+  overtimeMinutes: number;
+  status: AttendanceStatus | string;
+  isLate: boolean;
+  lateMinutes: number;
+  notes?: string;
+  shiftAssignmentId?: string;
+  shiftAssignment?: ShiftAssignment;
+  userId: string;
+  user?: { id: string; firstName: string; lastName: string; role: string };
+  tenantId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShiftTemplate {
+  id: string;
+  name: string;
+  startTime: string;
+  endTime: string;
+  color: string;
+  gracePeriodMinutes: number;
+  isActive: boolean;
+  tenantId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShiftAssignment {
+  id: string;
+  date: string;
+  status: ShiftAssignmentStatus | string;
+  notes?: string;
+  userId: string;
+  user?: { id: string; firstName: string; lastName: string; role: string };
+  shiftTemplateId: string;
+  shiftTemplate?: ShiftTemplate;
+  tenantId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShiftSwapRequest {
+  id: string;
+  status: SwapRequestStatus | string;
+  reason?: string;
+  requesterId: string;
+  requester?: { id: string; firstName: string; lastName: string };
+  targetId: string;
+  target?: { id: string; firstName: string; lastName: string };
+  requesterAssignmentId: string;
+  requesterAssignment?: ShiftAssignment;
+  targetAssignmentId: string;
+  approvedById?: string;
+  approvedBy?: { id: string; firstName: string; lastName: string };
+  tenantId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AttendanceSummary {
+  user: { id: string; firstName: string; lastName: string; role: string };
+  totalDays: number;
+  totalWorkedMinutes: number;
+  totalBreakMinutes: number;
+  totalOvertimeMinutes: number;
+  lateDays: number;
+  totalLateMinutes: number;
+}
+
+export interface PerformanceMetrics {
+  user: { id: string; firstName: string; lastName: string; role: string };
+  totalOrders: number;
+  totalSales: number;
+  avgOrderValue: number;
+  avgPrepTime: number;
+  totalHours: number;
+  ordersPerHour: number;
+  performanceScore: number;
+}
+
+export interface PerformanceTrend {
+  month: string;
+  label: string;
+  totalOrders: number;
+  totalSales: number;
+  avgOrderValue: number;
+  totalHours: number;
+  ordersPerHour: number;
+}
+
+export interface CreateShiftTemplateDto {
+  name: string;
+  startTime: string;
+  endTime: string;
+  color?: string;
+  gracePeriodMinutes?: number;
+  isActive?: boolean;
+}
+
+export interface UpdateShiftTemplateDto extends Partial<CreateShiftTemplateDto> {}
+
+export interface AssignShiftDto {
+  userId: string;
+  shiftTemplateId: string;
+  date: string;
+  notes?: string;
+}
+
+export interface CreateSwapRequestDto {
+  targetId: string;
+  requesterAssignmentId: string;
+  targetAssignmentId: string;
+  reason?: string;
 }
 
 // Re-export hardware types

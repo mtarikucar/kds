@@ -34,13 +34,15 @@ export class ReportsService {
       },
       _sum: {
         finalAmount: true,
+        discount: true,
       },
       _count: true,
     });
 
     const totalSales = Number(orderStats._sum.finalAmount || 0);
-    const orderCount = orderStats._count;
-    const averageOrderValue = orderCount > 0 ? totalSales / orderCount : 0;
+    const totalOrders = orderStats._count;
+    const averageOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
+    const totalDiscount = Number(orderStats._sum.discount || 0);
 
     // Get payment method breakdown
     const paymentBreakdown = await this.prisma.payment.groupBy({
@@ -64,15 +66,46 @@ export class ReportsService {
 
     const paymentMethodBreakdown = paymentBreakdown.map((pm) => ({
       method: pm.method,
-      totalAmount: Number(pm._sum.amount || 0),
+      total: Number(pm._sum.amount || 0),
       count: pm._count,
     }));
 
+    // Get daily sales breakdown
+    const paidOrders = await this.prisma.order.findMany({
+      where: {
+        tenantId,
+        status: OrderStatus.PAID,
+        createdAt: {
+          gte: dateRange.start,
+          lte: dateRange.end,
+        },
+      },
+      select: {
+        createdAt: true,
+        finalAmount: true,
+      },
+    });
+
+    const dailyMap = new Map<string, { sales: number; orders: number }>();
+    paidOrders.forEach((order) => {
+      const dateKey = order.createdAt.toISOString().slice(0, 10);
+      const existing = dailyMap.get(dateKey) || { sales: 0, orders: 0 };
+      existing.sales += Number(order.finalAmount);
+      existing.orders += 1;
+      dailyMap.set(dateKey, existing);
+    });
+
+    const dailySales = Array.from(dailyMap.entries())
+      .map(([date, data]) => ({ date, sales: data.sales, orders: data.orders }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
     return {
       totalSales,
-      orderCount,
+      totalOrders,
       averageOrderValue,
+      totalDiscount,
       paymentMethodBreakdown,
+      dailySales,
       startDate: dateRange.start,
       endDate: dateRange.end,
     };

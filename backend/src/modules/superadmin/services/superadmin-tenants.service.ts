@@ -368,6 +368,7 @@ export class SuperAdminTenantsService {
       inventoryTracking: plan.inventoryTracking,
       kdsIntegration: plan.kdsIntegration,
       reservationSystem: plan.reservationSystem,
+      personnelManagement: plan.personnelManagement,
     } : {};
 
     const planLimits = plan ? {

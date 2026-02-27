@@ -174,6 +174,11 @@ export default function PlansPage() {
                   Reservations
                 </span>
               )}
+              {plan.personnelManagement && (
+                <span className="px-2 py-0.5 text-xs bg-zinc-100 text-zinc-700 rounded">
+                  Personnel
+                </span>
+              )}
             </div>
 
             {plan.isDiscountActive && plan.discountStartDate && plan.discountEndDate && (
@@ -236,6 +241,7 @@ function PlanModal({
     inventoryTracking: plan?.inventoryTracking || false,
     kdsIntegration: plan?.kdsIntegration ?? true,
     reservationSystem: plan?.reservationSystem || false,
+    personnelManagement: plan?.personnelManagement || false,
     isActive: plan?.isActive ?? true,
     discountPercentage: plan?.discountPercentage || 0,
     discountLabel: plan?.discountLabel || '',
@@ -438,6 +444,15 @@ function PlanModal({
                   className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
                 />
                 <span className="text-sm text-zinc-700">Reservations</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={formData.personnelManagement}
+                  onChange={(e) => setFormData({ ...formData, personnelManagement: e.target.checked })}
+                  className="w-4 h-4 rounded border-zinc-300 text-zinc-900 focus:ring-zinc-900"
+                />
+                <span className="text-sm text-zinc-700">Personnel Management</span>
               </label>
               <label className="flex items-center gap-2">
                 <input

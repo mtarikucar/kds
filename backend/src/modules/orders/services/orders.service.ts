@@ -4,6 +4,7 @@ import {
   BadRequestException,
   Inject,
   forwardRef,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateOrderDto } from '../dto/create-order.dto';
@@ -14,6 +15,8 @@ import { OrderStatus, StockMovementType } from '../../../common/constants/order-
 import { validateTransition } from '../../../common/utils/order-state-machine';
 import { TableStatus } from '../../tables/dto/create-table.dto';
 import { KdsGateway } from '../../kds/kds.gateway';
+import { DeliveryStatusSyncService } from '../../delivery-platforms/services/delivery-status-sync.service';
+import { StockDeductionService } from '../../stock-management/services/stock-deduction.service';
 import { withTransaction, addBreadcrumb } from '../../../common/utils/tracing';
 
 @Injectable()
@@ -22,6 +25,12 @@ export class OrdersService {
     private prisma: PrismaService,
     @Inject(forwardRef(() => KdsGateway))
     private kdsGateway: KdsGateway,
+    @Optional()
+    @Inject(forwardRef(() => DeliveryStatusSyncService))
+    private deliveryStatusSync?: DeliveryStatusSyncService,
+    @Optional()
+    @Inject(forwardRef(() => StockDeductionService))
+    private stockDeductionService?: StockDeductionService,
   ) {}
 
   private generateOrderNumber(): string {
@@ -215,6 +224,16 @@ export class OrdersService {
 
         // Emit new order to kitchen via WebSocket
         this.kdsGateway.emitNewOrder(tenantId, createdOrder);
+
+        // Auto-deduct ingredients if configured
+        if (this.stockDeductionService) {
+          try {
+            await this.stockDeductionService.deductForOrder(createdOrder.id, tenantId);
+          } catch (error) {
+            // Log but don't block order creation
+            console.error(`[OrdersService] Ingredient deduction failed for order ${createdOrder.orderNumber}:`, error.message);
+          }
+        }
 
         addBreadcrumb('Order created successfully', 'order', { orderId: createdOrder.id, orderNumber: createdOrder.orderNumber });
         return createdOrder;
@@ -539,8 +558,20 @@ export class OrdersService {
       }
     }
 
+    // Reverse ingredient deductions on cancellation
+    if (updateStatusDto.status === OrderStatus.CANCELLED && this.stockDeductionService) {
+      try {
+        await this.stockDeductionService.reverseForOrder(id, tenantId);
+      } catch (error) {
+        console.error(`[OrdersService] Ingredient deduction reversal failed for order ${id}:`, error.message);
+      }
+    }
+
     // Emit status change via WebSocket
     this.kdsGateway.emitOrderStatusChange(tenantId, id, updateStatusDto.status);
+
+    // Sync status to delivery platform (if applicable)
+    this.deliveryStatusSync?.syncStatusToPlatform(id, updateStatusDto.status).catch(() => {});
 
     return updatedOrder;
   }
@@ -683,6 +714,9 @@ export class OrdersService {
     if (updatedOrder.sessionId) {
       this.kdsGateway.emitCustomerOrderApproved(updatedOrder.sessionId, updatedOrder);
     }
+
+    // Sync approval to delivery platform (accepts the order on the platform)
+    this.deliveryStatusSync?.syncStatusToPlatform(orderId, OrderStatus.PENDING).catch(() => {});
 
     return updatedOrder;
   }

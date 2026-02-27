@@ -12,24 +12,22 @@ export interface ZReport {
   id: string;
   reportNumber: string;
   reportDate: string;
-  status: 'GENERATED' | 'CLOSED';
   totalOrders: number;
-  grossSales: number;
-  discounts: number;
+  totalSales: number;
+  totalDiscount: number;
   netSales: number;
-  taxAmount: number;
   cashPayments: number;
   cardPayments: number;
   digitalPayments: number;
-  cashDrawerOpening: number;
-  cashDrawerClosing: number;
+  openingCash: number;
+  countedCash: number;
   expectedCash: number;
   cashDifference: number;
+  pdfExported: boolean;
   notes?: string;
   topProducts?: Array<{ name: string; quantity: number; revenue: number }>;
-  cashMovements?: Array<any>;
+  staffPerformance?: Array<any>;
   createdAt: string;
-  closedAt?: string;
 }
 
 export interface ZReportsListResponse {
@@ -99,8 +97,19 @@ export function useCloseZReport() {
 /**
  * Download Z-Report PDF
  */
-export function downloadZReportPdf(id: string, reportNumber: string) {
-  window.open(`${api.defaults.baseURL}/z-reports/${id}/pdf`, '_blank');
+export async function downloadZReportPdf(id: string, reportNumber: string) {
+  const response = await api.get(`/z-reports/${id}/pdf`, {
+    responseType: 'blob',
+  });
+  const blob = new Blob([response.data], { type: 'application/pdf' });
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${reportNumber}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
 }
 
 /**

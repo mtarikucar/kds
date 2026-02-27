@@ -63,6 +63,8 @@ export class PlanResponseDto {
     prioritySupport: boolean;
     inventoryTracking: boolean;
     kdsIntegration: boolean;
+    reservationSystem: boolean;
+    personnelManagement: boolean;
   };
 
   isActive: boolean;

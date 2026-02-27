@@ -75,24 +75,49 @@ export class ZReportsService {
     const netSales = orders.reduce((sum, order) => sum + Number(order.finalAmount), 0);
 
     // Calculate payment method breakdown
-    const cashPayments = orders
-      .flatMap((o) => o.payments)
-      .filter((p) => p.method === 'CASH')
-      .reduce((sum, p) => sum + Number(p.amount), 0);
+    const allPayments = orders.flatMap((o) => o.payments);
 
-    const cardPayments = orders
-      .flatMap((o) => o.payments)
-      .filter((p) => p.method === 'CARD')
-      .reduce((sum, p) => sum + Number(p.amount), 0);
+    const cashPaymentsList = allPayments.filter((p) => p.method === 'CASH');
+    const cashPayments = cashPaymentsList.reduce((sum, p) => sum + Number(p.amount), 0);
+    const cashPaymentCount = cashPaymentsList.length;
 
-    const digitalPayments = orders
-      .flatMap((o) => o.payments)
-      .filter((p) => p.method === 'DIGITAL')
-      .reduce((sum, p) => sum + Number(p.amount), 0);
+    const cardPaymentsList = allPayments.filter((p) => p.method === 'CARD');
+    const cardPayments = cardPaymentsList.reduce((sum, p) => sum + Number(p.amount), 0);
+    const cardPaymentCount = cardPaymentsList.length;
 
-    // Calculate tax (assuming 10% for simplicity - should be configurable)
-    const taxRate = 0.10;
-    const taxAmount = netSales * taxRate;
+    const digitalPaymentsList = allPayments.filter((p) => p.method === 'DIGITAL');
+    const digitalPayments = digitalPaymentsList.reduce((sum, p) => sum + Number(p.amount), 0);
+    const digitalPaymentCount = digitalPaymentsList.length;
+
+    // Order type breakdown
+    const dineInOrders = orders.filter((o) => o.type === 'DINE_IN');
+    const dineInSales = dineInOrders.reduce((sum, o) => sum + Number(o.finalAmount), 0);
+
+    const takeawayOrders = orders.filter((o) => o.type === 'TAKEAWAY');
+    const takeawaySales = takeawayOrders.reduce((sum, o) => sum + Number(o.finalAmount), 0);
+
+    const deliveryOrders = orders.filter((o) => o.type === 'DELIVERY');
+    const deliverySales = deliveryOrders.reduce((sum, o) => sum + Number(o.finalAmount), 0);
+
+    // Cancelled orders in the date range
+    const cancelledOrdersList = await this.prisma.order.findMany({
+      where: {
+        tenantId,
+        createdAt: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+        status: 'CANCELLED',
+      },
+      select: {
+        totalAmount: true,
+      },
+    });
+    const cancelledOrders = cancelledOrdersList.length;
+    const cancelledOrdersAmount = cancelledOrdersList.reduce(
+      (sum, o) => sum + Number(o.totalAmount),
+      0,
+    );
 
     // Cash drawer reconciliation
     const expectedCash = cashDrawerOpening + cashPayments;
@@ -153,8 +178,23 @@ export class ZReportsService {
 
         // Payment breakdown
         cashPayments,
+        cashPaymentCount,
         cardPayments,
+        cardPaymentCount,
         digitalPayments,
+        digitalPaymentCount,
+
+        // Order type breakdown
+        dineInSales,
+        dineInOrders: dineInOrders.length,
+        takeawaySales,
+        takeawayOrders: takeawayOrders.length,
+        deliverySales,
+        deliveryOrders: deliveryOrders.length,
+
+        // Cancelled orders
+        cancelledOrders,
+        cancelledOrdersAmount,
 
         // Cash drawer
         openingCash: cashDrawerOpening,
@@ -261,31 +301,34 @@ export class ZReportsService {
       doc.text(`Generated: ${report.createdAt.toLocaleString()}`);
       doc.moveDown();
 
+      // Get currency symbol
+      const currencySymbol = CURRENCY_SYMBOLS[tenant.currency] || '$';
+
       // Sales Summary
       doc.fontSize(14).text('Sales Summary', { underline: true });
       doc.fontSize(10);
       doc.text(`Total Orders: ${report.totalOrders}`);
-      doc.text(`Total Sales: $${report.totalSales.toFixed(2)}`);
-      doc.text(`Discounts: $${report.totalDiscount.toFixed(2)}`);
-      doc.text(`Net Sales: $${report.netSales.toFixed(2)}`);
+      doc.text(`Total Sales: ${currencySymbol}${report.totalSales.toFixed(2)}`);
+      doc.text(`Discounts: ${currencySymbol}${report.totalDiscount.toFixed(2)}`);
+      doc.text(`Net Sales: ${currencySymbol}${report.netSales.toFixed(2)}`);
       doc.moveDown();
 
       // Payment Methods
       doc.fontSize(14).text('Payment Methods', { underline: true });
       doc.fontSize(10);
-      doc.text(`Cash: $${report.cashPayments.toFixed(2)}`);
-      doc.text(`Card: $${report.cardPayments.toFixed(2)}`);
-      doc.text(`Digital: $${report.digitalPayments.toFixed(2)}`);
+      doc.text(`Cash: ${currencySymbol}${report.cashPayments.toFixed(2)}`);
+      doc.text(`Card: ${currencySymbol}${report.cardPayments.toFixed(2)}`);
+      doc.text(`Digital: ${currencySymbol}${report.digitalPayments.toFixed(2)}`);
       doc.moveDown();
 
       // Cash Drawer
       doc.fontSize(14).text('Cash Drawer Reconciliation', { underline: true });
       doc.fontSize(10);
-      doc.text(`Opening Balance: $${report.openingCash.toFixed(2)}`);
-      doc.text(`Cash Sales: $${report.cashPayments.toFixed(2)}`);
-      doc.text(`Expected Cash: $${report.expectedCash.toFixed(2)}`);
-      doc.text(`Actual Cash: $${report.countedCash.toFixed(2)}`);
-      doc.text(`Difference: $${report.cashDifference.toFixed(2)}`, {
+      doc.text(`Opening Balance: ${currencySymbol}${report.openingCash.toFixed(2)}`);
+      doc.text(`Cash Sales: ${currencySymbol}${report.cashPayments.toFixed(2)}`);
+      doc.text(`Expected Cash: ${currencySymbol}${report.expectedCash.toFixed(2)}`);
+      doc.text(`Actual Cash: ${currencySymbol}${report.countedCash.toFixed(2)}`);
+      doc.text(`Difference: ${currencySymbol}${report.cashDifference.toFixed(2)}`, {
         continued: true,
       });
 

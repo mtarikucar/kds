@@ -18,6 +18,8 @@ import enValidation from './locales/en/validation.json';
 import enErrors from './locales/en/errors.json';
 import enOnboarding from './locales/en/onboarding.json';
 import enReservations from './locales/en/reservations.json';
+import enPersonnel from './locales/en/personnel.json';
+import enStock from './locales/en/stock.json';
 
 import trCommon from './locales/tr/common.json';
 import trAuth from './locales/tr/auth.json';
@@ -33,6 +35,8 @@ import trValidation from './locales/tr/validation.json';
 import trErrors from './locales/tr/errors.json';
 import trOnboarding from './locales/tr/onboarding.json';
 import trReservations from './locales/tr/reservations.json';
+import trPersonnel from './locales/tr/personnel.json';
+import trStock from './locales/tr/stock.json';
 
 import ruCommon from './locales/ru/common.json';
 import ruAuth from './locales/ru/auth.json';
@@ -48,6 +52,8 @@ import ruValidation from './locales/ru/validation.json';
 import ruErrors from './locales/ru/errors.json';
 import ruOnboarding from './locales/ru/onboarding.json';
 import ruReservations from './locales/ru/reservations.json';
+import ruPersonnel from './locales/ru/personnel.json';
+import ruStock from './locales/ru/stock.json';
 
 import uzCommon from './locales/uz/common.json';
 import uzAuth from './locales/uz/auth.json';
@@ -63,6 +69,8 @@ import uzValidation from './locales/uz/validation.json';
 import uzErrors from './locales/uz/errors.json';
 import uzOnboarding from './locales/uz/onboarding.json';
 import uzReservations from './locales/uz/reservations.json';
+import uzPersonnel from './locales/uz/personnel.json';
+import uzStock from './locales/uz/stock.json';
 
 import arCommon from './locales/ar/common.json';
 import arAuth from './locales/ar/auth.json';
@@ -78,6 +86,8 @@ import arValidation from './locales/ar/validation.json';
 import arErrors from './locales/ar/errors.json';
 import arOnboarding from './locales/ar/onboarding.json';
 import arReservations from './locales/ar/reservations.json';
+import arPersonnel from './locales/ar/personnel.json';
+import arStock from './locales/ar/stock.json';
 
 // Define resources
 const resources = {
@@ -96,6 +106,8 @@ const resources = {
     errors: enErrors,
     onboarding: enOnboarding,
     reservations: enReservations,
+    personnel: enPersonnel,
+    stock: enStock,
   },
   tr: {
     common: trCommon,
@@ -112,6 +124,8 @@ const resources = {
     errors: trErrors,
     onboarding: trOnboarding,
     reservations: trReservations,
+    personnel: trPersonnel,
+    stock: trStock,
   },
   ru: {
     common: ruCommon,
@@ -128,6 +142,8 @@ const resources = {
     errors: ruErrors,
     onboarding: ruOnboarding,
     reservations: ruReservations,
+    personnel: ruPersonnel,
+    stock: ruStock,
   },
   uz: {
     common: uzCommon,
@@ -144,6 +160,8 @@ const resources = {
     errors: uzErrors,
     onboarding: uzOnboarding,
     reservations: uzReservations,
+    personnel: uzPersonnel,
+    stock: uzStock,
   },
   ar: {
     common: arCommon,
@@ -160,6 +178,8 @@ const resources = {
     errors: arErrors,
     onboarding: arOnboarding,
     reservations: arReservations,
+    personnel: arPersonnel,
+    stock: arStock,
   },
 };
 
@@ -244,7 +264,7 @@ i18next
     lng: getInitialLanguage(),
     fallbackLng: 'en',
     defaultNS: 'common',
-    ns: ['common', 'auth', 'pos', 'kitchen', 'menu', 'orders', 'customers', 'settings', 'subscriptions', 'reports', 'validation', 'errors', 'onboarding', 'reservations'],
+    ns: ['common', 'auth', 'pos', 'kitchen', 'menu', 'orders', 'customers', 'settings', 'subscriptions', 'reports', 'validation', 'errors', 'onboarding', 'reservations', 'personnel', 'stock'],
     interpolation: {
       escapeValue: false, // React already escapes values
     },

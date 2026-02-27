@@ -29,6 +29,7 @@ const FEATURE_LABELS: Record<string, string> = {
   inventoryTracking: 'Inventory Tracking',
   kdsIntegration: 'KDS Integration',
   reservationSystem: 'Reservation System',
+  personnelManagement: 'Personnel Management',
 };
 
 const LIMIT_LABELS: Record<string, string> = {

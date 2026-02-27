@@ -14,7 +14,7 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Modal from '../ui/Modal';
 import Spinner from '../ui/Spinner';
-import { formatCurrency } from '../../lib/utils';
+import { useFormatCurrency } from '../../hooks/useFormatCurrency';
 import {
   FileText,
   Download,
@@ -33,6 +33,7 @@ import { toast } from 'sonner';
 const ZReportsSection = () => {
   const { t } = useTranslation(['reports', 'common']);
   const queryClient = useQueryClient();
+  const formatCurrency = useFormatCurrency();
 
   const [page, setPage] = useState(1);
   const [dateFilter, setDateFilter] = useState({ startDate: '', endDate: '' });
@@ -213,7 +214,7 @@ const ZReportsSection = () => {
                       </td>
                       <td className="py-3 px-4 text-right">{report.totalOrders}</td>
                       <td className="py-3 px-4 text-center">
-                        {report.status === 'CLOSED' ? (
+                        {report.pdfExported ? (
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                             <CheckCircle className="w-3 h-3 mr-1" />
                             {t('zReports.finalized', 'Finalized')}
@@ -337,11 +338,11 @@ const ZReportsSection = () => {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-slate-600">{t('zReports.grossSales', 'Gross Sales')}</span>
-                  <span className="font-medium">{formatCurrency(selectedReport.grossSales)}</span>
+                  <span className="font-medium">{formatCurrency(selectedReport.totalSales)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600">{t('zReports.discounts', 'Discounts')}</span>
-                  <span className="font-medium text-red-600">-{formatCurrency(selectedReport.discounts)}</span>
+                  <span className="font-medium text-red-600">-{formatCurrency(selectedReport.totalDiscount)}</span>
                 </div>
                 <div className="flex justify-between border-t pt-2 mt-2">
                   <span className="font-semibold">{t('zReports.netSales', 'Net Sales')}</span>
@@ -387,7 +388,7 @@ const ZReportsSection = () => {
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span className="text-slate-600">{t('zReports.opening', 'Opening')}</span>
-                  <span className="font-medium">{formatCurrency(selectedReport.cashDrawerOpening)}</span>
+                  <span className="font-medium">{formatCurrency(selectedReport.openingCash)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600">{t('zReports.expected', 'Expected')}</span>
@@ -395,7 +396,7 @@ const ZReportsSection = () => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-600">{t('zReports.counted', 'Counted')}</span>
-                  <span className="font-medium">{formatCurrency(selectedReport.cashDrawerClosing)}</span>
+                  <span className="font-medium">{formatCurrency(selectedReport.countedCash)}</span>
                 </div>
                 <div className="flex justify-between border-t pt-2 mt-2">
                   <span className="font-semibold">{t('zReports.difference', 'Difference')}</span>

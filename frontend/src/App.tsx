@@ -44,6 +44,8 @@ import QRManagementPage from './pages/admin/QRManagementPage';
 import ReportsPage from './pages/admin/ReportsPage';
 import AnalyticsPage from './pages/admin/AnalyticsPage';
 import ReservationsPage from './pages/admin/ReservationsPage';
+import PersonnelManagementPage from './pages/admin/PersonnelManagementPage';
+import StockManagementPage from './pages/admin/StockManagementPage';
 import SubscriptionPlansPage from './pages/subscription/SubscriptionPlansPage';
 import ChangePlanPage from './pages/subscription/ChangePlanPage';
 import SubscriptionContactPage from './pages/subscription/SubscriptionContactPage';
@@ -56,6 +58,7 @@ import SubscriptionSettingsPage from './pages/settings/SubscriptionSettingsPage'
 import IntegrationsSettingsPage from './pages/settings/IntegrationsSettingsPage';
 import DesktopAppSettingsPage from './pages/settings/DesktopAppSettingsPage';
 import ReservationSettingsPage from './pages/settings/ReservationSettingsPage';
+import DeliveryPlatformsSettingsPage from './pages/settings/DeliveryPlatformsSettingsPage';
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { UpdateDialog } from './components/UpdateDialog';
@@ -157,6 +160,8 @@ function App() {
         <Route path="/admin/reports" element={<ReportsPage />} />
         <Route path="/admin/analytics" element={<AnalyticsPage />} />
         <Route path="/admin/reservations" element={<ReservationsPage />} />
+        <Route path="/admin/personnel" element={<PersonnelManagementPage />} />
+        <Route path="/admin/stock" element={<StockManagementPage />} />
 
         {/* Settings Routes - Nested */}
         <Route path="/admin/settings" element={<SettingsLayout />}>
@@ -169,6 +174,7 @@ function App() {
           <Route path="desktop" element={<DesktopAppSettingsPage />} />
           <Route path="integrations" element={<IntegrationsSettingsPage />} />
           <Route path="reservations" element={<ReservationSettingsPage />} />
+          <Route path="online-orders" element={<DeliveryPlatformsSettingsPage />} />
         </Route>
 
         {/* Dev-only routes */}

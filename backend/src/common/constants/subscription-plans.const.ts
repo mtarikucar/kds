@@ -24,6 +24,7 @@ export interface PlanConfig {
     inventoryTracking: boolean;
     kdsIntegration: boolean;
     reservationSystem: boolean;
+    personnelManagement: boolean;
   };
 }
 
@@ -52,6 +53,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       inventoryTracking: false,
       kdsIntegration: true,
       reservationSystem: false,
+      personnelManagement: false,
     },
   },
   [SubscriptionPlanType.BASIC]: {
@@ -78,6 +80,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       inventoryTracking: true,
       kdsIntegration: true,
       reservationSystem: false,
+      personnelManagement: false,
     },
   },
   [SubscriptionPlanType.PRO]: {
@@ -104,6 +107,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       inventoryTracking: true,
       kdsIntegration: true,
       reservationSystem: true,
+      personnelManagement: true,
     },
   },
   [SubscriptionPlanType.BUSINESS]: {
@@ -130,6 +134,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       inventoryTracking: true,
       kdsIntegration: true,
       reservationSystem: true,
+      personnelManagement: true,
     },
   },
 };

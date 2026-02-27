@@ -2,18 +2,25 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Inject,
+  forwardRef,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrderStatus } from '../../common/constants/order-status.enum';
 import { validateTransition } from '../../common/utils/order-state-machine';
 import { UpdateOrderItemStatusDto, OrderItemStatus } from './dto/update-order-item-status.dto';
 import { KdsGateway } from './kds.gateway';
+import { DeliveryStatusSyncService } from '../delivery-platforms/services/delivery-status-sync.service';
 
 @Injectable()
 export class KdsService {
   constructor(
     private prisma: PrismaService,
     private kdsGateway: KdsGateway,
+    @Optional()
+    @Inject(forwardRef(() => DeliveryStatusSyncService))
+    private deliveryStatusSync?: DeliveryStatusSyncService,
   ) {}
 
   async getKitchenOrders(tenantId: string) {
@@ -96,6 +103,9 @@ export class KdsService {
 
     // Emit status change via WebSocket
     this.kdsGateway.emitOrderStatusChange(tenantId, id, status);
+
+    // Sync status to delivery platform (if applicable)
+    this.deliveryStatusSync?.syncStatusToPlatform(id, status).catch(() => {});
 
     return updatedOrder;
   }
@@ -188,6 +198,9 @@ export class KdsService {
 
     // Emit status change via WebSocket
     this.kdsGateway.emitOrderStatusChange(tenantId, id, OrderStatus.CANCELLED);
+
+    // Sync cancellation to delivery platform (if applicable)
+    this.deliveryStatusSync?.syncStatusToPlatform(id, OrderStatus.CANCELLED).catch(() => {});
 
     return updatedOrder;
   }

@@ -17,6 +17,8 @@ import {
   X,
   Code,
   CalendarCheck,
+  UserCog,
+  Package,
 } from 'lucide-react';
 import { UserRole, PlanFeatures } from '../../types';
 import { useAuthStore } from '../../store/authStore';
@@ -98,6 +100,20 @@ const Sidebar = ({ isOpen, onClose, isRTL: isRTLProp }: SidebarProps) => {
       label: t('navigation.reservations'),
       roles: [UserRole.ADMIN, UserRole.MANAGER],
       requiredFeature: 'reservationSystem' as keyof PlanFeatures,
+    },
+    {
+      to: '/admin/personnel',
+      icon: UserCog,
+      label: t('navigation.personnel'),
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
+      requiredFeature: 'personnelManagement' as keyof PlanFeatures,
+    },
+    {
+      to: '/admin/stock',
+      icon: Package,
+      label: t('navigation.stock'),
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
+      requiredFeature: 'inventoryTracking' as keyof PlanFeatures,
     },
     {
       to: '/admin/reports',

@@ -157,6 +157,8 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       approvedAt: order.approvedAt,
       approvedById: order.approvedById,
       approvedBy: order.approvedBy,
+      source: order.source || null,
+      externalOrderId: order.externalOrderId || null,
       tenantId: order.tenantId,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
@@ -189,6 +191,8 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       approvedAt: order.approvedAt,
       approvedById: order.approvedById,
       approvedBy: order.approvedBy,
+      source: order.source || null,
+      externalOrderId: order.externalOrderId || null,
       tenantId: order.tenantId,
       createdAt: order.createdAt,
       updatedAt: order.updatedAt,
@@ -377,6 +381,32 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     this.logger.log(
       `New waiter request emitted for table ${waiterRequest.table?.number || waiterRequest.tableId} to pos-${tenantId}`
+    );
+  }
+
+  // ========================================
+  // PERSONNEL MANAGEMENT EVENTS
+  // ========================================
+
+  emitAttendanceUpdate(tenantId: string, data: any) {
+    this.server.to(`pos-${tenantId}`).emit('personnel:attendance-update', {
+      ...data,
+      timestamp: new Date(),
+    });
+
+    this.logger.log(
+      `Personnel attendance update emitted to pos-${tenantId}`
+    );
+  }
+
+  emitSwapRequestUpdate(tenantId: string, data: any) {
+    this.server.to(`pos-${tenantId}`).emit('personnel:swap-request-update', {
+      ...data,
+      timestamp: new Date(),
+    });
+
+    this.logger.log(
+      `Personnel swap request update emitted to pos-${tenantId}`
     );
   }
 

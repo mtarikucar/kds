@@ -64,7 +64,7 @@ superAdminApi.interceptors.response.use(
           return superAdminApi(originalRequest);
         } catch (refreshError) {
           useSuperAdminAuthStore.getState().logout();
-          window.location.href = '/superadmin/login';
+          window.location.href = import.meta.env.BASE_URL + 'superadmin/login';
         }
       }
     }
@@ -463,6 +463,7 @@ export const useChangeSubscriptionPlan = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['superadmin', 'subscriptions'] });
       queryClient.invalidateQueries({ queryKey: ['superadmin', 'tenants'] });
+      queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
     },
   });
 };

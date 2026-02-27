@@ -4,7 +4,72 @@
     "qrMenu": "QR Menü",
     "reports": "Raporlar",
     "branding": "Marka",
-    "reservations": "Rezervasyonlar"
+    "reservations": "Rezervasyonlar",
+    "onlineOrders": "Online Siparişler"
+  },
+  "onlineOrders": {
+    "title": "Online Sipariş Platformları",
+    "description": "Restoranınızı teslimat platformlarına bağlayarak siparişleri doğrudan mutfak ekranınıza alın.",
+    "activityLog": "Aktivite Günlüğü",
+    "activityLogDescription": "Son sipariş senkronizasyon aktivitelerini görüntüleyin ve entegrasyon sorunlarını giderin.",
+    "loadError": "Platform yapılandırmaları yüklenemedi.",
+    "status": {
+      "connecting": "Bağlanıyor",
+      "notConfigured": "Yapılandırılmadı",
+      "disabled": "Devre Dışı",
+      "missingCredentials": "Kimlik Bilgileri Eksik",
+      "circuitOpen": "Devre Açık",
+      "errors": "Hatalar ({{count}})",
+      "connected": "Bağlı"
+    },
+    "credentials": {
+      "restaurantId": "Restoran ID (platform üzerinde)",
+      "restaurantIdPlaceholder": "Platformdaki restoran/satıcı ID'si"
+    },
+    "autoAccept": "Siparişleri otomatik kabul et",
+    "autoAcceptDescription": "Gelen siparişleri personel onayı olmadan otomatik kabul et",
+    "lastError": "Son Hata",
+    "save": "Kaydet",
+    "testConnection": "Bağlantıyı Test Et",
+    "openRestaurant": "Restoranı Aç",
+    "closeRestaurant": "Restoranı Kapat",
+    "lastPoll": "Son yoklama",
+    "lastMenuSync": "Son menü senkronizasyonu",
+    "never": "Hiç",
+    "fillCredentials": "Lütfen etkinleştirmeden önce gerekli kimlik bilgilerini doldurun.",
+    "fillCredentialsFirst": "Lütfen önce gerekli kimlik bilgilerini doldurun.",
+    "logs": {
+      "all": "Tümü",
+      "success": "Başarılı",
+      "failed": "Başarısız",
+      "loadingLogs": "Günlükler yükleniyor...",
+      "noEntries": "Günlük kaydı bulunamadı",
+      "platform": "Platform",
+      "statusCode": "Durum Kodu",
+      "orderId": "Sipariş ID",
+      "error": "Hata",
+      "retries": "Yeniden Denemeler",
+      "showing": "{{total}} kaydın {{count}} tanesi gösteriliyor",
+      "na": "Yok",
+      "previous": "Önceki",
+      "next": "Sonraki"
+    },
+    "toast": {
+      "configCreated": "Platform yapılandırması oluşturuldu",
+      "configCreateFailed": "Platform yapılandırması oluşturulamadı",
+      "configUpdated": "Platform yapılandırması güncellendi",
+      "configUpdateFailed": "Platform yapılandırması güncellenemedi",
+      "configDeleted": "Platform yapılandırması silindi",
+      "configDeleteFailed": "Platform yapılandırması silinemedi",
+      "connectionSuccess": "Bağlantı başarılı",
+      "connectionFailed": "Bağlantı başarısız",
+      "connectionTestFailed": "Bağlantı testi başarısız",
+      "restaurantOpened": "Restoran platformda açıldı",
+      "restaurantClosed": "Restoran platformda kapatıldı",
+      "toggleFailed": "Restoran durumu değiştirilemedi",
+      "menuSyncStarted": "Menü senkronizasyonu başlatıldı",
+      "menuSyncFailed": "Menü senkronizasyonu başarısız"
+    }
   },
   "autoSave": {
     "idle": "Değişiklik yok",
