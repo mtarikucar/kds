@@ -4,7 +4,72 @@
     "qrMenu": "QR Menu",
     "reports": "Reports",
     "branding": "Branding",
-    "reservations": "Reservations"
+    "reservations": "Reservations",
+    "onlineOrders": "Онлайн-заказы"
+  },
+  "onlineOrders": {
+    "title": "Платформы онлайн-заказов",
+    "description": "Подключите ваш ресторан к платформам доставки, чтобы получать заказы прямо в систему кухонного дисплея.",
+    "activityLog": "Журнал активности",
+    "activityLogDescription": "Просмотр недавней активности синхронизации заказов и устранение проблем интеграции.",
+    "loadError": "Не удалось загрузить конфигурации платформ.",
+    "status": {
+      "connecting": "Подключение",
+      "notConfigured": "Не настроено",
+      "disabled": "Отключено",
+      "missingCredentials": "Отсутствуют учетные данные",
+      "circuitOpen": "Цепь разомкнута",
+      "errors": "Ошибки ({{count}})",
+      "connected": "Подключено"
+    },
+    "credentials": {
+      "restaurantId": "ID ресторана (на платформе)",
+      "restaurantIdPlaceholder": "ID ресторана/поставщика на платформе"
+    },
+    "autoAccept": "Автоприем заказов",
+    "autoAcceptDescription": "Автоматически принимать входящие заказы без одобрения персонала",
+    "lastError": "Последняя ошибка",
+    "save": "Сохранить",
+    "testConnection": "Проверить подключение",
+    "openRestaurant": "Открыть ресторан",
+    "closeRestaurant": "Закрыть ресторан",
+    "lastPoll": "Последний опрос",
+    "lastMenuSync": "Последняя синхронизация меню",
+    "never": "Никогда",
+    "fillCredentials": "Пожалуйста, заполните необходимые учетные данные перед включением.",
+    "fillCredentialsFirst": "Пожалуйста, сначала заполните необходимые учетные данные.",
+    "logs": {
+      "all": "Все",
+      "success": "Успешно",
+      "failed": "Неудачно",
+      "loadingLogs": "Загрузка журналов...",
+      "noEntries": "Записи не найдены",
+      "platform": "Платформа",
+      "statusCode": "Код статуса",
+      "orderId": "ID заказа",
+      "error": "Ошибка",
+      "retries": "Повторы",
+      "showing": "Показано {{count}} из {{total}} записей",
+      "na": "Н/Д",
+      "previous": "Предыдущая",
+      "next": "Следующая"
+    },
+    "toast": {
+      "configCreated": "Конфигурация платформы создана",
+      "configCreateFailed": "Не удалось создать конфигурацию платформы",
+      "configUpdated": "Конфигурация платформы обновлена",
+      "configUpdateFailed": "Не удалось обновить конфигурацию платформы",
+      "configDeleted": "Конфигурация платформы удалена",
+      "configDeleteFailed": "Не удалось удалить конфигурацию платформы",
+      "connectionSuccess": "Подключение успешно",
+      "connectionFailed": "Подключение не удалось",
+      "connectionTestFailed": "Проверка подключения не удалась",
+      "restaurantOpened": "Ресторан открыт на платформе",
+      "restaurantClosed": "Ресторан закрыт на платформе",
+      "toggleFailed": "Не удалось переключить статус ресторана",
+      "menuSyncStarted": "Синхронизация меню запущена",
+      "menuSyncFailed": "Синхронизация меню не удалась"
+    }
   },
   "autoSave": {
     "idle": "Нет изменений",

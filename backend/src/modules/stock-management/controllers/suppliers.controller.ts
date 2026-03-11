@@ -5,13 +5,17 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '../../../common/constants/roles.enum';
+import { PlanFeatureGuard } from '../../subscriptions/guards/plan-feature.guard';
+import { RequiresFeature } from '../../subscriptions/decorators/requires-feature.decorator';
+import { PlanFeature } from '../../../common/constants/subscription.enum';
 import { SuppliersService } from '../services/suppliers.service';
 import { CreateSupplierDto, UpdateSupplierDto, SupplierStockItemDto } from '../dto/create-supplier.dto';
 
 @ApiTags('stock-management/suppliers')
 @ApiBearerAuth()
 @Controller('stock-management/suppliers')
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@RequiresFeature(PlanFeature.INVENTORY_TRACKING)
 export class SuppliersController {
   constructor(private readonly service: SuppliersService) {}
 

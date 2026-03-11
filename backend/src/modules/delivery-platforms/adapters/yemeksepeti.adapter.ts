@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DeliveryPlatformConfig } from '@prisma/client';
 import { DeliveryPlatform } from '../constants/platform.enum';
 import {
@@ -11,8 +12,9 @@ import { BaseAdapter } from './base.adapter';
 
 @Injectable()
 export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
-  constructor() {
+  constructor(private configService: ConfigService) {
     super('YemeksepetiAdapter', 'https://middleware-api.yemeksepeti.com');
+    this.overrideBaseURL(this.configService.get<string>('YEMEKSEPETI_API_BASE_URL'));
   }
 
   async authenticate(config: DeliveryPlatformConfig): Promise<AuthResult> {

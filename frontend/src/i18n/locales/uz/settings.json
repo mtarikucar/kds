@@ -4,7 +4,72 @@
     "qrMenu": "QR Menu",
     "reports": "Reports",
     "branding": "Branding",
-    "reservations": "Reservations"
+    "reservations": "Reservations",
+    "onlineOrders": "Onlayn buyurtmalar"
+  },
+  "onlineOrders": {
+    "title": "Onlayn buyurtma platformalari",
+    "description": "Restoraningizni yetkazib berish platformalariga ulang va buyurtmalarni to'g'ridan-to'g'ri oshxona displey tizimida qabul qiling.",
+    "activityLog": "Faoliyat jurnali",
+    "activityLogDescription": "So'nggi buyurtma sinxronlash faoliyatini ko'ring va integratsiya muammolarini bartaraf eting.",
+    "loadError": "Platforma konfiguratsiyalarini yuklab bo'lmadi.",
+    "status": {
+      "connecting": "Ulanmoqda",
+      "notConfigured": "Sozlanmagan",
+      "disabled": "O'chirilgan",
+      "missingCredentials": "Hisob ma'lumotlari yo'q",
+      "circuitOpen": "Zanjir ochiq",
+      "errors": "Xatolar ({{count}})",
+      "connected": "Ulangan"
+    },
+    "credentials": {
+      "restaurantId": "Restoran ID (platformada)",
+      "restaurantIdPlaceholder": "Platformadagi restoran/sotuvchi ID"
+    },
+    "autoAccept": "Buyurtmalarni avtomatik qabul qilish",
+    "autoAcceptDescription": "Kiruvchi buyurtmalarni xodimlar roziligisiz avtomatik qabul qilish",
+    "lastError": "Oxirgi xato",
+    "save": "Saqlash",
+    "testConnection": "Ulanishni sinash",
+    "openRestaurant": "Restoranni ochish",
+    "closeRestaurant": "Restoranni yopish",
+    "lastPoll": "Oxirgi so'rov",
+    "lastMenuSync": "Oxirgi menyu sinxronlash",
+    "never": "Hech qachon",
+    "fillCredentials": "Iltimos, yoqishdan oldin kerakli hisob ma'lumotlarini to'ldiring.",
+    "fillCredentialsFirst": "Iltimos, avval kerakli hisob ma'lumotlarini to'ldiring.",
+    "logs": {
+      "all": "Barchasi",
+      "success": "Muvaffaqiyatli",
+      "failed": "Muvaffaqiyatsiz",
+      "loadingLogs": "Jurnallar yuklanmoqda...",
+      "noEntries": "Jurnal yozuvlari topilmadi",
+      "platform": "Platforma",
+      "statusCode": "Holat kodi",
+      "orderId": "Buyurtma ID",
+      "error": "Xato",
+      "retries": "Qayta urinishlar",
+      "showing": "{{total}} dan {{count}} ta yozuv ko'rsatilmoqda",
+      "na": "M/E",
+      "previous": "Oldingi",
+      "next": "Keyingi"
+    },
+    "toast": {
+      "configCreated": "Platforma konfiguratsiyasi yaratildi",
+      "configCreateFailed": "Platforma konfiguratsiyasini yaratib bo'lmadi",
+      "configUpdated": "Platforma konfiguratsiyasi yangilandi",
+      "configUpdateFailed": "Platforma konfiguratsiyasini yangilab bo'lmadi",
+      "configDeleted": "Platforma konfiguratsiyasi o'chirildi",
+      "configDeleteFailed": "Platforma konfiguratsiyasini o'chirib bo'lmadi",
+      "connectionSuccess": "Ulanish muvaffaqiyatli",
+      "connectionFailed": "Ulanish muvaffaqiyatsiz",
+      "connectionTestFailed": "Ulanish sinovi muvaffaqiyatsiz",
+      "restaurantOpened": "Restoran platformada ochildi",
+      "restaurantClosed": "Restoran platformada yopildi",
+      "toggleFailed": "Restoran holatini almashtirib bo'lmadi",
+      "menuSyncStarted": "Menyu sinxronlash boshlandi",
+      "menuSyncFailed": "Menyu sinxronlash muvaffaqiyatsiz"
+    }
   },
   "autoSave": {
     "idle": "O'zgarishlar yo'q",

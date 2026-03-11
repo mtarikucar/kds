@@ -5,13 +5,17 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '../../../common/constants/roles.enum';
+import { PlanFeatureGuard } from '../../subscriptions/guards/plan-feature.guard';
+import { RequiresFeature } from '../../subscriptions/decorators/requires-feature.decorator';
+import { PlanFeature } from '../../../common/constants/subscription.enum';
 import { IngredientMovementsService } from '../services/ingredient-movements.service';
 import { CreateIngredientMovementDto } from '../dto/create-ingredient-movement.dto';
 
 @ApiTags('stock-management/movements')
 @ApiBearerAuth()
 @Controller('stock-management/movements')
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@RequiresFeature(PlanFeature.INVENTORY_TRACKING)
 export class IngredientMovementsController {
   constructor(private readonly service: IngredientMovementsService) {}
 

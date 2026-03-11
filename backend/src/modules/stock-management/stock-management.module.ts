@@ -1,5 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { KdsModule } from '../kds/kds.module';
 
 // Controllers
 import { StockItemCategoriesController } from './controllers/stock-item-categories.controller';
@@ -30,7 +32,8 @@ import { StockDashboardService } from './services/stock-dashboard.service';
 @Module({
   imports: [
     PrismaModule,
-    forwardRef(() => import('../kds/kds.module').then(m => m.KdsModule)),
+    SubscriptionsModule,
+    forwardRef(() => KdsModule),
   ],
   controllers: [
     StockItemCategoriesController,

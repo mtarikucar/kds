@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as crypto from 'crypto';
+import { timingSafeEqual, createHmac } from 'crypto';
 
 @Injectable()
 export class WebhookAuthGuard implements CanActivate {
@@ -53,12 +53,13 @@ export class WebhookAuthGuard implements CanActivate {
       }
 
       const [header, payload, signature] = parts;
-      const expectedSignature = crypto
-        .createHmac('sha512', webhookSecret)
+      const expectedSignature = createHmac('sha512', webhookSecret)
         .update(`${header}.${payload}`)
         .digest('base64url');
 
-      if (signature !== expectedSignature) {
+      const sigBuf = Buffer.from(signature, 'utf8');
+      const expBuf = Buffer.from(expectedSignature, 'utf8');
+      if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) {
         throw new Error('Invalid signature');
       }
 
@@ -80,34 +81,28 @@ export class WebhookAuthGuard implements CanActivate {
   }
 
   private validateTrendyolWebhook(request: any): boolean {
-    const signature = request.headers['x-webhook-signature'];
-    if (!signature) {
-      // Trendyol v1 may not use signatures - allow if configured
-      const webhookSecret = this.configService.get<string>(
-        'TRENDYOL_WEBHOOK_SECRET',
-      );
-      if (!webhookSecret) {
-        this.logger.warn('TRENDYOL_WEBHOOK_SECRET not configured — skipping signature validation (Trendyol v1 compatibility)');
-        return true; // No secret configured = no validation required
-      }
-      throw new UnauthorizedException('Missing webhook signature');
-    }
-
     const webhookSecret = this.configService.get<string>(
       'TRENDYOL_WEBHOOK_SECRET',
     );
+
     if (!webhookSecret) {
-      this.logger.warn('TRENDYOL_WEBHOOK_SECRET not configured — skipping signature validation');
-      return true;
+      this.logger.error('TRENDYOL_WEBHOOK_SECRET not configured — rejecting webhook');
+      throw new UnauthorizedException('Webhook secret not configured');
+    }
+
+    const signature = request.headers['x-webhook-signature'];
+    if (!signature) {
+      throw new UnauthorizedException('Missing webhook signature');
     }
 
     const body = JSON.stringify(request.body);
-    const expectedSignature = crypto
-      .createHmac('sha256', webhookSecret)
+    const expectedSignature = createHmac('sha256', webhookSecret)
       .update(body)
       .digest('hex');
 
-    if (signature !== expectedSignature) {
+    const sigBuf = Buffer.from(signature, 'utf8');
+    const expBuf = Buffer.from(expectedSignature, 'utf8');
+    if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) {
       throw new UnauthorizedException('Invalid webhook signature');
     }
 

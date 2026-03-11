@@ -5,6 +5,7 @@ import {
   Inject,
   forwardRef,
   Optional,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrderStatus } from '../../common/constants/order-status.enum';
@@ -15,6 +16,8 @@ import { DeliveryStatusSyncService } from '../delivery-platforms/services/delive
 
 @Injectable()
 export class KdsService {
+  private readonly logger = new Logger(KdsService.name);
+
   constructor(
     private prisma: PrismaService,
     private kdsGateway: KdsGateway,
@@ -105,7 +108,9 @@ export class KdsService {
     this.kdsGateway.emitOrderStatusChange(tenantId, id, status);
 
     // Sync status to delivery platform (if applicable)
-    this.deliveryStatusSync?.syncStatusToPlatform(id, status).catch(() => {});
+    this.deliveryStatusSync?.syncStatusToPlatform(id, status).catch((err) => {
+      this.logger.error(`Delivery platform sync failed for order ${id}: ${err.message}`);
+    });
 
     return updatedOrder;
   }
@@ -200,7 +205,9 @@ export class KdsService {
     this.kdsGateway.emitOrderStatusChange(tenantId, id, OrderStatus.CANCELLED);
 
     // Sync cancellation to delivery platform (if applicable)
-    this.deliveryStatusSync?.syncStatusToPlatform(id, OrderStatus.CANCELLED).catch(() => {});
+    this.deliveryStatusSync?.syncStatusToPlatform(id, OrderStatus.CANCELLED).catch((err) => {
+      this.logger.error(`Delivery platform sync failed for order ${id}: ${err.message}`);
+    });
 
     return updatedOrder;
   }

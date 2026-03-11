@@ -1,13 +1,23 @@
 import { Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 
 export abstract class BaseAdapter {
   protected readonly logger: Logger;
   protected readonly httpClient: AxiosInstance;
+  protected readonly baseURL: string;
 
-  constructor(name: string, baseURL: string, timeout = 10_000) {
+  constructor(name: string, defaultBaseURL: string, timeout = 10_000) {
     this.logger = new Logger(name);
-    this.httpClient = axios.create({ baseURL, timeout });
+    this.baseURL = defaultBaseURL;
+    this.httpClient = axios.create({ baseURL: defaultBaseURL, timeout });
+  }
+
+  /** Allow overriding baseURL from env (call in subclass constructor if ConfigService is available) */
+  protected overrideBaseURL(url: string | undefined) {
+    if (url) {
+      this.httpClient.defaults.baseURL = url;
+    }
   }
 
   protected async request<T = any>(
