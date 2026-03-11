@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { useStockItems } from '../stockManagementApi';
 import { type Recipe } from '../types';
@@ -28,7 +29,9 @@ const RecipeForm = ({ recipe, onSave, onClose, isLoading }: Props) => {
   });
 
   useEffect(() => {
-    api.get('/menu/products').then((res) => setProducts(res.data)).catch(() => {});
+    api.get('/menu/products').then((res) => setProducts(res.data)).catch(() => {
+      toast.error(t('common.loadError'));
+    });
   }, []);
 
   const addIngredient = () => {

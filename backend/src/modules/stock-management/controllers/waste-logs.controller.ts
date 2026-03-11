@@ -5,13 +5,17 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '../../../common/constants/roles.enum';
+import { PlanFeatureGuard } from '../../subscriptions/guards/plan-feature.guard';
+import { RequiresFeature } from '../../subscriptions/decorators/requires-feature.decorator';
+import { PlanFeature } from '../../../common/constants/subscription.enum';
 import { WasteLogsService } from '../services/waste-logs.service';
 import { CreateWasteLogDto } from '../dto/create-waste-log.dto';
 
 @ApiTags('stock-management/waste-logs')
 @ApiBearerAuth()
 @Controller('stock-management/waste-logs')
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@RequiresFeature(PlanFeature.INVENTORY_TRACKING)
 export class WasteLogsController {
   constructor(private readonly service: WasteLogsService) {}
 

@@ -4,7 +4,72 @@
     "qrMenu": "QR Menu",
     "reports": "Reports",
     "branding": "Branding",
-    "reservations": "Reservations"
+    "reservations": "Reservations",
+    "onlineOrders": "الطلبات عبر الإنترنت"
+  },
+  "onlineOrders": {
+    "title": "منصات الطلبات عبر الإنترنت",
+    "description": "اربط مطعمك بمنصات التوصيل لاستقبال الطلبات مباشرة في نظام عرض المطبخ.",
+    "activityLog": "سجل النشاط",
+    "activityLogDescription": "عرض نشاط مزامنة الطلبات الأخير واستكشاف مشاكل التكامل.",
+    "loadError": "فشل تحميل إعدادات المنصات.",
+    "status": {
+      "connecting": "جاري الاتصال",
+      "notConfigured": "غير مُعدّ",
+      "disabled": "معطّل",
+      "missingCredentials": "بيانات الاعتماد مفقودة",
+      "circuitOpen": "الدائرة مفتوحة",
+      "errors": "أخطاء ({{count}})",
+      "connected": "متصل"
+    },
+    "credentials": {
+      "restaurantId": "معرّف المطعم (على المنصة)",
+      "restaurantIdPlaceholder": "معرّف المطعم/البائع على المنصة"
+    },
+    "autoAccept": "قبول الطلبات تلقائياً",
+    "autoAcceptDescription": "قبول الطلبات الواردة تلقائياً بدون موافقة الموظفين",
+    "lastError": "آخر خطأ",
+    "save": "حفظ",
+    "testConnection": "اختبار الاتصال",
+    "openRestaurant": "فتح المطعم",
+    "closeRestaurant": "إغلاق المطعم",
+    "lastPoll": "آخر استعلام",
+    "lastMenuSync": "آخر مزامنة للقائمة",
+    "never": "أبداً",
+    "fillCredentials": "يرجى ملء بيانات الاعتماد المطلوبة قبل التفعيل.",
+    "fillCredentialsFirst": "يرجى ملء بيانات الاعتماد المطلوبة أولاً.",
+    "logs": {
+      "all": "الكل",
+      "success": "ناجح",
+      "failed": "فاشل",
+      "loadingLogs": "جاري تحميل السجلات...",
+      "noEntries": "لم يتم العثور على سجلات",
+      "platform": "المنصة",
+      "statusCode": "رمز الحالة",
+      "orderId": "معرّف الطلب",
+      "error": "خطأ",
+      "retries": "إعادة المحاولات",
+      "showing": "عرض {{count}} من {{total}} سجل",
+      "na": "غ/م",
+      "previous": "السابق",
+      "next": "التالي"
+    },
+    "toast": {
+      "configCreated": "تم إنشاء إعدادات المنصة",
+      "configCreateFailed": "فشل إنشاء إعدادات المنصة",
+      "configUpdated": "تم تحديث إعدادات المنصة",
+      "configUpdateFailed": "فشل تحديث إعدادات المنصة",
+      "configDeleted": "تم حذف إعدادات المنصة",
+      "configDeleteFailed": "فشل حذف إعدادات المنصة",
+      "connectionSuccess": "تم الاتصال بنجاح",
+      "connectionFailed": "فشل الاتصال",
+      "connectionTestFailed": "فشل اختبار الاتصال",
+      "restaurantOpened": "تم فتح المطعم على المنصة",
+      "restaurantClosed": "تم إغلاق المطعم على المنصة",
+      "toggleFailed": "فشل تبديل حالة المطعم",
+      "menuSyncStarted": "بدأت مزامنة القائمة",
+      "menuSyncFailed": "فشلت مزامنة القائمة"
+    }
   },
   "autoSave": {
     "idle": "لا تغييرات",

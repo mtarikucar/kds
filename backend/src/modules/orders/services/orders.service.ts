@@ -14,6 +14,7 @@ import { TransferTableOrdersDto } from '../dto/transfer-table.dto';
 import { OrderStatus, StockMovementType } from '../../../common/constants/order-status.enum';
 import { validateTransition } from '../../../common/utils/order-state-machine';
 import { TableStatus } from '../../tables/dto/create-table.dto';
+import { Logger } from '@nestjs/common';
 import { KdsGateway } from '../../kds/kds.gateway';
 import { DeliveryStatusSyncService } from '../../delivery-platforms/services/delivery-status-sync.service';
 import { StockDeductionService } from '../../stock-management/services/stock-deduction.service';
@@ -21,6 +22,8 @@ import { withTransaction, addBreadcrumb } from '../../../common/utils/tracing';
 
 @Injectable()
 export class OrdersService {
+  private readonly logger = new Logger(OrdersService.name);
+
   constructor(
     private prisma: PrismaService,
     @Inject(forwardRef(() => KdsGateway))
@@ -229,9 +232,11 @@ export class OrdersService {
         if (this.stockDeductionService) {
           try {
             await this.stockDeductionService.deductForOrder(createdOrder.id, tenantId);
-          } catch (error) {
-            // Log but don't block order creation
-            console.error(`[OrdersService] Ingredient deduction failed for order ${createdOrder.orderNumber}:`, error.message);
+          } catch (error: any) {
+            this.logger.error(
+              `Ingredient deduction failed for order ${createdOrder.orderNumber}: ${error.message}`,
+              error.stack,
+            );
           }
         }
 
@@ -273,7 +278,6 @@ export class OrdersService {
       }
     }
 
-    console.log('[Orders Service] Where clause:', JSON.stringify(where, null, 2));
 
     const orders = await this.prisma.order.findMany({
       where,
@@ -320,7 +324,6 @@ export class OrdersService {
       orderBy: { createdAt: 'desc' },
     });
 
-    console.log('[Orders Service] Found orders:', orders.length, 'orders with statuses:', orders.map(o => o.status));
 
     return orders;
   }
@@ -562,8 +565,11 @@ export class OrdersService {
     if (updateStatusDto.status === OrderStatus.CANCELLED && this.stockDeductionService) {
       try {
         await this.stockDeductionService.reverseForOrder(id, tenantId);
-      } catch (error) {
-        console.error(`[OrdersService] Ingredient deduction reversal failed for order ${id}:`, error.message);
+      } catch (error: any) {
+        this.logger.error(
+          `Ingredient deduction reversal failed for order ${id}: ${error.message}`,
+          error.stack,
+        );
       }
     }
 
@@ -571,7 +577,9 @@ export class OrdersService {
     this.kdsGateway.emitOrderStatusChange(tenantId, id, updateStatusDto.status);
 
     // Sync status to delivery platform (if applicable)
-    this.deliveryStatusSync?.syncStatusToPlatform(id, updateStatusDto.status).catch(() => {});
+    this.deliveryStatusSync?.syncStatusToPlatform(id, updateStatusDto.status).catch((err) => {
+      this.logger.error(`Delivery platform sync failed for order ${id}: ${err.message}`);
+    });
 
     return updatedOrder;
   }
@@ -716,7 +724,9 @@ export class OrdersService {
     }
 
     // Sync approval to delivery platform (accepts the order on the platform)
-    this.deliveryStatusSync?.syncStatusToPlatform(orderId, OrderStatus.PENDING).catch(() => {});
+    this.deliveryStatusSync?.syncStatusToPlatform(orderId, OrderStatus.PENDING).catch((err) => {
+      this.logger.error(`Delivery platform sync failed for order ${orderId}: ${err.message}`);
+    });
 
     return updatedOrder;
   }

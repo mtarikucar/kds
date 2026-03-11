@@ -45,7 +45,8 @@ export class DeliveryLogService {
       });
     } catch (error: any) {
       this.logger.error(`Failed to create log entry: ${error.message}`, error.stack);
-      return null;
+      // Re-throw so callers are aware logging failed
+      throw error;
     }
   }
 

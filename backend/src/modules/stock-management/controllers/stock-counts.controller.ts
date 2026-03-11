@@ -5,6 +5,9 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '../../../common/constants/roles.enum';
+import { PlanFeatureGuard } from '../../subscriptions/guards/plan-feature.guard';
+import { RequiresFeature } from '../../subscriptions/decorators/requires-feature.decorator';
+import { PlanFeature } from '../../../common/constants/subscription.enum';
 import { StockCountsService } from '../services/stock-counts.service';
 import { CreateStockCountDto } from '../dto/create-stock-count.dto';
 import { UpdateStockCountItemDto } from '../dto/update-stock-count-item.dto';
@@ -12,7 +15,8 @@ import { UpdateStockCountItemDto } from '../dto/update-stock-count-item.dto';
 @ApiTags('stock-management/stock-counts')
 @ApiBearerAuth()
 @Controller('stock-management/stock-counts')
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@RequiresFeature(PlanFeature.INVENTORY_TRACKING)
 export class StockCountsController {
   constructor(private readonly service: StockCountsService) {}
 

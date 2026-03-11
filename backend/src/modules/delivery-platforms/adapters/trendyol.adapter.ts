@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DeliveryPlatformConfig } from '@prisma/client';
 import { DeliveryPlatform } from '../constants/platform.enum';
 import {
@@ -11,8 +12,9 @@ import { BaseAdapter } from './base.adapter';
 
 @Injectable()
 export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
-  constructor() {
+  constructor(private configService: ConfigService) {
     super('TrendyolAdapter', 'https://api.trendyol.com/yemek');
+    this.overrideBaseURL(this.configService.get<string>('TRENDYOL_API_BASE_URL'));
   }
 
   async authenticate(config: DeliveryPlatformConfig): Promise<AuthResult> {
