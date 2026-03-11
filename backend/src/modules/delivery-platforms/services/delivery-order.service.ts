@@ -71,15 +71,16 @@ export class DeliveryOrderService {
       // Build order items - map to internal products when possible
       const orderItems = normalizedOrder.items.map((item) => {
         const mapping = mappingByExternalId.get(item.externalItemId);
+        const modifierTotal = (item.modifiers || []).reduce(
+          (sum, m) => sum + m.price * m.quantity,
+          0,
+        );
         return {
           productId: mapping?.productId || null,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
-          subtotal: item.quantity * item.unitPrice,
-          modifierTotal: (item.modifiers || []).reduce(
-            (sum, m) => sum + m.price * m.quantity,
-            0,
-          ),
+          subtotal: item.quantity * item.unitPrice + modifierTotal,
+          modifierTotal,
           notes: item.notes
             ? `${item.name}${mapping ? '' : ' (unmapped)'}: ${item.notes}`
             : !mapping
@@ -104,7 +105,7 @@ export class DeliveryOrderService {
         where: { tenantId_platform: { tenantId, platform } },
       });
 
-      const autoAccept = config?.autoAccept ?? true;
+      const autoAccept = config?.isEnabled ? (config.autoAccept ?? false) : false;
 
       // Generate order number
       const orderNumber = `${platform.substring(0, 3)}-${Date.now()}-${crypto.randomUUID().substring(0, 8)}`;
@@ -195,7 +196,7 @@ export class DeliveryOrderService {
     const config = await this.prisma.deliveryPlatformConfig.findUnique({
       where: { tenantId_platform: { tenantId, platform } },
     });
-    const autoAccept = config?.autoAccept ?? true;
+    const autoAccept = config?.isEnabled ? (config.autoAccept ?? false) : false;
 
     // 5. If autoAccept, also accept on the platform side
     if (autoAccept && config) {

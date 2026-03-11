@@ -369,6 +369,7 @@ export class SuperAdminTenantsService {
       kdsIntegration: plan.kdsIntegration,
       reservationSystem: plan.reservationSystem,
       personnelManagement: plan.personnelManagement,
+      deliveryIntegration: plan.deliveryIntegration,
     } : {};
 
     const planLimits = plan ? {

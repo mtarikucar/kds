@@ -15,14 +15,36 @@ export class DeliveryConfigService {
     private adapterFactory: AdapterFactory,
   ) {}
 
+  private stripSensitiveFields(config: any) {
+    const { credentials, accessToken, ...safe } = config;
+    return {
+      ...safe,
+      hasCredentials: !!credentials,
+      hasAccessToken: !!accessToken,
+    };
+  }
+
   async findAll(tenantId: string) {
-    return this.prisma.deliveryPlatformConfig.findMany({
+    const configs = await this.prisma.deliveryPlatformConfig.findMany({
       where: { tenantId },
       orderBy: { platform: 'asc' },
     });
+    return configs.map((c) => this.stripSensitiveFields(c));
   }
 
   async findOne(tenantId: string, platform: string) {
+    const config = await this.prisma.deliveryPlatformConfig.findUnique({
+      where: { tenantId_platform: { tenantId, platform } },
+    });
+    if (!config) {
+      throw new NotFoundException(
+        `Configuration for ${platform} not found`,
+      );
+    }
+    return this.stripSensitiveFields(config);
+  }
+
+  async findOneInternal(tenantId: string, platform: string) {
     const config = await this.prisma.deliveryPlatformConfig.findUnique({
       where: { tenantId_platform: { tenantId, platform } },
     });
@@ -57,19 +79,52 @@ export class DeliveryConfigService {
       );
     }
 
+    // Prevent duplicate remoteRestaurantId per platform (cross-tenant collision)
+    if (dto.remoteRestaurantId) {
+      const conflict = await this.prisma.deliveryPlatformConfig.findFirst({
+        where: {
+          platform: dto.platform,
+          remoteRestaurantId: dto.remoteRestaurantId,
+          isEnabled: true,
+        },
+      });
+      if (conflict) {
+        throw new ConflictException(
+          `Remote restaurant ID "${dto.remoteRestaurantId}" is already registered for ${dto.platform}`,
+        );
+      }
+    }
+
     return this.prisma.deliveryPlatformConfig.create({
       data: {
         tenantId,
         platform: dto.platform,
         credentials: dto.credentials || undefined,
         remoteRestaurantId: dto.remoteRestaurantId,
-        autoAccept: dto.autoAccept ?? true,
+        autoAccept: dto.autoAccept ?? false,
       },
     });
   }
 
   async update(tenantId: string, platform: string, dto: UpdatePlatformConfigDto) {
-    const config = await this.findOne(tenantId, platform);
+    const config = await this.findOneInternal(tenantId, platform);
+
+    // Prevent cross-tenant remoteRestaurantId collision on update
+    if (dto.remoteRestaurantId && dto.remoteRestaurantId !== config.remoteRestaurantId) {
+      const conflict = await this.prisma.deliveryPlatformConfig.findFirst({
+        where: {
+          platform,
+          remoteRestaurantId: dto.remoteRestaurantId,
+          isEnabled: true,
+          id: { not: config.id },
+        },
+      });
+      if (conflict) {
+        throw new ConflictException(
+          `Remote restaurant ID "${dto.remoteRestaurantId}" is already registered for ${platform}`,
+        );
+      }
+    }
 
     const data: any = {};
     if (dto.isEnabled !== undefined) data.isEnabled = dto.isEnabled;
@@ -85,13 +140,13 @@ export class DeliveryConfigService {
   }
 
   async testConnection(tenantId: string, platform: string) {
-    const config = await this.findOne(tenantId, platform);
+    const config = await this.findOneInternal(tenantId, platform);
     const adapter = this.adapterFactory.getAdapter(platform);
     return adapter.testConnection(config);
   }
 
   async toggleRestaurant(tenantId: string, platform: string, open: boolean) {
-    const config = await this.findOne(tenantId, platform);
+    const config = await this.findOneInternal(tenantId, platform);
     const adapter = this.adapterFactory.getAdapter(platform);
 
     if (open && adapter.openRestaurant) {
@@ -149,7 +204,7 @@ export class DeliveryConfigService {
   }
 
   async delete(tenantId: string, platform: string) {
-    const config = await this.findOne(tenantId, platform);
+    const config = await this.findOneInternal(tenantId, platform);
     return this.prisma.deliveryPlatformConfig.delete({
       where: { id: config.id },
     });

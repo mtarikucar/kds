@@ -27,6 +27,9 @@ export class ShiftSwapService {
     if (!requesterAssignment) {
       throw new NotFoundException('Requester shift assignment not found');
     }
+    if (requesterAssignment.status === 'SWAPPED') {
+      throw new BadRequestException('Requester assignment has already been swapped');
+    }
 
     // Validate target assignment belongs to target
     const targetAssignment = await this.prisma.shiftAssignment.findFirst({
@@ -34,6 +37,9 @@ export class ShiftSwapService {
     });
     if (!targetAssignment) {
       throw new NotFoundException('Target shift assignment not found');
+    }
+    if (targetAssignment.status === 'SWAPPED') {
+      throw new BadRequestException('Target assignment has already been swapped');
     }
 
     const result = await this.prisma.shiftSwapRequest.create({

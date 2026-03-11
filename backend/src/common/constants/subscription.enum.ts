@@ -53,6 +53,7 @@ export enum PlanFeature {
   KDS_INTEGRATION = 'kdsIntegration',
   RESERVATION_SYSTEM = 'reservationSystem',
   PERSONNEL_MANAGEMENT = 'personnelManagement',
+  DELIVERY_INTEGRATION = 'deliveryIntegration',
 }
 
 export enum TenantStatus {

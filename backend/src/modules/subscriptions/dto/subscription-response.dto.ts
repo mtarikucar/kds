@@ -65,6 +65,7 @@ export class PlanResponseDto {
     kdsIntegration: boolean;
     reservationSystem: boolean;
     personnelManagement: boolean;
+    deliveryIntegration: boolean;
   };
 
   isActive: boolean;

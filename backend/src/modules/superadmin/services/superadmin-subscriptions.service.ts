@@ -53,6 +53,7 @@ export class SuperAdminSubscriptionsService {
         kdsIntegration: createDto.kdsIntegration ?? true,
         reservationSystem: createDto.reservationSystem || false,
         personnelManagement: createDto.personnelManagement || false,
+        deliveryIntegration: createDto.deliveryIntegration || false,
         isActive: createDto.isActive ?? true,
       },
     });
@@ -107,6 +108,7 @@ export class SuperAdminSubscriptionsService {
         kdsIntegration: updateDto.kdsIntegration,
         reservationSystem: updateDto.reservationSystem,
         personnelManagement: updateDto.personnelManagement,
+        deliveryIntegration: updateDto.deliveryIntegration,
         isActive: updateDto.isActive,
       },
     });

@@ -610,6 +610,7 @@ model SubscriptionPlan {
   kdsIntegration     Boolean @default(true)
   reservationSystem      Boolean @default(false)
   personnelManagement    Boolean @default(false)
+  deliveryIntegration    Boolean @default(false)
 
   // Discount settings
   discountPercentage   Int?       // Discount percentage (e.g., 25 for 25%)
@@ -2438,8 +2439,9 @@ model ShiftAssignment {
   updatedAt DateTime @updatedAt
 
   // Relations
-  attendances  Attendance[]
-  swapRequests ShiftSwapRequest[]
+  attendances           Attendance[]
+  swapRequestsRequester ShiftSwapRequest[] @relation("SwapRequester")
+  swapRequestsTarget    ShiftSwapRequest[] @relation("SwapTarget")
 
   @@unique([userId, date])
   @@index([tenantId])
@@ -2461,9 +2463,10 @@ model ShiftSwapRequest {
   target                 User            @relation("SwapTarget", fields: [targetId], references: [id], onDelete: Cascade)
 
   requesterAssignmentId  String
-  requesterAssignment    ShiftAssignment @relation(fields: [requesterAssignmentId], references: [id], onDelete: Cascade)
+  requesterAssignment    ShiftAssignment @relation("SwapRequester", fields: [requesterAssignmentId], references: [id], onDelete: Cascade)
 
   targetAssignmentId     String
+  targetAssignment       ShiftAssignment @relation("SwapTarget", fields: [targetAssignmentId], references: [id], onDelete: Cascade)
 
   approvedById           String?
   approvedBy             User?           @relation("SwapApprover", fields: [approvedById], references: [id], onDelete: SetNull)

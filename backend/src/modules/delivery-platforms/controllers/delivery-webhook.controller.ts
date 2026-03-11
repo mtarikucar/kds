@@ -7,6 +7,7 @@ import {
   Logger,
   HttpCode,
   HttpStatus,
+  HttpException,
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
@@ -61,7 +62,11 @@ export class DeliveryWebhookController {
         normalizedOrder,
       );
 
-      return { status: 'ok', orderId: order.id };
+      if (!order) {
+        return { status: 'ok', message: 'duplicate order ignored' };
+      }
+
+      return { status: 'ok' };
     } catch (error: any) {
       this.logger.error(
         `Failed to process Yemeksepeti webhook: ${error.message}`,
@@ -79,7 +84,10 @@ export class DeliveryWebhookController {
         nextRetryAt: new Date(Date.now() + 60_000),
       });
 
-      return { status: 'error', message: error.message };
+      throw new HttpException(
+        { status: 'error', message: 'Order processing failed' },
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
     }
   }
 
@@ -135,7 +143,11 @@ export class DeliveryWebhookController {
         normalizedOrder,
       );
 
-      return { status: 'ok', orderId: order.id };
+      if (!order) {
+        return { status: 'ok', message: 'duplicate order ignored' };
+      }
+
+      return { status: 'ok' };
     } catch (error: any) {
       this.logger.error(
         `Failed to process Trendyol webhook: ${error.message}`,
@@ -153,7 +165,10 @@ export class DeliveryWebhookController {
         nextRetryAt: new Date(Date.now() + 60_000),
       });
 
-      return { status: 'error', message: error.message };
+      throw new HttpException(
+        { status: 'error', message: 'Order processing failed' },
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
     }
   }
 }
