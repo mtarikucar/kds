@@ -721,6 +721,7 @@ export class SubscriptionService {
           kdsIntegration: plan.kdsIntegration,
           reservationSystem: plan.reservationSystem,
           personnelManagement: plan.personnelManagement,
+          deliveryIntegration: plan.deliveryIntegration,
         },
         // Discount information
         discount: isDiscountActive ? {
@@ -764,6 +765,7 @@ export class SubscriptionService {
       kdsIntegration: featureOverrides?.kdsIntegration ?? plan.kdsIntegration,
       reservationSystem: featureOverrides?.reservationSystem ?? plan.reservationSystem,
       personnelManagement: featureOverrides?.personnelManagement ?? plan.personnelManagement,
+      deliveryIntegration: featureOverrides?.deliveryIntegration ?? plan.deliveryIntegration,
     };
 
     const limits = {

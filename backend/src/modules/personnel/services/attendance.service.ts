@@ -53,23 +53,31 @@ export class AttendanceService {
       }
     }
 
-    const result = await this.prisma.attendance.create({
-      data: {
-        date: today,
-        clockIn: now,
-        status: AttendanceStatus.CLOCKED_IN,
-        isLate,
-        lateMinutes,
-        notes,
-        shiftAssignmentId: shiftAssignment?.id,
-        userId,
-        tenantId,
-      },
-      include: { user: { select: { id: true, firstName: true, lastName: true, role: true } } },
-    });
+    try {
+      const result = await this.prisma.attendance.create({
+        data: {
+          date: today,
+          clockIn: now,
+          status: AttendanceStatus.CLOCKED_IN,
+          isLate,
+          lateMinutes,
+          notes,
+          shiftAssignmentId: shiftAssignment?.id,
+          userId,
+          tenantId,
+        },
+        include: { user: { select: { id: true, firstName: true, lastName: true, role: true } } },
+      });
 
-    this.kdsGateway.emitAttendanceUpdate(tenantId, result);
-    return result;
+      this.kdsGateway.emitAttendanceUpdate(tenantId, result);
+      return result;
+    } catch (error: any) {
+      // Handle unique constraint violation (concurrent clock-in)
+      if (error.code === 'P2002') {
+        throw new BadRequestException('Already clocked in today');
+      }
+      throw error;
+    }
   }
 
   async clockOut(tenantId: string, userId: string) {
@@ -203,6 +211,10 @@ export class AttendanceService {
         user: { select: { id: true, firstName: true, lastName: true, role: true } },
       },
     });
+
+    if (attendance && attendance.tenantId !== tenantId) {
+      return { status: 'NOT_CLOCKED_IN', date: today };
+    }
 
     return attendance || { status: 'NOT_CLOCKED_IN', date: today };
   }

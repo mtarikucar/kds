@@ -16,6 +16,9 @@ import { TenantGuard } from '../../auth/guards/tenant.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '../../../common/constants/roles.enum';
+import { PlanFeatureGuard } from '../../subscriptions/guards/plan-feature.guard';
+import { RequiresFeature } from '../../subscriptions/decorators/requires-feature.decorator';
+import { PlanFeature } from '../../../common/constants/subscription.enum';
 import { DeliveryConfigService } from '../services/delivery-config.service';
 import { DeliveryLogService } from '../services/delivery-log.service';
 import { DeliveryMenuSyncService } from '../services/delivery-menu-sync.service';
@@ -25,7 +28,8 @@ import { UpdatePlatformConfigDto } from '../dto/update-platform-config.dto';
 @ApiTags('delivery-platforms')
 @ApiBearerAuth()
 @Controller('delivery-platforms')
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@RequiresFeature(PlanFeature.DELIVERY_INTEGRATION)
 export class DeliveryPlatformsController {
   constructor(
     private readonly configService: DeliveryConfigService,

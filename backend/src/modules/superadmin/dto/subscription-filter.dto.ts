@@ -144,6 +144,11 @@ export class CreatePlanDto {
   @IsBoolean()
   personnelManagement?: boolean = false;
 
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  deliveryIntegration?: boolean = false;
+
   @ApiPropertyOptional({ default: true })
   @IsOptional()
   @IsBoolean()

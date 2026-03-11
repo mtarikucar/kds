@@ -14,6 +14,7 @@ export class UpdateTenantOverridesDto {
     kdsIntegration?: boolean | null;
     reservationSystem?: boolean | null;
     personnelManagement?: boolean | null;
+    deliveryIntegration?: boolean | null;
   };
 
   @IsOptional()

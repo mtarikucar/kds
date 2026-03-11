@@ -76,24 +76,26 @@ export class StockDeductionService {
         });
         if (!stockItem) continue;
 
-        const newStock = Number(stockItem.currentStock) - deduction.quantity;
+        const currentStock = Number(stockItem.currentStock);
 
-        if (newStock < 0) {
+        if (currentStock < deduction.quantity) {
           this.logger.warn(
-            `Insufficient stock for ${deduction.stockItemName}: current=${stockItem.currentStock}, needed=${deduction.quantity}`,
+            `Insufficient stock for ${deduction.stockItemName}: current=${currentStock}, needed=${deduction.quantity}`,
           );
           // Still deduct but log warning - don't block order
         }
 
+        // Use atomic decrement to avoid race conditions
+        const deductAmount = Math.min(deduction.quantity, currentStock);
         await tx.stockItem.update({
           where: { id: deduction.stockItemId },
-          data: { currentStock: Math.max(0, newStock) },
+          data: { currentStock: { decrement: deductAmount } },
         });
 
         await tx.ingredientMovement.create({
           data: {
             type: IngredientMovementType.ORDER_DEDUCTION,
-            quantity: -deduction.quantity,
+            quantity: -deductAmount,
             costPerUnit: Number(stockItem.costPerUnit),
             notes: `Order ${order.orderNumber}`,
             referenceType: 'ORDER',
@@ -104,6 +106,7 @@ export class StockDeductionService {
         });
 
         // Check if low stock alert needed
+        const newStock = currentStock - deductAmount;
         if (newStock <= Number(stockItem.minStock)) {
           lowStockAlerts.push(deduction.stockItemName);
         }
@@ -142,11 +145,11 @@ export class StockDeductionService {
 
         await tx.ingredientMovement.create({
           data: {
-            type: IngredientMovementType.IN,
+            type: IngredientMovementType.ADJUSTMENT,
             quantity: reverseQty,
             costPerUnit: movement.costPerUnit ? Number(movement.costPerUnit) : undefined,
             notes: `Reversal: Order cancellation (${movement.notes})`,
-            referenceType: 'ORDER',
+            referenceType: 'ORDER_REVERSAL',
             referenceId: orderId,
             stockItemId: movement.stockItemId,
             tenantId,

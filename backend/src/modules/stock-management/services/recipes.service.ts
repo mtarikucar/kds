@@ -55,9 +55,9 @@ export class RecipesService {
     });
     if (!product) throw new BadRequestException('Product not found');
 
-    // Check if recipe already exists for this product
-    const existing = await this.prisma.recipe.findUnique({
-      where: { productId: dto.productId },
+    // Check if recipe already exists for this product within this tenant
+    const existing = await this.prisma.recipe.findFirst({
+      where: { productId: dto.productId, tenantId },
     });
     if (existing) throw new ConflictException('A recipe already exists for this product');
 

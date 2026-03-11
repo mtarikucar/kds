@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreatePurchaseOrderDto } from '../dto/create-purchase-order.dto';
 import { ReceivePurchaseOrderDto } from '../dto/receive-purchase-order.dto';
@@ -7,6 +7,8 @@ import { StockSettingsService } from './stock-settings.service';
 
 @Injectable()
 export class PurchaseOrdersService {
+  private readonly logger = new Logger(PurchaseOrdersService.name);
+
   constructor(
     private prisma: PrismaService,
     private stockSettings: StockSettingsService,
@@ -202,7 +204,16 @@ export class PurchaseOrdersService {
   async cancel(id: string, tenantId: string) {
     const po = await this.findOne(id, tenantId);
     if (po.status === PurchaseOrderStatus.RECEIVED || po.status === PurchaseOrderStatus.CANCELLED) {
-      throw new BadRequestException('Cannot cancel a received or already cancelled purchase order');
+      throw new BadRequestException(
+        `Cannot cancel a purchase order with status "${po.status}".`,
+      );
+    }
+    // Warn if partially received — stock already added won't be reversed
+    const hasReceivedItems = po.items.some((item) => Number(item.quantityReceived) > 0);
+    if (hasReceivedItems) {
+      this.logger.warn(
+        `Cancelling PO ${po.orderNumber} with already-received items. Stock will NOT be reversed.`,
+      );
     }
 
     return this.prisma.purchaseOrder.update({

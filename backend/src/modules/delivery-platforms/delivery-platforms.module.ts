@@ -3,6 +3,7 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { KdsModule } from '../kds/kds.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 
 // Adapters
 import { GetirAdapter } from './adapters/getir.adapter';
@@ -37,6 +38,7 @@ import { WebhookAuthGuard } from './guards/webhook-auth.guard';
     ConfigModule,
     ScheduleModule.forRoot(),
     forwardRef(() => KdsModule),
+    SubscriptionsModule,
   ],
   controllers: [DeliveryPlatformsController, DeliveryWebhookController],
   providers: [

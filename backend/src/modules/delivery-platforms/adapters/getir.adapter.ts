@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { DeliveryPlatformConfig } from '@prisma/client';
 import { DeliveryPlatform } from '../constants/platform.enum';
 import {
@@ -11,8 +12,9 @@ import { BaseAdapter } from './base.adapter';
 
 @Injectable()
 export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
-  constructor() {
+  constructor(private configService: ConfigService) {
     super('GetirAdapter', 'https://food-external-api.getir.com');
+    this.overrideBaseURL(this.configService.get<string>('GETIR_API_BASE_URL'));
   }
 
   async authenticate(config: DeliveryPlatformConfig): Promise<AuthResult> {
@@ -158,12 +160,12 @@ export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
       externalItemId: product.productId || product.id,
       name: product.name,
       quantity: product.count || product.quantity || 1,
-      unitPrice: product.price / 100, // Getir uses kuruş (cents)
+      unitPrice: Number(product.price || 0) / 100, // Getir uses kuruş (cents)
       notes: product.note,
       modifiers: (product.optionCategories || []).flatMap((cat: any) =>
         (cat.options || []).map((opt: any) => ({
           name: opt.name,
-          price: (opt.price || 0) / 100,
+          price: Number(opt.price || 0) / 100,
           quantity: opt.count || 1,
         })),
       ),

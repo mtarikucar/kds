@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateStockItemDto } from '../dto/create-stock-item.dto';
 import { UpdateStockItemDto } from '../dto/update-stock-item.dto';
@@ -66,6 +66,18 @@ export class StockItemsService {
 
   async remove(id: string, tenantId: string) {
     await this.findOne(id, tenantId);
+
+    // Prevent deletion of stock items used in active recipes
+    const recipeUsage = await this.prisma.recipeIngredient.findFirst({
+      where: { stockItemId: id },
+      include: { recipe: { select: { name: true } } },
+    });
+    if (recipeUsage) {
+      throw new BadRequestException(
+        `Cannot delete: stock item is used in recipe "${recipeUsage.recipe.name}"`,
+      );
+    }
+
     return this.prisma.stockItem.delete({ where: { id } });
   }
 

@@ -25,6 +25,7 @@ export interface PlanConfig {
     kdsIntegration: boolean;
     reservationSystem: boolean;
     personnelManagement: boolean;
+    deliveryIntegration: boolean;
   };
 }
 
@@ -54,6 +55,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       kdsIntegration: true,
       reservationSystem: false,
       personnelManagement: false,
+      deliveryIntegration: false,
     },
   },
   [SubscriptionPlanType.BASIC]: {
@@ -81,6 +83,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       kdsIntegration: true,
       reservationSystem: false,
       personnelManagement: false,
+      deliveryIntegration: false,
     },
   },
   [SubscriptionPlanType.PRO]: {
@@ -108,6 +111,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       kdsIntegration: true,
       reservationSystem: true,
       personnelManagement: true,
+      deliveryIntegration: true,
     },
   },
   [SubscriptionPlanType.BUSINESS]: {
@@ -135,6 +139,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
       kdsIntegration: true,
       reservationSystem: true,
       personnelManagement: true,
+      deliveryIntegration: true,
     },
   },
 };
