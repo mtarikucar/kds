@@ -268,7 +268,9 @@ export class DesktopAppService {
   }
 
   /**
-   * Simple version comparison (use semver in production)
+   * Numeric-only semver comparison.
+   * Handles "major.minor.patch" correctly but does NOT support pre-release
+   * tags (e.g. "1.0.0-beta.1"). Sufficient for admin-controlled release versions.
    */
   private compareVersions(v1: string, v2: string): number {
     const parts1 = v1.replace('v', '').split('.').map(Number);

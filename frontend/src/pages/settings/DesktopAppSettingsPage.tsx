@@ -89,7 +89,7 @@ const DesktopAppSettingsPage = () => {
       {/* Platform Selection */}
       <div className="mb-8">
         <h3 className="text-lg font-semibold text-slate-900 mb-4">{t('selectPlatform')}</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {platforms.map((platform) => (
             <button
               key={platform.id}
@@ -142,6 +142,14 @@ const DesktopAppSettingsPage = () => {
               <li>{t('windowsInstallStep2')}</li>
               <li>{t('windowsInstallStep3')}</li>
               <li>{t('windowsInstallStep4')}</li>
+            </ol>
+          )}
+          {(selectedPlatform === 'macArm' || selectedPlatform === 'macIntel') && (
+            <ol className="list-decimal list-inside space-y-2 text-slate-700">
+              <li>{t('macInstallStep1')}</li>
+              <li>{t('macInstallStep2')}</li>
+              <li>{t('macInstallStep3')}</li>
+              <li>{t('macInstallStep4')}</li>
             </ol>
           )}
           {selectedPlatform === 'linux' && (
