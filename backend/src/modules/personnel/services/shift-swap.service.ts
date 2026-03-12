@@ -76,39 +76,45 @@ export class ShiftSwapService {
       throw new NotFoundException('Swap request not found or already processed');
     }
 
-    const targetAssignment = await this.prisma.shiftAssignment.findFirst({
-      where: { id: request.targetAssignmentId, tenantId },
-    });
-
-    if (!targetAssignment) {
-      throw new NotFoundException('Target assignment no longer exists');
-    }
-
-    const reqAssignment = request.requesterAssignment;
-    const isSameDate = reqAssignment.date.getTime() === targetAssignment.date.getTime();
-
-    // For different-date swaps, validate no double-booking
-    if (!isSameDate) {
-      const [reqUserOnTargetDate, targetUserOnReqDate] = await Promise.all([
-        this.prisma.shiftAssignment.findUnique({
-          where: { userId_date: { userId: request.requesterId, date: targetAssignment.date } },
+    const result = await this.prisma.$transaction(async (tx) => {
+      const [targetAssignment, reqAssignment] = await Promise.all([
+        tx.shiftAssignment.findFirst({
+          where: { id: request.targetAssignmentId, tenantId },
         }),
-        this.prisma.shiftAssignment.findUnique({
-          where: { userId_date: { userId: request.targetId, date: reqAssignment.date } },
+        tx.shiftAssignment.findFirst({
+          where: { id: request.requesterAssignmentId, tenantId },
         }),
       ]);
 
-      // Allow the existing swap assignments themselves, but block other conflicts
-      if (reqUserOnTargetDate && reqUserOnTargetDate.id !== request.targetAssignmentId) {
-        throw new BadRequestException('Requester already has a shift on the target date');
+      if (!targetAssignment) {
+        throw new NotFoundException('Target assignment no longer exists');
       }
-      if (targetUserOnReqDate && targetUserOnReqDate.id !== request.requesterAssignmentId) {
-        throw new BadRequestException('Target already has a shift on the requester date');
+      if (!reqAssignment) {
+        throw new NotFoundException('Requester assignment no longer exists');
       }
-    }
+      const isSameDate = reqAssignment.date.getTime() === targetAssignment.date.getTime();
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      // First update swap request status (before touching assignments to avoid cascade issues)
+      // For different-date swaps, validate no double-booking (inside transaction for consistency)
+      if (!isSameDate) {
+        const [reqUserOnTargetDate, targetUserOnReqDate] = await Promise.all([
+          tx.shiftAssignment.findFirst({
+            where: { userId: request.requesterId, date: targetAssignment.date, tenantId },
+          }),
+          tx.shiftAssignment.findFirst({
+            where: { userId: request.targetId, date: reqAssignment.date, tenantId },
+          }),
+        ]);
+
+        // Allow the existing swap assignments themselves, but block other conflicts
+        if (reqUserOnTargetDate && reqUserOnTargetDate.id !== request.targetAssignmentId) {
+          throw new BadRequestException('Requester already has a shift on the target date');
+        }
+        if (targetUserOnReqDate && targetUserOnReqDate.id !== request.requesterAssignmentId) {
+          throw new BadRequestException('Target already has a shift on the requester date');
+        }
+      }
+
+      // Update swap request status (before touching assignments to avoid cascade issues)
       const updatedRequest = await tx.shiftSwapRequest.update({
         where: { id },
         data: {

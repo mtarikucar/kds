@@ -7,12 +7,14 @@ import { KdsController } from './kds.controller';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { OrdersModule } from '../orders/orders.module';
 import { DeliveryPlatformsModule } from '../delivery-platforms/delivery-platforms.module';
+import { StockManagementModule } from '../stock-management/stock-management.module';
 
 @Module({
   imports: [
     PrismaModule,
     forwardRef(() => OrdersModule),
     forwardRef(() => DeliveryPlatformsModule),
+    forwardRef(() => StockManagementModule),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

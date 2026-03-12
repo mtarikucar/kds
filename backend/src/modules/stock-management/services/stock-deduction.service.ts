@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { IngredientMovementType } from '../../../common/constants/stock-management.enum';
 import { StockSettingsService } from './stock-settings.service';
@@ -12,11 +13,18 @@ export class StockDeductionService {
     private stockSettings: StockSettingsService,
   ) {}
 
-  async deductForOrder(orderId: string, tenantId: string) {
+  async deductForOrder(orderId: string, tenantId: string, currentStatus?: string) {
     const settings = await this.stockSettings.get(tenantId);
     if (!settings.enableAutoDeduction) {
       this.logger.log(`Auto-deduction disabled for tenant ${tenantId}, skipping`);
       return;
+    }
+
+    // Only deduct at the configured status (default: PREPARING)
+    if (settings.deductOnStatus) {
+      if (!currentStatus || currentStatus !== settings.deductOnStatus) {
+        return;
+      }
     }
 
     const order = await this.prisma.order.findFirst({
@@ -71,8 +79,8 @@ export class StockDeductionService {
       const lowStockAlerts: string[] = [];
 
       for (const deduction of deductions) {
-        const stockItem = await tx.stockItem.findUnique({
-          where: { id: deduction.stockItemId },
+        const stockItem = await tx.stockItem.findFirst({
+          where: { id: deduction.stockItemId, tenantId },
         });
         if (!stockItem) continue;
 
@@ -82,10 +90,8 @@ export class StockDeductionService {
           this.logger.warn(
             `Insufficient stock for ${deduction.stockItemName}: current=${currentStock}, needed=${deduction.quantity}`,
           );
-          // Still deduct but log warning - don't block order
         }
 
-        // Use atomic decrement to avoid race conditions
         const deductAmount = Math.min(deduction.quantity, currentStock);
         await tx.stockItem.update({
           where: { id: deduction.stockItemId },
@@ -117,7 +123,7 @@ export class StockDeductionService {
       );
 
       return { deductions, lowStockAlerts };
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
   async reverseForOrder(orderId: string, tenantId: string) {
@@ -137,6 +143,12 @@ export class StockDeductionService {
       for (const movement of movements) {
         // Reverse the deduction (add back)
         const reverseQty = Math.abs(Number(movement.quantity));
+
+        // Verify stock item belongs to tenant before updating
+        const stockItem = await tx.stockItem.findFirst({
+          where: { id: movement.stockItemId, tenantId },
+        });
+        if (!stockItem) continue;
 
         await tx.stockItem.update({
           where: { id: movement.stockItemId },

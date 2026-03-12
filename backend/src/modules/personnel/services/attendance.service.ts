@@ -16,8 +16,8 @@ export class AttendanceService {
     today.setHours(0, 0, 0, 0);
 
     // Check no existing active record for today
-    const existing = await this.prisma.attendance.findUnique({
-      where: { userId_date: { userId, date: today } },
+    const existing = await this.prisma.attendance.findFirst({
+      where: { userId, date: today, tenantId },
     });
 
     if (existing && existing.status !== AttendanceStatus.CLOCKED_OUT) {
@@ -29,8 +29,8 @@ export class AttendanceService {
     }
 
     // Find shift assignment for today
-    const shiftAssignment = await this.prisma.shiftAssignment.findUnique({
-      where: { userId_date: { userId, date: today } },
+    const shiftAssignment = await this.prisma.shiftAssignment.findFirst({
+      where: { userId, date: today, tenantId },
       include: { shiftTemplate: true },
     });
 
@@ -84,8 +84,8 @@ export class AttendanceService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const attendance = await this.prisma.attendance.findUnique({
-      where: { userId_date: { userId, date: today } },
+    const attendance = await this.prisma.attendance.findFirst({
+      where: { userId, date: today, tenantId },
       include: { shiftAssignment: { include: { shiftTemplate: true } } },
     });
 
@@ -136,8 +136,8 @@ export class AttendanceService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const attendance = await this.prisma.attendance.findUnique({
-      where: { userId_date: { userId, date: today } },
+    const attendance = await this.prisma.attendance.findFirst({
+      where: { userId, date: today, tenantId },
     });
 
     if (!attendance) {
@@ -165,8 +165,8 @@ export class AttendanceService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const attendance = await this.prisma.attendance.findUnique({
-      where: { userId_date: { userId, date: today } },
+    const attendance = await this.prisma.attendance.findFirst({
+      where: { userId, date: today, tenantId },
     });
 
     if (!attendance) {
@@ -204,17 +204,13 @@ export class AttendanceService {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const attendance = await this.prisma.attendance.findUnique({
-      where: { userId_date: { userId, date: today } },
+    const attendance = await this.prisma.attendance.findFirst({
+      where: { userId, date: today, tenantId },
       include: {
         shiftAssignment: { include: { shiftTemplate: true } },
         user: { select: { id: true, firstName: true, lastName: true, role: true } },
       },
     });
-
-    if (attendance && attendance.tenantId !== tenantId) {
-      return { status: 'NOT_CLOCKED_IN', date: today };
-    }
 
     return attendance || { status: 'NOT_CLOCKED_IN', date: today };
   }

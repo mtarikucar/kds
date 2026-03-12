@@ -10,6 +10,7 @@ import { RequiresFeature } from '../../subscriptions/decorators/requires-feature
 import { PlanFeature } from '../../../common/constants/subscription.enum';
 import { StockItemCategoriesService } from '../services/stock-item-categories.service';
 import { CreateStockItemCategoryDto } from '../dto/create-stock-item-category.dto';
+import { UpdateStockItemCategoryDto } from '../dto/update-stock-item-category.dto';
 
 @ApiTags('stock-management/categories')
 @ApiBearerAuth()
@@ -43,7 +44,7 @@ export class StockItemCategoriesController {
   @Patch(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Update a stock item category' })
-  update(@Param('id') id: string, @Body() dto: Partial<CreateStockItemCategoryDto>, @Request() req) {
+  update(@Param('id') id: string, @Body() dto: UpdateStockItemCategoryDto, @Request() req) {
     return this.service.update(id, dto, req.tenantId);
   }
 

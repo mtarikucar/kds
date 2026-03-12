@@ -31,11 +31,18 @@ export class RetryScheduler {
             op.action === PlatformLogAction.STATUS_UPDATE &&
             op.orderId
           ) {
-            // Re-read the current order status and try syncing again
+            // Re-read current order status from DB to avoid syncing stale status
+            const order = await this.prisma.order.findUnique({
+              where: { id: op.orderId },
+            });
+            if (!order) {
+              await this.logService.markRetrySuccess(op.id);
+              this.logger.log(`Order ${op.orderId} no longer exists, skipping retry for log ${op.id}`);
+              continue;
+            }
             await this.statusSyncService.syncStatusToPlatform(
               op.orderId,
-              // We stored the target status in the request JSON
-              (op.request as any)?.status || '',
+              order.status,
             );
             await this.logService.markRetrySuccess(op.id);
             this.logger.log(`Retry succeeded for log ${op.id}`);

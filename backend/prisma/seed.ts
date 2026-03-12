@@ -20,6 +20,7 @@ async function main() {
       kdsIntegration: true,
       reservationSystem: false,
       personnelManagement: false,
+      deliveryIntegration: false,
     },
     create: {
       name: 'FREE',
@@ -42,6 +43,7 @@ async function main() {
       inventoryTracking: false,
       kdsIntegration: true,
       reservationSystem: false,
+      deliveryIntegration: false,
       isActive: true,
     },
   });
@@ -58,6 +60,7 @@ async function main() {
       kdsIntegration: true,
       reservationSystem: false,
       personnelManagement: false,
+      deliveryIntegration: false,
     },
     create: {
       name: 'BASIC',
@@ -80,6 +83,7 @@ async function main() {
       inventoryTracking: true,
       kdsIntegration: true,
       reservationSystem: false,
+      deliveryIntegration: false,
       isActive: true,
     },
   });
@@ -96,6 +100,7 @@ async function main() {
       kdsIntegration: true,
       reservationSystem: true,
       personnelManagement: true,
+      deliveryIntegration: true,
     },
     create: {
       name: 'PRO',
@@ -119,6 +124,7 @@ async function main() {
       kdsIntegration: true,
       reservationSystem: true,
       personnelManagement: true,
+      deliveryIntegration: true,
       isActive: true,
     },
   });
@@ -135,6 +141,7 @@ async function main() {
       kdsIntegration: true,
       reservationSystem: true,
       personnelManagement: true,
+      deliveryIntegration: true,
     },
     create: {
       name: 'BUSINESS',
@@ -158,6 +165,7 @@ async function main() {
       kdsIntegration: true,
       reservationSystem: true,
       personnelManagement: true,
+      deliveryIntegration: true,
       isActive: true,
     },
   });
