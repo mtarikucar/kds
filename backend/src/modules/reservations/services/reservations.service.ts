@@ -117,6 +117,27 @@ export class ReservationsService {
       if (dto.guestCount > table.capacity) {
         throw new BadRequestException(`Table capacity is ${table.capacity}`);
       }
+
+      // Check table time overlap
+      const existingTableReservations = await this.prisma.reservation.findMany({
+        where: {
+          tenantId,
+          tableId: dto.tableId,
+          date: new Date(dto.date),
+          status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED, ReservationStatus.SEATED] },
+        },
+      });
+
+      const requestStart = this.timeToMinutes(dto.startTime);
+      const requestEnd = this.timeToMinutes(dto.endTime);
+
+      for (const res of existingTableReservations) {
+        const resStart = this.timeToMinutes(res.startTime);
+        const resEnd = this.timeToMinutes(res.endTime);
+        if (requestStart < resEnd && requestEnd > resStart) {
+          throw new BadRequestException('This table is already reserved for the selected time period');
+        }
+      }
     }
 
     // Check slot availability
@@ -280,6 +301,35 @@ export class ReservationsService {
       data.date = new Date(dto.date);
     }
 
+    // Check table time overlap if relevant fields are changing
+    const effectiveTableId = dto.tableId ?? reservation.tableId;
+    const effectiveDate = dto.date ?? reservation.date;
+    const effectiveStartTime = dto.startTime ?? reservation.startTime;
+    const effectiveEndTime = dto.endTime ?? reservation.endTime;
+
+    if (effectiveTableId && (dto.tableId !== undefined || dto.date !== undefined || dto.startTime !== undefined || dto.endTime !== undefined)) {
+      const existingTableReservations = await this.prisma.reservation.findMany({
+        where: {
+          tenantId,
+          tableId: effectiveTableId,
+          date: new Date(effectiveDate instanceof Date ? effectiveDate.toISOString().split('T')[0] : effectiveDate),
+          status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED, ReservationStatus.SEATED] },
+          id: { not: id },
+        },
+      });
+
+      const requestStart = this.timeToMinutes(effectiveStartTime);
+      const requestEnd = this.timeToMinutes(effectiveEndTime);
+
+      for (const res of existingTableReservations) {
+        const resStart = this.timeToMinutes(res.startTime);
+        const resEnd = this.timeToMinutes(res.endTime);
+        if (requestStart < resEnd && requestEnd > resStart) {
+          throw new BadRequestException('This table is already reserved for the selected time period');
+        }
+      }
+    }
+
     return this.prisma.reservation.update({
       where: { id: reservation.id },
       data,
@@ -366,7 +416,7 @@ export class ReservationsService {
     if (reservation.tableId) {
       await this.prisma.table.update({
         where: { id: reservation.tableId },
-        data: { status: 'RESERVED' },
+        data: { status: 'OCCUPIED' },
       });
     }
 
