@@ -13,6 +13,7 @@ import { validateTransition } from '../../common/utils/order-state-machine';
 import { UpdateOrderItemStatusDto, OrderItemStatus } from './dto/update-order-item-status.dto';
 import { KdsGateway } from './kds.gateway';
 import { DeliveryStatusSyncService } from '../delivery-platforms/services/delivery-status-sync.service';
+import { StockDeductionService } from '../stock-management/services/stock-deduction.service';
 
 @Injectable()
 export class KdsService {
@@ -24,6 +25,9 @@ export class KdsService {
     @Optional()
     @Inject(forwardRef(() => DeliveryStatusSyncService))
     private deliveryStatusSync?: DeliveryStatusSyncService,
+    @Optional()
+    @Inject(forwardRef(() => StockDeductionService))
+    private stockDeductionService?: StockDeductionService,
   ) {}
 
   async getKitchenOrders(tenantId: string) {
@@ -90,10 +94,15 @@ export class KdsService {
     // Validate state transition using state machine (STRICT mode)
     validateTransition(order.status as OrderStatus, status);
 
+    // Build update data with status timestamps
+    const updateData: any = { status };
+    if (status === OrderStatus.PREPARING) updateData.preparingAt = new Date();
+    if (status === OrderStatus.READY) updateData.readyAt = new Date();
+
     // Update order status
     const updatedOrder = await this.prisma.order.update({
       where: { id },
-      data: { status },
+      data: updateData,
       include: {
         orderItems: {
           include: {
@@ -103,6 +112,21 @@ export class KdsService {
         table: true,
       },
     });
+
+    // Trigger stock deduction at the configured status (if applicable)
+    if (this.stockDeductionService) {
+      try {
+        const result = await this.stockDeductionService.deductForOrder(id, tenantId, status);
+        if (result?.lowStockAlerts?.length) {
+          this.kdsGateway.emitLowStockAlert(tenantId, result.lowStockAlerts);
+        }
+      } catch (error: any) {
+        this.logger.error(
+          `Stock deduction failed for order ${id}: ${error.message}`,
+          error.stack,
+        );
+      }
+    }
 
     // Emit status change via WebSocket
     this.kdsGateway.emitOrderStatusChange(tenantId, id, status);
@@ -200,6 +224,18 @@ export class KdsService {
         table: true,
       },
     });
+
+    // Reverse ingredient deductions on cancellation
+    if (this.stockDeductionService) {
+      try {
+        await this.stockDeductionService.reverseForOrder(id, tenantId);
+      } catch (error: any) {
+        this.logger.error(
+          `CRITICAL: Stock reversal failed for cancelled order ${id}. Manual stock adjustment may be needed. Error: ${error.message}`,
+          error.stack,
+        );
+      }
+    }
 
     // Emit status change via WebSocket
     this.kdsGateway.emitOrderStatusChange(tenantId, id, OrderStatus.CANCELLED);

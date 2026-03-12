@@ -13,10 +13,15 @@ import { initSentry } from './sentry.config';
 initSentry();
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bodyParser: false, // Disable built-in parser so our custom one with rawBody capture works
+  });
 
-  // Increase body parser limits for file uploads (e.g., logos)
-  app.use(bodyParser.json({ limit: '10mb' }));
+  // Custom body parser with rawBody capture for webhook HMAC verification
+  app.use(bodyParser.json({
+    limit: '10mb',
+    verify: (req: any, _res, buf) => { req.rawBody = buf; },
+  }));
   app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
 
   // Security headers with Helmet

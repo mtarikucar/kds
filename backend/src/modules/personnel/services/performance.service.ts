@@ -28,6 +28,8 @@ export class PerformanceService {
         finalAmount: true,
         createdAt: true,
         updatedAt: true,
+        preparingAt: true,
+        readyAt: true,
         status: true,
       },
     });
@@ -79,13 +81,17 @@ export class PerformanceService {
       );
       const avgOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
 
-      // Average prep time (diff between updatedAt and createdAt in minutes)
+      // Average prep time: use preparingAt → readyAt when available, fallback to updatedAt - createdAt
       let avgPrepTime = 0;
       if (totalOrders > 0) {
-        const totalPrepTime = userOrdersList.reduce((sum, o) => {
-          const diff = new Date(o.updatedAt).getTime() - new Date(o.createdAt).getTime();
-          return sum + diff / 60000;
-        }, 0);
+        let totalPrepTime = 0;
+        for (const o of userOrdersList) {
+          if (o.preparingAt && o.readyAt) {
+            totalPrepTime += (new Date(o.readyAt).getTime() - new Date(o.preparingAt).getTime()) / 60000;
+          } else {
+            totalPrepTime += (new Date(o.updatedAt).getTime() - new Date(o.createdAt).getTime()) / 60000;
+          }
+        }
         avgPrepTime = totalPrepTime / totalOrders;
       }
 

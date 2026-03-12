@@ -399,6 +399,15 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     );
   }
 
+  emitLowStockAlert(tenantId: string, items: string[]) {
+    this.server.to(`kitchen-${tenantId}`).to(`pos-${tenantId}`).emit('stock:low-stock-alert', {
+      items,
+      timestamp: new Date(),
+    });
+
+    this.logger.log(`Low stock alert emitted for ${items.length} items to kitchen-${tenantId}`);
+  }
+
   emitSwapRequestUpdate(tenantId: string, data: any) {
     this.server.to(`pos-${tenantId}`).emit('personnel:swap-request-update', {
       ...data,

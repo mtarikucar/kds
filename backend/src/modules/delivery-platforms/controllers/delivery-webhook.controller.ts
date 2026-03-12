@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
+import { Public } from '../../auth/decorators/public.decorator';
 import { WebhookAuthGuard } from '../guards/webhook-auth.guard';
 import { DeliveryConfigService } from '../services/delivery-config.service';
 import { DeliveryOrderService } from '../services/delivery-order.service';
@@ -19,6 +20,8 @@ import { AdapterFactory } from '../adapters/adapter-factory';
 import { DeliveryPlatform, PlatformLogDirection, PlatformLogAction } from '../constants/platform.enum';
 
 @ApiTags('delivery-webhooks')
+@Public()
+@UseGuards(WebhookAuthGuard)
 @Controller('webhooks/delivery')
 export class DeliveryWebhookController {
   private readonly logger = new Logger(DeliveryWebhookController.name);
@@ -35,7 +38,6 @@ export class DeliveryWebhookController {
    * POST /webhooks/delivery/yemeksepeti/order/:remoteId
    */
   @Post('yemeksepeti/order/:remoteId')
-  @UseGuards(WebhookAuthGuard)
   @HttpCode(HttpStatus.OK)
   async yemeksepetiNewOrder(
     @Param('remoteId') remoteId: string,
@@ -96,7 +98,6 @@ export class DeliveryWebhookController {
    * PUT /webhooks/delivery/yemeksepeti/:remoteId/order/:remoteOrderId/status
    */
   @Put('yemeksepeti/:remoteId/order/:remoteOrderId/status')
-  @UseGuards(WebhookAuthGuard)
   @HttpCode(HttpStatus.OK)
   async yemeksepetiStatusUpdate(
     @Param('remoteId') remoteId: string,
@@ -116,7 +117,6 @@ export class DeliveryWebhookController {
    * POST /webhooks/delivery/trendyol/order/:remoteId
    */
   @Post('trendyol/order/:remoteId')
-  @UseGuards(WebhookAuthGuard)
   @HttpCode(HttpStatus.OK)
   async trendyolNewOrder(
     @Param('remoteId') remoteId: string,

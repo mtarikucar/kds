@@ -95,7 +95,7 @@ export class WebhookAuthGuard implements CanActivate {
       throw new UnauthorizedException('Missing webhook signature');
     }
 
-    const body = JSON.stringify(request.body);
+    const body = request.rawBody?.toString('utf8') || JSON.stringify(request.body);
     const expectedSignature = createHmac('sha256', webhookSecret)
       .update(body)
       .digest('hex');

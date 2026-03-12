@@ -228,10 +228,13 @@ export class OrdersService {
         // Emit new order to kitchen via WebSocket
         this.kdsGateway.emitNewOrder(tenantId, createdOrder);
 
-        // Auto-deduct ingredients if configured
+        // Auto-deduct ingredients if configured (respects deductOnStatus setting)
         if (this.stockDeductionService) {
           try {
-            await this.stockDeductionService.deductForOrder(createdOrder.id, tenantId);
+            const deductResult = await this.stockDeductionService.deductForOrder(createdOrder.id, tenantId, OrderStatus.PENDING);
+            if (deductResult?.lowStockAlerts?.length > 0) {
+              this.kdsGateway.emitLowStockAlert(tenantId, deductResult.lowStockAlerts);
+            }
           } catch (error: any) {
             this.logger.error(
               `Ingredient deduction failed for order ${createdOrder.orderNumber}: ${error.message}`,
@@ -508,11 +511,14 @@ export class OrdersService {
     // Validate state transition using state machine (STRICT mode)
     validateTransition(order.status as OrderStatus, updateStatusDto.status);
 
+    // Build update data with status timestamps
+    const statusUpdateData: any = { status: updateStatusDto.status };
+    if (updateStatusDto.status === OrderStatus.PREPARING) statusUpdateData.preparingAt = new Date();
+    if (updateStatusDto.status === OrderStatus.READY) statusUpdateData.readyAt = new Date();
+
     const updatedOrder = await this.prisma.order.update({
       where: { id },
-      data: {
-        status: updateStatusDto.status,
-      },
+      data: statusUpdateData,
       include: {
         orderItems: {
           include: {
@@ -567,7 +573,23 @@ export class OrdersService {
         await this.stockDeductionService.reverseForOrder(id, tenantId);
       } catch (error: any) {
         this.logger.error(
-          `Ingredient deduction reversal failed for order ${id}: ${error.message}`,
+          `CRITICAL: Stock reversal failed for cancelled order ${id}. Manual stock adjustment may be needed. Error: ${error.message}`,
+          error.stack,
+        );
+        this.kdsGateway.emitLowStockAlert(tenantId, [`Stock reversal failed for order ${updatedOrder.orderNumber}. Please verify inventory.`]);
+      }
+    }
+
+    // Auto-deduct ingredients on status change (respects deductOnStatus setting)
+    if (this.stockDeductionService && updateStatusDto.status !== OrderStatus.CANCELLED) {
+      try {
+        const deductResult = await this.stockDeductionService.deductForOrder(id, tenantId, updateStatusDto.status);
+        if (deductResult?.lowStockAlerts?.length > 0) {
+          this.kdsGateway.emitLowStockAlert(tenantId, deductResult.lowStockAlerts);
+        }
+      } catch (error: any) {
+        this.logger.error(
+          `Ingredient deduction failed for order ${id} on status ${updateStatusDto.status}: ${error.message}`,
           error.stack,
         );
       }
