@@ -1,0 +1,144 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import marketingApi from '../../features/marketing/api/marketingApi';
+import { useMarketingAuthStore } from '../../store/marketingAuthStore';
+import type { Commission } from '../../features/marketing/types';
+
+const statusColors: Record<string, string> = {
+  PENDING: 'bg-yellow-100 text-yellow-800',
+  APPROVED: 'bg-blue-100 text-blue-800',
+  PAID: 'bg-green-100 text-green-800',
+};
+
+export default function CommissionsPage() {
+  const { user } = useMarketingAuthStore();
+  const isManager = user?.role === 'SALES_MANAGER';
+  const queryClient = useQueryClient();
+
+  const { data: commissions, isLoading } = useQuery({
+    queryKey: ['marketing', 'commissions'],
+    queryFn: () => marketingApi.get('/commissions').then((r) => r.data),
+  });
+
+  const { data: summary } = useQuery({
+    queryKey: ['marketing', 'commissions', 'summary'],
+    queryFn: () => marketingApi.get('/commissions/summary').then((r) => r.data),
+  });
+
+  const approveMutation = useMutation({
+    mutationFn: (id: string) => marketingApi.patch(`/commissions/${id}/approve`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['marketing', 'commissions'] }),
+  });
+
+  const payMutation = useMutation({
+    mutationFn: (id: string) => marketingApi.patch(`/commissions/${id}/pay`),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['marketing', 'commissions'] }),
+  });
+
+  const items: Commission[] = commissions?.data || [];
+
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-bold text-gray-900">Commissions</h1>
+
+      {/* Summary Cards */}
+      {summary && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <p className="text-sm text-gray-500">Pending</p>
+            <p className="text-2xl font-bold text-yellow-600 mt-1">
+              ${Number(summary.pending.total).toFixed(2)}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">{summary.pending.count} entries</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <p className="text-sm text-gray-500">Approved</p>
+            <p className="text-2xl font-bold text-blue-600 mt-1">
+              ${Number(summary.approved.total).toFixed(2)}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">{summary.approved.count} entries</p>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <p className="text-sm text-gray-500">Paid</p>
+            <p className="text-2xl font-bold text-green-600 mt-1">
+              ${Number(summary.paid.total).toFixed(2)}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">{summary.paid.count} entries</p>
+          </div>
+        </div>
+      )}
+
+      {/* Table */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-gray-50 text-left text-gray-500">
+                <th className="px-4 py-3 font-medium">Period</th>
+                <th className="px-4 py-3 font-medium">Type</th>
+                <th className="px-4 py-3 font-medium">Amount</th>
+                <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium hidden md:table-cell">Rep</th>
+                <th className="px-4 py-3 font-medium hidden md:table-cell">Date</th>
+                {isManager && <th className="px-4 py-3 font-medium">Actions</th>}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">Loading...</td>
+                </tr>
+              ) : items.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">No commissions found</td>
+                </tr>
+              ) : (
+                items.map((c) => (
+                  <tr key={c.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium text-gray-900">{c.period}</td>
+                    <td className="px-4 py-3 text-gray-600">{c.type}</td>
+                    <td className="px-4 py-3 font-medium">${Number(c.amount).toFixed(2)}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[c.status] || 'bg-gray-100'}`}>
+                        {c.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell text-gray-600">
+                      {c.marketingUser ? `${c.marketingUser.firstName} ${c.marketingUser.lastName}` : '-'}
+                    </td>
+                    <td className="px-4 py-3 hidden md:table-cell text-gray-400 text-xs">
+                      {new Date(c.createdAt).toLocaleDateString()}
+                    </td>
+                    {isManager && (
+                      <td className="px-4 py-3">
+                        <div className="flex gap-1">
+                          {c.status === 'PENDING' && (
+                            <button
+                              onClick={() => approveMutation.mutate(c.id)}
+                              disabled={approveMutation.isPending}
+                              className="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs hover:bg-blue-100"
+                            >
+                              Approve
+                            </button>
+                          )}
+                          {c.status === 'APPROVED' && (
+                            <button
+                              onClick={() => payMutation.mutate(c.id)}
+                              disabled={payMutation.isPending}
+                              className="px-2 py-1 bg-green-50 text-green-600 rounded text-xs hover:bg-green-100"
+                            >
+                              Mark Paid
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
