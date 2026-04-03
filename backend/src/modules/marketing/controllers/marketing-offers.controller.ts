@@ -24,7 +24,7 @@ export class MarketingOffersController {
 
   @Post()
   create(@Body() dto: CreateOfferDto, @CurrentMarketingUser() user: any) {
-    return this.offersService.create(dto, user.id);
+    return this.offersService.create(dto, user.id, user.role);
   }
 
   @Get()
@@ -37,8 +37,8 @@ export class MarketingOffersController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.offersService.findOne(id);
+  findOne(@Param('id') id: string, @CurrentMarketingUser() user: any) {
+    return this.offersService.findOne(id, user.id, user.role);
   }
 
   @Patch(':id')

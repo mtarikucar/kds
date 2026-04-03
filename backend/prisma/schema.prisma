@@ -2566,6 +2566,8 @@ model Lead {
   @@index([createdAt])
   @@index([nextFollowUp])
   @@index([priority])
+  @@index([assignedToId, status])
+  @@index([status, createdAt])
   @@map("leads")
 }
 
@@ -2615,6 +2617,8 @@ model MarketingTask {
   @@index([leadId])
   @@index([dueDate])
   @@index([status])
+  @@index([assignedToId, status])
+  @@index([dueDate, status])
   @@map("marketing_tasks")
 }
 
@@ -2642,6 +2646,7 @@ model LeadOffer {
   @@index([leadId])
   @@index([createdById])
   @@index([status])
+  @@index([leadId, status])
   @@map("lead_offers")
 }
 
@@ -2653,7 +2658,7 @@ model Commission {
   period          String    // "2026-04" (YYYY-MM format)
   tenantId        String?
   leadId          String?
-  notes           String?
+  notes           String?   @db.Text
 
   marketingUserId String
   marketingUser   MarketingUser @relation(fields: [marketingUserId], references: [id], onDelete: Cascade)
@@ -2666,6 +2671,7 @@ model Commission {
   @@index([marketingUserId])
   @@index([period])
   @@index([status])
+  @@index([period, status])
   @@map("commissions")
 }
 

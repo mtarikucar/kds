@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import marketingApi from '../../features/marketing/api/marketingApi';
@@ -36,32 +36,35 @@ export default function CreateLeadPage() {
   const [error, setError] = useState('');
 
   // Load existing lead data for edit mode
-  useQuery({
+  const { data: existingLead } = useQuery({
     queryKey: ['marketing', 'lead', id],
     queryFn: () => marketingApi.get(`/leads/${id}`).then((r) => r.data),
     enabled: isEdit,
-    // @ts-ignore
-    onSuccess: (data: any) => {
-      setForm({
-        businessName: data.businessName || '',
-        contactPerson: data.contactPerson || '',
-        phone: data.phone || '',
-        whatsapp: data.whatsapp || '',
-        email: data.email || '',
-        address: data.address || '',
-        city: data.city || '',
-        region: data.region || '',
-        businessType: data.businessType || 'RESTAURANT',
-        tableCount: data.tableCount?.toString() || '',
-        branchCount: data.branchCount?.toString() || '',
-        currentSystem: data.currentSystem || '',
-        source: data.source || 'PHONE',
-        notes: data.notes || '',
-        nextFollowUp: data.nextFollowUp ? data.nextFollowUp.split('T')[0] : '',
-        priority: data.priority || 'MEDIUM',
-      });
-    },
   });
+
+  // Populate form when lead data loads
+  useEffect(() => {
+    if (existingLead) {
+      setForm({
+        businessName: existingLead.businessName || '',
+        contactPerson: existingLead.contactPerson || '',
+        phone: existingLead.phone || '',
+        whatsapp: existingLead.whatsapp || '',
+        email: existingLead.email || '',
+        address: existingLead.address || '',
+        city: existingLead.city || '',
+        region: existingLead.region || '',
+        businessType: existingLead.businessType || 'RESTAURANT',
+        tableCount: existingLead.tableCount?.toString() || '',
+        branchCount: existingLead.branchCount?.toString() || '',
+        currentSystem: existingLead.currentSystem || '',
+        source: existingLead.source || 'PHONE',
+        notes: existingLead.notes || '',
+        nextFollowUp: existingLead.nextFollowUp ? existingLead.nextFollowUp.split('T')[0] : '',
+        priority: existingLead.priority || 'MEDIUM',
+      });
+    }
+  }, [existingLead]);
 
   const mutation = useMutation({
     mutationFn: (data: any) =>

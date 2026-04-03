@@ -51,19 +51,24 @@ export class MarketingDashboardService {
   async getLeadsByStatus(userId: string, userRole: string) {
     const where = userRole === 'SALES_REP' ? { assignedToId: userId } : {};
 
-    const statuses = [
+    // Use groupBy instead of N separate count queries
+    const grouped = await this.prisma.lead.groupBy({
+      by: ['status'],
+      where,
+      _count: { id: true },
+    });
+
+    const allStatuses = [
       'NEW', 'CONTACTED', 'NOT_REACHABLE', 'MEETING_DONE',
       'DEMO_SCHEDULED', 'OFFER_SENT', 'WAITING', 'WON', 'LOST',
     ];
 
-    const counts = await Promise.all(
-      statuses.map(async (status) => ({
-        status,
-        count: await this.prisma.lead.count({ where: { ...where, status } }),
-      })),
-    );
+    const countMap = new Map(grouped.map((g) => [g.status, g._count.id]));
 
-    return counts;
+    return allStatuses.map((status) => ({
+      status,
+      count: countMap.get(status) || 0,
+    }));
   }
 
   async getTodaySummary(userId: string, userRole: string) {
@@ -143,6 +148,7 @@ export class MarketingDashboardService {
     const now = new Date();
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
 
+    // Single query: get reps with counts
     const reps = await this.prisma.marketingUser.findMany({
       where: { role: 'SALES_REP', status: 'ACTIVE' },
       select: {
@@ -150,35 +156,36 @@ export class MarketingDashboardService {
         firstName: true,
         lastName: true,
         _count: {
-          select: {
-            leads: true,
-            activities: true,
-          },
+          select: { leads: true, activities: true },
         },
       },
     });
 
-    // Get won leads per rep this month
-    const wonCounts = await Promise.all(
-      reps.map(async (rep) => {
-        const wonLeads = await this.prisma.lead.count({
-          where: {
-            assignedToId: rep.id,
-            status: 'WON',
-            convertedAt: { gte: firstDay },
-          },
-        });
-        return {
-          id: rep.id,
-          name: `${rep.firstName} ${rep.lastName}`,
-          totalLeads: rep._count.leads,
-          totalActivities: rep._count.activities,
-          wonThisMonth: wonLeads,
-        };
-      }),
+    if (reps.length === 0) return [];
+
+    // Batch query for won leads this month instead of N+1
+    const wonCounts = await this.prisma.lead.groupBy({
+      by: ['assignedToId'],
+      where: {
+        assignedToId: { in: reps.map((r) => r.id) },
+        status: 'WON',
+        convertedAt: { gte: firstDay },
+      },
+      _count: { id: true },
+    });
+
+    const wonMap = new Map(
+      wonCounts.map((w) => [w.assignedToId, w._count.id]),
     );
 
-    return wonCounts
+    return reps
+      .map((rep) => ({
+        id: rep.id,
+        name: `${rep.firstName} ${rep.lastName}`,
+        totalLeads: rep._count.leads,
+        totalActivities: rep._count.activities,
+        wonThisMonth: wonMap.get(rep.id) || 0,
+      }))
       .sort((a, b) => b.wonThisMonth - a.wonThisMonth)
       .slice(0, limit);
   }
