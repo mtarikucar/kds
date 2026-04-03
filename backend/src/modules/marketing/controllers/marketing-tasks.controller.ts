@@ -51,6 +51,11 @@ export class MarketingTasksController {
     return this.tasksService.findCalendar(dateFrom, dateTo, user.id, user.role);
   }
 
+  @Get(':id')
+  findOne(@Param('id') id: string, @CurrentMarketingUser() user: any) {
+    return this.tasksService.findOne(id, user.id, user.role);
+  }
+
   @Patch(':id')
   update(
     @Param('id') id: string,

@@ -13,3 +13,5 @@ export * from './create-marketing-user.dto';
 export * from './update-marketing-user.dto';
 export * from './commission-filter.dto';
 export * from './report-filter.dto';
+export * from './change-password.dto';
+export * from './update-profile.dto';

@@ -11,6 +11,8 @@ import { MarketingPublic } from '../decorators/marketing-public.decorator';
 import { CurrentMarketingUser } from '../decorators/current-marketing-user.decorator';
 import { MarketingAuthService } from '../services/marketing-auth.service';
 import { MarketingLoginDto } from '../dto/login.dto';
+import { ChangePasswordDto } from '../dto/change-password.dto';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
 
 @Controller('marketing/auth')
 @UseGuards(MarketingGuard)
@@ -37,20 +39,20 @@ export class MarketingAuthController {
   @Patch('profile')
   updateProfile(
     @CurrentMarketingUser() user: any,
-    @Body() data: { firstName?: string; lastName?: string; phone?: string },
+    @Body() dto: UpdateProfileDto,
   ) {
-    return this.authService.updateProfile(user.id, data);
+    return this.authService.updateProfile(user.id, dto);
   }
 
   @Post('change-password')
   changePassword(
     @CurrentMarketingUser() user: any,
-    @Body() data: { currentPassword: string; newPassword: string },
+    @Body() dto: ChangePasswordDto,
   ) {
     return this.authService.changePassword(
       user.id,
-      data.currentPassword,
-      data.newPassword,
+      dto.currentPassword,
+      dto.newPassword,
     );
   }
 }

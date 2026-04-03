@@ -146,6 +146,24 @@ export class MarketingTasksService {
     });
   }
 
+  async findOne(id: string, userId: string, userRole: string) {
+    const task = await this.prisma.marketingTask.findUnique({
+      where: { id },
+      include: {
+        lead: { select: { id: true, businessName: true, contactPerson: true } },
+        assignedTo: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+
+    if (!task) throw new NotFoundException('Task not found');
+
+    if (userRole === 'SALES_REP' && task.assignedToId !== userId) {
+      throw new ForbiddenException('You can only view your own tasks');
+    }
+
+    return task;
+  }
+
   async update(id: string, dto: UpdateTaskDto, userId: string, userRole: string) {
     const task = await this.prisma.marketingTask.findUnique({ where: { id } });
 
