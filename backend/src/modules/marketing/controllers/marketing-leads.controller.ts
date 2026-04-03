@@ -1,0 +1,84 @@
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import { MarketingGuard } from '../guards/marketing.guard';
+import { MarketingRolesGuard } from '../guards/marketing-roles.guard';
+import { CurrentMarketingUser } from '../decorators/current-marketing-user.decorator';
+import { MarketingRoles } from '../decorators/marketing-roles.decorator';
+import { MarketingLeadsService } from '../services/marketing-leads.service';
+import { CreateLeadDto } from '../dto/create-lead.dto';
+import { UpdateLeadDto } from '../dto/update-lead.dto';
+import { LeadFilterDto } from '../dto/lead-filter.dto';
+import { ConvertLeadDto } from '../dto/convert-lead.dto';
+
+@Controller('marketing/leads')
+@UseGuards(MarketingGuard, MarketingRolesGuard)
+export class MarketingLeadsController {
+  constructor(private readonly leadsService: MarketingLeadsService) {}
+
+  @Post()
+  create(@Body() dto: CreateLeadDto, @CurrentMarketingUser() user: any) {
+    return this.leadsService.create(dto, user.id);
+  }
+
+  @Get()
+  findAll(@Query() filter: LeadFilterDto, @CurrentMarketingUser() user: any) {
+    return this.leadsService.findAll(filter, user.id, user.role);
+  }
+
+  @Get(':id')
+  findOne(@Param('id') id: string, @CurrentMarketingUser() user: any) {
+    return this.leadsService.findOne(id, user.id, user.role);
+  }
+
+  @Patch(':id')
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateLeadDto,
+    @CurrentMarketingUser() user: any,
+  ) {
+    return this.leadsService.update(id, dto, user.id, user.role);
+  }
+
+  @Patch(':id/status')
+  updateStatus(
+    @Param('id') id: string,
+    @Body() body: { status: string; lostReason?: string },
+    @CurrentMarketingUser() user: any,
+  ) {
+    return this.leadsService.updateStatus(id, body.status, body.lostReason, user.id, user.role);
+  }
+
+  @Patch(':id/assign')
+  @MarketingRoles('SALES_MANAGER')
+  assign(
+    @Param('id') id: string,
+    @Body() body: { assignedToId: string },
+  ) {
+    return this.leadsService.assign(id, body.assignedToId);
+  }
+
+  @Post(':id/convert')
+  @MarketingRoles('SALES_MANAGER')
+  convert(
+    @Param('id') id: string,
+    @Body() dto: ConvertLeadDto,
+    @CurrentMarketingUser() user: any,
+  ) {
+    return this.leadsService.convert(id, dto, user.id);
+  }
+
+  @Delete(':id')
+  @MarketingRoles('SALES_MANAGER')
+  delete(@Param('id') id: string) {
+    return this.leadsService.delete(id);
+  }
+}

@@ -1,0 +1,55 @@
+import { useState } from 'react';
+import { Outlet } from 'react-router-dom';
+import MarketingSidebar from './MarketingSidebar';
+import MarketingHeader from './MarketingHeader';
+import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
+
+export default function MarketingLayout() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  return (
+    <div className="flex min-h-screen bg-gray-50">
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar - desktop */}
+      <div className="hidden lg:block">
+        <MarketingSidebar />
+      </div>
+
+      {/* Sidebar - mobile */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 transform lg:hidden transition-transform duration-300 ease-in-out ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <MarketingSidebar />
+      </div>
+
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex items-center lg:hidden px-4 py-3 border-b bg-white">
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 rounded-lg hover:bg-gray-100"
+          >
+            {sidebarOpen ? (
+              <XMarkIcon className="w-5 h-5" />
+            ) : (
+              <Bars3Icon className="w-5 h-5" />
+            )}
+          </button>
+        </div>
+        <MarketingHeader />
+        <main className="flex-1 p-4 lg:p-6 overflow-auto">
+          <Outlet />
+        </main>
+      </div>
+    </div>
+  );
+}
