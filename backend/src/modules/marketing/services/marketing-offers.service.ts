@@ -7,7 +7,21 @@ import { UpdateOfferDto } from '../dto/update-offer.dto';
 export class MarketingOffersService {
   constructor(private prisma: PrismaService) {}
 
-  async create(dto: CreateOfferDto, userId: string) {
+  async create(dto: CreateOfferDto, userId: string, userRole: string) {
+    // Validate lead exists
+    const lead = await this.prisma.lead.findUnique({
+      where: { id: dto.leadId },
+    });
+
+    if (!lead) {
+      throw new NotFoundException('Lead not found');
+    }
+
+    // SALES_REP can only create offers for their own leads
+    if (userRole === 'SALES_REP' && lead.assignedToId !== userId) {
+      throw new ForbiddenException('You can only create offers for your own leads');
+    }
+
     return this.prisma.leadOffer.create({
       data: {
         planId: dto.planId,
@@ -54,7 +68,7 @@ export class MarketingOffersService {
     };
   }
 
-  async findOne(id: string) {
+  async findOne(id: string, userId: string, userRole: string) {
     const offer = await this.prisma.leadOffer.findUnique({
       where: { id },
       include: {
@@ -66,6 +80,11 @@ export class MarketingOffersService {
     });
 
     if (!offer) throw new NotFoundException('Offer not found');
+
+    if (userRole === 'SALES_REP' && offer.createdById !== userId) {
+      throw new ForbiddenException('You can only view your own offers');
+    }
+
     return offer;
   }
 
@@ -100,7 +119,6 @@ export class MarketingOffersService {
       throw new ForbiddenException('You can only send your own offers');
     }
 
-    // Update offer status and lead status
     const [updatedOffer] = await this.prisma.$transaction([
       this.prisma.leadOffer.update({
         where: { id },

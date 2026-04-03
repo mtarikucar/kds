@@ -94,25 +94,27 @@ export class MarketingReportsService {
     if (filter.dateFrom) where.createdAt = { ...where.createdAt, gte: new Date(filter.dateFrom) };
     if (filter.dateTo) where.createdAt = { ...where.createdAt, lte: new Date(filter.dateTo) };
 
-    const leads = await this.prisma.lead.groupBy({
+    // Batch: total by city
+    const totals = await this.prisma.lead.groupBy({
       by: ['city'],
       where: { ...where, city: { not: null } },
       _count: { id: true },
     });
 
-    const data = await Promise.all(
-      leads.map(async (group) => {
-        const won = await this.prisma.lead.count({
-          where: { ...where, city: group.city, status: 'WON' },
-        });
+    // Batch: won by city (single query instead of N+1)
+    const wonTotals = await this.prisma.lead.groupBy({
+      by: ['city'],
+      where: { ...where, city: { not: null }, status: 'WON' },
+      _count: { id: true },
+    });
 
-        return {
-          city: group.city,
-          total: group._count.id,
-          won,
-        };
-      }),
-    );
+    const wonMap = new Map(wonTotals.map((w) => [w.city, w._count.id]));
+
+    const data = totals.map((group) => ({
+      city: group.city,
+      total: group._count.id,
+      won: wonMap.get(group.city) || 0,
+    }));
 
     return data.sort((a, b) => b.total - a.total);
   }

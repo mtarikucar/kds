@@ -50,8 +50,9 @@ export class MarketingTasksService {
       if (filter.dateTo) where.dueDate.lte = new Date(filter.dateTo);
     }
 
+    const allowedSortFields = ['createdAt', 'updatedAt', 'dueDate', 'title', 'type', 'status', 'priority'];
     const orderBy: any = {};
-    if (filter.sortBy) {
+    if (filter.sortBy && allowedSortFields.includes(filter.sortBy)) {
       orderBy[filter.sortBy] = filter.sortOrder || 'asc';
     } else {
       orderBy.dueDate = 'asc';

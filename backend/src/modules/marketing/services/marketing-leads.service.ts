@@ -61,8 +61,9 @@ export class MarketingLeadsService {
       if (filter.dateTo) where.createdAt.lte = new Date(filter.dateTo);
     }
 
+    const allowedSortFields = ['createdAt', 'updatedAt', 'businessName', 'contactPerson', 'city', 'status', 'source', 'priority', 'nextFollowUp'];
     const orderBy: any = {};
-    if (filter.sortBy) {
+    if (filter.sortBy && allowedSortFields.includes(filter.sortBy)) {
       orderBy[filter.sortBy] = filter.sortOrder || 'desc';
     } else {
       orderBy.createdAt = 'desc';
@@ -115,6 +116,7 @@ export class MarketingLeadsService {
         },
         offers: {
           orderBy: { createdAt: 'desc' },
+          take: 20,
           include: {
             createdBy: {
               select: { id: true, firstName: true, lastName: true },
@@ -123,6 +125,7 @@ export class MarketingLeadsService {
         },
         tasks: {
           orderBy: { dueDate: 'asc' },
+          take: 50,
           where: { status: { not: 'CANCELLED' } },
           include: {
             assignedTo: {

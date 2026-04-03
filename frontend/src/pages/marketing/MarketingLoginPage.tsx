@@ -21,7 +21,7 @@ export default function MarketingLoginPage() {
       login(data.user, data.accessToken, data.refreshToken);
       navigate('/marketing/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed');
+      setError(err.response?.data?.message || err.message || 'Login failed. Please check your connection.');
     } finally {
       setLoading(false);
     }

@@ -85,11 +85,11 @@ export default function CommissionsPage() {
             <tbody className="divide-y divide-gray-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">Loading...</td>
+                  <td colSpan={isManager ? 7 : 6} className="px-4 py-8 text-center text-gray-500">Loading...</td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">No commissions found</td>
+                  <td colSpan={isManager ? 7 : 6} className="px-4 py-8 text-center text-gray-500">No commissions found</td>
                 </tr>
               ) : (
                 items.map((c) => (

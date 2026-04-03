@@ -29,7 +29,7 @@ export default function LeadDetailPage() {
 
   const { data: lead, isLoading } = useQuery({
     queryKey: ['marketing', 'lead', id],
-    queryFn: () => marketingApi.get<Lead>(`/leads/${id}`).then((r) => r.data),
+    queryFn: () => marketingApi.get<Lead & { activities: LeadActivity[] }>(`/leads/${id}`).then((r) => r.data),
   });
 
   const statusMutation = useMutation({
@@ -260,7 +260,7 @@ export default function LeadDetailPage() {
               </div>
             )}
 
-            <ActivityTimeline activities={(lead as any).activities || []} />
+            <ActivityTimeline activities={lead.activities || []} />
           </div>
         </div>
       </div>
