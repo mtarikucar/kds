@@ -1,11 +1,15 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useMarketingAuthStore } from '../../store/marketingAuthStore';
 import marketingApi from '../../features/marketing/api/marketingApi';
 
 export default function MarketingLoginPage() {
   const navigate = useNavigate();
-  const { login } = useMarketingAuthStore();
+  const { login, isAuthenticated } = useMarketingAuthStore();
+
+  if (isAuthenticated) {
+    return <Navigate to="/marketing/dashboard" replace />;
+  }
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');

@@ -1,10 +1,14 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CommissionFilterDto } from '../dto/commission-filter.dto';
+import { MarketingNotificationsService } from './marketing-notifications.service';
 
 @Injectable()
 export class MarketingCommissionsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: MarketingNotificationsService,
+  ) {}
 
   async findAll(filter: CommissionFilterDto, userId: string, userRole: string) {
     const page = filter.page || 1;
@@ -90,22 +94,44 @@ export class MarketingCommissionsService {
   }
 
   async approve(id: string) {
-    const commission = await this.prisma.commission.findUnique({ where: { id } });
-    if (!commission) throw new NotFoundException('Commission not found');
+    const commission = await this.prisma.$transaction(async (tx) => {
+      const c = await tx.commission.findUnique({ where: { id } });
+      if (!c) throw new NotFoundException('Commission not found');
 
-    return this.prisma.commission.update({
-      where: { id },
-      data: { status: 'APPROVED', approvedAt: new Date() },
+      if (c.status !== 'PENDING') {
+        throw new BadRequestException('Only PENDING commissions can be approved');
+      }
+
+      return tx.commission.update({
+        where: { id },
+        data: { status: 'APPROVED', approvedAt: new Date() },
+      });
     });
+
+    this.notificationsService.create({
+      userId: commission.marketingUserId,
+      type: 'COMMISSION_APPROVED',
+      title: 'Commission approved',
+      message: `Your commission of ${commission.amount} has been approved`,
+      metadata: { commissionId: id },
+    }).catch(() => {});
+
+    return commission;
   }
 
   async markPaid(id: string) {
-    const commission = await this.prisma.commission.findUnique({ where: { id } });
-    if (!commission) throw new NotFoundException('Commission not found');
+    return this.prisma.$transaction(async (tx) => {
+      const commission = await tx.commission.findUnique({ where: { id } });
+      if (!commission) throw new NotFoundException('Commission not found');
 
-    return this.prisma.commission.update({
-      where: { id },
-      data: { status: 'PAID', paidAt: new Date() },
+      if (commission.status !== 'APPROVED') {
+        throw new BadRequestException('Only APPROVED commissions can be marked as paid');
+      }
+
+      return tx.commission.update({
+        where: { id },
+        data: { status: 'PAID', paidAt: new Date() },
+      });
     });
   }
 }

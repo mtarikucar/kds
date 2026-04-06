@@ -7,6 +7,7 @@ import {
   Param,
   UseGuards,
 } from '@nestjs/common';
+import { MarketingRoute } from '../decorators/marketing-route.decorator';
 import { MarketingGuard } from '../guards/marketing.guard';
 import { MarketingRolesGuard } from '../guards/marketing-roles.guard';
 import { CurrentMarketingUser } from '../decorators/current-marketing-user.decorator';
@@ -14,6 +15,7 @@ import { MarketingRoles } from '../decorators/marketing-roles.decorator';
 import { MarketingActivitiesService } from '../services/marketing-activities.service';
 import { CreateActivityDto } from '../dto/create-activity.dto';
 
+@MarketingRoute()
 @Controller('marketing')
 @UseGuards(MarketingGuard, MarketingRolesGuard)
 export class MarketingActivitiesController {

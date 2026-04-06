@@ -1,14 +1,30 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateLeadDto } from '../dto/create-lead.dto';
 import { UpdateLeadDto } from '../dto/update-lead.dto';
 import { LeadFilterDto } from '../dto/lead-filter.dto';
 import { ConvertLeadDto } from '../dto/convert-lead.dto';
+import { MarketingNotificationsService } from './marketing-notifications.service';
 import * as bcrypt from 'bcryptjs';
+
+const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
+  NEW: ['CONTACTED', 'NOT_REACHABLE', 'LOST'],
+  CONTACTED: ['MEETING_DONE', 'DEMO_SCHEDULED', 'NOT_REACHABLE', 'WAITING', 'LOST'],
+  NOT_REACHABLE: ['CONTACTED', 'LOST'],
+  MEETING_DONE: ['DEMO_SCHEDULED', 'OFFER_SENT', 'WAITING', 'LOST'],
+  DEMO_SCHEDULED: ['MEETING_DONE', 'OFFER_SENT', 'WAITING', 'LOST'],
+  OFFER_SENT: ['WAITING', 'WON', 'LOST'],
+  WAITING: ['CONTACTED', 'OFFER_SENT', 'WON', 'LOST'],
+  LOST: ['NEW'],
+  WON: [],
+};
 
 @Injectable()
 export class MarketingLeadsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: MarketingNotificationsService,
+  ) {}
 
   async create(dto: CreateLeadDto, userId: string) {
     return this.prisma.lead.create({
@@ -186,6 +202,13 @@ export class MarketingLeadsService {
       throw new ForbiddenException('You can only update your own leads');
     }
 
+    const allowed = VALID_STATUS_TRANSITIONS[lead.status];
+    if (allowed && !allowed.includes(status)) {
+      throw new BadRequestException(
+        `Cannot transition from ${lead.status} to ${status}`,
+      );
+    }
+
     const updatedLead = await this.prisma.lead.update({
       where: { id },
       data: {
@@ -232,15 +255,93 @@ export class MarketingLeadsService {
     if (!lead) throw new NotFoundException('Lead not found');
     if (lead.convertedTenantId) throw new ForbiddenException('Lead already converted');
 
+    // Resolve subscription plan
+    let plan: any;
+    if (dto.planId) {
+      plan = await this.prisma.subscriptionPlan.findUnique({ where: { id: dto.planId } });
+      if (!plan) throw new NotFoundException('Subscription plan not found');
+    } else {
+      plan = await this.prisma.subscriptionPlan.findUnique({ where: { name: 'FREE' } });
+      if (!plan) throw new NotFoundException('FREE subscription plan not found');
+    }
+
+    // Validate offer if provided
+    let linkedOffer: any = null;
+    if (dto.offerId) {
+      linkedOffer = await this.prisma.leadOffer.findFirst({
+        where: { id: dto.offerId, leadId: id },
+      });
+      if (!linkedOffer) throw new NotFoundException('Offer not found for this lead');
+      if (!['DRAFT', 'SENT'].includes(linkedOffer.status)) {
+        throw new BadRequestException(`Offer status is ${linkedOffer.status}, cannot accept`);
+      }
+      if (linkedOffer.validUntil && new Date(linkedOffer.validUntil) < new Date()) {
+        throw new BadRequestException('Offer has expired');
+      }
+    }
+
+    // Generate subdomain
+    const baseSubdomain = dto.tenantName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    let finalSubdomain = baseSubdomain;
+    const existingTenant = await this.prisma.tenant.findUnique({
+      where: { subdomain: baseSubdomain },
+    });
+    if (existingTenant) {
+      finalSubdomain = `${baseSubdomain}-${Math.random().toString(36).substring(2, 8)}`;
+    }
+
     const hashedPassword = await bcrypt.hash(dto.adminPassword, 10);
 
-    // Transaction: create tenant, admin user, update lead, create commission
     const result = await this.prisma.$transaction(async (tx) => {
-      // Create tenant
+      // Create tenant with plan and subdomain
       const tenant = await tx.tenant.create({
         data: {
           name: dto.tenantName,
-          ...(dto.planId ? { currentPlanId: dto.planId } : {}),
+          subdomain: finalSubdomain,
+          currentPlanId: plan.id,
+          paymentRegion: 'TURKEY',
+        },
+      });
+
+      // Create subscription (mirrors auth.service.ts registration)
+      const now = new Date();
+      const isFreePlan = plan.name === 'FREE';
+      const hasTrial = linkedOffer?.trialDays && linkedOffer.trialDays > 0;
+
+      const currentPeriodEnd = new Date(now);
+      if (isFreePlan) {
+        currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 10);
+      } else if (hasTrial) {
+        currentPeriodEnd.setDate(currentPeriodEnd.getDate() + linkedOffer.trialDays);
+      } else {
+        currentPeriodEnd.setMonth(currentPeriodEnd.getMonth() + 1);
+      }
+
+      const amount = linkedOffer?.customPrice
+        ? Number(linkedOffer.customPrice)
+        : isFreePlan
+          ? 0
+          : Number(plan.monthlyPrice || 0);
+
+      await tx.subscription.create({
+        data: {
+          tenantId: tenant.id,
+          planId: plan.id,
+          status: 'ACTIVE',
+          billingCycle: 'MONTHLY',
+          paymentProvider: 'EMAIL',
+          startDate: now,
+          currentPeriodStart: now,
+          currentPeriodEnd,
+          isTrialPeriod: hasTrial ? true : false,
+          ...(hasTrial ? { trialStart: now, trialEnd: currentPeriodEnd } : {}),
+          amount,
+          currency: plan.currency || 'TRY',
+          autoRenew: true,
+          cancelAtPeriodEnd: false,
         },
       });
 
@@ -268,14 +369,21 @@ export class MarketingLeadsService {
         },
       });
 
+      // Mark the linked offer as accepted
+      if (linkedOffer) {
+        await tx.leadOffer.update({
+          where: { id: dto.offerId },
+          data: { status: 'ACCEPTED', respondedAt: new Date() },
+        });
+      }
+
       // Create commission for the rep
       if (lead.assignedToId) {
-        const now = new Date();
         const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
         await tx.commission.create({
           data: {
-            amount: 0, // Will be calculated based on business rules
+            amount: dto.commissionAmount ?? 0,
             type: 'SIGNUP',
             status: 'PENDING',
             period,
@@ -291,7 +399,7 @@ export class MarketingLeadsService {
         data: {
           type: 'STATUS_CHANGE',
           title: 'Lead converted to customer',
-          description: `Tenant "${dto.tenantName}" created`,
+          description: `Tenant "${dto.tenantName}" created with plan "${plan.name}"`,
           leadId: id,
           createdById: userId,
         },
@@ -299,6 +407,16 @@ export class MarketingLeadsService {
 
       return { lead: updatedLead, tenantId: tenant.id };
     });
+
+    if (lead.assignedToId) {
+      this.notificationsService.create({
+        userId: lead.assignedToId,
+        type: 'LEAD_CONVERTED',
+        title: 'Lead converted',
+        message: `"${dto.tenantName}" has been converted to a customer`,
+        metadata: { leadId: id, tenantId: result.tenantId },
+      }).catch(() => {});  // fire-and-forget, don't fail the main flow
+    }
 
     return result;
   }

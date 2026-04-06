@@ -5,6 +5,7 @@ import {
   Param,
   UseGuards,
   Res,
+  Request,
   NotFoundException,
 } from '@nestjs/common';
 import { Response } from 'express';
@@ -29,9 +30,12 @@ export class InvoiceController {
    */
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async getInvoice(@Param('id') id: string) {
+  async getInvoice(@Param('id') id: string, @Request() req) {
     const invoice = await this.billingService.getInvoiceByNumber(id);
     if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+    if (invoice.subscription?.tenantId !== req.user.tenantId) {
       throw new NotFoundException('Invoice not found');
     }
     return invoice;
@@ -42,10 +46,14 @@ export class InvoiceController {
    */
   @Get(':id/download')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async downloadInvoice(@Param('id') id: string, @Res() res: Response) {
+  async downloadInvoice(@Param('id') id: string, @Res() res: Response, @Request() req) {
     const invoice = await this.billingService.getInvoiceByNumber(id);
 
     if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+
+    if (invoice.subscription?.tenantId !== req.user.tenantId) {
       throw new NotFoundException('Invoice not found');
     }
 

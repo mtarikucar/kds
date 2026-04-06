@@ -1,10 +1,12 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
+import { MarketingRoute } from '../decorators/marketing-route.decorator';
 import { MarketingGuard } from '../guards/marketing.guard';
 import { MarketingRolesGuard } from '../guards/marketing-roles.guard';
 import { CurrentMarketingUser } from '../decorators/current-marketing-user.decorator';
 import { MarketingRoles } from '../decorators/marketing-roles.decorator';
 import { MarketingDashboardService } from '../services/marketing-dashboard.service';
 
+@MarketingRoute()
 @Controller('marketing/dashboard')
 @UseGuards(MarketingGuard, MarketingRolesGuard)
 export class MarketingDashboardController {

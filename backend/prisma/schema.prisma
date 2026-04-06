@@ -114,6 +114,8 @@ model Tenant {
   shiftTemplates        ShiftTemplate[]
   shiftAssignments      ShiftAssignment[]
   shiftSwapRequests     ShiftSwapRequest[]
+  marketingCommissions  Commission[]        @relation("MarketingCommissions")
+  convertedLead         Lead?               @relation("ConvertedTenant")
 
   @@index([currentPlanId])
   @@map("tenants")
@@ -630,6 +632,7 @@ model SubscriptionPlan {
   subscriptions           Subscription[]
   currentPlanTenants      Tenant[]             @relation("CurrentPlan")
   scheduledDowngrades     Subscription[]       @relation("ScheduledDowngrade")
+  leadOffers              LeadOffer[]
 
   @@map("subscription_plans")
 }
@@ -2548,6 +2551,7 @@ model Lead {
 
   // Conversion tracking
   convertedTenantId String?   @unique
+  convertedTenant   Tenant?   @relation("ConvertedTenant", fields: [convertedTenantId], references: [id], onDelete: SetNull)
   convertedAt       DateTime?
 
   createdAt         DateTime  @default(now())
@@ -2557,6 +2561,7 @@ model Lead {
   activities        LeadActivity[]
   tasks             MarketingTask[]
   offers            LeadOffer[]
+  commissions       Commission[]      @relation("CommissionLead")
 
   @@index([assignedToId])
   @@index([status])
@@ -2583,7 +2588,7 @@ model LeadActivity {
   lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   createdById String
-  createdBy   MarketingUser @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdBy   MarketingUser @relation(fields: [createdById], references: [id], onDelete: Restrict)
 
   createdAt   DateTime  @default(now())
 
@@ -2625,6 +2630,7 @@ model MarketingTask {
 model LeadOffer {
   id              String    @id @default(uuid())
   planId          String?
+  plan            SubscriptionPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
   customPrice     Decimal?  @db.Decimal(10, 2)
   discount        Decimal?  @db.Decimal(5, 2)
   trialDays       Int?
@@ -2638,7 +2644,7 @@ model LeadOffer {
   lead            Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   createdById     String
-  createdBy       MarketingUser @relation(fields: [createdById], references: [id], onDelete: Cascade)
+  createdBy       MarketingUser @relation(fields: [createdById], references: [id], onDelete: Restrict)
 
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
@@ -2657,11 +2663,13 @@ model Commission {
   status          String    @default("PENDING") // PENDING, APPROVED, PAID
   period          String    // "2026-04" (YYYY-MM format)
   tenantId        String?
+  tenant          Tenant?   @relation("MarketingCommissions", fields: [tenantId], references: [id], onDelete: SetNull)
   leadId          String?
+  lead            Lead?     @relation("CommissionLead", fields: [leadId], references: [id], onDelete: SetNull)
   notes           String?   @db.Text
 
   marketingUserId String
-  marketingUser   MarketingUser @relation(fields: [marketingUserId], references: [id], onDelete: Cascade)
+  marketingUser   MarketingUser @relation(fields: [marketingUserId], references: [id], onDelete: Restrict)
 
   approvedAt      DateTime?
   paidAt          DateTime?
@@ -2669,6 +2677,8 @@ model Commission {
   updatedAt       DateTime  @updatedAt
 
   @@index([marketingUserId])
+  @@index([tenantId])
+  @@index([leadId])
   @@index([period])
   @@index([status])
   @@index([period, status])

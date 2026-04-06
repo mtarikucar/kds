@@ -17,7 +17,7 @@ export class MarketingAuthService {
     private configService: ConfigService,
   ) {}
 
-  async login(dto: MarketingLoginDto) {
+  async login(dto: MarketingLoginDto, ip?: string) {
     const user = await this.prisma.marketingUser.findUnique({
       where: { email: dto.email },
     });
@@ -55,6 +55,7 @@ export class MarketingAuthService {
         failedLogins: 0,
         lockedUntil: null,
         lastLogin: new Date(),
+        ...(ip ? { lastLoginIp: ip } : {}),
       },
     });
 

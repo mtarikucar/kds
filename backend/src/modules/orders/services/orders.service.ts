@@ -124,9 +124,14 @@ export class OrdersService {
       }
     }
 
+    // Build product price map from DB (never trust client-supplied prices)
+    const productPriceMap = new Map(products.map((p) => [p.id, Number(p.price)]));
+
     // Calculate totals
     let totalAmount = 0;
     const orderItems = createOrderDto.items.map((item) => {
+      const serverPrice = productPriceMap.get(item.productId) ?? 0;
+
       // Calculate modifier total for this item
       let modifierTotal = 0;
       const itemModifiers = (item.modifiers || []).map((mod) => {
@@ -140,13 +145,13 @@ export class OrdersService {
         };
       });
 
-      const subtotal = item.quantity * (item.unitPrice + modifierTotal);
+      const subtotal = item.quantity * (serverPrice + modifierTotal);
       totalAmount += subtotal;
 
       return {
         productId: item.productId,
         quantity: item.quantity,
-        unitPrice: item.unitPrice,
+        unitPrice: serverPrice,
         subtotal,
         modifierTotal,
         notes: item.notes,

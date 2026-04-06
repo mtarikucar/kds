@@ -68,8 +68,8 @@ export class SubscriptionController {
    */
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async getSubscription(@Param('id') id: string) {
-    return await this.subscriptionService.getSubscriptionById(id);
+  async getSubscription(@Param('id') id: string, @Request() req) {
+    return await this.subscriptionService.getSubscriptionById(id, req.user.tenantId);
   }
 
   /**
@@ -90,7 +90,9 @@ export class SubscriptionController {
   async updateSubscription(
     @Param('id') id: string,
     @Body() dto: UpdateSubscriptionDto,
+    @Request() req,
   ) {
+    await this.subscriptionService.getSubscriptionById(id, req.user.tenantId);
     return await this.subscriptionService.updateSubscription(id, dto);
   }
 
@@ -99,7 +101,8 @@ export class SubscriptionController {
    */
   @Post(':id/change-plan')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async changePlan(@Param('id') id: string, @Body() dto: ChangePlanDto) {
+  async changePlan(@Param('id') id: string, @Body() dto: ChangePlanDto, @Request() req) {
+    await this.subscriptionService.getSubscriptionById(id, req.user.tenantId);
     return await this.subscriptionService.changePlan(id, dto);
   }
 
@@ -108,7 +111,8 @@ export class SubscriptionController {
    */
   @Get(':id/scheduled-downgrade')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async getScheduledDowngrade(@Param('id') id: string) {
+  async getScheduledDowngrade(@Param('id') id: string, @Request() req) {
+    await this.subscriptionService.getSubscriptionById(id, req.user.tenantId);
     return await this.subscriptionService.getScheduledDowngrade(id);
   }
 
@@ -120,7 +124,9 @@ export class SubscriptionController {
   async cancelSubscription(
     @Param('id') id: string,
     @Body() body: { immediate?: boolean; reason?: string },
+    @Request() req,
   ) {
+    await this.subscriptionService.getSubscriptionById(id, req.user.tenantId);
     return await this.subscriptionService.cancelSubscription(
       id,
       body.immediate || false,
@@ -133,7 +139,8 @@ export class SubscriptionController {
    */
   @Post(':id/reactivate')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async reactivateSubscription(@Param('id') id: string) {
+  async reactivateSubscription(@Param('id') id: string, @Request() req) {
+    await this.subscriptionService.getSubscriptionById(id, req.user.tenantId);
     return await this.subscriptionService.reactivateSubscription(id);
   }
 
@@ -142,7 +149,8 @@ export class SubscriptionController {
    */
   @Get(':id/invoices')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async getInvoices(@Param('id') id: string) {
+  async getInvoices(@Param('id') id: string, @Request() req) {
+    await this.subscriptionService.getSubscriptionById(id, req.user.tenantId);
     return await this.billingService.getSubscriptionInvoices(id);
   }
 
@@ -151,7 +159,8 @@ export class SubscriptionController {
    */
   @Delete(':id/scheduled-downgrade')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async cancelScheduledDowngrade(@Param('id') id: string) {
+  async cancelScheduledDowngrade(@Param('id') id: string, @Request() req) {
+    await this.subscriptionService.getSubscriptionById(id, req.user.tenantId);
     return await this.subscriptionService.cancelScheduledDowngrade(id);
   }
 

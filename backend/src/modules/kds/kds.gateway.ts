@@ -120,6 +120,9 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('join-kitchen')
   handleJoinKitchen(client: Socket) {
+    if (client.data.userType === 'customer') {
+      return;
+    }
     const tenantId = client.data.tenantId;
     client.join(`kitchen-${tenantId}`);
     this.logger.log(`Client ${client.id} joined kitchen-${tenantId}`);
@@ -127,6 +130,9 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('join-pos')
   handleJoinPos(client: Socket) {
+    if (client.data.userType === 'customer') {
+      return;
+    }
     const tenantId = client.data.tenantId;
     client.join(`pos-${tenantId}`);
     this.logger.log(`Client ${client.id} joined pos-${tenantId}`);

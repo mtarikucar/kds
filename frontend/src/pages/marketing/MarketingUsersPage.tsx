@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { PlusIcon } from '@heroicons/react/24/outline';
+import { toast } from 'sonner';
+import { PlusIcon, PencilIcon, KeyIcon } from '@heroicons/react/24/outline';
 import marketingApi from '../../features/marketing/api/marketingApi';
 
 export default function MarketingUsersPage() {
@@ -16,6 +17,19 @@ export default function MarketingUsersPage() {
   });
   const [error, setError] = useState('');
 
+  // Edit user state
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    firstName: '',
+    lastName: '',
+    phone: '',
+    role: 'SALES_REP',
+  });
+
+  // Reset password state
+  const [resetPasswordUserId, setResetPasswordUserId] = useState<string | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+
   const { data: users, isLoading } = useQuery({
     queryKey: ['marketing', 'users'],
     queryFn: () => marketingApi.get('/users').then((r) => r.data),
@@ -28,16 +42,90 @@ export default function MarketingUsersPage() {
       setShowForm(false);
       setForm({ email: '', password: '', firstName: '', lastName: '', phone: '', role: 'SALES_REP' });
       setError('');
+      toast.success('User created');
     },
     onError: (err: any) => {
       setError(err.response?.data?.message || 'Failed to create user');
+      toast.error('Failed to create user');
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => marketingApi.delete(`/users/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['marketing', 'users'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['marketing', 'users'] });
+      toast.success('User deactivated');
+    },
+    onError: () => {
+      toast.error('Failed to deactivate user');
+    },
   });
+
+  const editMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      marketingApi.patch(`/users/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['marketing', 'users'] });
+      setEditingUserId(null);
+      toast.success('User updated');
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'Failed to update user');
+    },
+  });
+
+  const reactivateMutation = useMutation({
+    mutationFn: (id: string) =>
+      marketingApi.patch(`/users/${id}`, { status: 'ACTIVE' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['marketing', 'users'] });
+      toast.success('User reactivated');
+    },
+    onError: () => {
+      toast.error('Failed to reactivate user');
+    },
+  });
+
+  const resetPasswordMutation = useMutation({
+    mutationFn: ({ id, password }: { id: string; password: string }) =>
+      marketingApi.patch(`/users/${id}`, { password }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['marketing', 'users'] });
+      setResetPasswordUserId(null);
+      setNewPassword('');
+      toast.success('Password reset successfully');
+    },
+    onError: (err: any) => {
+      toast.error(err.response?.data?.message || 'Failed to reset password');
+    },
+  });
+
+  const startEditing = (u: any) => {
+    setEditingUserId(u.id);
+    setEditForm({
+      firstName: u.firstName || '',
+      lastName: u.lastName || '',
+      phone: u.phone || '',
+      role: u.role || 'SALES_REP',
+    });
+    setResetPasswordUserId(null);
+    setNewPassword('');
+  };
+
+  const cancelEditing = () => {
+    setEditingUserId(null);
+  };
+
+  const startResetPassword = (id: string) => {
+    setResetPasswordUserId(id);
+    setNewPassword('');
+    setEditingUserId(null);
+  };
+
+  const cancelResetPassword = () => {
+    setResetPasswordUserId(null);
+    setNewPassword('');
+  };
 
   return (
     <div className="space-y-4">
@@ -148,42 +236,159 @@ export default function MarketingUsersPage() {
               ) : (
                 users.map((u: any) => (
                   <tr key={u.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-medium text-gray-900">
-                      {u.firstName} {u.lastName}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600">{u.email}</td>
-                    <td className="px-4 py-3">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                        u.role === 'SALES_MANAGER' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
-                      }`}>
-                        {u.role === 'SALES_MANAGER' ? 'Manager' : 'Sales Rep'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 hidden md:table-cell">
-                      <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
-                        u.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
-                        {u.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 hidden md:table-cell">{u._count?.leads || 0}</td>
-                    <td className="px-4 py-3 hidden lg:table-cell text-gray-400 text-xs">
-                      {u.lastLogin ? new Date(u.lastLogin).toLocaleString() : 'Never'}
-                    </td>
-                    <td className="px-4 py-3">
-                      {u.status === 'ACTIVE' && (
-                        <button
-                          onClick={() => {
-                            if (confirm('Deactivate this user?')) {
-                              deleteMutation.mutate(u.id);
-                            }
-                          }}
-                          className="text-xs text-red-600 hover:text-red-800"
-                        >
-                          Deactivate
-                        </button>
-                      )}
-                    </td>
+                    {editingUserId === u.id ? (
+                      <>
+                        <td className="px-4 py-3" colSpan={7}>
+                          <div className="space-y-3">
+                            <h4 className="text-xs font-semibold text-gray-500 uppercase">Edit User</h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                              <input
+                                type="text"
+                                placeholder="First Name"
+                                value={editForm.firstName}
+                                onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                                className="px-3 py-2 border rounded-lg text-sm"
+                              />
+                              <input
+                                type="text"
+                                placeholder="Last Name"
+                                value={editForm.lastName}
+                                onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                                className="px-3 py-2 border rounded-lg text-sm"
+                              />
+                              <input
+                                type="tel"
+                                placeholder="Phone"
+                                value={editForm.phone}
+                                onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                                className="px-3 py-2 border rounded-lg text-sm"
+                              />
+                              <select
+                                value={editForm.role}
+                                onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                                className="px-3 py-2 border rounded-lg text-sm"
+                              >
+                                <option value="SALES_REP">Sales Rep</option>
+                                <option value="SALES_MANAGER">Sales Manager</option>
+                              </select>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => editMutation.mutate({ id: u.id, data: editForm })}
+                                disabled={!editForm.firstName || !editForm.lastName || editMutation.isPending}
+                                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                              >
+                                {editMutation.isPending ? 'Saving...' : 'Save'}
+                              </button>
+                              <button
+                                onClick={cancelEditing}
+                                className="px-4 py-2 border rounded-lg text-sm"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </>
+                    ) : resetPasswordUserId === u.id ? (
+                      <>
+                        <td className="px-4 py-3 font-medium text-gray-900">
+                          {u.firstName} {u.lastName}
+                        </td>
+                        <td className="px-4 py-3" colSpan={5}>
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="password"
+                              placeholder="New password"
+                              value={newPassword}
+                              onChange={(e) => setNewPassword(e.target.value)}
+                              className="px-3 py-2 border rounded-lg text-sm w-48"
+                            />
+                            <button
+                              onClick={() => resetPasswordMutation.mutate({ id: u.id, password: newPassword })}
+                              disabled={!newPassword || resetPasswordMutation.isPending}
+                              className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-50"
+                            >
+                              {resetPasswordMutation.isPending ? 'Resetting...' : 'Confirm'}
+                            </button>
+                            <button
+                              onClick={cancelResetPassword}
+                              className="px-3 py-1.5 border rounded-lg text-xs"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3" />
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-4 py-3 font-medium text-gray-900">
+                          {u.firstName} {u.lastName}
+                        </td>
+                        <td className="px-4 py-3 text-gray-600">{u.email}</td>
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                            u.role === 'SALES_MANAGER' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'
+                          }`}>
+                            {u.role === 'SALES_MANAGER' ? 'Manager' : 'Sales Rep'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 hidden md:table-cell">
+                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${
+                            u.status === 'ACTIVE' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {u.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 hidden md:table-cell">{u._count?.leads || 0}</td>
+                        <td className="px-4 py-3 hidden lg:table-cell text-gray-400 text-xs">
+                          {u.lastLogin ? new Date(u.lastLogin).toLocaleString() : 'Never'}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => startEditing(u)}
+                              className="text-gray-400 hover:text-indigo-600"
+                              title="Edit user"
+                            >
+                              <PencilIcon className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => startResetPassword(u.id)}
+                              className="text-gray-400 hover:text-indigo-600"
+                              title="Reset password"
+                            >
+                              <KeyIcon className="w-4 h-4" />
+                            </button>
+                            {u.status === 'ACTIVE' ? (
+                              <button
+                                onClick={() => {
+                                  if (confirm('Deactivate this user?')) {
+                                    deleteMutation.mutate(u.id);
+                                  }
+                                }}
+                                className="text-xs text-red-600 hover:text-red-800"
+                              >
+                                Deactivate
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  if (confirm('Reactivate this user?')) {
+                                    reactivateMutation.mutate(u.id);
+                                  }
+                                }}
+                                disabled={reactivateMutation.isPending}
+                                className="text-xs text-green-600 hover:text-green-800 disabled:opacity-50"
+                              >
+                                Reactivate
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))
               )}

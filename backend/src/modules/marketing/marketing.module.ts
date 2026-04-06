@@ -14,6 +14,7 @@ import {
   MarketingReportsController,
   MarketingUsersController,
   MarketingCommissionsController,
+  MarketingNotificationsController,
 } from './controllers';
 
 // Services
@@ -27,6 +28,7 @@ import {
   MarketingReportsService,
   MarketingUsersService,
   MarketingCommissionsService,
+  MarketingNotificationsService,
 } from './services';
 
 // Guards & Strategies
@@ -58,6 +60,7 @@ import { MarketingJwtStrategy } from './strategies/marketing-jwt.strategy';
     MarketingReportsController,
     MarketingUsersController,
     MarketingCommissionsController,
+    MarketingNotificationsController,
   ],
   providers: [
     // Services
@@ -70,6 +73,7 @@ import { MarketingJwtStrategy } from './strategies/marketing-jwt.strategy';
     MarketingReportsService,
     MarketingUsersService,
     MarketingCommissionsService,
+    MarketingNotificationsService,
     // Guards & Strategies
     MarketingGuard,
     MarketingRolesGuard,
@@ -78,6 +82,7 @@ import { MarketingJwtStrategy } from './strategies/marketing-jwt.strategy';
   exports: [
     MarketingAuthService,
     MarketingUsersService,
+    MarketingNotificationsService,
   ],
 })
 export class MarketingModule {}

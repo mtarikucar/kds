@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import marketingApi from '../../features/marketing/api/marketingApi';
 import {
   BusinessType,
@@ -73,10 +74,12 @@ export default function CreateLeadPage() {
         : marketingApi.post('/leads', data),
     onSuccess: (res) => {
       const leadId = isEdit ? id : res.data.id;
+      toast.success(isEdit ? 'Lead updated' : 'Lead created');
       navigate(`/marketing/leads/${leadId}`);
     },
     onError: (err: any) => {
       setError(err.response?.data?.message || 'Failed to save lead');
+      toast.error('Failed to save lead');
     },
   });
 

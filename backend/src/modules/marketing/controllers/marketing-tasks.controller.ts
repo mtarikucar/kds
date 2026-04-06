@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { MarketingRoute } from '../decorators/marketing-route.decorator';
 import { MarketingGuard } from '../guards/marketing.guard';
 import { MarketingRolesGuard } from '../guards/marketing-roles.guard';
 import { CurrentMarketingUser } from '../decorators/current-marketing-user.decorator';
@@ -17,6 +18,7 @@ import { CreateTaskDto } from '../dto/create-task.dto';
 import { UpdateTaskDto } from '../dto/update-task.dto';
 import { TaskFilterDto } from '../dto/task-filter.dto';
 
+@MarketingRoute()
 @Controller('marketing/tasks')
 @UseGuards(MarketingGuard, MarketingRolesGuard)
 export class MarketingTasksController {

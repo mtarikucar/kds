@@ -80,11 +80,11 @@ export class InputSanitizerMiddleware implements NestMiddleware {
 @Injectable()
 export class SqlInjectionPreventionMiddleware implements NestMiddleware {
   private readonly sqlPatterns = [
-    /(\%27)|(\')|(\-\-)|(\%23)|(#)/gi, // SQL meta-characters
-    /((\%3D)|(=))[^\n]*((\%27)|(\')|(\-\-)|(\%3B)|(;))/gi, // Typical SQL injection
-    /\w*((\%27)|(\'))((\%6F)|o|(\%4F))((\%72)|r|(\%52))/gi, // union, select, etc.
-    /((\%27)|(\'))union/gi,
-    /exec(\s|\+)+(s|x)p\w+/gi,
+    /(\%27)|(\')|(\-\-)|(\%23)|(#)/i, // SQL meta-characters
+    /((\%3D)|(=))[^\n]*((\%27)|(\')|(\-\-)|(\%3B)|(;))/i, // Typical SQL injection
+    /\w*((\%27)|(\'))((\%6F)|o|(\%4F))((\%72)|r|(\%52))/i, // union, select, etc.
+    /((\%27)|(\'))union/i,
+    /exec(\s|\+)+(s|x)p\w+/i,
   ];
 
   use(req: Request, res: Response, next: NextFunction): void {

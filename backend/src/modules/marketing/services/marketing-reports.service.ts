@@ -11,49 +11,70 @@ export class MarketingReportsService {
     if (filter.dateFrom) dateFilter.gte = new Date(filter.dateFrom);
     if (filter.dateTo) dateFilter.lte = new Date(filter.dateTo);
 
-    const reps = await this.prisma.marketingUser.findMany({
-      where: {
-        status: 'ACTIVE',
-        ...(filter.marketingUserId ? { id: filter.marketingUserId } : {}),
-      },
-      select: { id: true, firstName: true, lastName: true, role: true },
-    });
+    const repWhere: any = {
+      status: 'ACTIVE',
+      ...(filter.marketingUserId ? { id: filter.marketingUserId } : {}),
+    };
 
-    const performance = await Promise.all(
-      reps.map(async (rep) => {
-        const leadWhere: any = { assignedToId: rep.id };
-        if (Object.keys(dateFilter).length) leadWhere.createdAt = dateFilter;
+    const dateWhere = Object.keys(dateFilter).length ? { createdAt: dateFilter } : {};
 
-        const activityWhere: any = { createdById: rep.id };
-        if (Object.keys(dateFilter).length) activityWhere.createdAt = dateFilter;
-
-        const [totalLeads, wonLeads, lostLeads, activities, demos, meetings] =
-          await Promise.all([
-            this.prisma.lead.count({ where: leadWhere }),
-            this.prisma.lead.count({ where: { ...leadWhere, status: 'WON' } }),
-            this.prisma.lead.count({ where: { ...leadWhere, status: 'LOST' } }),
-            this.prisma.leadActivity.count({ where: activityWhere }),
-            this.prisma.leadActivity.count({ where: { ...activityWhere, type: 'DEMO' } }),
-            this.prisma.leadActivity.count({ where: { ...activityWhere, type: 'MEETING' } }),
-          ]);
-
-        const totalProcessed = wonLeads + lostLeads;
-        const conversionRate = totalProcessed > 0 ? (wonLeads / totalProcessed) * 100 : 0;
-
-        return {
-          rep: { id: rep.id, name: `${rep.firstName} ${rep.lastName}`, role: rep.role },
-          totalLeads,
-          wonLeads,
-          lostLeads,
-          activities,
-          demos,
-          meetings,
-          conversionRate: Math.round(conversionRate * 100) / 100,
-        };
+    // Batch queries: fetch all reps + grouped counts in parallel
+    const [reps, leadsByRepAndStatus, activitiesByRepAndType] = await Promise.all([
+      this.prisma.marketingUser.findMany({
+        where: repWhere,
+        select: { id: true, firstName: true, lastName: true, role: true },
       }),
-    );
+      this.prisma.lead.groupBy({
+        by: ['assignedToId', 'status'],
+        where: { assignedTo: { is: repWhere }, ...dateWhere },
+        _count: { id: true },
+      }),
+      this.prisma.leadActivity.groupBy({
+        by: ['createdById', 'type'],
+        where: { createdBy: { is: repWhere }, ...dateWhere },
+        _count: { id: true },
+      }),
+    ]);
 
-    return performance;
+    // Build lookup maps
+    const leadMap = new Map<string, Map<string, number>>();
+    for (const row of leadsByRepAndStatus) {
+      if (!row.assignedToId) continue;
+      if (!leadMap.has(row.assignedToId)) leadMap.set(row.assignedToId, new Map());
+      leadMap.get(row.assignedToId)!.set(row.status, row._count.id);
+    }
+
+    const activityMap = new Map<string, Map<string, number>>();
+    for (const row of activitiesByRepAndType) {
+      if (!activityMap.has(row.createdById)) activityMap.set(row.createdById, new Map());
+      activityMap.get(row.createdById)!.set(row.type, row._count.id);
+    }
+
+    return reps.map((rep) => {
+      const leads = leadMap.get(rep.id) || new Map();
+      const acts = activityMap.get(rep.id) || new Map();
+
+      const totalLeads = Array.from(leads.values()).reduce((sum, c) => sum + c, 0);
+      const wonLeads = leads.get('WON') || 0;
+      const lostLeads = leads.get('LOST') || 0;
+      const totalActivities = Array.from(acts.values()).reduce((sum, c) => sum + c, 0);
+      const demos = acts.get('DEMO') || 0;
+      const meetings = acts.get('MEETING') || 0;
+
+      const totalProcessed = wonLeads + lostLeads;
+      const conversionRate = totalProcessed > 0 ? (wonLeads / totalProcessed) * 100 : 0;
+
+      return {
+        rep: { id: rep.id, name: `${rep.firstName} ${rep.lastName}`, role: rep.role },
+        totalLeads,
+        wonLeads,
+        lostLeads,
+        activities: totalActivities,
+        demos,
+        meetings,
+        conversionRate: Math.round(conversionRate * 100) / 100,
+      };
+    });
   }
 
   async getLeadSourceReport(filter: ReportFilterDto) {
@@ -61,32 +82,42 @@ export class MarketingReportsService {
     if (filter.dateFrom) where.createdAt = { ...where.createdAt, gte: new Date(filter.dateFrom) };
     if (filter.dateTo) where.createdAt = { ...where.createdAt, lte: new Date(filter.dateTo) };
 
-    const sources = [
-      'INSTAGRAM', 'REFERRAL', 'FIELD_VISIT', 'ADS', 'WEBSITE', 'PHONE', 'OTHER',
-    ];
+    // Use groupBy instead of N separate count queries
+    const [totalsBySource, statusBySource] = await Promise.all([
+      this.prisma.lead.groupBy({
+        by: ['source'],
+        where,
+        _count: { id: true },
+      }),
+      this.prisma.lead.groupBy({
+        by: ['source', 'status'],
+        where: { ...where, status: { in: ['WON', 'LOST'] } },
+        _count: { id: true },
+      }),
+    ]);
 
-    const data = await Promise.all(
-      sources.map(async (source) => {
-        const [total, won, lost] = await Promise.all([
-          this.prisma.lead.count({ where: { ...where, source } }),
-          this.prisma.lead.count({ where: { ...where, source, status: 'WON' } }),
-          this.prisma.lead.count({ where: { ...where, source, status: 'LOST' } }),
-        ]);
+    const statusMap = new Map<string, { won: number; lost: number }>();
+    for (const row of statusBySource) {
+      if (!statusMap.has(row.source)) statusMap.set(row.source, { won: 0, lost: 0 });
+      const entry = statusMap.get(row.source)!;
+      if (row.status === 'WON') entry.won = row._count.id;
+      if (row.status === 'LOST') entry.lost = row._count.id;
+    }
 
+    return totalsBySource
+      .map((group) => {
+        const { won, lost } = statusMap.get(group.source) || { won: 0, lost: 0 };
         const processed = won + lost;
         const conversionRate = processed > 0 ? (won / processed) * 100 : 0;
-
         return {
-          source,
-          total,
+          source: group.source,
+          total: group._count.id,
           won,
           lost,
           conversionRate: Math.round(conversionRate * 100) / 100,
         };
-      }),
-    );
-
-    return data.filter((d) => d.total > 0);
+      })
+      .filter((d) => d.total > 0);
   }
 
   async getRegionalReport(filter: ReportFilterDto) {
@@ -125,16 +156,22 @@ export class MarketingReportsService {
     if (filter.dateTo) where.createdAt = { ...where.createdAt, lte: new Date(filter.dateTo) };
 
     const statuses = [
-      'NEW', 'CONTACTED', 'MEETING_DONE', 'DEMO_SCHEDULED', 'OFFER_SENT', 'WON', 'LOST',
+      'NEW', 'CONTACTED', 'NOT_REACHABLE', 'MEETING_DONE', 'DEMO_SCHEDULED',
+      'OFFER_SENT', 'WAITING', 'WON', 'LOST',
     ];
 
-    const funnel = await Promise.all(
-      statuses.map(async (status) => ({
-        status,
-        count: await this.prisma.lead.count({ where: { ...where, status } }),
-      })),
-    );
+    // Use groupBy instead of N separate count queries
+    const groups = await this.prisma.lead.groupBy({
+      by: ['status'],
+      where,
+      _count: { id: true },
+    });
 
-    return funnel;
+    const countMap = new Map(groups.map((g) => [g.status, g._count.id]));
+
+    return statuses.map((status) => ({
+      status,
+      count: countMap.get(status) || 0,
+    }));
   }
 }

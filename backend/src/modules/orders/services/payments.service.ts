@@ -36,35 +36,44 @@ export class PaymentsService {
       async () => {
         addBreadcrumb('Starting payment creation', 'payment', { orderId, amount: createPaymentDto.amount });
 
-        // Verify order exists and belongs to tenant
-        const order = await this.ordersService.findOne(orderId, tenantId);
-
-        // Check if order is already paid
-        if (order.status === OrderStatus.PAID) {
-          throw new BadRequestException('Order is already paid');
-        }
-
-        // Check if order is cancelled
-        if (order.status === OrderStatus.CANCELLED) {
-          throw new BadRequestException('Cannot pay for a cancelled order');
-        }
-
-        // Prevent payment for orders awaiting approval (check BEFORE creating payment)
-        if (order.requiresApproval && order.status === OrderStatus.PENDING_APPROVAL) {
-          throw new BadRequestException(
-            'Order requires approval before payment can be processed. Please approve the order first.'
-          );
-        }
-
-        // Validate payment amount
-        if (createPaymentDto.amount > Number(order.finalAmount)) {
-          throw new BadRequestException('Payment amount exceeds order total');
-        }
+        // Verify order exists and belongs to tenant (lightweight pre-check for tenant isolation)
+        await this.ordersService.findOne(orderId, tenantId);
 
         addBreadcrumb('Payment validation passed', 'payment', { orderId });
 
         // Create payment and update order status in a transaction
         return this.prisma.$transaction(async (tx) => {
+          // Re-fetch order inside transaction for a consistent view
+          const order = await tx.order.findFirst({
+            where: { id: orderId, tenantId },
+          });
+
+          if (!order) {
+            throw new NotFoundException('Order not found');
+          }
+
+          // Check if order is already paid (inside transaction to prevent race condition)
+          if (order.status === OrderStatus.PAID) {
+            throw new BadRequestException('Order is already paid');
+          }
+
+          // Check if order is cancelled
+          if (order.status === OrderStatus.CANCELLED) {
+            throw new BadRequestException('Cannot pay for a cancelled order');
+          }
+
+          // Prevent payment for orders awaiting approval (check BEFORE creating payment)
+          if (order.requiresApproval && order.status === OrderStatus.PENDING_APPROVAL) {
+            throw new BadRequestException(
+              'Order requires approval before payment can be processed. Please approve the order first.'
+            );
+          }
+
+          // Validate payment amount
+          if (createPaymentDto.amount > Number(order.finalAmount)) {
+            throw new BadRequestException('Payment amount exceeds order total');
+          }
+
           // Create payment
           const payment = await tx.payment.create({
             data: {

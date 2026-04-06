@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsEmail } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEmail, IsNumber, Min, Max, MinLength } from 'class-validator';
 
 export class ConvertLeadDto {
   @IsOptional()
@@ -9,6 +9,12 @@ export class ConvertLeadDto {
   @IsString()
   offerId?: string;
 
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(99999999.99)
+  commissionAmount?: number;
+
   @IsString()
   @IsNotEmpty()
   tenantName: string;
@@ -18,6 +24,7 @@ export class ConvertLeadDto {
 
   @IsString()
   @IsNotEmpty()
+  @MinLength(6)
   adminPassword: string;
 
   @IsString()

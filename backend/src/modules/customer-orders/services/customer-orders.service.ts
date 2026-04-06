@@ -221,11 +221,12 @@ export class CustomerOrdersService {
     return orders;
   }
 
-  async getOrderById(orderId: string, sessionId: string) {
+  async getOrderById(orderId: string, sessionId: string, tenantId: string) {
     const order = await this.prisma.order.findFirst({
       where: {
         id: orderId,
         sessionId,
+        tenantId,
       },
       include: {
         orderItems: {

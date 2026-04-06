@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { ROLES_KEY } from '../decorators/roles.decorator';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { IS_SUPERADMIN_PUBLIC_KEY, IS_SUPERADMIN_ROUTE_KEY } from '../../superadmin/decorators/superadmin.decorator';
+import { IS_MARKETING_ROUTE_KEY } from '../../marketing/decorators/marketing-route.decorator';
 import { UserRole } from '../../../common/constants/roles.enum';
 
 @Injectable()
@@ -28,7 +29,13 @@ export class RolesGuard implements CanActivate {
       [context.getHandler(), context.getClass()],
     );
 
-    if (isPublic || isSuperAdminPublic || isSuperAdminRoute) {
+    // Check for Marketing routes (handled by MarketingGuard)
+    const isMarketingRoute = this.reflector.getAllAndOverride<boolean>(
+      IS_MARKETING_ROUTE_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+
+    if (isPublic || isSuperAdminPublic || isSuperAdminRoute || isMarketingRoute) {
       return true;
     }
 

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
-import { PlusIcon, CheckIcon, ClockIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { PlusIcon, CheckIcon, ClockIcon, ExclamationTriangleIcon, PencilSquareIcon, TrashIcon, PlayIcon } from '@heroicons/react/24/outline';
 import marketingApi from '../../features/marketing/api/marketingApi';
 import type { MarketingTask } from '../../features/marketing/types';
 
@@ -30,6 +31,14 @@ export default function TasksPage() {
     dueDate: new Date().toISOString().split('T')[0],
     description: '',
   });
+  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({
+    title: '',
+    type: 'FOLLOW_UP',
+    priority: 'MEDIUM',
+    dueDate: '',
+    description: '',
+  });
 
   const queryKey = tab === 'today'
     ? ['marketing', 'tasks', 'today']
@@ -48,7 +57,13 @@ export default function TasksPage() {
 
   const completeMutation = useMutation({
     mutationFn: (taskId: string) => marketingApi.patch(`/tasks/${taskId}/complete`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['marketing', 'tasks'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['marketing', 'tasks'] });
+      toast.success('Task completed');
+    },
+    onError: () => {
+      toast.error('Failed to complete task');
+    },
   });
 
   const createMutation = useMutation({
@@ -57,8 +72,59 @@ export default function TasksPage() {
       queryClient.invalidateQueries({ queryKey: ['marketing', 'tasks'] });
       setShowForm(false);
       setNewTask({ title: '', type: 'FOLLOW_UP', priority: 'MEDIUM', dueDate: new Date().toISOString().split('T')[0], description: '' });
+      toast.success('Task created');
+    },
+    onError: () => {
+      toast.error('Failed to create task');
     },
   });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) =>
+      marketingApi.patch(`/tasks/${id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['marketing', 'tasks'] });
+      setEditingTaskId(null);
+      toast.success('Task updated');
+    },
+    onError: () => {
+      toast.error('Failed to update task');
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => marketingApi.delete(`/tasks/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['marketing', 'tasks'] });
+      toast.success('Task deleted');
+    },
+    onError: () => {
+      toast.error('Failed to delete task');
+    },
+  });
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      marketingApi.patch(`/tasks/${id}`, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['marketing', 'tasks'] });
+      toast.success('Task status updated');
+    },
+    onError: () => {
+      toast.error('Failed to update task status');
+    },
+  });
+
+  const startEditing = (task: MarketingTask) => {
+    setEditingTaskId(task.id);
+    setEditForm({
+      title: task.title,
+      type: task.type,
+      priority: task.priority,
+      dueDate: task.dueDate ? task.dueDate.split('T')[0] : '',
+      description: task.description || '',
+    });
+  };
 
   const tasks = Array.isArray(data) ? data : data?.data || [];
 
@@ -157,6 +223,86 @@ export default function TasksPage() {
         ) : (
           tasks.map((task: MarketingTask) => {
             const isOverdue = new Date(task.dueDate) < new Date() && task.status !== 'COMPLETED';
+
+            if (editingTaskId === task.id) {
+              return (
+                <div key={task.id} className="p-4 bg-gray-50 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <input
+                      type="text"
+                      placeholder="Task title"
+                      value={editForm.title}
+                      onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                      className="sm:col-span-2 px-3 py-2 border rounded-lg text-sm"
+                    />
+                    <select
+                      value={editForm.type}
+                      onChange={(e) => setEditForm({ ...editForm, type: e.target.value })}
+                      className="px-3 py-2 border rounded-lg text-sm"
+                    >
+                      <option value="CALL">Call</option>
+                      <option value="VISIT">Visit</option>
+                      <option value="DEMO">Demo</option>
+                      <option value="FOLLOW_UP">Follow Up</option>
+                      <option value="MEETING">Meeting</option>
+                      <option value="OTHER">Other</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <input
+                      type="date"
+                      value={editForm.dueDate}
+                      onChange={(e) => setEditForm({ ...editForm, dueDate: e.target.value })}
+                      className="px-3 py-2 border rounded-lg text-sm"
+                    />
+                    <select
+                      value={editForm.priority}
+                      onChange={(e) => setEditForm({ ...editForm, priority: e.target.value })}
+                      className="px-3 py-2 border rounded-lg text-sm"
+                    >
+                      <option value="LOW">Low</option>
+                      <option value="MEDIUM">Medium</option>
+                      <option value="HIGH">High</option>
+                      <option value="URGENT">Urgent</option>
+                    </select>
+                    <input
+                      type="text"
+                      placeholder="Description (optional)"
+                      value={editForm.description}
+                      onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                      className="px-3 py-2 border rounded-lg text-sm"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() =>
+                        updateMutation.mutate({
+                          id: task.id,
+                          data: {
+                            title: editForm.title,
+                            type: editForm.type,
+                            priority: editForm.priority,
+                            dueDate: editForm.dueDate,
+                            description: editForm.description || undefined,
+                          },
+                        })
+                      }
+                      disabled={!editForm.title || updateMutation.isPending}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      Save
+                    </button>
+                    <button
+                      onClick={() => setEditingTaskId(null)}
+                      className="px-4 py-2 border rounded-lg text-sm"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+
             return (
               <div key={task.id} className="flex items-center gap-4 p-4 hover:bg-gray-50">
                 <button
@@ -182,7 +328,41 @@ export default function TasksPage() {
                       </Link>
                     )}
                     <span className={priorityColors[task.priority] || ''}>{task.priority}</span>
+                    {task.status === 'IN_PROGRESS' && (
+                      <span className="text-indigo-600 font-medium">In Progress</span>
+                    )}
                   </div>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {task.status === 'PENDING' && (
+                    <button
+                      onClick={() => statusMutation.mutate({ id: task.id, status: 'IN_PROGRESS' })}
+                      title="Start task"
+                      className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"
+                    >
+                      <PlayIcon className="w-4 h-4" />
+                    </button>
+                  )}
+                  {task.status !== 'COMPLETED' && (
+                    <button
+                      onClick={() => startEditing(task)}
+                      title="Edit task"
+                      className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"
+                    >
+                      <PencilSquareIcon className="w-4 h-4" />
+                    </button>
+                  )}
+                  <button
+                    onClick={() => {
+                      if (window.confirm('Are you sure you want to delete this task?')) {
+                        deleteMutation.mutate(task.id);
+                      }
+                    }}
+                    title="Delete task"
+                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                  >
+                    <TrashIcon className="w-4 h-4" />
+                  </button>
                 </div>
                 <div className="text-right flex-shrink-0">
                   <p className={`text-xs ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-400'}`}>

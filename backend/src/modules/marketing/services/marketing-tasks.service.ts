@@ -3,13 +3,17 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateTaskDto } from '../dto/create-task.dto';
 import { UpdateTaskDto } from '../dto/update-task.dto';
 import { TaskFilterDto } from '../dto/task-filter.dto';
+import { MarketingNotificationsService } from './marketing-notifications.service';
 
 @Injectable()
 export class MarketingTasksService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notificationsService: MarketingNotificationsService,
+  ) {}
 
   async create(dto: CreateTaskDto, userId: string) {
-    return this.prisma.marketingTask.create({
+    const task = await this.prisma.marketingTask.create({
       data: {
         title: dto.title,
         description: dto.description,
@@ -24,6 +28,18 @@ export class MarketingTasksService {
         assignedTo: { select: { id: true, firstName: true, lastName: true } },
       },
     });
+
+    if (task.assignedToId !== userId) {
+      this.notificationsService.create({
+        userId: task.assignedToId,
+        type: 'TASK_ASSIGNED',
+        title: 'New task assigned',
+        message: `Task: "${task.title}"`,
+        metadata: { taskId: task.id },
+      }).catch(() => {});
+    }
+
+    return task;
   }
 
   async findAll(filter: TaskFilterDto, userId: string, userRole: string) {

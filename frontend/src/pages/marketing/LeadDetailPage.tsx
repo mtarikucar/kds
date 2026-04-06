@@ -1,12 +1,15 @@
 import { useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
   PhoneIcon,
   EnvelopeIcon,
   MapPinIcon,
   PencilSquareIcon,
   ArrowLeftIcon,
+  TrashIcon,
+  CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import marketingApi from '../../features/marketing/api/marketingApi';
 import { LeadStatusBadge, ActivityTimeline } from '../../features/marketing/components';
@@ -16,53 +19,201 @@ import {
   BUSINESS_TYPE_LABELS,
   LEAD_SOURCE_LABELS,
   ActivityType,
+  TaskType,
+  OfferStatus,
 } from '../../features/marketing/types';
-import type { Lead, LeadActivity } from '../../features/marketing/types';
+import type { Lead, LeadActivity, LeadOffer, MarketingTask, MarketingUserInfo } from '../../features/marketing/types';
+import { useMarketingAuthStore } from '../../store/marketingAuthStore';
+
+const offerStatusColors: Record<string, string> = {
+  DRAFT: 'bg-gray-100 text-gray-800',
+  SENT: 'bg-blue-100 text-blue-800',
+  ACCEPTED: 'bg-green-100 text-green-800',
+  REJECTED: 'bg-red-100 text-red-800',
+  EXPIRED: 'bg-orange-100 text-orange-800',
+};
+
+const taskPriorityColors: Record<string, string> = {
+  LOW: 'text-gray-500',
+  MEDIUM: 'text-blue-600',
+  HIGH: 'text-orange-600',
+  URGENT: 'text-red-600',
+};
+
+type DetailLead = Lead & {
+  activities: LeadActivity[];
+  offers: LeadOffer[];
+  tasks: MarketingTask[];
+};
 
 export default function LeadDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const user = useMarketingAuthStore((s) => s.user);
+  const isManager = user?.role === 'SALES_MANAGER';
+
+  // UI state
+  const [activeTab, setActiveTab] = useState<'activities' | 'offers' | 'tasks'>('activities');
   const [showActivityForm, setShowActivityForm] = useState(false);
+  const [showOfferForm, setShowOfferForm] = useState(false);
+  const [showTaskForm, setShowTaskForm] = useState(false);
+  const [showConvertModal, setShowConvertModal] = useState(false);
+
+  // Activity form
   const [activityType, setActivityType] = useState<string>('NOTE');
   const [activityTitle, setActivityTitle] = useState('');
   const [activityDesc, setActivityDesc] = useState('');
 
+  // Offer form
+  const [offerPrice, setOfferPrice] = useState('');
+  const [offerDiscount, setOfferDiscount] = useState('');
+  const [offerTrial, setOfferTrial] = useState('');
+  const [offerNotes, setOfferNotes] = useState('');
+  const [offerValidUntil, setOfferValidUntil] = useState('');
+
+  // Task form
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskType, setTaskType] = useState<string>('FOLLOW_UP');
+  const [taskPriority, setTaskPriority] = useState('MEDIUM');
+  const [taskDueDate, setTaskDueDate] = useState('');
+  const [taskDesc, setTaskDesc] = useState('');
+
+  // Convert form
+  const [convertTenant, setConvertTenant] = useState('');
+  const [convertEmail, setConvertEmail] = useState('');
+  const [convertFirstName, setConvertFirstName] = useState('');
+  const [convertLastName, setConvertLastName] = useState('');
+  const [convertPassword, setConvertPassword] = useState('');
+  const [convertOfferId, setConvertOfferId] = useState('');
+  const [convertCommission, setConvertCommission] = useState('');
+
+  // Assign
+  const [assignUserId, setAssignUserId] = useState('');
+
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['marketing', 'lead', id] });
+
   const { data: lead, isLoading } = useQuery({
     queryKey: ['marketing', 'lead', id],
-    queryFn: () => marketingApi.get<Lead & { activities: LeadActivity[] }>(`/leads/${id}`).then((r) => r.data),
+    queryFn: () => marketingApi.get<DetailLead>(`/leads/${id}`).then((r) => r.data),
   });
 
+  const { data: repsData } = useQuery({
+    queryKey: ['marketing', 'users'],
+    queryFn: () => marketingApi.get('/users').then((r) => r.data),
+    enabled: isManager,
+  });
+
+  // Mutations
   const statusMutation = useMutation({
-    mutationFn: (status: string) =>
-      marketingApi.patch(`/leads/${id}/status`, { status }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['marketing', 'lead', id] });
-    },
+    mutationFn: (status: string) => marketingApi.patch(`/leads/${id}/status`, { status }),
+    onSuccess: () => { invalidate(); toast.success('Status updated'); },
+    onError: () => toast.error('Failed to update status'),
   });
 
   const activityMutation = useMutation({
     mutationFn: (data: { type: string; title: string; description?: string }) =>
       marketingApi.post(`/leads/${id}/activities`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['marketing', 'lead', id] });
+      invalidate();
       setShowActivityForm(false);
       setActivityTitle('');
       setActivityDesc('');
+      toast.success('Activity added');
     },
+    onError: () => toast.error('Failed to add activity'),
   });
 
-  if (isLoading) {
-    return <div className="text-center py-12 text-gray-500">Loading...</div>;
-  }
+  const createOfferMutation = useMutation({
+    mutationFn: (data: any) => marketingApi.post('/offers', data),
+    onSuccess: () => {
+      invalidate();
+      setShowOfferForm(false);
+      setOfferPrice(''); setOfferDiscount(''); setOfferTrial(''); setOfferNotes(''); setOfferValidUntil('');
+      toast.success('Offer created');
+    },
+    onError: () => toast.error('Failed to create offer'),
+  });
 
-  if (!lead) {
-    return <div className="text-center py-12 text-gray-500">Lead not found</div>;
-  }
+  const sendOfferMutation = useMutation({
+    mutationFn: (offerId: string) => marketingApi.post(`/offers/${offerId}/send`),
+    onSuccess: () => { invalidate(); toast.success('Offer sent'); },
+    onError: () => toast.error('Failed to send offer'),
+  });
+
+  const deleteOfferMutation = useMutation({
+    mutationFn: (offerId: string) => marketingApi.delete(`/offers/${offerId}`),
+    onSuccess: () => { invalidate(); toast.success('Offer deleted'); },
+    onError: () => toast.error('Failed to delete offer'),
+  });
+
+  const createTaskMutation = useMutation({
+    mutationFn: (data: any) => marketingApi.post('/tasks', data),
+    onSuccess: () => {
+      invalidate();
+      setShowTaskForm(false);
+      setTaskTitle(''); setTaskDesc(''); setTaskDueDate('');
+      toast.success('Task created');
+    },
+    onError: () => toast.error('Failed to create task'),
+  });
+
+  const completeTaskMutation = useMutation({
+    mutationFn: (taskId: string) => marketingApi.patch(`/tasks/${taskId}/complete`),
+    onSuccess: () => { invalidate(); toast.success('Task completed'); },
+    onError: () => toast.error('Failed to complete task'),
+  });
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: (taskId: string) => marketingApi.delete(`/tasks/${taskId}`),
+    onSuccess: () => { invalidate(); toast.success('Task deleted'); },
+    onError: () => toast.error('Failed to delete task'),
+  });
+
+  const convertMutation = useMutation({
+    mutationFn: (data: any) => marketingApi.post(`/leads/${id}/convert`, data),
+    onSuccess: () => {
+      invalidate();
+      setShowConvertModal(false);
+      toast.success('Lead converted successfully!');
+    },
+    onError: (err: any) => toast.error(err?.response?.data?.message || 'Failed to convert lead'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => marketingApi.delete(`/leads/${id}`),
+    onSuccess: () => { toast.success('Lead deleted'); navigate('/marketing/leads'); },
+    onError: () => toast.error('Failed to delete lead'),
+  });
+
+  const assignMutation = useMutation({
+    mutationFn: (repId: string) => marketingApi.patch(`/leads/${id}/assign`, { assignedToId: repId }),
+    onSuccess: () => { invalidate(); toast.success('Lead assigned'); },
+    onError: () => toast.error('Failed to assign lead'),
+  });
+
+  if (isLoading) return <div className="text-center py-12 text-gray-500">Loading...</div>;
+  if (!lead) return <div className="text-center py-12 text-gray-500">Lead not found</div>;
+
+  const canConvert = ['OFFER_SENT', 'WAITING'].includes(lead.status) && !lead.convertedTenantId;
+  const sentOffers = (lead.offers || []).filter((o) => o.status === 'SENT');
+
+  const initConvertForm = () => {
+    setConvertTenant(lead.businessName);
+    setConvertEmail(lead.email || '');
+    const parts = (lead.contactPerson || '').split(' ');
+    setConvertFirstName(parts[0] || '');
+    setConvertLastName(parts.slice(1).join(' ') || '');
+    setConvertPassword('');
+    setConvertOfferId(sentOffers[0]?.id || '');
+    setConvertCommission('');
+    setShowConvertModal(true);
+  };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <Link to="/marketing/leads" className="p-2 hover:bg-gray-100 rounded-lg">
             <ArrowLeftIcon className="w-5 h-5 text-gray-600" />
@@ -72,17 +223,32 @@ export default function LeadDetailPage() {
             <p className="text-sm text-gray-500">{lead.contactPerson}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <LeadStatusBadge status={lead.status} />
-          <Link
-            to={`/marketing/leads/${id}/edit`}
-            className="flex items-center gap-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
-          >
-            <PencilSquareIcon className="w-4 h-4" />
-            Edit
+          {canConvert && (
+            <button onClick={initConvertForm} className="px-3 py-1.5 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700">
+              Convert to Customer
+            </button>
+          )}
+          <Link to={`/marketing/leads/${id}/edit`} className="flex items-center gap-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
+            <PencilSquareIcon className="w-4 h-4" /> Edit
           </Link>
+          {isManager && (
+            <button
+              onClick={() => { if (window.confirm('Delete this lead?')) deleteMutation.mutate(); }}
+              className="flex items-center gap-1 px-3 py-1.5 border border-red-300 text-red-600 rounded-lg text-sm hover:bg-red-50"
+            >
+              <TrashIcon className="w-4 h-4" /> Delete
+            </button>
+          )}
         </div>
       </div>
+
+      {lead.convertedTenantId && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
+          This lead has been converted to a customer on {lead.convertedAt ? new Date(lead.convertedAt).toLocaleDateString() : 'N/A'}.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Info */}
@@ -100,9 +266,7 @@ export default function LeadDetailPage() {
               {lead.whatsapp && (
                 <div className="flex items-center gap-2">
                   <PhoneIcon className="w-4 h-4 text-green-500" />
-                  <a href={`https://wa.me/${lead.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline">
-                    WhatsApp
-                  </a>
+                  <a href={`https://wa.me/${lead.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="text-green-600 hover:underline">WhatsApp</a>
                 </div>
               )}
               {lead.email && (
@@ -124,46 +288,41 @@ export default function LeadDetailPage() {
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">Business Details</h3>
             <dl className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <dt className="text-gray-500">Type</dt>
-                <dd className="text-gray-900">{BUSINESS_TYPE_LABELS[lead.businessType as keyof typeof BUSINESS_TYPE_LABELS] || lead.businessType}</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt className="text-gray-500">Source</dt>
-                <dd className="text-gray-900">{LEAD_SOURCE_LABELS[lead.source as keyof typeof LEAD_SOURCE_LABELS] || lead.source}</dd>
-              </div>
-              {lead.tableCount != null && (
-                <div className="flex justify-between">
-                  <dt className="text-gray-500">Tables</dt>
-                  <dd className="text-gray-900">{lead.tableCount}</dd>
-                </div>
-              )}
-              {lead.branchCount != null && (
-                <div className="flex justify-between">
-                  <dt className="text-gray-500">Branches</dt>
-                  <dd className="text-gray-900">{lead.branchCount}</dd>
-                </div>
-              )}
-              {lead.currentSystem && (
-                <div className="flex justify-between">
-                  <dt className="text-gray-500">Current System</dt>
-                  <dd className="text-gray-900">{lead.currentSystem}</dd>
-                </div>
-              )}
-              {lead.assignedTo && (
-                <div className="flex justify-between">
-                  <dt className="text-gray-500">Assigned To</dt>
-                  <dd className="text-gray-900">{lead.assignedTo.firstName} {lead.assignedTo.lastName}</dd>
-                </div>
-              )}
-              {lead.nextFollowUp && (
-                <div className="flex justify-between">
-                  <dt className="text-gray-500">Next Follow-up</dt>
-                  <dd className="text-gray-900">{new Date(lead.nextFollowUp).toLocaleDateString()}</dd>
-                </div>
-              )}
+              <div className="flex justify-between"><dt className="text-gray-500">Type</dt><dd className="text-gray-900">{BUSINESS_TYPE_LABELS[lead.businessType as keyof typeof BUSINESS_TYPE_LABELS] || lead.businessType}</dd></div>
+              <div className="flex justify-between"><dt className="text-gray-500">Source</dt><dd className="text-gray-900">{LEAD_SOURCE_LABELS[lead.source as keyof typeof LEAD_SOURCE_LABELS] || lead.source}</dd></div>
+              {lead.tableCount != null && <div className="flex justify-between"><dt className="text-gray-500">Tables</dt><dd className="text-gray-900">{lead.tableCount}</dd></div>}
+              {lead.branchCount != null && <div className="flex justify-between"><dt className="text-gray-500">Branches</dt><dd className="text-gray-900">{lead.branchCount}</dd></div>}
+              {lead.currentSystem && <div className="flex justify-between"><dt className="text-gray-500">Current System</dt><dd className="text-gray-900">{lead.currentSystem}</dd></div>}
+              {lead.assignedTo && <div className="flex justify-between"><dt className="text-gray-500">Assigned To</dt><dd className="text-gray-900">{lead.assignedTo.firstName} {lead.assignedTo.lastName}</dd></div>}
+              {lead.nextFollowUp && <div className="flex justify-between"><dt className="text-gray-500">Next Follow-up</dt><dd className="text-gray-900">{new Date(lead.nextFollowUp).toLocaleDateString()}</dd></div>}
             </dl>
           </div>
+
+          {/* Assign (Manager only) */}
+          {isManager && (
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Assign Lead</h3>
+              <div className="flex gap-2">
+                <select
+                  value={assignUserId}
+                  onChange={(e) => setAssignUserId(e.target.value)}
+                  className="flex-1 px-3 py-2 border rounded-lg text-sm"
+                >
+                  <option value="">Select rep...</option>
+                  {(repsData || []).map((r: any) => (
+                    <option key={r.id} value={r.id}>{r.firstName} {r.lastName}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => assignUserId && assignMutation.mutate(assignUserId)}
+                  disabled={!assignUserId || assignMutation.isPending}
+                  className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm disabled:opacity-50"
+                >
+                  Assign
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Status Change */}
           <div className="bg-white rounded-xl border border-gray-200 p-5">
@@ -175,9 +334,7 @@ export default function LeadDetailPage() {
                   onClick={() => statusMutation.mutate(s)}
                   disabled={lead.status === s || statusMutation.isPending}
                   className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-                    lead.status === s
-                      ? 'bg-indigo-100 border-indigo-300 text-indigo-700'
-                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                    lead.status === s ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                   } disabled:opacity-50`}
                 >
                   {LEAD_STATUS_LABELS[s]}
@@ -186,7 +343,6 @@ export default function LeadDetailPage() {
             </div>
           </div>
 
-          {/* Notes */}
           {lead.notes && (
             <div className="bg-white rounded-xl border border-gray-200 p-5">
               <h3 className="text-sm font-semibold text-gray-900 mb-2">Notes</h3>
@@ -195,75 +351,291 @@ export default function LeadDetailPage() {
           )}
         </div>
 
-        {/* Right: Activity Timeline */}
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Activity Timeline</h3>
+        {/* Right: Tabs */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Tab buttons */}
+          <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+            {(['activities', 'offers', 'tasks'] as const).map((tab) => (
               <button
-                onClick={() => setShowActivityForm(!showActivityForm)}
-                className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === tab ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                }`}
               >
-                + Add Activity
+                {tab === 'activities' ? 'Activities' : tab === 'offers' ? `Offers (${lead.offers?.length || 0})` : `Tasks (${lead.tasks?.length || 0})`}
               </button>
-            </div>
-
-            {/* Quick Activity Form */}
-            {showActivityForm && (
-              <div className="mb-6 p-4 bg-gray-50 rounded-lg space-y-3">
-                <div className="flex gap-3">
-                  <select
-                    value={activityType}
-                    onChange={(e) => setActivityType(e.target.value)}
-                    className="px-3 py-2 border rounded-lg text-sm"
-                  >
-                    {Object.values(ActivityType).map((t) => (
-                      <option key={t} value={t}>{t}</option>
-                    ))}
-                  </select>
-                  <input
-                    type="text"
-                    placeholder="Activity title"
-                    value={activityTitle}
-                    onChange={(e) => setActivityTitle(e.target.value)}
-                    className="flex-1 px-3 py-2 border rounded-lg text-sm"
-                  />
-                </div>
-                <textarea
-                  placeholder="Description (optional)"
-                  value={activityDesc}
-                  onChange={(e) => setActivityDesc(e.target.value)}
-                  rows={2}
-                  className="w-full px-3 py-2 border rounded-lg text-sm"
-                />
-                <div className="flex gap-2">
-                  <button
-                    onClick={() =>
-                      activityMutation.mutate({
-                        type: activityType,
-                        title: activityTitle,
-                        description: activityDesc || undefined,
-                      })
-                    }
-                    disabled={!activityTitle || activityMutation.isPending}
-                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
-                  >
-                    {activityMutation.isPending ? 'Saving...' : 'Save'}
-                  </button>
-                  <button
-                    onClick={() => setShowActivityForm(false)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg text-sm"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-
-            <ActivityTimeline activities={lead.activities || []} />
+            ))}
           </div>
+
+          {/* Activities Tab */}
+          {activeTab === 'activities' && (
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Activity Timeline</h3>
+                <button onClick={() => setShowActivityForm(!showActivityForm)} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ Add Activity</button>
+              </div>
+              {showActivityForm && (
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg space-y-3">
+                  <div className="flex gap-3">
+                    <select value={activityType} onChange={(e) => setActivityType(e.target.value)} className="px-3 py-2 border rounded-lg text-sm">
+                      {Object.values(ActivityType).map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    <input type="text" placeholder="Activity title" value={activityTitle} onChange={(e) => setActivityTitle(e.target.value)} className="flex-1 px-3 py-2 border rounded-lg text-sm" />
+                  </div>
+                  <textarea placeholder="Description (optional)" value={activityDesc} onChange={(e) => setActivityDesc(e.target.value)} rows={2} className="w-full px-3 py-2 border rounded-lg text-sm" />
+                  <div className="flex gap-2">
+                    <button onClick={() => activityMutation.mutate({ type: activityType, title: activityTitle, description: activityDesc || undefined })} disabled={!activityTitle || activityMutation.isPending} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
+                      {activityMutation.isPending ? 'Saving...' : 'Save'}
+                    </button>
+                    <button onClick={() => setShowActivityForm(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm">Cancel</button>
+                  </div>
+                </div>
+              )}
+              <ActivityTimeline activities={lead.activities || []} />
+            </div>
+          )}
+
+          {/* Offers Tab */}
+          {activeTab === 'offers' && (
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Offers</h3>
+                {!lead.convertedTenantId && (
+                  <button onClick={() => setShowOfferForm(!showOfferForm)} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ New Offer</button>
+                )}
+              </div>
+
+              {showOfferForm && (
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Custom Price</label>
+                      <input type="number" value={offerPrice} onChange={(e) => setOfferPrice(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="0.00" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Discount (%)</label>
+                      <input type="number" value={offerDiscount} onChange={(e) => setOfferDiscount(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="0" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Trial Days</label>
+                      <input type="number" value={offerTrial} onChange={(e) => setOfferTrial(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="14" />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Valid Until</label>
+                      <input type="date" value={offerValidUntil} onChange={(e) => setOfferValidUntil(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" />
+                    </div>
+                  </div>
+                  <textarea placeholder="Notes" value={offerNotes} onChange={(e) => setOfferNotes(e.target.value)} rows={2} className="w-full px-3 py-2 border rounded-lg text-sm" />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => createOfferMutation.mutate({
+                        leadId: id,
+                        ...(offerPrice ? { customPrice: Number(offerPrice) } : {}),
+                        ...(offerDiscount ? { discount: Number(offerDiscount) } : {}),
+                        ...(offerTrial ? { trialDays: Number(offerTrial) } : {}),
+                        ...(offerValidUntil ? { validUntil: offerValidUntil } : {}),
+                        ...(offerNotes ? { notes: offerNotes } : {}),
+                      })}
+                      disabled={createOfferMutation.isPending}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      {createOfferMutation.isPending ? 'Creating...' : 'Create Offer'}
+                    </button>
+                    <button onClick={() => setShowOfferForm(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm">Cancel</button>
+                  </div>
+                </div>
+              )}
+
+              {(lead.offers || []).length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-6">No offers yet</p>
+              ) : (
+                <div className="space-y-3">
+                  {(lead.offers || []).map((offer) => (
+                    <div key={offer.id} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${offerStatusColors[offer.status] || 'bg-gray-100'}`}>
+                          {offer.status}
+                        </span>
+                        <span className="text-xs text-gray-400">{new Date(offer.createdAt).toLocaleDateString()}</span>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2 text-sm mb-3">
+                        {offer.customPrice && <div><span className="text-gray-500">Price:</span> <span className="font-medium">{offer.customPrice}</span></div>}
+                        {offer.discount && <div><span className="text-gray-500">Discount:</span> <span className="font-medium">{offer.discount}%</span></div>}
+                        {offer.trialDays && <div><span className="text-gray-500">Trial:</span> <span className="font-medium">{offer.trialDays} days</span></div>}
+                      </div>
+                      {offer.validUntil && <p className="text-xs text-gray-400 mb-2">Valid until: {new Date(offer.validUntil).toLocaleDateString()}</p>}
+                      {offer.notes && <p className="text-sm text-gray-600 mb-3">{offer.notes}</p>}
+                      <div className="flex gap-2">
+                        {offer.status === 'DRAFT' && (
+                          <>
+                            <button onClick={() => sendOfferMutation.mutate(offer.id)} className="px-3 py-1 bg-blue-600 text-white rounded text-xs font-medium hover:bg-blue-700">Send</button>
+                            <button onClick={() => { if (window.confirm('Delete this offer?')) deleteOfferMutation.mutate(offer.id); }} className="px-3 py-1 border border-red-300 text-red-600 rounded text-xs hover:bg-red-50">Delete</button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tasks Tab */}
+          {activeTab === 'tasks' && (
+            <div className="bg-white rounded-xl border border-gray-200 p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Tasks</h3>
+                <button onClick={() => setShowTaskForm(!showTaskForm)} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ New Task</button>
+              </div>
+
+              {showTaskForm && (
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg space-y-3">
+                  <div className="flex gap-3">
+                    <select value={taskType} onChange={(e) => setTaskType(e.target.value)} className="px-3 py-2 border rounded-lg text-sm">
+                      {Object.values(TaskType).map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                    <input type="text" placeholder="Task title" value={taskTitle} onChange={(e) => setTaskTitle(e.target.value)} className="flex-1 px-3 py-2 border rounded-lg text-sm" />
+                  </div>
+                  <div className="flex gap-3">
+                    <select value={taskPriority} onChange={(e) => setTaskPriority(e.target.value)} className="px-3 py-2 border rounded-lg text-sm">
+                      <option value="LOW">Low</option>
+                      <option value="MEDIUM">Medium</option>
+                      <option value="HIGH">High</option>
+                      <option value="URGENT">Urgent</option>
+                    </select>
+                    <input type="date" value={taskDueDate} onChange={(e) => setTaskDueDate(e.target.value)} className="px-3 py-2 border rounded-lg text-sm" />
+                  </div>
+                  <textarea placeholder="Description (optional)" value={taskDesc} onChange={(e) => setTaskDesc(e.target.value)} rows={2} className="w-full px-3 py-2 border rounded-lg text-sm" />
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => createTaskMutation.mutate({
+                        title: taskTitle,
+                        type: taskType,
+                        priority: taskPriority,
+                        dueDate: taskDueDate,
+                        leadId: id,
+                        ...(taskDesc ? { description: taskDesc } : {}),
+                      })}
+                      disabled={!taskTitle || !taskDueDate || createTaskMutation.isPending}
+                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                    >
+                      {createTaskMutation.isPending ? 'Creating...' : 'Create Task'}
+                    </button>
+                    <button onClick={() => setShowTaskForm(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm">Cancel</button>
+                  </div>
+                </div>
+              )}
+
+              {(lead.tasks || []).length === 0 ? (
+                <p className="text-sm text-gray-500 text-center py-6">No tasks yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {(lead.tasks || []).map((task) => (
+                    <div key={task.id} className="flex items-center gap-3 border border-gray-200 rounded-lg p-3">
+                      <button
+                        onClick={() => task.status !== 'COMPLETED' && completeTaskMutation.mutate(task.id)}
+                        disabled={task.status === 'COMPLETED'}
+                        className={`flex-shrink-0 w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                          task.status === 'COMPLETED' ? 'bg-green-500 border-green-500' : 'border-gray-300 hover:border-green-400'
+                        }`}
+                      >
+                        {task.status === 'COMPLETED' && <CheckCircleIcon className="w-4 h-4 text-white" />}
+                      </button>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-medium ${task.status === 'COMPLETED' ? 'line-through text-gray-400' : 'text-gray-900'}`}>
+                          {task.title}
+                        </p>
+                        <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
+                          <span className="bg-gray-100 px-1.5 py-0.5 rounded">{task.type}</span>
+                          <span className={taskPriorityColors[task.priority] || ''}>{task.priority}</span>
+                          <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                      {task.status !== 'COMPLETED' && (
+                        <button
+                          onClick={() => { if (window.confirm('Delete this task?')) deleteTaskMutation.mutate(task.id); }}
+                          className="text-gray-400 hover:text-red-500"
+                        >
+                          <TrashIcon className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Convert Modal */}
+      {showConvertModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Convert Lead to Customer</h2>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Tenant Name *</label>
+                <input type="text" value={convertTenant} onChange={(e) => setConvertTenant(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Admin Email *</label>
+                <input type="email" value={convertEmail} onChange={(e) => setConvertEmail(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">First Name *</label>
+                  <input type="text" value={convertFirstName} onChange={(e) => setConvertFirstName(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Last Name *</label>
+                  <input type="text" value={convertLastName} onChange={(e) => setConvertLastName(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Admin Password *</label>
+                <input type="password" value={convertPassword} onChange={(e) => setConvertPassword(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Min 6 characters" />
+              </div>
+              {sentOffers.length > 0 && (
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Link Offer (optional)</label>
+                  <select value={convertOfferId} onChange={(e) => setConvertOfferId(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm">
+                    <option value="">No offer</option>
+                    {sentOffers.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.customPrice ? `${o.customPrice} TL` : 'Standard'} {o.discount ? `(${o.discount}% off)` : ''} — {new Date(o.createdAt).toLocaleDateString()}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm text-gray-600 mb-1">Commission Amount</label>
+                <input type="number" value={convertCommission} onChange={(e) => setConvertCommission(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="0" />
+              </div>
+            </div>
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => convertMutation.mutate({
+                  tenantName: convertTenant,
+                  adminEmail: convertEmail,
+                  adminFirstName: convertFirstName,
+                  adminLastName: convertLastName,
+                  adminPassword: convertPassword,
+                  ...(convertOfferId ? { offerId: convertOfferId } : {}),
+                  ...(convertCommission ? { commissionAmount: Number(convertCommission) } : {}),
+                })}
+                disabled={!convertTenant || !convertEmail || !convertFirstName || !convertLastName || !convertPassword || convertMutation.isPending}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
+              >
+                {convertMutation.isPending ? 'Converting...' : 'Convert'}
+              </button>
+              <button onClick={() => setShowConvertModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

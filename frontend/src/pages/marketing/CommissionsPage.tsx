@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import marketingApi from '../../features/marketing/api/marketingApi';
 import { useMarketingAuthStore } from '../../store/marketingAuthStore';
 import type { Commission } from '../../features/marketing/types';
@@ -14,24 +16,55 @@ export default function CommissionsPage() {
   const isManager = user?.role === 'SALES_MANAGER';
   const queryClient = useQueryClient();
 
+  const [period, setPeriod] = useState('');
+  const [status, setStatus] = useState('');
+
   const { data: commissions, isLoading } = useQuery({
-    queryKey: ['marketing', 'commissions'],
-    queryFn: () => marketingApi.get('/commissions').then((r) => r.data),
+    queryKey: ['marketing', 'commissions', { period, status }],
+    queryFn: () =>
+      marketingApi
+        .get('/commissions', {
+          params: {
+            period: period || undefined,
+            status: status || undefined,
+          },
+        })
+        .then((r) => r.data),
   });
 
   const { data: summary } = useQuery({
-    queryKey: ['marketing', 'commissions', 'summary'],
-    queryFn: () => marketingApi.get('/commissions/summary').then((r) => r.data),
+    queryKey: ['marketing', 'commissions', 'summary', { period, status }],
+    queryFn: () =>
+      marketingApi
+        .get('/commissions/summary', {
+          params: {
+            period: period || undefined,
+            status: status || undefined,
+          },
+        })
+        .then((r) => r.data),
   });
 
   const approveMutation = useMutation({
     mutationFn: (id: string) => marketingApi.patch(`/commissions/${id}/approve`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['marketing', 'commissions'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['marketing', 'commissions'] });
+      toast.success('Commission approved');
+    },
+    onError: () => {
+      toast.error('Failed to approve commission');
+    },
   });
 
   const payMutation = useMutation({
     mutationFn: (id: string) => marketingApi.patch(`/commissions/${id}/pay`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['marketing', 'commissions'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['marketing', 'commissions'] });
+      toast.success('Commission marked as paid');
+    },
+    onError: () => {
+      toast.error('Failed to mark commission as paid');
+    },
   });
 
   const items: Commission[] = commissions?.data || [];
@@ -39,6 +72,34 @@ export default function CommissionsPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-bold text-gray-900">Commissions</h1>
+
+      {/* Filters */}
+      <div className="bg-white rounded-xl border border-gray-200 p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Period</label>
+            <input
+              type="month"
+              value={period}
+              onChange={(e) => setPeriod(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+            >
+              <option value="">All</option>
+              <option value="PENDING">PENDING</option>
+              <option value="APPROVED">APPROVED</option>
+              <option value="PAID">PAID</option>
+            </select>
+          </div>
+        </div>
+      </div>
 
       {/* Summary Cards */}
       {summary && (

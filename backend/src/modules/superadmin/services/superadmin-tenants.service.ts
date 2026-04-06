@@ -45,10 +45,13 @@ export class SuperAdminTenantsService {
       where.currentPlanId = planId;
     }
 
+    const allowedSortFields = ['createdAt', 'updatedAt', 'name', 'subdomain', 'status'];
+    const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+
     const [tenants, total] = await Promise.all([
       this.prisma.tenant.findMany({
         where,
-        orderBy: { [sortBy]: sortOrder },
+        orderBy: { [sortField]: sortOrder },
         skip: (page - 1) * limit,
         take: limit,
         include: {

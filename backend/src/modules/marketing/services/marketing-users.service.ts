@@ -89,9 +89,14 @@ export class MarketingUsersService {
     const user = await this.prisma.marketingUser.findUnique({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
 
+    const data: any = { ...dto };
+    if (dto.password) {
+      data.password = await bcrypt.hash(dto.password, 10);
+    }
+
     return this.prisma.marketingUser.update({
       where: { id },
-      data: dto,
+      data,
       select: {
         id: true,
         email: true,

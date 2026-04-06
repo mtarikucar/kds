@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { MarketingRoute } from '../decorators/marketing-route.decorator';
 import { MarketingGuard } from '../guards/marketing.guard';
 import { MarketingRolesGuard } from '../guards/marketing-roles.guard';
 import { CurrentMarketingUser } from '../decorators/current-marketing-user.decorator';
@@ -18,7 +19,9 @@ import { CreateLeadDto } from '../dto/create-lead.dto';
 import { UpdateLeadDto } from '../dto/update-lead.dto';
 import { LeadFilterDto } from '../dto/lead-filter.dto';
 import { ConvertLeadDto } from '../dto/convert-lead.dto';
+import { UpdateLeadStatusDto } from '../dto/update-lead-status.dto';
 
+@MarketingRoute()
 @Controller('marketing/leads')
 @UseGuards(MarketingGuard, MarketingRolesGuard)
 export class MarketingLeadsController {
@@ -51,10 +54,10 @@ export class MarketingLeadsController {
   @Patch(':id/status')
   updateStatus(
     @Param('id') id: string,
-    @Body() body: { status: string; lostReason?: string },
+    @Body() dto: UpdateLeadStatusDto,
     @CurrentMarketingUser() user: any,
   ) {
-    return this.leadsService.updateStatus(id, body.status, body.lostReason, user.id, user.role);
+    return this.leadsService.updateStatus(id, dto.status, dto.lostReason, user.id, user.role);
   }
 
   @Patch(':id/assign')

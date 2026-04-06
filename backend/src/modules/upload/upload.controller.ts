@@ -38,7 +38,7 @@ export class UploadController {
 
   @Post('logo')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @UseInterceptors(FileInterceptor('logo'))
+  @UseInterceptors(FileInterceptor('logo', { limits: { fileSize: 5 * 1024 * 1024 } }))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload restaurant logo' })
   @ApiBody({
@@ -71,7 +71,7 @@ export class UploadController {
 
   @Post('product-image')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @UseInterceptors(FileInterceptor('image'))
+  @UseInterceptors(FileInterceptor('image', { limits: { fileSize: 5 * 1024 * 1024 } }))
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload single product image' })
   @ApiBody({
@@ -105,7 +105,7 @@ export class UploadController {
 
   @Post('product-images')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @UseInterceptors(FilesInterceptor('images', 10)) // Max 10 images at once
+  @UseInterceptors(FilesInterceptor('images', 10, { limits: { fileSize: 5 * 1024 * 1024 } })) // Max 10 images at once
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload multiple product images' })
   @ApiBody({

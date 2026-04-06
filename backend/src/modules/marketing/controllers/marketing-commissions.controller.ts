@@ -6,6 +6,7 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { MarketingRoute } from '../decorators/marketing-route.decorator';
 import { MarketingGuard } from '../guards/marketing.guard';
 import { MarketingRolesGuard } from '../guards/marketing-roles.guard';
 import { CurrentMarketingUser } from '../decorators/current-marketing-user.decorator';
@@ -13,6 +14,7 @@ import { MarketingRoles } from '../decorators/marketing-roles.decorator';
 import { MarketingCommissionsService } from '../services/marketing-commissions.service';
 import { CommissionFilterDto } from '../dto/commission-filter.dto';
 
+@MarketingRoute()
 @Controller('marketing/commissions')
 @UseGuards(MarketingGuard, MarketingRolesGuard)
 export class MarketingCommissionsController {

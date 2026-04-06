@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsEmail, IsEnum, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsEmail, IsEnum, IsOptional, MinLength } from 'class-validator';
 
 export enum MarketingUserRole {
   SALES_MANAGER = 'SALES_MANAGER',
@@ -11,6 +11,7 @@ export class CreateMarketingUserDto {
 
   @IsString()
   @IsNotEmpty()
+  @MinLength(8)
   password: string;
 
   @IsString()

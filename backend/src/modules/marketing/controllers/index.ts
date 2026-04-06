@@ -7,3 +7,4 @@ export * from './marketing-dashboard.controller';
 export * from './marketing-reports.controller';
 export * from './marketing-users.controller';
 export * from './marketing-commissions.controller';
+export * from './marketing-notifications.controller';
