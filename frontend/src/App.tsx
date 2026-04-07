@@ -73,6 +73,9 @@ import IntegrationsSettingsPage from './pages/settings/IntegrationsSettingsPage'
 import DesktopAppSettingsPage from './pages/settings/DesktopAppSettingsPage';
 import ReservationSettingsPage from './pages/settings/ReservationSettingsPage';
 import DeliveryPlatformsSettingsPage from './pages/settings/DeliveryPlatformsSettingsPage';
+import SmsSettingsPage from './pages/settings/SmsSettingsPage';
+import AccountingSettingsPage from './pages/settings/AccountingSettingsPage';
+import InvoicesPage from './pages/admin/invoices/InvoicesPage';
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { UpdateDialog } from './components/UpdateDialog';
@@ -176,6 +179,7 @@ function App() {
         <Route path="/admin/reservations" element={<ReservationsPage />} />
         <Route path="/admin/personnel" element={<PersonnelManagementPage />} />
         <Route path="/admin/stock" element={<StockManagementPage />} />
+        <Route path="/admin/invoices" element={<InvoicesPage />} />
 
         {/* Settings Routes - Nested */}
         <Route path="/admin/settings" element={<SettingsLayout />}>
@@ -188,7 +192,9 @@ function App() {
           <Route path="desktop" element={<DesktopAppSettingsPage />} />
           <Route path="integrations" element={<IntegrationsSettingsPage />} />
           <Route path="reservations" element={<ReservationSettingsPage />} />
+          <Route path="sms" element={<SmsSettingsPage />} />
           <Route path="online-orders" element={<DeliveryPlatformsSettingsPage />} />
+          <Route path="accounting" element={<AccountingSettingsPage />} />
         </Route>
 
         {/* Dev-only routes */}

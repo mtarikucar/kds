@@ -19,6 +19,7 @@ import {
   CalendarCheck,
   UserCog,
   Package,
+  Receipt,
 } from 'lucide-react';
 import { UserRole, PlanFeatures } from '../../types';
 import { useAuthStore } from '../../store/authStore';
@@ -121,6 +122,12 @@ const Sidebar = ({ isOpen, onClose, isRTL: isRTLProp }: SidebarProps) => {
       label: t('navigation.reports'),
       roles: [UserRole.ADMIN, UserRole.MANAGER],
       requiredFeature: 'advancedReports' as keyof PlanFeatures,
+    },
+    {
+      to: '/admin/invoices',
+      icon: Receipt,
+      label: t('navigation.invoices'),
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
     {
       to: '/admin/analytics',

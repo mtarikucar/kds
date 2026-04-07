@@ -57,6 +57,7 @@
     "reservations": "Reservations",
     "personnel": "Personnel",
     "stock": "Stock",
+    "invoices": "Invoices",
     "expandSidebar": "Expand Sidebar",
     "collapseSidebar": "Collapse Sidebar"
   },
@@ -799,7 +800,10 @@
   "waiter": {
     "call": "Call Waiter",
     "callSuccess": "Waiter has been notified!",
-    "callError": "Failed to call waiter"
+    "callError": "Failed to call waiter",
+    "noTable": "Please scan the table QR code to call a waiter",
+    "cooldown": "Your waiter request has been sent. Please wait.",
+    "alreadyPending": "You already have a pending waiter request"
   },
   "bill": {
     "request": "Request Bill",

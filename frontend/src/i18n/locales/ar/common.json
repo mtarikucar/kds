@@ -57,6 +57,7 @@
     "reservations": "Reservations",
     "personnel": "الموظفين",
     "stock": "المخزون",
+    "invoices": "الفواتير",
     "expandSidebar": "توسيع الشريط الجانبي",
     "collapseSidebar": "طي الشريط الجانبي"
   },
@@ -701,7 +702,10 @@
   "waiter": {
     "call": "استدعاء النادل",
     "callSuccess": "تم إبلاغ النادل!",
-    "callError": "فشل استدعاء النادل"
+    "callError": "فشل استدعاء النادل",
+    "noTable": "يرجى مسح رمز QR الخاص بالطاولة لاستدعاء النادل",
+    "cooldown": "تم إرسال طلبك. يرجى الانتظار.",
+    "alreadyPending": "لديك بالفعل طلب نادل قيد الانتظار"
   },
   "bill": {
     "request": "طلب الفاتورة",
