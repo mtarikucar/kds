@@ -180,6 +180,7 @@ export interface Table {
   capacity: number;
   section?: string;
   status: string;
+  groupId?: string | null;
   tenantId: string;
   // Voxel position fields (null = not yet placed on floor plan)
   voxelX?: number | null;
@@ -197,6 +198,72 @@ export interface CreateTableDto {
 }
 
 export interface UpdateTableDto extends Partial<CreateTableDto> {}
+
+// Table Merge/Split Types
+export interface MergeTablesDto {
+  tableIds: string[];
+}
+
+export interface UnmergeTableDto {
+  tableId: string;
+}
+
+export interface TableGroupInfo {
+  groupId: string;
+  tables: { id: string; number: string; capacity: number; section?: string; status: string }[];
+  orders: any[];
+  summary: {
+    totalOrders: number;
+    totalAmount: number;
+    totalPaid: number;
+    remainingAmount: number;
+  };
+}
+
+// Bill Split Types
+export type SplitType = 'EQUAL' | 'BY_ITEMS' | 'CUSTOM';
+
+export interface SplitPaymentEntry {
+  amount: number;
+  method: string;
+  label?: string;
+  orderItemIds?: string[];
+}
+
+export interface SplitBillDto {
+  splitType: SplitType;
+  numberOfParts?: number;
+  payments: SplitPaymentEntry[];
+  customerPhone?: string;
+}
+
+export interface GroupBillSummary {
+  groupId: string;
+  tables: { id: string; number: string }[];
+  orders: {
+    id: string;
+    orderNumber: string;
+    tableId: string;
+    finalAmount: number;
+    paidAmount: number;
+  }[];
+  items: {
+    id: string;
+    orderId: string;
+    orderNumber: string;
+    tableNumber?: string;
+    productName?: string;
+    quantity: number;
+    unitPrice: number;
+    subtotal: number;
+    modifiers?: { name?: string; price: number }[];
+  }[];
+  summary: {
+    totalAmount: number;
+    totalPaid: number;
+    remainingAmount: number;
+  };
+}
 
 export interface PublicTable {
   id: string;

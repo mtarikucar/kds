@@ -330,6 +330,28 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   // ========================================
+  // TABLE MERGE/SPLIT EVENTS
+  // ========================================
+
+  emitTableMerge(tenantId: string, data: { groupId: string; tableNumbers: string[] }) {
+    this.server.to(`pos-${tenantId}`).emit('table:merged', {
+      groupId: data.groupId,
+      tableNumbers: data.tableNumbers,
+      timestamp: new Date(),
+    });
+    this.logger.log(`Table merge emitted: tables ${data.tableNumbers.join(', ')} merged into group ${data.groupId}`);
+  }
+
+  emitTableUnmerge(tenantId: string, data: { tableNumber: string; groupId?: string }) {
+    this.server.to(`pos-${tenantId}`).emit('table:unmerged', {
+      tableNumber: data.tableNumber,
+      groupId: data.groupId,
+      timestamp: new Date(),
+    });
+    this.logger.log(`Table unmerge emitted: table ${data.tableNumber} separated`);
+  }
+
+  // ========================================
   // BILL REQUEST EVENTS
   // ========================================
 

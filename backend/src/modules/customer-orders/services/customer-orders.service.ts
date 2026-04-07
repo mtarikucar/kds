@@ -278,6 +278,32 @@ export class CustomerOrdersService {
       throw new NotFoundException('Table not found');
     }
 
+    // Rate limit: prevent spam - check by both session AND table
+    const recentBySession = await this.prisma.waiterRequest.findFirst({
+      where: {
+        sessionId: dto.sessionId,
+        status: 'PENDING',
+        createdAt: { gte: new Date(Date.now() - 60000) },
+      },
+    });
+
+    if (recentBySession) {
+      throw new BadRequestException('A waiter request is already pending. Please wait.');
+    }
+
+    // Also rate limit by table to prevent session-swap bypass
+    const recentByTable = await this.prisma.waiterRequest.findFirst({
+      where: {
+        tableId: dto.tableId,
+        status: 'PENDING',
+        createdAt: { gte: new Date(Date.now() - 30000) },
+      },
+    });
+
+    if (recentByTable) {
+      throw new BadRequestException('A waiter request is already pending for this table.');
+    }
+
     const waiterRequest = await this.prisma.waiterRequest.create({
       data: {
         tableId: dto.tableId,

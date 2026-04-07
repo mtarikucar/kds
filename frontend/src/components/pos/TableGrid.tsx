@@ -3,7 +3,7 @@ import { usePendingOrders, useWaiterRequests, useBillRequests } from '../../feat
 import { Table, TableStatus } from '../../types';
 import Badge from '../ui/Badge';
 import Spinner from '../ui/Spinner';
-import { Clock, User, Receipt } from 'lucide-react';
+import { Clock, User, Receipt, Combine } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 interface TableGridProps {
@@ -55,6 +55,8 @@ const TableGrid = ({ selectedTable, onSelectTable }: TableGridProps) => {
             className={`relative p-5 md:p-6 rounded-xl transition-all duration-200 text-left ${
               isSelected
                 ? 'bg-primary-50 border-2 border-primary-400 shadow-md ring-2 ring-primary-500/20'
+                : table.groupId
+                ? 'bg-indigo-50/30 border-2 border-indigo-300 hover:border-indigo-400 hover:shadow-md'
                 : table.status === TableStatus.OCCUPIED
                 ? 'bg-white border-2 border-slate-200 hover:border-primary-300 hover:shadow-md'
                 : hasNotifications
@@ -96,6 +98,18 @@ const TableGrid = ({ selectedTable, onSelectTable }: TableGridProps) => {
                   {t(`tableGrid.status.${table.status}`)}
                 </Badge>
               </div>
+
+              {/* Merged Group Indicator */}
+              {table.groupId && (
+                <div className="mb-2">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-xs font-semibold ring-1 ring-inset ring-indigo-200/60">
+                    <Combine className="h-3 w-3" />
+                    {t('tableMerge.groupLabel')}
+                    {' '}
+                    {tables?.filter(t2 => t2.groupId === table.groupId).map(t2 => t2.number).join('+')}
+                  </span>
+                </div>
+              )}
 
               {/* Capacity */}
               <div className="text-sm md:text-base text-slate-500 flex items-center justify-center gap-1.5">

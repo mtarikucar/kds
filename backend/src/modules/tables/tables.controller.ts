@@ -9,12 +9,14 @@ import {
   UseGuards,
   Request,
   Query,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { TablesService } from './tables.service';
 import { CreateTableDto } from './dto/create-table.dto';
 import { UpdateTableDto } from './dto/update-table.dto';
 import { UpdateTableStatusDto } from './dto/update-table-status.dto';
+import { MergeTablesDto, UnmergeTableDto } from './dto/merge-tables.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
@@ -41,6 +43,45 @@ export class TablesController {
   create(@Body() createTableDto: CreateTableDto, @Request() req) {
     return this.tablesService.create(createTableDto, req.tenantId);
   }
+
+  // ========================================
+  // TABLE MERGE / SPLIT (static routes BEFORE :id wildcard)
+  // ========================================
+
+  @Post('merge')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiOperation({ summary: 'Merge tables into a group' })
+  @ApiResponse({ status: 200, description: 'Tables merged successfully' })
+  mergeTables(@Body() dto: MergeTablesDto, @Request() req) {
+    return this.tablesService.mergeTables(dto, req.tenantId);
+  }
+
+  @Post('unmerge')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiOperation({ summary: 'Remove a table from its group' })
+  @ApiResponse({ status: 200, description: 'Table unmerged successfully' })
+  unmergeTable(@Body() dto: UnmergeTableDto, @Request() req) {
+    return this.tablesService.unmergeTable(dto, req.tenantId);
+  }
+
+  @Post('unmerge-all/:groupId')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiOperation({ summary: 'Dissolve an entire table group' })
+  @ApiResponse({ status: 200, description: 'All tables unmerged' })
+  unmergeAll(@Param('groupId', new ParseUUIDPipe()) groupId: string, @Request() req) {
+    return this.tablesService.unmergeAll(groupId, req.tenantId);
+  }
+
+  @Get('group/:groupId')
+  @ApiOperation({ summary: 'Get all tables and orders in a group' })
+  @ApiResponse({ status: 200, description: 'Table group details with orders' })
+  getTableGroup(@Param('groupId', new ParseUUIDPipe()) groupId: string, @Request() req) {
+    return this.tablesService.getTableGroup(groupId, req.tenantId);
+  }
+
+  // ========================================
+  // STANDARD TABLE CRUD
+  // ========================================
 
   @Get()
   @ApiOperation({ summary: 'Get all tables' })
@@ -78,9 +119,6 @@ export class TablesController {
     @Body() updateTableDto: UpdateTableDto,
     @Request() req,
   ) {
-    console.log('Received update payload:', JSON.stringify(updateTableDto, null, 2));
-    console.log('Status value:', updateTableDto.status);
-    console.log('Status type:', typeof updateTableDto.status);
     return this.tablesService.update(id, updateTableDto, req.tenantId);
   }
 

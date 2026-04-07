@@ -7,6 +7,7 @@ import { UpdateReservationDto } from '../dto/update-reservation.dto';
 import { ReservationQueryDto } from '../dto/reservation-query.dto';
 import { ReservationSettingsService } from './reservation-settings.service';
 import { ReservationStatus } from '../constants/reservation-status.enum';
+import { SmsNotificationService } from '../../sms-settings/sms-notification.service';
 
 @Injectable()
 export class ReservationsService {
@@ -14,6 +15,7 @@ export class ReservationsService {
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
     private settingsService: ReservationSettingsService,
+    private smsNotificationService: SmsNotificationService,
   ) {}
 
   private async validateTenant(tenantId: string) {
@@ -211,6 +213,15 @@ export class ReservationsService {
       console.error('Failed to send reservation notification:', e.message);
     }
 
+    // Send SMS to customer
+    this.smsNotificationService.notifyReservationCreated(tenantId, {
+      customerPhone: reservation.customerPhone,
+      customerName: reservation.customerName,
+      date: dto.date,
+      startTime: dto.startTime,
+      reservationNumber: reservation.reservationNumber,
+    });
+
     return reservation;
   }
 
@@ -370,6 +381,16 @@ export class ReservationsService {
       console.error('Failed to send confirmation notification:', e.message);
     }
 
+    // Send SMS to customer
+    const dateStr = reservation.date instanceof Date ? reservation.date.toISOString().split('T')[0] : String(reservation.date);
+    this.smsNotificationService.notifyReservationConfirmed(tenantId, {
+      customerPhone: reservation.customerPhone,
+      customerName: reservation.customerName,
+      date: dateStr,
+      startTime: reservation.startTime,
+      reservationNumber: reservation.reservationNumber,
+    });
+
     return updated;
   }
 
@@ -400,6 +421,16 @@ export class ReservationsService {
     } catch (e) {
       console.error('Failed to send rejection notification:', e.message);
     }
+
+    // Send SMS to customer
+    const rejectDateStr = reservation.date instanceof Date ? reservation.date.toISOString().split('T')[0] : String(reservation.date);
+    this.smsNotificationService.notifyReservationRejected(tenantId, {
+      customerPhone: reservation.customerPhone,
+      customerName: reservation.customerName,
+      date: rejectDateStr,
+      startTime: reservation.startTime,
+      reason: rejectionReason,
+    });
 
     return updated;
   }
@@ -485,7 +516,7 @@ export class ReservationsService {
       });
     }
 
-    return this.prisma.reservation.update({
+    const cancelled = await this.prisma.reservation.update({
       where: { id: reservation.id },
       data: {
         status: ReservationStatus.CANCELLED,
@@ -494,6 +525,17 @@ export class ReservationsService {
       },
       include: { table: true },
     });
+
+    // Send SMS to customer
+    const cancelDateStr = reservation.date instanceof Date ? reservation.date.toISOString().split('T')[0] : String(reservation.date);
+    this.smsNotificationService.notifyReservationCancelled(tenantId, {
+      customerPhone: reservation.customerPhone,
+      customerName: reservation.customerName,
+      date: cancelDateStr,
+      startTime: reservation.startTime,
+    });
+
+    return cancelled;
   }
 
   async cancelPublic(id: string, tenantId: string) {
@@ -543,6 +585,15 @@ export class ReservationsService {
     } catch (e) {
       console.error('Failed to send cancellation notification:', e.message);
     }
+
+    // Send SMS to customer
+    const publicCancelDateStr = reservation.date instanceof Date ? reservation.date.toISOString().split('T')[0] : String(reservation.date);
+    this.smsNotificationService.notifyReservationCancelled(tenantId, {
+      customerPhone: reservation.customerPhone,
+      customerName: reservation.customerName,
+      date: publicCancelDateStr,
+      startTime: reservation.startTime,
+    });
 
     return updated;
   }

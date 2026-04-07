@@ -184,5 +184,45 @@
     "create": "إنشاء",
     "payment": "الدفع"
   },
-  "newCustomerOrder": "طلب عميل جديد: #{{orderNumber}}"
+  "newCustomerOrder": "طلب عميل جديد: #{{orderNumber}}",
+  "tableMerge": {
+    "title": "دمج الطاولات",
+    "mergeButton": "دمج الطاولات",
+    "unmergeButton": "فصل الطاولة",
+    "unmergeAllButton": "فصل الكل",
+    "selectTables": "اختر الطاولات للدمج:",
+    "selectAtLeast": "اختر طاولتين على الأقل",
+    "mergedGroup": "مجموعة مدمجة",
+    "mergeSuccess": "تم دمج الطاولات بنجاح",
+    "unmergeSuccess": "تم فصل الطاولة بنجاح",
+    "unmergeAllSuccess": "تم فصل جميع الطاولات",
+    "confirmMerge": "دمج {{count}} طاولات؟",
+    "confirmUnmerge": "فصل هذه الطاولة عن المجموعة؟",
+    "confirmUnmergeAll": "فصل جميع الطاولات في هذه المجموعة؟",
+    "groupLabel": "مجموعة",
+    "mergedWith": "مدمجة مع"
+  },
+  "billSplit": {
+    "title": "تقسيم الفاتورة",
+    "splitButton": "تقسيم الفاتورة",
+    "splitType": "طريقة التقسيم",
+    "equal": "تقسيم متساوٍ",
+    "byItems": "حسب العناصر",
+    "custom": "مبالغ مخصصة",
+    "numberOfPeople": "عدد الأشخاص",
+    "perPerson": "للشخص الواحد",
+    "person": "شخص",
+    "selectItems": "اختر العناصر لهذا الشخص",
+    "amount": "المبلغ",
+    "paymentMethod": "طريقة الدفع",
+    "addSplit": "إضافة شخص",
+    "removeSplit": "إزالة",
+    "remaining": "المتبقي",
+    "total": "الإجمالي",
+    "paid": "مدفوع",
+    "splitSuccess": "تم تقسيم الفاتورة وتسجيل المدفوعات",
+    "splitFailed": "فشل تقسيم الفاتورة",
+    "amountMismatch": "يجب أن تساوي المبالغ المقسمة الإجمالي",
+    "collectAll": "تحصيل جميع المدفوعات"
+  }
 }

@@ -9,6 +9,7 @@ import {
   UseGuards,
   Request,
   Query,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { OrdersService } from '../services/orders.service';
@@ -44,6 +45,42 @@ export class OrdersController {
     return this.ordersService.create(createOrderDto, req.user.id, req.tenantId);
   }
 
+  // ========================================
+  // STATIC-PREFIX ROUTES (before :id wildcard)
+  // ========================================
+
+  @Post('transfer-table')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiOperation({ summary: 'Transfer orders from one table to another (ADMIN, MANAGER, WAITER)' })
+  @ApiResponse({ status: 200, description: 'Orders successfully transferred' })
+  @ApiResponse({ status: 400, description: 'Invalid transfer request' })
+  @ApiResponse({ status: 404, description: 'Source or target table not found' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  transferTableOrders(@Body() dto: TransferTableOrdersDto, @Request() req) {
+    return this.ordersService.transferTableOrders(dto, req.tenantId);
+  }
+
+  @Post('sync-table-statuses')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({ summary: 'Sync all table statuses based on their active orders (ADMIN, MANAGER)' })
+  @ApiResponse({ status: 200, description: 'Table statuses synced successfully' })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  syncTableStatuses(@Request() req) {
+    return this.ordersService.syncTableStatuses(req.tenantId);
+  }
+
+  @Get('group-bill-summary/:groupId')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiOperation({ summary: 'Get combined bill summary for a table group' })
+  @ApiResponse({ status: 200, description: 'Group bill summary with all items' })
+  getGroupBillSummary(@Param('groupId', new ParseUUIDPipe()) groupId: string, @Request() req) {
+    return this.paymentsService.getGroupBillSummary(groupId, req.tenantId);
+  }
+
+  // ========================================
+  // STANDARD CRUD (wildcard :id routes)
+  // ========================================
+
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @ApiOperation({ summary: 'Get all orders (ADMIN, MANAGER, WAITER)' })
@@ -61,11 +98,7 @@ export class OrdersController {
   ) {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
-
-    // Convert comma-separated status string to array
     const statuses = status ? status.split(',').map(s => s.trim()) as OrderStatus[] : undefined;
-
-    console.log('[Orders Controller] Query params:', { tableId, status, statuses });
 
     return this.ordersService.findAll(req.tenantId, tableId, statuses, start, end);
   }
@@ -108,17 +141,6 @@ export class OrdersController {
     return this.ordersService.updateStatus(id, updateStatusDto, req.tenantId);
   }
 
-  @Post('transfer-table')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
-  @ApiOperation({ summary: 'Transfer orders from one table to another (ADMIN, MANAGER, WAITER)' })
-  @ApiResponse({ status: 200, description: 'Orders successfully transferred' })
-  @ApiResponse({ status: 400, description: 'Invalid transfer request' })
-  @ApiResponse({ status: 404, description: 'Source or target table not found' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
-  transferTableOrders(@Body() dto: TransferTableOrdersDto, @Request() req) {
-    return this.ordersService.transferTableOrders(dto, req.tenantId);
-  }
-
   @Post(':id/approve')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @ApiOperation({ summary: 'Approve a pending customer order (ADMIN, MANAGER, WAITER)' })
@@ -139,22 +161,5 @@ export class OrdersController {
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   remove(@Param('id') id: string, @Request() req) {
     return this.ordersService.remove(id, req.tenantId);
-  }
-
-  @Post('sync-table-statuses')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ summary: 'Sync all table statuses based on their active orders (ADMIN, MANAGER)' })
-  @ApiResponse({ status: 200, description: 'Table statuses synced successfully' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
-  syncTableStatuses(@Request() req) {
-    return this.ordersService.syncTableStatuses(req.tenantId);
-  }
-
-  @Get('group-bill-summary/:groupId')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
-  @ApiOperation({ summary: 'Get combined bill summary for a table group' })
-  @ApiResponse({ status: 200, description: 'Group bill summary with all items' })
-  getGroupBillSummary(@Param('groupId') groupId: string, @Request() req) {
-    return this.paymentsService.getGroupBillSummary(groupId, req.tenantId);
   }
 }

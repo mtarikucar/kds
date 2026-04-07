@@ -42,10 +42,6 @@ export class SplitPaymentEntry {
 }
 
 export class SplitBillDto {
-  @ApiProperty({ description: 'Order ID to split' })
-  @IsUUID()
-  orderId: string;
-
   @ApiProperty({ enum: SplitType })
   @IsEnum(SplitType)
   splitType: SplitType;

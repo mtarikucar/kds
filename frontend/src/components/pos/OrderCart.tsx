@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Trash2, Plus, Minus, ArrowRightLeft, ShoppingCart } from 'lucide-react';
+import { Trash2, Plus, Minus, ArrowRightLeft, ShoppingCart, Combine, Split } from 'lucide-react';
 import { Product } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import Button from '../ui/Button';
@@ -25,6 +25,8 @@ interface OrderCartProps {
   onCheckout: () => void;
   onCreateOrder: () => void;
   onTransferTable?: () => void;
+  onMergeTables?: () => void;
+  onSplitBill?: () => void;
   isCheckingOut?: boolean;
   isTwoStepCheckout?: boolean;
   hasActiveOrder?: boolean;
@@ -47,6 +49,8 @@ const OrderCart = ({
   onCheckout,
   onCreateOrder,
   onTransferTable,
+  onMergeTables,
+  onSplitBill,
   isCheckingOut = false,
   isTwoStepCheckout = false,
   hasActiveOrder = false,
@@ -67,7 +71,29 @@ const OrderCart = ({
           {t('currentOrder')}
         </CardTitle>
         <div className="flex gap-2">
-          {/* Transfer Button */}
+          {/* Table Actions */}
+          {hasSelectedTable && onMergeTables && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onMergeTables}
+              title={t('tableMerge.mergeButton')}
+              className="text-slate-500 hover:text-indigo-600"
+            >
+              <Combine className="h-4 w-4" />
+            </Button>
+          )}
+          {hasActiveOrder && hasSelectedTable && onSplitBill && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onSplitBill}
+              title={t('billSplit.splitButton')}
+              className="text-slate-500 hover:text-emerald-600"
+            >
+              <Split className="h-4 w-4" />
+            </Button>
+          )}
           {hasActiveOrder && hasSelectedTable && onTransferTable && (
             <Button
               variant="ghost"

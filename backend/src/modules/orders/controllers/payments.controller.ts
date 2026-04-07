@@ -52,7 +52,11 @@ export class PaymentsController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @ApiOperation({ summary: 'Split bill and create multiple payments' })
   @ApiResponse({ status: 201, description: 'Split payments created' })
-  splitBill(@Body() dto: SplitBillDto, @Request() req) {
-    return this.paymentsService.splitBill(dto, req.tenantId);
+  splitBill(
+    @Param('orderId') orderId: string,
+    @Body() dto: SplitBillDto,
+    @Request() req,
+  ) {
+    return this.paymentsService.splitBill(orderId, dto, req.tenantId);
   }
 }
