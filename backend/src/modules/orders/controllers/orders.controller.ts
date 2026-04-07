@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { OrdersService } from '../services/orders.service';
+import { PaymentsService } from '../services/payments.service';
 import { CreateOrderDto } from '../dto/create-order.dto';
 import { UpdateOrderDto } from '../dto/update-order.dto';
 import { UpdateOrderStatusDto } from '../dto/update-order-status.dto';
@@ -28,7 +29,10 @@ import { OrderStatus } from '../../../common/constants/order-status.enum';
 @Controller('orders')
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(
+    private readonly ordersService: OrdersService,
+    private readonly paymentsService: PaymentsService,
+  ) {}
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
@@ -144,5 +148,13 @@ export class OrdersController {
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   syncTableStatuses(@Request() req) {
     return this.ordersService.syncTableStatuses(req.tenantId);
+  }
+
+  @Get('group-bill-summary/:groupId')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiOperation({ summary: 'Get combined bill summary for a table group' })
+  @ApiResponse({ status: 200, description: 'Group bill summary with all items' })
+  getGroupBillSummary(@Param('groupId') groupId: string, @Request() req) {
+    return this.paymentsService.getGroupBillSummary(groupId, req.tenantId);
   }
 }

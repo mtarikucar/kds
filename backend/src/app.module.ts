@@ -37,6 +37,8 @@ import { DeliveryPlatformsModule } from './modules/delivery-platforms/delivery-p
 import { PersonnelModule } from './modules/personnel/personnel.module';
 import { StockManagementModule } from './modules/stock-management/stock-management.module';
 import { MarketingModule } from './modules/marketing/marketing.module';
+import { AccountingModule } from './modules/accounting/accounting.module';
+import { SmsSettingsModule } from './modules/sms-settings/sms-settings.module';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './common/middleware/input-sanitizer.middleware';
 
@@ -97,6 +99,8 @@ import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './co
     PersonnelModule,
     StockManagementModule,
     MarketingModule,
+    SmsSettingsModule,
+    AccountingModule,
   ],
   controllers: [AppController],
   providers: [

@@ -5,6 +5,8 @@ import { OrdersController } from './controllers/orders.controller';
 import { PaymentsController } from './controllers/payments.controller';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { CustomersModule } from '../customers/customers.module';
+import { SmsSettingsModule } from '../sms-settings/sms-settings.module';
+import { AccountingModule } from '../accounting/accounting.module';
 
 @Module({
   imports: [
@@ -13,6 +15,8 @@ import { CustomersModule } from '../customers/customers.module';
     forwardRef(() => import('../delivery-platforms/delivery-platforms.module').then(m => m.DeliveryPlatformsModule)),
     forwardRef(() => import('../stock-management/stock-management.module').then(m => m.StockManagementModule)),
     CustomersModule,
+    SmsSettingsModule,
+    AccountingModule,
   ],
   controllers: [OrdersController, PaymentsController],
   providers: [OrdersService, PaymentsService],
