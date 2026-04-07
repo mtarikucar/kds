@@ -1,4 +1,4 @@
-import { IsBoolean, IsOptional, IsString, IsInt, Min } from 'class-validator';
+import { IsBoolean, IsOptional, IsString, IsInt, Min, IsIn } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateAccountingSettingsDto {
@@ -11,7 +11,7 @@ export class UpdateAccountingSettingsDto {
   @ApiPropertyOptional() @IsString() @IsOptional() companyPhone?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() companyEmail?: string;
 
-  @ApiPropertyOptional() @IsString() @IsOptional() provider?: string;
+  @ApiPropertyOptional() @IsString() @IsOptional() @IsIn(['NONE', 'PARASUT', 'LOGO', 'FORIBA']) provider?: string;
   @ApiPropertyOptional() @IsBoolean() @IsOptional() autoSync?: boolean;
 
   @ApiPropertyOptional() @IsString() @IsOptional() parasutCompanyId?: string;

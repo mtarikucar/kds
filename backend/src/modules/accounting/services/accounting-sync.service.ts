@@ -100,12 +100,13 @@ export class AccountingSyncService {
   }
 
   private async getToken(tenantId: string, settings: any, adapter: AccountingAdapter): Promise<string> {
-    const cached = this.tokenCache.get(tenantId);
+    const cacheKey = `${tenantId}:${adapter.name}`;
+    const cached = this.tokenCache.get(cacheKey);
     if (cached && cached.expiresAt > new Date()) return cached.token;
 
     const credentials = this.getCredentials(settings);
     const result = await adapter.authenticate(credentials);
-    this.tokenCache.set(tenantId, {
+    this.tokenCache.set(cacheKey, {
       token: result.accessToken,
       expiresAt: result.expiresAt || new Date(Date.now() + 7200000),
     });

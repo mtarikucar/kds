@@ -50,7 +50,7 @@ export class PaymentsService {
         addBreadcrumb('Payment validation passed', 'payment', { orderId });
 
         // Create payment and update order status in a transaction
-        return this.prisma.$transaction(async (tx) => {
+        const result = await this.prisma.$transaction(async (tx) => {
           // Re-fetch order inside transaction for a consistent view
           const order = await tx.order.findFirst({
             where: { id: orderId, tenantId },
@@ -219,22 +219,25 @@ export class PaymentsService {
               }
             }
 
-            // Auto-generate invoice if enabled
-            if (this.salesInvoiceService && this.accountingSettingsService) {
-              try {
-                const accSettings = await this.accountingSettingsService.findByTenant(tenantId);
-                if (accSettings.autoGenerateInvoice) {
-                  await this.salesInvoiceService.createFromOrder(orderId, tenantId);
-                }
-              } catch (err) {
-                console.error('Auto-invoice generation failed:', err.message);
-              }
-            }
           }
 
           addBreadcrumb('Payment completed successfully', 'payment', { paymentId: payment.id });
           return payment;
         });
+
+        // Auto-generate invoice AFTER transaction commits
+        if (this.salesInvoiceService && this.accountingSettingsService) {
+          try {
+            const accSettings = await this.accountingSettingsService.findByTenant(tenantId);
+            if (accSettings.autoGenerateInvoice) {
+              await this.salesInvoiceService.createFromOrder(orderId, tenantId);
+            }
+          } catch (err) {
+            console.error('Auto-invoice generation failed:', err.message);
+          }
+        }
+
+        return result;
       }
     );
   }
@@ -277,10 +280,10 @@ export class PaymentsService {
   // SPLIT BILL
   // ========================================
 
-  async splitBill(dto: SplitBillDto, tenantId: string) {
+  async splitBill(orderId: string, dto: SplitBillDto, tenantId: string) {
     // Pre-validate order exists and is in valid state
     const preCheck = await this.prisma.order.findFirst({
-      where: { id: dto.orderId, tenantId },
+      where: { id: orderId, tenantId },
     });
 
     if (!preCheck) {
@@ -298,7 +301,7 @@ export class PaymentsService {
     // All validation and payment creation inside transaction for race-condition safety
     const result = await this.prisma.$transaction(async (tx) => {
       const order = await tx.order.findFirst({
-        where: { id: dto.orderId, tenantId },
+        where: { id: orderId, tenantId },
         include: {
           orderItems: { include: { product: true } },
           payments: { where: { status: PaymentStatus.COMPLETED } },
@@ -330,7 +333,7 @@ export class PaymentsService {
             method: entry.method,
             status: PaymentStatus.COMPLETED,
             notes: entry.label || null,
-            orderId: dto.orderId,
+            orderId: orderId,
             paidAt: new Date(),
           },
         });
@@ -339,7 +342,7 @@ export class PaymentsService {
 
       // Check if order is fully paid now
       const totalPaid = await tx.payment.aggregate({
-        where: { orderId: dto.orderId, status: PaymentStatus.COMPLETED },
+        where: { orderId: orderId, status: PaymentStatus.COMPLETED },
         _sum: { amount: true },
       });
 
@@ -349,7 +352,7 @@ export class PaymentsService {
       if (isFullyPaid) {
         // Mark order as paid
         await tx.order.update({
-          where: { id: dto.orderId },
+          where: { id: orderId },
           data: { status: OrderStatus.PAID, paidAt: new Date() },
         });
 
@@ -393,24 +396,25 @@ export class PaymentsService {
           }
         }
 
-        // Auto-generate invoice if enabled
-        if (this.salesInvoiceService && this.accountingSettingsService) {
-          try {
-            const accSettings = await this.accountingSettingsService.findByTenant(tenantId);
-            if (accSettings.autoGenerateInvoice) {
-              await this.salesInvoiceService.createFromOrder(dto.orderId, tenantId);
-            }
-          } catch (err) {
-            console.error('Auto-invoice generation failed:', err.message);
-          }
-        }
       }
 
       return { payments, isFullyPaid };
     });
 
+    // Auto-generate invoice AFTER transaction commits
+    if (result.isFullyPaid && this.salesInvoiceService && this.accountingSettingsService) {
+      try {
+        const accSettings = await this.accountingSettingsService.findByTenant(tenantId);
+        if (accSettings.autoGenerateInvoice) {
+          await this.salesInvoiceService.createFromOrder(orderId, tenantId);
+        }
+      } catch (err) {
+        console.error('Auto-invoice generation failed:', err.message);
+      }
+    }
+
     return {
-      orderId: dto.orderId,
+      orderId: orderId,
       splitType: dto.splitType,
       payments: result.payments,
       orderFullyPaid: result.isFullyPaid,

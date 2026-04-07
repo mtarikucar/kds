@@ -37,15 +37,14 @@ export class AccountingSettingsService {
   }
 
   async getNextInvoiceNumber(tenantId: string): Promise<string> {
-    const settings = await this.findByTenant(tenantId);
-    const prefix = settings.invoicePrefix || 'FTR';
-    const num = settings.nextInvoiceNumber || 1;
-
-    await this.prisma.accountingSettings.update({
+    const settings = await this.prisma.accountingSettings.upsert({
       where: { tenantId },
-      data: { nextInvoiceNumber: num + 1 },
+      update: { nextInvoiceNumber: { increment: 1 } },
+      create: { tenantId, nextInvoiceNumber: 2 },
     });
 
+    const prefix = settings.invoicePrefix || 'FTR';
+    const num = (settings.nextInvoiceNumber || 2) - 1; // We incremented, so subtract 1 to get current
     return `${prefix}-${String(num).padStart(6, '0')}`;
   }
 }

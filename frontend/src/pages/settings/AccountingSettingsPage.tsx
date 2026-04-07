@@ -93,7 +93,18 @@ const AccountingSettingsPage = () => {
 
   const saveSettings = useCallback(
     async (newSettings: AccountingSettingsState) => {
-      await updateSettings(newSettings);
+      // Don't send empty credential fields (they would wipe stored values)
+      const payload = { ...newSettings };
+      const credentialFields = [
+        'parasutClientSecret', 'parasutPassword',
+        'logoPassword', 'foribaPassword',
+      ] as const;
+      for (const field of credentialFields) {
+        if (!payload[field]) {
+          delete payload[field];
+        }
+      }
+      await updateSettings(payload);
     },
     [updateSettings]
   );
