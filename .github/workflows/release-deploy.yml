@@ -187,6 +187,8 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           DESKTOP_RELEASE_API_KEY: ${{ secrets.DESKTOP_RELEASE_API_KEY }}
+          MARKETING_JWT_SECRET: ${{ secrets.MARKETING_JWT_SECRET }}
+          SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.SUPERADMIN_JWT_REFRESH_SECRET }}
         run: |
           ssh root@${{ env.SERVER_HOST }} << EOF
             cd /root/kds
