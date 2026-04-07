@@ -70,8 +70,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
       details = isDevelopment ? exception.message : undefined;
     } else if (exception instanceof Error) {
       // Generic errors
-      message = exception.message || 'An unexpected error occurred';
-      error = exception.name || 'Error';
+      message = isDevelopment ? exception.message : 'An unexpected error occurred';
+      error = isDevelopment ? exception.name : 'Internal Server Error';
       stack = isDevelopment ? exception.stack : undefined;
     }
 

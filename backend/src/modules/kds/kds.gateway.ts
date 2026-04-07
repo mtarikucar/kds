@@ -120,6 +120,9 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('join-kitchen')
   handleJoinKitchen(client: Socket) {
+    if (client.data.userType === 'customer') {
+      return;
+    }
     const tenantId = client.data.tenantId;
     client.join(`kitchen-${tenantId}`);
     this.logger.log(`Client ${client.id} joined kitchen-${tenantId}`);
@@ -127,6 +130,9 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('join-pos')
   handleJoinPos(client: Socket) {
+    if (client.data.userType === 'customer') {
+      return;
+    }
     const tenantId = client.data.tenantId;
     client.join(`pos-${tenantId}`);
     this.logger.log(`Client ${client.id} joined pos-${tenantId}`);
@@ -321,6 +327,28 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.log(
       `Table transfer emitted: ${data.transferredCount} order(s) from table ${data.sourceTableNumber} to table ${data.targetTableNumber}`
     );
+  }
+
+  // ========================================
+  // TABLE MERGE/SPLIT EVENTS
+  // ========================================
+
+  emitTableMerge(tenantId: string, data: { groupId: string; tableNumbers: string[] }) {
+    this.server.to(`pos-${tenantId}`).emit('table:merged', {
+      groupId: data.groupId,
+      tableNumbers: data.tableNumbers,
+      timestamp: new Date(),
+    });
+    this.logger.log(`Table merge emitted: tables ${data.tableNumbers.join(', ')} merged into group ${data.groupId}`);
+  }
+
+  emitTableUnmerge(tenantId: string, data: { tableNumber: string; groupId?: string }) {
+    this.server.to(`pos-${tenantId}`).emit('table:unmerged', {
+      tableNumber: data.tableNumber,
+      groupId: data.groupId,
+      timestamp: new Date(),
+    });
+    this.logger.log(`Table unmerge emitted: table ${data.tableNumber} separated`);
   }
 
   // ========================================

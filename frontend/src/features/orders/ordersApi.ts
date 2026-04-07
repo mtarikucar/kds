@@ -11,15 +11,15 @@ import {
   OrderFilters,
   WaiterRequest,
   BillRequest,
+  SplitBillDto,
+  GroupBillSummary,
 } from '../../types';
 
 export const useOrders = (filters?: OrderFilters) => {
   return useQuery({
     queryKey: ['orders', filters],
     queryFn: async (): Promise<Order[]> => {
-      console.log('[useOrders] Fetching orders with filters:', filters);
       const response = await api.get('/orders', { params: filters });
-      console.log('[useOrders] Response:', response.data);
       return response.data;
     },
   });
@@ -189,6 +189,43 @@ export const useCreatePayment = () => {
     onError: (error: any) => {
       toast.error(error.response?.data?.message || i18n.t('pos:paymentRecordFailed'));
     },
+  });
+};
+
+// ========================================
+// SPLIT BILL
+// ========================================
+
+export const useSplitBill = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: SplitBillDto & { orderId: string }) => {
+      const { orderId, ...body } = data;
+      const response = await api.post(`/orders/${orderId}/payments/split`, body);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['orders'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      queryClient.invalidateQueries({ queryKey: ['tableGroup'] });
+      toast.success(i18n.t('pos:billSplit.splitSuccess'));
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || i18n.t('pos:billSplit.splitFailed'));
+    },
+  });
+};
+
+export const useGroupBillSummary = (groupId: string | null) => {
+  return useQuery({
+    queryKey: ['groupBillSummary', groupId],
+    queryFn: async (): Promise<GroupBillSummary> => {
+      const response = await api.get(`/orders/group-bill-summary/${groupId}`);
+      return response.data;
+    },
+    enabled: !!groupId,
   });
 };
 

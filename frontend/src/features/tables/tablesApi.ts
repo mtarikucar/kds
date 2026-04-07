@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import api from '../../lib/api';
-import { Table, CreateTableDto, UpdateTableDto } from '../../types';
+import { Table, CreateTableDto, UpdateTableDto, MergeTablesDto, UnmergeTableDto, TableGroupInfo } from '../../types';
 
 export const useTables = () => {
   return useQuery({
@@ -104,5 +104,72 @@ export const useUpdateTableStatus = () => {
     onError: (error: any) => {
       toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
+  });
+};
+
+// ========================================
+// TABLE MERGE / SPLIT
+// ========================================
+
+export const useMergeTables = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: MergeTablesDto): Promise<TableGroupInfo> => {
+      const response = await api.post('/tables/merge', data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      toast.success(i18n.t('pos:tableMerge.mergeSuccess'));
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+    },
+  });
+};
+
+export const useUnmergeTable = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: UnmergeTableDto): Promise<void> => {
+      await api.post('/tables/unmerge', data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      toast.success(i18n.t('pos:tableMerge.unmergeSuccess'));
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+    },
+  });
+};
+
+export const useUnmergeAll = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (groupId: string): Promise<void> => {
+      await api.post(`/tables/unmerge-all/${groupId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      toast.success(i18n.t('pos:tableMerge.unmergeAllSuccess'));
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
+    },
+  });
+};
+
+export const useTableGroup = (groupId: string | null) => {
+  return useQuery({
+    queryKey: ['tableGroup', groupId],
+    queryFn: async (): Promise<TableGroupInfo> => {
+      const response = await api.get(`/tables/group/${groupId}`);
+      return response.data;
+    },
+    enabled: !!groupId,
   });
 };

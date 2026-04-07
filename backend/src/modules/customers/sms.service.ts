@@ -1,27 +1,66 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as Twilio from 'twilio';
+import { SmsProvider, SmsSendResult } from './sms-providers/sms-provider.interface';
+import { TwilioProvider } from './sms-providers/twilio.provider';
+import { NetGsmProvider } from './sms-providers/netgsm.provider';
 
 @Injectable()
 export class SmsService {
   private readonly logger = new Logger(SmsService.name);
-  private twilioClient: Twilio.Twilio | null = null;
-  private isEnabled: boolean;
+  private provider: SmsProvider | null = null;
+  private mockMode: boolean;
 
   constructor(private configService: ConfigService) {
-    const accountSid = this.configService.get<string>('TWILIO_ACCOUNT_SID');
-    const authToken = this.configService.get<string>('TWILIO_AUTH_TOKEN');
+    this.provider = this.initializeProvider();
+    this.mockMode = !this.provider;
 
-    if (accountSid && authToken) {
-      this.twilioClient = Twilio.default(accountSid, authToken);
-      this.isEnabled = true;
-      this.logger.log('Twilio SMS service initialized');
-    } else {
-      this.isEnabled = false;
-      this.logger.warn(
-        'Twilio credentials not configured - SMS will be mocked',
-      );
+    if (this.mockMode) {
+      this.logger.warn('No SMS provider configured - SMS will be mocked');
     }
+  }
+
+  private initializeProvider(): SmsProvider | null {
+    const providerName = (this.configService.get<string>('SMS_PROVIDER') || '').toLowerCase();
+
+    // Explicit provider selection
+    if (providerName === 'netgsm') {
+      const provider = new NetGsmProvider(
+        this.configService.get<string>('NETGSM_USERCODE'),
+        this.configService.get<string>('NETGSM_PASSWORD'),
+        this.configService.get<string>('NETGSM_MSGHEADER'),
+      );
+      if (provider.isConfigured()) return provider;
+      this.logger.warn('NetGSM selected but credentials missing');
+      return null;
+    }
+
+    if (providerName === 'twilio') {
+      const provider = new TwilioProvider(
+        this.configService.get<string>('TWILIO_ACCOUNT_SID'),
+        this.configService.get<string>('TWILIO_AUTH_TOKEN'),
+        this.configService.get<string>('TWILIO_PHONE_NUMBER'),
+      );
+      if (provider.isConfigured()) return provider;
+      this.logger.warn('Twilio selected but credentials missing');
+      return null;
+    }
+
+    // Auto-detect: try NetGSM first (cheaper for TR), then Twilio
+    const netgsm = new NetGsmProvider(
+      this.configService.get<string>('NETGSM_USERCODE'),
+      this.configService.get<string>('NETGSM_PASSWORD'),
+      this.configService.get<string>('NETGSM_MSGHEADER'),
+    );
+    if (netgsm.isConfigured()) return netgsm;
+
+    const twilio = new TwilioProvider(
+      this.configService.get<string>('TWILIO_ACCOUNT_SID'),
+      this.configService.get<string>('TWILIO_AUTH_TOKEN'),
+      this.configService.get<string>('TWILIO_PHONE_NUMBER'),
+    );
+    if (twilio.isConfigured()) return twilio;
+
+    return null;
   }
 
   /**
@@ -31,79 +70,47 @@ export class SmsService {
     to: string,
     message: string,
     maxRetries: number = 3,
-  ): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    if (!this.isEnabled || !this.twilioClient) {
-      // Mock mode for development
+  ): Promise<SmsSendResult> {
+    if (this.mockMode || !this.provider) {
       this.logger.log(`[MOCK SMS] To: ${to}, Message: ${message}`);
-      return {
-        success: true,
-        messageId: `mock-${Date.now()}`,
-      };
-    }
-
-    const from = this.configService.get<string>('TWILIO_PHONE_NUMBER');
-
-    if (!from) {
-      this.logger.error('TWILIO_PHONE_NUMBER not configured');
-      return {
-        success: false,
-        error: 'SMS service not properly configured',
-      };
+      return { success: true, messageId: `mock-${Date.now()}` };
     }
 
     let lastError: Error | null = null;
 
-    // Retry logic with exponential backoff
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const result = await this.twilioClient.messages.create({
-          body: message,
-          from,
-          to,
-        });
+        const result = await this.provider.send(to, message);
 
-        this.logger.log(
-          `SMS sent successfully to ${to} (SID: ${result.sid})`,
-        );
+        // Provider returned a non-retryable error
+        if (!result.success && result.error?.startsWith('Non-retryable:')) {
+          this.logger.error(`${this.provider.name} non-retryable error for ${to}: ${result.error}`);
+          return result;
+        }
 
-        return {
-          success: true,
-          messageId: result.sid,
-        };
+        if (result.success) return result;
+
+        // Unexpected failure without throw
+        lastError = new Error(result.error || 'Unknown error');
       } catch (error) {
         lastError = error as Error;
-
         this.logger.warn(
-          `SMS send attempt ${attempt}/${maxRetries} failed for ${to}: ${error.message}`,
+          `SMS send attempt ${attempt}/${maxRetries} failed for ${to} via ${this.provider.name}: ${error.message}`,
         );
+      }
 
-        // Don't retry on certain errors
-        if (
-          error.code === 21211 || // Invalid phone number
-          error.code === 21408 || // Permission denied
-          error.code === 21610    // Unsubscribed recipient
-        ) {
-          this.logger.error(`Non-retryable error for ${to}: ${error.message}`);
-          break;
-        }
-
-        // Wait before retry (exponential backoff: 1s, 2s, 4s)
-        if (attempt < maxRetries) {
-          const waitTime = Math.pow(2, attempt - 1) * 1000;
-          await new Promise((resolve) => setTimeout(resolve, waitTime));
-        }
+      // Exponential backoff: 1s, 2s, 4s
+      if (attempt < maxRetries) {
+        const waitTime = Math.pow(2, attempt - 1) * 1000;
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
       }
     }
 
-    // All retries failed
     this.logger.error(
-      `Failed to send SMS to ${to} after ${maxRetries} attempts: ${lastError?.message}`,
+      `Failed to send SMS to ${to} via ${this.provider.name} after ${maxRetries} attempts: ${lastError?.message}`,
     );
 
-    return {
-      success: false,
-      error: lastError?.message || 'Unknown error',
-    };
+    return { success: false, error: lastError?.message || 'Unknown error' };
   }
 
   /**
@@ -127,6 +134,13 @@ export class SmsService {
    * Check if SMS service is enabled
    */
   isServiceEnabled(): boolean {
-    return this.isEnabled;
+    return !this.mockMode;
+  }
+
+  /**
+   * Get active provider name
+   */
+  getProviderName(): string {
+    return this.provider?.name || 'mock';
   }
 }

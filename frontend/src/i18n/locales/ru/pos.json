@@ -184,5 +184,45 @@
     "create": "Создать",
     "payment": "Оплата"
   },
-  "newCustomerOrder": "Новый заказ клиента: №{{orderNumber}}"
+  "newCustomerOrder": "Новый заказ клиента: №{{orderNumber}}",
+  "tableMerge": {
+    "title": "Объединение столов",
+    "mergeButton": "Объединить столы",
+    "unmergeButton": "Разделить стол",
+    "unmergeAllButton": "Разделить все",
+    "selectTables": "Выберите столы для объединения:",
+    "selectAtLeast": "Выберите минимум 2 стола",
+    "mergedGroup": "Объединённая группа",
+    "mergeSuccess": "Столы успешно объединены",
+    "unmergeSuccess": "Стол успешно отделён",
+    "unmergeAllSuccess": "Все столы разделены",
+    "confirmMerge": "Объединить {{count}} столов?",
+    "confirmUnmerge": "Отделить этот стол от группы?",
+    "confirmUnmergeAll": "Разделить все столы в этой группе?",
+    "groupLabel": "Группа",
+    "mergedWith": "Объединён с"
+  },
+  "billSplit": {
+    "title": "Разделение счёта",
+    "splitButton": "Разделить счёт",
+    "splitType": "Способ разделения",
+    "equal": "Поровну",
+    "byItems": "По позициям",
+    "custom": "Произвольные суммы",
+    "numberOfPeople": "Количество гостей",
+    "perPerson": "на человека",
+    "person": "Гость",
+    "selectItems": "Выберите позиции для этого гостя",
+    "amount": "Сумма",
+    "paymentMethod": "Способ оплаты",
+    "addSplit": "Добавить гостя",
+    "removeSplit": "Удалить",
+    "remaining": "Остаток",
+    "total": "Итого",
+    "paid": "Оплачено",
+    "splitSuccess": "Счёт разделён, оплата зарегистрирована",
+    "splitFailed": "Не удалось разделить счёт",
+    "amountMismatch": "Сумма частей должна равняться итогу",
+    "collectAll": "Принять все платежи"
+  }
 }

@@ -44,8 +44,12 @@ const SubdomainOrdersPage: React.FC<SubdomainOrdersPageProps> = ({ subdomain }) 
   }, [sessionId, menuData]);
 
   const handleCallWaiter = async () => {
-    if (!sessionId || !menuData || !tableId) {
+    if (!sessionId || !menuData) {
       toast.error(t('messages.operationFailed'));
+      return;
+    }
+    if (!tableId) {
+      toast.error(t('waiter.noTable'));
       return;
     }
 

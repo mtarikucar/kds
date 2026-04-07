@@ -13,13 +13,15 @@ import AwaitingPaymentSection from '../../components/pos/AwaitingPaymentSection'
 import PendingOrdersPanel from '../../components/pos/PendingOrdersPanel';
 import WaiterRequestsPanel from '../../components/pos/WaiterRequestsPanel';
 import BillRequestsPanel from '../../components/pos/BillRequestsPanel';
-import { useCreateOrder, useUpdateOrder, useOrders, useTransferTableOrders } from '../../features/orders/ordersApi';
+import { useCreateOrder, useUpdateOrder, useOrders, useTransferTableOrders, useSplitBill } from '../../features/orders/ordersApi';
 import { useCreatePayment, usePendingOrders, useWaiterRequests, useBillRequests } from '../../features/orders/ordersApi';
 import TransferTableModal from '../../components/pos/TransferTableModal';
-import { useTables, useUpdateTableStatus } from '../../features/tables/tablesApi';
+import TableMergeModal from '../../components/pos/TableMergeModal';
+import BillSplitModal from '../../components/pos/BillSplitModal';
+import { useTables, useUpdateTableStatus, useMergeTables, useUnmergeTable, useUnmergeAll } from '../../features/tables/tablesApi';
 import { useGetPosSettings } from '../../features/pos/posApi';
 import { usePosSocket } from '../../features/pos/usePosSocket';
-import { Product, Table, TableStatus, OrderType, OrderStatus } from '../../types';
+import { Product, Table, TableStatus, OrderType, OrderStatus, SplitType, SplitPaymentEntry } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { useResponsive } from '../../hooks/useResponsive';
 import Spinner from '../../components/ui/Spinner';
@@ -56,6 +58,8 @@ const POSPage = () => {
   const [isProductOptionsModalOpen, setIsProductOptionsModalOpen] = useState(false);
   const [productForOptions, setProductForOptions] = useState<Product | null>(null);
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
+  const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
+  const [isBillSplitModalOpen, setIsBillSplitModalOpen] = useState(false);
 
   // Responsive hook
   const { isDesktop } = useResponsive();
@@ -85,6 +89,10 @@ const POSPage = () => {
   const { mutate: createPayment, isPending: isCreatingPayment } = useCreatePayment();
   const { mutate: updateTableStatus } = useUpdateTableStatus();
   const { mutate: transferTableOrders, isPending: isTransferring } = useTransferTableOrders();
+  const { mutate: mergeTables, isPending: isMerging } = useMergeTables();
+  const { mutate: unmergeTable } = useUnmergeTable();
+  const { mutate: unmergeAll } = useUnmergeAll();
+  const { mutate: splitBill, isPending: isSplitting } = useSplitBill();
 
   // Determine if tableless mode is enabled
   const isTablelessMode = posSettings?.enableTablelessMode ?? false;
@@ -563,6 +571,41 @@ const POSPage = () => {
     );
   };
 
+  // Handle table merge
+  const handleMergeTables = (tableIds: string[]) => {
+    mergeTables({ tableIds }, {
+      onSuccess: () => setIsMergeModalOpen(false),
+    });
+  };
+
+  const handleUnmergeTable = (tableId: string) => {
+    unmergeTable({ tableId });
+  };
+
+  const handleUnmergeAll = (groupId: string) => {
+    unmergeAll(groupId, {
+      onSuccess: () => setIsMergeModalOpen(false),
+    });
+  };
+
+  // Handle bill split - returns promise for sequential multi-order calls
+  const handleBillSplit = (orderId: string, splitType: SplitType, payments: SplitPaymentEntry[]) => {
+    return new Promise<void>((resolve, reject) => {
+      splitBill(
+        { orderId, splitType, payments },
+        {
+          onSuccess: () => {
+            setIsBillSplitModalOpen(false);
+            setCurrentOrderId(null);
+            setCurrentOrderAmount(null);
+            resolve();
+          },
+          onError: (err) => reject(err),
+        }
+      );
+    });
+  };
+
   // Calculate totals (including modifier prices)
   const subtotal = cartItems.reduce((sum, item) => {
     const itemPrice = Number(item.price);
@@ -826,6 +869,8 @@ const POSPage = () => {
                     onCheckout={handleCheckout}
                     onCreateOrder={handleCreateOrder}
                     onTransferTable={handleTransferTable}
+                    onMergeTables={() => setIsMergeModalOpen(true)}
+                    onSplitBill={() => setIsBillSplitModalOpen(true)}
                     isCheckingOut={isCreatingOrder || isUpdatingOrder}
                     isTwoStepCheckout={isTwoStepCheckout}
                     hasActiveOrder={!!currentOrderId}
@@ -957,6 +1002,28 @@ const POSPage = () => {
           ).length || 0}
           onConfirm={handleTransferConfirm}
           isLoading={isTransferring}
+        />
+      )}
+
+      {/* Table Merge Modal */}
+      <TableMergeModal
+        isOpen={isMergeModalOpen}
+        onClose={() => setIsMergeModalOpen(false)}
+        currentTable={selectedTable}
+        onMerge={handleMergeTables}
+        onUnmerge={handleUnmergeTable}
+        onUnmergeAll={handleUnmergeAll}
+        isLoading={isMerging}
+      />
+
+      {/* Bill Split Modal */}
+      {tableOrders && (
+        <BillSplitModal
+          isOpen={isBillSplitModalOpen}
+          onClose={() => setIsBillSplitModalOpen(false)}
+          orders={tableOrders}
+          onConfirm={handleBillSplit}
+          isLoading={isSplitting}
         />
       )}
     </div>

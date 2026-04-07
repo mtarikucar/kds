@@ -57,6 +57,7 @@
     "reservations": "Reservations",
     "personnel": "Xodimlar",
     "stock": "Zaxira",
+    "invoices": "Hisob-fakturalar",
     "expandSidebar": "Yon panelni kengaytirish",
     "collapseSidebar": "Yon panelni yig'ish"
   },
@@ -681,7 +682,10 @@
   "waiter": {
     "call": "Ofitsiantni chaqirish",
     "callSuccess": "Ofitsiant xabardor qilindi!",
-    "callError": "Ofitsiantni chaqirib bo'lmadi"
+    "callError": "Ofitsiantni chaqirib bo'lmadi",
+    "noTable": "Ofitsiantni chaqirish uchun stol QR kodini skanerlang",
+    "cooldown": "So'rovingiz yuborildi. Iltimos, kuting.",
+    "alreadyPending": "Sizda allaqachon kutilayotgan ofitsiant so'rovi bor"
   },
   "bill": {
     "request": "Hisob so'rash",

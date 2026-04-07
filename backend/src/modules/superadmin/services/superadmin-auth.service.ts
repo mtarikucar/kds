@@ -152,7 +152,7 @@ export class SuperAdminAuthService {
         secret: superAdmin.twoFactorSecret,
         encoding: 'base32',
         token: code,
-        window: 4, // Allow 4 steps tolerance (2 minutes before/after)
+        window: 1,
       });
 
       if (!isValid) {
@@ -271,7 +271,7 @@ export class SuperAdminAuthService {
       secret: superAdmin.twoFactorSecret,
       encoding: 'base32',
       token: enable2FADto.code,
-      window: 4, // Allow 4 steps tolerance (2 minutes before/after)
+      window: 1,
     });
 
     if (!isValid) {
@@ -325,16 +325,10 @@ export class SuperAdminAuthService {
         secret: superAdmin.twoFactorSecret,
         encoding: 'base32',
         token: code,
-        window: 4, // Allow 4 steps tolerance (2 minutes before/after)
+        window: 1,
       });
 
-      // Debug: Generate current expected code for troubleshooting
       if (!isValid) {
-        const expectedCode = speakeasy.totp({
-          secret: superAdmin.twoFactorSecret,
-          encoding: 'base32',
-        });
-        console.log('2FA Debug - Expected code:', expectedCode, 'Received:', code);
         throw new BadRequestException('Invalid verification code');
       }
 

@@ -1,4 +1,4 @@
-import { Injectable, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, Inject, forwardRef, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateNotificationDto, NotificationType } from './dto/create-notification.dto';
 import { NotificationsGateway } from './notifications.gateway';
@@ -47,7 +47,12 @@ export class NotificationsService {
     });
   }
 
-  async markAsRead(notificationId: string, userId: string) {
+  async markAsRead(notificationId: string, userId: string, tenantId: string) {
+    const notification = await this.prisma.notification.findFirst({
+      where: { id: notificationId, tenantId },
+    });
+    if (!notification) throw new NotFoundException('Notification not found');
+
     return this.prisma.userNotificationRead.create({
       data: { notificationId, userId },
     });

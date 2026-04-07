@@ -38,8 +38,12 @@ const OrderTrackingPage = () => {
   }, [sessionId, tenantId]);
 
   const handleCallWaiter = async () => {
-    if (!sessionId || !tenantId || !tableId) {
+    if (!sessionId || !tenantId) {
       toast.error(t('messages.operationFailed'));
+      return;
+    }
+    if (!tableId) {
+      toast.error(t('waiter.noTable'));
       return;
     }
 

@@ -17,8 +17,8 @@ export class NotificationsController {
   }
 
   @Post(':id/read')
-  markAsRead(@Param('id') id: string, @CurrentUser('id') userId: string) {
-    return this.service.markAsRead(id, userId);
+  markAsRead(@Param('id') id: string, @CurrentUser('id') userId: string, @CurrentUser('tenantId') tenantId: string) {
+    return this.service.markAsRead(id, userId, tenantId);
   }
 
   @Post('mark-all-read')

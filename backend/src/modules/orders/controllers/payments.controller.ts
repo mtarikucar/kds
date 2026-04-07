@@ -10,6 +10,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { PaymentsService } from '../services/payments.service';
 import { CreatePaymentDto } from '../dto/create-payment.dto';
+import { SplitBillDto } from '../dto/split-bill.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
@@ -45,5 +46,17 @@ export class PaymentsController {
   @ApiResponse({ status: 404, description: 'Order not found' })
   findAll(@Param('orderId') orderId: string, @Request() req) {
     return this.paymentsService.findByOrder(orderId, req.tenantId);
+  }
+
+  @Post('split')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiOperation({ summary: 'Split bill and create multiple payments' })
+  @ApiResponse({ status: 201, description: 'Split payments created' })
+  splitBill(
+    @Param('orderId') orderId: string,
+    @Body() dto: SplitBillDto,
+    @Request() req,
+  ) {
+    return this.paymentsService.splitBill(orderId, dto, req.tenantId);
   }
 }

@@ -51,7 +51,7 @@ export class SubscriptionService {
   /**
    * Get subscription by ID
    */
-  async getSubscriptionById(id: string) {
+  async getSubscriptionById(id: string, tenantId?: string) {
     const subscription = await this.prisma.subscription.findUnique({
       where: { id },
       include: {
@@ -67,6 +67,10 @@ export class SubscriptionService {
     });
 
     if (!subscription) {
+      throw new NotFoundException('Subscription not found');
+    }
+
+    if (tenantId && subscription.tenantId !== tenantId) {
       throw new NotFoundException('Subscription not found');
     }
 

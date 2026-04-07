@@ -8,6 +8,7 @@ import {
   Delete,
   UseGuards,
   Request,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { TenantsService } from './tenants.service';
@@ -47,14 +48,14 @@ export class TenantsController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
   @Get()
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Get all tenants (ADMIN only)' })
-  @ApiResponse({ status: 200, description: 'List of all tenants' })
+  @ApiOperation({ summary: 'Get current tenant (ADMIN only)' })
+  @ApiResponse({ status: 200, description: 'Current tenant details' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
-  findAll() {
-    return this.tenantsService.findAll();
+  findAll(@Request() req) {
+    return this.tenantsService.findOne(req.tenantId);
   }
 
   @ApiBearerAuth()
@@ -79,39 +80,44 @@ export class TenantsController {
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
   @Get(':id')
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Get a tenant by ID (ADMIN only)' })
+  @ApiOperation({ summary: 'Get a tenant by ID (ADMIN only, own tenant)' })
   @ApiResponse({ status: 200, description: 'Tenant details' })
-  @ApiResponse({ status: 404, description: 'Tenant not found' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
-  findOne(@Param('id') id: string) {
+  findOne(@Param('id') id: string, @Request() req) {
+    if (id !== req.tenantId) {
+      throw new ForbiddenException('Cannot access other tenants');
+    }
     return this.tenantsService.findOne(id);
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
   @Patch(':id')
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Update a tenant (ADMIN only)' })
+  @ApiOperation({ summary: 'Update a tenant (ADMIN only, own tenant)' })
   @ApiResponse({ status: 200, description: 'Tenant successfully updated' })
-  @ApiResponse({ status: 404, description: 'Tenant not found' })
-  @ApiResponse({ status: 409, description: 'Subdomain already in use' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
-  update(@Param('id') id: string, @Body() updateTenantDto: UpdateTenantDto) {
+  update(@Param('id') id: string, @Body() updateTenantDto: UpdateTenantDto, @Request() req) {
+    if (id !== req.tenantId) {
+      throw new ForbiddenException('Cannot modify other tenants');
+    }
     return this.tenantsService.update(id, updateTenantDto);
   }
 
   @ApiBearerAuth()
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
   @Delete(':id')
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Delete a tenant (ADMIN only)' })
+  @ApiOperation({ summary: 'Delete a tenant (ADMIN only, own tenant)' })
   @ApiResponse({ status: 200, description: 'Tenant successfully deleted' })
-  @ApiResponse({ status: 404, description: 'Tenant not found' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
-  remove(@Param('id') id: string) {
+  remove(@Param('id') id: string, @Request() req) {
+    if (id !== req.tenantId) {
+      throw new ForbiddenException('Cannot delete other tenants');
+    }
     return this.tenantsService.remove(id);
   }
 }

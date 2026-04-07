@@ -57,9 +57,10 @@ export class CustomerOrdersController {
   @ApiResponse({ status: 404, description: 'Order not found' })
   async getOrderById(
     @Param('orderId') orderId: string,
-    @Query('sessionId') sessionId: string
+    @Query('sessionId') sessionId: string,
+    @Query('tenantId') tenantId: string
   ) {
-    return this.customerOrdersService.getOrderById(orderId, sessionId);
+    return this.customerOrdersService.getOrderById(orderId, sessionId, tenantId);
   }
 
   // ========================================

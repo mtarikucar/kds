@@ -75,6 +75,9 @@ model Tenant {
   qrMenuSettings      QrMenuSettings?
   posSettings         PosSettings?
   reservationSettings ReservationSettings?
+  smsSettings         SmsSettings?
+  accountingSettings  AccountingSettings?
+  salesInvoices       SalesInvoice[]
   reservations        Reservation[]
   integrationSettings IntegrationSettings[]
   apiKeys             ApiKey[]
@@ -114,6 +117,8 @@ model Tenant {
   shiftTemplates        ShiftTemplate[]
   shiftAssignments      ShiftAssignment[]
   shiftSwapRequests     ShiftSwapRequest[]
+  marketingCommissions  Commission[]        @relation("MarketingCommissions")
+  convertedLead         Lead?               @relation("ConvertedTenant")
 
   @@index([currentPlanId])
   @@map("tenants")
@@ -221,6 +226,7 @@ model Product {
   stockTracked Boolean @default(false)
   currentStock Int     @default(0)
   displayOrder Int     @default(0)
+  taxRate      Int     @default(10) // KDV rate: 0, 1, 10, 20
 
   categoryId String
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
@@ -370,6 +376,9 @@ model Table {
   section  String?
   status   String  @default("AVAILABLE") // AVAILABLE, OCCUPIED, RESERVED
 
+  // Table grouping (merge/split)
+  groupId String? // Shared UUID for merged tables; null = standalone
+
   // Voxel world position
   voxelX        Int?
   voxelY        Int?     @default(0)
@@ -394,6 +403,7 @@ model Table {
 
   @@unique([tenantId, number])
   @@index([tenantId])
+  @@index([tenantId, groupId])
   @@map("tables")
 }
 
@@ -427,6 +437,7 @@ model Order {
   totalAmount  Decimal @db.Decimal(10, 2)
   discount     Decimal @default(0) @db.Decimal(10, 2)
   finalAmount  Decimal @db.Decimal(10, 2)
+  taxAmount    Decimal @default(0) @db.Decimal(10, 2)
 
   notes        String?
   customerName String?
@@ -466,6 +477,7 @@ model Order {
   // Relations
   orderItems OrderItem[]
   payments   Payment[]
+  salesInvoice   SalesInvoice?
 
   @@unique([tenantId, orderNumber])
   @@index([tenantId])
@@ -486,6 +498,8 @@ model OrderItem {
   unitPrice     Decimal @db.Decimal(10, 2)
   subtotal      Decimal @db.Decimal(10, 2)
   modifierTotal Decimal @default(0) @db.Decimal(10, 2) // Total cost of modifiers
+  taxRate       Int     @default(10)
+  taxAmount     Decimal @default(0) @db.Decimal(10, 2)
   notes         String?
   status        String  @default("PENDING") // PENDING, PREPARING, READY
 
@@ -630,6 +644,7 @@ model SubscriptionPlan {
   subscriptions           Subscription[]
   currentPlanTenants      Tenant[]             @relation("CurrentPlan")
   scheduledDowngrades     Subscription[]       @relation("ScheduledDowngrade")
+  leadOffers              LeadOffer[]
 
   @@map("subscription_plans")
 }
@@ -882,6 +897,35 @@ model ReservationSettings {
 
   @@index([tenantId])
   @@map("reservation_settings")
+}
+
+// ========================================
+// SMS NOTIFICATION SETTINGS
+// ========================================
+
+model SmsSettings {
+  id        String   @id @default(uuid())
+  tenantId  String   @unique
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  isEnabled                  Boolean @default(false)
+
+  smsOnReservationCreated    Boolean @default(true)
+  smsOnReservationConfirmed  Boolean @default(true)
+  smsOnReservationRejected   Boolean @default(true)
+  smsOnReservationCancelled  Boolean @default(true)
+
+  smsOnOrderCreated          Boolean @default(true)
+  smsOnOrderApproved         Boolean @default(true)
+  smsOnOrderPreparing        Boolean @default(true)
+  smsOnOrderReady            Boolean @default(true)
+  smsOnOrderCancelled        Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("sms_settings")
 }
 
 // ========================================
@@ -1374,6 +1418,8 @@ model ZReport {
   totalDiscount           Decimal @default(0) @db.Decimal(10, 2)
   totalRefunds            Decimal @default(0) @db.Decimal(10, 2)
   netSales                Decimal @db.Decimal(10, 2) // totalSales - totalRefunds
+  totalTax                Decimal @default(0) @db.Decimal(10, 2)
+  taxBreakdown            Json?
 
   // Order Type Breakdown
   dineInSales             Decimal @default(0) @db.Decimal(10, 2)
@@ -2484,4 +2530,338 @@ model ShiftSwapRequest {
   @@index([targetId])
   @@index([status])
   @@map("shift_swap_requests")
+}
+
+// ========================================
+// MARKETING / SALES REPRESENTATIVE PANEL
+// ========================================
+
+model MarketingUser {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  password        String
+  firstName       String
+  lastName        String
+  phone           String?
+  avatar          String?
+  role            String    // SALES_MANAGER, SALES_REP
+  status          String    @default("ACTIVE") // ACTIVE, INACTIVE
+  lastLogin       DateTime?
+  lastLoginIp     String?
+  failedLogins    Int       @default(0)
+  lockedUntil     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  leads           Lead[]            @relation("AssignedRep")
+  activities      LeadActivity[]
+  tasks           MarketingTask[]
+  offers          LeadOffer[]
+  commissions     Commission[]
+  notifications   MarketingNotification[]
+
+  @@index([email])
+  @@index([role])
+  @@index([status])
+  @@map("marketing_users")
+}
+
+model Lead {
+  id                String    @id @default(uuid())
+  businessName      String
+  contactPerson     String
+  phone             String?
+  whatsapp          String?
+  email             String?
+  address           String?
+  city              String?
+  region            String?
+  businessType      String    // CAFE, RESTAURANT, BAR, PATISSERIE, FAST_FOOD, OTHER
+  tableCount        Int?
+  branchCount       Int?
+  currentSystem     String?
+  source            String    // INSTAGRAM, REFERRAL, FIELD_VISIT, ADS, WEBSITE, PHONE, OTHER
+  status            String    @default("NEW") // NEW, CONTACTED, NOT_REACHABLE, MEETING_DONE, DEMO_SCHEDULED, OFFER_SENT, WAITING, WON, LOST
+  lostReason        String?
+  notes             String?   @db.Text
+  nextFollowUp      DateTime?
+  priority          String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+
+  // Assigned sales rep
+  assignedToId      String?
+  assignedTo        MarketingUser? @relation("AssignedRep", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  // Conversion tracking
+  convertedTenantId String?   @unique
+  convertedTenant   Tenant?   @relation("ConvertedTenant", fields: [convertedTenantId], references: [id], onDelete: SetNull)
+  convertedAt       DateTime?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  activities        LeadActivity[]
+  tasks             MarketingTask[]
+  offers            LeadOffer[]
+  commissions       Commission[]      @relation("CommissionLead")
+
+  @@index([assignedToId])
+  @@index([status])
+  @@index([city])
+  @@index([source])
+  @@index([businessType])
+  @@index([createdAt])
+  @@index([nextFollowUp])
+  @@index([priority])
+  @@index([assignedToId, status])
+  @@index([status, createdAt])
+  @@map("leads")
+}
+
+model LeadActivity {
+  id          String    @id @default(uuid())
+  type        String    // CALL, VISIT, NOTE, EMAIL, WHATSAPP, STATUS_CHANGE, DEMO, MEETING
+  title       String
+  description String?   @db.Text
+  outcome     String?   // POSITIVE, NEGATIVE, NEUTRAL, NO_ANSWER
+  duration    Int?      // Duration in minutes (for calls/visits)
+
+  leadId      String
+  lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   MarketingUser @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  createdAt   DateTime  @default(now())
+
+  @@index([leadId])
+  @@index([createdById])
+  @@index([createdAt])
+  @@index([type])
+  @@map("lead_activities")
+}
+
+model MarketingTask {
+  id            String    @id @default(uuid())
+  title         String
+  description   String?
+  type          String    // CALL, VISIT, DEMO, FOLLOW_UP, MEETING, OTHER
+  status        String    @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, CANCELLED
+  priority      String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  dueDate       DateTime
+  completedAt   DateTime?
+
+  leadId        String?
+  lead          Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  assignedToId  String
+  assignedTo    MarketingUser @relation(fields: [assignedToId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([assignedToId])
+  @@index([leadId])
+  @@index([dueDate])
+  @@index([status])
+  @@index([assignedToId, status])
+  @@index([dueDate, status])
+  @@map("marketing_tasks")
+}
+
+model LeadOffer {
+  id              String    @id @default(uuid())
+  planId          String?
+  plan            SubscriptionPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+  customPrice     Decimal?  @db.Decimal(10, 2)
+  discount        Decimal?  @db.Decimal(5, 2)
+  trialDays       Int?
+  notes           String?   @db.Text
+  status          String    @default("DRAFT") // DRAFT, SENT, ACCEPTED, REJECTED, EXPIRED
+  validUntil      DateTime?
+  sentAt          DateTime?
+  respondedAt     DateTime?
+
+  leadId          String
+  lead            Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  createdById     String
+  createdBy       MarketingUser @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([leadId])
+  @@index([createdById])
+  @@index([status])
+  @@index([leadId, status])
+  @@map("lead_offers")
+}
+
+model Commission {
+  id              String    @id @default(uuid())
+  amount          Decimal   @db.Decimal(10, 2)
+  type            String    // SIGNUP, RENEWAL, UPSELL
+  status          String    @default("PENDING") // PENDING, APPROVED, PAID
+  period          String    // "2026-04" (YYYY-MM format)
+  tenantId        String?
+  tenant          Tenant?   @relation("MarketingCommissions", fields: [tenantId], references: [id], onDelete: SetNull)
+  leadId          String?
+  lead            Lead?     @relation("CommissionLead", fields: [leadId], references: [id], onDelete: SetNull)
+  notes           String?   @db.Text
+
+  marketingUserId String
+  marketingUser   MarketingUser @relation(fields: [marketingUserId], references: [id], onDelete: Restrict)
+
+  approvedAt      DateTime?
+  paidAt          DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([marketingUserId])
+  @@index([tenantId])
+  @@index([leadId])
+  @@index([period])
+  @@index([status])
+  @@index([period, status])
+  @@map("commissions")
+}
+
+model MarketingNotification {
+  id          String    @id @default(uuid())
+  type        String    // FOLLOW_UP_REMINDER, DEMO_REMINDER, INACTIVE_LEAD, OFFER_EXPIRING, TASK_DUE
+  title       String
+  message     String
+  isRead      Boolean   @default(false)
+  metadata    Json?
+
+  userId      String
+  user        MarketingUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("marketing_notifications")
+}
+
+// ========================================
+// ACCOUNTING SETTINGS
+// ========================================
+
+model AccountingSettings {
+  id        String   @id @default(uuid())
+  tenantId  String   @unique
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  autoGenerateInvoice  Boolean @default(false)
+
+  companyName          String?
+  companyTaxId         String?
+  companyTaxOffice     String?
+  companyAddress       String?
+  companyPhone         String?
+  companyEmail         String?
+
+  provider             String  @default("NONE")
+  autoSync             Boolean @default(false)
+
+  parasutCompanyId     String?
+  parasutClientId      String?
+  parasutClientSecret  String?
+  parasutUsername       String?
+  parasutPassword      String?
+
+  logoApiUrl           String?
+  logoUsername          String?
+  logoPassword         String?
+  logoFirmNumber       String?
+
+  foribaApiUrl         String?
+  foribaUsername        String?
+  foribaPassword       String?
+  foribaServiceType    String?
+
+  invoicePrefix        String  @default("FTR")
+  nextInvoiceNumber    Int     @default(1)
+  defaultPaymentTermDays Int   @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@map("accounting_settings")
+}
+
+// ========================================
+// SALES INVOICE (Müşteri Satış Faturası)
+// ========================================
+
+model SalesInvoice {
+  id             String   @id @default(uuid())
+  invoiceNumber  String
+  type           String   @default("SALES")
+  status         String   @default("DRAFT")
+
+  customerName   String?
+  customerPhone  String?
+  customerEmail  String?
+  customerTaxId  String?
+  customerTaxOffice String?
+
+  subtotal       Decimal  @db.Decimal(10, 2)
+  taxAmount      Decimal  @db.Decimal(10, 2)
+  totalAmount    Decimal  @db.Decimal(10, 2)
+  discount       Decimal  @default(0) @db.Decimal(10, 2)
+  currency       String   @default("TRY")
+
+  taxBreakdown   Json?
+
+  orderId        String?  @unique
+  order          Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  paymentMethod  String?
+
+  externalId     String?
+  externalProvider String?
+  externalStatus String?
+  syncedAt       DateTime?
+  syncError      String?
+
+  pdfUrl         String?
+
+  issueDate      DateTime @default(now())
+  dueDate        DateTime?
+
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  items          SalesInvoiceItem[]
+
+  @@unique([tenantId, invoiceNumber])
+  @@index([tenantId])
+  @@index([orderId])
+  @@index([status])
+  @@index([issueDate])
+  @@map("sales_invoices")
+}
+
+model SalesInvoiceItem {
+  id             String   @id @default(uuid())
+  description    String
+  quantity       Int
+  unitPrice      Decimal  @db.Decimal(10, 2)
+  taxRate        Int      @default(10)
+  taxAmount      Decimal  @db.Decimal(10, 2)
+  subtotal       Decimal  @db.Decimal(10, 2)
+  total          Decimal  @db.Decimal(10, 2)
+
+  invoiceId      String
+  invoice        SalesInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("sales_invoice_items")
 }

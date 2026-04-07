@@ -18,6 +18,8 @@ import { Logger } from '@nestjs/common';
 import { KdsGateway } from '../../kds/kds.gateway';
 import { DeliveryStatusSyncService } from '../../delivery-platforms/services/delivery-status-sync.service';
 import { StockDeductionService } from '../../stock-management/services/stock-deduction.service';
+import { SmsNotificationService } from '../../sms-settings/sms-notification.service';
+import { TaxCalculationService } from '../../accounting/services/tax-calculation.service';
 import { withTransaction, addBreadcrumb } from '../../../common/utils/tracing';
 
 @Injectable()
@@ -34,6 +36,10 @@ export class OrdersService {
     @Optional()
     @Inject(forwardRef(() => StockDeductionService))
     private stockDeductionService?: StockDeductionService,
+    @Optional()
+    private smsNotificationService?: SmsNotificationService,
+    @Optional()
+    private taxCalculationService?: TaxCalculationService,
   ) {}
 
   private generateOrderNumber(): string {
@@ -124,9 +130,17 @@ export class OrdersService {
       }
     }
 
-    // Calculate totals
+    // Build product price map from DB (never trust client-supplied prices)
+    const productMap = new Map(products.map((p) => [p.id, p]));
+
+    // Calculate totals with tax
     let totalAmount = 0;
+    let totalTaxAmount = 0;
     const orderItems = createOrderDto.items.map((item) => {
+      const product = productMap.get(item.productId);
+      const serverPrice = Number(product?.price ?? 0);
+      const taxRate = product?.taxRate ?? 10;
+
       // Calculate modifier total for this item
       let modifierTotal = 0;
       const itemModifiers = (item.modifiers || []).map((mod) => {
@@ -140,15 +154,25 @@ export class OrdersService {
         };
       });
 
-      const subtotal = item.quantity * (item.unitPrice + modifierTotal);
+      const subtotal = item.quantity * (serverPrice + modifierTotal);
       totalAmount += subtotal;
+
+      // Calculate tax for this line item (prices are KDV-inclusive)
+      let itemTaxAmount = 0;
+      if (this.taxCalculationService) {
+        const tax = this.taxCalculationService.extractTax(subtotal, taxRate);
+        itemTaxAmount = tax.taxAmount;
+        totalTaxAmount += itemTaxAmount;
+      }
 
       return {
         productId: item.productId,
         quantity: item.quantity,
-        unitPrice: item.unitPrice,
+        unitPrice: serverPrice,
         subtotal,
         modifierTotal,
+        taxRate,
+        taxAmount: itemTaxAmount,
         notes: item.notes,
         modifiers: itemModifiers.length > 0 ? { create: itemModifiers } : undefined,
       };
@@ -156,6 +180,10 @@ export class OrdersService {
 
     const discount = createOrderDto.discount || 0;
     const finalAmount = totalAmount - discount;
+
+    // Recalculate tax after discount (proportional)
+    const discountRatio = totalAmount > 0 ? discount / totalAmount : 0;
+    const adjustedTaxAmount = Math.round(totalTaxAmount * (1 - discountRatio) * 100) / 100;
 
     // Generate order number
     const orderNumber = this.generateOrderNumber();
@@ -169,6 +197,7 @@ export class OrdersService {
       totalAmount,
       discount,
       finalAmount,
+      taxAmount: adjustedTaxAmount,
       notes: createOrderDto.notes,
       customerName: createOrderDto.customerName,
       userId,
@@ -244,6 +273,15 @@ export class OrdersService {
         }
 
         addBreadcrumb('Order created successfully', 'order', { orderId: createdOrder.id, orderNumber: createdOrder.orderNumber });
+
+        // Send SMS to customer if phone available
+        if (createdOrder.customerPhone && this.smsNotificationService) {
+          this.smsNotificationService.notifyOrderCreated(tenantId, {
+            customerPhone: createdOrder.customerPhone,
+            orderNumber: createdOrder.orderNumber,
+          });
+        }
+
         return createdOrder;
       }
     );
@@ -603,6 +641,26 @@ export class OrdersService {
       this.logger.error(`Delivery platform sync failed for order ${id}: ${err.message}`);
     });
 
+    // Send SMS to customer on key status changes
+    if (updatedOrder.customerPhone && this.smsNotificationService) {
+      if (updateStatusDto.status === OrderStatus.PREPARING) {
+        this.smsNotificationService.notifyOrderPreparing(tenantId, {
+          customerPhone: updatedOrder.customerPhone,
+          orderNumber: updatedOrder.orderNumber,
+        });
+      } else if (updateStatusDto.status === OrderStatus.READY) {
+        this.smsNotificationService.notifyOrderReady(tenantId, {
+          customerPhone: updatedOrder.customerPhone,
+          orderNumber: updatedOrder.orderNumber,
+        });
+      } else if (updateStatusDto.status === OrderStatus.CANCELLED) {
+        this.smsNotificationService.notifyOrderCancelled(tenantId, {
+          customerPhone: updatedOrder.customerPhone,
+          orderNumber: updatedOrder.orderNumber,
+        });
+      }
+    }
+
     return updatedOrder;
   }
 
@@ -749,6 +807,14 @@ export class OrdersService {
     this.deliveryStatusSync?.syncStatusToPlatform(orderId, OrderStatus.PENDING).catch((err) => {
       this.logger.error(`Delivery platform sync failed for order ${orderId}: ${err.message}`);
     });
+
+    // Send SMS to customer
+    if (updatedOrder.customerPhone && this.smsNotificationService) {
+      this.smsNotificationService.notifyOrderApproved(tenantId, {
+        customerPhone: updatedOrder.customerPhone,
+        orderNumber: updatedOrder.orderNumber,
+      });
+    }
 
     return updatedOrder;
   }

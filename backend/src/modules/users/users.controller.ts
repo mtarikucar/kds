@@ -70,7 +70,7 @@ export class UsersController {
   @ApiResponse({ status: 409, description: 'Email already in use' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto, @Request() req) {
-    return this.usersService.update(id, updateUserDto, req.tenantId);
+    return this.usersService.update(id, updateUserDto, req.tenantId, req.user?.role);
   }
 
   @Delete(':id')

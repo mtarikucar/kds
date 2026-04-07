@@ -184,5 +184,45 @@
     "create": "Yaratish",
     "payment": "To'lov"
   },
-  "newCustomerOrder": "Yangi mijoz buyurtmasi: №{{orderNumber}}"
+  "newCustomerOrder": "Yangi mijoz buyurtmasi: №{{orderNumber}}",
+  "tableMerge": {
+    "title": "Stollarni birlashtirish",
+    "mergeButton": "Stollarni birlashtirish",
+    "unmergeButton": "Stolni ajratish",
+    "unmergeAllButton": "Hammasini ajratish",
+    "selectTables": "Birlashtirish uchun stollarni tanlang:",
+    "selectAtLeast": "Kamida 2 ta stol tanlang",
+    "mergedGroup": "Birlashtirilgan guruh",
+    "mergeSuccess": "Stollar muvaffaqiyatli birlashtirildi",
+    "unmergeSuccess": "Stol muvaffaqiyatli ajratildi",
+    "unmergeAllSuccess": "Barcha stollar ajratildi",
+    "confirmMerge": "{{count}} ta stol birlashtirilsinmi?",
+    "confirmUnmerge": "Bu stolni guruhdan ajratmoqchimisiz?",
+    "confirmUnmergeAll": "Guruhdagi barcha stollar ajratilsinmi?",
+    "groupLabel": "Guruh",
+    "mergedWith": "Birlashtirilgan"
+  },
+  "billSplit": {
+    "title": "Hisobni bo'lish",
+    "splitButton": "Hisobni bo'lish",
+    "splitType": "Bo'lish usuli",
+    "equal": "Teng bo'lish",
+    "byItems": "Mahsulotlar bo'yicha",
+    "custom": "Ixtiyoriy summalar",
+    "numberOfPeople": "Kishilar soni",
+    "perPerson": "har bir kishi uchun",
+    "person": "Kishi",
+    "selectItems": "Bu kishi uchun mahsulotlarni tanlang",
+    "amount": "Summa",
+    "paymentMethod": "To'lov usuli",
+    "addSplit": "Kishi qo'shish",
+    "removeSplit": "Olib tashlash",
+    "remaining": "Qoldiq",
+    "total": "Jami",
+    "paid": "To'langan",
+    "splitSuccess": "Hisob bo'lindi va to'lovlar qayd etildi",
+    "splitFailed": "Hisobni bo'lib bo'lmadi",
+    "amountMismatch": "Bo'lingan summalar jamiga teng bo'lishi kerak",
+    "collectAll": "Barcha to'lovlarni qabul qilish"
+  }
 }

@@ -395,6 +395,14 @@ export const usePosSocket = () => {
     socket.on('waiter-request:new', handleWaiterRequestNew);
     socket.on('waiter-request:updated', handleWaiterRequestUpdated);
 
+    // Table merge/unmerge: invalidate tables cache
+    const handleTableMergeOrUnmerge = () => {
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      queryClient.invalidateQueries({ queryKey: ['tableGroup'] });
+    };
+    socket.on('table:merged', handleTableMergeOrUnmerge);
+    socket.on('table:unmerged', handleTableMergeOrUnmerge);
+
     // Join POS room
     socket.emit('join-pos');
 
@@ -410,6 +418,8 @@ export const usePosSocket = () => {
       socket.off('bill-request:updated', handleBillRequestUpdated);
       socket.off('waiter-request:new', handleWaiterRequestNew);
       socket.off('waiter-request:updated', handleWaiterRequestUpdated);
+      socket.off('table:merged', handleTableMergeOrUnmerge);
+      socket.off('table:unmerged', handleTableMergeOrUnmerge);
       socket.emit('leave-pos');
       disconnectSocket();
     };

@@ -103,7 +103,7 @@ export class UsersService {
     return user;
   }
 
-  async update(id: string, updateUserDto: UpdateUserDto, tenantId: string) {
+  async update(id: string, updateUserDto: UpdateUserDto, tenantId: string, callerRole?: string) {
     // Check if user exists and belongs to tenant
     await this.findOne(id, tenantId);
 
@@ -120,6 +120,12 @@ export class UsersService {
 
     // If password is being updated, hash it
     const updateData: any = { ...updateUserDto };
+
+    // Only ADMIN can change roles; strip role field for non-ADMIN callers
+    if (updateData.role && callerRole !== 'ADMIN') {
+      delete updateData.role;
+    }
+
     if (updateUserDto.password) {
       updateData.password = await bcrypt.hash(updateUserDto.password, 10);
     }

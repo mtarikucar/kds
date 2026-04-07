@@ -50,7 +50,6 @@ export class QrMenuController {
         id: true,
         name: true,
         wifiSsid: true,
-        wifiPassword: true,
         socialInstagram: true,
         socialFacebook: true,
         socialTwitter: true,
@@ -193,7 +192,6 @@ export class QrMenuController {
         name: tenant.name,
         wifi: tenant.wifiSsid ? {
           ssid: tenant.wifiSsid,
-          password: tenant.wifiPassword,
         } : null,
         socialMedia: {
           instagram: tenant.socialInstagram,

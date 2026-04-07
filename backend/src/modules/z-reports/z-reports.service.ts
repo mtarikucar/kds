@@ -142,6 +142,22 @@ export class ZReportsService {
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 10);
 
+    // Tax breakdown from order items
+    const allOrderItems = orders.flatMap(o => o.orderItems);
+    const taxBreakdownMap: Record<number, { taxableAmount: number; taxAmount: number }> = {};
+    let totalTax = 0;
+
+    for (const item of allOrderItems) {
+      const rate = item.taxRate ?? 10;
+      const tax = Number(item.taxAmount || 0);
+      if (!taxBreakdownMap[rate]) {
+        taxBreakdownMap[rate] = { taxableAmount: 0, taxAmount: 0 };
+      }
+      taxBreakdownMap[rate].taxAmount += tax;
+      taxBreakdownMap[rate].taxableAmount += Number(item.subtotal) - tax;
+      totalTax += tax;
+    }
+
     // Get cash drawer movements for the day
     const cashMovements = await this.prisma.cashDrawerMovement.findMany({
       where: {
@@ -175,6 +191,8 @@ export class ZReportsService {
         totalSales: grossSales,
         totalDiscount: discounts,
         netSales,
+        totalTax,
+        taxBreakdown: taxBreakdownMap,
 
         // Payment breakdown
         cashPayments,

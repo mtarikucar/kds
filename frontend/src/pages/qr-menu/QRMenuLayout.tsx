@@ -3,7 +3,8 @@ import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, UtensilsCrossed, X, ShoppingCart } from 'lucide-react';
+import { Menu, UtensilsCrossed, X, ShoppingCart, User } from 'lucide-react';
+import { toast } from 'sonner';
 import Spinner from '../../components/ui/Spinner';
 import MenuDrawer from '../../components/qr-menu/MenuDrawer';
 import { useCartStore } from '../../store/cartStore';
@@ -100,6 +101,8 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [waiterCooldown, setWaiterCooldown] = useState(0);
+  const [isCallingWaiter, setIsCallingWaiter] = useState(false);
 
   const initializeSession = useCartStore(state => state.initializeSession);
   const cartItems = useCartStore(state => state.items);
@@ -161,6 +164,52 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({
       onSessionIdChange(sessionId);
     }
   }, [sessionId, onSessionIdChange]);
+
+  // Waiter call cooldown timer
+  useEffect(() => {
+    if (waiterCooldown <= 0) return;
+    const timer = setTimeout(() => setWaiterCooldown(waiterCooldown - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [waiterCooldown]);
+
+  const handleCallWaiter = async () => {
+    if (!sessionId || !tenantId) {
+      toast.error(t('messages.operationFailed'));
+      return;
+    }
+    if (!tableId) {
+      toast.error(t('waiter.noTable'));
+      return;
+    }
+    if (waiterCooldown > 0) {
+      toast.info(t('waiter.cooldown'));
+      return;
+    }
+
+    setIsCallingWaiter(true);
+    try {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+      await axios.post(`${API_URL}/customer-orders/waiter-requests`, {
+        tenantId,
+        tableId,
+        sessionId,
+      });
+      toast.success(t('waiter.callSuccess'));
+      setWaiterCooldown(60);
+    } catch (error: any) {
+      const status = error.response?.status;
+      const message = error.response?.data?.message || '';
+      // Rate limit: backend returns 400 with "pending" in message
+      if (status === 400 && message.toLowerCase().includes('pending')) {
+        toast.warning(t('waiter.alreadyPending'));
+        setWaiterCooldown(30);
+      } else {
+        toast.error(message || t('waiter.callError'));
+      }
+    } finally {
+      setIsCallingWaiter(false);
+    }
+  };
 
   // Check if current language is RTL
   const isRTL = RTL_LANGUAGES.includes(i18n.language);
@@ -284,6 +333,8 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({
         settings={settings}
         sessionId={sessionId}
         subdomain={subdomain}
+        onCallWaiter={handleCallWaiter}
+        isCallingWaiter={isCallingWaiter || waiterCooldown > 0}
       />
 
       {/* Main Content */}
@@ -307,6 +358,35 @@ const QRMenuLayout: React.FC<QRMenuLayoutProps> = ({
           style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
         />
       </main>
+
+      {/* Floating Call Waiter FAB */}
+      <AnimatePresence>
+        {tableId && sessionId && currentPage !== 'orders' && (
+          <motion.button
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+            onClick={handleCallWaiter}
+            disabled={isCallingWaiter}
+            className="fixed z-40 flex items-center gap-2 px-4 py-3 rounded-full shadow-lg disabled:opacity-70"
+            style={{
+              bottom: enableCustomerOrdering && itemCount > 0 ? 'calc(5.5rem + env(safe-area-inset-bottom, 0px))' : 'calc(1.5rem + env(safe-area-inset-bottom, 0px))',
+              ...(isRTL ? { left: '1rem' } : { right: '1rem' }),
+              backgroundColor: waiterCooldown > 0 ? '#94a3b8' : settings.secondaryColor || '#6366f1',
+              boxShadow: `0 4px 20px ${waiterCooldown > 0 ? '#94a3b840' : (settings.secondaryColor || '#6366f1') + '50'}`,
+            }}
+            whileTap={waiterCooldown > 0 ? {} : { scale: 0.92 }}
+          >
+            <User className="h-5 w-5 text-white" />
+            <span className="text-white text-sm font-semibold">
+              {waiterCooldown > 0
+                ? `${waiterCooldown}s`
+                : t('waiter.call', 'Call Waiter')}
+            </span>
+          </motion.button>
+        )}
+      </AnimatePresence>
 
       {/* Floating Cart Button */}
       <AnimatePresence>

@@ -14,6 +14,7 @@ import {
   ClipboardList,
   UtensilsCrossed,
   ShoppingCart,
+  User,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { WifiInfo, SocialMedia } from '../../pages/qr-menu/QRMenuLayout';
@@ -106,6 +107,8 @@ interface MenuDrawerProps {
   };
   sessionId: string | null;
   subdomain?: string;
+  onCallWaiter?: () => void;
+  isCallingWaiter?: boolean;
 }
 
 const MenuDrawer: React.FC<MenuDrawerProps> = ({
@@ -116,6 +119,8 @@ const MenuDrawer: React.FC<MenuDrawerProps> = ({
   settings,
   sessionId,
   subdomain,
+  onCallWaiter,
+  isCallingWaiter = false,
 }) => {
   const { t, i18n } = useTranslation('common');
   const navigate = useNavigate();
@@ -146,6 +151,13 @@ const MenuDrawer: React.FC<MenuDrawerProps> = ({
 
   const handleLanguageChange = (langCode: string) => {
     i18n.changeLanguage(langCode);
+  };
+
+  const handleCallWaiterClick = () => {
+    if (onCallWaiter) {
+      onCallWaiter();
+      onClose();
+    }
   };
 
   const handleNavigateToCart = () => {
@@ -306,6 +318,26 @@ const MenuDrawer: React.FC<MenuDrawerProps> = ({
                     )}
                   </div>
                 </div>
+              )}
+
+              {/* Call Waiter */}
+              {table && sessionId && onCallWaiter && (
+                <motion.button
+                  onClick={handleCallWaiterClick}
+                  disabled={isCallingWaiter}
+                  className="w-full p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl flex items-center justify-between group hover:from-blue-100 hover:to-indigo-100 transition-colors disabled:opacity-60"
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-xl bg-blue-100">
+                      <User className="h-5 w-5 text-blue-600" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-semibold text-slate-900">{t('waiter.call', 'Call Waiter')}</h3>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-slate-400 group-hover:text-slate-600 transition-colors rtl-flip" />
+                </motion.button>
               )}
 
               {/* Rewards */}

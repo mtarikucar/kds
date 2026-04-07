@@ -24,6 +24,7 @@ import { SmsService } from './sms.service';
     CustomerSessionService,
     PhoneVerificationService,
     ReferralService,
+    SmsService,
   ],
 })
 export class CustomersModule {}
