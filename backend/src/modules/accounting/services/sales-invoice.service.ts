@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Optional, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AccountingSettingsService } from './accounting-settings.service';
 import { TaxCalculationService } from './tax-calculation.service';
+import { AccountingSyncService } from './accounting-sync.service';
 import { CreateSalesInvoiceDto, InvoiceQueryDto } from '../dto/create-sales-invoice.dto';
 import { InvoiceStatus } from '../constants/accounting.enum';
 
@@ -11,6 +12,7 @@ export class SalesInvoiceService {
     private prisma: PrismaService,
     private settingsService: AccountingSettingsService,
     private taxService: TaxCalculationService,
+    @Optional() private syncService?: AccountingSyncService,
   ) {}
 
   async createFromOrder(orderId: string, tenantId: string, dto?: CreateSalesInvoiceDto) {
@@ -61,7 +63,7 @@ export class SalesInvoiceService {
 
     const paymentMethod = order.payments[0]?.method || null;
 
-    return this.prisma.salesInvoice.create({
+    const invoice = await this.prisma.salesInvoice.create({
       data: {
         invoiceNumber,
         status: InvoiceStatus.ISSUED,
@@ -96,6 +98,18 @@ export class SalesInvoiceService {
       },
       include: { items: true },
     });
+
+    // Auto-sync if enabled
+    if (this.syncService) {
+      const accSettings = await this.settingsService.findByTenant(tenantId);
+      if (accSettings.autoSync && accSettings.provider !== 'NONE') {
+        this.syncService.syncInvoice(invoice.id, tenantId).catch((err) => {
+          console.error('Auto-sync failed:', err.message);
+        });
+      }
+    }
+
+    return invoice;
   }
 
   async findAll(tenantId: string, query: InvoiceQueryDto) {

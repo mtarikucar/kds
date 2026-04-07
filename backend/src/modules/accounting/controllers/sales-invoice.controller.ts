@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Patch, Param, Query, Body, UseGuards, Request } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { SalesInvoiceService } from '../services/sales-invoice.service';
+import { AccountingSyncService } from '../services/accounting-sync.service';
 import { CreateSalesInvoiceDto, InvoiceQueryDto } from '../dto/create-sales-invoice.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
@@ -13,7 +14,10 @@ import { UserRole } from '../../../common/constants/roles.enum';
 @Controller('sales-invoices')
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 export class SalesInvoiceController {
-  constructor(private readonly service: SalesInvoiceService) {}
+  constructor(
+    private readonly service: SalesInvoiceService,
+    private readonly syncService: AccountingSyncService,
+  ) {}
 
   @Post('from-order/:orderId')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
@@ -34,6 +38,13 @@ export class SalesInvoiceController {
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   findOne(@Param('id') id: string, @Request() req) {
+    return this.service.findOne(id, req.tenantId);
+  }
+
+  @Post(':id/sync')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  async syncToProvider(@Param('id') id: string, @Request() req) {
+    await this.syncService.syncInvoice(id, req.tenantId);
     return this.service.findOne(id, req.tenantId);
   }
 
