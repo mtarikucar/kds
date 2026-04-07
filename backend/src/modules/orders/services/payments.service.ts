@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreatePaymentDto } from '../dto/create-payment.dto';
@@ -11,6 +12,8 @@ import { TableStatus } from '../../tables/dto/create-table.dto';
 import { OrdersService } from './orders.service';
 import { CustomersService } from '../../customers/customers.service';
 import { withTransaction, addBreadcrumb } from '../../../common/utils/tracing';
+import { SalesInvoiceService } from '../../accounting/services/sales-invoice.service';
+import { AccountingSettingsService } from '../../accounting/services/accounting-settings.service';
 
 @Injectable()
 export class PaymentsService {
@@ -18,6 +21,10 @@ export class PaymentsService {
     private prisma: PrismaService,
     private ordersService: OrdersService,
     private customersService: CustomersService,
+    @Optional()
+    private salesInvoiceService?: SalesInvoiceService,
+    @Optional()
+    private accountingSettingsService?: AccountingSettingsService,
   ) {}
 
   async create(orderId: string, createPaymentDto: CreatePaymentDto, tenantId: string) {
@@ -211,6 +218,18 @@ export class PaymentsService {
                 });
               }
             }
+
+            // Auto-generate invoice if enabled
+            if (this.salesInvoiceService && this.accountingSettingsService) {
+              try {
+                const accSettings = await this.accountingSettingsService.findByTenant(tenantId);
+                if (accSettings.autoGenerateInvoice) {
+                  await this.salesInvoiceService.createFromOrder(orderId, tenantId);
+                }
+              } catch (err) {
+                console.error('Auto-invoice generation failed:', err.message);
+              }
+            }
           }
 
           addBreadcrumb('Payment completed successfully', 'payment', { paymentId: payment.id });
@@ -371,6 +390,18 @@ export class PaymentsService {
               where: { id: order.tableId },
               data: { status: TableStatus.AVAILABLE },
             });
+          }
+        }
+
+        // Auto-generate invoice if enabled
+        if (this.salesInvoiceService && this.accountingSettingsService) {
+          try {
+            const accSettings = await this.accountingSettingsService.findByTenant(tenantId);
+            if (accSettings.autoGenerateInvoice) {
+              await this.salesInvoiceService.createFromOrder(dto.orderId, tenantId);
+            }
+          } catch (err) {
+            console.error('Auto-invoice generation failed:', err.message);
           }
         }
       }
