@@ -1415,6 +1415,8 @@ model ZReport {
   totalDiscount           Decimal @default(0) @db.Decimal(10, 2)
   totalRefunds            Decimal @default(0) @db.Decimal(10, 2)
   netSales                Decimal @db.Decimal(10, 2) // totalSales - totalRefunds
+  totalTax                Decimal @default(0) @db.Decimal(10, 2)
+  taxBreakdown            Json?
 
   // Order Type Breakdown
   dineInSales             Decimal @default(0) @db.Decimal(10, 2)
