@@ -25,7 +25,7 @@ export default function Navbar() {
 
   const isHidden = scrollDirection === 'down' && !isAtTop && !isMenuOpen;
 
-  // When at top, we're over the dark Ramadan hero - use light text
+  // When at top, we're over the dark hero - use light text
   // When scrolled, glass background is active - use dark text
   const textPrimary = isAtTop ? 'text-white' : 'text-slate-900';
   const textSecondary = isAtTop ? 'text-white/80 hover:text-white' : 'text-slate-600 hover:text-slate-900';
@@ -85,7 +85,7 @@ export default function Navbar() {
               href="/app/register"
               className={`inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-300 ${
                 isAtTop
-                  ? 'text-ramadan-deep bg-ramadan-gold hover:bg-ramadan-star'
+                  ? 'text-white bg-orange-500 hover:bg-orange-600'
                   : 'text-white bg-slate-900 hover:bg-slate-800'
               }`}
             >

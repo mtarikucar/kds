@@ -92,12 +92,12 @@ export default async function LocaleLayout({ children, params }: Props) {
   const dir = localeConfig[locale as Locale]?.dir || 'ltr';
 
   return (
-    <html lang={locale} dir={dir} className={inter.className} suppressHydrationWarning>
+    <html lang={locale} dir={dir} className={inter.className}>
       <head>
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
-      <body className="antialiased" suppressHydrationWarning>
+      <body className="antialiased">
         <NextIntlClientProvider messages={messages}>
           <SmoothScroll>
             {children}

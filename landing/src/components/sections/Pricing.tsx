@@ -8,8 +8,6 @@ import { useTranslations } from 'next-intl';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { Tilt3D } from '@/components/animations/Tilt3D';
 import { GradientOrb } from '@/components/animations/FloatingElement';
-import { RamadanDecorSet } from '@/components/animations/RamadanDecorations';
-import CountdownTimer from '@/components/ui/CountdownTimer';
 import { type PlanFromAPI } from '@/lib/api';
 
 interface PricingProps {
@@ -18,7 +16,7 @@ interface PricingProps {
 
 export default function Pricing({ apiPlans }: PricingProps) {
   const t = useTranslations('pricing');
-  const tRamadan = useTranslations('ramadan');
+
   const sectionRef = useRef<HTMLElement>(null);
   const prefersReducedMotion = useReducedMotion();
   const [mounted, setMounted] = useState(false);
@@ -110,13 +108,13 @@ export default function Pricing({ apiPlans }: PricingProps) {
 
   return (
     <section ref={sectionRef} id="pricing" className="section-padding relative overflow-hidden">
-      {/* Ramadan themed background */}
-      <div className="absolute inset-0 bg-gradient-to-b from-ramadan-deep/[0.03] via-white to-ramadan-deep/[0.05]" />
+      {/* Background */}
+      <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-white to-slate-50" />
 
-      {/* Floating orbs - Ramadan colors */}
+      {/* Floating orbs */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <GradientOrb
-          color="rgba(212, 160, 23, 0.08)"
+          color="rgba(249, 115, 22, 0.08)"
           size={400}
           blur={100}
           className="absolute -top-20 right-1/4"
@@ -132,9 +130,6 @@ export default function Pricing({ apiPlans }: PricingProps) {
         />
       </div>
 
-      {/* Ramadan decorations */}
-      <RamadanDecorSet variant="pricing" />
-
       <Container className="relative">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -147,7 +142,7 @@ export default function Pricing({ apiPlans }: PricingProps) {
             initial={{ opacity: 0, scale: 0.9 }}
             whileInView={{ opacity: 1, scale: 1 }}
             viewport={{ once: true }}
-            className="inline-block text-sm font-semibold text-ramadan-gold mb-4 uppercase tracking-wider"
+            className="inline-block text-sm font-semibold text-orange-500 mb-4 uppercase tracking-wider"
           >
             {t('badge')}
           </motion.span>
@@ -156,18 +151,6 @@ export default function Pricing({ apiPlans }: PricingProps) {
           </h2>
           <p className="text-lg text-slate-600">{t('subtitle')}</p>
 
-          {/* Countdown Timer for active discount */}
-          {activeDiscount?.discountEndDate && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ delay: 0.3 }}
-              className="mt-6 flex justify-center"
-            >
-              <CountdownTimer targetDate={activeDiscount.discountEndDate} variant="light" />
-            </motion.div>
-          )}
         </motion.div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
@@ -190,7 +173,7 @@ export default function Pricing({ apiPlans }: PricingProps) {
                   className={`
                     relative h-full bg-white rounded-3xl p-8
                     ${plan.popular
-                      ? 'shadow-2xl shadow-ramadan-gold/20 border-2 border-ramadan-gold'
+                      ? 'shadow-2xl shadow-orange-500/20 border-2 border-orange-500'
                       : 'shadow-xl shadow-slate-200/50 border border-slate-200'}
                   `}
                 >
@@ -201,7 +184,7 @@ export default function Pricing({ apiPlans }: PricingProps) {
                       animate={{ opacity: 1, y: 0 }}
                       className="absolute -top-4 left-1/2 -translate-x-1/2"
                     >
-                      <div className="flex items-center gap-1.5 bg-gradient-to-r from-ramadan-gold to-ramadan-star text-ramadan-deep text-sm font-semibold px-4 py-1.5 rounded-full shadow-lg">
+                      <div className="flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-amber-500 text-slate-900 text-sm font-semibold px-4 py-1.5 rounded-full shadow-lg">
                         <Sparkles className="w-4 h-4" />
                         {t('mostPopular')}
                       </div>
@@ -216,9 +199,9 @@ export default function Pricing({ apiPlans }: PricingProps) {
                       viewport={{ once: true }}
                       className="mb-3"
                     >
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-ramadan-gold/10 text-ramadan-gold border border-ramadan-gold/20 rounded-full">
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-orange-500/10 text-orange-500 border border-orange-500/20 rounded-full">
                         <Tag className="w-3 h-3" />
-                        {tRamadan('discountBadge', { percent: plan.discountPercentage })}
+                        {plan.discountPercentage}% OFF
                       </span>
                     </motion.div>
                   )}
@@ -237,7 +220,7 @@ export default function Pricing({ apiPlans }: PricingProps) {
                           whileInView={{ scale: 1 }}
                           viewport={{ once: true }}
                           transition={{ delay: 0.3 + index * 0.1, type: 'spring' }}
-                          className="text-5xl font-bold text-ramadan-gold"
+                          className="text-5xl font-bold text-orange-500"
                         >
                           {plan.discountedPrice}
                         </motion.span>
@@ -248,7 +231,7 @@ export default function Pricing({ apiPlans }: PricingProps) {
                         whileInView={{ scale: 1 }}
                         viewport={{ once: true }}
                         transition={{ delay: 0.3 + index * 0.1, type: 'spring' }}
-                        className={`text-5xl font-bold ${plan.popular ? 'text-ramadan-gold' : 'text-slate-900'}`}
+                        className={`text-5xl font-bold ${plan.popular ? 'text-orange-500' : 'text-slate-900'}`}
                       >
                         {plan.price}
                       </motion.span>
@@ -272,7 +255,7 @@ export default function Pricing({ apiPlans }: PricingProps) {
                           viewport={{ once: true }}
                           transition={{ delay: 0.5 + i * 0.05, type: 'spring' }}
                         >
-                          <Check className={`w-5 h-5 flex-shrink-0 ${plan.popular ? 'text-ramadan-gold' : 'text-green-500'}`} />
+                          <Check className={`w-5 h-5 flex-shrink-0 ${plan.popular ? 'text-orange-500' : 'text-green-500'}`} />
                         </motion.div>
                         <span className="text-slate-600">{feature}</span>
                       </motion.li>
@@ -286,7 +269,7 @@ export default function Pricing({ apiPlans }: PricingProps) {
                     className={`
                       w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold transition-all
                       ${plan.popular
-                        ? 'bg-gradient-to-r from-ramadan-gold to-ramadan-star text-ramadan-deep shadow-lg shadow-ramadan-gold/25 hover:shadow-xl hover:shadow-ramadan-gold/30'
+                        ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-slate-900 shadow-lg shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/30'
                         : 'bg-slate-100 text-slate-900 hover:bg-slate-200'}
                     `}
                   >

@@ -281,18 +281,7 @@
     "trustBadge2": "14 günlük ücretsiz deneme",
     "trustBadge3": "İstediğiniz zaman iptal"
   },
-  "ramadan": {
-    "bannerTitle": "Ramazan'a Ozel %50 Indirim!",
-    "bannerCta": "Simdi Basla",
-    "heroLabel": "Ramazan Kampanyasi",
-    "discountBadge": "%{percent} INDIRIM",
-    "originalPrice": "Normal fiyat",
-    "campaignEnds": "Kampanya bitis:",
-    "days": "gun",
-    "hours": "saat",
-    "minutes": "dakika",
-    "seconds": "saniye"
-  },
+
   "mascot": {
     "welcome": "Hoş geldiniz! 👋",
     "welcomeMessage": "Ben HummyTummy'nin şefiyim. Size yardımcı olmak için buradayım!",

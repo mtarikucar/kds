@@ -281,18 +281,7 @@
     "trustBadge2": "تجربة مجانية 14 يوماً",
     "trustBadge3": "إلغاء في أي وقت"
   },
-  "ramadan": {
-    "bannerTitle": "عرض رمضان الخاص - خصم 50%!",
-    "bannerCta": "ابدأ الآن",
-    "heroLabel": "حملة رمضان",
-    "discountBadge": "خصم {percent}%",
-    "originalPrice": "السعر العادي",
-    "campaignEnds": "ينتهي العرض:",
-    "days": "يوم",
-    "hours": "ساعة",
-    "minutes": "دقيقة",
-    "seconds": "ثانية"
-  },
+
   "mascot": {
     "welcome": "مرحباً! 👋",
     "welcomeMessage": "أنا شيف HummyTummy. أنا هنا لمساعدتك!",

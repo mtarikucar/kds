@@ -8,8 +8,6 @@ import TrustSecurity from '@/components/sections/TrustSecurity';
 import Pricing from '@/components/sections/Pricing';
 import FinalCTA from '@/components/sections/FinalCTA';
 import Footer from '@/components/sections/Footer';
-import RamadanBanner from '@/components/sections/RamadanBanner';
-import ClientOnly from '@/components/ClientOnly';
 import { getPlans } from '@/lib/api';
 
 type Props = {
@@ -19,28 +17,20 @@ type Props = {
 export default async function HomePage({ params }: Props) {
   const { locale } = await params;
   setRequestLocale(locale);
-
   const plans = await getPlans();
-
-  const activeDiscountPlan = plans.find(
-    (p) => p.isDiscountActive && p.discountPercentage && p.discountEndDate && new Date(p.discountEndDate) > new Date()
-  );
 
   return (
     <>
       <Navbar />
-      <ClientOnly>
-        <RamadanBanner discountEndDate={activeDiscountPlan?.discountEndDate} />
-        <main className="min-h-screen">
-          <Hero />
-          <ProductOverview />
-          <FeatureScroller />
-          <BusinessValue />
-          <TrustSecurity />
-          <Pricing apiPlans={plans} />
-          <FinalCTA />
-        </main>
-      </ClientOnly>
+      <main className="min-h-screen">
+        <Hero />
+        <ProductOverview />
+        <FeatureScroller />
+        <BusinessValue />
+        <TrustSecurity />
+        <Pricing apiPlans={plans} />
+        <FinalCTA />
+      </main>
       <Footer />
     </>
   );

@@ -12,7 +12,7 @@ import { FloatingElement, GradientOrb } from '@/components/animations/FloatingEl
 import { Tilt3D } from '@/components/animations/Tilt3D';
 import { ParallaxLayer } from '@/components/animations/ParallaxLayer';
 import { DashboardMockup } from '@/components/mockups/DashboardMockup';
-import { RamadanDecorSet } from '@/components/animations/RamadanDecorations';
+
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -43,7 +43,7 @@ export default function Hero() {
   const prefersReducedMotion = useReducedMotion();
   const stats = getStats();
   const t = useTranslations('hero');
-  const tRamadan = useTranslations('ramadan');
+
   const sectionRef = useRef<HTMLElement>(null);
 
   const { scrollYProgress } = useScroll({
@@ -63,10 +63,10 @@ export default function Hero() {
       ref={sectionRef}
       className="relative min-h-screen pt-40 pb-20 lg:pt-48 lg:pb-32 overflow-hidden"
     >
-      {/* Ramadan themed background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-ramadan-deep via-[#16213e] to-[#0f3460]" />
+      {/* Background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900" />
 
-      {/* Floating gradient orbs with Ramadan colors */}
+      {/* Floating gradient orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <ParallaxLayer speed={0.3}>
           <GradientOrb
@@ -100,28 +100,26 @@ export default function Hero() {
           />
         </ParallaxLayer>
 
-        {/* Decorative floating elements - gold themed */}
+        {/* Decorative floating elements */}
         <FloatingElement
-          className="absolute top-32 right-[15%] w-4 h-4 bg-ramadan-gold/30 rounded-full blur-sm"
+          className="absolute top-32 right-[15%] w-4 h-4 bg-orange-500/30 rounded-full blur-sm"
           duration={4}
           amplitude={15}
         />
         <FloatingElement
-          className="absolute top-48 left-[20%] w-3 h-3 bg-ramadan-star/40 rounded-full blur-sm"
+          className="absolute top-48 left-[20%] w-3 h-3 bg-amber-400/40 rounded-full blur-sm"
           duration={5}
           delay={1}
           amplitude={20}
         />
         <FloatingElement
-          className="absolute bottom-40 right-[25%] w-5 h-5 bg-ramadan-gold/20 rounded-full blur-sm"
+          className="absolute bottom-40 right-[25%] w-5 h-5 bg-orange-500/20 rounded-full blur-sm"
           duration={6}
           delay={2}
           amplitude={18}
         />
       </div>
 
-      {/* Ramadan decorations (crescent, lanterns, stars) */}
-      <RamadanDecorSet variant="hero" />
 
       <motion.div
         style={prefersReducedMotion ? {} : { opacity: heroOpacity, y: heroY, scale: heroScale }}
@@ -135,25 +133,12 @@ export default function Hero() {
               animate="visible"
               className="text-center lg:text-left"
             >
-              {/* Ramadan Badge */}
-              <motion.div
-                variants={childVariants}
-                className="inline-flex items-center gap-2 px-4 py-2 mb-6 text-sm font-medium text-ramadan-gold bg-ramadan-gold/10 rounded-full border border-ramadan-gold/20 backdrop-blur-md shadow-lg shadow-ramadan-gold/10"
-              >
-                <motion.span
-                  className="w-2 h-2 bg-ramadan-gold rounded-full"
-                  animate={prefersReducedMotion ? {} : { scale: [1, 1.2, 1] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                />
-                {tRamadan('heroLabel')}
-              </motion.div>
-
               {/* Headline with text reveal */}
               <motion.div variants={childVariants}>
                 {prefersReducedMotion ? (
                   <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white tracking-tight leading-[1.1] mb-6">
                     {t('headline')}{' '}
-                    <span className="bg-gradient-to-r from-ramadan-gold to-ramadan-star bg-clip-text text-transparent">{t('headlineHighlight')}</span>
+                    <span className="bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">{t('headlineHighlight')}</span>
                   </h1>
                 ) : (
                   <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white tracking-tight leading-[1.1] mb-6">
@@ -184,7 +169,7 @@ export default function Hero() {
                   href="/app/register"
                   whileHover={prefersReducedMotion ? {} : { scale: 1.02, y: -2 }}
                   whileTap={prefersReducedMotion ? {} : { scale: 0.98 }}
-                  className="inline-flex items-center justify-center gap-2 px-8 py-4 text-base font-semibold text-ramadan-deep bg-gradient-to-r from-ramadan-gold to-ramadan-star rounded-2xl hover:from-ramadan-star hover:to-ramadan-gold transition-all hover:shadow-xl hover:shadow-ramadan-gold/20 group"
+                  className="inline-flex items-center justify-center gap-2 px-8 py-4 text-base font-semibold text-slate-900 bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl hover:from-amber-500 hover:to-orange-500 transition-all hover:shadow-xl hover:shadow-orange-500/20 group"
                 >
                   {t('cta')}
                   <ArrowRight
@@ -198,7 +183,7 @@ export default function Hero() {
                   whileTap={prefersReducedMotion ? {} : { scale: 0.98 }}
                   className="inline-flex items-center justify-center gap-2 px-8 py-4 text-base font-semibold text-white/90 bg-white/10 backdrop-blur-sm rounded-2xl border border-white/20 hover:border-white/30 hover:bg-white/15 transition-all"
                 >
-                  <Play size={18} className="text-ramadan-gold" />
+                  <Play size={18} className="text-orange-500" />
                   {t('ctaSecondary')}
                 </motion.a>
               </motion.div>
@@ -217,7 +202,7 @@ export default function Hero() {
                     className="flex items-center gap-2"
                   >
                     <motion.svg
-                      className="w-5 h-5 text-ramadan-gold"
+                      className="w-5 h-5 text-orange-500"
                       fill="currentColor"
                       viewBox="0 0 20 20"
                       initial={prefersReducedMotion ? {} : { scale: 0 }}

@@ -10,7 +10,6 @@ interface ErrorPageProps {
 
 export default function ErrorPage({ error, reset }: ErrorPageProps) {
   useEffect(() => {
-    // Log the error to Sentry
     Sentry.captureException(error);
   }, [error]);
 
@@ -24,7 +23,6 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
-              xmlns="http://www.w3.org/2000/svg"
             >
               <path
                 strokeLinecap="round"
@@ -41,8 +39,7 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
         </h1>
 
         <p className="text-slate-400 mb-8">
-          We apologize for the inconvenience. Our team has been notified and is
-          working to fix the issue.
+          We apologize for the inconvenience. Our team has been notified.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -61,7 +58,6 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
           </a>
         </div>
 
-        {/* Error details for debugging */}
         <div className="mt-8 text-left bg-slate-800/50 rounded-lg p-4 border border-slate-700 max-h-64 overflow-auto">
           <p className="text-xs text-red-400 font-mono font-bold mb-1">{error.name}: {error.message}</p>
           {error.digest && (

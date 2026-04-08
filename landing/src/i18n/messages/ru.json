@@ -281,18 +281,7 @@
     "trustBadge2": "14-дневный бесплатный период",
     "trustBadge3": "Отмена в любое время"
   },
-  "ramadan": {
-    "bannerTitle": "Специальное предложение Рамадана - скидка 50%!",
-    "bannerCta": "Начать сейчас",
-    "heroLabel": "Акция Рамадана",
-    "discountBadge": "Скидка {percent}%",
-    "originalPrice": "Обычная цена",
-    "campaignEnds": "Акция заканчивается:",
-    "days": "дней",
-    "hours": "часов",
-    "minutes": "мин",
-    "seconds": "сек"
-  },
+
   "mascot": {
     "welcome": "Добро пожаловать! 👋",
     "welcomeMessage": "Я шеф-повар HummyTummy. Я здесь, чтобы помочь вам!",
