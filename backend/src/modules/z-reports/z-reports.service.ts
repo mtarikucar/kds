@@ -42,17 +42,30 @@ export class ZReportsService {
       throw new BadRequestException('Z-Report already exists for this date');
     }
 
-    // Get orders for the report date
-    const startOfDay = new Date(reportDate);
-    startOfDay.setHours(0, 0, 0, 0);
+    // Get tenant timezone for accurate date boundaries
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { timezone: true, currency: true },
+    });
+    const tz = tenant?.timezone || 'UTC';
+    const dateStr = new Date(reportDate).toISOString().slice(0, 10);
 
-    const endOfDay = new Date(reportDate);
-    endOfDay.setHours(23, 59, 59, 999);
+    // Use Intl to get the offset for the tenant's timezone on this date
+    const refDate = new Date(`${dateStr}T12:00:00Z`);
+    const localStr = refDate.toLocaleString('sv-SE', { timeZone: tz }); // "YYYY-MM-DD HH:MM:SS"
+    const localDate = new Date(localStr.replace(' ', 'T') + 'Z');
+    const offsetMs = refDate.getTime() - localDate.getTime();
+
+    const startOfDay = new Date(`${dateStr}T00:00:00Z`);
+    startOfDay.setTime(startOfDay.getTime() + offsetMs);
+
+    const endOfDay = new Date(`${dateStr}T23:59:59.999Z`);
+    endOfDay.setTime(endOfDay.getTime() + offsetMs);
 
     const orders = await this.prisma.order.findMany({
       where: {
         tenantId,
-        createdAt: {
+        paidAt: {
           gte: startOfDay,
           lte: endOfDay,
         },
@@ -60,9 +73,14 @@ export class ZReportsService {
       },
       include: {
         payments: true,
+        user: {
+          select: { id: true, firstName: true, lastName: true },
+        },
         orderItems: {
           include: {
-            product: true,
+            product: {
+              include: { category: { select: { id: true, name: true } } },
+            },
           },
         },
       },
@@ -72,10 +90,10 @@ export class ZReportsService {
     const totalOrders = orders.length;
     const grossSales = orders.reduce((sum, order) => sum + Number(order.totalAmount), 0);
     const discounts = orders.reduce((sum, order) => sum + Number(order.discount), 0);
-    const netSales = orders.reduce((sum, order) => sum + Number(order.finalAmount), 0);
+    const rawNetSales = orders.reduce((sum, order) => sum + Number(order.finalAmount), 0);
 
-    // Calculate payment method breakdown
-    const allPayments = orders.flatMap((o) => o.payments);
+    // Calculate payment method breakdown (only COMPLETED payments)
+    const allPayments = orders.flatMap((o) => o.payments).filter((p) => p.status === 'COMPLETED');
 
     const cashPaymentsList = allPayments.filter((p) => p.method === 'CASH');
     const cashPayments = cashPaymentsList.reduce((sum, p) => sum + Number(p.amount), 0);
@@ -89,6 +107,14 @@ export class ZReportsService {
     const digitalPayments = digitalPaymentsList.reduce((sum, p) => sum + Number(p.amount), 0);
     const digitalPaymentCount = digitalPaymentsList.length;
 
+    // Calculate refunds
+    const refundedPayments = orders.flatMap((o) => o.payments).filter((p) => p.status === 'REFUNDED');
+    const refundedAmount = refundedPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+    const totalRefunds = refundedAmount;
+
+    // Net sales accounts for refunds
+    const netSales = rawNetSales - totalRefunds;
+
     // Order type breakdown
     const dineInOrders = orders.filter((o) => o.type === 'DINE_IN');
     const dineInSales = dineInOrders.reduce((sum, o) => sum + Number(o.finalAmount), 0);
@@ -98,6 +124,9 @@ export class ZReportsService {
 
     const deliveryOrders = orders.filter((o) => o.type === 'DELIVERY');
     const deliverySales = deliveryOrders.reduce((sum, o) => sum + Number(o.finalAmount), 0);
+
+    const counterOrders = orders.filter((o) => o.type === 'COUNTER');
+    const counterSales = counterOrders.reduce((sum, o) => sum + Number(o.finalAmount), 0);
 
     // Cancelled orders in the date range
     const cancelledOrdersList = await this.prisma.order.findMany({
@@ -118,10 +147,6 @@ export class ZReportsService {
       (sum, o) => sum + Number(o.totalAmount),
       0,
     );
-
-    // Cash drawer reconciliation
-    const expectedCash = cashDrawerOpening + cashPayments;
-    const cashDifference = cashDrawerClosing - expectedCash;
 
     // Get top selling products
     const productSales = new Map<string, { name: string; quantity: number; revenue: number }>();
@@ -178,6 +203,63 @@ export class ZReportsService {
       },
     });
 
+    // Calculate cash in/out movements
+    const cashInTotal = cashMovements
+      .filter((m) => m.type === 'CASH_IN')
+      .reduce((sum, m) => sum + Number(m.amount), 0);
+    const cashOutTotal = cashMovements
+      .filter((m) => m.type === 'CASH_OUT')
+      .reduce((sum, m) => sum + Number(m.amount), 0);
+    const cashInOut = cashInTotal - cashOutTotal;
+
+    // Cash drawer reconciliation (after cash movements so cashInOut is available)
+    const expectedCash = cashDrawerOpening + cashPayments + cashInOut;
+    const cashDifference = cashDrawerClosing - expectedCash;
+
+    // Calculate staff performance
+    const staffMap = new Map<string, { name: string; sales: number; orders: number; refunds: number }>();
+    for (const order of orders) {
+      const staffId = order.userId || 'unknown';
+      const staffName = order.user ? `${order.user.firstName} ${order.user.lastName}` : 'Unknown';
+      const existing = staffMap.get(staffId) || { name: staffName, sales: 0, orders: 0, refunds: 0 };
+      existing.sales += Number(order.finalAmount);
+      existing.orders += 1;
+      staffMap.set(staffId, existing);
+    }
+    const staffPerformance = Array.from(staffMap.entries()).map(([id, data]) => ({
+      staffId: id,
+      ...data,
+    }));
+
+    // Calculate open (unfulfilled) orders
+    const openOrders = await this.prisma.order.findMany({
+      where: {
+        tenantId,
+        createdAt: { gte: startOfDay, lte: endOfDay },
+        status: { notIn: ['PAID', 'CANCELLED'] },
+      },
+      select: { finalAmount: true },
+    });
+    const openChecks = openOrders.length;
+    const openChecksAmount = openOrders.reduce((sum, o) => sum + Number(o.finalAmount), 0);
+
+    // Calculate category breakdown
+    const categoryMap = new Map<string, { categoryName: string; sales: number; quantity: number }>();
+    for (const order of orders) {
+      for (const item of order.orderItems) {
+        const catId = item.product.categoryId;
+        const catName = item.product.category?.name || 'Uncategorized';
+        const existing = categoryMap.get(catId) || { categoryName: catName, sales: 0, quantity: 0 };
+        existing.sales += Number(item.subtotal);
+        existing.quantity += item.quantity;
+        categoryMap.set(catId, existing);
+      }
+    }
+    const categoryBreakdown = Array.from(categoryMap.entries()).map(([id, data]) => ({
+      categoryId: id,
+      ...data,
+    }));
+
     // Create the Z-Report
     const report = await this.prisma.zReport.create({
       data: {
@@ -214,21 +296,26 @@ export class ZReportsService {
         cancelledOrders,
         cancelledOrdersAmount,
 
+        // Refund data
+        totalRefunds,
+        refundedPayments: refundedPayments.length,
+        refundedAmount,
+
         // Cash drawer
         openingCash: cashDrawerOpening,
         countedCash: cashDrawerClosing,
         expectedCash,
         cashDifference,
+        cashInOut,
+
+        // Open checks
+        openChecks,
+        openChecksAmount,
 
         // Additional data
         topProducts: topProducts as any,
-        staffPerformance: cashMovements.map((m) => ({
-          type: m.type,
-          amount: m.amount,
-          reason: m.reason,
-          performedBy: `${m.user.firstName} ${m.user.lastName}`,
-          timestamp: m.createdAt,
-        })) as any,
+        categoryBreakdown: categoryBreakdown as any,
+        staffPerformance: staffPerformance as any,
 
         notes,
       },
@@ -326,27 +413,27 @@ export class ZReportsService {
       doc.fontSize(14).text('Sales Summary', { underline: true });
       doc.fontSize(10);
       doc.text(`Total Orders: ${report.totalOrders}`);
-      doc.text(`Total Sales: ${currencySymbol}${report.totalSales.toFixed(2)}`);
-      doc.text(`Discounts: ${currencySymbol}${report.totalDiscount.toFixed(2)}`);
-      doc.text(`Net Sales: ${currencySymbol}${report.netSales.toFixed(2)}`);
+      doc.text(`Total Sales: ${currencySymbol}${Number(report.totalSales).toFixed(2)}`);
+      doc.text(`Discounts: ${currencySymbol}${Number(report.totalDiscount).toFixed(2)}`);
+      doc.text(`Net Sales: ${currencySymbol}${Number(report.netSales).toFixed(2)}`);
       doc.moveDown();
 
       // Payment Methods
       doc.fontSize(14).text('Payment Methods', { underline: true });
       doc.fontSize(10);
-      doc.text(`Cash: ${currencySymbol}${report.cashPayments.toFixed(2)}`);
-      doc.text(`Card: ${currencySymbol}${report.cardPayments.toFixed(2)}`);
-      doc.text(`Digital: ${currencySymbol}${report.digitalPayments.toFixed(2)}`);
+      doc.text(`Cash: ${currencySymbol}${Number(report.cashPayments).toFixed(2)}`);
+      doc.text(`Card: ${currencySymbol}${Number(report.cardPayments).toFixed(2)}`);
+      doc.text(`Digital: ${currencySymbol}${Number(report.digitalPayments).toFixed(2)}`);
       doc.moveDown();
 
       // Cash Drawer
       doc.fontSize(14).text('Cash Drawer Reconciliation', { underline: true });
       doc.fontSize(10);
-      doc.text(`Opening Balance: ${currencySymbol}${report.openingCash.toFixed(2)}`);
-      doc.text(`Cash Sales: ${currencySymbol}${report.cashPayments.toFixed(2)}`);
-      doc.text(`Expected Cash: ${currencySymbol}${report.expectedCash.toFixed(2)}`);
-      doc.text(`Actual Cash: ${currencySymbol}${report.countedCash.toFixed(2)}`);
-      doc.text(`Difference: ${currencySymbol}${report.cashDifference.toFixed(2)}`, {
+      doc.text(`Opening Balance: ${currencySymbol}${Number(report.openingCash).toFixed(2)}`);
+      doc.text(`Cash Sales: ${currencySymbol}${Number(report.cashPayments).toFixed(2)}`);
+      doc.text(`Expected Cash: ${currencySymbol}${Number(report.expectedCash).toFixed(2)}`);
+      doc.text(`Actual Cash: ${currencySymbol}${Number(report.countedCash).toFixed(2)}`);
+      doc.text(`Difference: ${currencySymbol}${Number(report.cashDifference).toFixed(2)}`, {
         continued: true,
       });
 

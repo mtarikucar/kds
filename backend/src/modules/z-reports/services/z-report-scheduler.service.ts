@@ -84,7 +84,11 @@ export class ZReportSchedulerService {
       const currentTimeInMinutes = currentHour * 60 + currentMinute;
 
       // Match if current time is within 0-14 minutes after closing time
-      const minutesSinceClosing = currentTimeInMinutes - closingTimeInMinutes;
+      let minutesSinceClosing = currentTimeInMinutes - closingTimeInMinutes;
+      // Handle midnight wraparound (e.g., closing at 23:50, current time 00:05)
+      if (minutesSinceClosing < 0) {
+        minutesSinceClosing += 24 * 60;
+      }
       if (minutesSinceClosing >= 0 && minutesSinceClosing < 15) {
         // Check if we haven't already sent a report today
         const today = new Date();

@@ -15,14 +15,16 @@ import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ZReportsService } from './z-reports.service';
 import { CreateZReportDto } from './dto/create-z-report.dto';
+import { QueryZReportDto } from './dto/query-z-report.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { TenantGuard } from '../auth/guards/tenant.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
 
 @ApiTags('z-reports')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 @Controller('z-reports')
 export class ZReportsController {
   constructor(private readonly zReportsService: ZReportsService) {}
@@ -41,7 +43,7 @@ export class ZReportsController {
   @ApiQuery({ name: 'limit', required: false })
   @ApiQuery({ name: 'startDate', required: false })
   @ApiQuery({ name: 'endDate', required: false })
-  async findAll(@Req() req, @Query() query: any) {
+  async findAll(@Req() req, @Query() query: QueryZReportDto) {
     return this.zReportsService.findAll(req.user.tenantId, query);
   }
 
