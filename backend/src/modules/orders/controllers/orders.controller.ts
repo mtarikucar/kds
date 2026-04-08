@@ -30,7 +30,7 @@ import { OrderStatus } from '../../../common/constants/order-status.enum';
 @ApiTags('orders')
 @ApiBearerAuth()
 @Controller('orders')
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 export class OrdersController {
   constructor(
     private readonly ordersService: OrdersService,
@@ -38,6 +38,7 @@ export class OrdersController {
   ) {}
 
   @Post()
+  @UseGuards(PlanFeatureGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @CheckLimit(LimitType.MONTHLY_ORDERS)
   @ApiOperation({ summary: 'Create a new order (ADMIN, MANAGER, WAITER)' })

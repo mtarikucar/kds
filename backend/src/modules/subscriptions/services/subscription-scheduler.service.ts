@@ -80,8 +80,8 @@ export class SubscriptionSchedulerService {
     try {
       const now = new Date();
 
-      // Batch update - tek query ile tüm subscription'ları güncelle
-      const result = await this.prisma.subscription.updateMany({
+      // Find subscriptions to cancel so we can clear their tenant plans
+      const pendingCancellations = await this.prisma.subscription.findMany({
         where: {
           cancelAtPeriodEnd: true,
           currentPeriodEnd: {
@@ -91,11 +91,36 @@ export class SubscriptionSchedulerService {
             not: SubscriptionStatus.CANCELLED,
           },
         },
+        select: { id: true, tenantId: true },
+      });
+
+      if (pendingCancellations.length === 0) {
+        this.logger.log('No pending cancellations found');
+        return;
+      }
+
+      // Batch update - tek query ile tüm subscription'ları güncelle
+      const result = await this.prisma.subscription.updateMany({
+        where: {
+          id: { in: pendingCancellations.map(s => s.id) },
+        },
         data: {
           status: SubscriptionStatus.CANCELLED,
           endedAt: now,
         },
       });
+
+      // Clear currentPlanId for cancelled tenants
+      for (const sub of pendingCancellations) {
+        try {
+          await this.prisma.tenant.update({
+            where: { id: sub.tenantId },
+            data: { currentPlanId: null },
+          });
+        } catch (err) {
+          this.logger.error(`Failed to clear plan for tenant ${sub.tenantId}: ${err.message}`);
+        }
+      }
 
       this.logger.log(`Cancelled ${result.count} subscriptions`);
     } catch (error) {
