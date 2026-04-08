@@ -18,12 +18,14 @@ export default function FeatureScroller() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const prefersReducedMotion = useReducedMotion();
   const t = useTranslations('features');
 
   // Check for mobile on mount
   useEffect(() => {
     setIsMobile(window.matchMedia('(max-width: 768px)').matches);
+    setMounted(true);
   }, []);
 
   const { scrollYProgress } = useScroll({
@@ -169,7 +171,7 @@ export default function FeatureScroller() {
   const colors = colorVariants[activeFeature.color];
 
   // Reduced motion or mobile fallback - show simple list view
-  if (prefersReducedMotion || isMobile) {
+  if (prefersReducedMotion || (mounted && isMobile)) {
     return (
       <section id="features" className="section-padding bg-slate-50">
         <Container>

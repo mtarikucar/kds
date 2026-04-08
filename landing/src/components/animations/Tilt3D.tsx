@@ -25,9 +25,11 @@ export function Tilt3D({
   const ref = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
   const [isMobile, setIsMobile] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setIsMobile(window.matchMedia('(max-width: 768px)').matches);
+    setMounted(true);
   }, []);
 
   const { x, y, isHovering } = useMousePosition(ref, {
@@ -44,7 +46,7 @@ export function Tilt3D({
   const glareY = useTransform(y, [-1, 1], ['0%', '100%']);
 
   // Skip 3D effect if user prefers reduced motion or on mobile
-  if (prefersReducedMotion || isMobile) {
+  if (prefersReducedMotion || (mounted && isMobile)) {
     return <div className={className}>{children}</div>;
   }
 

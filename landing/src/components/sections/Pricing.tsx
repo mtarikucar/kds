@@ -21,16 +21,21 @@ export default function Pricing({ apiPlans }: PricingProps) {
   const tRamadan = useTranslations('ramadan');
   const sectionRef = useRef<HTMLElement>(null);
   const prefersReducedMotion = useReducedMotion();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ['start end', 'end start'],
   });
 
-  // Check if any API plan has an active discount
-  const activeDiscount = apiPlans?.find(
+  // Check if any API plan has an active discount (only after mount to avoid hydration mismatch)
+  const activeDiscount = mounted ? apiPlans?.find(
     (p) => p.isDiscountActive && p.discountPercentage && p.discountEndDate && new Date(p.discountEndDate) > new Date()
-  );
+  ) : undefined;
 
   // Build plans from translations (static) with optional API discount overlay
   const staticPlans = [
@@ -89,7 +94,7 @@ export default function Pricing({ apiPlans }: PricingProps) {
     const apiPlan = apiPlans?.find(
       (ap) => ap.name.toLowerCase() === sp.key.toLowerCase()
     );
-    const hasDiscount = apiPlan?.isDiscountActive && apiPlan?.discountPercentage &&
+    const hasDiscount = mounted && apiPlan?.isDiscountActive && apiPlan?.discountPercentage &&
       apiPlan?.discountEndDate && new Date(apiPlan.discountEndDate) > new Date();
 
     return {

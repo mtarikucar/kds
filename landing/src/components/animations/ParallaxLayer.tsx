@@ -23,9 +23,11 @@ export function ParallaxLayer({
   const ref = useRef<HTMLDivElement>(null);
   const prefersReducedMotion = useReducedMotion();
   const [isMobile, setIsMobile] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setIsMobile(window.matchMedia('(max-width: 768px)').matches);
+    setMounted(true);
   }, []);
 
   const { y, x } = useParallax({
@@ -35,7 +37,7 @@ export function ParallaxLayer({
   });
 
   // Skip parallax if user prefers reduced motion or on mobile
-  if (prefersReducedMotion || isMobile) {
+  if (prefersReducedMotion || (mounted && isMobile)) {
     const Component = as as any;
     return <Component className={className}>{children}</Component>;
   }

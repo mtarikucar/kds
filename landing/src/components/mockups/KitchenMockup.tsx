@@ -20,6 +20,7 @@ interface KitchenMockupProps {
 
 export function KitchenMockup({ className = '' }: KitchenMockupProps) {
   const prefersReducedMotion = useReducedMotion();
+  const [mounted, setMounted] = useState(false);
   const [tickets, setTickets] = useState<KitchenTicket[]>([
     {
       id: 1,
@@ -30,7 +31,7 @@ export function KitchenMockup({ className = '' }: KitchenMockupProps) {
         { name: 'Rice Pilaf', quantity: 3, done: true },
       ],
       priority: 'normal',
-      startTime: Date.now() - 480000,
+      startTime: 0,
       elapsed: 480,
     },
     {
@@ -41,10 +42,21 @@ export function KitchenMockup({ className = '' }: KitchenMockupProps) {
         { name: 'Pide', quantity: 2, done: false },
       ],
       priority: 'rush',
-      startTime: Date.now() - 180000,
+      startTime: 0,
       elapsed: 180,
     },
   ]);
+
+  // Set actual start times after mount
+  useEffect(() => {
+    setMounted(true);
+    setTickets((prev) =>
+      prev.map((ticket) => ({
+        ...ticket,
+        startTime: ticket.id === 1 ? Date.now() - 480000 : Date.now() - 180000,
+      }))
+    );
+  }, []);
 
   // Update elapsed time
   useEffect(() => {

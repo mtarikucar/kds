@@ -25,9 +25,11 @@ export function FloatingElement({
 }: FloatingElementProps) {
   const prefersReducedMotion = useReducedMotion();
   const [isMobile, setIsMobile] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setIsMobile(window.matchMedia('(max-width: 768px)').matches);
+    setMounted(true);
   }, []);
 
   const getAnimation = () => {
@@ -48,7 +50,7 @@ export function FloatingElement({
   };
 
   // Skip animations if user prefers reduced motion or on mobile
-  if (prefersReducedMotion || isMobile) {
+  if (prefersReducedMotion || (mounted && isMobile)) {
     return <div className={className}>{children}</div>;
   }
 
