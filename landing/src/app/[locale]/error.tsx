@@ -61,11 +61,16 @@ export default function ErrorPage({ error, reset }: ErrorPageProps) {
           </a>
         </div>
 
-        {error.digest && (
-          <p className="mt-8 text-xs text-slate-500">
-            Error ID: {error.digest}
-          </p>
-        )}
+        {/* Error details for debugging */}
+        <div className="mt-8 text-left bg-slate-800/50 rounded-lg p-4 border border-slate-700 max-h-64 overflow-auto">
+          <p className="text-xs text-red-400 font-mono font-bold mb-1">{error.name}: {error.message}</p>
+          {error.digest && (
+            <p className="text-xs text-slate-500 font-mono mb-2">Digest: {error.digest}</p>
+          )}
+          {error.stack && (
+            <pre className="text-[10px] text-slate-500 font-mono whitespace-pre-wrap break-all leading-relaxed">{error.stack}</pre>
+          )}
+        </div>
       </div>
     </div>
   );
