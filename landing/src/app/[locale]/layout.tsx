@@ -6,6 +6,7 @@ import { Inter } from 'next/font/google';
 import { locales, localeConfig, type Locale } from '@/i18n/config';
 import { SmoothScroll } from '@/components/SmoothScroll';
 import { FloatingMascot } from '@/components/FloatingMascot';
+import DebugConsole from '@/components/debug/DebugConsole';
 import '../globals.css';
 
 const inter = Inter({ subsets: ['latin', 'cyrillic'] });
@@ -98,6 +99,7 @@ export default async function LocaleLayout({ children, params }: Props) {
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
       </head>
       <body className="antialiased">
+        <DebugConsole />
         <NextIntlClientProvider messages={messages}>
           <SmoothScroll>
             {children}
