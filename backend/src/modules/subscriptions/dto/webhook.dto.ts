@@ -1,21 +1,18 @@
-import { IsString, IsNotEmpty, IsObject, IsOptional } from 'class-validator';
+import { IsString, IsNotEmpty, IsObject } from 'class-validator';
 
-export class StripeWebhookDto {
+export class PaytrWebhookDto {
   @IsString()
   @IsNotEmpty()
-  signature: string;
-
-  @IsObject()
-  @IsNotEmpty()
-  payload: any;
-}
-
-export class IyzicoWebhookDto {
-  @IsObject()
-  @IsNotEmpty()
-  payload: any;
+  merchant_oid: string;
 
   @IsString()
-  @IsOptional()
-  signature?: string;
+  @IsNotEmpty()
+  status: string;
+
+  @IsString()
+  @IsNotEmpty()
+  hash: string;
+
+  @IsObject()
+  payload: any;
 }

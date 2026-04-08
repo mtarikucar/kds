@@ -68,6 +68,20 @@ export class PlanFeatureGuard implements CanActivate {
 
     const currentPlan = tenant.currentPlan;
 
+    // Check if tenant has an active subscription
+    const activeSubscription = await this.prisma.subscription.findFirst({
+      where: {
+        tenantId: user.tenantId,
+        status: { in: ['ACTIVE', 'TRIALING', 'PAST_DUE'] },
+      },
+    });
+
+    if (!activeSubscription && currentPlan.name !== 'FREE') {
+      throw new ForbiddenException(
+        'Your subscription has expired or been cancelled. Please renew to access this feature.',
+      );
+    }
+
     // Check if plan tier is sufficient
     if (requiredPlans && requiredPlans.length > 0) {
       const hasPlanAccess = requiredPlans.includes(currentPlan.name as SubscriptionPlanType);

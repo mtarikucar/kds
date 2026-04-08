@@ -11,27 +11,13 @@ export class BillingService {
   /**
    * Generate a unique invoice number
    */
-  private async generateInvoiceNumber(): Promise<string> {
+  private generateInvoiceNumber(): string {
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
-
-    // Get count of invoices this month
-    const startOfMonth = new Date(year, now.getMonth(), 1);
-    const endOfMonth = new Date(year, now.getMonth() + 1, 0, 23, 59, 59);
-
-    const count = await this.prisma.invoice.count({
-      where: {
-        createdAt: {
-          gte: startOfMonth,
-          lte: endOfMonth,
-        },
-      },
-    });
-
-    // Format: INV-YYYYMM-####
-    const sequence = String(count + 1).padStart(4, '0');
-    return `INV-${year}${month}-${sequence}`;
+    const day = String(now.getDate()).padStart(2, '0');
+    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    return `INV-${year}${month}${day}-${random}`;
   }
 
   /**
@@ -47,7 +33,7 @@ export class BillingService {
     description?: string,
   ) {
     try {
-      const invoiceNumber = await this.generateInvoiceNumber();
+      const invoiceNumber = this.generateInvoiceNumber();
 
       // Calculate tax (you can customize this based on your requirements)
       const taxRate = 0; // 0% for now, adjust as needed

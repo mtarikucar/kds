@@ -108,12 +108,6 @@ export class SubscriptionService {
       );
     }
 
-    // Check if tenant already has an active subscription
-    const existingSubscription = await this.getCurrentSubscription(tenantId);
-    if (existingSubscription) {
-      throw new BadRequestException('Tenant already has an active subscription');
-    }
-
     // Get the plan
     const plan = await this.prisma.subscriptionPlan.findUnique({
       where: { id: dto.planId },
@@ -157,37 +151,54 @@ export class SubscriptionService {
     // Since PayTR is removed, all subscriptions now use manual/contact-based payment
     const paymentProvider = PaymentProvider.EMAIL;
 
-    // Create subscription in database
-    const subscription = await this.prisma.subscription.create({
-      data: {
-        tenantId,
-        planId: dto.planId,
-        status: isTrialPeriod ? SubscriptionStatus.TRIALING : SubscriptionStatus.ACTIVE,
-        billingCycle: dto.billingCycle,
-        paymentProvider,
-        startDate: now,
-        currentPeriodStart,
-        currentPeriodEnd,
-        isTrialPeriod,
-        trialStart,
-        trialEnd,
-        amount: Number(amount),
-        currency: plan.currency,
-        autoRenew: true,
-        cancelAtPeriodEnd: false,
-      },
-      include: { plan: true },
-    });
+    // Create subscription and update tenant atomically
+    const subscription = await this.prisma.$transaction(async (tx) => {
+      // Check for existing active subscription
+      const existing = await tx.subscription.findFirst({
+        where: {
+          tenantId,
+          status: { in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING, SubscriptionStatus.PAST_DUE] },
+        },
+      });
 
-    // Update tenant
-    await this.prisma.tenant.update({
-      where: { id: tenantId },
-      data: {
-        currentPlanId: plan.id,
-        trialUsed: isTrialPeriod ? true : tenant.trialUsed,
-        trialStartedAt: isTrialPeriod ? trialStart : tenant.trialStartedAt,
-        trialEndsAt: isTrialPeriod ? trialEnd : tenant.trialEndsAt,
-      },
+      if (existing) {
+        throw new BadRequestException('Tenant already has an active subscription');
+      }
+
+      // Create subscription
+      const sub = await tx.subscription.create({
+        data: {
+          tenantId,
+          planId: dto.planId,
+          status: isTrialPeriod ? SubscriptionStatus.TRIALING : SubscriptionStatus.ACTIVE,
+          billingCycle: dto.billingCycle,
+          paymentProvider,
+          startDate: now,
+          currentPeriodStart,
+          currentPeriodEnd,
+          isTrialPeriod,
+          trialStart,
+          trialEnd,
+          amount: Number(amount),
+          currency: plan.currency,
+          autoRenew: true,
+          cancelAtPeriodEnd: false,
+        },
+        include: { plan: true },
+      });
+
+      // Update tenant
+      await tx.tenant.update({
+        where: { id: tenantId },
+        data: {
+          currentPlanId: plan.id,
+          trialUsed: isTrialPeriod ? true : tenant.trialUsed,
+          trialStartedAt: isTrialPeriod ? trialStart : tenant.trialStartedAt,
+          trialEndsAt: isTrialPeriod ? trialEnd : tenant.trialEndsAt,
+        },
+      });
+
+      return sub;
     });
 
     // Create payment provider subscription (if not free and not trial)
@@ -551,6 +562,12 @@ export class SubscriptionService {
 
       // PayTR uses one-time payments, no subscription to cancel
 
+      // Clear tenant's current plan on immediate cancellation
+      await this.prisma.tenant.update({
+        where: { id: updated.tenantId },
+        data: { currentPlanId: null },
+      });
+
       this.logger.log(`Subscription ${subscriptionId} cancelled immediately. Reason: ${reason || 'Not provided'}`);
       return updated;
     } else {
@@ -579,7 +596,7 @@ export class SubscriptionService {
   async reactivateSubscription(subscriptionId: string) {
     const subscription = await this.getSubscriptionById(subscriptionId);
 
-    if (subscription.status !== SubscriptionStatus.CANCELLED || !subscription.cancelAtPeriodEnd) {
+    if (!subscription.cancelAtPeriodEnd) {
       throw new BadRequestException('Can only reactivate subscriptions that are set to cancel at period end');
     }
 
@@ -601,9 +618,14 @@ export class SubscriptionService {
    * Update subscription settings
    */
   async updateSubscription(subscriptionId: string, dto: UpdateSubscriptionDto) {
+    const data: any = {};
+    if (dto.billingCycle !== undefined) data.billingCycle = dto.billingCycle;
+    if (dto.autoRenew !== undefined) data.autoRenew = dto.autoRenew;
+    if (dto.cancelAtPeriodEnd !== undefined) data.cancelAtPeriodEnd = dto.cancelAtPeriodEnd;
+
     const updated = await this.prisma.subscription.update({
       where: { id: subscriptionId },
-      data: dto,
+      data,
       include: { plan: true },
     });
 
@@ -810,7 +832,7 @@ export class SubscriptionService {
 
     for (const subscription of expiredTrials) {
       // Check if payment method is on file
-      const hasPaymentMethod = subscription.stripeCustomerId || subscription.paytrMerchantOid;
+      const hasPaymentMethod = !!subscription.paytrMerchantOid;
 
       if (hasPaymentMethod && subscription.autoRenew) {
         // Attempt to convert to paid subscription

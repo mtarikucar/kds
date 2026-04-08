@@ -8,7 +8,6 @@ import {
   Param,
   UseGuards,
   Request,
-  SetMetadata,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { SubscriptionService } from '../services/subscription.service';
@@ -17,12 +16,11 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
+import { Public } from '../../auth/decorators/public.decorator';
 import { UserRole } from '../../../common/constants/roles.enum';
 import { CreateSubscriptionDto } from '../dto/create-subscription.dto';
 import { UpdateSubscriptionDto } from '../dto/update-subscription.dto';
 import { ChangePlanDto } from '../dto/change-plan.dto';
-
-export const Public = () => SetMetadata('isPublic', true);
 
 @ApiTags('subscriptions')
 @ApiBearerAuth()
@@ -61,6 +59,16 @@ export class SubscriptionController {
   async getCurrentSubscription(@Request() req) {
     const tenantId = req.user.tenantId;
     return await this.subscriptionService.getCurrentSubscription(tenantId);
+  }
+
+  /**
+   * Get all invoices for current tenant
+   */
+  @Get('tenant/invoices')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  async getTenantInvoices(@Request() req) {
+    const tenantId = req.user.tenantId;
+    return await this.billingService.getTenantInvoices(tenantId);
   }
 
   /**
@@ -164,13 +172,4 @@ export class SubscriptionController {
     return await this.subscriptionService.cancelScheduledDowngrade(id);
   }
 
-  /**
-   * Get all invoices for current tenant
-   */
-  @Get('tenant/invoices')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async getTenantInvoices(@Request() req) {
-    const tenantId = req.user.tenantId;
-    return await this.billingService.getTenantInvoices(tenantId);
-  }
 }

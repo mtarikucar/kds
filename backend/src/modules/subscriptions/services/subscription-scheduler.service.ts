@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { SubscriptionService } from './subscription.service';
+import { NotificationService } from './notification.service';
 import { SubscriptionStatus } from '../../../common/constants/subscription.enum';
 
 @Injectable()
@@ -11,6 +12,7 @@ export class SubscriptionSchedulerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly subscriptionService: SubscriptionService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   /**
@@ -169,7 +171,27 @@ export class SubscriptionSchedulerService {
         this.logger.log(
           `Trial ending soon for tenant ${subscription.tenant.name} (${subscription.tenant.id})`,
         );
-        // TODO: Send email/notification
+
+        // Send trial ending reminder email
+        const adminUsers = await this.prisma.user.findMany({
+          where: { tenantId: subscription.tenantId, role: 'ADMIN' },
+          select: { email: true },
+        });
+
+        for (const admin of adminUsers) {
+          if (admin.email) {
+            try {
+              await this.notificationService.sendTrialEndingReminder(
+                admin.email,
+                subscription.tenant.name,
+                subscription.plan.displayName,
+                3,
+              );
+            } catch (err) {
+              this.logger.error(`Failed to send trial reminder to ${admin.email}: ${err.message}`);
+            }
+          }
+        }
       }
     } catch (error) {
       this.logger.error(`Error sending trial reminders: ${error.message}`);

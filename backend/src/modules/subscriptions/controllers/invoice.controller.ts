@@ -75,8 +75,12 @@ export class InvoiceController {
    */
   @Post(':id/generate-pdf')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async generatePdf(@Param('id') id: string) {
-    const pdfUrl = await this.invoicePdfService.generateInvoicePdf(id);
+  async generatePdf(@Param('id') id: string, @Request() req) {
+    const invoice = await this.billingService.getInvoiceByNumber(id);
+    if (!invoice || invoice.subscription?.tenantId !== req.user.tenantId) {
+      throw new NotFoundException('Invoice not found');
+    }
+    const pdfUrl = await this.invoicePdfService.generateInvoicePdf(invoice.id);
     return { success: true, pdfUrl };
   }
 }
