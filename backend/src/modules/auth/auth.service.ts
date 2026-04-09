@@ -24,7 +24,6 @@ import { EmailService } from '../../common/services/email.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/dto/create-notification.dto';
 import {
-  ResourceAlreadyExistsException,
   ResourceNotFoundException,
   InvalidCredentialsException,
   ValidationException,
@@ -55,7 +54,7 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new ResourceAlreadyExistsException('User', 'email', registerDto.email);
+      throw new BadRequestException('Registration failed. Please check your information and try again.');
     }
 
     // Validate registration data
@@ -154,9 +153,12 @@ export class AuthService {
         throw new ResourceNotFoundException('Tenant', registerDto.tenantId);
       }
 
-      // Cannot join as ADMIN (ADMIN creates their own restaurant)
-      if (userRole === UserRole.ADMIN) {
-        throw new ValidationException('Cannot join existing restaurant as ADMIN. ADMIN must create their own restaurant.');
+      // Only allow non-privileged roles when joining an existing restaurant
+      const allowedJoinRoles = [UserRole.WAITER, UserRole.KITCHEN, UserRole.COURIER];
+      if (userRole && !allowedJoinRoles.includes(userRole)) {
+        throw new ValidationException(
+          `Cannot join existing restaurant as ${userRole}. Allowed roles: ${allowedJoinRoles.join(', ')}`,
+        );
       }
 
       // Default to WAITER if no role provided
@@ -237,7 +239,7 @@ export class AuthService {
     }
 
     // Track successful registration in Sentry
-    Sentry.captureMessage(`New user registered: ${user.email}`, {
+    Sentry.captureMessage('New user registered', {
       level: 'info',
       tags: {
         event: 'user.register',
@@ -247,9 +249,6 @@ export class AuthService {
       extra: {
         userId: user.id,
         tenantId: user.tenantId,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
       },
     });
 
@@ -358,6 +357,11 @@ export class AuthService {
       return null;
     }
 
+    // Social auth users cannot login with password
+    if (!user.password) {
+      return null;
+    }
+
     if (user.status === 'PENDING_APPROVAL') {
       throw new UnauthorizedException('Hesabınız henüz onaylanmadı. Lütfen yönetici onayını bekleyin.');
     }
@@ -406,22 +410,28 @@ export class AuthService {
   }
 
   private async generateTokens(user: UserResponseDto): Promise<AuthResponseDto> {
-    const payload = {
+    const basePayload = {
       sub: user.id,
       email: user.email,
       role: user.role,
       tenantId: user.tenantId,
     };
 
-    const accessToken = this.jwtService.sign(payload, {
-      secret: this.configService.get<string>('JWT_SECRET'),
-      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN') || '7d',
-    });
+    const accessToken = this.jwtService.sign(
+      { ...basePayload, type: 'access' },
+      {
+        secret: this.configService.get<string>('JWT_SECRET'),
+        expiresIn: this.configService.get<string>('JWT_EXPIRES_IN') || '1h',
+      },
+    );
 
-    const refreshToken = this.jwtService.sign(payload, {
-      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-      expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '30d',
-    });
+    const refreshToken = this.jwtService.sign(
+      { ...basePayload, type: 'refresh' },
+      {
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '30d',
+      },
+    );
 
     return {
       accessToken,
@@ -497,32 +507,27 @@ export class AuthService {
   async resetPassword(resetPasswordDto: ResetPasswordDto): Promise<{ message: string }> {
     const { token, newPassword } = resetPasswordDto;
 
-    // Find user by reset token
-    const user = await this.prisma.user.findFirst({
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Atomic check-and-set: prevents TOCTOU race condition
+    const result = await this.prisma.user.updateMany({
       where: {
         resetToken: token,
         resetTokenExpiry: {
           gt: new Date(), // Token not expired
         },
       },
-    });
-
-    if (!user) {
-      throw new BadRequestException('Invalid or expired reset token');
-    }
-
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    // Update password and clear reset token
-    await this.prisma.user.update({
-      where: { id: user.id },
       data: {
         password: hashedPassword,
         resetToken: null,
         resetTokenExpiry: null,
       },
     });
+
+    if (result.count === 0) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
 
     return {
       message: 'Password has been reset successfully',
@@ -1086,7 +1091,7 @@ export class AuthService {
     const user = await this.prisma.user.create({
       data: {
         email,
-        password: '', // No password for social auth users
+        password: null, // Social auth users cannot login with password
         firstName,
         lastName,
         role: UserRole.ADMIN,

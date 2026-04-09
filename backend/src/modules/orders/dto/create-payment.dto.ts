@@ -3,9 +3,9 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PaymentMethod } from '../../../common/constants/order-status.enum';
 
 export class CreatePaymentDto {
-  @ApiProperty({ description: 'Payment amount', minimum: 0 })
+  @ApiProperty({ description: 'Payment amount', minimum: 0.01 })
   @IsNumber()
-  @Min(0)
+  @Min(0.01)
   amount: number;
 
   @ApiProperty({ enum: PaymentMethod, description: 'Payment method' })

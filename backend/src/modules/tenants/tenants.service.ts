@@ -30,7 +30,7 @@ export class TenantsService {
       data: {
         name: createTenantDto.name,
         subdomain: createTenantDto.subdomain,
-        status: createTenantDto.status || TenantStatus.ACTIVE,
+        status: TenantStatus.ACTIVE,
       },
     });
   }

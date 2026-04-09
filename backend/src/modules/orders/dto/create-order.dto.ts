@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsArray, ValidateNested, IsNumber, Min } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsArray, ValidateNested, IsNumber, Min, Max, ArrayMinSize, ArrayMaxSize, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { OrderType } from '../../../common/constants/order-status.enum';
@@ -19,17 +19,19 @@ export class CreateOrderItemDto {
   @IsString()
   productId: string;
 
-  @ApiProperty({ description: 'Quantity', minimum: 1 })
+  @ApiProperty({ description: 'Quantity', minimum: 1, maximum: 9999 })
   @IsNumber()
   @Min(1)
+  @Max(9999)
   quantity: number;
 
   @ApiPropertyOptional({ description: 'Special notes for this item' })
   @IsString()
+  @MaxLength(500)
   @IsOptional()
   notes?: string;
 
-  @ApiProperty({ description: 'Unit price at the time of order' })
+  @ApiProperty({ description: 'Unit price at the time of order (server will override with DB price)' })
   @IsNumber()
   @Min(0)
   unitPrice: number;
@@ -59,6 +61,7 @@ export class CreateOrderDto {
 
   @ApiPropertyOptional({ description: 'Order notes' })
   @IsString()
+  @MaxLength(1000)
   @IsOptional()
   notes?: string;
 
@@ -70,6 +73,8 @@ export class CreateOrderDto {
 
   @ApiProperty({ type: [CreateOrderItemDto], description: 'Order items' })
   @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
   @ValidateNested({ each: true })
   @Type(() => CreateOrderItemDto)
   items: CreateOrderItemDto[];

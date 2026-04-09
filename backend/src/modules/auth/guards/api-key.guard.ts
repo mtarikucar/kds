@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
+import { timingSafeEqual } from 'crypto';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
 /**
@@ -43,7 +44,10 @@ export class ApiKeyGuard implements CanActivate {
       throw new UnauthorizedException('API key authentication is not configured');
     }
 
-    if (apiKey !== validApiKey) {
+    // Use timing-safe comparison to prevent timing attacks
+    const apiKeyBuf = Buffer.from(apiKey);
+    const validBuf = Buffer.from(validApiKey);
+    if (apiKeyBuf.length !== validBuf.length || !timingSafeEqual(apiKeyBuf, validBuf)) {
       throw new UnauthorizedException('Invalid API key');
     }
 
@@ -51,11 +55,10 @@ export class ApiKeyGuard implements CanActivate {
   }
 
   private extractApiKey(request: any): string | undefined {
-    // Support multiple header formats
+    // Only accept dedicated API key headers (not Bearer tokens)
     return (
       request.headers['x-api-key'] ||
-      request.headers['api-key'] ||
-      request.headers['authorization']?.replace('Bearer ', '')
+      request.headers['api-key']
     );
   }
 }

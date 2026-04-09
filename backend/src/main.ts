@@ -12,6 +12,24 @@ import { initSentry } from './sentry.config';
 // Initialize Sentry as early as possible
 initSentry();
 
+// Global unhandled error handlers
+process.on('unhandledRejection', (reason: any) => {
+  console.error('Unhandled Rejection:', reason);
+  try {
+    const Sentry = require('@sentry/node');
+    Sentry.captureException(reason instanceof Error ? reason : new Error(String(reason)));
+  } catch {}
+});
+
+process.on('uncaughtException', (error: Error) => {
+  console.error('Uncaught Exception:', error);
+  try {
+    const Sentry = require('@sentry/node');
+    Sentry.captureException(error);
+  } catch {}
+  process.exit(1);
+});
+
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bodyParser: false, // Disable built-in parser so our custom one with rawBody capture works
@@ -121,6 +139,9 @@ async function bootstrap() {
   if (process.env.NODE_ENV !== 'production') {
     SwaggerModule.setup('api/docs', app, document);
   }
+
+  // Enable graceful shutdown hooks
+  app.enableShutdownHooks();
 
   const port = process.env.PORT || 3000;
   await app.listen(port);

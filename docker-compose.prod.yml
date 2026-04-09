@@ -15,7 +15,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - '5432:5432'
+      - '127.0.0.1:5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -33,12 +33,11 @@ services:
     image: redis:7-alpine
     container_name: kds_redis_prod
     restart: always
-    ports:
-      - '6379:6379'
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ['CMD', 'redis-cli', 'ping']
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD}', 'ping']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -65,13 +64,13 @@ services:
       NODE_ENV: production
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-restaurant_pos_prod}
-      REDIS_URL: redis://redis:6379/2
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/2
       JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-30d}
       SUPERADMIN_JWT_SECRET: ${SUPERADMIN_JWT_SECRET:-${JWT_SECRET}}
-      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+      CORS_ORIGIN: ${CORS_ORIGIN:?CORS_ORIGIN must be set in production}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
       IYZICO_API_KEY: ${IYZICO_API_KEY}
       IYZICO_SECRET_KEY: ${IYZICO_SECRET_KEY}

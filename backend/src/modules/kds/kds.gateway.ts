@@ -13,9 +13,16 @@ import { PrismaService } from '../../prisma/prisma.service';
 @Injectable()
 @WebSocketGateway({
   cors: {
-    origin: process.env.CORS_ORIGIN
-      ? process.env.CORS_ORIGIN.split(',')
-      : ['http://localhost:5173'],
+    origin: (origin: string, callback: (err: Error | null, allow?: boolean) => void) => {
+      if (!origin) return callback(null, true);
+      const allowedOrigins = process.env.CORS_ORIGIN
+        ? process.env.CORS_ORIGIN.split(',')
+        : ['http://localhost:5173'];
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      if (/^https:\/\/[a-z0-9-]+\.hummytummy\.com$/.test(origin)) return callback(null, true);
+      if (/^https:\/\/[a-z0-9-]+\.staging\.hummytummy\.com$/.test(origin)) return callback(null, true);
+      return callback(new Error('Not allowed by CORS'), false);
+    },
     credentials: true,
   },
   namespace: '/kds',
@@ -44,8 +51,8 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         try {
           const payload = this.jwtService.verify(token);
 
-          // Store user info in socket data
-          client.data.userId = payload.userId;
+          // Store user info in socket data (JWT uses 'sub' for userId)
+          client.data.userId = payload.sub || payload.userId;
           client.data.tenantId = payload.tenantId;
           client.data.role = payload.role;
           client.data.userType = 'staff';
@@ -136,6 +143,24 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const tenantId = client.data.tenantId;
     client.join(`pos-${tenantId}`);
     this.logger.log(`Client ${client.id} joined pos-${tenantId}`);
+  }
+
+  @SubscribeMessage('leave-kitchen')
+  handleLeaveKitchen(client: Socket) {
+    const tenantId = client.data.tenantId;
+    if (tenantId) {
+      client.leave(`kitchen-${tenantId}`);
+      this.logger.log(`Client ${client.id} left kitchen-${tenantId}`);
+    }
+  }
+
+  @SubscribeMessage('leave-pos')
+  handleLeavePos(client: Socket) {
+    const tenantId = client.data.tenantId;
+    if (tenantId) {
+      client.leave(`pos-${tenantId}`);
+      this.logger.log(`Client ${client.id} left pos-${tenantId}`);
+    }
   }
 
   emitNewOrder(tenantId: string, order: any) {

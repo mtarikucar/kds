@@ -66,11 +66,27 @@ export class InvoicePdfService {
   }
 
   /**
+   * Escape HTML special characters to prevent XSS
+   */
+  private escapeHtml(str: string): string {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  /**
    * Generate HTML content for invoice
    */
   private generateInvoiceHtml(invoice: any): string {
     const tenant = invoice.subscription.tenant;
     const plan = invoice.subscription.plan;
+    const tenantName = this.escapeHtml(tenant.name);
+    const tenantEmail = tenant.email ? this.escapeHtml(tenant.email) : null;
+    const tenantAddress = tenant.address ? this.escapeHtml(tenant.address) : null;
+    const planDisplayName = this.escapeHtml(plan.displayName);
 
     return `
 <!DOCTYPE html>
@@ -207,9 +223,9 @@ export class InvoicePdfService {
 
     <div class="section">
         <div class="section-title">Bill To</div>
-        <div style="font-size: 16px; font-weight: 600;">${tenant.name}</div>
-        ${tenant.email ? `<div style="color: #666;">${tenant.email}</div>` : ''}
-        ${tenant.address ? `<div style="color: #666;">${tenant.address}</div>` : ''}
+        <div style="font-size: 16px; font-weight: 600;">${tenantName}</div>
+        ${tenantEmail ? `<div style="color: #666;">${tenantEmail}</div>` : ''}
+        ${tenantAddress ? `<div style="color: #666;">${tenantAddress}</div>` : ''}
     </div>
 
     <div class="section">
@@ -242,7 +258,7 @@ export class InvoicePdfService {
         <tbody>
             <tr>
                 <td>
-                    <strong>${plan.displayName}</strong>
+                    <strong>${planDisplayName}</strong>
                     <div style="color: #666; font-size: 14px;">
                         ${invoice.subscription.billingCycle} Subscription
                     </div>

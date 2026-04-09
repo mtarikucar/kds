@@ -10,8 +10,8 @@ const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   [OrderStatus.PENDING]: [OrderStatus.PREPARING, OrderStatus.CANCELLED],
   [OrderStatus.PREPARING]: [OrderStatus.READY, OrderStatus.CANCELLED],
   [OrderStatus.READY]: [OrderStatus.SERVED, OrderStatus.CANCELLED],
-  [OrderStatus.SERVED]: [OrderStatus.PAID],
-  [OrderStatus.PAID]: [], // Terminal state - no transitions allowed
+  [OrderStatus.SERVED]: [OrderStatus.PAID, OrderStatus.CANCELLED],
+  [OrderStatus.PAID]: [OrderStatus.CANCELLED], // Allow cancellation/void of paid orders for refund flow
   [OrderStatus.CANCELLED]: [], // Terminal state - no transitions allowed
 };
 

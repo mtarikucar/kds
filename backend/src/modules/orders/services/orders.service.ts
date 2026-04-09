@@ -6,6 +6,7 @@ import {
   forwardRef,
   Optional,
 } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateOrderDto } from '../dto/create-order.dto';
 import { UpdateOrderDto } from '../dto/update-order.dto';
@@ -44,9 +45,7 @@ export class OrdersService {
 
   private generateOrderNumber(): string {
     const timestamp = Date.now();
-    const random = Math.floor(Math.random() * 1000)
-      .toString()
-      .padStart(3, '0');
+    const random = randomUUID().substring(0, 8).toUpperCase();
     return `ORD-${timestamp}-${random}`;
   }
 
@@ -293,6 +292,8 @@ export class OrdersService {
     statuses?: OrderStatus[],
     startDate?: Date,
     endDate?: Date,
+    take: number = 100,
+    skip: number = 0,
   ) {
     const where: any = { tenantId };
 
@@ -363,6 +364,8 @@ export class OrdersService {
         payments: true,
       },
       orderBy: { createdAt: 'desc' },
+      take: Math.min(take, 500),
+      skip,
     });
 
 
@@ -461,22 +464,49 @@ export class OrdersService {
         );
       }
 
-      // Calculate new totals
+      // Build product price map from DB (never trust client-supplied prices)
+      const productMap = new Map(products.map((p) => [p.id, p]));
+
+      // Calculate new totals using server-side prices
       let totalAmount = 0;
+      let totalTaxAmount = 0;
       const orderItems = updateOrderDto.items.map((item) => {
-        const subtotal = item.quantity * item.unitPrice;
+        const product = productMap.get(item.productId);
+        const serverPrice = Number(product?.price ?? 0);
+        const taxRate = product?.taxRate ?? 10;
+
+        // Calculate modifier total if modifiers are present
+        let modifierTotal = 0;
+        // TODO: if modifiers are added to update flow, fetch from DB like create()
+
+        const subtotal = item.quantity * (serverPrice + modifierTotal);
         totalAmount += subtotal;
+
+        // Calculate tax for this line item (prices are KDV-inclusive)
+        let itemTaxAmount = 0;
+        if (this.taxCalculationService) {
+          const tax = this.taxCalculationService.extractTax(subtotal, taxRate);
+          itemTaxAmount = tax.taxAmount;
+          totalTaxAmount += itemTaxAmount;
+        }
+
         return {
           productId: item.productId,
           quantity: item.quantity,
-          unitPrice: item.unitPrice,
+          unitPrice: serverPrice,
           subtotal,
+          taxRate,
+          taxAmount: itemTaxAmount,
           notes: item.notes,
         };
       });
 
       const discount = updateOrderDto.discount !== undefined ? updateOrderDto.discount : Number(order.discount);
       const finalAmount = totalAmount - discount;
+
+      // Recalculate tax after discount (proportional)
+      const discountRatio = totalAmount > 0 ? discount / totalAmount : 0;
+      const adjustedTaxAmount = Math.round(totalTaxAmount * (1 - discountRatio) * 100) / 100;
 
       // Delete old items and create new ones
       await this.prisma.orderItem.deleteMany({
@@ -489,6 +519,7 @@ export class OrdersService {
       updateData.totalAmount = totalAmount;
       updateData.discount = discount;
       updateData.finalAmount = finalAmount;
+      updateData.taxAmount = adjustedTaxAmount;
     } else if (updateOrderDto.discount !== undefined) {
       // Only discount is being updated
       updateData.discount = updateOrderDto.discount;
@@ -536,74 +567,82 @@ export class OrdersService {
   }
 
   async updateStatus(id: string, updateStatusDto: UpdateOrderStatusDto, tenantId: string) {
-    // Check if order exists and belongs to tenant
-    const order = await this.findOne(id, tenantId);
-
-    // Prevent status updates for orders awaiting approval (must use approve endpoint)
-    if (order.requiresApproval && order.status === OrderStatus.PENDING_APPROVAL) {
-      throw new BadRequestException(
-        'Order requires approval before status can be changed. Please approve the order first.'
-      );
-    }
-
-    // Validate state transition using state machine (STRICT mode)
-    validateTransition(order.status as OrderStatus, updateStatusDto.status);
-
-    // Build update data with status timestamps
-    const statusUpdateData: any = { status: updateStatusDto.status };
-    if (updateStatusDto.status === OrderStatus.PREPARING) statusUpdateData.preparingAt = new Date();
-    if (updateStatusDto.status === OrderStatus.READY) statusUpdateData.readyAt = new Date();
-
-    const updatedOrder = await this.prisma.order.update({
-      where: { id },
-      data: statusUpdateData,
-      include: {
-        orderItems: {
-          include: {
-            product: true,
-          },
+    // Use transaction to prevent race conditions on status transitions
+    const updatedOrder = await this.prisma.$transaction(async (tx) => {
+      // Check if order exists and belongs to tenant
+      const order = await tx.order.findFirst({
+        where: { id, tenantId },
+        include: {
+          orderItems: { include: { product: true } },
+          table: true,
         },
-        table: true,
-      },
-    });
+      });
 
-    // Ensure table status is synced with order status
-    if (updatedOrder.tableId) {
-      const activeStatuses = [
-        OrderStatus.PENDING,
-        OrderStatus.PREPARING,
-        OrderStatus.READY,
-        OrderStatus.SERVED,
-      ];
+      if (!order) {
+        throw new NotFoundException(`Order with ID ${id} not found`);
+      }
 
-      if (activeStatuses.includes(updateStatusDto.status as OrderStatus)) {
-        // Order is active - ensure table is OCCUPIED
-        await this.prisma.table.update({
-          where: { id: updatedOrder.tableId },
-          data: { status: TableStatus.OCCUPIED },
-        });
-      } else if (
-        updateStatusDto.status === OrderStatus.PAID ||
-        updateStatusDto.status === OrderStatus.CANCELLED
-      ) {
-        // Order is completed - check if there are other active orders on this table
-        const activeOrdersCount = await this.prisma.order.count({
-          where: {
-            tableId: updatedOrder.tableId,
-            id: { not: id },
-            status: { in: activeStatuses },
-          },
-        });
+      // Prevent status updates for orders awaiting approval (must use approve endpoint)
+      if (order.requiresApproval && order.status === OrderStatus.PENDING_APPROVAL) {
+        throw new BadRequestException(
+          'Order requires approval before status can be changed. Please approve the order first.'
+        );
+      }
 
-        if (activeOrdersCount === 0) {
-          // No other active orders - mark table as AVAILABLE
-          await this.prisma.table.update({
-            where: { id: updatedOrder.tableId },
-            data: { status: TableStatus.AVAILABLE },
+      // Validate state transition using state machine (STRICT mode)
+      validateTransition(order.status as OrderStatus, updateStatusDto.status);
+
+      // Build update data with status timestamps
+      const statusUpdateData: any = { status: updateStatusDto.status };
+      if (updateStatusDto.status === OrderStatus.PREPARING) statusUpdateData.preparingAt = new Date();
+      if (updateStatusDto.status === OrderStatus.READY) statusUpdateData.readyAt = new Date();
+
+      const updated = await tx.order.update({
+        where: { id },
+        data: statusUpdateData,
+        include: {
+          orderItems: { include: { product: true } },
+          table: true,
+        },
+      });
+
+      // Ensure table status is synced with order status
+      if (updated.tableId) {
+        const activeStatuses = [
+          OrderStatus.PENDING,
+          OrderStatus.PREPARING,
+          OrderStatus.READY,
+          OrderStatus.SERVED,
+        ];
+
+        if (activeStatuses.includes(updateStatusDto.status as OrderStatus)) {
+          await tx.table.update({
+            where: { id: updated.tableId },
+            data: { status: TableStatus.OCCUPIED },
           });
+        } else if (
+          updateStatusDto.status === OrderStatus.PAID ||
+          updateStatusDto.status === OrderStatus.CANCELLED
+        ) {
+          const activeOrdersCount = await tx.order.count({
+            where: {
+              tableId: updated.tableId,
+              id: { not: id },
+              status: { in: activeStatuses },
+            },
+          });
+
+          if (activeOrdersCount === 0) {
+            await tx.table.update({
+              where: { id: updated.tableId },
+              data: { status: TableStatus.AVAILABLE },
+            });
+          }
         }
       }
-    }
+
+      return updated;
+    });
 
     // Reverse ingredient deductions on cancellation
     if (updateStatusDto.status === OrderStatus.CANCELLED && this.stockDeductionService) {
@@ -977,6 +1016,21 @@ export class OrdersService {
       select: { id: true, number: true, status: true },
     });
 
+    // Single aggregation query: count active orders per table (eliminates N+1)
+    const activeOrderCounts = await this.prisma.order.groupBy({
+      by: ['tableId'],
+      where: {
+        tenantId,
+        status: { in: activeStatuses },
+        tableId: { not: null },
+      },
+      _count: { id: true },
+    });
+
+    const activeCountMap = new Map(
+      activeOrderCounts.map((r) => [r.tableId, r._count.id]),
+    );
+
     const updates: { tableId: string; tableNumber: string; oldStatus: string; newStatus: string }[] = [];
 
     for (const table of tables) {
@@ -985,15 +1039,8 @@ export class OrdersService {
         continue;
       }
 
-      // Count active orders for this table
-      const activeOrdersCount = await this.prisma.order.count({
-        where: {
-          tableId: table.id,
-          status: { in: activeStatuses },
-        },
-      });
-
-      const expectedStatus = activeOrdersCount > 0 ? TableStatus.OCCUPIED : TableStatus.AVAILABLE;
+      const activeCount = activeCountMap.get(table.id) || 0;
+      const expectedStatus = activeCount > 0 ? TableStatus.OCCUPIED : TableStatus.AVAILABLE;
 
       if (table.status !== expectedStatus) {
         await this.prisma.table.update({

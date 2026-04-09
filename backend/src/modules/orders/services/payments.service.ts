@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   Optional,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreatePaymentDto } from '../dto/create-payment.dto';
@@ -17,6 +18,8 @@ import { AccountingSettingsService } from '../../accounting/services/accounting-
 
 @Injectable()
 export class PaymentsService {
+  private readonly logger = new Logger(PaymentsService.name);
+
   constructor(
     private prisma: PrismaService,
     private ordersService: OrdersService,
@@ -151,49 +154,28 @@ export class PaymentsService {
               },
             });
 
-            // Deduct stock for tracked products
-            for (const item of payment.order.orderItems) {
-              const product = await tx.product.findUnique({
-                where: { id: item.productId },
-              });
-
-              if (product && product.stockTracked) {
-                const newStock = product.currentStock - item.quantity;
-
-                if (newStock < 0) {
-                  throw new BadRequestException(
-                    `Insufficient stock for product: ${product.name}`
-                  );
-                }
-
-                await tx.product.update({
-                  where: { id: product.id },
-                  data: {
-                    currentStock: newStock,
-                    isAvailable: newStock > 0,
-                  },
-                });
-
-                // Create stock movement record
-                await tx.stockMovement.create({
-                  data: {
-                    type: StockMovementType.OUT,
-                    quantity: item.quantity,
-                    reason: `Order ${payment.order.orderNumber}`,
-                    productId: product.id,
-                    userId: order.userId,
-                    tenantId: order.tenantId,
-                  },
-                });
-              }
-            }
+            // NOTE: Stock deduction is handled by StockDeductionService (triggered on order
+            // status change). Do NOT duplicate stock deduction here.
 
             // Update table status if applicable
             if (order.tableId) {
-              await tx.table.update({
-                where: { id: order.tableId },
-                data: { status: TableStatus.AVAILABLE },
+              // Check if other active orders exist on this table before marking available
+              const otherActiveOrders = await tx.order.count({
+                where: {
+                  tableId: order.tableId,
+                  id: { not: orderId },
+                  status: {
+                    notIn: [OrderStatus.PAID, OrderStatus.CANCELLED],
+                  },
+                },
               });
+
+              if (otherActiveOrders === 0) {
+                await tx.table.update({
+                  where: { id: order.tableId },
+                  data: { status: TableStatus.AVAILABLE },
+                });
+              }
             }
 
             // Update customer statistics if customer is linked (within transaction)
@@ -233,7 +215,7 @@ export class PaymentsService {
               await this.salesInvoiceService.createFromOrder(orderId, tenantId);
             }
           } catch (err) {
-            console.error('Auto-invoice generation failed:', err.message);
+            this.logger.error(`Auto-invoice generation failed for order ${orderId}: ${err.message}`, err.stack);
           }
         }
 
@@ -252,6 +234,14 @@ export class PaymentsService {
     });
   }
 
+  // Valid payment status transitions
+  private static readonly VALID_PAYMENT_TRANSITIONS: Record<PaymentStatus, PaymentStatus[]> = {
+    [PaymentStatus.PENDING]: [PaymentStatus.COMPLETED, PaymentStatus.FAILED],
+    [PaymentStatus.COMPLETED]: [PaymentStatus.REFUNDED],
+    [PaymentStatus.FAILED]: [],
+    [PaymentStatus.REFUNDED]: [],
+  };
+
   async updateStatus(id: string, status: PaymentStatus, tenantId: string) {
     const payment = await this.prisma.payment.findUnique({
       where: { id },
@@ -265,7 +255,16 @@ export class PaymentsService {
     }
 
     // Verify payment belongs to tenant
-    const order = await this.ordersService.findOne(payment.orderId, tenantId);
+    await this.ordersService.findOne(payment.orderId, tenantId);
+
+    // Validate payment state transition
+    const currentStatus = payment.status as PaymentStatus;
+    const validTransitions = PaymentsService.VALID_PAYMENT_TRANSITIONS[currentStatus] || [];
+    if (!validTransitions.includes(status)) {
+      throw new BadRequestException(
+        `Invalid payment status transition: ${currentStatus} -> ${status}. Allowed: ${validTransitions.join(', ') || 'none'}`,
+      );
+    }
 
     return this.prisma.payment.update({
       where: { id },
@@ -318,8 +317,8 @@ export class PaymentsService {
 
       const totalSplitAmount = dto.payments.reduce((sum, p) => sum + p.amount, 0);
 
-      // Allow small rounding tolerance (1 cent)
-      if (totalSplitAmount > remaining + 0.01) {
+      // Allow small rounding tolerance (1 cent) but prevent systematic overpayment
+      if (totalSplitAmount > remaining && Math.abs(totalSplitAmount - remaining) > 0.01) {
         throw new BadRequestException(
           `Split total (${totalSplitAmount.toFixed(2)}) exceeds remaining amount (${remaining.toFixed(2)})`
         );
@@ -356,27 +355,8 @@ export class PaymentsService {
           data: { status: OrderStatus.PAID, paidAt: new Date() },
         });
 
-        // Deduct stock
-        for (const item of order.orderItems) {
-          const product = await tx.product.findUnique({ where: { id: item.productId } });
-          if (product && product.stockTracked) {
-            const newStock = product.currentStock - item.quantity;
-            await tx.product.update({
-              where: { id: product.id },
-              data: { currentStock: Math.max(0, newStock), isAvailable: newStock > 0 },
-            });
-            await tx.stockMovement.create({
-              data: {
-                type: StockMovementType.OUT,
-                quantity: item.quantity,
-                reason: `Order ${order.orderNumber} (split bill)`,
-                productId: product.id,
-                userId: order.userId,
-                tenantId: order.tenantId,
-              },
-            });
-          }
-        }
+        // NOTE: Stock deduction is handled by StockDeductionService (triggered on order
+        // status change). Do NOT duplicate stock deduction here.
 
         // Update table status
         if (order.tableId) {

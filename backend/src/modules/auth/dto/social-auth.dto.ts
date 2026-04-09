@@ -1,4 +1,4 @@
-import { IsString, IsOptional } from 'class-validator';
+import { IsString, IsOptional, IsNotEmpty } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class GoogleAuthDto {
@@ -7,6 +7,7 @@ export class GoogleAuthDto {
     example: 'eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...',
   })
   @IsString()
+  @IsNotEmpty()
   credential: string;
 }
 
@@ -16,6 +17,7 @@ export class AppleAuthDto {
     example: 'eyJraWQiOiJXNldjT0tCIiwiYWxnIjoiUlMyNTYifQ...',
   })
   @IsString()
+  @IsNotEmpty()
   identityToken: string;
 
   @ApiPropertyOptional({

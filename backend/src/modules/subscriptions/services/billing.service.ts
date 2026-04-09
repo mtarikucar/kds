@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { InvoiceStatus } from '../../../common/constants/subscription.enum';
 
@@ -16,7 +17,7 @@ export class BillingService {
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
     const day = String(now.getDate()).padStart(2, '0');
-    const random = Math.random().toString(36).substring(2, 10).toUpperCase();
+    const random = randomUUID().replace(/-/g, '').substring(0, 10).toUpperCase();
     return `INV-${year}${month}${day}-${random}`;
   }
 
@@ -35,8 +36,8 @@ export class BillingService {
     try {
       const invoiceNumber = this.generateInvoiceNumber();
 
-      // Calculate tax (you can customize this based on your requirements)
-      const taxRate = 0; // 0% for now, adjust as needed
+      // Calculate tax (Turkish KDV at 20%)
+      const taxRate = 0.20;
       const subtotal = amount;
       const tax = subtotal * taxRate;
       const total = subtotal + tax;
@@ -182,7 +183,7 @@ export class BillingService {
   getDaysRemaining(periodEnd: Date): number {
     const now = new Date();
     const diff = periodEnd.getTime() - now.getTime();
-    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+    return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
   }
 
   /**

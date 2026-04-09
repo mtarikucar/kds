@@ -55,21 +55,18 @@ export class InputSanitizerMiddleware implements NestMiddleware {
 
   /**
    * Sanitize string to prevent XSS
-   * Escapes HTML special characters
+   * Only strips script tags and event handlers — does NOT encode entities,
+   * because React escapes output by default and encoding on input corrupts stored data.
    */
   private sanitizeString(str: string): string {
     if (typeof str !== 'string') {
       return str;
     }
 
-    // Escape HTML special characters
+    // Remove script tags and event handlers only (not all HTML entities)
     return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#x27;')
-      .replace(/\//g, '&#x2F;');
+      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+      .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '');
   }
 }
 
@@ -79,12 +76,13 @@ export class InputSanitizerMiddleware implements NestMiddleware {
  */
 @Injectable()
 export class SqlInjectionPreventionMiddleware implements NestMiddleware {
+  // Narrowed patterns to reduce false positives (Prisma uses parameterized queries)
+  // Only detect obvious SQL injection attempts, not legitimate apostrophes or hashes
   private readonly sqlPatterns = [
-    /(\%27)|(\')|(\-\-)|(\%23)|(#)/i, // SQL meta-characters
-    /((\%3D)|(=))[^\n]*((\%27)|(\')|(\-\-)|(\%3B)|(;))/i, // Typical SQL injection
-    /\w*((\%27)|(\'))((\%6F)|o|(\%4F))((\%72)|r|(\%52))/i, // union, select, etc.
-    /((\%27)|(\'))union/i,
-    /exec(\s|\+)+(s|x)p\w+/i,
+    /'\s*(or|and)\s+.*=.*/i, // ' OR 1=1, ' AND ''='
+    /'\s*;\s*(drop|delete|update|insert|alter)\s/i, // '; DROP TABLE
+    /union\s+(all\s+)?select\s/i, // UNION SELECT
+    /exec(\s|\+)+(s|x)p\w+/i, // exec sp_, exec xp_
   ];
 
   use(req: Request, res: Response, next: NextFunction): void {

@@ -10,6 +10,7 @@ import {
   Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../auth/decorators/public.decorator';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
@@ -31,6 +32,7 @@ export class CustomerOrdersController {
 
   @Public()
   @Post()
+  @Throttle({ short: { ttl: 1000, limit: 2 }, medium: { ttl: 60000, limit: 10 } })
   @ApiOperation({ summary: 'Create a new customer order (no authentication required)' })
   @ApiResponse({ status: 201, description: 'Order created successfully' })
   @ApiResponse({ status: 400, description: 'Invalid order data' })
@@ -69,6 +71,7 @@ export class CustomerOrdersController {
 
   @Public()
   @Post('waiter-requests')
+  @Throttle({ short: { ttl: 1000, limit: 1 }, medium: { ttl: 60000, limit: 5 } })
   @ApiOperation({ summary: 'Create a waiter request (no authentication required)' })
   @ApiResponse({ status: 201, description: 'Waiter request created' })
   @ApiResponse({ status: 404, description: 'Table not found' })
@@ -93,6 +96,7 @@ export class CustomerOrdersController {
 
   @Public()
   @Post('bill-requests')
+  @Throttle({ short: { ttl: 1000, limit: 1 }, medium: { ttl: 60000, limit: 5 } })
   @ApiOperation({ summary: 'Create a bill request (no authentication required)' })
   @ApiResponse({ status: 201, description: 'Bill request created' })
   @ApiResponse({ status: 404, description: 'Table not found' })

@@ -6,8 +6,12 @@ import {
   IsOptional,
   IsInt,
   Min,
+  Max,
   IsNumber,
   IsEnum,
+  ArrayMinSize,
+  ArrayMaxSize,
+  MaxLength,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -22,11 +26,8 @@ export class OrderItemModifierDto {
   @ApiProperty({ example: 1 })
   @IsInt()
   @Min(1)
+  @Max(99)
   quantity: number;
-
-  @ApiProperty({ example: 5.00 })
-  @IsNumber({ maxDecimalPlaces: 2 })
-  priceAdjustment: number;
 }
 
 export class CreateOrderItemDto {
@@ -38,10 +39,12 @@ export class CreateOrderItemDto {
   @ApiProperty({ example: 2 })
   @IsInt()
   @Min(1)
+  @Max(9999)
   quantity: number;
 
   @ApiProperty({ example: 'No onions, extra sauce', required: false })
   @IsString()
+  @MaxLength(500)
   @IsOptional()
   notes?: string;
 
@@ -81,12 +84,15 @@ export class CreateCustomerOrderDto {
 
   @ApiProperty({ type: [CreateOrderItemDto] })
   @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
   @ValidateNested({ each: true })
   @Type(() => CreateOrderItemDto)
   items: CreateOrderItemDto[];
 
   @ApiProperty({ example: 'Please bring extra napkins', required: false })
   @IsString()
+  @MaxLength(1000)
   @IsOptional()
   notes?: string;
 

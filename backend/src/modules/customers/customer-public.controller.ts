@@ -1,5 +1,6 @@
 import { Controller, Post, Get, Body, Param, Query, Headers, Ip, BadRequestException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsOptional, IsEmail } from 'class-validator';
 import { CustomersService } from './customers.service';
 import { LoyaltyService } from './loyalty.service';
 import { CustomerSessionService } from './customer-session.service';
@@ -8,36 +9,72 @@ import { ReferralService } from './referral.service';
 
 // DTO classes for request validation
 class CreateSessionDto {
+  @IsString()
+  @IsNotEmpty()
   tenantId: string;
+
+  @IsString()
+  @IsOptional()
   tableId?: string;
 }
 
 class IdentifyCustomerDto {
+  @IsString()
+  @IsNotEmpty()
   sessionId: string;
+
+  @IsString()
+  @IsNotEmpty()
   phone: string;
+
+  @IsString()
+  @IsOptional()
   name?: string;
+
+  @IsEmail()
+  @IsOptional()
   email?: string;
 }
 
-class GetLoyaltyBalanceDto {
-  sessionId: string;
-}
-
 class SendOTPDto {
+  @IsString()
+  @IsNotEmpty()
   phone: string;
+
+  @IsString()
+  @IsOptional()
   sessionId?: string;
+
+  @IsString()
+  @IsNotEmpty()
   tenantId: string;
 }
 
 class VerifyOTPDto {
+  @IsString()
+  @IsNotEmpty()
   phone: string;
+
+  @IsString()
+  @IsNotEmpty()
   code: string;
+
+  @IsString()
+  @IsNotEmpty()
   tenantId: string;
 }
 
 class ApplyReferralCodeDto {
+  @IsString()
+  @IsNotEmpty()
   customerId: string;
+
+  @IsString()
+  @IsNotEmpty()
   referralCode: string;
+
+  @IsString()
+  @IsNotEmpty()
   tenantId: string;
 }
 

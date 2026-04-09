@@ -72,45 +72,48 @@ export class KdsService {
   }
 
   async updateOrderStatus(id: string, status: OrderStatus, tenantId: string) {
-    // Verify order exists and belongs to tenant
-    const order = await this.prisma.order.findFirst({
-      where: {
-        id,
-        tenantId,
-      },
-    });
-
-    if (!order) {
-      throw new NotFoundException(`Order with ID ${id} not found`);
-    }
-
-    // Prevent status updates for orders awaiting approval
-    if (order.requiresApproval && order.status === OrderStatus.PENDING_APPROVAL) {
-      throw new BadRequestException(
-        'Order requires approval before status can be changed. Please approve the order first.'
-      );
-    }
-
-    // Validate state transition using state machine (STRICT mode)
-    validateTransition(order.status as OrderStatus, status);
-
-    // Build update data with status timestamps
-    const updateData: any = { status };
-    if (status === OrderStatus.PREPARING) updateData.preparingAt = new Date();
-    if (status === OrderStatus.READY) updateData.readyAt = new Date();
-
-    // Update order status
-    const updatedOrder = await this.prisma.order.update({
-      where: { id },
-      data: updateData,
-      include: {
-        orderItems: {
-          include: {
-            product: true,
-          },
+    // Use transaction with serializable isolation to prevent race conditions
+    const updatedOrder = await this.prisma.$transaction(async (tx) => {
+      // Verify order exists and belongs to tenant
+      const order = await tx.order.findFirst({
+        where: {
+          id,
+          tenantId,
         },
-        table: true,
-      },
+      });
+
+      if (!order) {
+        throw new NotFoundException(`Order with ID ${id} not found`);
+      }
+
+      // Prevent status updates for orders awaiting approval
+      if (order.requiresApproval && order.status === OrderStatus.PENDING_APPROVAL) {
+        throw new BadRequestException(
+          'Order requires approval before status can be changed. Please approve the order first.'
+        );
+      }
+
+      // Validate state transition using state machine (STRICT mode)
+      validateTransition(order.status as OrderStatus, status);
+
+      // Build update data with status timestamps
+      const updateData: any = { status };
+      if (status === OrderStatus.PREPARING) updateData.preparingAt = new Date();
+      if (status === OrderStatus.READY) updateData.readyAt = new Date();
+
+      // Update order status
+      return tx.order.update({
+        where: { id },
+        data: updateData,
+        include: {
+          orderItems: {
+            include: {
+              product: true,
+            },
+          },
+          table: true,
+        },
+      });
     });
 
     // Trigger stock deduction at the configured status (if applicable)
@@ -144,44 +147,56 @@ export class KdsService {
     updateDto: UpdateOrderItemStatusDto,
     tenantId: string,
   ) {
-    // Verify order item exists
-    const orderItem = await this.prisma.orderItem.findUnique({
-      where: { id: updateDto.orderItemId },
-      include: {
-        order: true,
-      },
-    });
+    // Use transaction for atomicity: item update + all-ready check + order promotion
+    const { updatedOrderItem, shouldPromote, orderId } = await this.prisma.$transaction(async (tx) => {
+      // Verify order item exists
+      const orderItem = await tx.orderItem.findUnique({
+        where: { id: updateDto.orderItemId },
+        include: {
+          order: true,
+        },
+      });
 
-    if (!orderItem) {
-      throw new NotFoundException(`Order item with ID ${updateDto.orderItemId} not found`);
-    }
-
-    // Verify order belongs to tenant
-    if (orderItem.order.tenantId !== tenantId) {
-      throw new BadRequestException('Order item does not belong to your tenant');
-    }
-
-    // Update order item status
-    const updatedOrderItem = await this.prisma.orderItem.update({
-      where: { id: updateDto.orderItemId },
-      data: { status: updateDto.status },
-      include: {
-        product: true,
-        order: true,
-      },
-    });
-
-    // Check if all items are ready, then update order status
-    const allItems = await this.prisma.orderItem.findMany({
-      where: { orderId: orderItem.orderId },
-    });
-
-    const allReady = allItems.every((item) => item.status === OrderItemStatus.READY);
-    if (allReady && orderItem.order.status !== OrderStatus.READY) {
-      // Only auto-promote to READY if order doesn't require approval or is already approved
-      if (!orderItem.order.requiresApproval || orderItem.order.status !== OrderStatus.PENDING_APPROVAL) {
-        await this.updateOrderStatus(orderItem.orderId, OrderStatus.READY, tenantId);
+      if (!orderItem) {
+        throw new NotFoundException(`Order item with ID ${updateDto.orderItemId} not found`);
       }
+
+      // Verify order belongs to tenant
+      if (orderItem.order.tenantId !== tenantId) {
+        throw new BadRequestException('Order item does not belong to your tenant');
+      }
+
+      // Update order item status
+      const updated = await tx.orderItem.update({
+        where: { id: updateDto.orderItemId },
+        data: { status: updateDto.status },
+        include: {
+          product: true,
+          order: true,
+        },
+      });
+
+      // Check if all items are ready, then update order status
+      const allItems = await tx.orderItem.findMany({
+        where: { orderId: orderItem.orderId },
+      });
+
+      const allReady = allItems.every((item) => item.status === OrderItemStatus.READY);
+      const shouldPromoteOrder =
+        allReady &&
+        orderItem.order.status !== OrderStatus.READY &&
+        (!orderItem.order.requiresApproval || orderItem.order.status !== OrderStatus.PENDING_APPROVAL);
+
+      return {
+        updatedOrderItem: updated,
+        shouldPromote: shouldPromoteOrder,
+        orderId: orderItem.orderId,
+      };
+    });
+
+    // Promote order outside transaction (updateOrderStatus has its own transaction)
+    if (shouldPromote) {
+      await this.updateOrderStatus(orderId, OrderStatus.READY, tenantId);
     }
 
     // Emit item status change via WebSocket

@@ -402,8 +402,8 @@ export class ZReportsService {
       doc.moveDown();
 
       doc.fontSize(12).text(`Report Number: ${report.reportNumber}`);
-      doc.text(`Date: ${report.reportDate.toLocaleDateString()}`);
-      doc.text(`Generated: ${report.createdAt.toLocaleString()}`);
+      doc.text(`Date: ${format(new Date(report.reportDate), 'MMMM dd, yyyy')}`);
+      doc.text(`Generated: ${format(new Date(report.createdAt), 'MMMM dd, yyyy HH:mm')}`);
       doc.moveDown();
 
       // Get currency symbol

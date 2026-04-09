@@ -90,9 +90,9 @@ export class ZReportSchedulerService {
         minutesSinceClosing += 24 * 60;
       }
       if (minutesSinceClosing >= 0 && minutesSinceClosing < 15) {
-        // Check if we haven't already sent a report today
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        // Check if we haven't already sent a report today (in tenant's timezone)
+        const tenantToday = this.getTimeInTimezone(now, tenant.timezone || 'UTC');
+        const today = new Date(tenantToday.getFullYear(), tenantToday.getMonth(), tenantToday.getDate());
 
         const existingReport = await this.prisma.zReport.findFirst({
           where: {
