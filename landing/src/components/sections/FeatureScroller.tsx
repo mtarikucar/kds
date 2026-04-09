@@ -103,8 +103,7 @@ export default function FeatureScroller() {
     const scrollHeight = container.offsetHeight - window.innerHeight;
     const progress = Math.max(0, Math.min(1, scrolled / scrollHeight));
 
-    const featureCount = 5;
-    const newIndex = Math.min(featureCount - 1, Math.floor(progress * featureCount));
+    const newIndex = Math.min(4, Math.floor(progress * 5));
 
     setActiveIndex((prev) => {
       if (prev !== newIndex) {
@@ -378,7 +377,7 @@ export default function FeatureScroller() {
                     <div
                       key={index}
                       className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                        activeIndex === index ? `${colors.bg} scale-130` : 'bg-slate-300'
+                        activeIndex === index ? `${colors.bg} scale-[1.3]` : 'bg-slate-300'
                       }`}
                     />
                   ))}

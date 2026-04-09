@@ -107,6 +107,7 @@ body {
 [data-animate].is-visible {
   opacity: 1;
   transform: none !important;
+  will-change: auto;
 }
 
 /* Stagger delay via CSS custom property */
@@ -223,6 +224,7 @@ body {
   display: inline-block;
   animation: word-reveal 0.5s cubic-bezier(0.25, 0.4, 0.25, 1) both;
   animation-delay: var(--word-delay, 0s);
+  animation-play-state: var(--word-play-state, running);
 }
 
 .animate-badge-slide-in {

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef, useState } from 'react';
 import { Container } from '@/components/ui/Container';
 import { ArrowRight, MessageCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -10,6 +11,25 @@ export default function FinalCTA() {
   const stats = getStats();
   const t = useTranslations('cta');
   const sectionRef = useScrollReveal<HTMLElement>();
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const [wordAnimationReady, setWordAnimationReady] = useState(false);
+
+  // Only start word-reveal animation when heading enters viewport
+  useEffect(() => {
+    const el = headingRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setWordAnimationReady(true);
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.1 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const titleWords = t('title').split(' ');
 
@@ -70,12 +90,15 @@ export default function FinalCTA() {
         <div className="max-w-3xl mx-auto">
           <div className="text-center" data-animate="fade">
             {/* Word-by-word reveal heading */}
-            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight mb-6 perspective-1000">
+            <h2 ref={headingRef} className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white tracking-tight mb-6 perspective-1000">
               {titleWords.map((word, i) => (
                 <span
                   key={i}
                   className="animate-word-reveal inline-block mr-[0.3em]"
-                  style={{ '--word-delay': `${0.3 + i * 0.05}s` } as React.CSSProperties}
+                  style={{
+                    '--word-delay': `${0.3 + i * 0.05}s`,
+                    '--word-play-state': wordAnimationReady ? 'running' : 'paused',
+                  } as React.CSSProperties}
                 >
                   {word}
                 </span>

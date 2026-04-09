@@ -56,7 +56,7 @@ export function DashboardMockup({ className = '', interactive = true }: Dashboar
     <div className={`relative ${className}`}>
       {/* Main dashboard window */}
       <div
-        className={`bg-white rounded-2xl shadow-2xl shadow-slate-900/10 border border-slate-200/80 overflow-hidden transition-all duration-600 ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}
+        className={`bg-white rounded-2xl shadow-2xl shadow-slate-900/10 border border-slate-200/80 overflow-hidden transition-all duration-[600ms] ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'}`}
       >
         {/* Window chrome */}
         <div className="flex items-center gap-2 px-4 py-3 bg-gradient-to-b from-slate-50 to-slate-100/50 border-b border-slate-200/80">
@@ -156,7 +156,7 @@ export function DashboardMockup({ className = '', interactive = true }: Dashboar
           {/* Live activity */}
           <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-orange-500 to-orange-400 transition-all duration-1500 delay-800"
+              className="h-full bg-gradient-to-r from-orange-500 to-orange-400 transition-all duration-[1500ms] delay-800"
               style={{ width: mounted ? '75%' : '0%' }}
             />
           </div>
@@ -167,7 +167,7 @@ export function DashboardMockup({ className = '', interactive = true }: Dashboar
       {notifications.slice(0, 1).map((notification, index) => (
         <div
           key={notification.id}
-          className="absolute -bottom-6 -left-6 bg-white rounded-xl shadow-xl border border-slate-200 p-4 w-56 transition-all duration-400 opacity-100 translate-x-0 translate-y-0"
+          className="absolute -bottom-6 -left-6 bg-white rounded-xl shadow-xl border border-slate-200 p-4 w-56 transition-all duration-[400ms] opacity-100 translate-x-0 translate-y-0"
           style={{ zIndex: 10 - index }}
         >
           <div className="flex items-center gap-3">
