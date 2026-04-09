@@ -3,13 +3,11 @@
 import { ArrowRight, Play, ChevronDown } from 'lucide-react';
 import { Container } from '@/components/ui/Container';
 import { useTranslations } from 'next-intl';
-import { getStats } from '@/lib/api';
 import { DashboardMockup } from '@/components/mockups/DashboardMockup';
 import { useScrollFade } from '@/hooks/useScrollFade';
 
 export default function Hero() {
   const t = useTranslations('hero');
-  getStats(); // keep stats loaded
 
   const { ref: sectionRef, style: fadeStyle } = useScrollFade<HTMLElement>({
     fadeEnd: 0.5,

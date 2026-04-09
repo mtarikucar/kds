@@ -21,8 +21,12 @@ export default function FeatureScroller() {
   const t = useTranslations('features');
 
   useEffect(() => {
-    setIsMobile(window.matchMedia('(max-width: 768px)').matches);
+    const mq = window.matchMedia('(max-width: 768px)');
+    setIsMobile(mq.matches);
     setMounted(true);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
   }, []);
 
   const features = [
@@ -403,9 +407,9 @@ export default function FeatureScroller() {
             {/* Scroll hint */}
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-slate-400 text-xs animate-glow-pulse">
               {activeIndex < features.length - 1 ? (
-                <span>Scroll to explore &bull; {activeIndex + 1}/{features.length}</span>
+                <span>{t('scrollHint')} &bull; {activeIndex + 1}/{features.length}</span>
               ) : (
-                <span>Continue scrolling</span>
+                <span>{t('continueScrolling')}</span>
               )}
             </div>
           </Container>

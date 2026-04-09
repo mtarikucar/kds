@@ -13,17 +13,21 @@ export function FloatingMascot() {
   const t = useTranslations('mascot');
 
   useEffect(() => {
-    const hasVisited = localStorage.getItem(FIRST_VISIT_KEY);
-    if (!hasVisited) {
-      setIsFirstVisit(true);
-      setShowWelcome(true);
-      localStorage.setItem(FIRST_VISIT_KEY, 'true');
+    try {
+      const hasVisited = localStorage.getItem(FIRST_VISIT_KEY);
+      if (!hasVisited) {
+        setIsFirstVisit(true);
+        setShowWelcome(true);
+        localStorage.setItem(FIRST_VISIT_KEY, 'true');
 
-      const timer = setTimeout(() => {
-        setShowWelcome(false);
-      }, 5000);
+        const timer = setTimeout(() => {
+          setShowWelcome(false);
+        }, 5000);
 
-      return () => clearTimeout(timer);
+        return () => clearTimeout(timer);
+      }
+    } catch {
+      // localStorage unavailable (private browsing, etc.) — treat as returning visitor
     }
   }, []);
 

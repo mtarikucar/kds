@@ -20,10 +20,14 @@ function easeOutExpo(t: number): number {
 
 function formatValue(
   current: number,
+  targetValue: number,
   format: string,
   locale: string
 ): string {
-  const rounded = Math.round(current);
+  // Preserve decimal precision from the target value
+  const hasDecimals = targetValue % 1 !== 0;
+  const display = hasDecimals ? parseFloat(current.toFixed(1)) : Math.round(current);
+
   switch (format) {
     case 'currency':
       return new Intl.NumberFormat(locale, {
@@ -31,11 +35,11 @@ function formatValue(
         currency: 'USD',
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
-      }).format(rounded);
+      }).format(display);
     case 'percentage':
-      return `${rounded}%`;
+      return hasDecimals ? `${display.toFixed(1)}%` : `${display}%`;
     default:
-      return new Intl.NumberFormat(locale).format(rounded);
+      return new Intl.NumberFormat(locale).format(display);
   }
 }
 
@@ -114,7 +118,7 @@ export function AnimatedCounter({
   return (
     <span ref={ref} className={className}>
       {prefix}
-      {formatValue(displayValue, format, locale)}
+      {formatValue(displayValue, value, format, locale)}
       {suffix}
     </span>
   );

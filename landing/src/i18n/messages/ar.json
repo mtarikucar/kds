@@ -147,7 +147,9 @@
         "syncTime": "وقت المزامنة",
         "realTime": "فوري"
       }
-    }
+    },
+    "scrollHint": "مرر للاستكشاف",
+    "continueScrolling": "تابع التمرير"
   },
   "pricing": {
     "badge": "الأسعار",

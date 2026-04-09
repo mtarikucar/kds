@@ -147,7 +147,9 @@
         "syncTime": "Sinxronizatsiya",
         "realTime": "Real vaqt"
       }
-    }
+    },
+    "scrollHint": "Ko'rish uchun aylantiring",
+    "continueScrolling": "Aylantirishni davom eting"
   },
   "pricing": {
     "badge": "Narxlar",

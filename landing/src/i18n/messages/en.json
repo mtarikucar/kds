@@ -147,7 +147,9 @@
         "syncTime": "Sync time",
         "realTime": "Real-time"
       }
-    }
+    },
+    "scrollHint": "Scroll to explore",
+    "continueScrolling": "Continue scrolling"
   },
   "pricing": {
     "badge": "Pricing",

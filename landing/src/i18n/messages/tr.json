@@ -147,7 +147,9 @@
         "syncTime": "Senkronizasyon",
         "realTime": "Gerçek zamanlı"
       }
-    }
+    },
+    "scrollHint": "Keşfetmek için kaydırın",
+    "continueScrolling": "Kaydırmaya devam edin"
   },
   "pricing": {
     "badge": "Fiyatlandırma",

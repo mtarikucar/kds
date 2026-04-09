@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Plus, Minus, CreditCard, Wallet, ShoppingCart, Check } from 'lucide-react';
 
 interface CartItem {
@@ -54,15 +54,23 @@ export function POSMockup({ className = '' }: POSMockupProps) {
     );
   };
 
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  useEffect(() => {
+    return () => timersRef.current.forEach(clearTimeout);
+  }, []);
+
   const handlePayment = () => {
     setPaymentStep('payment');
-    setTimeout(() => {
+    const t1 = setTimeout(() => {
       setPaymentStep('success');
-      setTimeout(() => {
+      const t2 = setTimeout(() => {
         setPaymentStep('cart');
         setCart([]);
       }, 2000);
+      timersRef.current.push(t2);
     }, 1500);
+    timersRef.current.push(t1);
   };
 
   return (
