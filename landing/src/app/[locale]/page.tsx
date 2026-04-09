@@ -1,7 +1,6 @@
 import { setRequestLocale } from 'next-intl/server';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/sections/Footer';
-import ClientOnly from '@/components/ClientOnly';
 import Hero from '@/components/sections/Hero';
 import ProductOverview from '@/components/sections/ProductOverview';
 import FeatureScroller from '@/components/sections/FeatureScroller';
@@ -23,17 +22,15 @@ export default async function HomePage({ params }: Props) {
   return (
     <>
       <Navbar />
-      <ClientOnly>
-        <main className="min-h-screen">
-          <Hero />
-          <ProductOverview />
-          <FeatureScroller />
-          <BusinessValue />
-          <TrustSecurity />
-          <Pricing apiPlans={plans} />
-          <FinalCTA />
-        </main>
-      </ClientOnly>
+      <main className="min-h-screen">
+        <Hero />
+        <ProductOverview />
+        <FeatureScroller />
+        <BusinessValue />
+        <TrustSecurity />
+        <Pricing apiPlans={plans} />
+        <FinalCTA />
+      </main>
       <Footer />
     </>
   );

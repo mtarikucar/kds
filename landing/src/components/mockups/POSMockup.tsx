@@ -1,8 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { Plus, Minus, CreditCard, Wallet, ShoppingCart, Check } from 'lucide-react';
 
 interface CartItem {
@@ -17,7 +15,6 @@ interface POSMockupProps {
 }
 
 export function POSMockup({ className = '' }: POSMockupProps) {
-  const prefersReducedMotion = useReducedMotion();
   const [cart, setCart] = useState<CartItem[]>([
     { id: 1, name: 'Adana Kebab', price: 180, quantity: 2 },
     { id: 2, name: 'Ayran', price: 25, quantity: 2 },
@@ -79,16 +76,14 @@ export function POSMockup({ className = '' }: POSMockupProps) {
           </div>
           <div className="grid grid-cols-3 gap-2">
             {products.map((product) => (
-              <motion.button
+              <button
                 key={product.id}
-                whileHover={prefersReducedMotion ? {} : { scale: 1.02 }}
-                whileTap={prefersReducedMotion ? {} : { scale: 0.98 }}
                 onClick={() => addToCart(product)}
-                className="p-3 bg-white rounded-xl border border-slate-200 hover:border-orange-300 hover:shadow-md transition-all text-left"
+                className="p-3 bg-white rounded-xl border border-slate-200 hover:border-orange-300 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-transform text-left"
               >
                 <div className="text-sm font-medium text-slate-900 truncate">{product.name}</div>
                 <div className="text-xs text-orange-600 font-semibold">₺{product.price}</div>
-              </motion.button>
+              </button>
             ))}
           </div>
         </div>
@@ -103,132 +98,86 @@ export function POSMockup({ className = '' }: POSMockupProps) {
             </div>
           </div>
 
-          <AnimatePresence mode="wait">
-            {paymentStep === 'cart' && (
-              <motion.div
-                key="cart"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex-1 overflow-auto p-3"
-              >
-                <div className="space-y-2">
-                  <AnimatePresence>
-                    {cart.map((item) => (
-                      <motion.div
-                        key={item.id}
-                        layout
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        exit={{ opacity: 0, x: -20 }}
-                        className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-medium text-slate-900 truncate">{item.name}</div>
-                          <div className="text-xs text-slate-500">₺{item.price}</div>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <motion.button
-                            whileTap={prefersReducedMotion ? {} : { scale: 0.9 }}
-                            onClick={() => updateQuantity(item.id, -1)}
-                            className="w-6 h-6 rounded bg-slate-200 flex items-center justify-center hover:bg-slate-300"
-                          >
-                            <Minus className="w-3 h-3" />
-                          </motion.button>
-                          <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
-                          <motion.button
-                            whileTap={prefersReducedMotion ? {} : { scale: 0.9 }}
-                            onClick={() => updateQuantity(item.id, 1)}
-                            className="w-6 h-6 rounded bg-slate-200 flex items-center justify-center hover:bg-slate-300"
-                          >
-                            <Plus className="w-3 h-3" />
-                          </motion.button>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
-                </div>
-              </motion.div>
-            )}
-
-            {paymentStep === 'payment' && (
-              <motion.div
-                key="payment"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex-1 flex items-center justify-center"
-              >
-                <div className="text-center">
-                  <motion.div
-                    animate={prefersReducedMotion ? {} : { rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                    className="w-12 h-12 border-3 border-orange-500 border-t-transparent rounded-full mx-auto mb-3"
-                  />
-                  <div className="text-sm font-medium text-slate-600">Processing...</div>
-                </div>
-              </motion.div>
-            )}
-
-            {paymentStep === 'success' && (
-              <motion.div
-                key="success"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0 }}
-                className="flex-1 flex items-center justify-center"
-              >
-                <div className="text-center">
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: 'spring', stiffness: 200 }}
-                    className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3"
+          {paymentStep === 'cart' && (
+            <div className="flex-1 overflow-auto p-3 transition-all duration-300">
+              <div className="space-y-2">
+                {cart.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg"
                   >
-                    <Check className="w-8 h-8 text-green-600" />
-                  </motion.div>
-                  <div className="text-sm font-medium text-green-600">Payment Successful!</div>
-                  <div className="text-xs text-slate-500 mt-1">₺{total}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-slate-900 truncate">{item.name}</div>
+                      <div className="text-xs text-slate-500">₺{item.price}</div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => updateQuantity(item.id, -1)}
+                        className="w-6 h-6 rounded bg-slate-200 flex items-center justify-center hover:bg-slate-300 active:scale-90 transition-transform"
+                      >
+                        <Minus className="w-3 h-3" />
+                      </button>
+                      <span className="w-6 text-center text-sm font-medium">{item.quantity}</span>
+                      <button
+                        onClick={() => updateQuantity(item.id, 1)}
+                        className="w-6 h-6 rounded bg-slate-200 flex items-center justify-center hover:bg-slate-300 active:scale-90 transition-transform"
+                      >
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {paymentStep === 'payment' && (
+            <div className="flex-1 flex items-center justify-center transition-all duration-300">
+              <div className="text-center">
+                <div className="w-12 h-12 border-3 border-orange-500 border-t-transparent rounded-full mx-auto mb-3 animate-spin" />
+                <div className="text-sm font-medium text-slate-600">Processing...</div>
+              </div>
+            </div>
+          )}
+
+          {paymentStep === 'success' && (
+            <div className="flex-1 flex items-center justify-center transition-all duration-300">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3 animate-scale-in">
+                  <Check className="w-8 h-8 text-green-600" />
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                <div className="text-sm font-medium text-green-600">Payment Successful!</div>
+                <div className="text-xs text-slate-500 mt-1">₺{total}</div>
+              </div>
+            </div>
+          )}
 
           {/* Total & Pay */}
           {paymentStep === 'cart' && (
             <div className="p-4 border-t border-slate-100">
               <div className="flex justify-between mb-3">
                 <span className="text-slate-600">Total</span>
-                <motion.span
-                  key={total}
-                  initial={{ scale: 1.1 }}
-                  animate={{ scale: 1 }}
-                  className="font-bold text-slate-900"
-                >
+                <span className="font-bold text-slate-900">
                   ₺{total}
-                </motion.span>
+                </span>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <motion.button
-                  whileHover={prefersReducedMotion ? {} : { scale: 1.02 }}
-                  whileTap={prefersReducedMotion ? {} : { scale: 0.98 }}
+                <button
                   onClick={handlePayment}
                   disabled={cart.length === 0}
-                  className="flex items-center justify-center gap-1 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                  className="flex items-center justify-center gap-1 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] transition-transform"
                 >
                   <CreditCard className="w-4 h-4" />
                   Card
-                </motion.button>
-                <motion.button
-                  whileHover={prefersReducedMotion ? {} : { scale: 1.02 }}
-                  whileTap={prefersReducedMotion ? {} : { scale: 0.98 }}
+                </button>
+                <button
                   onClick={handlePayment}
                   disabled={cart.length === 0}
-                  className="flex items-center justify-center gap-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                  className="flex items-center justify-center gap-1 py-2 bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 hover:scale-[1.02] active:scale-[0.98] transition-transform"
                 >
                   <Wallet className="w-4 h-4" />
                   Cash
-                </motion.button>
+                </button>
               </div>
             </div>
           )}

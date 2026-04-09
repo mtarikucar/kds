@@ -1,13 +1,10 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
-import { motion, useScroll } from 'framer-motion';
+import { useState, useEffect } from 'react';
 import { Container } from '@/components/ui/Container';
 import { Check, ArrowRight, Sparkles, Tag } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useReducedMotion } from '@/hooks/useReducedMotion';
-import { Tilt3D } from '@/components/animations/Tilt3D';
-import { GradientOrb } from '@/components/animations/FloatingElement';
+import { useScrollReveal } from '@/hooks/useScrollReveal';
 import { type PlanFromAPI } from '@/lib/api';
 
 interface PricingProps {
@@ -16,24 +13,12 @@ interface PricingProps {
 
 export default function Pricing({ apiPlans }: PricingProps) {
   const t = useTranslations('pricing');
-
-  const sectionRef = useRef<HTMLElement>(null);
-  const prefersReducedMotion = useReducedMotion();
+  const sectionRef = useScrollReveal<HTMLElement>();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
-
-  const { scrollYProgress } = useScroll({
-    target: sectionRef,
-    offset: ['start end', 'end start'],
-  });
-
-  // Check if any API plan has an active discount (only after mount to avoid hydration mismatch)
-  const activeDiscount = mounted ? apiPlans?.find(
-    (p) => p.isDiscountActive && p.discountPercentage && p.discountEndDate && new Date(p.discountEndDate) > new Date()
-  ) : undefined;
 
   // Build plans from translations (static) with optional API discount overlay
   const staticPlans = [
@@ -87,7 +72,7 @@ export default function Pricing({ apiPlans }: PricingProps) {
     },
   ];
 
-  // Map API plans to overlay discount info on static plans
+  // Map API plans to overlay discount info
   const plans = staticPlans.map((sp) => {
     const apiPlan = apiPlans?.find(
       (ap) => ap.name.toLowerCase() === sp.key.toLowerCase()
@@ -111,64 +96,52 @@ export default function Pricing({ apiPlans }: PricingProps) {
       {/* Background */}
       <div className="absolute inset-0 bg-gradient-to-b from-slate-50 via-white to-slate-50" />
 
-      {/* Floating orbs */}
+      {/* Gradient orbs */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <GradientOrb
-          color="rgba(249, 115, 22, 0.08)"
-          size={400}
-          blur={100}
-          className="absolute -top-20 right-1/4"
-          duration={12}
+        <div
+          className="gradient-orb"
+          style={{
+            top: '-80px',
+            right: '25%',
+            width: '400px',
+            height: '400px',
+            background: 'radial-gradient(circle, rgba(249, 115, 22, 0.08) 0%, transparent 70%)',
+            filter: 'blur(100px)',
+          }}
         />
-        <GradientOrb
-          color="rgba(107, 33, 168, 0.06)"
-          size={350}
-          blur={80}
-          className="absolute bottom-20 left-1/4"
-          duration={15}
-          delay={4}
+        <div
+          className="gradient-orb"
+          style={{
+            bottom: '80px',
+            left: '25%',
+            width: '350px',
+            height: '350px',
+            background: 'radial-gradient(circle, rgba(107, 33, 168, 0.06) 0%, transparent 70%)',
+            filter: 'blur(80px)',
+          }}
         />
       </div>
 
       <Container className="relative">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5 }}
-          className="text-center max-w-3xl mx-auto mb-16"
-        >
-          <motion.span
-            initial={{ opacity: 0, scale: 0.9 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            className="inline-block text-sm font-semibold text-orange-500 mb-4 uppercase tracking-wider"
-          >
+        <div data-animate="slide-up" className="text-center max-w-3xl mx-auto mb-16">
+          <span className="inline-block text-sm font-semibold text-orange-500 mb-4 uppercase tracking-wider">
             {t('badge')}
-          </motion.span>
+          </span>
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 tracking-tight mb-4">
             {t('title')}
           </h2>
           <p className="text-lg text-slate-600">{t('subtitle')}</p>
-
-        </motion.div>
+        </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 max-w-6xl mx-auto">
           {plans.map((plan, index) => (
-            <motion.div
+            <div
               key={plan.key}
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
+              data-animate="slide-up"
+              style={{ '--delay': `${index * 0.1}s` } as React.CSSProperties}
               className={plan.popular ? 'lg:-mt-4 lg:mb-4' : ''}
             >
-              <Tilt3D
-                maxRotation={plan.popular ? 8 : 5}
-                perspective={1000}
-                scale={plan.popular ? 1.03 : 1.02}
-                glare={plan.popular}
-              >
+              <div className={plan.popular ? 'hover-tilt-strong' : 'hover-tilt'}>
                 <div
                   className={`
                     relative h-full bg-white rounded-3xl p-8
@@ -179,31 +152,22 @@ export default function Pricing({ apiPlans }: PricingProps) {
                 >
                   {/* Popular badge */}
                   {plan.popular && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="absolute -top-4 left-1/2 -translate-x-1/2"
-                    >
+                    <div className="absolute -top-4 left-1/2 -translate-x-1/2">
                       <div className="flex items-center gap-1.5 bg-gradient-to-r from-orange-500 to-amber-500 text-slate-900 text-sm font-semibold px-4 py-1.5 rounded-full shadow-lg">
                         <Sparkles className="w-4 h-4" />
                         {t('mostPopular')}
                       </div>
-                    </motion.div>
+                    </div>
                   )}
 
                   {/* Discount badge */}
                   {plan.discountPercentage && (
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      whileInView={{ opacity: 1, scale: 1 }}
-                      viewport={{ once: true }}
-                      className="mb-3"
-                    >
+                    <div className="mb-3">
                       <span className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-bold bg-orange-500/10 text-orange-500 border border-orange-500/20 rounded-full">
                         <Tag className="w-3 h-3" />
                         {plan.discountPercentage}% OFF
                       </span>
-                    </motion.div>
+                    </div>
                   )}
 
                   <div className="text-center mb-6">
@@ -215,59 +179,34 @@ export default function Pricing({ apiPlans }: PricingProps) {
                     {plan.discountedPrice ? (
                       <>
                         <span className="text-xl text-slate-400 line-through mr-2">{plan.price}</span>
-                        <motion.span
-                          initial={{ scale: 0.5 }}
-                          whileInView={{ scale: 1 }}
-                          viewport={{ once: true }}
-                          transition={{ delay: 0.3 + index * 0.1, type: 'spring' }}
-                          className="text-5xl font-bold text-orange-500"
-                        >
+                        <span className="text-5xl font-bold text-orange-500 animate-scale-in">
                           {plan.discountedPrice}
-                        </motion.span>
+                        </span>
                       </>
                     ) : (
-                      <motion.span
-                        initial={{ scale: 0.5 }}
-                        whileInView={{ scale: 1 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: 0.3 + index * 0.1, type: 'spring' }}
-                        className={`text-5xl font-bold ${plan.popular ? 'text-orange-500' : 'text-slate-900'}`}
-                      >
+                      <span className={`text-5xl font-bold ${plan.popular ? 'text-orange-500' : 'text-slate-900'}`}>
                         {plan.price}
-                      </motion.span>
+                      </span>
                     )}
                     <span className="text-slate-500">{plan.period}</span>
                   </div>
 
                   <ul className="space-y-3 mb-8">
                     {plan.features.map((feature, i) => (
-                      <motion.li
+                      <li
                         key={feature}
-                        initial={{ opacity: 0, x: -10 }}
-                        whileInView={{ opacity: 1, x: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ delay: 0.4 + i * 0.05 }}
                         className="flex items-center gap-3 text-sm"
                       >
-                        <motion.div
-                          initial={prefersReducedMotion ? {} : { scale: 0 }}
-                          whileInView={{ scale: 1 }}
-                          viewport={{ once: true }}
-                          transition={{ delay: 0.5 + i * 0.05, type: 'spring' }}
-                        >
-                          <Check className={`w-5 h-5 flex-shrink-0 ${plan.popular ? 'text-orange-500' : 'text-green-500'}`} />
-                        </motion.div>
+                        <Check className={`w-5 h-5 flex-shrink-0 ${plan.popular ? 'text-orange-500' : 'text-green-500'}`} />
                         <span className="text-slate-600">{feature}</span>
-                      </motion.li>
+                      </li>
                     ))}
                   </ul>
 
-                  <motion.a
+                  <a
                     href={plan.href}
-                    whileHover={prefersReducedMotion ? {} : { scale: 1.02, y: -2 }}
-                    whileTap={prefersReducedMotion ? {} : { scale: 0.98 }}
                     className={`
-                      w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold transition-all
+                      hover-lift w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-semibold transition-all
                       ${plan.popular
                         ? 'bg-gradient-to-r from-orange-500 to-amber-500 text-slate-900 shadow-lg shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/30'
                         : 'bg-slate-100 text-slate-900 hover:bg-slate-200'}
@@ -275,22 +214,20 @@ export default function Pricing({ apiPlans }: PricingProps) {
                   >
                     {plan.cta}
                     <ArrowRight className="w-4 h-4" />
-                  </motion.a>
+                  </a>
                 </div>
-              </Tilt3D>
-            </motion.div>
+              </div>
+            </div>
           ))}
         </div>
 
-        <motion.p
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.5, delay: 0.6 }}
+        <p
+          data-animate="fade"
+          style={{ '--delay': '0.6s' } as React.CSSProperties}
           className="text-center text-sm text-slate-500 mt-12"
         >
           {t('trialNote')}
-        </motion.p>
+        </p>
       </Container>
     </section>
   );

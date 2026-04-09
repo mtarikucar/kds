@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
-import { Clock, ChefHat, CheckCircle, AlertCircle } from 'lucide-react';
+import { Clock, ChefHat, CheckCircle } from 'lucide-react';
 
 interface Order {
   id: number;
@@ -120,11 +119,7 @@ export function OrdersMockup({ className = '' }: OrdersMockupProps) {
             <p className="text-xs text-slate-500">Real-time kitchen display</p>
           </div>
           <div className="flex items-center gap-2">
-            <motion.div
-              animate={prefersReducedMotion ? {} : { scale: [1, 1.2, 1] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-              className="w-2 h-2 bg-green-500 rounded-full"
-            />
+            <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
             <span className="text-xs text-slate-500">Live</span>
           </div>
         </div>
@@ -132,74 +127,61 @@ export function OrdersMockup({ className = '' }: OrdersMockupProps) {
 
       {/* Orders list */}
       <div className="p-4 space-y-3 max-h-[360px] overflow-hidden">
-        <AnimatePresence mode="popLayout">
-          {orders.map((order) => {
-            const config = getStatusConfig(order.status);
-            const Icon = config.icon;
+        {orders.map((order, i) => {
+          const config = getStatusConfig(order.status);
+          const Icon = config.icon;
 
-            return (
-              <motion.div
-                key={order.id}
-                layout
-                initial={{ opacity: 0, x: -20, scale: 0.95 }}
-                animate={{ opacity: 1, x: 0, scale: 1 }}
-                exit={{ opacity: 0, x: 20, scale: 0.95 }}
-                transition={{ duration: 0.3 }}
-                className={`p-4 rounded-xl border ${config.border} bg-gradient-to-r from-white to-slate-50/50`}
-              >
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-8 h-8 ${config.bg} rounded-lg flex items-center justify-center`}>
-                      <Icon className={`w-4 h-4 ${config.color}`} />
-                    </div>
-                    <div>
-                      <div className="font-medium text-slate-900">Order #{order.id}</div>
-                      <div className="text-xs text-slate-500">Table {order.table}</div>
-                    </div>
+          return (
+            <div
+              key={order.id}
+              className={`p-4 rounded-xl border ${config.border} bg-gradient-to-r from-white to-slate-50/50 animate-hero-fade-in`}
+              style={{ animationDelay: `${i * 75}ms` }}
+            >
+              <div className="flex items-start justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className={`w-8 h-8 ${config.bg} rounded-lg flex items-center justify-center`}>
+                    <Icon className={`w-4 h-4 ${config.color}`} />
                   </div>
-                  <div className="text-right">
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${config.bg} ${config.color}`}>
-                      {config.label}
-                    </span>
-                    {order.status !== 'ready' && (
-                      <motion.div
-                        key={order.time}
-                        initial={{ scale: 1.1 }}
-                        animate={{ scale: 1 }}
-                        className="text-xs text-slate-500 mt-1"
-                      >
-                        {formatTime(order.time)}
-                      </motion.div>
-                    )}
+                  <div>
+                    <div className="font-medium text-slate-900">Order #{order.id}</div>
+                    <div className="text-xs text-slate-500">Table {order.table}</div>
                   </div>
                 </div>
-
-                <div className="flex flex-wrap gap-1">
-                  {order.items.map((item, i) => (
-                    <span
-                      key={i}
-                      className="text-xs px-2 py-1 bg-slate-100 text-slate-600 rounded-md"
-                    >
-                      {item}
-                    </span>
-                  ))}
+                <div className="text-right">
+                  <span className={`text-xs font-medium px-2 py-1 rounded-full ${config.bg} ${config.color}`}>
+                    {config.label}
+                  </span>
+                  {order.status !== 'ready' && (
+                    <div className="text-xs text-slate-500 mt-1">
+                      {formatTime(order.time)}
+                    </div>
+                  )}
                 </div>
+              </div>
 
-                {/* Progress bar for preparing orders */}
-                {order.status === 'preparing' && (
-                  <div className="mt-3 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <motion.div
-                      className="h-full bg-blue-500 rounded-full"
-                      initial={{ width: '0%' }}
-                      animate={{ width: `${Math.max(10, 100 - (order.time / 180) * 100)}%` }}
-                      transition={{ duration: 0.5 }}
-                    />
-                  </div>
-                )}
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
+              <div className="flex flex-wrap gap-1">
+                {order.items.map((item, j) => (
+                  <span
+                    key={j}
+                    className="text-xs px-2 py-1 bg-slate-100 text-slate-600 rounded-md"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+
+              {/* Progress bar for preparing orders */}
+              {order.status === 'preparing' && (
+                <div className="mt-3 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-blue-500 rounded-full transition-all duration-500"
+                    style={{ width: `${Math.max(10, 100 - (order.time / 180) * 100)}%` }}
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

@@ -1,8 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
-import { motion, useInView, useSpring, useTransform } from 'framer-motion';
-import { useReducedMotion } from '@/hooks/useReducedMotion';
+import { useRef, useEffect, useState, useCallback } from 'react';
 
 interface AnimatedCounterProps {
   value: number;
@@ -14,6 +12,31 @@ interface AnimatedCounterProps {
   suffix?: string;
   className?: string;
   once?: boolean;
+}
+
+function easeOutExpo(t: number): number {
+  return t === 1 ? 1 : 1 - Math.pow(2, -10 * t);
+}
+
+function formatValue(
+  current: number,
+  format: string,
+  locale: string
+): string {
+  const rounded = Math.round(current);
+  switch (format) {
+    case 'currency':
+      return new Intl.NumberFormat(locale, {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(rounded);
+    case 'percentage':
+      return `${rounded}%`;
+    default:
+      return new Intl.NumberFormat(locale).format(rounded);
+  }
 }
 
 export function AnimatedCounter({
@@ -28,79 +51,70 @@ export function AnimatedCounter({
   once = true,
 }: AnimatedCounterProps) {
   const ref = useRef<HTMLSpanElement>(null);
-  const isInView = useInView(ref, { once, margin: '-100px' });
-  const prefersReducedMotion = useReducedMotion();
-  const [hasAnimated, setHasAnimated] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
-  const [mounted, setMounted] = useState(false);
+  const [displayValue, setDisplayValue] = useState(0);
+  const hasAnimated = useRef(false);
+  const rafRef = useRef<number>(0);
 
-  useEffect(() => {
-    setIsMobile(window.matchMedia('(max-width: 768px)').matches);
-    setMounted(true);
-  }, []);
+  const animate = useCallback(() => {
+    const startTime = performance.now();
+    const durationMs = duration * 1000;
 
-  const spring = useSpring(0, {
-    duration: duration * 1000,
-    bounce: 0,
-  });
+    const tick = (now: number) => {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / durationMs, 1);
+      const easedProgress = easeOutExpo(progress);
+      const current = easedProgress * value;
 
-  const display = useTransform(spring, (current) => {
-    const rounded = Math.round(current);
+      setDisplayValue(current);
 
-    switch (format) {
-      case 'currency':
-        return new Intl.NumberFormat(locale, {
-          style: 'currency',
-          currency: 'USD',
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 0,
-        }).format(rounded);
-      case 'percentage':
-        return `${rounded}%`;
-      default:
-        return new Intl.NumberFormat(locale).format(rounded);
-    }
-  });
-
-  useEffect(() => {
-    if (isInView && !hasAnimated) {
-      const timeout = setTimeout(() => {
-        spring.set(value);
-        setHasAnimated(true);
-      }, delay * 1000);
-
-      return () => clearTimeout(timeout);
-    }
-  }, [isInView, hasAnimated, value, spring, delay]);
-
-  // Skip animation if user prefers reduced motion or on mobile
-  if (prefersReducedMotion || (mounted && isMobile)) {
-    const formattedValue = (() => {
-      switch (format) {
-        case 'currency':
-          return new Intl.NumberFormat(locale, {
-            style: 'currency',
-            currency: 'USD',
-            minimumFractionDigits: 0,
-          }).format(value);
-        case 'percentage':
-          return `${value}%`;
-        default:
-          return new Intl.NumberFormat(locale).format(value);
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(tick);
       }
-    })();
+    };
 
-    return (
-      <span ref={ref} className={className}>
-        {prefix}{formattedValue}{suffix}
-      </span>
+    rafRef.current = requestAnimationFrame(tick);
+  }, [value, duration]);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) {
+      setDisplayValue(value);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !hasAnimated.current) {
+            hasAnimated.current = true;
+            if (once) observer.unobserve(el);
+
+            if (delay > 0) {
+              setTimeout(animate, delay * 1000);
+            } else {
+              animate();
+            }
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: '-50px' }
     );
-  }
+
+    observer.observe(el);
+
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, [animate, delay, once, value]);
 
   return (
     <span ref={ref} className={className}>
       {prefix}
-      <motion.span>{display}</motion.span>
+      {formatValue(displayValue, format, locale)}
       {suffix}
     </span>
   );

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { Flame, Timer, CheckCircle2, Bell } from 'lucide-react';
 
@@ -103,110 +102,85 @@ export function KitchenMockup({ className = '' }: KitchenMockupProps) {
             <div className="px-3 py-1.5 bg-green-500/20 rounded-lg">
               <span className="text-xs font-medium text-green-400">85% Error Reduction</span>
             </div>
-            <motion.div
-              animate={prefersReducedMotion ? {} : { scale: [1, 1.1, 1] }}
-              transition={{ duration: 1, repeat: Infinity }}
-            >
+            <div className="animate-pulse">
               <Bell className="w-5 h-5 text-slate-400" />
-            </motion.div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Tickets grid */}
       <div className="p-4 grid grid-cols-2 gap-4">
-        <AnimatePresence>
-          {tickets.map((ticket) => {
-            const completedItems = ticket.items.filter((i) => i.done).length;
-            const totalItems = ticket.items.length;
-            const progress = (completedItems / totalItems) * 100;
+        {tickets.map((ticket) => {
+          const completedItems = ticket.items.filter((i) => i.done).length;
+          const totalItems = ticket.items.length;
+          const progress = (completedItems / totalItems) * 100;
 
-            return (
-              <motion.div
-                key={ticket.id}
-                layout
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className={`
-                  p-4 rounded-xl border-2
-                  ${ticket.priority === 'rush'
-                    ? 'bg-red-950/50 border-red-500/50'
-                    : 'bg-slate-800/50 border-slate-700'}
-                `}
-              >
-                {/* Ticket header */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-lg font-bold text-white">T{ticket.table}</span>
-                    {ticket.priority === 'rush' && (
-                      <motion.span
-                        animate={prefersReducedMotion ? {} : { opacity: [1, 0.5, 1] }}
-                        transition={{ duration: 0.5, repeat: Infinity }}
-                        className="px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded"
+          return (
+            <div
+              key={ticket.id}
+              className={`
+                p-4 rounded-xl border-2
+                ${ticket.priority === 'rush'
+                  ? 'bg-red-950/50 border-red-500/50'
+                  : 'bg-slate-800/50 border-slate-700'}
+              `}
+            >
+              {/* Ticket header */}
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg font-bold text-white">T{ticket.table}</span>
+                  {ticket.priority === 'rush' && (
+                    <span className="px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded animate-pulse">
+                      RUSH
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 text-slate-400">
+                  <Timer className="w-4 h-4" />
+                  <span className={`text-sm font-mono ${ticket.elapsed > 600 ? 'text-red-400' : ''}`}>
+                    {formatTime(ticket.elapsed)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Items */}
+              <div className="space-y-2 mb-3">
+                {ticket.items.map((item, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between transition-all duration-300"
+                    style={{ opacity: item.done ? 0.5 : 1 }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="w-5 h-5 rounded flex items-center justify-center transition-all duration-300"
+                        style={{ backgroundColor: item.done ? '#22c55e' : '#475569' }}
                       >
-                        RUSH
-                      </motion.span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1 text-slate-400">
-                    <Timer className="w-4 h-4" />
-                    <motion.span
-                      key={ticket.elapsed}
-                      initial={{ scale: 1.1 }}
-                      animate={{ scale: 1 }}
-                      className={`text-sm font-mono ${ticket.elapsed > 600 ? 'text-red-400' : ''}`}
-                    >
-                      {formatTime(ticket.elapsed)}
-                    </motion.span>
-                  </div>
-                </div>
-
-                {/* Items */}
-                <div className="space-y-2 mb-3">
-                  {ticket.items.map((item, i) => (
-                    <motion.div
-                      key={i}
-                      initial={false}
-                      animate={{ opacity: item.done ? 0.5 : 1 }}
-                      className="flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-2">
-                        <motion.div
-                          initial={false}
-                          animate={{
-                            backgroundColor: item.done ? '#22c55e' : '#475569',
-                            scale: item.done ? [1, 1.2, 1] : 1,
-                          }}
-                          className="w-5 h-5 rounded flex items-center justify-center"
-                        >
-                          {item.done && <CheckCircle2 className="w-3 h-3 text-white" />}
-                        </motion.div>
-                        <span className={`text-sm ${item.done ? 'text-slate-500 line-through' : 'text-white'}`}>
-                          {item.name}
-                        </span>
+                        {item.done && <CheckCircle2 className="w-3 h-3 text-white" />}
                       </div>
-                      <span className="text-sm text-slate-400">x{item.quantity}</span>
-                    </motion.div>
-                  ))}
-                </div>
+                      <span className={`text-sm ${item.done ? 'text-slate-500 line-through' : 'text-white'}`}>
+                        {item.name}
+                      </span>
+                    </div>
+                    <span className="text-sm text-slate-400">x{item.quantity}</span>
+                  </div>
+                ))}
+              </div>
 
-                {/* Progress bar */}
-                <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-                  <motion.div
-                    className="h-full bg-gradient-to-r from-green-500 to-green-400"
-                    initial={{ width: '0%' }}
-                    animate={{ width: `${progress}%` }}
-                    transition={{ duration: 0.5 }}
-                  />
-                </div>
-                <div className="mt-1 text-xs text-slate-500 text-right">
-                  {completedItems}/{totalItems} items
-                </div>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
+              {/* Progress bar */}
+              <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-green-500 to-green-400 transition-all duration-500"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+              <div className="mt-1 text-xs text-slate-500 text-right">
+                {completedItems}/{totalItems} items
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Stats footer */}

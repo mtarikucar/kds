@@ -1,12 +1,11 @@
 'use client';
 
-import { forwardRef } from 'react';
-import { motion, HTMLMotionProps } from 'framer-motion';
+import { forwardRef, ButtonHTMLAttributes, AnchorHTMLAttributes } from 'react';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
-interface ButtonProps extends Omit<HTMLMotionProps<'button'>, 'ref'> {
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
   href?: string;
@@ -30,32 +29,28 @@ const sizes: Record<ButtonSize, string> = {
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ variant = 'primary', size = 'md', href, children, className = '', ...props }, ref) => {
     const baseClasses =
-      'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed';
+      'inline-flex items-center justify-center font-medium rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed hover-lift';
     const combinedClasses = `${baseClasses} ${variants[variant]} ${sizes[size]} ${className}`;
 
     if (href) {
       return (
-        <motion.a
+        <a
           href={href}
           className={combinedClasses}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
         >
           {children}
-        </motion.a>
+        </a>
       );
     }
 
     return (
-      <motion.button
+      <button
         ref={ref}
         className={combinedClasses}
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
         {...props}
       >
         {children}
-      </motion.button>
+      </button>
     );
   }
 );

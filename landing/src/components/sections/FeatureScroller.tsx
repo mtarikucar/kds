@@ -1,10 +1,8 @@
 'use client';
 
-import { useRef, useState, useEffect } from 'react';
-import { motion, useScroll, useTransform, AnimatePresence, useMotionValueEvent } from 'framer-motion';
+import { useRef, useState, useEffect, useCallback } from 'react';
 import { Container } from '@/components/ui/Container';
 import { QrCode, LayoutGrid, CreditCard, ChefHat, Building2 } from 'lucide-react';
-import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { useTranslations } from 'next-intl';
 import { QRMenuMockup } from '@/components/mockups/QRMenuMockup';
 import { OrdersMockup } from '@/components/mockups/OrdersMockup';
@@ -12,38 +10,20 @@ import { POSMockup } from '@/components/mockups/POSMockup';
 import { KitchenMockup } from '@/components/mockups/KitchenMockup';
 import { DashboardMockup } from '@/components/mockups/DashboardMockup';
 import { AnimatedCounter } from '@/components/animations/AnimatedCounter';
-import { GradientOrb } from '@/components/animations/FloatingElement';
 
 export default function FeatureScroller() {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(0);
+  const [prevIndex, setPrevIndex] = useState(-1);
   const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const prefersReducedMotion = useReducedMotion();
+  const rafRef = useRef<number>(0);
   const t = useTranslations('features');
 
-  // Check for mobile on mount
   useEffect(() => {
     setIsMobile(window.matchMedia('(max-width: 768px)').matches);
     setMounted(true);
   }, []);
-
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ['start start', 'end end'],
-  });
-
-  // Track scroll progress to set active feature
-  useMotionValueEvent(scrollYProgress, 'change', (latest) => {
-    const featureCount = 5;
-    const newIndex = Math.min(
-      featureCount - 1,
-      Math.floor(latest * featureCount)
-    );
-    if (newIndex !== activeIndex) {
-      setActiveIndex(newIndex);
-    }
-  });
 
   const features = [
     {
@@ -113,15 +93,54 @@ export default function FeatureScroller() {
     },
   ];
 
+  // Scroll-driven feature switching
+  const handleScroll = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const scrolled = -rect.top;
+    const scrollHeight = container.offsetHeight - window.innerHeight;
+    const progress = Math.max(0, Math.min(1, scrolled / scrollHeight));
+
+    const featureCount = 5;
+    const newIndex = Math.min(featureCount - 1, Math.floor(progress * featureCount));
+
+    setActiveIndex((prev) => {
+      if (prev !== newIndex) {
+        setPrevIndex(prev);
+      }
+      return newIndex;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (isMobile) return;
+
+    const onScroll = () => {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(handleScroll);
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    handleScroll();
+
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, [handleScroll, isMobile]);
+
+  // Clear prevIndex after transition completes
+  useEffect(() => {
+    if (prevIndex >= 0) {
+      const timer = setTimeout(() => setPrevIndex(-1), 500);
+      return () => clearTimeout(timer);
+    }
+  }, [prevIndex]);
+
   const activeFeature = features[activeIndex];
   const Icon = activeFeature.icon;
-
-  // Progress for each feature
-  const featureProgress = useTransform(
-    scrollYProgress,
-    [activeIndex / 5, (activeIndex + 1) / 5],
-    [0, 1]
-  );
 
   const renderMockup = (mockupId: string) => {
     switch (mockupId) {
@@ -141,37 +160,19 @@ export default function FeatureScroller() {
   };
 
   const colorVariants: Record<string, { bg: string; text: string; gradient: string }> = {
-    orange: {
-      bg: 'bg-orange-500',
-      text: 'text-orange-600',
-      gradient: 'from-orange-500/20 to-amber-500/10',
-    },
-    blue: {
-      bg: 'bg-blue-500',
-      text: 'text-blue-600',
-      gradient: 'from-blue-500/20 to-cyan-500/10',
-    },
-    green: {
-      bg: 'bg-green-500',
-      text: 'text-green-600',
-      gradient: 'from-green-500/20 to-emerald-500/10',
-    },
-    red: {
-      bg: 'bg-red-500',
-      text: 'text-red-600',
-      gradient: 'from-red-500/20 to-rose-500/10',
-    },
-    purple: {
-      bg: 'bg-purple-500',
-      text: 'text-purple-600',
-      gradient: 'from-purple-500/20 to-violet-500/10',
-    },
+    orange: { bg: 'bg-orange-500', text: 'text-orange-600', gradient: 'from-orange-500/20 to-amber-500/10' },
+    blue: { bg: 'bg-blue-500', text: 'text-blue-600', gradient: 'from-blue-500/20 to-cyan-500/10' },
+    green: { bg: 'bg-green-500', text: 'text-green-600', gradient: 'from-green-500/20 to-emerald-500/10' },
+    red: { bg: 'bg-red-500', text: 'text-red-600', gradient: 'from-red-500/20 to-rose-500/10' },
+    purple: { bg: 'bg-purple-500', text: 'text-purple-600', gradient: 'from-purple-500/20 to-violet-500/10' },
   };
 
   const colors = colorVariants[activeFeature.color];
 
-  // Reduced motion or mobile fallback - show simple list view
-  if (prefersReducedMotion || (mounted && isMobile)) {
+  // Reduced motion or mobile fallback - simple list view
+  const prefersReduced = mounted && typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  if (prefersReduced || (mounted && isMobile)) {
     return (
       <section id="features" className="section-padding bg-slate-50">
         <Container>
@@ -200,7 +201,7 @@ export default function FeatureScroller() {
                   <ul className="space-y-2">
                     {feature.bullets.map((bullet, i) => (
                       <li key={i} className="flex items-start gap-2 text-slate-700">
-                        <span className="text-green-500">✓</span>
+                        <span className="text-green-500">&#10003;</span>
                         {bullet}
                       </li>
                     ))}
@@ -216,48 +217,49 @@ export default function FeatureScroller() {
 
   return (
     <section id="features" className="relative bg-slate-50">
-      {/* Scroll container - this determines the scroll length */}
+      {/* Scroll container */}
       <div ref={containerRef} className="relative" style={{ height: '300vh' }}>
         {/* Sticky container */}
         <div className="sticky top-0 h-screen overflow-hidden">
           {/* Background gradient */}
-          <motion.div
-            className={`absolute inset-0 bg-gradient-to-br ${colors.gradient} transition-colors duration-700`}
-          />
+          <div className={`absolute inset-0 bg-gradient-to-br ${colors.gradient} transition-colors duration-700`} />
 
-          {/* Floating orbs */}
+          {/* Gradient orbs */}
           <div className="absolute inset-0 pointer-events-none overflow-hidden">
-            <GradientOrb
-              color={`rgba(249, 115, 22, 0.15)`}
-              size={500}
-              blur={100}
-              className="absolute -top-40 -right-40"
-              duration={12}
+            <div
+              className="gradient-orb"
+              style={{
+                top: '-160px',
+                right: '-160px',
+                width: '500px',
+                height: '500px',
+                background: 'radial-gradient(circle, rgba(249, 115, 22, 0.15) 0%, transparent 70%)',
+                filter: 'blur(100px)',
+              }}
             />
-            <GradientOrb
-              color={`rgba(59, 130, 246, 0.1)`}
-              size={400}
-              blur={80}
-              className="absolute bottom-20 -left-20"
-              duration={15}
-              delay={3}
+            <div
+              className="gradient-orb"
+              style={{
+                bottom: '80px',
+                left: '-80px',
+                width: '400px',
+                height: '400px',
+                background: 'radial-gradient(circle, rgba(59, 130, 246, 0.1) 0%, transparent 70%)',
+                filter: 'blur(80px)',
+              }}
             />
           </div>
 
           <Container className="relative h-full py-8">
             {/* Section header */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="text-center pt-8 mb-8"
-            >
+            <div className="text-center pt-8 mb-8">
               <span className="inline-block text-sm font-semibold text-orange-600 mb-2 uppercase tracking-wider">
                 {t('badge')}
               </span>
               <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-900 tracking-tight">
                 {t('title')}
               </h2>
-            </motion.div>
+            </div>
 
             {/* Main content grid */}
             <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center h-[calc(100%-140px)]">
@@ -266,7 +268,7 @@ export default function FeatureScroller() {
                 {/* Progress indicator */}
                 <div className="absolute -left-4 top-0 bottom-0 hidden lg:flex flex-col justify-center gap-3">
                   {features.map((_, index) => (
-                    <motion.button
+                    <button
                       key={index}
                       onClick={() => {
                         if (containerRef.current) {
@@ -280,82 +282,55 @@ export default function FeatureScroller() {
                       }}
                       className="relative w-3 h-3"
                     >
-                      <motion.div
-                        className={`absolute inset-0 rounded-full transition-colors ${
-                          activeIndex === index ? colors.bg : 'bg-slate-300'
+                      <div
+                        className={`absolute inset-0 rounded-full transition-all duration-300 ${
+                          activeIndex === index ? `${colors.bg} scale-150` : 'bg-slate-300 scale-100'
                         }`}
-                        animate={{
-                          scale: activeIndex === index ? 1.5 : 1,
-                        }}
                       />
                       {activeIndex === index && (
-                        <motion.div
-                          layoutId="activeIndicator"
-                          className={`absolute inset-0 rounded-full ${colors.bg} opacity-30`}
-                          initial={false}
-                          animate={{ scale: 2 }}
-                          transition={{ duration: 0.6, repeat: Infinity, repeatType: 'reverse' }}
+                        <div
+                          className={`absolute inset-0 rounded-full ${colors.bg} opacity-30 animate-pulse-ring`}
                         />
                       )}
-                    </motion.button>
+                    </button>
                   ))}
                 </div>
 
-                {/* Feature content with AnimatePresence */}
-                <AnimatePresence mode="wait">
-                  <motion.div
+                {/* Feature content with CSS transitions */}
+                <div className="relative">
+                  <div
                     key={activeFeature.id}
-                    initial={{ opacity: 0, y: 30 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -30 }}
-                    transition={{ duration: 0.5, ease: [0.25, 0.4, 0.25, 1] }}
-                    className="bg-white/90 rounded-3xl p-6 lg:p-8 shadow-2xl shadow-slate-900/5 border border-white/50"
+                    className="bg-white/90 rounded-3xl p-6 lg:p-8 shadow-2xl shadow-slate-900/5 border border-white/50 feature-content-enter"
                   >
                     {/* Feature header */}
                     <div className="flex items-start gap-4 mb-6">
-                      <motion.div
-                        initial={{ scale: 0, rotate: -180 }}
-                        animate={{ scale: 1, rotate: 0 }}
-                        transition={{ delay: 0.2, type: 'spring', stiffness: 200 }}
-                        className={`w-14 h-14 ${colors.bg} rounded-2xl flex items-center justify-center shadow-lg`}
+                      <div
+                        className={`w-14 h-14 ${colors.bg} rounded-2xl flex items-center justify-center shadow-lg animate-icon-spring`}
+                        key={`icon-${activeFeature.id}`}
                       >
                         <Icon className="w-7 h-7 text-white" />
-                      </motion.div>
+                      </div>
                       <div>
-                        <motion.h3
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.1 }}
-                          className="text-xl lg:text-2xl font-bold text-slate-900 mb-1"
-                        >
+                        <h3 className="text-xl lg:text-2xl font-bold text-slate-900 mb-1">
                           {activeFeature.title}
-                        </motion.h3>
-                        <motion.p
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ delay: 0.2 }}
-                          className="text-slate-600"
-                        >
+                        </h3>
+                        <p className="text-slate-600">
                           {activeFeature.description}
-                        </motion.p>
+                        </p>
                       </div>
                     </div>
 
                     {/* Feature bullets */}
                     <ul className="space-y-3 mb-6">
                       {activeFeature.bullets.map((bullet, i) => (
-                        <motion.li
-                          key={i}
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.3 + i * 0.1 }}
-                          className="flex items-start gap-3"
+                        <li
+                          key={`${activeFeature.id}-${i}`}
+                          className="flex items-start gap-3 animate-hero-fade-in"
+                          style={{ animationDelay: `${0.1 + i * 0.08}s` }}
                         >
-                          <motion.svg
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            transition={{ delay: 0.4 + i * 0.1, type: 'spring' }}
-                            className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5"
+                          <svg
+                            className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5 animate-check-pop"
+                            style={{ animationDelay: `${0.15 + i * 0.08}s` }}
                             fill="currentColor"
                             viewBox="0 0 20 20"
                           >
@@ -364,19 +339,14 @@ export default function FeatureScroller() {
                               d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
                               clipRule="evenodd"
                             />
-                          </motion.svg>
+                          </svg>
                           <span className="text-slate-700">{bullet}</span>
-                        </motion.li>
+                        </li>
                       ))}
                     </ul>
 
                     {/* Feature metrics */}
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.5 }}
-                      className="flex flex-wrap gap-4"
-                    >
+                    <div className="flex flex-wrap gap-4">
                       {activeFeature.metrics.map((metric, i) => (
                         <div
                           key={metric.label}
@@ -391,67 +361,54 @@ export default function FeatureScroller() {
                                 prefix={'prefix' in metric ? metric.prefix : undefined}
                                 suffix={'suffix' in metric ? metric.suffix : undefined}
                                 duration={1.5}
-                                delay={0.6 + i * 0.2}
+                                delay={0.3 + i * 0.2}
                               />
                             )}
                           </div>
                           <div className="text-sm text-slate-500">{metric.label}</div>
                         </div>
                       ))}
-                    </motion.div>
-                  </motion.div>
-                </AnimatePresence>
+                    </div>
+                  </div>
+                </div>
 
                 {/* Mobile progress dots */}
                 <div className="flex justify-center gap-2 mt-6 lg:hidden">
                   {features.map((_, index) => (
-                    <motion.div
+                    <div
                       key={index}
-                      className={`w-2 h-2 rounded-full transition-colors ${
-                        activeIndex === index ? colors.bg : 'bg-slate-300'
+                      className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                        activeIndex === index ? `${colors.bg} scale-130` : 'bg-slate-300'
                       }`}
-                      animate={{ scale: activeIndex === index ? 1.3 : 1 }}
                     />
                   ))}
                 </div>
               </div>
 
               {/* Right: Animated mockup */}
-              <div className="relative hidden lg:flex items-center justify-center">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={activeFeature.mockup}
-                    initial={{ opacity: 0, scale: 0.9, rotateY: -15 }}
-                    animate={{ opacity: 1, scale: 1, rotateY: 0 }}
-                    exit={{ opacity: 0, scale: 0.9, rotateY: 15 }}
-                    transition={{ duration: 0.6, ease: [0.25, 0.4, 0.25, 1] }}
-                    className="relative"
-                  >
-                    {renderMockup(activeFeature.mockup)}
+              <div className="relative hidden lg:flex items-center justify-center perspective-1000">
+                <div
+                  key={activeFeature.mockup}
+                  className="relative feature-mockup-enter"
+                >
+                  {renderMockup(activeFeature.mockup)}
 
-                    {/* Decorative elements */}
-                    <motion.div
-                      className={`absolute -z-10 w-full h-full ${colors.bg} opacity-10 blur-3xl rounded-full`}
-                      animate={{ scale: [1, 1.1, 1] }}
-                      transition={{ duration: 4, repeat: Infinity }}
-                    />
-                  </motion.div>
-                </AnimatePresence>
+                  {/* Decorative glow */}
+                  <div
+                    className={`absolute -z-10 w-full h-full ${colors.bg} opacity-10 blur-3xl rounded-full animate-glow-pulse`}
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Scroll hint at bottom */}
-            <motion.div
-              className="absolute bottom-4 left-1/2 -translate-x-1/2 text-slate-400 text-xs"
-              animate={{ opacity: [0.5, 1, 0.5] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            >
+            {/* Scroll hint */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-slate-400 text-xs animate-glow-pulse">
               {activeIndex < features.length - 1 ? (
-                <span>Scroll to explore • {activeIndex + 1}/{features.length}</span>
+                <span>Scroll to explore &bull; {activeIndex + 1}/{features.length}</span>
               ) : (
                 <span>Continue scrolling</span>
               )}
-            </motion.div>
+            </div>
           </Container>
         </div>
       </div>

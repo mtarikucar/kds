@@ -1,8 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { QrCode, ChevronRight, Star, Wifi, Instagram, Facebook } from 'lucide-react';
 
 interface QRMenuMockupProps {
@@ -10,7 +8,6 @@ interface QRMenuMockupProps {
 }
 
 export function QRMenuMockup({ className = '' }: QRMenuMockupProps) {
-  const prefersReducedMotion = useReducedMotion();
   const [activeCategory, setActiveCategory] = useState('Kebabs');
 
   const categories = ['Kebabs', 'Pide', 'Drinks', 'Desserts'];
@@ -62,19 +59,16 @@ export function QRMenuMockup({ className = '' }: QRMenuMockupProps) {
                 <h3 className="font-bold text-lg">Sultan Kebab</h3>
                 <p className="text-xs text-orange-100">Traditional Turkish Cuisine</p>
               </div>
-              <motion.div
-                animate={prefersReducedMotion ? {} : { rotate: [0, 10, -10, 0] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
+              <div className="animate-pulse">
                 <QrCode className="w-8 h-8 text-white/80" />
-              </motion.div>
+              </div>
             </div>
             <div className="flex items-center gap-3 text-xs">
               <div className="flex items-center gap-1">
                 <Star className="w-3 h-3 fill-yellow-300 text-yellow-300" />
                 <span>4.9</span>
               </div>
-              <span className="text-orange-200">•</span>
+              <span className="text-orange-200">&bull;</span>
               <span className="text-orange-100">Table 7</span>
             </div>
           </div>
@@ -82,76 +76,58 @@ export function QRMenuMockup({ className = '' }: QRMenuMockupProps) {
           {/* Categories */}
           <div className="px-4 py-3 flex gap-2 overflow-x-auto border-b border-slate-100">
             {categories.map((cat) => (
-              <motion.button
+              <button
                 key={cat}
-                whileTap={prefersReducedMotion ? {} : { scale: 0.95 }}
                 onClick={() => setActiveCategory(cat)}
                 className={`
-                  px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors
+                  px-4 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all active:scale-95
                   ${activeCategory === cat
                     ? 'bg-orange-500 text-white'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}
                 `}
               >
                 {cat}
-              </motion.button>
+              </button>
             ))}
           </div>
 
           {/* Menu items */}
           <div className="p-4 space-y-3 h-[260px] overflow-hidden">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeCategory}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-3"
-              >
-                {menuItems[activeCategory as keyof typeof menuItems]?.map((item, i) => (
-                  <motion.div
-                    key={item.name}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                    className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl"
-                  >
-                    <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center text-2xl shadow-sm">
-                      {item.image}
+            <div key={activeCategory} className="space-y-3 transition-opacity duration-200">
+              {menuItems[activeCategory as keyof typeof menuItems]?.map((item, i) => (
+                <div
+                  key={item.name}
+                  className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl animate-hero-fade-in"
+                  style={{ animationDelay: `${i * 100}ms` }}
+                >
+                  <div className="w-12 h-12 bg-white rounded-lg flex items-center justify-center text-2xl shadow-sm">
+                    {item.image}
+                  </div>
+                  <div className="flex-1">
+                    <div className="font-medium text-slate-900 text-sm">{item.name}</div>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-orange-600 font-semibold">&#8378;{item.price}</span>
+                      <span className="flex items-center gap-0.5 text-slate-400">
+                        <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                        {item.rating}
+                      </span>
                     </div>
-                    <div className="flex-1">
-                      <div className="font-medium text-slate-900 text-sm">{item.name}</div>
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-orange-600 font-semibold">₺{item.price}</span>
-                        <span className="flex items-center gap-0.5 text-slate-400">
-                          <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                          {item.rating}
-                        </span>
-                      </div>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-slate-300" />
-                  </motion.div>
-                ))}
-              </motion.div>
-            </AnimatePresence>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-slate-300" />
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Social footer */}
           <div className="px-5 py-3 bg-slate-50 border-t border-slate-100">
             <div className="flex items-center justify-center gap-4">
-              <motion.div
-                whileHover={prefersReducedMotion ? {} : { scale: 1.1 }}
-                className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center"
-              >
+              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center hover:scale-110 transition-transform">
                 <Instagram className="w-4 h-4 text-white" />
-              </motion.div>
-              <motion.div
-                whileHover={prefersReducedMotion ? {} : { scale: 1.1 }}
-                className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center"
-              >
+              </div>
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center hover:scale-110 transition-transform">
                 <Facebook className="w-4 h-4 text-white" />
-              </motion.div>
+              </div>
               <div className="flex items-center gap-1 px-3 py-1 bg-white rounded-full border border-slate-200">
                 <Wifi className="w-3 h-3 text-slate-400" />
                 <span className="text-xs text-slate-500">Free WiFi</span>
@@ -167,17 +143,15 @@ export function QRMenuMockup({ className = '' }: QRMenuMockupProps) {
       </div>
 
       {/* Floating QR code */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.8, y: 20 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-        className="absolute -bottom-4 -right-4 bg-white p-3 rounded-xl shadow-xl border border-slate-200"
+      <div
+        className="absolute -bottom-4 -right-4 bg-white p-3 rounded-xl shadow-xl border border-slate-200 animate-hero-fade-in"
+        style={{ animationDelay: '500ms' }}
       >
         <div className="w-16 h-16 bg-slate-100 rounded-lg flex items-center justify-center">
           <QrCode className="w-10 h-10 text-slate-400" />
         </div>
         <div className="text-xs text-center mt-1 text-slate-500">Scan me</div>
-      </motion.div>
+      </div>
     </div>
   );
 }

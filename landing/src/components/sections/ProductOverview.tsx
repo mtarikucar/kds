@@ -1,53 +1,29 @@
 'use client';
 
-import { motion } from 'framer-motion';
 import { Container } from '@/components/ui/Container';
 import { Zap, Shield, TrendingUp, Globe } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { getStats } from '@/lib/api';
+import { useScrollReveal } from '@/hooks/useScrollReveal';
 
 export default function ProductOverview() {
   const stats = getStats();
   const t = useTranslations('product');
+  const sectionRef = useScrollReveal<HTMLElement>();
 
   const benefits = [
-    {
-      key: 'fast',
-      icon: Zap,
-      title: t('benefits.fast.title'),
-      description: t('benefits.fast.description'),
-    },
-    {
-      key: 'secure',
-      icon: Shield,
-      title: t('benefits.secure.title'),
-      description: t('benefits.secure.description'),
-    },
-    {
-      key: 'insights',
-      icon: TrendingUp,
-      title: t('benefits.insights.title'),
-      description: t('benefits.insights.description'),
-    },
-    {
-      key: 'global',
-      icon: Globe,
-      title: t('benefits.global.title'),
-      description: t('benefits.global.description'),
-    },
+    { key: 'fast', icon: Zap, title: t('benefits.fast.title'), description: t('benefits.fast.description') },
+    { key: 'secure', icon: Shield, title: t('benefits.secure.title'), description: t('benefits.secure.description') },
+    { key: 'insights', icon: TrendingUp, title: t('benefits.insights.title'), description: t('benefits.insights.description') },
+    { key: 'global', icon: Globe, title: t('benefits.global.title'), description: t('benefits.global.description') },
   ];
 
   return (
-    <section id="product" className="section-padding bg-gradient-subtle">
+    <section ref={sectionRef} id="product" className="section-padding bg-gradient-subtle">
       <Container>
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
           {/* Left Content */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true, margin: '-100px' }}
-            transition={{ duration: 0.5 }}
-          >
+          <div data-animate="slide-up">
             <span className="inline-block text-sm font-semibold text-orange-600 mb-4 uppercase tracking-wider">
               {t('badge')}
             </span>
@@ -60,12 +36,10 @@ export default function ProductOverview() {
 
             <div className="grid sm:grid-cols-2 gap-6">
               {benefits.map((benefit, index) => (
-                <motion.div
+                <div
                   key={benefit.key}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.4, delay: index * 0.1 }}
+                  data-animate="slide-up"
+                  style={{ '--delay': `${0.1 + index * 0.1}s` } as React.CSSProperties}
                   className="flex gap-4"
                 >
                   <div className="flex-shrink-0 w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
@@ -75,19 +49,13 @@ export default function ProductOverview() {
                     <h3 className="font-semibold text-slate-900 mb-1">{benefit.title}</h3>
                     <p className="text-sm text-slate-600">{benefit.description}</p>
                   </div>
-                </motion.div>
+                </div>
               ))}
             </div>
-          </motion.div>
+          </div>
 
           {/* Right Mock Panels */}
-          <motion.div
-            initial={{ opacity: 0, x: 40 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true, margin: '-100px' }}
-            transition={{ duration: 0.6 }}
-            className="relative"
-          >
+          <div data-animate="slide-right" style={{ '--delay': '0.2s' } as React.CSSProperties} className="relative">
             <div className="space-y-4">
               {/* Panel 1 - Orders Dashboard */}
               <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-5">
@@ -104,7 +72,7 @@ export default function ProductOverview() {
                     <div key={i} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
                       <div>
                         <div className="font-medium text-slate-900 text-sm">{order.table}</div>
-                        <div className="text-xs text-slate-500">{order.items} • {order.time}</div>
+                        <div className="text-xs text-slate-500">{order.items} &bull; {order.time}</div>
                       </div>
                       <span className={`text-xs px-2 py-1 rounded-full ${
                         order.status === 'Ready' ? 'bg-green-100 text-green-700' :
@@ -146,7 +114,7 @@ export default function ProductOverview() {
 
             {/* Decorative gradient */}
             <div className="absolute -z-10 -bottom-8 -right-8 w-64 h-64 bg-orange-100 rounded-full blur-3xl opacity-50" />
-          </motion.div>
+          </div>
         </div>
       </Container>
     </section>
