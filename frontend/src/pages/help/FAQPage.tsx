@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HelpCircle, Search, ChevronDown } from 'lucide-react';
+import { cn } from '../../lib/utils';
 
 interface FaqItem {
   id: string;
@@ -25,7 +26,7 @@ const CATEGORY_KEYS = [
 type CategoryKey = (typeof CATEGORY_KEYS)[number];
 
 const FAQPage = () => {
-  const { t, i18n } = useTranslation('help');
+  const { t } = useTranslation('help');
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState<CategoryKey>('all');
   const [openId, setOpenId] = useState<string | null>(null);
@@ -33,7 +34,7 @@ const FAQPage = () => {
   const items = useMemo(() => {
     const raw = t('items', { returnObjects: true });
     return Array.isArray(raw) ? (raw as FaqItem[]) : [];
-  }, [t, i18n.language]);
+  }, [t]);
 
   const filteredItems = useMemo(() => {
     const normalised = search.trim().toLocaleLowerCase();
@@ -53,7 +54,6 @@ const FAQPage = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      {/* Page Header */}
       <div className="flex items-center gap-4">
         <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20">
           <HelpCircle className="w-7 h-7 text-white" />
@@ -66,7 +66,6 @@ const FAQPage = () => {
         </div>
       </div>
 
-      {/* Search */}
       <div className="relative">
         <Search className="absolute start-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" aria-hidden="true" />
         <input
@@ -79,7 +78,6 @@ const FAQPage = () => {
         />
       </div>
 
-      {/* Category Pills */}
       <div className="flex gap-2 overflow-x-auto pb-1">
         {CATEGORY_KEYS.map((key) => {
           const isActive = category === key;
@@ -88,11 +86,12 @@ const FAQPage = () => {
               key={key}
               type="button"
               onClick={() => setCategory(key)}
-              className={`shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors border ${
+              className={cn(
+                'shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors border',
                 isActive
                   ? 'bg-primary-600 text-white border-primary-600'
                   : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-              }`}
+              )}
               aria-pressed={isActive}
             >
               {t(`categories.${key}`)}
@@ -101,7 +100,6 @@ const FAQPage = () => {
         })}
       </div>
 
-      {/* Items */}
       {filteredItems.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200/60 py-16 text-center">
           <div className="mx-auto w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mb-4">
@@ -129,9 +127,10 @@ const FAQPage = () => {
                     {item.question}
                   </span>
                   <ChevronDown
-                    className={`w-5 h-5 shrink-0 text-slate-400 transition-transform ${
-                      isOpen ? 'rotate-180' : ''
-                    }`}
+                    className={cn(
+                      'w-5 h-5 shrink-0 text-slate-400 transition-transform',
+                      isOpen && 'rotate-180'
+                    )}
                     aria-hidden="true"
                   />
                 </button>

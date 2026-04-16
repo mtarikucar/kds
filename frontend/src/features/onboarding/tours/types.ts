@@ -42,3 +42,17 @@ export const TOUR_IDS = {
 } as const;
 
 export type TourId = (typeof TOUR_IDS)[keyof typeof TOUR_IDS];
+
+export const COMPLETION_STEP: TourStep = {
+  target: 'body',
+  content: '',
+  title: '',
+  placement: 'center',
+  disableBeacon: true,
+  spotlightPadding: 0,
+  styles: {
+    spotlight: {
+      display: 'none',
+    },
+  },
+};
