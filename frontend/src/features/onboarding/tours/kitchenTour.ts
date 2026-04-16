@@ -5,13 +5,22 @@ export const kitchenTourSteps: TourStep[] = [
     target: '[data-tour="kitchen-stats"]',
     content: '',
     title: '',
+    placement: 'center',
+    disableBeacon: true,
+    route: '/kitchen',
+    spotlightPadding: 0,
+    locale: {
+      skip: 'tour.skip',
+    },
+  },
+  {
+    target: '[data-tour="kitchen-stats"]',
+    content: '',
+    title: '',
     placement: 'bottom',
     disableBeacon: true,
     route: '/kitchen',
     spotlightPadding: 8,
-    locale: {
-      skip: 'tour.skip',
-    },
   },
   {
     target: '[data-tour="order-queues"]',
@@ -30,6 +39,19 @@ export const kitchenTourSteps: TourStep[] = [
     disableBeacon: true,
     route: '/kitchen',
     spotlightPadding: 8,
+  },
+  {
+    target: 'body',
+    content: '',
+    title: '',
+    placement: 'center',
+    disableBeacon: true,
+    spotlightPadding: 0,
+    styles: {
+      spotlight: {
+        display: 'none',
+      },
+    },
   },
 ];
 

@@ -1,0 +1,142 @@
+{
+  "title": "Ko'p so'raladigan savollar",
+  "subtitle": "HummyTummy haqida eng ko'p so'raladigan savollarga javoblar.",
+  "searchPlaceholder": "Savollarni qidirish...",
+  "noResults": "So'rovingizga mos savol topilmadi.",
+  "resultCount": "{{count}} natija",
+  "resultCount_plural": "{{count}} natija",
+  "categories": {
+    "all": "Hammasi",
+    "general": "Umumiy",
+    "pos": "POS",
+    "menu": "Menyu",
+    "tables": "Stollar va bron",
+    "kitchen": "Oshxona ekrani",
+    "qr": "QR kodlar",
+    "subscription": "Obuna",
+    "account": "Hisob",
+    "notifications": "Bildirishnomalar"
+  },
+  "items": [
+    {
+      "id": "what-is",
+      "category": "general",
+      "question": "HummyTummy nima?",
+      "answer": "HummyTummy — POS, oshxona ekrani, menyu va stol boshqaruvi, QR buyurtma va hisobotlarni bitta mahsulotda birlashtirgan bulutli restoran boshqaruv platformasidir."
+    },
+    {
+      "id": "devices",
+      "category": "general",
+      "question": "Qanday qurilmalarda foydalanish mumkin?",
+      "answer": "Zamonaviy brauzeri bo'lgan har qanday qurilmada — kompyuter, planshet va telefonlarda. Windows va macOS uchun alohida ilova ham mavjud."
+    },
+    {
+      "id": "language",
+      "category": "general",
+      "question": "Tilni qanday o'zgartiraman?",
+      "answer": "Sarlavhadagi til almashtirgichidan foydalaning. Ingliz, turk, rus, o'zbek va arab tillari qo'llab-quvvatlanadi. Tanlangan til qurilmada saqlanadi."
+    },
+    {
+      "id": "reports",
+      "category": "general",
+      "question": "Sotuv hisobotlari va tahlilni qayerdan ko'raman?",
+      "answer": "Admin menyusidagi Hisobotlar yoki Tahlil bo'limiga o'ting. U yerda daromad, eng ko'p sotilgan mahsulotlar, soatlik taqsimot va boshqalar mavjud."
+    },
+    {
+      "id": "pos-order",
+      "category": "pos",
+      "question": "POS'da qanday buyurtma yarataman?",
+      "answer": "POS'ni oching, stol tanlang yoki olib ketish buyurtmasini boshlang, menyu panelidan mahsulotlarni savatga qo'shing, so'ng to'lovni amalga oshiring yoki buyurtmani oshxonaga yuboring."
+    },
+    {
+      "id": "split-bill",
+      "category": "pos",
+      "question": "Hisobni mijozlar o'rtasida bo'lish mumkinmi?",
+      "answer": "Ha. Buyurtma savatini oching, bo'lish opsiyasini tanlang va hisobni mahsulot yoki miqdor bo'yicha bo'ling."
+    },
+    {
+      "id": "add-product",
+      "category": "menu",
+      "question": "Menyuga yangi mahsulotni qanday qo'shaman?",
+      "answer": "Menyu boshqaruviga o'ting, kategoriyani oching yoki yarating, so'ng \"Mahsulot qo'shish\" tugmasini bosing. Nomi, narxi, tavsifi va rasmini kiriting."
+    },
+    {
+      "id": "stock",
+      "category": "menu",
+      "question": "Omborni qayerdan boshqaraman?",
+      "answer": "Admin menyusidagi Ombor boshqaruvi bo'limidan. Qoldiqlarni sozlash, ingredientlarni kuzatish va kam qoldiq haqida ogohlantirishlar olish mumkin."
+    },
+    {
+      "id": "tables",
+      "category": "tables",
+      "question": "Stollarni qanday qo'shish va tahrirlash mumkin?",
+      "answer": "Stol boshqaruviga o'ting. To'g'ridan-to'g'ri panjaradan stol qo'shish, nomini o'zgartirish va holatini (bo'sh/band) o'zgartirish mumkin."
+    },
+    {
+      "id": "reservations",
+      "category": "tables",
+      "question": "Mijozlar stollarni onlayn bron qila oladimi?",
+      "answer": "Ha. Bronlar umumiy bron havolasi orqali qabul qilinadi va admin panelidagi Bronlar sahifasidan boshqariladi."
+    },
+    {
+      "id": "kitchen",
+      "category": "kitchen",
+      "question": "Oshxona ekrani qanday ishlaydi?",
+      "answer": "Oshxona sahifasi buyurtmalarni Kutilmoqda, Tayyorlanmoqda va Tayyor ustunlarida jonli yangilanishlar va shoshilinchlik ko'rsatkichlari bilan ko'rsatadi."
+    },
+    {
+      "id": "kitchen-action",
+      "category": "kitchen",
+      "question": "Oshxonada buyurtmani keyingi bosqichga qanday o'tkazaman?",
+      "answer": "Buyurtma kartasidagi harakat tugmasini bosing (masalan, \"Tayyorlashni boshlash\" yoki \"Tayyor\"). Holat tizimning barcha foydalanuvchilari uchun real vaqtda yangilanadi."
+    },
+    {
+      "id": "qr-create",
+      "category": "qr",
+      "question": "Stollarim uchun QR kodlarni qanday yarataman?",
+      "answer": "QR boshqaruviga o'ting, \"Stol QR\" ni tanlang va har bir stol uchun bitta kod yarating. Ranglarni sozlashingiz va logotipingizni qo'shishingiz mumkin."
+    },
+    {
+      "id": "qr-download",
+      "category": "qr",
+      "question": "Barcha QR kodlarni bir vaqtning o'zida yuklab olish yoki chop etish mumkinmi?",
+      "answer": "Ha — QR boshqaruvi sahifasidagi \"Hammasini yuklab olish\" yoki \"Varaqni chop etish\" opsiyasidan foydalaning."
+    },
+    {
+      "id": "qr-menu",
+      "category": "qr",
+      "question": "QR menyu mijozlarga qanday ko'rinadi?",
+      "answer": "Mijoz QR kodni skaner qilib, brendingizga xos menyuni ko'radi; u yerda kategoriyalarni ko'rish, mahsulotlarni savatga qo'shish va ilova o'rnatmasdan buyurtma berish mumkin."
+    },
+    {
+      "id": "plan-change",
+      "category": "subscription",
+      "question": "Obuna tarifimni o'zgartirishim mumkinmi?",
+      "answer": "Ha. Sozlamalar → Obuna bo'limiga kirib yangi tarif tanlang. O'zgarishlar keyingi hisob davrida yoki mumkin bo'lgan hollarda darhol qo'llaniladi."
+    },
+    {
+      "id": "cancel",
+      "category": "subscription",
+      "question": "Obunani istalgan vaqtda bekor qilishim mumkinmi?",
+      "answer": "Ha, istalgan vaqtda bekor qilishingiz mumkin. Hisobingiz to'langan muddat tugaguncha faol qoladi."
+    },
+    {
+      "id": "personnel",
+      "category": "account",
+      "question": "Xodimlarni qanday qo'shaman?",
+      "answer": "Xodimlar boshqaruvi bo'limiga o'ting va Admin, Menejer, Ofitsiant yoki Oshpaz rollari bilan foydalanuvchilar yarating. Har bir rolning o'z huquqlari va paneli bor."
+    },
+    {
+      "id": "password",
+      "category": "account",
+      "question": "Parolni qanday tiklayman?",
+      "answer": "Kirish sahifasidagi \"Parolni unutdingizmi\" tugmasini bosing va xatdagi havolaga o'ting; yoki tizimda bo'lsangiz, profilingizdan parolni o'zgartiring."
+    },
+    {
+      "id": "notifications",
+      "category": "notifications",
+      "question": "Yangi buyurtma va ofitsiant chaqiruvlari haqida qanday xabar olaman?",
+      "answer": "Sarlavhadagi qo'ng'iroq belgisi yangi buyurtmalar, ofitsiant chaqiruvlari va mijozlardan hisob so'rovlari haqida jonli bildirishnomalarni ko'rsatadi."
+    }
+  ]
+}

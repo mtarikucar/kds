@@ -34,6 +34,7 @@ import CommissionsPage from './pages/marketing/CommissionsPage';
 import MarketingUsersPage from './pages/marketing/MarketingUsersPage';
 import { MarketingLayout, MarketingProtectedRoute } from './features/marketing/components';
 import ProfilePage from './pages/profile/ProfilePage';
+import FAQPage from './pages/help/FAQPage';
 import CustomersPage from './pages/customers/CustomersPage';
 import CustomerDetailPage from './pages/customers/CustomerDetailPage';
 import QRMenuPage from './pages/qr-menu/QRMenuPage';
@@ -154,6 +155,7 @@ function App() {
       <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/help" element={<FAQPage />} />
       </Route>
 
       {/* Protected Routes - ADMIN, MANAGER, WAITER */}

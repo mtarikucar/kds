@@ -84,16 +84,6 @@
         "content": "Tüm QR kodlarınızı tek seferde indirin veya masa QR kodları sayfası yazdırın. Masalara yerleştirmek veya girişte sergilemek için idealdir."
       }
     },
-    "tables": {
-      "viewToggle": {
-        "title": "Görünüm Seçenekleri",
-        "content": "Grid görünümü ve 3D Kat Planı görünümü arasında geçiş yapın. 3D görünüm ile restoran düzeninizi görsel olarak tasarlayabilirsiniz."
-      },
-      "floorPlan3d": {
-        "title": "3D Kat Planı",
-        "content": "YENİ! Restoran düzeninizi 3D olarak tasarlayın. Masaları sürükleyip bırakın, mobilya ekleyin ve mekanınızın sanal bir temsilini oluşturun."
-      }
-    },
     "settings": {
       "navigation": {
         "title": "Ayarlar Menüsü",
@@ -105,6 +95,10 @@
       "content": "Gerçek zamanlı bildirimlerle güncel kalın. Yeni siparişler, garson çağrıları ve müşteri hesap istekleri için uyarılar alacaksınız."
     },
     "kitchen": {
+      "welcome": {
+        "title": "Mutfak Ekranına Hoşgeldiniz!",
+        "content": "Burası mutfak ekibinin sipariş akışını yönettiği ekrandır. Bekleyen, hazırlanan ve hazır olan siparişleri tek bir ekrandan takip edebilirsiniz."
+      },
       "stats": {
         "title": "Sipariş İstatistikleri",
         "content": "Sipariş sayılarını bir bakışta takip edin. Bekleyen, hazırlanan ve hazır olan sipariş sayılarını görün."

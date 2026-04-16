@@ -11,6 +11,7 @@ interface OrderQueueProps {
   onUpdateStatus: (orderId: string, status: OrderStatus) => void;
   onCancelOrder?: (orderId: string) => void;
   updatingOrderId?: string;
+  dataTour?: string;
 }
 
 const OrderQueue = ({
@@ -20,6 +21,7 @@ const OrderQueue = ({
   onUpdateStatus,
   onCancelOrder,
   updatingOrderId,
+  dataTour,
 }: OrderQueueProps) => {
   const { t } = useTranslation('kitchen');
 
@@ -73,7 +75,7 @@ const OrderQueue = ({
   const EmptyIcon = config.emptyIcon;
 
   return (
-    <div className={cn('rounded-xl border border-slate-200/60 h-full flex flex-col min-h-0', config.bg)}>
+    <div className={cn('rounded-xl border border-slate-200/60 h-full flex flex-col min-h-0', config.bg)} data-tour={dataTour}>
       {/* Column Header */}
       <div className={cn('flex items-center justify-between px-4 py-3 rounded-t-xl', config.headerBg)}>
         <div className="flex items-center gap-2">

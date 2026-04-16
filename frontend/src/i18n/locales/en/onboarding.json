@@ -84,16 +84,6 @@
         "content": "Download all your QR codes at once or print a sheet of table QR codes. Perfect for placing on tables or displaying at your entrance."
       }
     },
-    "tables": {
-      "viewToggle": {
-        "title": "View Options",
-        "content": "Switch between Grid view and 3D Floor Plan view. The 3D view lets you design your restaurant layout visually."
-      },
-      "floorPlan3d": {
-        "title": "3D Floor Plan",
-        "content": "NEW! Design your restaurant layout in 3D. Drag and drop tables, add furniture, and create a virtual representation of your space."
-      }
-    },
     "settings": {
       "navigation": {
         "title": "Settings Menu",
@@ -105,6 +95,10 @@
       "content": "Stay updated with real-time notifications. You'll receive alerts for new orders, waiter calls, and bill requests from customers."
     },
     "kitchen": {
+      "welcome": {
+        "title": "Welcome to the Kitchen Display!",
+        "content": "This is where your kitchen team manages the order flow. Track preparation times, urgency and ready orders all from one screen."
+      },
       "stats": {
         "title": "Order Statistics",
         "content": "Track order counts at a glance. See how many orders are pending, being prepared, and ready for service."

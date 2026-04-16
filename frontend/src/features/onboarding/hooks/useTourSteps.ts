@@ -82,8 +82,7 @@ function getStepKey(tourId: string, index: number): string {
       'menu.addCategory',
       'qr.management',
       'qr.download',
-      'tables.viewToggle',
-      'tables.floorPlan3d',
+      'notifications',
       'settings.navigation',
       'completion',
     ],
@@ -95,9 +94,11 @@ function getStepKey(tourId: string, index: number): string {
       'completion',
     ],
     [TOUR_IDS.KITCHEN]: [
+      'kitchen.welcome',
       'kitchen.stats',
       'kitchen.orderQueues',
       'kitchen.orderActions',
+      'completion',
     ],
   };
 
