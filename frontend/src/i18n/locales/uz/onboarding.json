@@ -84,16 +84,6 @@
         "content": "Barcha QR kodlaringizni bir vaqtning o'zida yuklab oling yoki stol QR kodlari varag'ini chop eting. Stollarga joylashtirish yoki kirish joyida ko'rsatish uchun ideal."
       }
     },
-    "tables": {
-      "viewToggle": {
-        "title": "Ko'rish parametrlari",
-        "content": "Grid ko'rinishi va 3D qavat rejasi ko'rinishi o'rtasida almashing. 3D ko'rinish restoraningiz joylashuvini vizual loyihalash imkonini beradi."
-      },
-      "floorPlan3d": {
-        "title": "3D Qavat rejasi",
-        "content": "YANGI! Restoraningiz joylashuvini 3D da loyihalang. Stollarni sudrab tashlang, mebel qo'shing va makoningizning virtual tasvirini yarating."
-      }
-    },
     "settings": {
       "navigation": {
         "title": "Sozlamalar menyusi",
@@ -105,6 +95,10 @@
       "content": "Real vaqtdagi bildirishnomalar bilan xabardor bo'ling. Yangi buyurtmalar, ofitsiant chaqiruvlari va mijozlardan hisob so'rovlari haqida ogohlantirishlar olasiz."
     },
     "kitchen": {
+      "welcome": {
+        "title": "Oshxona ekraniga xush kelibsiz!",
+        "content": "Bu oshxona jamoasi buyurtma oqimini boshqaradigan ekrandir. Tayyorlash vaqti, shoshilinchlik va tayyor buyurtmalarni bir ekrandan kuzating."
+      },
       "stats": {
         "title": "Buyurtma statistikasi",
         "content": "Buyurtma sonlarini bir qarashda kuzating. Qancha buyurtma kutilayotgan, tayyorlanayotgan va xizmat ko'rsatishga tayyor ekanligini ko'ring."

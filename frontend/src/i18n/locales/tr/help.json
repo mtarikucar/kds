@@ -1,0 +1,142 @@
+{
+  "title": "Sık Sorulan Sorular",
+  "subtitle": "HummyTummy hakkında en çok sorulan soruların yanıtlarını burada bulabilirsiniz.",
+  "searchPlaceholder": "Sorularda ara...",
+  "noResults": "Aramanızla eşleşen soru bulunamadı.",
+  "resultCount": "{{count}} sonuç",
+  "resultCount_plural": "{{count}} sonuç",
+  "categories": {
+    "all": "Tümü",
+    "general": "Genel",
+    "pos": "POS",
+    "menu": "Menü",
+    "tables": "Masalar ve Rezervasyon",
+    "kitchen": "Mutfak Ekranı",
+    "qr": "QR Kodlar",
+    "subscription": "Abonelik",
+    "account": "Hesap",
+    "notifications": "Bildirimler"
+  },
+  "items": [
+    {
+      "id": "what-is",
+      "category": "general",
+      "question": "HummyTummy nedir?",
+      "answer": "HummyTummy; POS, mutfak ekranı, menü ve masa yönetimi, QR sipariş ve raporlamayı tek çatı altında birleştiren bulut tabanlı bir restoran yönetim platformudur."
+    },
+    {
+      "id": "devices",
+      "category": "general",
+      "question": "Hangi cihazlarda kullanabilirim?",
+      "answer": "Modern bir tarayıcısı olan her cihazda — masaüstü, tablet ve telefonlarda kullanabilirsiniz. Windows ve macOS için bağımsız bir masaüstü uygulaması da mevcuttur."
+    },
+    {
+      "id": "language",
+      "category": "general",
+      "question": "Dili nasıl değiştiririm?",
+      "answer": "Üst menüdeki dil seçiciyi kullanın. İngilizce, Türkçe, Rusça, Özbekçe ve Arapça desteklenir. Seçtiğiniz dil cihazınızda hatırlanır."
+    },
+    {
+      "id": "reports",
+      "category": "general",
+      "question": "Satış raporlarını ve analizleri nerede görürüm?",
+      "answer": "Yönetici menüsündeki Raporlar veya Analitik sayfalarında ciro, en çok satan ürünler, saatlik dağılım ve daha fazlasını bulabilirsiniz."
+    },
+    {
+      "id": "pos-order",
+      "category": "pos",
+      "question": "POS'ta nasıl sipariş oluştururum?",
+      "answer": "POS'u açın, bir masa seçin veya paket sipariş başlatın, menü panelinden ürünleri sepete ekleyin, ardından ödeme alın ya da siparişi mutfağa gönderin."
+    },
+    {
+      "id": "split-bill",
+      "category": "pos",
+      "question": "Hesabı müşteriler arasında bölebilir miyim?",
+      "answer": "Evet. Sipariş sepetini açıp bölme seçeneğini kullanarak hesabı ürün bazında veya tutar bazında bölebilirsiniz."
+    },
+    {
+      "id": "add-product",
+      "category": "menu",
+      "question": "Menüye nasıl yeni ürün eklerim?",
+      "answer": "Menü Yönetimi'ne gidin, bir kategori açın veya yeni kategori oluşturun, ardından \"Ürün Ekle\"ye tıklayın. Ad, fiyat, açıklama girip görsel yükleyin."
+    },
+    {
+      "id": "stock",
+      "category": "menu",
+      "question": "Stokları nereden yönetirim?",
+      "answer": "Yönetici menüsündeki Stok Yönetimi sayfasından. Miktarları güncelleyebilir, malzemeleri takip edebilir ve düşük stok uyarıları alabilirsiniz."
+    },
+    {
+      "id": "tables",
+      "category": "tables",
+      "question": "Masaları nasıl eklerim ve düzenlerim?",
+      "answer": "Masa Yönetimi sayfasından masa ekleyebilir, yeniden adlandırabilir ve durumlarını (boş/dolu) doğrudan grid üzerinden değiştirebilirsiniz."
+    },
+    {
+      "id": "reservations",
+      "category": "tables",
+      "question": "Müşteriler online rezervasyon yapabilir mi?",
+      "answer": "Evet. Genel rezervasyon bağlantısı üzerinden rezervasyon alınabilir ve yönetici panelindeki Rezervasyonlar sayfasından yönetilebilir."
+    },
+    {
+      "id": "kitchen",
+      "category": "kitchen",
+      "question": "Mutfak Ekranı nasıl çalışır?",
+      "answer": "Mutfak sayfası siparişleri Bekleyen, Hazırlanıyor ve Hazır sütunlarında canlı olarak gösterir; aciliyet göstergeleri sayesinde ekip her an ne yapacağını bilir."
+    },
+    {
+      "id": "kitchen-action",
+      "category": "kitchen",
+      "question": "Mutfakta bir siparişi nasıl bir sonraki aşamaya alırım?",
+      "answer": "Sipariş kartındaki aksiyon butonuna tıklayın (örn. \"Hazırlamaya Başla\" veya \"Hazır\"). Durum tüm sistem kullanıcıları için anlık olarak güncellenir."
+    },
+    {
+      "id": "qr-create",
+      "category": "qr",
+      "question": "Masalarım için QR kod nasıl oluştururum?",
+      "answer": "QR Yönetimi'ne gidin, \"Masa QR\" seçeneğiyle her masa için QR oluşturun. Renkleri özelleştirebilir, logonuzu ekleyebilirsiniz."
+    },
+    {
+      "id": "qr-download",
+      "category": "qr",
+      "question": "QR kodları toplu olarak indirebilir veya yazdırabilir miyim?",
+      "answer": "Evet — QR Yönetimi sayfasındaki \"Tümünü İndir\" veya \"Sayfa Yazdır\" seçeneğini kullanabilirsiniz."
+    },
+    {
+      "id": "qr-menu",
+      "category": "qr",
+      "question": "Müşteri QR menüyü nasıl görüyor?",
+      "answer": "Müşteri QR kodu okutunca markanıza özel bir menü görür. Kategorileri inceleyip ürünleri sepete ekleyerek, uygulama kurmadan sipariş verebilir."
+    },
+    {
+      "id": "plan-change",
+      "category": "subscription",
+      "question": "Abonelik planımı değiştirebilir miyim?",
+      "answer": "Evet. Ayarlar → Abonelik bölümüne gidip yeni bir plan seçebilirsiniz. Değişiklik bir sonraki faturalama döneminde veya uygun olduğu durumda hemen uygulanır."
+    },
+    {
+      "id": "cancel",
+      "category": "subscription",
+      "question": "Aboneliğimi istediğim zaman iptal edebilir miyim?",
+      "answer": "Evet, istediğiniz zaman iptal edebilirsiniz. Hesabınız ödenen dönemin sonuna kadar aktif kalır."
+    },
+    {
+      "id": "personnel",
+      "category": "account",
+      "question": "Personel nasıl eklerim?",
+      "answer": "Personel Yönetimi sayfasından Admin, Müdür, Garson veya Mutfak rollerinde kullanıcı oluşturabilirsiniz. Her rolün kendi yetkileri ve paneli vardır."
+    },
+    {
+      "id": "password",
+      "category": "account",
+      "question": "Şifremi nasıl sıfırlarım?",
+      "answer": "Giriş sayfasındaki \"Şifremi Unuttum\" bağlantısına tıklayıp e-postadaki adımları izleyin. Zaten giriş yaptıysanız profilinizden de değiştirebilirsiniz."
+    },
+    {
+      "id": "notifications",
+      "category": "notifications",
+      "question": "Yeni sipariş ve garson çağrılarından nasıl haberdar olurum?",
+      "answer": "Üst menüdeki çan simgesi canlı bildirimleri gösterir; yeni sipariş, garson çağrısı ve müşteri hesap istekleri anlık olarak burada görünür."
+    }
+  ]
+}

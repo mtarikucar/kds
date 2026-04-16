@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import { RotateCcw, HelpCircle } from 'lucide-react';
 import { Mascot } from './Mascot';
 import { useOnboardingContext } from './OnboardingProvider';
@@ -75,16 +76,15 @@ export function MascotButton() {
               <RotateCcw className="w-4 h-4 text-slate-500" aria-hidden="true" />
               {t('mascot.restartTour')}
             </button>
-            <a
-              href="https://hummytummy.com/docs"
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              to="/help"
+              onClick={() => setIsOpen(false)}
               role="menuitem"
               className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
             >
               <HelpCircle className="w-4 h-4 text-slate-500" aria-hidden="true" />
               {t('mascot.help')}
-            </a>
+            </Link>
           </div>
         </div>
       )}

@@ -108,6 +108,7 @@ const KitchenDisplayPage = () => {
           onUpdateStatus={handleUpdateStatus}
           onCancelOrder={handleCancelOrder}
           updatingOrderId={updatingOrderId || undefined}
+          dataTour="order-actions"
         />
 
         <OrderQueue

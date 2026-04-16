@@ -1,0 +1,142 @@
+{
+  "title": "Frequently Asked Questions",
+  "subtitle": "Find answers to the most common questions about HummyTummy.",
+  "searchPlaceholder": "Search questions...",
+  "noResults": "No questions match your search.",
+  "resultCount": "{{count}} result",
+  "resultCount_plural": "{{count}} results",
+  "categories": {
+    "all": "All",
+    "general": "General",
+    "pos": "POS",
+    "menu": "Menu",
+    "tables": "Tables & Reservations",
+    "kitchen": "Kitchen Display",
+    "qr": "QR Codes",
+    "subscription": "Subscription",
+    "account": "Account",
+    "notifications": "Notifications"
+  },
+  "items": [
+    {
+      "id": "what-is",
+      "category": "general",
+      "question": "What is HummyTummy?",
+      "answer": "HummyTummy is a cloud-based restaurant management platform that unifies POS, kitchen display, menu and table management, QR ordering and reporting in a single product."
+    },
+    {
+      "id": "devices",
+      "category": "general",
+      "question": "Which devices can I use?",
+      "answer": "Any modern device with a browser — desktops, tablets and phones. A standalone desktop app is also available for Windows and macOS."
+    },
+    {
+      "id": "language",
+      "category": "general",
+      "question": "How do I change the language?",
+      "answer": "Use the language switcher in the header. English, Turkish, Russian, Uzbek and Arabic are supported. The selected language is remembered on the device."
+    },
+    {
+      "id": "reports",
+      "category": "general",
+      "question": "Where can I see sales reports and analytics?",
+      "answer": "Go to Reports or Analytics from the admin menu. You will find revenue, top products, hourly breakdowns and more."
+    },
+    {
+      "id": "pos-order",
+      "category": "pos",
+      "question": "How do I create an order in the POS?",
+      "answer": "Open the POS, pick a table or start a takeaway order, add products from the menu panel to the cart, then process payment or send the order to the kitchen."
+    },
+    {
+      "id": "split-bill",
+      "category": "pos",
+      "question": "Can I split a bill between customers?",
+      "answer": "Yes. Open the order cart, choose the split option and divide the bill by item or by amount."
+    },
+    {
+      "id": "add-product",
+      "category": "menu",
+      "question": "How do I add a new product to the menu?",
+      "answer": "Go to Menu Management, open a category or create one, then click \"Add Product\". Fill in the name, price, description and upload an image."
+    },
+    {
+      "id": "stock",
+      "category": "menu",
+      "question": "Where do I manage stock levels?",
+      "answer": "From Stock Management under the admin menu. You can adjust inventory, track ingredients and receive low-stock alerts."
+    },
+    {
+      "id": "tables",
+      "category": "tables",
+      "question": "How do I add and edit tables?",
+      "answer": "Go to Table Management. You can add, rename and mark tables as occupied or available directly from the grid."
+    },
+    {
+      "id": "reservations",
+      "category": "tables",
+      "question": "Can customers reserve tables online?",
+      "answer": "Yes. Reservations can be taken via the public reservation link and managed from the Reservations page in the admin panel."
+    },
+    {
+      "id": "kitchen",
+      "category": "kitchen",
+      "question": "How does the Kitchen Display work?",
+      "answer": "The Kitchen page shows orders in Pending, Preparing and Ready columns with live updates and urgency indicators so the team always knows what to cook next."
+    },
+    {
+      "id": "kitchen-action",
+      "category": "kitchen",
+      "question": "How do I move an order forward in the kitchen?",
+      "answer": "Click the action button on the order card (e.g. \"Start Preparing\" or \"Mark Ready\"). The status updates in real time for everyone using the system."
+    },
+    {
+      "id": "qr-create",
+      "category": "qr",
+      "question": "How do I create QR codes for my tables?",
+      "answer": "Go to QR Management, pick \"Table QR\" and generate one per table. You can customise colours and add your logo."
+    },
+    {
+      "id": "qr-download",
+      "category": "qr",
+      "question": "Can I download or print all QR codes at once?",
+      "answer": "Yes — use the \"Download all\" or \"Print sheet\" option on the QR Management page."
+    },
+    {
+      "id": "qr-menu",
+      "category": "qr",
+      "question": "What does my QR menu look like to customers?",
+      "answer": "Customers scan the QR code and see a branded menu where they can browse categories, add items to a cart and place an order without installing an app."
+    },
+    {
+      "id": "plan-change",
+      "category": "subscription",
+      "question": "Can I change my subscription plan?",
+      "answer": "Yes. Go to Settings → Subscription and pick a new plan. Changes apply at the next billing cycle, or immediately where applicable."
+    },
+    {
+      "id": "cancel",
+      "category": "subscription",
+      "question": "Can I cancel my subscription anytime?",
+      "answer": "Yes, you can cancel at any time. Your account stays active until the end of the paid period."
+    },
+    {
+      "id": "personnel",
+      "category": "account",
+      "question": "How do I add staff members?",
+      "answer": "Go to Personnel Management and create users with roles such as Admin, Manager, Waiter or Kitchen. Each role has its own permissions and dashboard."
+    },
+    {
+      "id": "password",
+      "category": "account",
+      "question": "How do I reset my password?",
+      "answer": "Click \"Forgot password\" on the login page and follow the email link, or change your password from your profile if you are already signed in."
+    },
+    {
+      "id": "notifications",
+      "category": "notifications",
+      "question": "How do I get alerts for new orders and waiter calls?",
+      "answer": "The bell icon in the header shows live notifications for new orders, waiter calls and bill requests from customers."
+    }
+  ]
+}

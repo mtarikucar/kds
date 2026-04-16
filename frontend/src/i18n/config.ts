@@ -20,6 +20,7 @@ import enOnboarding from './locales/en/onboarding.json';
 import enReservations from './locales/en/reservations.json';
 import enPersonnel from './locales/en/personnel.json';
 import enStock from './locales/en/stock.json';
+import enHelp from './locales/en/help.json';
 
 import trCommon from './locales/tr/common.json';
 import trAuth from './locales/tr/auth.json';
@@ -37,6 +38,7 @@ import trOnboarding from './locales/tr/onboarding.json';
 import trReservations from './locales/tr/reservations.json';
 import trPersonnel from './locales/tr/personnel.json';
 import trStock from './locales/tr/stock.json';
+import trHelp from './locales/tr/help.json';
 
 import ruCommon from './locales/ru/common.json';
 import ruAuth from './locales/ru/auth.json';
@@ -54,6 +56,7 @@ import ruOnboarding from './locales/ru/onboarding.json';
 import ruReservations from './locales/ru/reservations.json';
 import ruPersonnel from './locales/ru/personnel.json';
 import ruStock from './locales/ru/stock.json';
+import ruHelp from './locales/ru/help.json';
 
 import uzCommon from './locales/uz/common.json';
 import uzAuth from './locales/uz/auth.json';
@@ -71,6 +74,7 @@ import uzOnboarding from './locales/uz/onboarding.json';
 import uzReservations from './locales/uz/reservations.json';
 import uzPersonnel from './locales/uz/personnel.json';
 import uzStock from './locales/uz/stock.json';
+import uzHelp from './locales/uz/help.json';
 
 import arCommon from './locales/ar/common.json';
 import arAuth from './locales/ar/auth.json';
@@ -88,6 +92,7 @@ import arOnboarding from './locales/ar/onboarding.json';
 import arReservations from './locales/ar/reservations.json';
 import arPersonnel from './locales/ar/personnel.json';
 import arStock from './locales/ar/stock.json';
+import arHelp from './locales/ar/help.json';
 
 // Define resources
 const resources = {
@@ -108,6 +113,7 @@ const resources = {
     reservations: enReservations,
     personnel: enPersonnel,
     stock: enStock,
+    help: enHelp,
   },
   tr: {
     common: trCommon,
@@ -126,6 +132,7 @@ const resources = {
     reservations: trReservations,
     personnel: trPersonnel,
     stock: trStock,
+    help: trHelp,
   },
   ru: {
     common: ruCommon,
@@ -144,6 +151,7 @@ const resources = {
     reservations: ruReservations,
     personnel: ruPersonnel,
     stock: ruStock,
+    help: ruHelp,
   },
   uz: {
     common: uzCommon,
@@ -162,6 +170,7 @@ const resources = {
     reservations: uzReservations,
     personnel: uzPersonnel,
     stock: uzStock,
+    help: uzHelp,
   },
   ar: {
     common: arCommon,
@@ -180,6 +189,7 @@ const resources = {
     reservations: arReservations,
     personnel: arPersonnel,
     stock: arStock,
+    help: arHelp,
   },
 };
 
@@ -264,7 +274,7 @@ i18next
     lng: getInitialLanguage(),
     fallbackLng: 'en',
     defaultNS: 'common',
-    ns: ['common', 'auth', 'pos', 'kitchen', 'menu', 'orders', 'customers', 'settings', 'subscriptions', 'reports', 'validation', 'errors', 'onboarding', 'reservations', 'personnel', 'stock'],
+    ns: ['common', 'auth', 'pos', 'kitchen', 'menu', 'orders', 'customers', 'settings', 'subscriptions', 'reports', 'validation', 'errors', 'onboarding', 'reservations', 'personnel', 'stock', 'help'],
     interpolation: {
       escapeValue: false, // React already escapes values
     },

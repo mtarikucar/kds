@@ -86,21 +86,11 @@ export const adminTourSteps: TourStep[] = [
     spotlightPadding: 8,
   },
   {
-    target: '[data-tour="view-toggle"]',
+    target: '[data-tour="notifications"]',
     content: '',
     title: '',
     placement: 'bottom',
     disableBeacon: true,
-    route: '/admin/tables',
-    spotlightPadding: 8,
-  },
-  {
-    target: '[data-tour="floor-plan-3d"]',
-    content: '',
-    title: '',
-    placement: 'top',
-    disableBeacon: true,
-    route: '/admin/tables',
     spotlightPadding: 8,
   },
   {
@@ -109,7 +99,7 @@ export const adminTourSteps: TourStep[] = [
     title: '',
     placement: 'right',
     disableBeacon: true,
-    route: '/admin/settings/subscription',
+    route: '/admin/settings',
     spotlightPadding: 8,
   },
   {
