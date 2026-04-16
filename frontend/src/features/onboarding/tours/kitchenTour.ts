@@ -1,4 +1,4 @@
-import { TourStep, TourConfig, TOUR_IDS } from './types';
+import { TourStep, TourConfig, TOUR_IDS, COMPLETION_STEP } from './types';
 
 export const kitchenTourSteps: TourStep[] = [
   {
@@ -40,19 +40,7 @@ export const kitchenTourSteps: TourStep[] = [
     route: '/kitchen',
     spotlightPadding: 8,
   },
-  {
-    target: 'body',
-    content: '',
-    title: '',
-    placement: 'center',
-    disableBeacon: true,
-    spotlightPadding: 0,
-    styles: {
-      spotlight: {
-        display: 'none',
-      },
-    },
-  },
+  COMPLETION_STEP,
 ];
 
 export const kitchenTour: TourConfig = {

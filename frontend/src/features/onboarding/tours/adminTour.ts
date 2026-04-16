@@ -1,4 +1,4 @@
-import { TourStep, TourConfig, TOUR_IDS } from './types';
+import { TourStep, TourConfig, TOUR_IDS, COMPLETION_STEP } from './types';
 
 export const adminTourSteps: TourStep[] = [
   {
@@ -102,19 +102,7 @@ export const adminTourSteps: TourStep[] = [
     route: '/admin/settings',
     spotlightPadding: 8,
   },
-  {
-    target: 'body',
-    content: '',
-    title: '',
-    placement: 'center',
-    disableBeacon: true,
-    spotlightPadding: 0,
-    styles: {
-      spotlight: {
-        display: 'none',
-      },
-    },
-  },
+  COMPLETION_STEP,
 ];
 
 export const adminTour: TourConfig = {
