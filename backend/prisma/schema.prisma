@@ -1629,8 +1629,26 @@ model SuperAdmin {
   firstName         String
   lastName          String
   status            String    @default("ACTIVE") // ACTIVE, INACTIVE
-  twoFactorSecret   String?
-  twoFactorEnabled  Boolean   @default(false)
+
+  // 2FA (TOTP)
+  twoFactorSecret          String?
+  twoFactorEnabled         Boolean  @default(false)
+  // Secret that has been generated but not yet confirmed by a successful
+  // TOTP; promoted to twoFactorSecret only after enable2FA verifies it.
+  pendingTwoFactorSecret   String?
+  // One-time recovery codes (sha256-hashed) for when the authenticator
+  // is lost. Each entry gets removed as it is used.
+  backupCodes              String[] @default([])
+  // Replay-protection: records the TOTP time step of the last accepted
+  // code, plus when it expires. A code can only be used once.
+  lastTotpStep             BigInt?
+  lastTotpStepExpiresAt    DateTime?
+
+  // Session revocation: bumped on logout, password change, 2FA change,
+  // account suspension. Access tokens carry this version and are
+  // rejected once they don't match.
+  tokenVersion             Int      @default(0)
+
   lastLogin         DateTime?
   lastLoginIp       String?
   failedLogins      Int       @default(0)

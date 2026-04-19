@@ -18,6 +18,7 @@ import {
   ExtendSubscriptionDto,
   UpdateSubscriptionDto,
 } from '../dto/subscription-filter.dto';
+import { CancelSubscriptionDto } from '../dto/cancel-subscription.dto';
 import { SuperAdminGuard } from '../guards/superadmin.guard';
 import { SuperAdminRoute } from '../decorators/superadmin.decorator';
 import { CurrentSuperAdmin } from '../decorators/current-superadmin.decorator';
@@ -116,10 +117,10 @@ export class SuperAdminSubscriptionsController {
   }
 
   @Post('subscriptions/:id/cancel')
-  @ApiOperation({ summary: 'Cancel subscription' })
+  @ApiOperation({ summary: 'Cancel subscription (IMMEDIATE or AT_PERIOD_END)' })
   async cancelSubscription(
     @Param('id') id: string,
-    @Body('reason') reason: string,
+    @Body() dto: CancelSubscriptionDto,
     @CurrentSuperAdmin('id') actorId: string,
     @CurrentSuperAdmin('email') actorEmail: string,
   ) {
@@ -127,7 +128,8 @@ export class SuperAdminSubscriptionsController {
       id,
       actorId,
       actorEmail,
-      reason,
+      dto.mode,
+      dto.reason,
     );
   }
 }

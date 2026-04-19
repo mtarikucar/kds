@@ -198,6 +198,16 @@ export class SuperAdminTenantsService {
 
     const previousStatus = tenant.status;
 
+    // No-op — skip the write and the audit row so operator noise stays low.
+    if (previousStatus === updateDto.status) {
+      return this.prisma.tenant.findUnique({
+        where: { id },
+        include: {
+          currentPlan: { select: { id: true, name: true, displayName: true } },
+        },
+      });
+    }
+
     // Transaction: status flip + quarantine released subdomain atomically.
     const updated = await this.prisma.$transaction(async (tx) => {
       const next = await tx.tenant.update({
@@ -291,24 +301,27 @@ export class SuperAdminTenantsService {
     const reason = updateDto.reason ? ` Reason: ${updateDto.reason}` : '';
     const message = `${tenantName} status is now ${updateDto.status}.${reason}`;
 
-    for (const admin of admins) {
-      await this.notificationsService
-        .createAndSend({
-          title,
-          message,
-          type:
-            updateDto.status === TenantStatus.ACTIVE
-              ? NotificationType.SUCCESS
-              : NotificationType.WARNING,
-          userId: admin.id,
-          tenantId,
-          data: { action: 'TENANT_STATUS_CHANGE', status: updateDto.status },
-        })
-        .catch((err) => console.error('notifyAdmins failed:', err));
-      await this.emailService
-        .sendPlainEmail(admin.email, title, message)
-        .catch((err) => console.error('sendPlainEmail failed:', err));
-    }
+    // Fan out in parallel so a slow SMTP can't block the HTTP response.
+    await Promise.allSettled(
+      admins.flatMap((admin) => [
+        this.notificationsService
+          .createAndSend({
+            title,
+            message,
+            type:
+              updateDto.status === TenantStatus.ACTIVE
+                ? NotificationType.SUCCESS
+                : NotificationType.WARNING,
+            userId: admin.id,
+            tenantId,
+            data: { action: 'TENANT_STATUS_CHANGE', status: updateDto.status },
+          })
+          .catch((err) => console.error('notifyAdmins failed:', err)),
+        this.emailService
+          .sendPlainEmail(admin.email, title, message)
+          .catch((err) => console.error('sendPlainEmail failed:', err)),
+      ]),
+    );
   }
 
   async getTenantUsers(tenantId: string, page: number = 1, limit: number = 20) {

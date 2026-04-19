@@ -37,23 +37,25 @@ export class SuperAdminSubscriptionsService {
         description: createDto.description,
         monthlyPrice: createDto.monthlyPrice,
         yearlyPrice: createDto.yearlyPrice,
-        currency: createDto.currency || 'TRY',
-        trialDays: createDto.trialDays || 0,
-        maxUsers: createDto.maxUsers || 1,
-        maxTables: createDto.maxTables || 5,
-        maxProducts: createDto.maxProducts || 50,
-        maxCategories: createDto.maxCategories || 10,
-        maxMonthlyOrders: createDto.maxMonthlyOrders || 100,
-        advancedReports: createDto.advancedReports || false,
-        multiLocation: createDto.multiLocation || false,
-        customBranding: createDto.customBranding || false,
-        apiAccess: createDto.apiAccess || false,
-        prioritySupport: createDto.prioritySupport || false,
-        inventoryTracking: createDto.inventoryTracking || false,
+        // Use nullish coalescing so an explicit `false` from the caller
+        // isn't silently flipped to a default `true`/number.
+        currency: createDto.currency ?? 'TRY',
+        trialDays: createDto.trialDays ?? 0,
+        maxUsers: createDto.maxUsers ?? 1,
+        maxTables: createDto.maxTables ?? 5,
+        maxProducts: createDto.maxProducts ?? 50,
+        maxCategories: createDto.maxCategories ?? 10,
+        maxMonthlyOrders: createDto.maxMonthlyOrders ?? 100,
+        advancedReports: createDto.advancedReports ?? false,
+        multiLocation: createDto.multiLocation ?? false,
+        customBranding: createDto.customBranding ?? false,
+        apiAccess: createDto.apiAccess ?? false,
+        prioritySupport: createDto.prioritySupport ?? false,
+        inventoryTracking: createDto.inventoryTracking ?? false,
         kdsIntegration: createDto.kdsIntegration ?? true,
-        reservationSystem: createDto.reservationSystem || false,
-        personnelManagement: createDto.personnelManagement || false,
-        deliveryIntegration: createDto.deliveryIntegration || false,
+        reservationSystem: createDto.reservationSystem ?? false,
+        personnelManagement: createDto.personnelManagement ?? false,
+        deliveryIntegration: createDto.deliveryIntegration ?? false,
         isActive: createDto.isActive ?? true,
       },
     });
@@ -246,7 +248,7 @@ export class SuperAdminSubscriptionsService {
       throw new NotFoundException('Subscription not found');
     }
 
-    const updateData: any = {};
+    const updateData: { planId?: string; status?: string } = {};
 
     if (updateDto.planId) {
       const plan = await this.prisma.subscriptionPlan.findUnique({
@@ -256,29 +258,31 @@ export class SuperAdminSubscriptionsService {
         throw new NotFoundException('Plan not found');
       }
       updateData.planId = updateDto.planId;
-
-      // Also update tenant's current plan
-      await this.prisma.tenant.update({
-        where: { id: existing.tenantId },
-        data: { currentPlanId: updateDto.planId },
-      });
     }
 
     if (updateDto.status) {
       updateData.status = updateDto.status;
     }
 
-    const subscription = await this.prisma.subscription.update({
-      where: { id },
-      data: updateData,
-      include: {
-        tenant: {
-          select: { id: true, name: true },
+    // Subscription plan change + tenant.currentPlanId must move
+    // atomically, otherwise a failure between them leaves feature
+    // gating out of sync with the subscription row.
+    const subscription = await this.prisma.$transaction(async (tx) => {
+      const sub = await tx.subscription.update({
+        where: { id },
+        data: updateData,
+        include: {
+          tenant: { select: { id: true, name: true } },
+          plan: { select: { id: true, name: true, displayName: true } },
         },
-        plan: {
-          select: { id: true, name: true, displayName: true },
-        },
-      },
+      });
+      if (updateData.planId) {
+        await tx.tenant.update({
+          where: { id: existing.tenantId },
+          data: { currentPlanId: updateData.planId },
+        });
+      }
+      return sub;
     });
 
     await this.auditService.log({
@@ -357,6 +361,7 @@ export class SuperAdminSubscriptionsService {
     id: string,
     actorId: string,
     actorEmail: string,
+    mode: 'IMMEDIATE' | 'AT_PERIOD_END' = 'AT_PERIOD_END',
     reason?: string,
   ) {
     const subscription = await this.prisma.subscription.findUnique({
@@ -368,14 +373,31 @@ export class SuperAdminSubscriptionsService {
       throw new NotFoundException('Subscription not found');
     }
 
+    const now = new Date();
+    // The two modes are mutually exclusive — the prior implementation
+    // wrote status=CANCELLED AND cancelAtPeriodEnd=true, which left
+    // downstream billing/feature-gating code unable to tell the admin's
+    // intent.
+    const data =
+      mode === 'IMMEDIATE'
+        ? {
+            status: 'CANCELLED',
+            cancelledAt: now,
+            endedAt: now,
+            cancelAtPeriodEnd: false,
+            autoRenew: false,
+            cancellationReason: reason,
+          }
+        : {
+            cancelAtPeriodEnd: true,
+            autoRenew: false,
+            cancelledAt: now,
+            cancellationReason: reason,
+          };
+
     const updated = await this.prisma.subscription.update({
       where: { id },
-      data: {
-        status: 'CANCELLED',
-        cancelledAt: new Date(),
-        cancellationReason: reason,
-        cancelAtPeriodEnd: true,
-      },
+      data,
       include: {
         tenant: {
           select: { id: true, name: true },

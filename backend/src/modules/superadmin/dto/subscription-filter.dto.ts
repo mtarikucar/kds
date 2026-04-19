@@ -1,21 +1,30 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsInt, Min, Max, IsNumber, IsBoolean, IsDateString } from 'class-validator';
+import { IsEnum, IsIn, IsUUID, IsOptional, IsString, IsInt, Min, Max, IsNumber, IsBoolean, IsDateString, MaxLength } from 'class-validator';
+import { PartialType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
+const SUBSCRIPTION_STATUSES = [
+  'ACTIVE',
+  'CANCELLED',
+  'EXPIRED',
+  'PAST_DUE',
+  'TRIALING',
+] as const;
+
 export class SubscriptionFilterDto {
-  @ApiPropertyOptional({ description: 'Filter by status' })
+  @ApiPropertyOptional({ enum: SUBSCRIPTION_STATUSES })
   @IsOptional()
-  @IsString()
-  status?: string;
+  @IsIn(SUBSCRIPTION_STATUSES)
+  status?: (typeof SUBSCRIPTION_STATUSES)[number];
 
   @ApiPropertyOptional({ description: 'Filter by plan ID' })
   @IsOptional()
-  @IsString()
+  @IsUUID()
   planId?: string;
 
   @ApiPropertyOptional({ description: 'Filter by tenant ID' })
   @IsOptional()
-  @IsString()
+  @IsUUID()
   tenantId?: string;
 
   @ApiPropertyOptional({ default: 1, minimum: 1 })
@@ -37,25 +46,30 @@ export class SubscriptionFilterDto {
 export class CreatePlanDto {
   @ApiProperty()
   @IsString()
+  @MaxLength(50)
   name: string;
 
   @ApiProperty()
   @IsString()
+  @MaxLength(100)
   displayName: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(500)
   description?: string;
 
   @ApiProperty()
   @Type(() => Number)
   @IsNumber()
+  @Min(0)
   monthlyPrice: number;
 
   @ApiProperty()
   @Type(() => Number)
   @IsNumber()
+  @Min(0)
   yearlyPrice: number;
 
   @ApiPropertyOptional({ default: 'TRY' })
@@ -73,30 +87,35 @@ export class CreatePlanDto {
   @IsOptional()
   @Type(() => Number)
   @IsInt()
+  @Min(-1)
   maxUsers?: number = 1;
 
   @ApiPropertyOptional({ default: 5 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
+  @Min(-1)
   maxTables?: number = 5;
 
   @ApiPropertyOptional({ default: 50 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
+  @Min(-1)
   maxProducts?: number = 50;
 
   @ApiPropertyOptional({ default: 10 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
+  @Min(-1)
   maxCategories?: number = 10;
 
   @ApiPropertyOptional({ default: 100 })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
+  @Min(-1)
   maxMonthlyOrders?: number = 100;
 
   @ApiPropertyOptional({ default: false })
@@ -183,7 +202,9 @@ export class CreatePlanDto {
   isDiscountActive?: boolean;
 }
 
-export class UpdatePlanDto extends CreatePlanDto {}
+// PATCH semantics: every field optional so clients don't have to resend
+// the whole plan when touching a single attribute.
+export class UpdatePlanDto extends PartialType(CreatePlanDto) {}
 
 export class ExtendSubscriptionDto {
   @ApiProperty({ description: 'Number of days to extend' })
@@ -201,11 +222,11 @@ export class ExtendSubscriptionDto {
 export class UpdateSubscriptionDto {
   @ApiPropertyOptional({ description: 'New plan ID' })
   @IsOptional()
-  @IsString()
+  @IsUUID()
   planId?: string;
 
-  @ApiPropertyOptional({ description: 'Subscription status' })
+  @ApiPropertyOptional({ enum: SUBSCRIPTION_STATUSES })
   @IsOptional()
-  @IsString()
-  status?: string;
+  @IsIn(SUBSCRIPTION_STATUSES)
+  status?: (typeof SUBSCRIPTION_STATUSES)[number];
 }
