@@ -1,16 +1,28 @@
 import {
-  Controller,
-  Get,
-  Post,
+  BadRequestException,
   Body,
-  Patch,
-  Param,
+  Controller,
   Delete,
-  UseGuards,
+  Get,
+  Param,
+  Patch,
+  Post,
   Query,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { DesktopAppService } from './desktop-app.service';
+
+const VERSION_REGEX = /^v?\d+\.\d+\.\d+$/;
+const PLATFORM_REGEX = /^[a-z0-9-]{1,32}$/i;
 import { CreateReleaseDto } from './dto/create-release.dto';
 import { UpdateReleaseDto } from './dto/update-release.dto';
 import { UpdateManifestDto } from './dto/update-manifest.dto';
@@ -35,33 +47,29 @@ export class DesktopAppController {
    * Check for updates (Tauri updater endpoint)
    */
   @Public()
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @Get('updates/:platform/:currentVersion')
   @ApiOperation({ summary: 'Check for updates - Used by Tauri app' })
-  @ApiParam({ name: 'platform', example: 'windows-x86_64', description: 'Target platform' })
-  @ApiParam({ name: 'currentVersion', example: '0.2.6', description: 'Current app version' })
-  @ApiResponse({
-    status: 200,
-    description: 'Update manifest returned',
-    type: UpdateManifestDto,
-  })
   @ApiResponse({ status: 204, description: 'No update available' })
   async checkForUpdates(
     @Param('platform') platform: string,
     @Param('currentVersion') currentVersion: string,
   ): Promise<UpdateManifestDto | null> {
-    const manifest = await this.desktopAppService.checkForUpdates(platform, currentVersion);
-
-    if (!manifest) {
-      return null; // NestJS will return 204 No Content
+    if (!PLATFORM_REGEX.test(platform)) {
+      throw new BadRequestException('Invalid platform');
     }
-
-    return manifest;
+    if (!VERSION_REGEX.test(currentVersion)) {
+      throw new BadRequestException('Invalid version');
+    }
+    const manifest = await this.desktopAppService.checkForUpdates(platform, currentVersion);
+    return manifest ?? null;
   }
 
   /**
    * Get latest published release (public)
    */
   @Public()
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Get('releases/latest')
   @ApiOperation({ summary: 'Get latest published release' })
   @ApiResponse({ status: 200, description: 'Latest release', type: DesktopRelease })
@@ -74,6 +82,7 @@ export class DesktopAppController {
    * Get all published releases (public)
    */
   @Public()
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Get('releases/published')
   @ApiOperation({ summary: 'Get all published releases' })
   @ApiResponse({ status: 200, description: 'List of published releases', type: [DesktopRelease] })
@@ -85,15 +94,19 @@ export class DesktopAppController {
    * Track download (public, for analytics)
    */
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('releases/:version/download/:platform')
   @ApiOperation({ summary: 'Track a download for analytics' })
-  @ApiParam({ name: 'version', example: '0.2.6' })
-  @ApiParam({ name: 'platform', example: 'windows' })
-  @ApiResponse({ status: 200, description: 'Download tracked' })
   async trackDownload(
     @Param('version') version: string,
     @Param('platform') platform: string,
   ): Promise<{ message: string }> {
+    if (!VERSION_REGEX.test(version)) {
+      throw new BadRequestException('Invalid version');
+    }
+    if (!PLATFORM_REGEX.test(platform)) {
+      throw new BadRequestException('Invalid platform');
+    }
     await this.desktopAppService.trackDownload(version, platform);
     return { message: 'Download tracked' };
   }
@@ -106,6 +119,9 @@ export class DesktopAppController {
    * Create a new release via CI/CD (API Key required)
    * Used by GitHub Actions for automated releases
    */
+  // @Public() skips the global JwtAuthGuard. ApiKeyGuard no longer honors
+  // IS_PUBLIC_KEY (was the bypass bug), so the endpoint still enforces the
+  // DESKTOP_RELEASE_API_KEY header.
   @Public()
   @Post('ci/releases')
   @UseGuards(ApiKeyGuard)

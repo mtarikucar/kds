@@ -273,17 +273,20 @@ export class DesktopAppService {
    * tags (e.g. "1.0.0-beta.1"). Sufficient for admin-controlled release versions.
    */
   private compareVersions(v1: string, v2: string): number {
-    const parts1 = v1.replace('v', '').split('.').map(Number);
-    const parts2 = v2.replace('v', '').split('.').map(Number);
+    const toParts = (v: string) =>
+      v.replace(/^v/, '').split('.').map((part) => {
+        const n = parseInt(part, 10);
+        return Number.isNaN(n) ? 0 : n;
+      });
+    const parts1 = toParts(v1);
+    const parts2 = toParts(v2);
 
     for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
-      const p1 = parts1[i] || 0;
-      const p2 = parts2[i] || 0;
-
+      const p1 = parts1[i] ?? 0;
+      const p2 = parts2[i] ?? 0;
       if (p1 > p2) return 1;
       if (p1 < p2) return -1;
     }
-
     return 0;
   }
 

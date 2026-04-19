@@ -1,8 +1,10 @@
 import {
+  BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
-  BadRequestException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateProductDto } from '../dto/create-product.dto';
 import { UpdateProductDto } from '../dto/update-product.dto';
@@ -194,12 +196,25 @@ export class ProductsService {
   }
 
   async remove(id: string, tenantId: string) {
-    // Check if product exists and belongs to tenant
     await this.findOne(id, tenantId);
 
-    return this.prisma.product.delete({
-      where: { id },
-    });
+    try {
+      return await this.prisma.product.delete({ where: { id } });
+    } catch (err) {
+      // OrderItem.productId uses onDelete: Restrict, so a product that was
+      // ever ordered cannot be hard-deleted. Translate the P2003 into a
+      // clearer 409 instead of a 500 and hint the admin toward "mark
+      // unavailable" (soft-delete via isAvailable:false).
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2003'
+      ) {
+        throw new ConflictException(
+          'Cannot delete a product that has associated orders. Mark it as unavailable instead.',
+        );
+      }
+      throw err;
+    }
   }
 
   async updateStock(id: string, quantity: number, tenantId: string) {

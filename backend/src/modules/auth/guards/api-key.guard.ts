@@ -1,17 +1,20 @@
 import {
-  Injectable,
   CanActivate,
   ExecutionContext,
+  Injectable,
   UnauthorizedException,
 } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
+import { Reflector } from '@nestjs/core';
 import { timingSafeEqual } from 'crypto';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
 /**
- * Guard for validating API keys for service-to-service authentication
- * Used by external services like GitHub Actions for automated tasks
+ * Service-to-service API key guard. Used by GitHub Actions CI to publish
+ * desktop releases. Unlike JwtAuthGuard, this guard does NOT honor
+ * `@Public()` — when explicitly attached to an endpoint via @UseGuards
+ * it always enforces the API key. Previously the public-bypass shortcut
+ * here combined with a `@Public()` controller decoration to leave the
+ * CI endpoints entirely unauthenticated.
  */
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
@@ -21,16 +24,6 @@ export class ApiKeyGuard implements CanActivate {
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
-    // Check if endpoint is marked as public
-    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
-
-    if (isPublic) {
-      return true;
-    }
-
     const request = context.switchToHttp().getRequest();
     const apiKey = this.extractApiKey(request);
 
@@ -39,7 +32,6 @@ export class ApiKeyGuard implements CanActivate {
     }
 
     const validApiKey = this.configService.get<string>('DESKTOP_RELEASE_API_KEY');
-
     if (!validApiKey) {
       throw new UnauthorizedException('API key authentication is not configured');
     }
@@ -52,17 +44,13 @@ export class ApiKeyGuard implements CanActivate {
   }
 
   private extractApiKey(request: any): string | undefined {
-    // Only accept dedicated API-key headers; do not fall back to Authorization
-    // (which is owned by the JWT strategy) to avoid cross-mechanism confusion.
     return request.headers['x-api-key'] || request.headers['api-key'];
   }
 
   private safeCompare(a: string, b: string): boolean {
     const aBuf = Buffer.from(a, 'utf8');
     const bBuf = Buffer.from(b, 'utf8');
-    if (aBuf.length !== bBuf.length) {
-      return false;
-    }
+    if (aBuf.length !== bBuf.length) return false;
     return timingSafeEqual(aBuf, bBuf);
   }
 }
