@@ -1,5 +1,6 @@
 import { Controller, Post, Get, Body, UseGuards, Req } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
@@ -12,12 +13,19 @@ import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 
+// Shared per-endpoint throttle budgets for sensitive auth actions
+const LOGIN_THROTTLE = { default: { limit: 5, ttl: 60_000 } };
+const REGISTER_THROTTLE = { default: { limit: 3, ttl: 3_600_000 } };
+const FORGOT_THROTTLE = { default: { limit: 5, ttl: 60_000 } };
+const VERIFY_THROTTLE = { default: { limit: 5, ttl: 60_000 } };
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Public()
+  @Throttle(REGISTER_THROTTLE)
   @Post('register')
   @ApiOperation({ summary: 'Register a new user' })
   @ApiResponse({
@@ -31,6 +39,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle(LOGIN_THROTTLE)
   @Post('login')
   @ApiOperation({ summary: 'Login user' })
   @ApiResponse({
@@ -66,7 +75,19 @@ export class AuthController {
     return this.authService.getProfile(userId);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Post('logout')
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Log out the authenticated user (records activity)' })
+  @ApiResponse({ status: 200, description: 'Logged out' })
+  async logout(@CurrentUser('id') userId: string, @Req() req: Request) {
+    const ip = req.ip || req.headers['x-forwarded-for']?.toString();
+    const userAgent = req.headers['user-agent'];
+    return this.authService.logout(userId, ip, userAgent);
+  }
+
   @Public()
+  @Throttle(FORGOT_THROTTLE)
   @Post('forgot-password')
   @ApiOperation({ summary: 'Request password reset' })
   @ApiResponse({ status: 200, description: 'Password reset email sent (if user exists)' })
@@ -75,6 +96,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle(FORGOT_THROTTLE)
   @Post('reset-password')
   @ApiOperation({ summary: 'Reset password with token' })
   @ApiResponse({ status: 200, description: 'Password successfully reset' })
@@ -97,15 +119,17 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle(VERIFY_THROTTLE)
   @Post('verify-email')
   @ApiOperation({ summary: 'Verify email with 6-digit code' })
   @ApiResponse({ status: 200, description: 'Email successfully verified' })
   @ApiResponse({ status: 400, description: 'Invalid or expired verification code' })
   async verifyEmail(@Body() dto: VerifyEmailCodeDto) {
-    return this.authService.verifyEmailWithCode(dto.code);
+    return this.authService.verifyEmailWithCode(dto.email, dto.code);
   }
 
   @UseGuards(JwtAuthGuard)
+  @Throttle(VERIFY_THROTTLE)
   @Post('resend-verification')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Resend email verification' })

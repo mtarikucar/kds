@@ -134,13 +134,13 @@ model User {
   approvedBy    User?     @relation("UserApprover", fields: [approvedById], references: [id], onDelete: SetNull)
   approvedUsers User[]    @relation("UserApprover")
 
-  // Email verification (code-based)
+  // Email verification (code-based, hashed at rest)
   emailVerified                 Boolean   @default(false)
-  emailVerificationCode         String?   @db.VarChar(6)
+  emailVerificationCodeHash     String?
   emailVerificationCodeExpires  DateTime?
 
-  // Password reset
-  resetToken       String?   @unique
+  // Password reset (token hashed at rest)
+  resetTokenHash   String?   @unique
   resetTokenExpiry DateTime?
 
   // Profile

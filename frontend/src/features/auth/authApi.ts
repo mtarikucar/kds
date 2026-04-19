@@ -115,7 +115,7 @@ export const useResetPassword = () => {
 
 export const useChangePassword = () => {
   return useMutation({
-    mutationFn: async (data: { oldPassword: string; newPassword: string }): Promise<{ message: string }> => {
+    mutationFn: async (data: { currentPassword: string; newPassword: string }): Promise<{ message: string }> => {
       const response = await api.post('/auth/change-password', data);
       return response.data;
     },
@@ -132,8 +132,8 @@ export const useVerifyEmail = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (code: string): Promise<{ message: string; verified: boolean }> => {
-      const response = await api.post('/auth/verify-email', { code });
+    mutationFn: async (data: { email: string; code: string }): Promise<{ message: string; verified: boolean }> => {
+      const response = await api.post('/auth/verify-email', data);
       return response.data;
     },
     onSuccess: () => {

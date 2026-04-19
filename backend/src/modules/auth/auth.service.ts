@@ -9,7 +9,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid';
+import { createHash, randomBytes } from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import * as appleSignin from 'apple-signin-auth';
 import * as Sentry from '@sentry/node';
@@ -33,6 +33,10 @@ import {
 @Injectable()
 export class AuthService {
   private googleClient: OAuth2Client;
+
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
 
   constructor(
     private prisma: PrismaService,
@@ -382,6 +386,10 @@ export class AuthService {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       });
 
+      if (payload.type && payload.type !== 'user') {
+        throw new UnauthorizedException('Invalid token type');
+      }
+
       const user = await this.prisma.user.findUnique({
         where: { id: payload.sub },
         select: {
@@ -405,22 +413,36 @@ export class AuthService {
     }
   }
 
+  async logout(userId: string, ip?: string, userAgent?: string): Promise<{ message: string }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { tenantId: true },
+    });
+    if (user) {
+      await this.logUserActivity(userId, user.tenantId, 'LOGOUT', ip, userAgent);
+    }
+    return { message: 'Logged out' };
+  }
+
   private async generateTokens(user: UserResponseDto): Promise<AuthResponseDto> {
     const payload = {
       sub: user.id,
       email: user.email,
       role: user.role,
       tenantId: user.tenantId,
+      type: 'user' as const,
     };
 
     const accessToken = this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_SECRET'),
       expiresIn: this.configService.get<string>('JWT_EXPIRES_IN') || '7d',
+      algorithm: 'HS256',
     });
 
     const refreshToken = this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
       expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '30d',
+      algorithm: 'HS256',
     });
 
     return {
@@ -469,22 +491,23 @@ export class AuthService {
       };
     }
 
-    // Generate reset token
-    const resetToken = uuidv4();
+    // Generate high-entropy reset token (sent via email in raw form, stored hashed)
+    const rawToken = randomBytes(32).toString('hex');
+    const resetTokenHash = this.hashToken(rawToken);
     const resetTokenExpiry = new Date();
     resetTokenExpiry.setHours(resetTokenExpiry.getHours() + 1); // Token valid for 1 hour
 
-    // Store token in database
+    // Store only the hash so a DB leak does not yield usable tokens
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
-        resetToken,
+        resetTokenHash,
         resetTokenExpiry,
       },
     });
 
-    // Send password reset email
-    await this.emailService.sendPasswordResetEmail(user.email, resetToken);
+    // Send password reset email with the raw token
+    await this.emailService.sendPasswordResetEmail(user.email, rawToken);
 
     return {
       message: 'If an account with that email exists, a password reset link has been sent.',
@@ -497,10 +520,11 @@ export class AuthService {
   async resetPassword(resetPasswordDto: ResetPasswordDto): Promise<{ message: string }> {
     const { token, newPassword } = resetPasswordDto;
 
-    // Find user by reset token
+    // Lookup by the hash of the incoming token (constant-time-ish via unique index)
+    const resetTokenHash = this.hashToken(token);
     const user = await this.prisma.user.findFirst({
       where: {
-        resetToken: token,
+        resetTokenHash,
         resetTokenExpiry: {
           gt: new Date(), // Token not expired
         },
@@ -514,12 +538,12 @@ export class AuthService {
     // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    // Update password and clear reset token
+    // Update password and clear reset token (invalidate on use)
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
         password: hashedPassword,
-        resetToken: null,
+        resetTokenHash: null,
         resetTokenExpiry: null,
       },
     });
@@ -571,38 +595,18 @@ export class AuthService {
   }
 
   /**
-   * Generate a 6-digit verification code
-   * Ensures uniqueness across active codes
+   * Generate a 6-digit verification code (uniformly distributed via crypto RNG).
+   * Scope is per-user, so no cross-user uniqueness loop is needed.
    */
-  private async generateVerificationCode(): Promise<string> {
-    let code: string;
-    let isUnique = false;
-
-    while (!isUnique) {
-      // Generate 6-digit random number
-      code = Math.floor(100000 + Math.random() * 900000).toString();
-
-      // Check if code is already in use (not expired)
-      const existingUser = await this.prisma.user.findFirst({
-        where: {
-          emailVerificationCode: code,
-          emailVerificationCodeExpires: {
-            gt: new Date(),
-          },
-        },
-      });
-
-      if (!existingUser) {
-        isUnique = true;
-      }
-    }
-
-    return code;
+  private generateVerificationCode(): string {
+    // 1,000,000 values → 0-999,999, formatted as 6 digits
+    const n = randomBytes(4).readUInt32BE(0) % 1_000_000;
+    return n.toString().padStart(6, '0');
   }
 
   /**
    * Send email verification code
-   * Generates a 6-digit code and sends it via email
+   * Generates a 6-digit code, stores its sha256 hash, emails the raw code.
    */
   async sendEmailVerification(userId: string): Promise<{ message: string; codeExpiry: Date }> {
     const user = await this.prisma.user.findUnique({
@@ -621,20 +625,20 @@ export class AuthService {
     }
 
     // Generate 6-digit verification code
-    const verificationCode = await this.generateVerificationCode();
+    const verificationCode = this.generateVerificationCode();
     const codeExpires = new Date();
     codeExpires.setHours(codeExpires.getHours() + 1); // Code valid for 1 hour
 
-    // Store code in database
+    // Store only the hash so a DB leak does not yield usable codes
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
-        emailVerificationCode: verificationCode,
+        emailVerificationCodeHash: this.hashToken(verificationCode),
         emailVerificationCodeExpires: codeExpires,
       },
     });
 
-    // Send verification email with code
+    // Send verification email with raw code
     await this.emailService.sendEmailVerificationCode(
       user.email,
       verificationCode,
@@ -667,20 +671,25 @@ export class AuthService {
   }
 
   /**
-   * Verify email using 6-digit code
+   * Verify email using 6-digit code, scoped to the account identified by email.
    */
-  async verifyEmailWithCode(code: string): Promise<{ message: string; verified: boolean }> {
-    // Find user by verification code
-    const user = await this.prisma.user.findFirst({
-      where: {
-        emailVerificationCode: code,
-        emailVerificationCodeExpires: {
-          gt: new Date(), // Code not expired
-        },
-      },
+  async verifyEmailWithCode(
+    email: string,
+    code: string,
+  ): Promise<{ message: string; verified: boolean }> {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
     });
 
-    if (!user) {
+    // Return the same error for "no user" and "bad code" so the endpoint cannot
+    // be used to enumerate which emails are registered.
+    if (
+      !user ||
+      !user.emailVerificationCodeHash ||
+      !user.emailVerificationCodeExpires ||
+      user.emailVerificationCodeExpires <= new Date() ||
+      user.emailVerificationCodeHash !== this.hashToken(code)
+    ) {
       throw new BadRequestException('Invalid or expired verification code');
     }
 
@@ -689,7 +698,7 @@ export class AuthService {
       where: { id: user.id },
       data: {
         emailVerified: true,
-        emailVerificationCode: null,
+        emailVerificationCodeHash: null,
         emailVerificationCodeExpires: null,
       },
     });

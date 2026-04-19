@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
+import { timingSafeEqual } from 'crypto';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
 /**
@@ -43,7 +44,7 @@ export class ApiKeyGuard implements CanActivate {
       throw new UnauthorizedException('API key authentication is not configured');
     }
 
-    if (apiKey !== validApiKey) {
+    if (!this.safeCompare(apiKey, validApiKey)) {
       throw new UnauthorizedException('Invalid API key');
     }
 
@@ -51,11 +52,17 @@ export class ApiKeyGuard implements CanActivate {
   }
 
   private extractApiKey(request: any): string | undefined {
-    // Support multiple header formats
-    return (
-      request.headers['x-api-key'] ||
-      request.headers['api-key'] ||
-      request.headers['authorization']?.replace('Bearer ', '')
-    );
+    // Only accept dedicated API-key headers; do not fall back to Authorization
+    // (which is owned by the JWT strategy) to avoid cross-mechanism confusion.
+    return request.headers['x-api-key'] || request.headers['api-key'];
+  }
+
+  private safeCompare(a: string, b: string): boolean {
+    const aBuf = Buffer.from(a, 'utf8');
+    const bBuf = Buffer.from(b, 'utf8');
+    if (aBuf.length !== bBuf.length) {
+      return false;
+    }
+    return timingSafeEqual(aBuf, bBuf);
   }
 }
