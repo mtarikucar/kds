@@ -67,8 +67,10 @@ const ReservationLookupPage: React.FC = () => {
       const updated = await cancelMutation.mutateAsync({
         tenantId,
         id: reservation.id,
+        customerPhone: phone.trim(),
+        reservationNumber: reservationNumber.trim(),
       });
-      setReservation(updated);
+      setReservation({ ...reservation, ...updated });
       setShowCancelConfirm(false);
     } catch {
       // Error handled by mutation state
