@@ -1,41 +1,34 @@
-import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsOptional, Length, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateWaiterRequestDto {
-  @ApiProperty({ example: 'uuid-of-tenant' })
-  @IsString()
-  @IsNotEmpty()
-  tenantId: string;
-
-  @ApiProperty({ example: 'uuid-of-table' })
-  @IsString()
-  @IsNotEmpty()
-  tableId: string;
-
-  @ApiProperty({ example: 'uuid-session-id' })
-  @IsString()
-  @IsNotEmpty()
-  sessionId: string;
-
-  @ApiProperty({ example: 'We need extra plates', required: false })
+  @ApiPropertyOptional({ description: 'Table ID; optional for tableless (counter) orders' })
   @IsString()
   @IsOptional()
+  @MaxLength(64)
+  tableId?: string;
+
+  @ApiProperty()
+  @IsString()
+  @Length(32, 128)
+  sessionId: string;
+
+  @ApiPropertyOptional({ example: 'We need extra plates' })
+  @IsString()
+  @IsOptional()
+  @MaxLength(500)
   message?: string;
 }
 
 export class CreateBillRequestDto {
-  @ApiProperty({ example: 'uuid-of-tenant' })
+  @ApiPropertyOptional({ description: 'Table ID; optional for tableless (counter) orders' })
   @IsString()
-  @IsNotEmpty()
-  tenantId: string;
+  @IsOptional()
+  @MaxLength(64)
+  tableId?: string;
 
-  @ApiProperty({ example: 'uuid-of-table' })
+  @ApiProperty()
   @IsString()
-  @IsNotEmpty()
-  tableId: string;
-
-  @ApiProperty({ example: 'uuid-session-id' })
-  @IsString()
-  @IsNotEmpty()
+  @Length(32, 128)
   sessionId: string;
 }

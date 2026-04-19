@@ -1326,13 +1326,14 @@ model UserNotificationRead {
 // ========================================
 
 model WaiterRequest {
-  id      String @id @default(uuid())
-  message String?
-  status  String @default("PENDING") // PENDING, ACKNOWLEDGED, COMPLETED
+  id        String  @id @default(uuid())
+  message   String?
+  status    String  @default("PENDING") // PENDING, ACKNOWLEDGED, COMPLETED
   sessionId String
+  tenantId  String
 
-  tableId String
-  table   Table @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  tableId String?
+  table   Table?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
 
   acknowledgedAt   DateTime?
   acknowledgedById String?
@@ -1345,6 +1346,8 @@ model WaiterRequest {
   @@index([tableId])
   @@index([status])
   @@index([sessionId])
+  @@index([tenantId])
+  @@index([tenantId, status])
   @@map("waiter_requests")
 }
 
@@ -1352,9 +1355,10 @@ model BillRequest {
   id        String @id @default(uuid())
   status    String @default("PENDING") // PENDING, ACKNOWLEDGED, COMPLETED
   sessionId String
+  tenantId  String
 
-  tableId String
-  table   Table @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  tableId String?
+  table   Table?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
 
   acknowledgedAt   DateTime?
   acknowledgedById String?
@@ -1367,6 +1371,8 @@ model BillRequest {
   @@index([tableId])
   @@index([status])
   @@index([sessionId])
+  @@index([tenantId])
+  @@index([tenantId, status])
   @@map("bill_requests")
 }
 

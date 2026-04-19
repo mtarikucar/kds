@@ -8,10 +8,15 @@ import {
   Min,
   IsNumber,
   IsEnum,
+  Length,
+  MaxLength,
+  Matches,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { OrderType } from '../../../common/constants/order-status.enum';
+
+const PHONE_REGEX = /^\+?[1-9]\d{7,14}$/;
 
 export class OrderItemModifierDto {
   @ApiProperty({ example: 'uuid-of-modifier' })
@@ -23,10 +28,6 @@ export class OrderItemModifierDto {
   @IsInt()
   @Min(1)
   quantity: number;
-
-  @ApiProperty({ example: 5.00 })
-  @IsNumber({ maxDecimalPlaces: 2 })
-  priceAdjustment: number;
 }
 
 export class CreateOrderItemDto {
@@ -43,6 +44,7 @@ export class CreateOrderItemDto {
   @ApiProperty({ example: 'No onions, extra sauce', required: false })
   @IsString()
   @IsOptional()
+  @MaxLength(500)
   notes?: string;
 
   @ApiProperty({ type: [OrderItemModifierDto], required: false })
@@ -54,29 +56,27 @@ export class CreateOrderItemDto {
 }
 
 export class CreateCustomerOrderDto {
-  @ApiProperty({ example: 'uuid-of-tenant' })
-  @IsString()
-  @IsNotEmpty()
-  tenantId: string;
-
   @ApiPropertyOptional({ example: 'uuid-of-table', description: 'Optional for COUNTER orders (tableless mode)' })
   @IsString()
   @IsOptional()
+  @MaxLength(64)
   tableId?: string;
 
-  @ApiPropertyOptional({ enum: OrderType, example: OrderType.DINE_IN, description: 'Order type - defaults to DINE_IN if tableId provided, COUNTER if tableless' })
+  @ApiPropertyOptional({ enum: OrderType })
   @IsEnum(OrderType)
   @IsOptional()
   type?: OrderType;
 
-  @ApiProperty({ example: 'uuid-session-id' })
+  @ApiProperty()
   @IsString()
-  @IsNotEmpty()
+  @Length(32, 128)
   sessionId: string;
 
-  @ApiProperty({ example: '+905551234567', required: false })
+  @ApiProperty({ required: false })
   @IsString()
   @IsOptional()
+  @MaxLength(20)
+  @Matches(PHONE_REGEX)
   customerPhone?: string;
 
   @ApiProperty({ type: [CreateOrderItemDto] })
@@ -85,17 +85,18 @@ export class CreateCustomerOrderDto {
   @Type(() => CreateOrderItemDto)
   items: CreateOrderItemDto[];
 
-  @ApiProperty({ example: 'Please bring extra napkins', required: false })
+  @ApiProperty({ required: false })
   @IsString()
   @IsOptional()
+  @MaxLength(500)
   notes?: string;
 
-  @ApiPropertyOptional({ example: 40.7128, description: 'Customer latitude for location validation' })
+  @ApiPropertyOptional()
   @IsNumber()
   @IsOptional()
   latitude?: number;
 
-  @ApiPropertyOptional({ example: -74.0060, description: 'Customer longitude for location validation' })
+  @ApiPropertyOptional()
   @IsNumber()
   @IsOptional()
   longitude?: number;

@@ -1,25 +1,40 @@
 import {
-  Controller,
-  Post,
-  Get,
   Body,
+  Controller,
+  Get,
   Param,
-  Query,
   Patch,
-  UseGuards,
+  Post,
+  Query,
   Request,
+  UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../auth/decorators/public.decorator';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { TenantGuard } from '../../auth/guards/tenant.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
+import { TenantGuard } from '../../auth/guards/tenant.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '../../../common/constants/roles.enum';
 import { CustomerOrdersService } from '../services/customer-orders.service';
 import { CreateCustomerOrderDto } from '../dto/create-customer-order.dto';
-import { CreateWaiterRequestDto, CreateBillRequestDto } from '../dto/waiter-request.dto';
+import {
+  CreateBillRequestDto,
+  CreateWaiterRequestDto,
+} from '../dto/waiter-request.dto';
 
+/**
+ * QR-menu / customer-facing endpoints. Every public mutation resolves tenantId
+ * from the server-side CustomerSession row; the request body MUST NOT supply
+ * tenantId. Paired with per-endpoint @Throttle because there is no auth wall
+ * in front of these routes.
+ */
 @ApiTags('Customer Orders')
 @Controller('customer-orders')
 export class CustomerOrdersController {
@@ -30,34 +45,30 @@ export class CustomerOrdersController {
   // ========================================
 
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post()
-  @ApiOperation({ summary: 'Create a new customer order (no authentication required)' })
+  @ApiOperation({ summary: 'Create a new customer order' })
   @ApiResponse({ status: 201, description: 'Order created successfully' })
-  @ApiResponse({ status: 400, description: 'Invalid order data' })
-  @ApiResponse({ status: 404, description: 'Tenant or table not found' })
+  @ApiResponse({ status: 401, description: 'Invalid or expired session' })
   async createOrder(@Body() dto: CreateCustomerOrderDto) {
     return this.customerOrdersService.createOrder(dto);
   }
 
   @Public()
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @Get('session/:sessionId')
-  @ApiOperation({ summary: 'Get all orders for a session (no authentication required)' })
-  @ApiResponse({ status: 200, description: 'Session orders retrieved' })
-  async getSessionOrders(
-    @Param('sessionId') sessionId: string,
-    @Query('tenantId') tenantId: string
-  ) {
-    return this.customerOrdersService.getSessionOrders(sessionId, tenantId);
+  @ApiOperation({ summary: 'Get all orders for a session' })
+  async getSessionOrders(@Param('sessionId') sessionId: string) {
+    return this.customerOrdersService.getSessionOrders(sessionId);
   }
 
   @Public()
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @Get(':orderId')
-  @ApiOperation({ summary: 'Get order details by ID (no authentication required)' })
-  @ApiResponse({ status: 200, description: 'Order details retrieved' })
-  @ApiResponse({ status: 404, description: 'Order not found' })
+  @ApiOperation({ summary: 'Get order details by ID' })
   async getOrderById(
     @Param('orderId') orderId: string,
-    @Query('sessionId') sessionId: string
+    @Query('sessionId') sessionId: string,
   ) {
     return this.customerOrdersService.getOrderById(orderId, sessionId);
   }
@@ -67,23 +78,19 @@ export class CustomerOrdersController {
   // ========================================
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('waiter-requests')
-  @ApiOperation({ summary: 'Create a waiter request (no authentication required)' })
-  @ApiResponse({ status: 201, description: 'Waiter request created' })
-  @ApiResponse({ status: 404, description: 'Table not found' })
+  @ApiOperation({ summary: 'Create a waiter request' })
   async createWaiterRequest(@Body() dto: CreateWaiterRequestDto) {
     return this.customerOrdersService.createWaiterRequest(dto);
   }
 
   @Public()
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Get('waiter-requests/session/:sessionId')
-  @ApiOperation({ summary: 'Get all waiter requests for a session (no authentication required)' })
-  @ApiResponse({ status: 200, description: 'Waiter requests retrieved' })
-  async getSessionWaiterRequests(
-    @Param('sessionId') sessionId: string,
-    @Query('tenantId') tenantId: string
-  ) {
-    return this.customerOrdersService.getSessionWaiterRequests(sessionId, tenantId);
+  @ApiOperation({ summary: 'Get all waiter requests for a session' })
+  async getSessionWaiterRequests(@Param('sessionId') sessionId: string) {
+    return this.customerOrdersService.getSessionWaiterRequests(sessionId);
   }
 
   // ========================================
@@ -91,23 +98,19 @@ export class CustomerOrdersController {
   // ========================================
 
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('bill-requests')
-  @ApiOperation({ summary: 'Create a bill request (no authentication required)' })
-  @ApiResponse({ status: 201, description: 'Bill request created' })
-  @ApiResponse({ status: 404, description: 'Table not found' })
+  @ApiOperation({ summary: 'Create a bill request' })
   async createBillRequest(@Body() dto: CreateBillRequestDto) {
     return this.customerOrdersService.createBillRequest(dto);
   }
 
   @Public()
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Get('bill-requests/session/:sessionId')
-  @ApiOperation({ summary: 'Get all bill requests for a session (no authentication required)' })
-  @ApiResponse({ status: 200, description: 'Bill requests retrieved' })
-  async getSessionBillRequests(
-    @Param('sessionId') sessionId: string,
-    @Query('tenantId') tenantId: string
-  ) {
-    return this.customerOrdersService.getSessionBillRequests(sessionId, tenantId);
+  @ApiOperation({ summary: 'Get all bill requests for a session' })
+  async getSessionBillRequests(@Param('sessionId') sessionId: string) {
+    return this.customerOrdersService.getSessionBillRequests(sessionId);
   }
 
   // ========================================
@@ -119,7 +122,6 @@ export class CustomerOrdersController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all active waiter requests for tenant (STAFF)' })
-  @ApiResponse({ status: 200, description: 'Active waiter requests retrieved' })
   async getActiveWaiterRequests(@Request() req) {
     return this.customerOrdersService.getActiveWaiterRequests(req.tenantId);
   }
@@ -129,11 +131,7 @@ export class CustomerOrdersController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Acknowledge a waiter request (STAFF)' })
-  @ApiResponse({ status: 200, description: 'Waiter request acknowledged' })
-  async acknowledgeWaiterRequest(
-    @Param('id') id: string,
-    @Request() req
-  ) {
+  async acknowledgeWaiterRequest(@Param('id') id: string, @Request() req) {
     return this.customerOrdersService.acknowledgeWaiterRequest(id, req.user.id, req.tenantId);
   }
 
@@ -142,11 +140,7 @@ export class CustomerOrdersController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Mark a waiter request as completed (STAFF)' })
-  @ApiResponse({ status: 200, description: 'Waiter request completed' })
-  async completeWaiterRequest(
-    @Param('id') id: string,
-    @Request() req
-  ) {
+  async completeWaiterRequest(@Param('id') id: string, @Request() req) {
     return this.customerOrdersService.completeWaiterRequest(id, req.user.id, req.tenantId);
   }
 
@@ -155,7 +149,6 @@ export class CustomerOrdersController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get all active bill requests for tenant (STAFF)' })
-  @ApiResponse({ status: 200, description: 'Active bill requests retrieved' })
   async getActiveBillRequests(@Request() req) {
     return this.customerOrdersService.getActiveBillRequests(req.tenantId);
   }
@@ -165,11 +158,7 @@ export class CustomerOrdersController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Acknowledge a bill request (STAFF)' })
-  @ApiResponse({ status: 200, description: 'Bill request acknowledged' })
-  async acknowledgeBillRequest(
-    @Param('id') id: string,
-    @Request() req
-  ) {
+  async acknowledgeBillRequest(@Param('id') id: string, @Request() req) {
     return this.customerOrdersService.acknowledgeBillRequest(id, req.user.id, req.tenantId);
   }
 
@@ -178,11 +167,7 @@ export class CustomerOrdersController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Mark a bill request as completed (STAFF)' })
-  @ApiResponse({ status: 200, description: 'Bill request completed' })
-  async completeBillRequest(
-    @Param('id') id: string,
-    @Request() req
-  ) {
+  async completeBillRequest(@Param('id') id: string, @Request() req) {
     return this.customerOrdersService.completeBillRequest(id, req.user.id, req.tenantId);
   }
 }
