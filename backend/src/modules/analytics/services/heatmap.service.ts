@@ -413,8 +413,11 @@ export class HeatmapService {
     let totalSeverity = 0;
 
     for (const [, data] of cellData) {
-      const avgPersons = data.totalPersons / data.count;
-      const avgDwell = data.count > 0 ? data.totalDwell / data.totalPersons : 0;
+      const avgPersons = data.count > 0 ? data.totalPersons / data.count : 0;
+      // Guard the divisor (prev: checked count but divided by totalPersons,
+      // which yielded NaN and cascaded through the severity score).
+      const avgDwell =
+        data.totalPersons > 0 ? data.totalDwell / data.totalPersons : 0;
 
       // Congestion threshold: high traffic + high dwell time
       const trafficScore = Math.min(avgPersons / 50, 1); // Normalize to 0-1

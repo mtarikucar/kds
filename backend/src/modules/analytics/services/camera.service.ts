@@ -3,6 +3,23 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CameraStatus } from '../enums/analytics.enum';
 import { CreateCameraDto, UpdateCameraDto, CameraResponseDto } from '../dto';
+import {
+  decryptString,
+  encryptString,
+} from '../../../common/helpers/encryption.helper';
+
+/**
+ * Replace `user:pass` in an RTSP/ONVIF URL with `***:***` so responses
+ * to the tenant admin UI don't leak NVR credentials. The plaintext
+ * still lives (encrypted) on disk for the edge device to use.
+ */
+function redactStreamUrl(url: string): string {
+  try {
+    return url.replace(/(:\/\/)[^:/@]+:[^@]+@/, '$1***:***@');
+  } catch {
+    return url;
+  }
+}
 
 @Injectable()
 export class CameraService {
@@ -31,7 +48,9 @@ export class CameraService {
         tenantId,
         name: dto.name,
         description: dto.description,
-        streamUrl: dto.streamUrl,
+        // Encrypted at rest; the edge device's config fetch decrypts on
+        // the fly. Only the redacted form flows back to the admin UI.
+        streamUrl: encryptString(dto.streamUrl),
         streamType: dto.streamType || 'RTSP',
         voxelX: dto.voxelX,
         voxelY: dto.voxelY ?? 2.5,
@@ -117,7 +136,7 @@ export class CameraService {
       data: {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.description !== undefined && { description: dto.description }),
-        ...(dto.streamUrl !== undefined && { streamUrl: dto.streamUrl }),
+        ...(dto.streamUrl !== undefined && { streamUrl: encryptString(dto.streamUrl) }),
         ...(dto.streamType !== undefined && { streamType: dto.streamType }),
         ...(dto.status !== undefined && { status: dto.status }),
         ...(dto.voxelX !== undefined && { voxelX: dto.voxelX }),
@@ -284,23 +303,36 @@ export class CameraService {
     createdAt: Date;
     updatedAt: Date;
   }): CameraResponseDto {
+    // The stored streamUrl is encrypted (AES-GCM). We decrypt so we
+    // can build the redacted form but never return the plaintext.
+    const decrypted = camera.streamUrl ? decryptString(camera.streamUrl) : '';
     return {
       id: camera.id,
       name: camera.name,
       description: camera.description || undefined,
-      streamUrl: camera.streamUrl,
+      streamUrl: redactStreamUrl(decrypted),
       streamType: camera.streamType as CameraResponseDto['streamType'],
       status: camera.status as CameraResponseDto['status'],
-      voxelX: camera.voxelX || undefined,
-      voxelY: camera.voxelY || undefined,
-      voxelZ: camera.voxelZ || undefined,
-      rotationY: camera.rotationY || undefined,
-      fov: camera.fov || undefined,
+      // Preserve legitimate zero coordinates (`|| undefined` threw away 0).
+      voxelX: camera.voxelX ?? undefined,
+      voxelY: camera.voxelY ?? undefined,
+      voxelZ: camera.voxelZ ?? undefined,
+      rotationY: camera.rotationY ?? undefined,
+      fov: camera.fov ?? undefined,
       calibrationData: camera.calibrationData as Record<string, unknown> | undefined,
       lastSeenAt: camera.lastSeenAt || undefined,
       errorMessage: camera.errorMessage || undefined,
       createdAt: camera.createdAt,
       updatedAt: camera.updatedAt,
     };
+  }
+
+  /**
+   * Used by the edge-device config path where the plaintext stream URL
+   * actually needs to reach the device. Never call from user-facing
+   * endpoints.
+   */
+  decryptStreamUrl(encrypted: string): string {
+    return decryptString(encrypted);
   }
 }
