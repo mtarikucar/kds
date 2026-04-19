@@ -1,4 +1,5 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 
 export enum LoyaltyTransactionType {
@@ -10,7 +11,6 @@ export enum LoyaltyTransactionType {
   REFERRAL = 'REFERRAL',
 }
 
-// Loyalty tier thresholds
 export enum LoyaltyTier {
   BRONZE = 'BRONZE',
   SILVER = 'SILVER',
@@ -18,24 +18,12 @@ export enum LoyaltyTier {
   PLATINUM = 'PLATINUM',
 }
 
-// Loyalty program configuration
 const LOYALTY_CONFIG = {
-  // Points earned per currency unit spent
-  pointsPerCurrencyUnit: 1, // 1 point per ₺1 or $1
-
-  // Currency value per point when redeeming
-  currencyPerPoint: 0.1, // 100 points = ₺10 or $10
-
-  // Minimum points required to redeem
+  pointsPerCurrencyUnit: 1,
+  currencyPerPoint: new Prisma.Decimal('0.1'),
   minRedeemPoints: 100,
-
-  // Welcome bonus for new customers
   welcomeBonus: 50,
-
-  // Birthday bonus points
   birthdayBonus: 100,
-
-  // Tier thresholds (total lifetime points earned)
   tiers: {
     BRONZE: { threshold: 0, multiplier: 1.0, name: 'Bronze' },
     SILVER: { threshold: 500, multiplier: 1.25, name: 'Silver' },
@@ -46,329 +34,256 @@ const LOYALTY_CONFIG = {
 
 @Injectable()
 export class LoyaltyService {
+  private readonly logger = new Logger(LoyaltyService.name);
+
   constructor(private prisma: PrismaService) {}
 
-  // ========================================
-  // POINTS MANAGEMENT
-  // ========================================
-
+  /**
+   * Award (or deduct, for redemption) points atomically. The balance check +
+   * update + transaction insert run inside a single Serializable `$transaction`
+   * so two concurrent calls cannot both read balance N and both decrement:
+   * - For positive delta (award), no balance gate is needed.
+   * - For negative delta (redemption), we use a conditional `updateMany`
+   *   where loyaltyPoints >= |delta|; if another caller drained the balance,
+   *   count === 0 and we raise BadRequestException.
+   */
   async awardPoints(
     customerId: string,
+    tenantId: string,
     points: number,
     type: LoyaltyTransactionType,
     description: string,
-    metadata?: {
-      orderId?: string;
-      orderNumber?: string;
-      orderAmount?: number;
-    },
+    metadata?: { orderId?: string; orderNumber?: string; orderAmount?: number | Prisma.Decimal },
   ) {
-    const customer = await this.prisma.customer.findUnique({
-      where: { id: customerId },
-    });
-
-    if (!customer) {
-      throw new BadRequestException('Customer not found');
+    if (!Number.isInteger(points) || points === 0) {
+      throw new BadRequestException('points must be a non-zero integer');
     }
 
-    const balanceBefore = customer.loyaltyPoints;
-    const balanceAfter = balanceBefore + points;
+    return this.prisma.$transaction(async (tx) => {
+      const customer = await tx.customer.findFirst({
+        where: { id: customerId, tenantId },
+      });
+      if (!customer) throw new BadRequestException('Customer not found');
 
-    // Create transaction record
-    const transaction = await this.prisma.loyaltyTransaction.create({
-      data: {
-        customerId,
-        type,
-        points,
-        description,
-        orderId: metadata?.orderId,
-        orderNumber: metadata?.orderNumber,
-        orderAmount: metadata?.orderAmount,
-        balanceBefore,
-        balanceAfter,
-        metadata: metadata ? { additional: metadata } : undefined,
-      },
-    });
+      const balanceBefore = customer.loyaltyPoints;
+      const balanceAfter = balanceBefore + points;
 
-    // Update customer's loyalty points
-    await this.prisma.customer.update({
-      where: { id: customerId },
-      data: { loyaltyPoints: balanceAfter },
-    });
+      if (points < 0) {
+        const needed = -points;
+        if (balanceBefore < needed) {
+          throw new BadRequestException('Insufficient loyalty points');
+        }
+        const result = await tx.customer.updateMany({
+          where: { id: customerId, tenantId, loyaltyPoints: { gte: needed } },
+          data: { loyaltyPoints: { decrement: needed } },
+        });
+        if (result.count !== 1) {
+          throw new BadRequestException('Insufficient loyalty points (race)');
+        }
+      } else {
+        await tx.customer.updateMany({
+          where: { id: customerId, tenantId },
+          data: { loyaltyPoints: { increment: points } },
+        });
+      }
 
-    return {
-      transaction,
-      newBalance: balanceAfter,
-    };
+      const transaction = await tx.loyaltyTransaction.create({
+        data: {
+          customerId,
+          type,
+          points,
+          description,
+          orderId: metadata?.orderId,
+          orderNumber: metadata?.orderNumber,
+          orderAmount: metadata?.orderAmount as any,
+          balanceBefore,
+          balanceAfter,
+          metadata: metadata ? { additional: metadata as any } : undefined,
+        },
+      });
+
+      return { transaction, newBalance: balanceAfter };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
-  async earnPointsFromOrder(customerId: string, orderId: string, orderNumber: string, orderAmount: number) {
+  async earnPointsFromOrder(
+    customerId: string,
+    tenantId: string,
+    orderId: string,
+    orderNumber: string,
+    orderAmount: number,
+  ) {
     const points = Math.floor(orderAmount * LOYALTY_CONFIG.pointsPerCurrencyUnit);
-
     return this.awardPoints(
       customerId,
+      tenantId,
       points,
       LoyaltyTransactionType.EARNED,
       `Earned ${points} points from order ${orderNumber}`,
-      {
-        orderId,
-        orderNumber,
-        orderAmount,
-      },
+      { orderId, orderNumber, orderAmount },
     );
   }
 
-  async redeemPoints(customerId: string, pointsToRedeem: number, orderId?: string, orderNumber?: string) {
-    const customer = await this.prisma.customer.findUnique({
-      where: { id: customerId },
-    });
-
-    if (!customer) {
-      throw new BadRequestException('Customer not found');
-    }
-
-    // Validate redemption
+  async redeemPoints(
+    customerId: string,
+    tenantId: string,
+    pointsToRedeem: number,
+    orderId?: string,
+    orderNumber?: string,
+  ) {
     if (pointsToRedeem < LOYALTY_CONFIG.minRedeemPoints) {
       throw new BadRequestException(
         `Minimum ${LOYALTY_CONFIG.minRedeemPoints} points required to redeem`,
       );
     }
 
-    if (customer.loyaltyPoints < pointsToRedeem) {
-      throw new BadRequestException('Insufficient loyalty points');
-    }
+    const discountAmount = LOYALTY_CONFIG.currencyPerPoint.mul(pointsToRedeem);
 
-    // Calculate discount amount
-    const discountAmount = pointsToRedeem * LOYALTY_CONFIG.currencyPerPoint;
-
-    // Create redemption transaction
     const result = await this.awardPoints(
       customerId,
-      -pointsToRedeem, // Negative for redemption
+      tenantId,
+      -pointsToRedeem,
       LoyaltyTransactionType.REDEEMED,
-      `Redeemed ${pointsToRedeem} points for ${discountAmount} discount`,
-      {
-        orderId,
-        orderNumber,
-        orderAmount: discountAmount,
-      },
+      `Redeemed ${pointsToRedeem} points for ${discountAmount.toString()} discount`,
+      { orderId, orderNumber, orderAmount: discountAmount },
     );
 
-    return {
-      ...result,
-      discountAmount,
-    };
+    return { ...result, discountAmount: discountAmount.toNumber() };
   }
 
-  async awardWelcomeBonus(customerId: string) {
+  async awardWelcomeBonus(customerId: string, tenantId: string) {
     return this.awardPoints(
       customerId,
+      tenantId,
       LOYALTY_CONFIG.welcomeBonus,
       LoyaltyTransactionType.BONUS,
       `Welcome bonus: ${LOYALTY_CONFIG.welcomeBonus} points`,
     );
   }
 
-  async awardBirthdayBonus(customerId: string) {
+  async awardBirthdayBonus(customerId: string, tenantId: string) {
     return this.awardPoints(
       customerId,
+      tenantId,
       LOYALTY_CONFIG.birthdayBonus,
       LoyaltyTransactionType.BONUS,
       `Birthday bonus: ${LOYALTY_CONFIG.birthdayBonus} points`,
     );
   }
 
-  // ========================================
-  // TRANSACTION HISTORY
-  // ========================================
-
-  async getTransactionHistory(customerId: string, limit = 50) {
+  async getTransactionHistory(customerId: string, tenantId: string, limit = 50) {
+    // Tenant-scoped via relation filter to block cross-tenant probing by
+    // guessed customerId.
     return this.prisma.loyaltyTransaction.findMany({
-      where: { customerId },
+      where: { customerId, customer: { tenantId } },
       orderBy: { createdAt: 'desc' },
-      take: limit,
+      take: Math.min(limit, 200),
     });
   }
 
-  async getBalance(customerId: string) {
-    const customer = await this.prisma.customer.findUnique({
-      where: { id: customerId },
+  async getBalance(customerId: string, tenantId: string) {
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: customerId, tenantId },
       select: { loyaltyPoints: true },
     });
+    if (!customer) throw new BadRequestException('Customer not found');
 
-    if (!customer) {
-      throw new BadRequestException('Customer not found');
-    }
-
+    const redeemable = LOYALTY_CONFIG.currencyPerPoint.mul(customer.loyaltyPoints);
     return {
       points: customer.loyaltyPoints,
-      redeemableAmount: customer.loyaltyPoints * LOYALTY_CONFIG.currencyPerPoint,
+      redeemableAmount: redeemable.toNumber(),
       canRedeem: customer.loyaltyPoints >= LOYALTY_CONFIG.minRedeemPoints,
       minRedeemPoints: LOYALTY_CONFIG.minRedeemPoints,
     };
   }
 
-  // ========================================
-  // ANALYTICS
-  // ========================================
-
   async getLoyaltyStats(tenantId: string) {
-    // Get all customers with loyalty points
-    const customers = await this.prisma.customer.findMany({
-      where: { tenantId, loyaltyPoints: { gt: 0 } },
-      select: { loyaltyPoints: true },
-    });
+    const [totalsAgg, earnedAgg, redeemedAgg] = await this.prisma.$transaction([
+      this.prisma.customer.aggregate({
+        where: { tenantId, loyaltyPoints: { gt: 0 } },
+        _count: { _all: true },
+        _sum: { loyaltyPoints: true },
+        _avg: { loyaltyPoints: true },
+      }),
+      this.prisma.loyaltyTransaction.aggregate({
+        where: { customer: { tenantId }, type: LoyaltyTransactionType.EARNED },
+        _sum: { points: true },
+      }),
+      this.prisma.loyaltyTransaction.aggregate({
+        where: { customer: { tenantId }, type: LoyaltyTransactionType.REDEEMED },
+        _sum: { points: true },
+      }),
+    ]);
 
-    const totalPointsIssued = customers.reduce((sum, c) => sum + c.loyaltyPoints, 0);
-    const avgPointsPerCustomer = customers.length > 0 ? totalPointsIssued / customers.length : 0;
-
-    // Get recent transactions
-    const recentTransactions = await this.prisma.loyaltyTransaction.findMany({
-      where: {
-        customer: { tenantId },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 100,
-    });
-
-    const pointsEarned = recentTransactions
-      .filter((t) => t.type === LoyaltyTransactionType.EARNED)
-      .reduce((sum, t) => sum + t.points, 0);
-
-    const pointsRedeemed = Math.abs(
-      recentTransactions
-        .filter((t) => t.type === LoyaltyTransactionType.REDEEMED)
-        .reduce((sum, t) => sum + t.points, 0),
-    );
+    const pointsEarned = earnedAgg._sum.points ?? 0;
+    const pointsRedeemed = Math.abs(redeemedAgg._sum.points ?? 0);
 
     return {
-      totalCustomersWithPoints: customers.length,
-      totalPointsIssued,
-      avgPointsPerCustomer: Math.round(avgPointsPerCustomer),
+      totalCustomersWithPoints: totalsAgg._count._all,
+      totalPointsIssued: totalsAgg._sum.loyaltyPoints ?? 0,
+      avgPointsPerCustomer: Math.round(totalsAgg._avg.loyaltyPoints ?? 0),
       pointsEarned,
       pointsRedeemed,
       redemptionRate: pointsEarned > 0 ? (pointsRedeemed / pointsEarned) * 100 : 0,
     };
   }
 
-  // ========================================
-  // TIER MANAGEMENT
-  // ========================================
-
-  /**
-   * Calculate tier based on lifetime points earned
-   */
   calculateTier(lifetimePoints: number): LoyaltyTier {
-    if (lifetimePoints >= LOYALTY_CONFIG.tiers.PLATINUM.threshold) {
-      return LoyaltyTier.PLATINUM;
-    } else if (lifetimePoints >= LOYALTY_CONFIG.tiers.GOLD.threshold) {
-      return LoyaltyTier.GOLD;
-    } else if (lifetimePoints >= LOYALTY_CONFIG.tiers.SILVER.threshold) {
-      return LoyaltyTier.SILVER;
-    } else {
-      return LoyaltyTier.BRONZE;
-    }
+    if (lifetimePoints >= LOYALTY_CONFIG.tiers.PLATINUM.threshold) return LoyaltyTier.PLATINUM;
+    if (lifetimePoints >= LOYALTY_CONFIG.tiers.GOLD.threshold) return LoyaltyTier.GOLD;
+    if (lifetimePoints >= LOYALTY_CONFIG.tiers.SILVER.threshold) return LoyaltyTier.SILVER;
+    return LoyaltyTier.BRONZE;
   }
 
-  /**
-   * Get tier information including thresholds and benefits
-   */
   getTierInfo(tier: LoyaltyTier) {
     return LOYALTY_CONFIG.tiers[tier];
   }
 
-  /**
-   * Check and upgrade customer tier if needed
-   */
-  async checkAndUpgradeTier(customerId: string): Promise<{
-    upgraded: boolean;
-    oldTier?: LoyaltyTier;
-    newTier: LoyaltyTier;
-  }> {
-    const customer = await this.prisma.customer.findUnique({
-      where: { id: customerId },
-      select: {
-        id: true,
-        loyaltyTier: true,
-      },
+  async checkAndUpgradeTier(customerId: string, tenantId: string) {
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: customerId, tenantId },
+      select: { id: true, loyaltyTier: true },
     });
+    if (!customer) throw new BadRequestException('Customer not found');
 
-    if (!customer) {
-      throw new BadRequestException('Customer not found');
-    }
-
-    // Calculate lifetime points earned (sum of all positive transactions)
-    const transactions = await this.prisma.loyaltyTransaction.findMany({
-      where: {
-        customerId,
-        points: { gt: 0 },
-      },
-      select: { points: true },
+    const lifetimeAgg = await this.prisma.loyaltyTransaction.aggregate({
+      where: { customerId, customer: { tenantId }, points: { gt: 0 } },
+      _sum: { points: true },
     });
-
-    const lifetimePoints = transactions.reduce((sum, t) => sum + t.points, 0);
+    const lifetimePoints = lifetimeAgg._sum.points ?? 0;
     const calculatedTier = this.calculateTier(lifetimePoints);
     const currentTier = customer.loyaltyTier as LoyaltyTier;
 
-    // Check if tier needs to be upgraded
-    const tierOrder = [LoyaltyTier.BRONZE, LoyaltyTier.SILVER, LoyaltyTier.GOLD, LoyaltyTier.PLATINUM];
-    const currentTierIndex = tierOrder.indexOf(currentTier);
-    const calculatedTierIndex = tierOrder.indexOf(calculatedTier);
-
-    if (calculatedTierIndex > currentTierIndex) {
-      // Upgrade tier
-      await this.prisma.customer.update({
-        where: { id: customerId },
+    const order = [LoyaltyTier.BRONZE, LoyaltyTier.SILVER, LoyaltyTier.GOLD, LoyaltyTier.PLATINUM];
+    if (order.indexOf(calculatedTier) > order.indexOf(currentTier)) {
+      await this.prisma.customer.updateMany({
+        where: { id: customerId, tenantId },
         data: { loyaltyTier: calculatedTier },
       });
-
-      console.log(`[Loyalty] Customer ${customerId} upgraded from ${currentTier} to ${calculatedTier}`);
-
-      return {
-        upgraded: true,
-        oldTier: currentTier,
-        newTier: calculatedTier,
-      };
+      this.logger.log(`Customer ${customerId} upgraded from ${currentTier} to ${calculatedTier}`);
+      return { upgraded: true, oldTier: currentTier, newTier: calculatedTier };
     }
-
-    return {
-      upgraded: false,
-      newTier: currentTier,
-    };
+    return { upgraded: false, newTier: currentTier };
   }
 
-  /**
-   * Get customer's tier status and progress
-   */
-  async getTierStatus(customerId: string) {
-    const customer = await this.prisma.customer.findUnique({
-      where: { id: customerId },
-      select: {
-        loyaltyTier: true,
-      },
+  async getTierStatus(customerId: string, tenantId: string) {
+    const customer = await this.prisma.customer.findFirst({
+      where: { id: customerId, tenantId },
+      select: { loyaltyTier: true },
     });
+    if (!customer) throw new BadRequestException('Customer not found');
 
-    if (!customer) {
-      throw new BadRequestException('Customer not found');
-    }
-
-    // Calculate lifetime points
-    const transactions = await this.prisma.loyaltyTransaction.findMany({
-      where: {
-        customerId,
-        points: { gt: 0 },
-      },
-      select: { points: true },
+    const lifetimeAgg = await this.prisma.loyaltyTransaction.aggregate({
+      where: { customerId, customer: { tenantId }, points: { gt: 0 } },
+      _sum: { points: true },
     });
-
-    const lifetimePoints = transactions.reduce((sum, t) => sum + t.points, 0);
+    const lifetimePoints = lifetimeAgg._sum.points ?? 0;
     const currentTier = customer.loyaltyTier as LoyaltyTier;
     const currentTierInfo = this.getTierInfo(currentTier);
 
-    // Calculate next tier info
-    const tierOrder = [LoyaltyTier.BRONZE, LoyaltyTier.SILVER, LoyaltyTier.GOLD, LoyaltyTier.PLATINUM];
-    const currentTierIndex = tierOrder.indexOf(currentTier);
-    const nextTier = currentTierIndex < tierOrder.length - 1 ? tierOrder[currentTierIndex + 1] : null;
+    const order = [LoyaltyTier.BRONZE, LoyaltyTier.SILVER, LoyaltyTier.GOLD, LoyaltyTier.PLATINUM];
+    const nextIdx = order.indexOf(currentTier) + 1;
+    const nextTier = nextIdx < order.length ? order[nextIdx] : null;
     const nextTierInfo = nextTier ? this.getTierInfo(nextTier) : null;
 
     return {
@@ -384,46 +299,36 @@ export class LoyaltyService {
     };
   }
 
-  // ========================================
-  // GENERIC POINTS MANAGEMENT (for Referral Service)
-  // ========================================
-
-  /**
-   * Add points to customer (generic method for external services)
-   */
   async addPoints(params: {
     customerId: string;
+    tenantId: string;
     points: number;
     type: string;
     description: string;
     source: string;
     metadata?: any;
   }) {
-    const { customerId, points, type, description, metadata } = params;
-
-    // Award points
+    const { customerId, tenantId, points, type, description, metadata } = params;
     const result = await this.awardPoints(
       customerId,
+      tenantId,
       points,
       type as LoyaltyTransactionType,
       description,
       metadata,
     );
-
-    // Check for tier upgrade
-    const tierResult = await this.checkAndUpgradeTier(customerId);
-
-    return {
-      ...result,
-      tierUpgrade: tierResult.upgraded ? tierResult : null,
-    };
+    const tierResult = await this.checkAndUpgradeTier(customerId, tenantId);
+    return { ...result, tierUpgrade: tierResult.upgraded ? tierResult : null };
   }
 
-  // ========================================
-  // CONFIGURATION
-  // ========================================
-
   getLoyaltyConfig() {
-    return LOYALTY_CONFIG;
+    return {
+      pointsPerCurrencyUnit: LOYALTY_CONFIG.pointsPerCurrencyUnit,
+      currencyPerPoint: LOYALTY_CONFIG.currencyPerPoint.toNumber(),
+      minRedeemPoints: LOYALTY_CONFIG.minRedeemPoints,
+      welcomeBonus: LOYALTY_CONFIG.welcomeBonus,
+      birthdayBonus: LOYALTY_CONFIG.birthdayBonus,
+      tiers: LOYALTY_CONFIG.tiers,
+    };
   }
 }

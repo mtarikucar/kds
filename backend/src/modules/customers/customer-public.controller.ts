@@ -1,46 +1,37 @@
-import { Controller, Post, Get, Body, Param, Query, Headers, Ip, BadRequestException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Ip,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
+import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { CustomersService } from './customers.service';
 import { LoyaltyService } from './loyalty.service';
 import { CustomerSessionService } from './customer-session.service';
 import { PhoneVerificationService } from './phone-verification.service';
 import { ReferralService } from './referral.service';
+import {
+  ApplyReferralCodeDto,
+  CreatePublicSessionDto,
+  IdentifyCustomerDto,
+  SendOTPDto,
+  VerifyOTPDto,
+} from './dto/customer.dto';
+import { normalizePhone } from './customers.helpers';
 
-// DTO classes for request validation
-class CreateSessionDto {
-  tenantId: string;
-  tableId?: string;
-}
-
-class IdentifyCustomerDto {
-  sessionId: string;
-  phone: string;
-  name?: string;
-  email?: string;
-}
-
-class GetLoyaltyBalanceDto {
-  sessionId: string;
-}
-
-class SendOTPDto {
-  phone: string;
-  sessionId?: string;
-  tenantId: string;
-}
-
-class VerifyOTPDto {
-  phone: string;
-  code: string;
-  tenantId: string;
-}
-
-class ApplyReferralCodeDto {
-  customerId: string;
-  referralCode: string;
-  tenantId: string;
-}
-
+/**
+ * Guest-facing endpoints reachable from the QR-menu subdomain. Every
+ * mutation resolves `tenantId` from the server-side session record instead
+ * of accepting it from the request body, except for `createSession` where
+ * the tenantId bootstraps the session in the first place. Rate limits are
+ * tight because there is no auth wall behind the throttler.
+ */
 @ApiTags('customer-public')
 @Controller('customer-public')
 export class CustomerPublicController {
@@ -57,10 +48,11 @@ export class CustomerPublicController {
   // ========================================
 
   @Post('sessions')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiOperation({ summary: 'Create a new customer session' })
   @ApiResponse({ status: 201, description: 'Session created successfully' })
   async createSession(
-    @Body() dto: CreateSessionDto,
+    @Body() dto: CreatePublicSessionDto,
     @Headers('user-agent') userAgent: string,
     @Ip() ipAddress: string,
   ) {
@@ -71,15 +63,15 @@ export class CustomerPublicController {
   }
 
   @Get('sessions/:sessionId')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @ApiOperation({ summary: 'Get session information' })
-  @ApiResponse({ status: 200, description: 'Session retrieved successfully' })
   async getSession(@Param('sessionId') sessionId: string) {
     return this.sessionService.getSession(sessionId);
   }
 
   @Post('sessions/validate')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @ApiOperation({ summary: 'Validate a session' })
-  @ApiResponse({ status: 200, description: 'Session validation result' })
   async validateSession(@Body('sessionId') sessionId: string) {
     const isValid = await this.sessionService.validateSession(sessionId);
     return { valid: isValid };
@@ -90,32 +82,28 @@ export class CustomerPublicController {
   // ========================================
 
   @Post('identify')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'Identify customer by phone number' })
-  @ApiResponse({ status: 200, description: 'Customer identified successfully' })
   async identifyCustomer(@Body() dto: IdentifyCustomerDto) {
-    // Validate session
-    const session = await this.sessionService.getSession(dto.sessionId);
+    const session = await this.sessionService.requireSession(dto.sessionId);
 
-    // Find or create customer by phone
     const customer = await this.customersService.findOrCreateByPhone(
       dto.phone,
       session.tenantId,
-      {
-        name: dto.name,
-        email: dto.email,
-      },
+      { name: dto.name, email: dto.email },
     );
 
-    // Link customer to session
     const updatedSession = await this.sessionService.linkCustomerToSession(
       dto.sessionId,
       customer.id,
-      dto.phone,
+      normalizePhone(dto.phone),
     );
 
-    // Check if this is a new customer and award welcome bonus
     if (customer.totalOrders === 0 && customer.loyaltyPoints === 0) {
-      const bonusResult = await this.loyaltyService.awardWelcomeBonus(customer.id);
+      const bonusResult = await this.loyaltyService.awardWelcomeBonus(
+        customer.id,
+        session.tenantId,
+      );
       return {
         session: updatedSession,
         customer,
@@ -126,10 +114,7 @@ export class CustomerPublicController {
       };
     }
 
-    return {
-      session: updatedSession,
-      customer,
-    };
+    return { session: updatedSession, customer };
   }
 
   // ========================================
@@ -137,24 +122,21 @@ export class CustomerPublicController {
   // ========================================
 
   @Get('profile')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @ApiOperation({ summary: 'Get customer profile by session' })
-  @ApiResponse({ status: 200, description: 'Customer profile retrieved' })
   async getProfile(@Query('sessionId') sessionId: string) {
-    const session = await this.sessionService.getSession(sessionId);
-
+    const session = await this.sessionService.requireSession(sessionId);
     if (!session.customerId) {
       throw new BadRequestException('Customer not identified in this session');
     }
-
     return this.customersService.getCustomerProfile(session.customerId, session.tenantId);
   }
 
   @Get('loyalty/balance')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @ApiOperation({ summary: 'Get loyalty points balance' })
-  @ApiResponse({ status: 200, description: 'Loyalty balance retrieved' })
   async getLoyaltyBalance(@Query('sessionId') sessionId: string) {
-    const session = await this.sessionService.getSession(sessionId);
-
+    const session = await this.sessionService.requireSession(sessionId);
     if (!session.customerId) {
       return {
         points: 0,
@@ -163,51 +145,45 @@ export class CustomerPublicController {
         identified: false,
       };
     }
-
-    const balance = await this.loyaltyService.getBalance(session.customerId);
-    return {
-      ...balance,
-      identified: true,
-    };
+    const balance = await this.loyaltyService.getBalance(session.customerId, session.tenantId);
+    return { ...balance, identified: true };
   }
 
   @Get('loyalty/transactions')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @ApiOperation({ summary: 'Get loyalty transaction history' })
-  @ApiResponse({ status: 200, description: 'Transaction history retrieved' })
   async getLoyaltyTransactions(
     @Query('sessionId') sessionId: string,
-    @Query('limit') limit?: number,
+    @Query('limit') limit?: string,
   ) {
-    const session = await this.sessionService.getSession(sessionId);
-
+    const session = await this.sessionService.requireSession(sessionId);
     if (!session.customerId) {
       throw new BadRequestException('Customer not identified in this session');
     }
-
+    const parsedLimit = limit ? parseInt(limit, 10) : 50;
     return this.loyaltyService.getTransactionHistory(
       session.customerId,
-      limit ? parseInt(limit.toString()) : 50,
+      session.tenantId,
+      Number.isFinite(parsedLimit) ? parsedLimit : 50,
     );
   }
 
   @Get('loyalty/config')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @ApiOperation({ summary: 'Get loyalty program configuration' })
-  @ApiResponse({ status: 200, description: 'Loyalty config retrieved' })
   async getLoyaltyConfig() {
     return this.loyaltyService.getLoyaltyConfig();
   }
 
   @Get('loyalty/tier')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @ApiOperation({ summary: 'Get customer tier status' })
-  @ApiResponse({ status: 200, description: 'Tier status retrieved' })
   async getTierStatus(@Query('sessionId') sessionId: string) {
-    const session = await this.sessionService.getSession(sessionId);
-
+    const session = await this.sessionService.requireSession(sessionId);
     if (!session.customerId) {
       throw new BadRequestException('Customer not identified in this session');
     }
-
-    return this.loyaltyService.getTierStatus(session.customerId);
+    return this.loyaltyService.getTierStatus(session.customerId, session.tenantId);
   }
 
   // ========================================
@@ -215,35 +191,44 @@ export class CustomerPublicController {
   // ========================================
 
   @Post('phone/send-otp')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @ApiOperation({ summary: 'Send OTP to phone number' })
-  @ApiResponse({ status: 200, description: 'OTP sent successfully' })
   async sendOTP(@Body() dto: SendOTPDto) {
-    return this.phoneVerificationService.sendOTP(dto.phone, dto.sessionId || null, dto.tenantId);
+    const session = await this.sessionService.requireSession(dto.sessionId);
+    return this.phoneVerificationService.sendOTP(dto.phone, dto.sessionId, session.tenantId);
   }
 
   @Post('phone/verify-otp')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @ApiOperation({ summary: 'Verify OTP code' })
-  @ApiResponse({ status: 200, description: 'Phone verified successfully' })
   async verifyOTP(@Body() dto: VerifyOTPDto) {
-    const result = await this.phoneVerificationService.verifyOTP(dto.phone, dto.code, dto.tenantId);
+    const session = await this.sessionService.requireSession(dto.sessionId);
+    const result = await this.phoneVerificationService.verifyOTP(
+      dto.phone,
+      dto.code,
+      dto.sessionId,
+      session.tenantId,
+    );
 
-    // If verification successful, update customer phoneVerified status
     if (result.verified) {
-      // Find customer by phone
-      const customer = await this.customersService.findByPhone(dto.phone, dto.tenantId);
+      const canonical = normalizePhone(dto.phone);
+      const customer = await this.customersService.findByPhone(canonical, session.tenantId);
       if (customer) {
-        await this.customersService.update(customer.id, { phoneVerified: true }, dto.tenantId);
+        await this.customersService.markPhoneVerified(customer.id, session.tenantId);
       }
     }
-
     return result;
   }
 
   @Get('phone/verification-status/:verificationId')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiOperation({ summary: 'Get verification status' })
-  @ApiResponse({ status: 200, description: 'Verification status retrieved' })
-  async getVerificationStatus(@Param('verificationId') verificationId: string) {
-    return this.phoneVerificationService.getVerificationStatus(verificationId);
+  async getVerificationStatus(
+    @Param('verificationId') verificationId: string,
+    @Query('sessionId') sessionId: string,
+  ) {
+    const session = await this.sessionService.requireSession(sessionId);
+    return this.phoneVerificationService.getVerificationStatus(verificationId, session.tenantId);
   }
 
   // ========================================
@@ -251,30 +236,43 @@ export class CustomerPublicController {
   // ========================================
 
   @Post('referral/generate')
-  @ApiOperation({ summary: 'Generate referral code for customer' })
-  @ApiResponse({ status: 200, description: 'Referral code generated' })
-  async generateReferralCode(@Body('customerId') customerId: string) {
-    const code = await this.referralService.generateReferralCode(customerId);
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Generate referral code for the current session customer' })
+  async generateReferralCode(@Body('sessionId') sessionId: string) {
+    const session = await this.sessionService.requireSession(sessionId);
+    if (!session.customerId) {
+      throw new BadRequestException('Customer not identified in this session');
+    }
+    const code = await this.referralService.generateReferralCode(
+      session.customerId,
+      session.tenantId,
+    );
     return { referralCode: code };
   }
 
   @Post('referral/apply')
-  @ApiOperation({ summary: 'Apply referral code' })
-  @ApiResponse({ status: 200, description: 'Referral code applied successfully' })
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Apply referral code (phone must be verified)' })
   async applyReferralCode(@Body() dto: ApplyReferralCodeDto) {
-    return this.referralService.applyReferralCode(dto.customerId, dto.referralCode, dto.tenantId);
-  }
-
-  @Get('referral/stats')
-  @ApiOperation({ summary: 'Get referral statistics' })
-  @ApiResponse({ status: 200, description: 'Referral stats retrieved' })
-  async getReferralStats(@Query('sessionId') sessionId: string) {
-    const session = await this.sessionService.getSession(sessionId);
-
+    const session = await this.sessionService.requireSession(dto.sessionId);
     if (!session.customerId) {
       throw new BadRequestException('Customer not identified in this session');
     }
+    return this.referralService.applyReferralCode(
+      session.customerId,
+      dto.referralCode,
+      session.tenantId,
+    );
+  }
 
-    return this.referralService.getReferralStats(session.customerId);
+  @Get('referral/stats')
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Get referral statistics' })
+  async getReferralStats(@Query('sessionId') sessionId: string) {
+    const session = await this.sessionService.requireSession(sessionId);
+    if (!session.customerId) {
+      throw new BadRequestException('Customer not identified in this session');
+    }
+    return this.referralService.getReferralStats(session.customerId, session.tenantId);
   }
 }
