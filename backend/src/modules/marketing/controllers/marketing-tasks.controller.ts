@@ -13,6 +13,7 @@ import {
 import { MarketingGuard } from '../guards/marketing.guard';
 import { MarketingRolesGuard } from '../guards/marketing-roles.guard';
 import { MarketingRoute } from '../decorators/marketing-public.decorator';
+import { MarketingRoles } from '../decorators/marketing-roles.decorator';
 import { CurrentMarketingUser } from '../decorators/current-marketing-user.decorator';
 import { MarketingTasksService } from '../services/marketing-tasks.service';
 import { CreateTaskDto } from '../dto/create-task.dto';
@@ -78,6 +79,7 @@ export class MarketingTasksController {
   }
 
   @Delete(':id')
+  @MarketingRoles('SALES_MANAGER')
   delete(@Param('id') id: string, @CurrentMarketingUser() user: MarketingUserPayload) {
     return this.tasksService.delete(id, user.id, user.role);
   }

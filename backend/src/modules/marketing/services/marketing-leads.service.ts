@@ -1,14 +1,56 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { randomBytes } from 'crypto';
+import { addDays, addMonths, addYears } from 'date-fns';
+import * as bcrypt from 'bcryptjs';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
+import { EmailService } from '../../../common/services/email.service';
 import { CreateLeadDto } from '../dto/create-lead.dto';
 import { UpdateLeadDto } from '../dto/update-lead.dto';
 import { LeadFilterDto } from '../dto/lead-filter.dto';
 import { ConvertLeadDto } from '../dto/convert-lead.dto';
-import * as bcrypt from 'bcryptjs';
+
+/**
+ * Allowed lead status transitions. Terminal states (WON, LOST) are
+ * captured by returning an empty array — no further move is permitted
+ * once the lead is closed, otherwise a rep could flip a converted WON
+ * lead back to NEW and leave the tenant/commission dangling.
+ */
+const ALLOWED_TRANSITIONS: Record<string, string[]> = {
+  NEW: ['CONTACTED', 'NOT_REACHABLE', 'LOST'],
+  CONTACTED: ['MEETING_DONE', 'DEMO_SCHEDULED', 'NOT_REACHABLE', 'WAITING', 'LOST'],
+  NOT_REACHABLE: ['CONTACTED', 'LOST'],
+  MEETING_DONE: ['DEMO_SCHEDULED', 'OFFER_SENT', 'WAITING', 'LOST'],
+  DEMO_SCHEDULED: ['MEETING_DONE', 'OFFER_SENT', 'WAITING', 'LOST'],
+  OFFER_SENT: ['WAITING', 'WON', 'LOST'],
+  WAITING: ['OFFER_SENT', 'WON', 'LOST'],
+  WON: [],
+  LOST: [],
+};
+
+/** Signup commission as a fraction of the plan's monthly price. */
+const SIGNUP_COMMISSION_RATE = 0.1;
 
 @Injectable()
 export class MarketingLeadsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private configService: ConfigService,
+    private emailService: EmailService,
+  ) {}
+
+  private bcryptCost(): number {
+    const raw = this.configService.get<string>('BCRYPT_COST');
+    const parsed = raw ? parseInt(raw, 10) : NaN;
+    return Number.isFinite(parsed) && parsed >= 10 && parsed <= 15 ? parsed : 12;
+  }
 
   async create(dto: CreateLeadDto, userId: string) {
     return this.prisma.lead.create({
@@ -30,9 +72,8 @@ export class MarketingLeadsService {
     const limit = filter.limit || 20;
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: Prisma.LeadWhereInput = {};
 
-    // SALES_REP can only see their own leads
     if (userRole === 'SALES_REP') {
       where.assignedToId = userId;
     } else if (filter.assignedToId) {
@@ -61,10 +102,20 @@ export class MarketingLeadsService {
       if (filter.dateTo) where.createdAt.lte = new Date(filter.dateTo);
     }
 
-    const allowedSortFields = ['createdAt', 'updatedAt', 'businessName', 'contactPerson', 'city', 'status', 'source', 'priority', 'nextFollowUp'];
-    const orderBy: any = {};
+    const allowedSortFields = [
+      'createdAt',
+      'updatedAt',
+      'businessName',
+      'contactPerson',
+      'city',
+      'status',
+      'source',
+      'priority',
+      'nextFollowUp',
+    ];
+    const orderBy: Prisma.LeadOrderByWithRelationInput = {};
     if (filter.sortBy && allowedSortFields.includes(filter.sortBy)) {
-      orderBy[filter.sortBy] = filter.sortOrder || 'desc';
+      (orderBy as any)[filter.sortBy] = filter.sortOrder || 'desc';
     } else {
       orderBy.createdAt = 'desc';
     }
@@ -152,38 +203,77 @@ export class MarketingLeadsService {
 
   async update(id: string, dto: UpdateLeadDto, userId: string, userRole: string) {
     const lead = await this.prisma.lead.findUnique({ where: { id } });
-
     if (!lead) {
       throw new NotFoundException('Lead not found');
     }
-
     if (userRole === 'SALES_REP' && lead.assignedToId !== userId) {
       throw new ForbiddenException('You can only update your own leads');
     }
 
-    const data: any = { ...dto };
-    if (dto.nextFollowUp) data.nextFollowUp = new Date(dto.nextFollowUp);
+    // Build update explicitly — the DTO now omits assignedToId and
+    // status, but being explicit keeps us safe from future DTO drift.
+    const data: Prisma.LeadUpdateInput = {
+      ...(dto.businessName !== undefined && { businessName: dto.businessName }),
+      ...(dto.contactPerson !== undefined && { contactPerson: dto.contactPerson }),
+      ...(dto.phone !== undefined && { phone: dto.phone }),
+      ...(dto.whatsapp !== undefined && { whatsapp: dto.whatsapp }),
+      ...(dto.email !== undefined && { email: dto.email }),
+      ...(dto.address !== undefined && { address: dto.address }),
+      ...(dto.city !== undefined && { city: dto.city }),
+      ...(dto.region !== undefined && { region: dto.region }),
+      ...(dto.businessType !== undefined && { businessType: dto.businessType }),
+      ...(dto.tableCount !== undefined && { tableCount: dto.tableCount }),
+      ...(dto.branchCount !== undefined && { branchCount: dto.branchCount }),
+      ...(dto.currentSystem !== undefined && { currentSystem: dto.currentSystem }),
+      ...(dto.source !== undefined && { source: dto.source }),
+      ...(dto.notes !== undefined && { notes: dto.notes }),
+      ...(dto.priority !== undefined && { priority: dto.priority }),
+      ...(dto.nextFollowUp !== undefined && {
+        nextFollowUp: dto.nextFollowUp ? new Date(dto.nextFollowUp) : null,
+      }),
+    };
 
     return this.prisma.lead.update({
       where: { id },
       data,
       include: {
-        assignedTo: {
-          select: { id: true, firstName: true, lastName: true },
-        },
+        assignedTo: { select: { id: true, firstName: true, lastName: true } },
       },
     });
   }
 
-  async updateStatus(id: string, status: string, lostReason: string | undefined, userId: string, userRole: string) {
+  async updateStatus(
+    id: string,
+    status: string,
+    lostReason: string | undefined,
+    userId: string,
+    userRole: string,
+  ) {
     const lead = await this.prisma.lead.findUnique({ where: { id } });
-
-    if (!lead) {
-      throw new NotFoundException('Lead not found');
-    }
+    if (!lead) throw new NotFoundException('Lead not found');
 
     if (userRole === 'SALES_REP' && lead.assignedToId !== userId) {
       throw new ForbiddenException('You can only update your own leads');
+    }
+
+    // Terminal states cannot be re-opened from this endpoint. WON in
+    // particular is owned by `convert()` (which sets convertedTenantId);
+    // flipping it back here would leave a dangling tenant.
+    const allowed = ALLOWED_TRANSITIONS[lead.status] ?? [];
+    if (status !== lead.status && !allowed.includes(status)) {
+      throw new BadRequestException(
+        `Invalid transition from ${lead.status} to ${status}`,
+      );
+    }
+    if (status === 'WON') {
+      throw new BadRequestException(
+        'Use /convert to move a lead to WON (creates tenant and commission)',
+      );
+    }
+    if (lead.convertedTenantId) {
+      throw new BadRequestException(
+        'Cannot change status of an already-converted lead',
+      );
     }
 
     const updatedLead = await this.prisma.lead.update({
@@ -194,7 +284,6 @@ export class MarketingLeadsService {
       },
     });
 
-    // Log status change as activity
     await this.prisma.leadActivity.create({
       data: {
         type: 'STATUS_CHANGE',
@@ -208,43 +297,114 @@ export class MarketingLeadsService {
     return updatedLead;
   }
 
-  async assign(id: string, assignedToId: string) {
+  async assign(id: string, assignedToId: string, actorId: string) {
     const lead = await this.prisma.lead.findUnique({ where: { id } });
     if (!lead) throw new NotFoundException('Lead not found');
 
-    const rep = await this.prisma.marketingUser.findUnique({ where: { id: assignedToId } });
+    const rep = await this.prisma.marketingUser.findUnique({
+      where: { id: assignedToId },
+      select: { id: true, role: true, status: true, firstName: true, lastName: true },
+    });
     if (!rep) throw new NotFoundException('Sales rep not found');
+    if (rep.role !== 'SALES_REP') {
+      throw new BadRequestException('Target must be a SALES_REP');
+    }
+    if (rep.status !== 'ACTIVE') {
+      throw new BadRequestException('Target rep is not active');
+    }
 
-    return this.prisma.lead.update({
+    const updated = await this.prisma.lead.update({
       where: { id },
       data: { assignedToId },
       include: {
-        assignedTo: {
-          select: { id: true, firstName: true, lastName: true },
-        },
+        assignedTo: { select: { id: true, firstName: true, lastName: true } },
       },
     });
+
+    await this.prisma.leadActivity.create({
+      data: {
+        type: 'STATUS_CHANGE',
+        title: 'Lead assigned',
+        description: `Assigned to ${rep.firstName} ${rep.lastName}`,
+        leadId: id,
+        createdById: actorId,
+      },
+    });
+
+    return updated;
   }
 
+  /**
+   * Convert a lead to a paying tenant. Creates tenant + admin user +
+   * subscription in a single transaction, generates a random admin
+   * password (never accepted from the DTO), emails a welcome note, and
+   * records the rep's signup commission. Idempotent via lead.convertedTenantId.
+   */
   async convert(id: string, dto: ConvertLeadDto, userId: string) {
     const lead = await this.prisma.lead.findUnique({ where: { id } });
-
     if (!lead) throw new NotFoundException('Lead not found');
-    if (lead.convertedTenantId) throw new ForbiddenException('Lead already converted');
+    if (lead.convertedTenantId) {
+      throw new ConflictException('Lead already converted');
+    }
 
-    const hashedPassword = await bcrypt.hash(dto.adminPassword, 10);
+    // Pre-flight email uniqueness check so we can fail with 409 instead
+    // of leaking a raw Prisma P2002 from inside the transaction.
+    const emailCollision = await this.prisma.user.findUnique({
+      where: { email: dto.adminEmail },
+      select: { id: true },
+    });
+    if (emailCollision) {
+      throw new ConflictException('Admin email is already in use');
+    }
 
-    // Transaction: create tenant, admin user, update lead, create commission
+    let plan: Awaited<ReturnType<typeof this.prisma.subscriptionPlan.findUnique>> | null = null;
+    let offer: Awaited<ReturnType<typeof this.prisma.leadOffer.findUnique>> | null = null;
+    if (dto.offerId) {
+      offer = await this.prisma.leadOffer.findUnique({ where: { id: dto.offerId } });
+      if (!offer || offer.leadId !== id) {
+        throw new BadRequestException('Offer not found for this lead');
+      }
+    }
+    const planId = offer?.planId ?? dto.planId ?? null;
+    if (planId) {
+      plan = await this.prisma.subscriptionPlan.findUnique({ where: { id: planId } });
+      if (!plan || !plan.isActive) {
+        throw new BadRequestException('Plan not found or inactive');
+      }
+    }
+
+    // Generate a random admin password the rep never sees; the new
+    // owner receives it via email and is expected to change it on
+    // first login (they can also use /auth/forgot-password).
+    const rawPassword = randomBytes(12).toString('base64url');
+    const hashedPassword = await bcrypt.hash(rawPassword, this.bcryptCost());
+
+    const now = new Date();
+    const trialDays = offer?.trialDays ?? plan?.trialDays ?? 0;
+    const canTrial = !!plan && trialDays > 0 && plan.name !== 'FREE';
+    const trialStart = canTrial ? now : null;
+    const trialEnd = canTrial ? addDays(now, trialDays) : null;
+    const billingCycle = 'MONTHLY';
+    const currentPeriodEnd = canTrial
+      ? (trialEnd as Date)
+      : plan
+        ? addMonths(now, 1)
+        : addYears(now, 10);
+    const subscriptionAmount = plan
+      ? offer?.customPrice ?? plan.monthlyPrice
+      : null;
+
     const result = await this.prisma.$transaction(async (tx) => {
-      // Create tenant
       const tenant = await tx.tenant.create({
         data: {
           name: dto.tenantName,
-          ...(dto.planId ? { currentPlanId: dto.planId } : {}),
+          ...(plan ? { currentPlanId: plan.id } : {}),
+          ...(canTrial
+            ? { trialUsed: true, trialStartedAt: trialStart, trialEndsAt: trialEnd }
+            : {}),
         },
       });
 
-      // Create admin user for the tenant
       await tx.user.create({
         data: {
           email: dto.adminEmail,
@@ -258,7 +418,35 @@ export class MarketingLeadsService {
         },
       });
 
-      // Update lead as converted
+      if (plan && subscriptionAmount != null) {
+        await tx.subscription.create({
+          data: {
+            tenantId: tenant.id,
+            planId: plan.id,
+            status: canTrial ? 'TRIALING' : 'ACTIVE',
+            billingCycle,
+            paymentProvider: 'EMAIL',
+            startDate: now,
+            currentPeriodStart: now,
+            currentPeriodEnd,
+            isTrialPeriod: canTrial,
+            trialStart,
+            trialEnd,
+            amount: subscriptionAmount,
+            currency: plan.currency,
+            autoRenew: true,
+            cancelAtPeriodEnd: false,
+          },
+        });
+      }
+
+      if (offer) {
+        await tx.leadOffer.update({
+          where: { id: offer.id },
+          data: { status: 'ACCEPTED' },
+        });
+      }
+
       const updatedLead = await tx.lead.update({
         where: { id },
         data: {
@@ -268,14 +456,21 @@ export class MarketingLeadsService {
         },
       });
 
-      // Create commission for the rep
       if (lead.assignedToId) {
-        const now = new Date();
+        // Signup commission: percentage of the plan's monthly price when
+        // a plan was attached to the conversion; 0 when no plan was
+        // specified (FREE flows). Managers can tweak this later via the
+        // commissions service.
+        const commissionAmount = plan
+          ? new Prisma.Decimal(plan.monthlyPrice)
+              .mul(SIGNUP_COMMISSION_RATE)
+              .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP)
+          : new Prisma.Decimal(0);
         const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
         await tx.commission.create({
           data: {
-            amount: 0, // Will be calculated based on business rules
+            amount: commissionAmount,
             type: 'SIGNUP',
             status: 'PENDING',
             period,
@@ -286,7 +481,6 @@ export class MarketingLeadsService {
         });
       }
 
-      // Log activity
       await tx.leadActivity.create({
         data: {
           type: 'STATUS_CHANGE',
@@ -300,6 +494,30 @@ export class MarketingLeadsService {
       return { lead: updatedLead, tenantId: tenant.id };
     });
 
+    // Send the welcome email outside the transaction. Failure here
+    // shouldn't roll back the conversion — the owner can still recover
+    // via /auth/forgot-password.
+    try {
+      await this.emailService.sendPlainEmail(
+        dto.adminEmail,
+        'Welcome to your HummyTummy account',
+        [
+          `Hi ${dto.adminFirstName},`,
+          '',
+          `Your account for "${dto.tenantName}" has been created.`,
+          '',
+          `Temporary password: ${rawPassword}`,
+          '',
+          'Please log in and change your password immediately.',
+          'You can also request a password reset at /forgot-password.',
+        ].join('\n'),
+      );
+    } catch (err) {
+      // Log only; do not fail the response.
+      // eslint-disable-next-line no-console
+      console.error('Failed to send welcome email after lead conversion:', err);
+    }
+
     return result;
   }
 
@@ -309,7 +527,7 @@ export class MarketingLeadsService {
 
     await this.prisma.lead.update({
       where: { id },
-      data: { status: 'LOST', lostReason: 'Deleted by manager' },
+      data: { status: 'LOST', lostReason: 'archived_by_manager' },
     });
     return { message: 'Lead archived successfully' };
   }

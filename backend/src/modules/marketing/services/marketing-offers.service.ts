@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateOfferDto } from '../dto/create-offer.dto';
 import { UpdateOfferDto } from '../dto/update-offer.dto';
@@ -111,12 +116,21 @@ export class MarketingOffersService {
   }
 
   async markSent(id: string, userId: string, userRole: string) {
-    const offer = await this.prisma.leadOffer.findUnique({ where: { id } });
+    const offer = await this.prisma.leadOffer.findUnique({
+      where: { id },
+      include: { lead: { select: { status: true, convertedTenantId: true } } },
+    });
 
     if (!offer) throw new NotFoundException('Offer not found');
 
     if (userRole === 'SALES_REP' && offer.createdById !== userId) {
       throw new ForbiddenException('You can only send your own offers');
+    }
+    if (offer.status !== 'DRAFT') {
+      throw new BadRequestException('Only draft offers can be sent');
+    }
+    if (offer.lead.convertedTenantId || ['WON', 'LOST'].includes(offer.lead.status)) {
+      throw new BadRequestException('Lead is already closed');
     }
 
     const [updatedOffer] = await this.prisma.$transaction([
@@ -124,10 +138,15 @@ export class MarketingOffersService {
         where: { id },
         data: { status: 'SENT', sentAt: new Date() },
       }),
-      this.prisma.lead.update({
-        where: { id: offer.leadId },
-        data: { status: 'OFFER_SENT' },
-      }),
+      // Only advance the lead forward; don't clobber a later status.
+      ...(['OFFER_SENT', 'WAITING', 'WON', 'LOST'].includes(offer.lead.status)
+        ? []
+        : [
+            this.prisma.lead.update({
+              where: { id: offer.leadId },
+              data: { status: 'OFFER_SENT' },
+            }),
+          ]),
     ]);
 
     return updatedOffer;

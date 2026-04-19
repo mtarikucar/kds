@@ -1,12 +1,33 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateTaskDto } from '../dto/create-task.dto';
 import { UpdateTaskDto } from '../dto/update-task.dto';
 import { TaskFilterDto } from '../dto/task-filter.dto';
 
+// Allow a small grace for clock skew before rejecting a dueDate as
+// "in the past". 5 minutes is enough for any sane client drift.
+const PAST_DUE_GRACE_MS = 5 * 60 * 1000;
+const MAX_CALENDAR_RANGE_DAYS = 62;
+
 @Injectable()
 export class MarketingTasksService {
   constructor(private prisma: PrismaService) {}
+
+  private assertDueDateNotInPast(dueDate: Date | string): Date {
+    const d = new Date(dueDate);
+    if (Number.isNaN(d.getTime())) {
+      throw new BadRequestException('Invalid dueDate');
+    }
+    if (d.getTime() < Date.now() - PAST_DUE_GRACE_MS) {
+      throw new BadRequestException('dueDate must not be in the past');
+    }
+    return d;
+  }
 
   async create(dto: CreateTaskDto, userId: string) {
     return this.prisma.marketingTask.create({
@@ -15,7 +36,7 @@ export class MarketingTasksService {
         description: dto.description,
         type: dto.type,
         priority: dto.priority || 'MEDIUM',
-        dueDate: new Date(dto.dueDate),
+        dueDate: this.assertDueDateNotInPast(dto.dueDate),
         leadId: dto.leadId,
         assignedToId: dto.assignedToId || userId,
       },
@@ -125,11 +146,23 @@ export class MarketingTasksService {
   }
 
   async findCalendar(dateFrom: string, dateTo: string, userId: string, userRole: string) {
+    const from = new Date(dateFrom);
+    const to = new Date(dateTo);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
+      throw new BadRequestException('Invalid date range');
+    }
+    if (from > to) {
+      throw new BadRequestException('dateFrom must be <= dateTo');
+    }
+    const rangeDays = (to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24);
+    if (rangeDays > MAX_CALENDAR_RANGE_DAYS) {
+      throw new BadRequestException(
+        `Calendar range cannot exceed ${MAX_CALENDAR_RANGE_DAYS} days`,
+      );
+    }
+
     const where: any = {
-      dueDate: {
-        gte: new Date(dateFrom),
-        lte: new Date(dateTo),
-      },
+      dueDate: { gte: from, lte: to },
     };
 
     if (userRole === 'SALES_REP') {
@@ -139,6 +172,7 @@ export class MarketingTasksService {
     return this.prisma.marketingTask.findMany({
       where,
       orderBy: { dueDate: 'asc' },
+      take: 500,
       include: {
         lead: { select: { id: true, businessName: true } },
         assignedTo: { select: { id: true, firstName: true, lastName: true } },

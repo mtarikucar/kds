@@ -1,4 +1,12 @@
-import { IsString, IsNotEmpty, IsEmail, IsEnum, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsEmail,
+  IsEnum,
+  IsOptional,
+  Matches,
+  MinLength,
+} from 'class-validator';
 
 export enum MarketingUserRole {
   SALES_MANAGER = 'SALES_MANAGER',
@@ -11,6 +19,11 @@ export class CreateMarketingUserDto {
 
   @IsString()
   @IsNotEmpty()
+  @MinLength(8)
+  @Matches(/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
+    message:
+      'Password must contain at least one lowercase letter, one uppercase letter, and one digit',
+  })
   password: string;
 
   @IsString()

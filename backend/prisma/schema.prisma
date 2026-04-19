@@ -2568,6 +2568,11 @@ model MarketingUser {
   lastLoginIp     String?
   failedLogins    Int       @default(0)
   lockedUntil     DateTime?
+
+  // Session revocation token: carried in access/refresh JWTs; bumped on
+  // logout and on password change so outstanding tokens are invalidated.
+  tokenVersion    Int       @default(0)
+
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 

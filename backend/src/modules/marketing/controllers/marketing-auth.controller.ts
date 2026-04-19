@@ -5,7 +5,10 @@ import {
   Patch,
   Body,
   UseGuards,
+  Req,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import { Request } from 'express';
 import { MarketingGuard } from '../guards/marketing.guard';
 import { MarketingPublic, MarketingRoute } from '../decorators/marketing-public.decorator';
 import { CurrentMarketingUser } from '../decorators/current-marketing-user.decorator';
@@ -13,7 +16,13 @@ import { MarketingAuthService } from '../services/marketing-auth.service';
 import { MarketingLoginDto } from '../dto/login.dto';
 import { ChangePasswordDto } from '../dto/change-password.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
+import { RefreshTokenDto } from '../dto/refresh-token.dto';
 import { MarketingUserPayload } from '../types';
+
+// Marketing realm carries platform-wide sales data; treating its auth
+// surface as tightly as the superadmin realm is appropriate.
+const LOGIN_THROTTLE = { default: { limit: 5, ttl: 60_000 } };
+const REFRESH_THROTTLE = { default: { limit: 30, ttl: 60_000 } };
 
 @Controller('marketing/auth')
 @UseGuards(MarketingGuard)
@@ -23,14 +32,22 @@ export class MarketingAuthController {
 
   @Post('login')
   @MarketingPublic()
-  login(@Body() dto: MarketingLoginDto) {
-    return this.authService.login(dto);
+  @Throttle(LOGIN_THROTTLE)
+  login(@Body() dto: MarketingLoginDto, @Req() req: Request) {
+    const ip = req.ip || req.headers['x-forwarded-for']?.toString();
+    return this.authService.login(dto, ip);
   }
 
   @Post('refresh')
   @MarketingPublic()
-  refresh(@Body('refreshToken') refreshToken: string) {
-    return this.authService.refreshToken(refreshToken);
+  @Throttle(REFRESH_THROTTLE)
+  refresh(@Body() dto: RefreshTokenDto) {
+    return this.authService.refreshToken(dto.refreshToken);
+  }
+
+  @Post('logout')
+  logout(@CurrentMarketingUser() user: MarketingUserPayload) {
+    return this.authService.logout(user.id);
   }
 
   @Get('profile')

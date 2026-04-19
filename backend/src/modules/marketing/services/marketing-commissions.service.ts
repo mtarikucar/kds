@@ -95,10 +95,39 @@ export class MarketingCommissionsService {
     if (commission.status !== 'PENDING') {
       throw new BadRequestException('Only pending commissions can be approved');
     }
+    // An amount of zero usually means the auto-calculation had nothing
+    // to apply (FREE-plan conversion, etc.). Require the manager to
+    // set a real amount before approval so accounting has something to
+    // pay out.
+    if (new (commission.amount.constructor as any)(commission.amount).isZero?.() ||
+        Number(commission.amount) === 0) {
+      throw new BadRequestException(
+        'Commission amount is zero. Set an amount before approving.',
+      );
+    }
 
     return this.prisma.commission.update({
       where: { id },
       data: { status: 'APPROVED', approvedAt: new Date() },
+    });
+  }
+
+  /**
+   * Set the commission amount. Only valid while still PENDING so
+   * approved/paid rows remain immutable for audit.
+   */
+  async updateAmount(id: string, amount: number) {
+    if (!Number.isFinite(amount) || amount < 0) {
+      throw new BadRequestException('Amount must be a non-negative number');
+    }
+    const commission = await this.prisma.commission.findUnique({ where: { id } });
+    if (!commission) throw new NotFoundException('Commission not found');
+    if (commission.status !== 'PENDING') {
+      throw new BadRequestException('Only pending commissions can be updated');
+    }
+    return this.prisma.commission.update({
+      where: { id },
+      data: { amount },
     });
   }
 

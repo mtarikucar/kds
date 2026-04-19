@@ -2,10 +2,18 @@ import {
   Controller,
   Get,
   Patch,
+  Body,
   Param,
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { IsNumber, Min } from 'class-validator';
+
+class UpdateCommissionAmountDto {
+  @IsNumber()
+  @Min(0)
+  amount: number;
+}
 import { MarketingGuard } from '../guards/marketing.guard';
 import { MarketingRolesGuard } from '../guards/marketing-roles.guard';
 import { MarketingRoute } from '../decorators/marketing-public.decorator';
@@ -37,6 +45,15 @@ export class MarketingCommissionsController {
     @Query('period') period?: string,
   ) {
     return this.commissionsService.getSummary(user.id, user.role, period);
+  }
+
+  @Patch(':id')
+  @MarketingRoles('SALES_MANAGER')
+  updateAmount(
+    @Param('id') id: string,
+    @Body() dto: UpdateCommissionAmountDto,
+  ) {
+    return this.commissionsService.updateAmount(id, dto.amount);
   }
 
   @Patch(':id/approve')

@@ -67,8 +67,9 @@ export class MarketingLeadsController {
   assign(
     @Param('id') id: string,
     @Body() dto: AssignLeadDto,
+    @CurrentMarketingUser() user: MarketingUserPayload,
   ) {
-    return this.leadsService.assign(id, dto.assignedToId);
+    return this.leadsService.assign(id, dto.assignedToId, user.id);
   }
 
   @Post(':id/convert')

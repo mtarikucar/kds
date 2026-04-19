@@ -18,17 +18,23 @@ export class MarketingReportsController {
     return this.reportsService.getPerformanceReport(filter);
   }
 
+  // Aggregate reports show data across every rep, so only managers
+  // should see them; otherwise a SALES_REP can read the whole team's
+  // conversion funnel and regional performance.
   @Get('lead-sources')
+  @MarketingRoles('SALES_MANAGER')
   getLeadSources(@Query() filter: ReportFilterDto) {
     return this.reportsService.getLeadSourceReport(filter);
   }
 
   @Get('regional')
+  @MarketingRoles('SALES_MANAGER')
   getRegional(@Query() filter: ReportFilterDto) {
     return this.reportsService.getRegionalReport(filter);
   }
 
   @Get('conversion')
+  @MarketingRoles('SALES_MANAGER')
   getConversion(@Query() filter: ReportFilterDto) {
     return this.reportsService.getConversionFunnel(filter);
   }

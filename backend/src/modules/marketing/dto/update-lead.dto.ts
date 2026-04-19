@@ -1,25 +1,13 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { PartialType, OmitType } from '@nestjs/mapped-types';
 import { CreateLeadDto } from './create-lead.dto';
 
-export enum LeadStatus {
-  NEW = 'NEW',
-  CONTACTED = 'CONTACTED',
-  NOT_REACHABLE = 'NOT_REACHABLE',
-  MEETING_DONE = 'MEETING_DONE',
-  DEMO_SCHEDULED = 'DEMO_SCHEDULED',
-  OFFER_SENT = 'OFFER_SENT',
-  WAITING = 'WAITING',
-  WON = 'WON',
-  LOST = 'LOST',
-}
-
-export class UpdateLeadDto extends PartialType(CreateLeadDto) {
-  @IsOptional()
-  @IsEnum(LeadStatus)
-  status?: LeadStatus;
-
-  @IsOptional()
-  @IsString()
-  lostReason?: string;
-}
+/**
+ * Intentionally omits `assignedToId` — reassignment goes through the
+ * dedicated, manager-only `PATCH /leads/:id/assign` endpoint so a rep
+ * cannot silently reassign their own lead. `status` and `lostReason`
+ * likewise live on `PATCH /leads/:id/status` so every state transition
+ * leaves a matching audit entry.
+ */
+export class UpdateLeadDto extends PartialType(
+  OmitType(CreateLeadDto, ['assignedToId'] as const),
+) {}

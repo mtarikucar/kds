@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateMarketingUserDto } from '../dto/create-marketing-user.dto';
@@ -10,7 +11,16 @@ import { UpdateMarketingUserDto } from '../dto/update-marketing-user.dto';
 
 @Injectable()
 export class MarketingUsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private configService: ConfigService,
+  ) {}
+
+  private bcryptCost(): number {
+    const raw = this.configService.get<string>('BCRYPT_COST');
+    const parsed = raw ? parseInt(raw, 10) : NaN;
+    return Number.isFinite(parsed) && parsed >= 10 && parsed <= 15 ? parsed : 12;
+  }
 
   async create(dto: CreateMarketingUserDto) {
     const existing = await this.prisma.marketingUser.findUnique({
@@ -21,7 +31,7 @@ export class MarketingUsersService {
       throw new ConflictException('Email already exists');
     }
 
-    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    const hashedPassword = await bcrypt.hash(dto.password, this.bcryptCost());
 
     return this.prisma.marketingUser.create({
       data: {
