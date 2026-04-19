@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateContactDto } from './dto/create-contact.dto';
 import { MailerService } from './mailer.service';
@@ -12,63 +12,74 @@ export class ContactService {
     private mailerService: MailerService,
   ) {}
 
-  async create(createContactDto: CreateContactDto) {
-    try {
-      // Save to database
-      const contactMessage = await this.prisma.contactMessage.create({
-        data: {
-          name: createContactDto.name,
-          email: createContactDto.email,
-          phone: createContactDto.phone,
-          message: createContactDto.message,
-          status: 'NEW',
-        },
-      });
-
-      this.logger.log(`New contact message received from ${createContactDto.email}`);
-
-      // Send email notifications (admin notification + user confirmation)
-      const emailResults = await this.mailerService.sendBothEmails({
-        name: createContactDto.name,
-        email: createContactDto.email,
-        phone: createContactDto.phone,
-        message: createContactDto.message,
-      });
-
-      if (!emailResults.adminSent) {
-        this.logger.warn('Admin notification email was not sent');
-      }
-
-      if (!emailResults.userSent) {
-        this.logger.warn('User confirmation email was not sent');
-      }
-
+  async create(dto: CreateContactDto) {
+    // Honeypot: silently accept-and-ignore rather than throwing so bots can't
+    // probe whether the field is being inspected.
+    if (dto.website && dto.website.trim().length > 0) {
+      this.logger.warn(`Honeypot triggered from contact form (${dto.email})`);
       return {
         success: true,
         message: 'Your message has been sent successfully. We will get back to you soon!',
       };
-    } catch (error) {
-      this.logger.error(`Failed to create contact message: ${error.message}`);
-      throw error;
     }
+
+    const contactMessage = await this.prisma.contactMessage.create({
+      data: {
+        name: dto.name,
+        email: dto.email,
+        phone: dto.phone,
+        message: dto.message,
+        status: 'NEW',
+      },
+    });
+    this.logger.log(`New contact message ${contactMessage.id} from ${dto.email}`);
+
+    // Only admin notification is emailed. User confirmation was previously
+    // sent to the submitter-supplied email address, which turned the SMTP
+    // sender into a spam cannon (attacker posts `email = victim@...`). The
+    // in-page success toast is sufficient confirmation for real users.
+    const adminSent = await this.mailerService.sendAdminNotification({
+      name: dto.name,
+      email: dto.email,
+      phone: dto.phone,
+      message: dto.message,
+    });
+    if (!adminSent) {
+      this.logger.warn(`Admin notification not sent for contact ${contactMessage.id}`);
+    }
+
+    return {
+      success: true,
+      message: 'Your message has been sent successfully. We will get back to you soon!',
+    };
   }
 
-  async findAll() {
-    return this.prisma.contactMessage.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+  async findAll(page = 1, limit = 50) {
+    const safeLimit = Math.min(Math.max(limit, 1), 200);
+    const safePage = Math.max(page, 1);
+    const [data, total] = await this.prisma.$transaction([
+      this.prisma.contactMessage.findMany({
+        orderBy: { createdAt: 'desc' },
+        skip: (safePage - 1) * safeLimit,
+        take: safeLimit,
+      }),
+      this.prisma.contactMessage.count(),
+    ]);
+    return { data, total, page: safePage, pageSize: safeLimit };
   }
 
   async findOne(id: string) {
-    return this.prisma.contactMessage.findUnique({
-      where: { id },
-    });
+    const row = await this.prisma.contactMessage.findUnique({ where: { id } });
+    if (!row) throw new NotFoundException('Contact message not found');
+    return row;
   }
 
   async markAsRead(id: string) {
-    return this.prisma.contactMessage.update({
+    const result = await this.prisma.contactMessage.updateMany({
       where: { id },
       data: { status: 'READ' },
     });
+    if (result.count !== 1) throw new NotFoundException('Contact message not found');
+    return this.findOne(id);
   }
 }

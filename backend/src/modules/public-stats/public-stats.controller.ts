@@ -18,6 +18,7 @@ import { PublicStatsService } from './public-stats.service';
 import { TrackViewDto } from './dto/track-view.dto';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { PublicStatsResponseDto, PublicReviewResponseDto } from './dto/public-stats-response.dto';
+import { Throttle } from '@nestjs/throttler';
 import { Public } from '../auth/decorators/public.decorator';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -30,6 +31,7 @@ export class PublicStatsController {
   constructor(private readonly statsService: PublicStatsService) {}
 
   @Public()
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @Post('track')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Track page view (Public)' })
@@ -45,6 +47,7 @@ export class PublicStatsController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @Get('stats')
   @ApiOperation({ summary: 'Get public statistics (Public)' })
   @ApiResponse({ status: 200, description: 'Public statistics', type: PublicStatsResponseDto })
@@ -58,6 +61,7 @@ export class PublicStatsController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 3, ttl: 60 * 60_000 } })
   @Post('reviews')
   @ApiOperation({ summary: 'Submit a review (Public)' })
   @ApiResponse({ status: 201, description: 'Review submitted successfully' })
@@ -74,6 +78,7 @@ export class PublicStatsController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @Get('reviews')
   @ApiOperation({ summary: 'Get approved reviews (Public)' })
   @ApiQuery({ name: 'limit', required: false, type: Number })

@@ -118,6 +118,7 @@ export class ReportsService {
     limit: number = 10,
   ) {
     const dateRange = this.getDateRange(startDate, endDate);
+    const safeLimit = Math.min(Math.max(limit, 1), 100);
 
     // Get top selling products
     const topProducts = await this.prisma.orderItem.groupBy({
@@ -141,14 +142,16 @@ export class ReportsService {
           subtotal: 'desc',
         },
       },
-      take: limit,
+      take: safeLimit,
     });
 
-    // Fetch product details
+    // Fetch product details — tenant-scoped so a stale OrderItem referencing
+    // a cross-tenant product (data-import edge case) cannot leak.
     const productIds = topProducts.map((item) => item.productId);
     const products = await this.prisma.product.findMany({
       where: {
         id: { in: productIds },
+        tenantId,
       },
       include: {
         category: {
@@ -219,7 +222,8 @@ export class ReportsService {
   }
 
   async getOrdersByHour(tenantId: string, date?: Date) {
-    const targetDate = date || new Date();
+    // Clone the caller-supplied Date so we never mutate a shared reference.
+    const targetDate = new Date(date ?? Date.now());
     targetDate.setHours(0, 0, 0, 0);
 
     const endDate = new Date(targetDate);
@@ -466,10 +470,11 @@ export class ReportsService {
       _count: true,
     });
 
-    // Fetch user details
+    // Fetch user details — tenant-scoped for the same defense-in-depth reason
+    // as product lookups above.
     const userIds = staffOrders.map((s) => s.userId).filter(Boolean) as string[];
     const users = await this.prisma.user.findMany({
-      where: { id: { in: userIds } },
+      where: { id: { in: userIds }, tenantId },
       select: { id: true, firstName: true, lastName: true, role: true },
     });
 
