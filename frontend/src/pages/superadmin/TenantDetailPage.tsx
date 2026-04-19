@@ -117,7 +117,7 @@ export default function TenantDetailPage() {
   };
 
   const activeSubscription = tenant.subscriptions?.find(
-    (sub: any) => sub.status === 'ACTIVE' || sub.status === 'TRIALING'
+    (sub: { status: string }) => sub.status === 'ACTIVE' || sub.status === 'TRIALING',
   );
 
   const handleChangePlan = () => {
@@ -538,7 +538,14 @@ export default function TenantDetailPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100">
-            {users?.data.map((user: any) => (
+            {users?.data.map((user: {
+              id: string;
+              firstName: string;
+              lastName: string;
+              email: string;
+              role: string;
+              status: string;
+            }) => (
               <tr key={user.id}>
                 <td className="px-5 py-3 text-sm text-zinc-900">
                   {user.firstName} {user.lastName}
@@ -573,7 +580,7 @@ export default function TenantDetailPage() {
               </p>
 
               <div className="space-y-2 mb-6">
-                {plans?.map((plan: any) => (
+                {plans?.map((plan: { id: string; displayName: string; price: number; currency: string; billingCycle: string; isActive: boolean }) => (
                   <label
                     key={plan.id}
                     className={`flex items-center justify-between p-4 border rounded-xl cursor-pointer transition-colors ${

@@ -1,12 +1,11 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsEnum, IsOptional, IsString, IsInt, IsIn, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
+import { TenantStatus } from '../../../common/constants/subscription.enum';
 
-export enum TenantStatus {
-  ACTIVE = 'ACTIVE',
-  SUSPENDED = 'SUSPENDED',
-  DELETED = 'DELETED',
-}
+// Re-export so existing imports of `TenantStatus from './tenant-filter.dto'`
+// keep working while the canonical definition lives in the common module.
+export { TenantStatus };
 
 export const TENANT_SORTABLE_FIELDS = [
   'createdAt',
