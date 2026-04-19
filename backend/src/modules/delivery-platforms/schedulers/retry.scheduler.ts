@@ -55,6 +55,19 @@ export class RetryScheduler {
             const order = await this.prisma.order.findUnique({
               where: { id: op.orderId },
             });
+            // Don't "accept" an order the staff has since rejected /
+            // cancelled — otherwise the retry would silently flip it
+            // back to the platform side.
+            if (
+              order &&
+              ['CANCELLED', 'REJECTED', 'PAID'].includes(order.status as string)
+            ) {
+              await this.logService.markRetrySuccess(op.id);
+              this.logger.log(
+                `Skipping ORDER_ACCEPTED retry for ${op.orderId} (status ${order.status})`,
+              );
+              continue;
+            }
             if (order?.source && order.tenantId) {
               const config = await this.prisma.deliveryPlatformConfig.findUnique({
                 where: {

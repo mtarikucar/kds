@@ -1994,9 +1994,11 @@ model DeliveryPlatformConfig {
   platform  String   // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS
   isEnabled Boolean  @default(false)
 
-  // Authentication
-  credentials    Json?      // Platform-specific API keys/secrets (encrypted at app level)
-  accessToken    String?    // Current access token
+  // Authentication (all three fields hold AES-256-GCM-encrypted JSON;
+  // see common/helpers/encryption.helper.ts). Never log these or return
+  // them from tenant-facing endpoints.
+  credentials    Json?      // { ciphertext, iv, authTag } or null
+  accessToken    String?    // AES-GCM-encrypted bearer token
   tokenExpiresAt DateTime?  // Token expiration time
 
   // Platform identifiers
@@ -2018,6 +2020,10 @@ model DeliveryPlatformConfig {
   autoAccept   Boolean @default(true)  // Auto-accept incoming orders
   notifySound  String? // Custom notification sound identifier
 
+  // Soft delete marker so we don't orphan in-flight orders / mappings
+  // when an admin hits Delete while orders are still syncing.
+  deletedAt DateTime?
+
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -2025,6 +2031,10 @@ model DeliveryPlatformConfig {
   updatedAt DateTime @updatedAt
 
   @@unique([tenantId, platform])
+  // Platform-wide uniqueness: two tenants can't claim the same remote
+  // restaurant id (prior gap allowed disabled tenants to collide with
+  // enabled ones and mis-route webhooks).
+  @@unique([platform, remoteRestaurantId])
   @@index([tenantId])
   @@index([platform])
   @@index([isEnabled])

@@ -24,6 +24,12 @@ export class DeliveryLogService {
 
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * Best-effort log write. Swallows errors so a transient DB hiccup in
+   * the audit path cannot fail a successful order-create or make a
+   * webhook retry loop with the platform — the caller has already done
+   * the real work.
+   */
   async log(entry: LogEntry) {
     try {
       return await this.prisma.deliveryPlatformLog.create({
@@ -44,10 +50,32 @@ export class DeliveryLogService {
         },
       });
     } catch (error: any) {
-      this.logger.error(`Failed to create log entry: ${error.message}`, error.stack);
-      // Re-throw so callers are aware logging failed
-      throw error;
+      this.logger.warn(`Failed to create log entry: ${error.message}`);
+      return null;
     }
+  }
+
+  /**
+   * Strip attacker/customer-controlled PII before persisting a raw
+   * webhook body. The platform's order id/token is kept for debugging;
+   * personal identifiers are dropped so log-table retention doesn't
+   * inadvertently turn into long-term PII storage.
+   */
+  scrubPii<T>(raw: T): unknown {
+    if (raw == null || typeof raw !== 'object') return raw;
+    const redacted: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+      if (
+        /phone|email|address|customer|name|buyer|recipient|gsm/i.test(key)
+      ) {
+        redacted[key] = '[redacted]';
+      } else if (value && typeof value === 'object') {
+        redacted[key] = this.scrubPii(value);
+      } else {
+        redacted[key] = value;
+      }
+    }
+    return redacted;
   }
 
   async getFailedOperations(limit = 50) {

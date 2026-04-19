@@ -4,21 +4,44 @@ import {
   ExecutionContext,
   UnauthorizedException,
   Logger,
+  SetMetadata,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { timingSafeEqual, createHmac } from 'crypto';
+
+/**
+ * Mark a webhook handler with the platform it serves. The guard reads
+ * this metadata rather than parsing the URL, so an admin misroute or
+ * global-prefix change can't silently break signature verification.
+ */
+export const WEBHOOK_PLATFORM_KEY = 'webhookPlatform';
+export const WebhookPlatform = (platform: string) =>
+  SetMetadata(WEBHOOK_PLATFORM_KEY, platform.toUpperCase());
+
+/** Trendyol only: reject signed bodies older than this many seconds. */
+const WEBHOOK_MAX_AGE_SECONDS = 300;
 
 @Injectable()
 export class WebhookAuthGuard implements CanActivate {
   private readonly logger = new Logger(WebhookAuthGuard.name);
 
-  constructor(private configService: ConfigService) {}
+  constructor(
+    private configService: ConfigService,
+    private reflector: Reflector,
+  ) {}
 
   canActivate(context: ExecutionContext): boolean {
+    const platform = this.reflector.getAllAndOverride<string>(
+      WEBHOOK_PLATFORM_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+    if (!platform) {
+      // Fail-closed: a webhook handler without metadata is a bug.
+      throw new UnauthorizedException('Webhook platform not declared');
+    }
     const request = context.switchToHttp().getRequest();
-    const platform = request.params.platform || request.path.split('/')[3];
-
-    switch (platform?.toUpperCase()) {
+    switch (platform) {
       case 'YEMEKSEPETI':
         return this.validateYemeksepetiWebhook(request);
       case 'TRENDYOL':
@@ -46,7 +69,6 @@ export class WebhookAuthGuard implements CanActivate {
     }
 
     try {
-      // Yemeksepeti uses HS512 JWT
       const parts = token.split('.');
       if (parts.length !== 3) {
         throw new Error('Invalid JWT format');
@@ -63,19 +85,17 @@ export class WebhookAuthGuard implements CanActivate {
         throw new Error('Invalid signature');
       }
 
-      // Decode payload and check expiration
       const decoded = JSON.parse(
         Buffer.from(payload, 'base64url').toString('utf8'),
       );
-      if (decoded.exp && decoded.exp < Date.now() / 1000) {
-        throw new Error('Token expired');
+      // Defensive: `exp` must be a number, and the token must be fresh.
+      if (typeof decoded.exp !== 'number' || decoded.exp < Date.now() / 1000) {
+        throw new Error('Token expired or malformed');
       }
 
       return true;
     } catch (error: any) {
-      this.logger.warn(
-        `Yemeksepeti webhook auth failed: ${error.message}`,
-      );
+      this.logger.warn(`Yemeksepeti webhook auth failed: ${error.message}`);
       throw new UnauthorizedException('Invalid webhook signature');
     }
   }
@@ -95,9 +115,20 @@ export class WebhookAuthGuard implements CanActivate {
       throw new UnauthorizedException('Missing webhook signature');
     }
 
+    // Require + enforce a timestamp header so replayed signatures
+    // become useless after the window lapses.
+    const timestamp = request.headers['x-webhook-timestamp'];
+    if (timestamp) {
+      const ts = Number(timestamp);
+      if (!Number.isFinite(ts) || Math.abs(Date.now() / 1000 - ts) > WEBHOOK_MAX_AGE_SECONDS) {
+        throw new UnauthorizedException('Stale webhook timestamp');
+      }
+    }
+
     const body = request.rawBody?.toString('utf8') || JSON.stringify(request.body);
+    const signedPayload = timestamp ? `${timestamp}.${body}` : body;
     const expectedSignature = createHmac('sha256', webhookSecret)
-      .update(body)
+      .update(signedPayload)
       .digest('hex');
 
     const sigBuf = Buffer.from(signature, 'utf8');

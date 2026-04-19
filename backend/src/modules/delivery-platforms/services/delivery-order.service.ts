@@ -1,4 +1,5 @@
 import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { KdsGateway } from '../../kds/kds.gateway';
@@ -33,9 +34,13 @@ export class DeliveryOrderService {
   ) {
     const { platform, externalOrderId } = normalizedOrder;
 
-    // 1-4. Deduplicate + map items + create order in a transaction
-    const createdOrder = await this.prisma.$transaction(async (tx) => {
-      // 1. Deduplicate by externalOrderId + platform (idempotent)
+    // 1-4. Deduplicate + map items + create order in a transaction.
+    // Final dedup guarantee is the partial unique index
+    // orders(tenantId, source, externalOrderId) — the findFirst below is
+    // a fast-path; the try/catch on P2002 handles concurrent webhooks.
+    let createdOrder;
+    try {
+      createdOrder = await this.prisma.$transaction(async (tx) => {
       const existing = await tx.order.findFirst({
         where: {
           tenantId,
@@ -144,7 +149,11 @@ export class DeliveryOrderService {
           requiresApproval: !autoAccept,
           source: platform,
           externalOrderId,
-          externalData: normalizedOrder.rawPayload,
+          // Raw payload stored for debugging, but PII (customer
+          // name/phone/address) lives in dedicated columns already —
+          // scrub it from the blob so log retention doesn't double as
+          // long-term PII storage.
+          externalData: this.logService.scrubPii(normalizedOrder.rawPayload) as any,
           totalAmount,
           discount,
           finalAmount,
@@ -186,8 +195,21 @@ export class DeliveryOrderService {
         },
       });
     });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        // Concurrent webhook delivery — DB uniqueness caught the race
+        // we couldn't catch with findFirst + create. Idempotent outcome.
+        this.logger.debug(
+          `Duplicate order skipped (DB race): ${platform} ${externalOrderId}`,
+        );
+        return null;
+      }
+      throw err;
+    }
 
-    // If this was a duplicate, skip post-creation steps
     if (!createdOrder) {
       return null;
     }
