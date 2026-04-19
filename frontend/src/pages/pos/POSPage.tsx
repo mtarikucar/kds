@@ -332,7 +332,6 @@ const POSPage = () => {
       items: cartItems.map((item) => ({
         productId: item.id,
         quantity: item.quantity,
-        unitPrice: item.price,
         notes: item.notes,
         modifiers: item.modifiers?.map(m => ({
           modifierId: m.modifierId,
@@ -409,7 +408,6 @@ const POSPage = () => {
       items: cartItems.map((item) => ({
         productId: item.id,
         quantity: item.quantity,
-        unitPrice: item.price,
         notes: item.notes,
         modifiers: item.modifiers?.map(m => ({
           modifierId: m.modifierId,

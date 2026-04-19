@@ -529,6 +529,9 @@ model Order {
   @@index([approvedById])
   @@index([source])
   @@index([externalOrderId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, tableId, status])
   @@map("orders")
 }
 
@@ -587,15 +590,19 @@ model Payment {
   method String  // CASH, CARD, DIGITAL
   status String  @default("PENDING") // PENDING, COMPLETED, FAILED, REFUNDED
 
-  transactionId String?
-  notes         String?
+  transactionId  String?
+  idempotencyKey String?
+  notes          String?
 
-  orderId String
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  tenantId String
+  orderId  String
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   createdAt DateTime  @default(now())
   paidAt    DateTime?
 
+  @@unique([orderId, idempotencyKey])
+  @@index([tenantId])
   @@index([orderId])
   @@index([status])
   @@map("payments")

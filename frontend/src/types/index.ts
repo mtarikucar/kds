@@ -323,7 +323,6 @@ export interface DeliveryPlatformLog {
 export interface CreateOrderItemDto {
   productId: string;
   quantity: number;
-  unitPrice: number;
   notes?: string;
 }
 
@@ -337,9 +336,14 @@ export interface CreateOrderDto {
 }
 
 export interface UpdateOrderDto {
-  status?: OrderStatus;
   discount?: number;
   notes?: string;
+  customerName?: string;
+  items?: CreateOrderItemDto[];
+}
+
+export interface UpdateOrderStatusDto {
+  status: OrderStatus;
 }
 
 // Payment Types

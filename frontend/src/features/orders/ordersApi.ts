@@ -6,6 +6,7 @@ import {
   Order,
   CreateOrderDto,
   UpdateOrderDto,
+  UpdateOrderStatusDto,
   CreatePaymentDto,
   Payment,
   OrderFilters,
@@ -17,10 +18,10 @@ export const useOrders = (filters?: OrderFilters) => {
   return useQuery({
     queryKey: ['orders', filters],
     queryFn: async (): Promise<Order[]> => {
-      console.log('[useOrders] Fetching orders with filters:', filters);
       const response = await api.get('/orders', { params: filters });
-      console.log('[useOrders] Response:', response.data);
-      return response.data;
+      // Server now returns { data, total, page, pageSize }; tolerate the legacy
+      // array shape as well so the hook keeps working during the migration.
+      return Array.isArray(response.data) ? response.data : response.data.data;
     },
   });
 };
@@ -97,7 +98,7 @@ export const useUpdateOrderStatus = () => {
       data,
     }: {
       id: string;
-      data: UpdateOrderDto;
+      data: UpdateOrderStatusDto;
     }): Promise<Order> => {
       // Use KDS endpoint for real-time updates with WebSocket emission
       const response = await api.patch(`/kds/orders/${id}/status`, data);
@@ -243,7 +244,7 @@ export const useWaiterRequests = () => {
       const response = await api.get('/customer-orders/waiter-requests/tenant/active');
       return response.data;
     },
-    refetchInterval: 10000, // Poll every 10 seconds
+    // Real-time updates delivered via Socket.IO (see usePosSocket).
   });
 };
 
@@ -300,7 +301,7 @@ export const useBillRequests = () => {
       const response = await api.get('/customer-orders/bill-requests/tenant/active');
       return response.data;
     },
-    refetchInterval: 10000, // Poll every 10 seconds
+    // Real-time updates delivered via Socket.IO (see usePosSocket).
   });
 };
 
