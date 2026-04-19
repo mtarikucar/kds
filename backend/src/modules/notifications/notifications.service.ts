@@ -1,4 +1,4 @@
-import { Injectable, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, Inject, NotFoundException, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateNotificationDto, NotificationType } from './dto/create-notification.dto';
 import { NotificationsGateway } from './notifications.gateway';
@@ -47,9 +47,27 @@ export class NotificationsService {
     });
   }
 
-  async markAsRead(notificationId: string, userId: string) {
-    return this.prisma.userNotificationRead.create({
-      data: { notificationId, userId },
+  async markAsRead(notificationId: string, userId: string, tenantId: string) {
+    // Authorization: the notification must belong to the caller's tenant AND
+    // either be addressed to the caller or be a tenant-wide (isGlobal) one.
+    // Previously the service blindly created a UserNotificationRead row for
+    // any notificationId, letting a user in tenant A mark-as-read a
+    // notification that belongs to tenant B (cross-tenant IDOR write).
+    const notification = await this.prisma.notification.findFirst({
+      where: {
+        id: notificationId,
+        tenantId,
+        OR: [{ userId }, { isGlobal: true }],
+      },
+      select: { id: true },
+    });
+    if (!notification) {
+      throw new NotFoundException('Notification not found');
+    }
+    return this.prisma.userNotificationRead.upsert({
+      where: { notificationId_userId: { notificationId, userId } },
+      create: { notificationId, userId },
+      update: {},
     });
   }
 
@@ -59,7 +77,9 @@ export class NotificationsService {
       select: { id: true },
     });
 
-    await Promise.all(
+    if (notifications.length === 0) return;
+
+    await this.prisma.$transaction(
       notifications.map((n) =>
         this.prisma.userNotificationRead.upsert({
           where: { notificationId_userId: { notificationId: n.id, userId } },

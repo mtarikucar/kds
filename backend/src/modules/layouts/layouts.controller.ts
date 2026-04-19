@@ -10,6 +10,7 @@ import {
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
 import { LayoutsService } from './layouts.service';
 import { UpdateLayoutDto } from './dto/update-layout.dto';
+import { UpdateTablePositionDto } from './dto/update-table-position.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
@@ -47,7 +48,7 @@ export class LayoutsController {
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   updateTablePosition(
     @Param('tableId') tableId: string,
-    @Body() position: { x: number; y: number; z: number; rotation: number },
+    @Body() position: UpdateTablePositionDto,
     @Request() req,
   ) {
     return this.layoutsService.updateTablePosition(req.tenantId, tableId, position);

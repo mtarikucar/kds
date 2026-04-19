@@ -38,7 +38,21 @@ export class UploadController {
 
   @Post('logo')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @UseInterceptors(FileInterceptor('logo'))
+  @UseInterceptors(
+    FileInterceptor('logo', {
+      limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+      fileFilter: (_req, file, cb) => {
+        // MIME header is client-supplied; still pre-filter at multer layer
+        // so we reject obviously-wrong types before buffering. A magic-byte
+        // sniff runs in UploadService for the real check.
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
+          cb(new BadRequestException('Invalid file type'), false);
+        } else {
+          cb(null, true);
+        }
+      },
+    }),
+  )
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload restaurant logo' })
   @ApiBody({
@@ -71,7 +85,18 @@ export class UploadController {
 
   @Post('product-image')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @UseInterceptors(FileInterceptor('image'))
+  @UseInterceptors(
+    FileInterceptor('image', {
+      limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+      fileFilter: (_req, file, cb) => {
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
+          cb(new BadRequestException('Invalid file type'), false);
+        } else {
+          cb(null, true);
+        }
+      },
+    }),
+  )
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload single product image' })
   @ApiBody({
@@ -105,7 +130,18 @@ export class UploadController {
 
   @Post('product-images')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @UseInterceptors(FilesInterceptor('images', 10)) // Max 10 images at once
+  @UseInterceptors(
+    FilesInterceptor('images', 10, {
+      limits: { fileSize: 5 * 1024 * 1024, files: 10 },
+      fileFilter: (_req, file, cb) => {
+        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
+          cb(new BadRequestException('Invalid file type'), false);
+        } else {
+          cb(null, true);
+        }
+      },
+    }),
+  )
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Upload multiple product images' })
   @ApiBody({

@@ -1,11 +1,12 @@
 import {
+  BadRequestException,
+  Body,
   Controller,
   Get,
   Post,
-  Body,
-  UseGuards,
-  Request,
   Query,
+  Request,
+  UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { StockService } from './stock.service';
@@ -64,7 +65,14 @@ export class StockController {
   @ApiResponse({ status: 200, description: 'List of low stock products', type: [StockAlertDto] })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   getLowStockAlerts(@Request() req, @Query('threshold') threshold?: string) {
-    const thresholdNum = threshold ? parseInt(threshold, 10) : 10;
+    let thresholdNum = 10;
+    if (threshold !== undefined) {
+      const parsed = parseInt(threshold, 10);
+      if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1_000_000) {
+        throw new BadRequestException('threshold must be a non-negative integer ≤ 1,000,000');
+      }
+      thresholdNum = parsed;
+    }
     return this.stockService.getLowStockAlerts(req.tenantId, thresholdNum);
   }
 }

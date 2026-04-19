@@ -11,6 +11,7 @@ import {
   Query,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { TablesService } from './tables.service';
 import { CreateTableDto } from './dto/create-table.dto';
 import { UpdateTableDto } from './dto/update-table.dto';
@@ -51,6 +52,7 @@ export class TablesController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Get('public/:tenantId')
   @ApiOperation({ summary: 'Get available tables for customer selection (no auth required)' })
   @ApiResponse({ status: 200, description: 'List of available tables for customers' })
@@ -78,9 +80,6 @@ export class TablesController {
     @Body() updateTableDto: UpdateTableDto,
     @Request() req,
   ) {
-    console.log('Received update payload:', JSON.stringify(updateTableDto, null, 2));
-    console.log('Status value:', updateTableDto.status);
-    console.log('Status type:', typeof updateTableDto.status);
     return this.tablesService.update(id, updateTableDto, req.tenantId);
   }
 
