@@ -7,7 +7,16 @@ import { UpdateShiftTemplateDto } from '../dto/update-shift-template.dto';
 export class ShiftTemplatesService {
   constructor(private prisma: PrismaService) {}
 
+  private assertDistinctTimes(startTime: string, endTime: string) {
+    if (startTime === endTime) {
+      throw new BadRequestException(
+        'startTime and endTime must differ (zero-length shift)',
+      );
+    }
+  }
+
   async create(tenantId: string, dto: CreateShiftTemplateDto) {
+    this.assertDistinctTimes(dto.startTime, dto.endTime);
     return this.prisma.shiftTemplate.create({
       data: {
         ...dto,

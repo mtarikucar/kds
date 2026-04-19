@@ -2546,8 +2546,14 @@ model ShiftAssignment {
 
 model ShiftSwapRequest {
   id        String @id @default(uuid())
-  status    String @default("PENDING") // PENDING, APPROVED, REJECTED
+  status    String @default("PENDING") // PENDING, TARGET_ACCEPTED, TARGET_REJECTED, APPROVED, REJECTED
   reason    String?
+
+  // Two-stage approval: the target employee must consent before a
+  // manager can apply the swap. Prior flow let a manager force a swap
+  // onto an unwilling employee.
+  targetRespondedAt DateTime?
+  targetApproved    Boolean?
 
   requesterId            String
   requester              User            @relation("SwapRequester", fields: [requesterId], references: [id], onDelete: Cascade)

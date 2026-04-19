@@ -35,9 +35,23 @@ export class ShiftSwapController {
     return this.shiftSwapService.createRequest(req.tenantId, req.user.id, dto);
   }
 
+  @Patch(':id/target-accept')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER, UserRole.KITCHEN, UserRole.COURIER)
+  @ApiOperation({ summary: 'Target employee accepts the swap' })
+  targetAccept(@Request() req, @Param('id') id: string) {
+    return this.shiftSwapService.respondAsTarget(id, req.tenantId, req.user.id, true);
+  }
+
+  @Patch(':id/target-reject')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER, UserRole.KITCHEN, UserRole.COURIER)
+  @ApiOperation({ summary: 'Target employee rejects the swap' })
+  targetReject(@Request() req, @Param('id') id: string) {
+    return this.shiftSwapService.respondAsTarget(id, req.tenantId, req.user.id, false);
+  }
+
   @Patch(':id/approve')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ summary: 'Approve shift swap' })
+  @ApiOperation({ summary: 'Approve shift swap (requires target consent first)' })
   approve(@Request() req, @Param('id') id: string) {
     return this.shiftSwapService.approve(id, req.tenantId, req.user.id);
   }

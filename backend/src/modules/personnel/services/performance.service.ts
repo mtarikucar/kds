@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { PerformanceQueryDto } from '../dto/performance-query.dto';
 
@@ -75,10 +76,13 @@ export class PerformanceService {
     for (const userId of allUsers) {
       const userOrdersList = userOrders.get(userId) || [];
       const totalOrders = userOrdersList.length;
-      const totalSales = userOrdersList.reduce(
-        (sum, o) => sum + Number(o.finalAmount || 0),
-        0,
+      // Accumulate in Decimal so precision is not lost for large tenants;
+      // convert to number only at the JSON boundary.
+      const totalSalesDecimal = userOrdersList.reduce<Prisma.Decimal>(
+        (sum, o) => sum.add(new Prisma.Decimal(o.finalAmount ?? 0)),
+        new Prisma.Decimal(0),
       );
+      const totalSales = totalSalesDecimal.toNumber();
       const avgOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
 
       // Average prep time: use preparingAt → readyAt when available, fallback to updatedAt - createdAt

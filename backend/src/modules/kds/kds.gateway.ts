@@ -53,6 +53,11 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
           // Join tenant-specific rooms
           client.join(`kitchen-${payload.tenantId}`);
           client.join(`pos-${payload.tenantId}`);
+          // Personnel updates (attendance, swap requests) are only for
+          // ADMIN/MANAGER users — every other role stays out.
+          if (payload.role === 'ADMIN' || payload.role === 'MANAGER') {
+            client.join(`personnel-${payload.tenantId}`);
+          }
 
           this.logger.log(
             `Staff client ${client.id} connected (User: ${payload.userId}, Tenant: ${payload.tenantId})`
@@ -389,13 +394,16 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // ========================================
 
   emitAttendanceUpdate(tenantId: string, data: any) {
-    this.server.to(`pos-${tenantId}`).emit('personnel:attendance-update', {
+    // Personnel-scoped room so low-privilege POS waiters don't receive
+    // the entire staff's clock-in/out stream (names, roles, break
+    // status) on every update.
+    this.server.to(`personnel-${tenantId}`).emit('personnel:attendance-update', {
       ...data,
       timestamp: new Date(),
     });
 
     this.logger.log(
-      `Personnel attendance update emitted to pos-${tenantId}`
+      `Personnel attendance update emitted to personnel-${tenantId}`
     );
   }
 
@@ -409,13 +417,15 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   emitSwapRequestUpdate(tenantId: string, data: any) {
-    this.server.to(`pos-${tenantId}`).emit('personnel:swap-request-update', {
-      ...data,
-      timestamp: new Date(),
-    });
+    this.server
+      .to(`personnel-${tenantId}`)
+      .emit('personnel:swap-request-update', {
+        ...data,
+        timestamp: new Date(),
+      });
 
     this.logger.log(
-      `Personnel swap request update emitted to pos-${tenantId}`
+      `Personnel swap request update emitted to personnel-${tenantId}`
     );
   }
 

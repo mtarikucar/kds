@@ -102,9 +102,14 @@ export class AttendanceService {
     }
 
     const now = new Date();
-    const totalWorkedMinutes = Math.floor(
-      (now.getTime() - attendance.clockIn.getTime()) / 60000,
-    ) - attendance.totalBreakMinutes;
+    // Clamp to zero: defends against a manually edited clockIn in the
+    // future or a totalBreakMinutes that exceeds elapsed time.
+    const totalWorkedMinutes = Math.max(
+      0,
+      Math.floor(
+        (now.getTime() - attendance.clockIn.getTime()) / 60000,
+      ) - attendance.totalBreakMinutes,
+    );
 
     let overtimeMinutes = 0;
     if (attendance.shiftAssignment?.shiftTemplate) {
@@ -237,7 +242,14 @@ export class AttendanceService {
     if (query.startDate || query.endDate) {
       where.date = {};
       if (query.startDate) where.date.gte = new Date(query.startDate);
-      if (query.endDate) where.date.lte = new Date(query.endDate);
+      if (query.endDate) {
+        // Include the whole calendar day — a bare ISO date parses as
+        // 00:00:00, which otherwise excludes everything that happened
+        // on the endDate itself.
+        const end = new Date(query.endDate);
+        end.setHours(23, 59, 59, 999);
+        where.date.lte = end;
+      }
     }
 
     const page = query.page || 1;
