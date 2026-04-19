@@ -70,10 +70,13 @@ export class MarketingAuthService {
       expiresIn: '8h',
     });
 
-    const refreshToken = await this.jwtService.signAsync(payload, {
-      secret: this.configService.get<string>('MARKETING_JWT_SECRET'),
-      expiresIn: '7d',
-    });
+    const refreshToken = await this.jwtService.signAsync(
+      { ...payload, tokenType: 'refresh' },
+      {
+        secret: this.configService.get<string>('MARKETING_JWT_REFRESH_SECRET') || this.configService.get<string>('MARKETING_JWT_SECRET'),
+        expiresIn: '7d',
+      },
+    );
 
     return {
       accessToken,
@@ -93,11 +96,15 @@ export class MarketingAuthService {
   async refreshToken(token: string) {
     try {
       const payload = await this.jwtService.verifyAsync(token, {
-        secret: this.configService.get<string>('MARKETING_JWT_SECRET'),
+        secret: this.configService.get<string>('MARKETING_JWT_REFRESH_SECRET') || this.configService.get<string>('MARKETING_JWT_SECRET'),
       });
 
       if (payload.type !== 'marketing') {
         throw new UnauthorizedException('Invalid token type');
+      }
+
+      if (payload.tokenType !== 'refresh') {
+        throw new UnauthorizedException('Invalid token: not a refresh token');
       }
 
       const user = await this.prisma.marketingUser.findUnique({

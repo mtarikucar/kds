@@ -9,13 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { IS_MARKETING_PUBLIC_KEY } from '../decorators/marketing-public.decorator';
 import { PrismaService } from '../../../prisma/prisma.service';
-
-export interface MarketingJwtPayload {
-  sub: string;
-  email: string;
-  role: string;
-  type: 'marketing';
-}
+import { MarketingJwtPayload } from '../types';
 
 @Injectable()
 export class MarketingGuard implements CanActivate {

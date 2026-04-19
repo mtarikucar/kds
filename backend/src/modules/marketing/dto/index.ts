@@ -15,3 +15,5 @@ export * from './commission-filter.dto';
 export * from './report-filter.dto';
 export * from './change-password.dto';
 export * from './update-profile.dto';
+export * from './update-lead-status.dto';
+export * from './assign-lead.dto';

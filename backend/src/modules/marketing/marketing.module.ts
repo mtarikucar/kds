@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
 // Controllers
@@ -29,14 +28,12 @@ import {
   MarketingCommissionsService,
 } from './services';
 
-// Guards & Strategies
+// Guards
 import { MarketingGuard } from './guards/marketing.guard';
 import { MarketingRolesGuard } from './guards/marketing-roles.guard';
-import { MarketingJwtStrategy } from './strategies/marketing-jwt.strategy';
 
 @Module({
   imports: [
-    PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
@@ -70,10 +67,9 @@ import { MarketingJwtStrategy } from './strategies/marketing-jwt.strategy';
     MarketingReportsService,
     MarketingUsersService,
     MarketingCommissionsService,
-    // Guards & Strategies
+    // Guards
     MarketingGuard,
     MarketingRolesGuard,
-    MarketingJwtStrategy,
   ],
   exports: [
     MarketingAuthService,

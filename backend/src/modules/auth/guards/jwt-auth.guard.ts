@@ -3,6 +3,7 @@ import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import { IS_SUPERADMIN_PUBLIC_KEY, IS_SUPERADMIN_ROUTE_KEY } from '../../superadmin/decorators/superadmin.decorator';
+import { IS_MARKETING_ROUTE_KEY } from '../../marketing/decorators/marketing-public.decorator';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
@@ -34,8 +35,14 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       [context.getHandler(), context.getClass()],
     );
 
-    // Skip for public routes and superadmin routes
-    if (isPublic || isPublicAlt || isSuperAdminPublic || isSuperAdminRoute) {
+    // Check for Marketing routes (handled by MarketingGuard)
+    const isMarketingRoute = this.reflector.getAllAndOverride<boolean>(
+      IS_MARKETING_ROUTE_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+
+    // Skip for public routes, superadmin routes, and marketing routes
+    if (isPublic || isPublicAlt || isSuperAdminPublic || isSuperAdminRoute || isMarketingRoute) {
       return true;
     }
 

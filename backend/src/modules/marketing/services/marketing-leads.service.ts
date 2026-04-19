@@ -307,7 +307,10 @@ export class MarketingLeadsService {
     const lead = await this.prisma.lead.findUnique({ where: { id } });
     if (!lead) throw new NotFoundException('Lead not found');
 
-    await this.prisma.lead.delete({ where: { id } });
-    return { message: 'Lead deleted successfully' };
+    await this.prisma.lead.update({
+      where: { id },
+      data: { status: 'LOST', lostReason: 'Deleted by manager' },
+    });
+    return { message: 'Lead archived successfully' };
   }
 }

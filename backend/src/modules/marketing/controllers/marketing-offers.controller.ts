@@ -11,25 +11,28 @@ import {
 } from '@nestjs/common';
 import { MarketingGuard } from '../guards/marketing.guard';
 import { MarketingRolesGuard } from '../guards/marketing-roles.guard';
+import { MarketingRoute } from '../decorators/marketing-public.decorator';
 import { CurrentMarketingUser } from '../decorators/current-marketing-user.decorator';
 import { MarketingRoles } from '../decorators/marketing-roles.decorator';
 import { MarketingOffersService } from '../services/marketing-offers.service';
 import { CreateOfferDto } from '../dto/create-offer.dto';
 import { UpdateOfferDto } from '../dto/update-offer.dto';
+import { MarketingUserPayload } from '../types';
 
 @Controller('marketing/offers')
 @UseGuards(MarketingGuard, MarketingRolesGuard)
+@MarketingRoute()
 export class MarketingOffersController {
   constructor(private readonly offersService: MarketingOffersService) {}
 
   @Post()
-  create(@Body() dto: CreateOfferDto, @CurrentMarketingUser() user: any) {
+  create(@Body() dto: CreateOfferDto, @CurrentMarketingUser() user: MarketingUserPayload) {
     return this.offersService.create(dto, user.id, user.role);
   }
 
   @Get()
   findAll(
-    @CurrentMarketingUser() user: any,
+    @CurrentMarketingUser() user: MarketingUserPayload,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
@@ -37,7 +40,7 @@ export class MarketingOffersController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @CurrentMarketingUser() user: any) {
+  findOne(@Param('id') id: string, @CurrentMarketingUser() user: MarketingUserPayload) {
     return this.offersService.findOne(id, user.id, user.role);
   }
 
@@ -45,13 +48,13 @@ export class MarketingOffersController {
   update(
     @Param('id') id: string,
     @Body() dto: UpdateOfferDto,
-    @CurrentMarketingUser() user: any,
+    @CurrentMarketingUser() user: MarketingUserPayload,
   ) {
     return this.offersService.update(id, dto, user.id, user.role);
   }
 
   @Post(':id/send')
-  markSent(@Param('id') id: string, @CurrentMarketingUser() user: any) {
+  markSent(@Param('id') id: string, @CurrentMarketingUser() user: MarketingUserPayload) {
     return this.offersService.markSent(id, user.id, user.role);
   }
 

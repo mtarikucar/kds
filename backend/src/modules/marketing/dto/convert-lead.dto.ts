@@ -1,4 +1,4 @@
-import { IsString, IsNotEmpty, IsOptional, IsEmail } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEmail, MinLength } from 'class-validator';
 
 export class ConvertLeadDto {
   @IsOptional()
@@ -18,6 +18,7 @@ export class ConvertLeadDto {
 
   @IsString()
   @IsNotEmpty()
+  @MinLength(8)
   adminPassword: string;
 
   @IsString()

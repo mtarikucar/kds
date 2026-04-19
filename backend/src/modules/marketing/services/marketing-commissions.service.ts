@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CommissionFilterDto } from '../dto/commission-filter.dto';
 
@@ -92,6 +92,9 @@ export class MarketingCommissionsService {
   async approve(id: string) {
     const commission = await this.prisma.commission.findUnique({ where: { id } });
     if (!commission) throw new NotFoundException('Commission not found');
+    if (commission.status !== 'PENDING') {
+      throw new BadRequestException('Only pending commissions can be approved');
+    }
 
     return this.prisma.commission.update({
       where: { id },
@@ -102,6 +105,9 @@ export class MarketingCommissionsService {
   async markPaid(id: string) {
     const commission = await this.prisma.commission.findUnique({ where: { id } });
     if (!commission) throw new NotFoundException('Commission not found');
+    if (commission.status !== 'APPROVED') {
+      throw new BadRequestException('Only approved commissions can be marked as paid');
+    }
 
     return this.prisma.commission.update({
       where: { id },
