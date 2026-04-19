@@ -5,8 +5,6 @@ module.exports = function (options, webpack) {
       sharp: 'commonjs sharp',
       iyzipay: 'commonjs iyzipay',
       '@sentry/profiling-node': 'commonjs @sentry/profiling-node',
-      ssh2: 'commonjs ssh2',
-      'cpu-features': 'commonjs cpu-features',
     },
     module: {
       ...options.module,

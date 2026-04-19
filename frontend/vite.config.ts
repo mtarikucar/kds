@@ -96,7 +96,6 @@ export default defineConfig({
           if (id.includes('three') || id.includes('@react-three')) return 'three';
           if (id.includes('konva')) return 'konva';
           if (id.includes('leaflet')) return 'leaflet';
-          if (id.includes('@xterm')) return 'xterm';
           if (id.includes('@sentry')) return 'sentry';
           if (id.includes('framer-motion')) return 'framer';
           if (id.includes('i18next')) return 'i18n';

@@ -30,7 +30,6 @@ import { DesktopAppModule } from './modules/desktop-app/desktop-app.module';
 import { PublicStatsModule } from './modules/public-stats/public-stats.module';
 import { LayoutsModule } from './modules/layouts/layouts.module';
 import { SuperAdminModule } from './modules/superadmin/superadmin.module';
-import { SuperAdminTerminalModule } from './modules/superadmin-terminal/superadmin-terminal.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ReservationsModule } from './modules/reservations/reservations.module';
 import { DeliveryPlatformsModule } from './modules/delivery-platforms/delivery-platforms.module';
@@ -90,7 +89,6 @@ import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './co
     PublicStatsModule,
     LayoutsModule,
     SuperAdminModule,
-    SuperAdminTerminalModule,
     AnalyticsModule,
     ReservationsModule,
     DeliveryPlatformsModule,

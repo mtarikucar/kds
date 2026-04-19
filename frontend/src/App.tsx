@@ -17,7 +17,6 @@ const PlansPage = lazy(() => import('./pages/superadmin/PlansPage'));
 const SubscriptionsPage = lazy(() => import('./pages/superadmin/SubscriptionsPage'));
 const AuditLogsPage = lazy(() => import('./pages/superadmin/AuditLogsPage'));
 const SuperAdminSettingsPage = lazy(() => import('./pages/superadmin/SuperAdminSettingsPage'));
-const TerminalPage = lazy(() => import('./pages/superadmin/TerminalPage'));
 import { SuperAdminLayout, SuperAdminProtectedRoute } from './features/superadmin/components';
 
 // Marketing Panel Pages (lazy-loaded)
@@ -231,7 +230,6 @@ function App() {
           <Route path="/superadmin/plans" element={<PlansPage />} />
           <Route path="/superadmin/subscriptions" element={<SubscriptionsPage />} />
           <Route path="/superadmin/audit-logs" element={<AuditLogsPage />} />
-          <Route path="/superadmin/terminal" element={<TerminalPage />} />
           <Route path="/superadmin/settings" element={<SuperAdminSettingsPage />} />
         </Route>
       </Route>

@@ -11,7 +11,6 @@ import {
   Layers,
   LogOut,
   ChevronDown,
-  Terminal,
 } from 'lucide-react';
 import { useSuperAdminAuthStore } from '../../../store/superAdminAuthStore';
 import { useSuperAdminLogout } from '../api/superAdminApi';
@@ -23,7 +22,6 @@ const navigation = [
   { name: 'Plans', href: '/superadmin/plans', icon: Layers },
   { name: 'Subscriptions', href: '/superadmin/subscriptions', icon: CreditCard },
   { name: 'Audit Logs', href: '/superadmin/audit-logs', icon: FileText },
-  { name: 'Terminal', href: '/superadmin/terminal', icon: Terminal },
   { name: 'Settings', href: '/superadmin/settings', icon: Settings },
 ];
 
