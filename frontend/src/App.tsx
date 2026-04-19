@@ -6,73 +6,80 @@ import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage';
 import VerifyEmailPage from './pages/auth/VerifyEmailPage';
 
-// SuperAdmin Pages
-import SuperAdminLoginPage from './pages/superadmin/SuperAdminLoginPage';
-import SuperAdmin2FAPage from './pages/superadmin/SuperAdmin2FAPage';
-import SuperAdminDashboardPage from './pages/superadmin/SuperAdminDashboardPage';
-import TenantsPage from './pages/superadmin/TenantsPage';
-import TenantDetailPage from './pages/superadmin/TenantDetailPage';
-import AllUsersPage from './pages/superadmin/AllUsersPage';
-import PlansPage from './pages/superadmin/PlansPage';
-import SubscriptionsPage from './pages/superadmin/SubscriptionsPage';
-import AuditLogsPage from './pages/superadmin/AuditLogsPage';
-import SuperAdminSettingsPage from './pages/superadmin/SuperAdminSettingsPage';
-import TerminalPage from './pages/superadmin/TerminalPage';
+// SuperAdmin Pages (lazy-loaded)
+const SuperAdminLoginPage = lazy(() => import('./pages/superadmin/SuperAdminLoginPage'));
+const SuperAdmin2FAPage = lazy(() => import('./pages/superadmin/SuperAdmin2FAPage'));
+const SuperAdminDashboardPage = lazy(() => import('./pages/superadmin/SuperAdminDashboardPage'));
+const TenantsPage = lazy(() => import('./pages/superadmin/TenantsPage'));
+const TenantDetailPage = lazy(() => import('./pages/superadmin/TenantDetailPage'));
+const AllUsersPage = lazy(() => import('./pages/superadmin/AllUsersPage'));
+const PlansPage = lazy(() => import('./pages/superadmin/PlansPage'));
+const SubscriptionsPage = lazy(() => import('./pages/superadmin/SubscriptionsPage'));
+const AuditLogsPage = lazy(() => import('./pages/superadmin/AuditLogsPage'));
+const SuperAdminSettingsPage = lazy(() => import('./pages/superadmin/SuperAdminSettingsPage'));
+const TerminalPage = lazy(() => import('./pages/superadmin/TerminalPage'));
 import { SuperAdminLayout, SuperAdminProtectedRoute } from './features/superadmin/components';
 
-// Marketing Panel Pages
-import MarketingLoginPage from './pages/marketing/MarketingLoginPage';
-import MarketingDashboardPage from './pages/marketing/MarketingDashboardPage';
-import LeadsPage from './pages/marketing/LeadsPage';
-import LeadDetailPage from './pages/marketing/LeadDetailPage';
-import CreateLeadPage from './pages/marketing/CreateLeadPage';
-import TasksPage from './pages/marketing/TasksPage';
-import CalendarPage from './pages/marketing/CalendarPage';
-import OffersPage from './pages/marketing/OffersPage';
-import MarketingReportsPage from './pages/marketing/ReportsPage';
-import CommissionsPage from './pages/marketing/CommissionsPage';
-import MarketingUsersPage from './pages/marketing/MarketingUsersPage';
+// Marketing Panel Pages (lazy-loaded)
+const MarketingLoginPage = lazy(() => import('./pages/marketing/MarketingLoginPage'));
+const MarketingDashboardPage = lazy(() => import('./pages/marketing/MarketingDashboardPage'));
+const LeadsPage = lazy(() => import('./pages/marketing/LeadsPage'));
+const LeadDetailPage = lazy(() => import('./pages/marketing/LeadDetailPage'));
+const CreateLeadPage = lazy(() => import('./pages/marketing/CreateLeadPage'));
+const TasksPage = lazy(() => import('./pages/marketing/TasksPage'));
+const CalendarPage = lazy(() => import('./pages/marketing/CalendarPage'));
+const OffersPage = lazy(() => import('./pages/marketing/OffersPage'));
+const MarketingReportsPage = lazy(() => import('./pages/marketing/ReportsPage'));
+const CommissionsPage = lazy(() => import('./pages/marketing/CommissionsPage'));
+const MarketingUsersPage = lazy(() => import('./pages/marketing/MarketingUsersPage'));
 import { MarketingLayout, MarketingProtectedRoute } from './features/marketing/components';
 import ProfilePage from './pages/profile/ProfilePage';
 import CustomersPage from './pages/customers/CustomersPage';
 import CustomerDetailPage from './pages/customers/CustomerDetailPage';
-import QRMenuPage from './pages/qr-menu/QRMenuPage';
-import CartPage from './pages/qr-menu/CartPage';
-import OrderTrackingPage from './pages/qr-menu/OrderTrackingPage';
-import LoyaltyPage from './pages/qr-menu/LoyaltyPage';
-import SubdomainQRMenuPage from './pages/qr-menu/SubdomainQRMenuPage';
-import SubdomainCartPage from './pages/qr-menu/SubdomainCartPage';
-import SubdomainOrdersPage from './pages/qr-menu/SubdomainOrdersPage';
-import SubdomainLoyaltyPage from './pages/qr-menu/SubdomainLoyaltyPage';
-import PublicReservationPage from './pages/reservations/PublicReservationPage';
-import ReservationLookupPage from './pages/reservations/ReservationLookupPage';
-import TermsOfServicePage from './pages/legal/TermsOfServicePage';
-import PrivacyPolicyPage from './pages/legal/PrivacyPolicyPage';
+
+// QR Menu Pages (lazy-loaded - customer-facing)
+const QRMenuPage = lazy(() => import('./pages/qr-menu/QRMenuPage'));
+const CartPage = lazy(() => import('./pages/qr-menu/CartPage'));
+const OrderTrackingPage = lazy(() => import('./pages/qr-menu/OrderTrackingPage'));
+const LoyaltyPage = lazy(() => import('./pages/qr-menu/LoyaltyPage'));
+const SubdomainQRMenuPage = lazy(() => import('./pages/qr-menu/SubdomainQRMenuPage'));
+const SubdomainCartPage = lazy(() => import('./pages/qr-menu/SubdomainCartPage'));
+const SubdomainOrdersPage = lazy(() => import('./pages/qr-menu/SubdomainOrdersPage'));
+const SubdomainLoyaltyPage = lazy(() => import('./pages/qr-menu/SubdomainLoyaltyPage'));
+
+const PublicReservationPage = lazy(() => import('./pages/reservations/PublicReservationPage'));
+const ReservationLookupPage = lazy(() => import('./pages/reservations/ReservationLookupPage'));
+const TermsOfServicePage = lazy(() => import('./pages/legal/TermsOfServicePage'));
+const PrivacyPolicyPage = lazy(() => import('./pages/legal/PrivacyPolicyPage'));
 import DashboardPage from './pages/DashboardPage';
 import POSPage from './pages/pos/POSPage';
 import KitchenDisplayPage from './pages/kitchen/KitchenDisplayPage';
-import MenuManagementPage from './pages/admin/MenuManagementPage';
-import TableManagementPage from './pages/admin/TableManagementPage';
-import UserManagementPage from './pages/admin/UserManagementPage';
-import QRManagementPage from './pages/admin/QRManagementPage';
-import ReportsPage from './pages/admin/ReportsPage';
-import AnalyticsPage from './pages/admin/AnalyticsPage';
-import ReservationsPage from './pages/admin/ReservationsPage';
-import PersonnelManagementPage from './pages/admin/PersonnelManagementPage';
-import StockManagementPage from './pages/admin/StockManagementPage';
-import SubscriptionPlansPage from './pages/subscription/SubscriptionPlansPage';
-import ChangePlanPage from './pages/subscription/ChangePlanPage';
-import SubscriptionContactPage from './pages/subscription/SubscriptionContactPage';
-import SettingsLayout from './pages/settings/SettingsLayout';
-import POSSettingsPage from './pages/settings/POSSettingsPage';
-import QRMenuSettingsPage from './pages/settings/QRMenuSettingsPage';
-import ReportsSettingsPage from './pages/settings/ReportsSettingsPage';
-import BrandingSettingsPage from './pages/settings/BrandingSettingsPage';
-import SubscriptionSettingsPage from './pages/settings/SubscriptionSettingsPage';
-import IntegrationsSettingsPage from './pages/settings/IntegrationsSettingsPage';
-import DesktopAppSettingsPage from './pages/settings/DesktopAppSettingsPage';
-import ReservationSettingsPage from './pages/settings/ReservationSettingsPage';
-import DeliveryPlatformsSettingsPage from './pages/settings/DeliveryPlatformsSettingsPage';
+
+// Admin Pages (lazy-loaded)
+const MenuManagementPage = lazy(() => import('./pages/admin/MenuManagementPage'));
+const TableManagementPage = lazy(() => import('./pages/admin/TableManagementPage'));
+const UserManagementPage = lazy(() => import('./pages/admin/UserManagementPage'));
+const QRManagementPage = lazy(() => import('./pages/admin/QRManagementPage'));
+const ReportsPage = lazy(() => import('./pages/admin/ReportsPage'));
+const AnalyticsPage = lazy(() => import('./pages/admin/AnalyticsPage'));
+const ReservationsPage = lazy(() => import('./pages/admin/ReservationsPage'));
+const PersonnelManagementPage = lazy(() => import('./pages/admin/PersonnelManagementPage'));
+const StockManagementPage = lazy(() => import('./pages/admin/StockManagementPage'));
+
+// Subscription & Settings Pages (lazy-loaded)
+const SubscriptionPlansPage = lazy(() => import('./pages/subscription/SubscriptionPlansPage'));
+const ChangePlanPage = lazy(() => import('./pages/subscription/ChangePlanPage'));
+const SubscriptionContactPage = lazy(() => import('./pages/subscription/SubscriptionContactPage'));
+const SettingsLayout = lazy(() => import('./pages/settings/SettingsLayout'));
+const POSSettingsPage = lazy(() => import('./pages/settings/POSSettingsPage'));
+const QRMenuSettingsPage = lazy(() => import('./pages/settings/QRMenuSettingsPage'));
+const ReportsSettingsPage = lazy(() => import('./pages/settings/ReportsSettingsPage'));
+const BrandingSettingsPage = lazy(() => import('./pages/settings/BrandingSettingsPage'));
+const SubscriptionSettingsPage = lazy(() => import('./pages/settings/SubscriptionSettingsPage'));
+const IntegrationsSettingsPage = lazy(() => import('./pages/settings/IntegrationsSettingsPage'));
+const DesktopAppSettingsPage = lazy(() => import('./pages/settings/DesktopAppSettingsPage'));
+const ReservationSettingsPage = lazy(() => import('./pages/settings/ReservationSettingsPage'));
+const DeliveryPlatformsSettingsPage = lazy(() => import('./pages/settings/DeliveryPlatformsSettingsPage'));
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
 import { UpdateDialog } from './components/UpdateDialog';
@@ -116,7 +123,7 @@ function App() {
   // Subdomain access - only show QR menu routes
   if (subdomainInfo.isSubdomainAccess && subdomainInfo.subdomain) {
     return (
-      <>
+      <Suspense fallback={null}>
         <Routes>
           <Route path="/" element={<SubdomainQRMenuPage subdomain={subdomainInfo.subdomain} />} />
           <Route path="/cart" element={<SubdomainCartPage subdomain={subdomainInfo.subdomain} />} />
@@ -124,12 +131,13 @@ function App() {
           <Route path="/loyalty" element={<SubdomainLoyaltyPage subdomain={subdomainInfo.subdomain} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-      </>
+      </Suspense>
     );
   }
 
   return (
     <>
+      <Suspense fallback={null}>
       <Routes>
       {/* Public Routes */}
       <Route path="/" element={<Navigate to="/login" replace />} />
@@ -246,6 +254,7 @@ function App() {
         </Route>
       </Route>
     </Routes>
+    </Suspense>
 
       {/* Update Dialog */}
       {showUpdateDialog && (
