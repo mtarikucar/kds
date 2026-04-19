@@ -39,7 +39,7 @@ export class PurchaseOrdersController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Create a purchase order' })
   create(@Body() dto: CreatePurchaseOrderDto, @Request() req) {
-    return this.service.create(dto, req.tenantId);
+    return this.service.create(dto, req.tenantId, req.user?.id);
   }
 
   @Post(':id/submit')
@@ -53,13 +53,13 @@ export class PurchaseOrdersController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Receive items against a purchase order' })
   receive(@Param('id') id: string, @Body() dto: ReceivePurchaseOrderDto, @Request() req) {
-    return this.service.receive(id, dto, req.tenantId);
+    return this.service.receive(id, dto, req.tenantId, req.user?.id);
   }
 
   @Post(':id/cancel')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Cancel a purchase order' })
   cancel(@Param('id') id: string, @Request() req) {
-    return this.service.cancel(id, req.tenantId);
+    return this.service.cancel(id, req.tenantId, req.user?.id);
   }
 }

@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateStockCountDto } from '../dto/create-stock-count.dto';
 import { UpdateStockCountItemDto } from '../dto/update-stock-count-item.dto';
@@ -32,9 +38,8 @@ export class StockCountsService {
     return count;
   }
 
-  async create(dto: CreateStockCountDto, tenantId: string) {
-    // Get stock items to include
-    const itemsWhere: any = { tenantId, isActive: true };
+  async create(dto: CreateStockCountDto, tenantId: string, userId?: string) {
+    const itemsWhere: Prisma.StockItemWhereInput = { tenantId, isActive: true };
     if (dto.stockItemIds?.length) {
       itemsWhere.id = { in: dto.stockItemIds };
     }
@@ -43,9 +48,25 @@ export class StockCountsService {
       where: itemsWhere,
       select: { id: true, currentStock: true },
     });
-
     if (stockItems.length === 0) {
       throw new BadRequestException('No stock items found for counting');
+    }
+
+    // Refuse to start a second IN_PROGRESS count that overlaps with an
+    // existing one — two parallel counts against the same items would
+    // apply each other's stale variances on finalize.
+    const existing = await this.prisma.stockCount.findFirst({
+      where: {
+        tenantId,
+        status: StockCountStatus.IN_PROGRESS,
+        items: { some: { stockItemId: { in: stockItems.map((s) => s.id) } } },
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      throw new ConflictException(
+        'Another stock count is already in progress for one or more of these items',
+      );
     }
 
     return this.prisma.stockCount.create({
@@ -53,6 +74,7 @@ export class StockCountsService {
         name: dto.name,
         notes: dto.notes,
         tenantId,
+        createdById: userId,
         items: {
           create: stockItems.map((item) => ({
             stockItemId: item.id,
@@ -101,21 +123,33 @@ export class StockCountsService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      // Apply adjustments for each item with variance
       for (const item of count.items) {
-        if (item.variance === null || Number(item.variance) === 0) continue;
+        if (item.countedQty === null) continue;
+        const countedQty = new Prisma.Decimal(item.countedQty);
 
-        // Update stock item with counted quantity
-        await tx.stockItem.update({
-          where: { id: item.stockItemId },
-          data: { currentStock: Number(item.countedQty) },
+        // Tenant-scoped updateMany so a poisoned stockItemId from some
+        // other tenant cannot be overwritten here.
+        const current = await tx.stockItem.findFirst({
+          where: { id: item.stockItemId, tenantId },
+        });
+        if (!current) continue;
+
+        // Compare against the CURRENT stock (not the stale
+        // expectedQty snapshot taken at count creation) so order
+        // deductions that happened during the count are correctly
+        // netted out. `variance` stays as reporting metadata.
+        const adjustment = countedQty.sub(current.currentStock);
+        if (adjustment.isZero()) continue;
+
+        await tx.stockItem.updateMany({
+          where: { id: item.stockItemId, tenantId },
+          data: { currentStock: countedQty as any },
         });
 
-        // Create movement record for the adjustment
         await tx.ingredientMovement.create({
           data: {
             type: IngredientMovementType.COUNT_ADJUSTMENT,
-            quantity: Number(item.variance),
+            quantity: adjustment as any,
             notes: `Stock count adjustment: ${count.name || `Count #${count.id.slice(0, 8)}`}`,
             referenceType: 'STOCK_COUNT',
             referenceId: count.id,
@@ -125,7 +159,6 @@ export class StockCountsService {
         });
       }
 
-      // Mark count as completed
       return tx.stockCount.update({
         where: { id },
         data: { status: StockCountStatus.COMPLETED, completedAt: new Date() },

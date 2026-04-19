@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsArray, ValidateNested, Min, IsDateString } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsArray, ArrayMinSize, ValidateNested, Min, IsDateString } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -26,6 +26,7 @@ export class ReceiveLineItemDto {
 export class ReceivePurchaseOrderDto {
   @ApiProperty({ type: [ReceiveLineItemDto], description: 'Items being received' })
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => ReceiveLineItemDto)
   items: ReceiveLineItemDto[];

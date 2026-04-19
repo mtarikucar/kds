@@ -489,6 +489,11 @@ model Order {
   requiresApproval Boolean @default(false) // If true, waiter must approve before going to kitchen
   approvedAt       DateTime? // When the order was approved
 
+  // Idempotency flag for recipe/stock deduction. Prevents duplicate
+  // deductions when deductOnStatus is tweaked mid-lifecycle or when
+  // multiple status-change hooks race.
+  stockDeducted Boolean @default(false)
+
   tableId String?
   table   Table?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
 
@@ -2286,6 +2291,7 @@ model PurchaseOrder {
   status        String  @default("DRAFT") // DRAFT, SUBMITTED, PARTIALLY_RECEIVED, RECEIVED, CANCELLED
   notes         String?
   expectedDate  DateTime?
+  createdById   String?
 
   supplierId String
   supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
@@ -2330,12 +2336,14 @@ model PurchaseOrderItem {
 
 model IngredientMovement {
   id            String  @id @default(uuid())
-  type          String  // IN, OUT, ADJUSTMENT, WASTE, ORDER_DEDUCTION, PO_RECEIVE, COUNT_ADJUSTMENT
+  type          String  // IN, OUT, ADJUSTMENT, WASTE, ORDER_DEDUCTION, ORDER_REVERSAL, PO_RECEIVE, PO_CANCEL_REVERSAL, COUNT_ADJUSTMENT
   quantity      Decimal @db.Decimal(10, 3) // Positive for additions, negative for deductions
   costPerUnit   Decimal? @db.Decimal(10, 4)
   notes         String?
   referenceType String? // ORDER, PURCHASE_ORDER, WASTE_LOG, STOCK_COUNT
   referenceId   String?
+  // Audit: who triggered the movement (null for system/scheduler paths).
+  createdById   String?
 
   stockItemId String
   stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
@@ -2359,6 +2367,7 @@ model WasteLog {
   reason   String  // EXPIRED, SPOILED, DAMAGED, OVERPRODUCTION, PREPARATION_WASTE, CUSTOMER_RETURN, OTHER
   notes    String?
   cost     Decimal? @db.Decimal(10, 4) // Calculated cost of waste
+  createdById String?
 
   stockItemId String
   stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
@@ -2380,6 +2389,7 @@ model StockCount {
   name   String?
   status String @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, CANCELLED
   notes  String?
+  createdById String?
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -2423,6 +2433,13 @@ model StockSettings {
   deductOnStatus      String  @default("PREPARING") // Which order status triggers deduction
   lowStockAlertDays   Int     @default(3) // Days before expiry to alert
   poNumberPrefix      String  @default("PO")
+  // When false (default), deductions that would drop a stock item
+  // below zero are refused. When true, negative stock is allowed and
+  // the shortfall is recorded for investigation.
+  allowNegativeStock  Boolean @default(false)
+  // Monotonic per-tenant PO counter; used by purchase-orders.service
+  // to mint collision-free order numbers in a transaction.
+  poSequence          Int     @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

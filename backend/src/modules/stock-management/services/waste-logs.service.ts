@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateWasteLogDto } from '../dto/create-waste-log.dto';
 import { IngredientMovementType } from '../../../common/constants/stock-management.enum';
@@ -24,53 +29,63 @@ export class WasteLogsService {
     });
   }
 
-  async create(dto: CreateWasteLogDto, tenantId: string) {
+  async create(dto: CreateWasteLogDto, tenantId: string, userId?: string) {
     return this.prisma.$transaction(async (tx) => {
       const stockItem = await tx.stockItem.findFirst({
         where: { id: dto.stockItemId, tenantId },
       });
       if (!stockItem) throw new BadRequestException('Stock item not found');
 
-      const newStock = Number(stockItem.currentStock) - dto.quantity;
-      if (newStock < 0) {
-        throw new BadRequestException(
+      const wasteQty = new Prisma.Decimal(dto.quantity);
+
+      // Atomic decrement: the updateMany only fires when
+      // currentStock >= wasteQty, so two concurrent waste logs can't
+      // both read the same pre-state and drive stock negative.
+      const decremented = await tx.stockItem.updateMany({
+        where: {
+          id: stockItem.id,
+          tenantId,
+          currentStock: { gte: wasteQty as any },
+        },
+        data: { currentStock: { decrement: wasteQty as any } },
+      });
+      if (decremented.count === 0) {
+        throw new ConflictException(
           `Cannot waste more than current stock. Current: ${stockItem.currentStock}, Requested: ${dto.quantity}`,
         );
       }
 
-      // Deduct stock
-      await tx.stockItem.update({
-        where: { id: stockItem.id },
-        data: { currentStock: newStock },
-      });
+      const costPerUnit = stockItem.costPerUnit
+        ? new Prisma.Decimal(stockItem.costPerUnit)
+        : null;
+      const cost = costPerUnit
+        ? wasteQty.mul(costPerUnit).toDecimalPlaces(4, Prisma.Decimal.ROUND_HALF_UP)
+        : null;
 
-      // Calculate waste cost
-      const cost = dto.quantity * Number(stockItem.costPerUnit);
-
-      // Create waste log
       const wasteLog = await tx.wasteLog.create({
         data: {
-          quantity: dto.quantity,
+          quantity: wasteQty as any,
           reason: dto.reason,
           notes: dto.notes,
-          cost,
+          cost: cost ? (cost as any) : undefined,
           stockItemId: dto.stockItemId,
           tenantId,
+          createdById: userId,
         },
         include: { stockItem: { select: { id: true, name: true, unit: true } } },
       });
 
-      // Create movement record
       await tx.ingredientMovement.create({
         data: {
           type: IngredientMovementType.WASTE,
-          quantity: -dto.quantity,
-          costPerUnit: Number(stockItem.costPerUnit),
+          quantity: wasteQty.neg() as any,
+          costPerUnit: costPerUnit ? (costPerUnit as any) : undefined,
           notes: `Waste: ${dto.reason}${dto.notes ? ` - ${dto.notes}` : ''}`,
           referenceType: 'WASTE_LOG',
           referenceId: wasteLog.id,
           stockItemId: dto.stockItemId,
           tenantId,
+          createdById: userId,
         },
       });
 

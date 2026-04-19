@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsNumber, IsArray, ValidateNested, Min } from 'class-validator';
+import { IsString, IsOptional, IsNumber, IsArray, ArrayMinSize, ValidateNested, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -36,6 +36,7 @@ export class CreateRecipeDto {
 
   @ApiProperty({ type: [RecipeIngredientDto], description: 'Recipe ingredients' })
   @IsArray()
+  @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => RecipeIngredientDto)
   ingredients: RecipeIngredientDto[];

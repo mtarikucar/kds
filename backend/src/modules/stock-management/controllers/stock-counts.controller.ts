@@ -39,7 +39,7 @@ export class StockCountsController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Start a new stock count session' })
   create(@Body() dto: CreateStockCountDto, @Request() req) {
-    return this.service.create(dto, req.tenantId);
+    return this.service.create(dto, req.tenantId, req.user?.id);
   }
 
   @Patch(':id/items/:itemId')
