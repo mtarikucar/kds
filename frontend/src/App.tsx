@@ -19,6 +19,20 @@ import AuditLogsPage from './pages/superadmin/AuditLogsPage';
 import SuperAdminSettingsPage from './pages/superadmin/SuperAdminSettingsPage';
 import TerminalPage from './pages/superadmin/TerminalPage';
 import { SuperAdminLayout, SuperAdminProtectedRoute } from './features/superadmin/components';
+
+// Marketing Panel Pages
+import MarketingLoginPage from './pages/marketing/MarketingLoginPage';
+import MarketingDashboardPage from './pages/marketing/MarketingDashboardPage';
+import LeadsPage from './pages/marketing/LeadsPage';
+import LeadDetailPage from './pages/marketing/LeadDetailPage';
+import CreateLeadPage from './pages/marketing/CreateLeadPage';
+import TasksPage from './pages/marketing/TasksPage';
+import CalendarPage from './pages/marketing/CalendarPage';
+import OffersPage from './pages/marketing/OffersPage';
+import MarketingReportsPage from './pages/marketing/ReportsPage';
+import CommissionsPage from './pages/marketing/CommissionsPage';
+import MarketingUsersPage from './pages/marketing/MarketingUsersPage';
+import { MarketingLayout, MarketingProtectedRoute } from './features/marketing/components';
 import ProfilePage from './pages/profile/ProfilePage';
 import CustomersPage from './pages/customers/CustomersPage';
 import CustomerDetailPage from './pages/customers/CustomerDetailPage';
@@ -211,6 +225,24 @@ function App() {
           <Route path="/superadmin/audit-logs" element={<AuditLogsPage />} />
           <Route path="/superadmin/terminal" element={<TerminalPage />} />
           <Route path="/superadmin/settings" element={<SuperAdminSettingsPage />} />
+        </Route>
+      </Route>
+      {/* Marketing Panel Routes */}
+      <Route path="/marketing/login" element={<MarketingLoginPage />} />
+      <Route element={<MarketingProtectedRoute />}>
+        <Route element={<MarketingLayout />}>
+          <Route path="/marketing" element={<Navigate to="/marketing/dashboard" replace />} />
+          <Route path="/marketing/dashboard" element={<MarketingDashboardPage />} />
+          <Route path="/marketing/leads" element={<LeadsPage />} />
+          <Route path="/marketing/leads/new" element={<CreateLeadPage />} />
+          <Route path="/marketing/leads/:id" element={<LeadDetailPage />} />
+          <Route path="/marketing/leads/:id/edit" element={<CreateLeadPage />} />
+          <Route path="/marketing/tasks" element={<TasksPage />} />
+          <Route path="/marketing/calendar" element={<CalendarPage />} />
+          <Route path="/marketing/offers" element={<OffersPage />} />
+          <Route path="/marketing/reports" element={<MarketingReportsPage />} />
+          <Route path="/marketing/commissions" element={<CommissionsPage />} />
+          <Route path="/marketing/users" element={<MarketingUsersPage />} />
         </Route>
       </Route>
     </Routes>

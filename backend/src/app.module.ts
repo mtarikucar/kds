@@ -36,6 +36,7 @@ import { ReservationsModule } from './modules/reservations/reservations.module';
 import { DeliveryPlatformsModule } from './modules/delivery-platforms/delivery-platforms.module';
 import { PersonnelModule } from './modules/personnel/personnel.module';
 import { StockManagementModule } from './modules/stock-management/stock-management.module';
+import { MarketingModule } from './modules/marketing/marketing.module';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './common/middleware/input-sanitizer.middleware';
 
@@ -95,6 +96,7 @@ import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './co
     DeliveryPlatformsModule,
     PersonnelModule,
     StockManagementModule,
+    MarketingModule,
   ],
   controllers: [AppController],
   providers: [

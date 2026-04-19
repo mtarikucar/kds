@@ -2485,3 +2485,210 @@ model ShiftSwapRequest {
   @@index([status])
   @@map("shift_swap_requests")
 }
+
+// ========================================
+// MARKETING / SALES REPRESENTATIVE PANEL
+// ========================================
+
+model MarketingUser {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  password        String
+  firstName       String
+  lastName        String
+  phone           String?
+  avatar          String?
+  role            String    // SALES_MANAGER, SALES_REP
+  status          String    @default("ACTIVE") // ACTIVE, INACTIVE
+  lastLogin       DateTime?
+  lastLoginIp     String?
+  failedLogins    Int       @default(0)
+  lockedUntil     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  leads           Lead[]            @relation("AssignedRep")
+  activities      LeadActivity[]
+  tasks           MarketingTask[]
+  offers          LeadOffer[]
+  commissions     Commission[]
+  notifications   MarketingNotification[]
+
+  @@index([email])
+  @@index([role])
+  @@index([status])
+  @@map("marketing_users")
+}
+
+model Lead {
+  id                String    @id @default(uuid())
+  businessName      String
+  contactPerson     String
+  phone             String?
+  whatsapp          String?
+  email             String?
+  address           String?
+  city              String?
+  region            String?
+  businessType      String    // CAFE, RESTAURANT, BAR, PATISSERIE, FAST_FOOD, OTHER
+  tableCount        Int?
+  branchCount       Int?
+  currentSystem     String?
+  source            String    // INSTAGRAM, REFERRAL, FIELD_VISIT, ADS, WEBSITE, PHONE, OTHER
+  status            String    @default("NEW") // NEW, CONTACTED, NOT_REACHABLE, MEETING_DONE, DEMO_SCHEDULED, OFFER_SENT, WAITING, WON, LOST
+  lostReason        String?
+  notes             String?   @db.Text
+  nextFollowUp      DateTime?
+  priority          String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+
+  // Assigned sales rep
+  assignedToId      String?
+  assignedTo        MarketingUser? @relation("AssignedRep", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  // Conversion tracking
+  convertedTenantId String?   @unique
+  convertedAt       DateTime?
+
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  activities        LeadActivity[]
+  tasks             MarketingTask[]
+  offers            LeadOffer[]
+
+  @@index([assignedToId])
+  @@index([status])
+  @@index([city])
+  @@index([source])
+  @@index([businessType])
+  @@index([createdAt])
+  @@index([nextFollowUp])
+  @@index([priority])
+  @@index([assignedToId, status])
+  @@index([status, createdAt])
+  @@map("leads")
+}
+
+model LeadActivity {
+  id          String    @id @default(uuid())
+  type        String    // CALL, VISIT, NOTE, EMAIL, WHATSAPP, STATUS_CHANGE, DEMO, MEETING
+  title       String
+  description String?   @db.Text
+  outcome     String?   // POSITIVE, NEGATIVE, NEUTRAL, NO_ANSWER
+  duration    Int?      // Duration in minutes (for calls/visits)
+
+  leadId      String
+  lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  createdById String
+  createdBy   MarketingUser @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now())
+
+  @@index([leadId])
+  @@index([createdById])
+  @@index([createdAt])
+  @@index([type])
+  @@map("lead_activities")
+}
+
+model MarketingTask {
+  id            String    @id @default(uuid())
+  title         String
+  description   String?
+  type          String    // CALL, VISIT, DEMO, FOLLOW_UP, MEETING, OTHER
+  status        String    @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, CANCELLED
+  priority      String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  dueDate       DateTime
+  completedAt   DateTime?
+
+  leadId        String?
+  lead          Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+
+  assignedToId  String
+  assignedTo    MarketingUser @relation(fields: [assignedToId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([assignedToId])
+  @@index([leadId])
+  @@index([dueDate])
+  @@index([status])
+  @@index([assignedToId, status])
+  @@index([dueDate, status])
+  @@map("marketing_tasks")
+}
+
+model LeadOffer {
+  id              String    @id @default(uuid())
+  planId          String?
+  customPrice     Decimal?  @db.Decimal(10, 2)
+  discount        Decimal?  @db.Decimal(5, 2)
+  trialDays       Int?
+  notes           String?   @db.Text
+  status          String    @default("DRAFT") // DRAFT, SENT, ACCEPTED, REJECTED, EXPIRED
+  validUntil      DateTime?
+  sentAt          DateTime?
+  respondedAt     DateTime?
+
+  leadId          String
+  lead            Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  createdById     String
+  createdBy       MarketingUser @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([leadId])
+  @@index([createdById])
+  @@index([status])
+  @@index([leadId, status])
+  @@map("lead_offers")
+}
+
+model Commission {
+  id              String    @id @default(uuid())
+  amount          Decimal   @db.Decimal(10, 2)
+  type            String    // SIGNUP, RENEWAL, UPSELL
+  status          String    @default("PENDING") // PENDING, APPROVED, PAID
+  period          String    // "2026-04" (YYYY-MM format)
+  tenantId        String?
+  leadId          String?
+  notes           String?   @db.Text
+
+  marketingUserId String
+  marketingUser   MarketingUser @relation(fields: [marketingUserId], references: [id], onDelete: Cascade)
+
+  approvedAt      DateTime?
+  paidAt          DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([marketingUserId])
+  @@index([period])
+  @@index([status])
+  @@index([period, status])
+  @@map("commissions")
+}
+
+model MarketingNotification {
+  id          String    @id @default(uuid())
+  type        String    // FOLLOW_UP_REMINDER, DEMO_REMINDER, INACTIVE_LEAD, OFFER_EXPIRING, TASK_DUE
+  title       String
+  message     String
+  isRead      Boolean   @default(false)
+  metadata    Json?
+
+  userId      String
+  user        MarketingUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt   DateTime  @default(now())
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("marketing_notifications")
+}
