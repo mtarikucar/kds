@@ -6,6 +6,8 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import helmet from 'helmet';
 import * as bodyParser from 'body-parser';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const cookieParser = require('cookie-parser');
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { initSentry } from './sentry.config';
 
@@ -23,6 +25,7 @@ async function bootstrap() {
     verify: (req: any, _res, buf) => { req.rawBody = buf; },
   }));
   app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
+  app.use(cookieParser());
 
   // Security headers with Helmet
   app.use(

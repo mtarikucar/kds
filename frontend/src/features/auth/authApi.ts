@@ -14,7 +14,8 @@ export const useLogin = () => {
       return response.data;
     },
     onSuccess: (data) => {
-      login(data.user, data.accessToken, data.refreshToken);
+      // refresh token is stored by the backend as an httpOnly cookie
+      login(data.user, data.accessToken);
       toast.success(i18n.t('common:notifications.loginSuccessful'));
     },
     onError: (error: any) => {
@@ -172,7 +173,7 @@ export const useGoogleAuth = () => {
       return response.data;
     },
     onSuccess: (data) => {
-      login(data.user, data.accessToken, data.refreshToken);
+      login(data.user, data.accessToken);
       toast.success(i18n.t('common:notifications.googleLoginSuccessful'));
     },
     onError: (error: any) => {
@@ -191,7 +192,7 @@ export const useAppleAuth = () => {
       return response.data;
     },
     onSuccess: (data) => {
-      login(data.user, data.accessToken, data.refreshToken);
+      login(data.user, data.accessToken);
       toast.success(i18n.t('common:notifications.appleLoginSuccessful'));
     },
     onError: (error: any) => {

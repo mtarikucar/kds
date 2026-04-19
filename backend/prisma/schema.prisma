@@ -121,6 +121,28 @@ model Tenant {
 }
 
 /**
+ * Per-session refresh tokens. Only the sha256 hash is stored so a DB leak
+ * does not yield usable tokens. Each successful refresh rotates the token
+ * (marks the old one revoked, issues a new one). Logout / admin suspend
+ * sets revokedAt on all of a user's tokens.
+ */
+model RefreshToken {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+/**
  * Subdomains released by deleted/suspended tenants or settings changes
  * are parked here for a quarantine window to prevent subdomain takeover
  * (a new tenant picking up a subdomain still referenced by printed QR
@@ -181,6 +203,7 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
+  refreshTokens                  RefreshToken[]
   orders                         Order[]
   approvedOrders                 Order[] @relation("ApprovedOrders")
   acknowledgedWaiterRequests     WaiterRequest[] @relation("AcknowledgedWaiterRequests")

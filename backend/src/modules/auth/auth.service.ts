@@ -45,6 +45,19 @@ export class AuthService {
   }
 
   /**
+   * bcrypt work factor. 12 is the 2026 baseline; allow tenants to tune via
+   * env so production can bump cost without a code change.
+   */
+  private bcryptCost(): number {
+    const raw = this.configService.get<string>('BCRYPT_COST');
+    const parsed = raw ? parseInt(raw, 10) : NaN;
+    if (Number.isFinite(parsed) && parsed >= 10 && parsed <= 15) {
+      return parsed;
+    }
+    return 12;
+  }
+
+  /**
    * Find a free subdomain for a new tenant. Falls back to appending a
    * cryptographically-strong 6-hex suffix when the preferred slug is taken
    * or quarantined. Uniqueness is ultimately enforced by the DB unique
@@ -203,7 +216,7 @@ export class AuthService {
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+    const hashedPassword = await bcrypt.hash(registerDto.password, this.bcryptCost());
 
     // Determine user status: ADMIN creating restaurant = ACTIVE, others = PENDING_APPROVAL
     const userStatus = hasRestaurantName ? 'ACTIVE' : 'PENDING_APPROVAL';
@@ -347,7 +360,7 @@ export class AuthService {
       email: user.email,
     });
 
-    return this.generateTokens(user);
+    return this.generateTokens(user, ip, userAgent);
   }
 
   private async logUserActivity(
@@ -390,71 +403,105 @@ export class AuthService {
       },
     });
 
+    // Defer all account-state disclosure until after a successful password
+    // check, so the endpoint cannot be used to enumerate registered emails.
     if (!user) {
+      return null;
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
       return null;
     }
 
     if (user.status === 'PENDING_APPROVAL') {
       throw new UnauthorizedException('Hesabınız henüz onaylanmadı. Lütfen yönetici onayını bekleyin.');
     }
-
     if (user.status !== 'ACTIVE') {
       throw new UnauthorizedException('User account is inactive');
     }
-
-    // Block login if the tenant was suspended/deleted by SuperAdmin — the
-    // user-level `status` flag is unrelated to tenant lifecycle.
     if (user.tenant?.status !== TenantStatus.ACTIVE) {
       throw new UnauthorizedException('Your restaurant account is not active');
-    }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (!isPasswordValid) {
-      return null;
     }
 
     const { password: _, tenant: __, ...result } = user;
     return result;
   }
 
-  async refreshToken(refreshToken: string): Promise<AuthResponseDto> {
+  /**
+   * Rotate the refresh token. Verifies the signed JWT, looks it up in the
+   * DB by its hash, revokes it, and issues a fresh access+refresh pair.
+   *
+   * Reuse detection: if the presented token was already revoked, we treat
+   * it as a token-theft signal and revoke every active refresh token for
+   * the user (forcing re-login on every session).
+   */
+  async refreshToken(
+    refreshToken: string,
+    ip?: string,
+    userAgent?: string,
+  ): Promise<AuthResponseDto> {
+    let payload: any;
     try {
-      const payload = this.jwtService.verify(refreshToken, {
+      payload = this.jwtService.verify(refreshToken, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        algorithms: ['HS256'],
       });
-
-      if (payload.type && payload.type !== 'user') {
-        throw new UnauthorizedException('Invalid token type');
-      }
-
-      const user = await this.prisma.user.findUnique({
-        where: { id: payload.sub },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          status: true,
-          tenantId: true,
-          tenant: { select: { status: true } },
-        },
-      });
-
-      if (!user || user.status !== 'ACTIVE') {
-        throw new UnauthorizedException('User not found or inactive');
-      }
-
-      if (user.tenant?.status !== TenantStatus.ACTIVE) {
-        throw new UnauthorizedException('Your restaurant account is not active');
-      }
-
-      const { tenant: _t, ...userForToken } = user;
-      return this.generateTokens(userForToken);
-    } catch (error) {
+    } catch (_err) {
       throw new UnauthorizedException('Invalid refresh token');
     }
+
+    if (payload.type && payload.type !== 'user') {
+      throw new UnauthorizedException('Invalid token type');
+    }
+
+    const tokenHash = this.hashToken(refreshToken);
+    const stored = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash },
+    });
+
+    if (!stored || stored.expiresAt <= new Date()) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    if (stored.revokedAt) {
+      // Possible replay of a rotated-out token — revoke the entire family.
+      await this.prisma.refreshToken.updateMany({
+        where: { userId: stored.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      throw new UnauthorizedException('Refresh token reuse detected');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: stored.userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        status: true,
+        tenantId: true,
+        tenant: { select: { status: true } },
+      },
+    });
+
+    if (!user || user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('User not found or inactive');
+    }
+    if (user.tenant?.status !== TenantStatus.ACTIVE) {
+      throw new UnauthorizedException('Your restaurant account is not active');
+    }
+
+    // Revoke the rotated-out token, issue a new pair.
+    await this.prisma.refreshToken.update({
+      where: { id: stored.id },
+      data: { revokedAt: new Date() },
+    });
+
+    const { tenant: _t, ...userForToken } = user;
+    return this.generateTokens(userForToken, ip, userAgent);
   }
 
   async logout(userId: string, ip?: string, userAgent?: string): Promise<{ message: string }> {
@@ -463,12 +510,21 @@ export class AuthService {
       select: { tenantId: true },
     });
     if (user) {
+      // Revoke every active refresh token, then audit.
+      await this.prisma.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
       await this.logUserActivity(userId, user.tenantId, 'LOGOUT', ip, userAgent);
     }
     return { message: 'Logged out' };
   }
 
-  private async generateTokens(user: UserResponseDto): Promise<AuthResponseDto> {
+  private async generateTokens(
+    user: UserResponseDto,
+    ip?: string,
+    userAgent?: string,
+  ): Promise<AuthResponseDto> {
     const payload = {
       sub: user.id,
       email: user.email,
@@ -479,14 +535,29 @@ export class AuthService {
 
     const accessToken = this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_SECRET'),
-      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN') || '7d',
+      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN') || '15m',
       algorithm: 'HS256',
     });
 
+    const refreshExpiresIn =
+      this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '30d';
     const refreshToken = this.jwtService.sign(payload, {
       secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-      expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '30d',
+      expiresIn: refreshExpiresIn,
       algorithm: 'HS256',
+    });
+
+    // Persist the hash so we can revoke/rotate server-side.
+    const decoded: any = this.jwtService.decode(refreshToken);
+    const expiresAt = new Date(decoded.exp * 1000);
+    await this.prisma.refreshToken.create({
+      data: {
+        tokenHash: this.hashToken(refreshToken),
+        userId: user.id,
+        expiresAt,
+        ip,
+        userAgent,
+      },
     });
 
     return {
@@ -580,7 +651,7 @@ export class AuthService {
     }
 
     // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(newPassword, this.bcryptCost());
 
     // Update password and clear reset token (invalidate on use)
     await this.prisma.user.update({
@@ -623,7 +694,7 @@ export class AuthService {
     }
 
     // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(newPassword, this.bcryptCost());
 
     // Update password
     await this.prisma.user.update({
@@ -795,7 +866,22 @@ export class AuthService {
           lastName = payload.family_name || '';
         }
       } catch (idTokenError) {
-        // If ID token verification fails, try as access token
+        // If ID token verification fails, treat the credential as an access
+        // token. We must first verify the audience via the tokeninfo endpoint
+        // — otherwise any valid Google access token issued for any OAuth
+        // client could authenticate as that user here.
+        const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
+        const tokenInfoRes = await fetch(
+          `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(credential)}`,
+        );
+        if (!tokenInfoRes.ok) {
+          throw new UnauthorizedException('Invalid Google token');
+        }
+        const tokenInfo = (await tokenInfoRes.json()) as { aud?: string };
+        if (!clientId || tokenInfo.aud !== clientId) {
+          throw new UnauthorizedException('Google token not issued for this application');
+        }
+
         const response = await fetch(
           `https://www.googleapis.com/oauth2/v3/userinfo`,
           {
