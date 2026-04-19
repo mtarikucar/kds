@@ -29,13 +29,16 @@ export interface UpdateUserData {
   firstName?: string;
   lastName?: string;
   role?: 'ADMIN' | 'MANAGER' | 'WAITER' | 'KITCHEN' | 'COURIER';
-  status?: 'ACTIVE' | 'INACTIVE';
+  // Status transitions go through /approve, /reject, /reactivate, DELETE
+  // instead of the generic PATCH /users/:id.
 }
 
 export const usersApi = {
   async getAll(): Promise<User[]> {
-    const response = await api.get('/users');
-    return response.data;
+    // Backend returns `{ data, meta }` for future pagination; current UI
+    // still consumes a flat array, so we pull `data` here.
+    const response = await api.get('/users', { params: { limit: 100 } });
+    return response.data.data ?? response.data;
   },
 
   async getById(id: string): Promise<User> {

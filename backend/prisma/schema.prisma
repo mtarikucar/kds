@@ -174,6 +174,12 @@ model User {
   approvedBy    User?     @relation("UserApprover", fields: [approvedById], references: [id], onDelete: SetNull)
   approvedUsers User[]    @relation("UserApprover")
 
+  // Reactivation audit (when a soft-deleted user is brought back)
+  reactivatedAt    DateTime?
+  reactivatedById  String?
+  reactivatedBy    User?     @relation("UserReactivator", fields: [reactivatedById], references: [id], onDelete: SetNull)
+  reactivatedUsers User[]    @relation("UserReactivator")
+
   // Email verification (code-based, hashed at rest)
   emailVerified                 Boolean   @default(false)
   emailVerificationCodeHash     String?
