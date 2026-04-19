@@ -693,7 +693,10 @@ model Subscription {
   // Subscription details
   status          String   @default("ACTIVE") // ACTIVE, CANCELLED, EXPIRED, PAST_DUE, TRIALING
   billingCycle    String   // MONTHLY, YEARLY
-  paymentProvider String   // STRIPE, PAYTR
+  // Only EMAIL (contact-based WhatsApp/Email) is active today; Stripe
+  // and PayTR were removed in prior commits. Renewals are superadmin-
+  // driven after the tenant contacts support.
+  paymentProvider String   // EMAIL
 
   // Dates
   startDate       DateTime @default(now())
@@ -706,19 +709,6 @@ model Subscription {
   isTrialPeriod Boolean  @default(false)
   trialStart    DateTime?
   trialEnd      DateTime?
-
-  // Payment provider IDs
-  stripeSubscriptionId String? @unique
-  stripeCustomerId     String?
-
-  // PayTR fields
-  paytrMerchantOid    String? @unique
-  paytrPaymentToken   String?
-
-  // Renewal tracking for one-time payments
-  renewalLinkSentAt   DateTime?
-  renewalLinkToken    String?
-  graceEndDate        DateTime?
 
   // Pricing at time of subscription
   amount   Decimal @db.Decimal(10, 2)
@@ -761,14 +751,11 @@ model SubscriptionPayment {
   amount          Decimal @db.Decimal(10, 2)
   currency        String  @default("TRY")
   status          String  @default("PENDING") // PENDING, SUCCEEDED, FAILED, REFUNDED
-  paymentProvider String  // STRIPE, PAYTR
+  // Only EMAIL (contact-based) — external providers removed.
+  paymentProvider String  // EMAIL
 
-  // Provider-specific IDs
-  stripePaymentIntentId String? @unique
-
-  // PayTR fields
-  paytrMerchantOid      String? @unique
-  paytrPaymentToken     String?
+  // Free-form external reference (receipt id, bank transfer id) for audit.
+  externalReference String? @unique
 
   // Payment metadata
   paymentMethod String? // card, bank_transfer, etc.
@@ -835,6 +822,18 @@ model Invoice {
   @@index([status])
   @@index([dueDate])
   @@map("invoices")
+}
+
+/**
+ * Monotonic counter for invoice numbering. Updated atomically inside a
+ * transaction (UPDATE ... RETURNING) so two concurrent invoice writes
+ * never race on the same number.
+ */
+model InvoiceCounter {
+  scope    String @id // e.g. "202604" (year+month)
+  sequence Int    @default(0)
+
+  @@map("invoice_counters")
 }
 
 
