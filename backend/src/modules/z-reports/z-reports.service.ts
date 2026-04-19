@@ -1,11 +1,18 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { createHash } from 'crypto';
+import { format } from 'date-fns';
+import PDFDocument from 'pdfkit';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from '../../common/services/email.service';
 import { CreateZReportDto } from './dto/create-z-report.dto';
-import PDFDocument from 'pdfkit';
-import { format } from 'date-fns';
 
-// Currency symbol mapping
 const CURRENCY_SYMBOLS: Record<string, string> = {
   TRY: '₺',
   USD: '$',
@@ -14,6 +21,8 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   CAD: 'C$',
   AUD: 'A$',
 };
+
+const ACTIVE_OPEN_ORDER_STATUSES = ['PENDING', 'PREPARING', 'READY', 'SERVED'] as const;
 
 @Injectable()
 export class ZReportsService {
@@ -24,219 +33,238 @@ export class ZReportsService {
     private emailService: EmailService,
   ) {}
 
-  /**
-   * Generate a Z-Report for end-of-day reconciliation
-   */
   async generateReport(tenantId: string, userId: string, createDto: CreateZReportDto) {
     const { reportDate, cashDrawerOpening, cashDrawerClosing, notes } = createDto;
 
-    // Check if report already exists for this date
-    const existing = await this.prisma.zReport.findFirst({
-      where: {
-        tenantId,
-        reportDate: new Date(reportDate),
-      },
-    });
-
-    if (existing) {
-      throw new BadRequestException('Z-Report already exists for this date');
-    }
-
-    // Get orders for the report date
     const startOfDay = new Date(reportDate);
     startOfDay.setHours(0, 0, 0, 0);
 
     const endOfDay = new Date(reportDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const orders = await this.prisma.order.findMany({
-      where: {
-        tenantId,
-        createdAt: {
-          gte: startOfDay,
-          lte: endOfDay,
+    const reportNumber = `Z-${startOfDay.toISOString().slice(0, 10).replace(/-/g, '')}`;
+
+    try {
+      return await this.prisma.$transaction(
+        async (tx) => {
+          const existing = await tx.zReport.findFirst({
+            where: { tenantId, reportDate: startOfDay },
+            select: { id: true },
+          });
+          if (existing) {
+            throw new BadRequestException('Z-Report already exists for this date');
+          }
+
+          const orders = await tx.order.findMany({
+            where: {
+              tenantId,
+              createdAt: { gte: startOfDay, lte: endOfDay },
+              status: 'PAID',
+            },
+            include: {
+              payments: true,
+              orderItems: { include: { product: true } },
+            },
+          });
+
+          const totalOrders = orders.length;
+          let grossSales = new Prisma.Decimal(0);
+          let discounts = new Prisma.Decimal(0);
+          let netSales = new Prisma.Decimal(0);
+          for (const order of orders) {
+            grossSales = grossSales.add(order.totalAmount);
+            discounts = discounts.add(order.discount);
+            netSales = netSales.add(order.finalAmount);
+          }
+
+          // Only COMPLETED payments count toward cash/card/digital totals.
+          // REFUNDED and FAILED payments are tracked separately so the cash-
+          // drawer reconciliation does not over-predict cash on hand.
+          const completedPayments = orders
+            .flatMap((o) => o.payments)
+            .filter((p) => p.status === 'COMPLETED');
+          const refundedPaymentsList = orders
+            .flatMap((o) => o.payments)
+            .filter((p) => p.status === 'REFUNDED');
+
+          const sumBy = (list: typeof completedPayments, method: string) =>
+            list
+              .filter((p) => p.method === method)
+              .reduce((sum, p) => sum.add(p.amount), new Prisma.Decimal(0));
+
+          const cashPayments = sumBy(completedPayments, 'CASH');
+          const cardPayments = sumBy(completedPayments, 'CARD');
+          const digitalPayments = sumBy(completedPayments, 'DIGITAL');
+          const cashPaymentCount = completedPayments.filter((p) => p.method === 'CASH').length;
+          const cardPaymentCount = completedPayments.filter((p) => p.method === 'CARD').length;
+          const digitalPaymentCount = completedPayments.filter((p) => p.method === 'DIGITAL').length;
+
+          const refundedAmount = refundedPaymentsList.reduce(
+            (sum, p) => sum.add(p.amount),
+            new Prisma.Decimal(0),
+          );
+
+          const ordersByType = (type: string) => orders.filter((o) => o.type === type);
+          const sumFinal = (list: typeof orders) =>
+            list.reduce((sum, o) => sum.add(o.finalAmount), new Prisma.Decimal(0));
+
+          const dineInOrders = ordersByType('DINE_IN');
+          const takeawayOrders = ordersByType('TAKEAWAY');
+          const deliveryOrders = ordersByType('DELIVERY');
+
+          const cancelledOrdersList = await tx.order.findMany({
+            where: {
+              tenantId,
+              createdAt: { gte: startOfDay, lte: endOfDay },
+              status: 'CANCELLED',
+            },
+            select: { totalAmount: true },
+          });
+          const cancelledOrdersAmount = cancelledOrdersList.reduce(
+            (sum, o) => sum.add(o.totalAmount),
+            new Prisma.Decimal(0),
+          );
+
+          // Open-checks: orders still in an active lifecycle status at the
+          // moment the report is generated. A non-zero value here signals
+          // that the day isn't legitimately closeable yet.
+          const openChecksAgg = await tx.order.aggregate({
+            where: {
+              tenantId,
+              createdAt: { gte: startOfDay, lte: endOfDay },
+              status: { in: [...ACTIVE_OPEN_ORDER_STATUSES] },
+            },
+            _count: { _all: true },
+            _sum: { finalAmount: true },
+          });
+          const openChecks = openChecksAgg._count._all;
+          const openChecksAmount = openChecksAgg._sum.finalAmount
+            ? new Prisma.Decimal(openChecksAgg._sum.finalAmount)
+            : new Prisma.Decimal(0);
+
+          const opening = new Prisma.Decimal(cashDrawerOpening);
+          const closing = new Prisma.Decimal(cashDrawerClosing);
+          const expectedCash = opening.add(cashPayments);
+          const cashDifference = closing.sub(expectedCash);
+
+          const productSales = new Map<
+            string,
+            { name: string; quantity: number; revenue: Prisma.Decimal }
+          >();
+          for (const order of orders) {
+            for (const item of order.orderItems) {
+              const existingProd = productSales.get(item.productId) || {
+                name: item.product.name,
+                quantity: 0,
+                revenue: new Prisma.Decimal(0),
+              };
+              existingProd.quantity += item.quantity;
+              existingProd.revenue = existingProd.revenue.add(item.subtotal);
+              productSales.set(item.productId, existingProd);
+            }
+          }
+          const topProducts = Array.from(productSales.values())
+            .sort((a, b) => b.revenue.comparedTo(a.revenue))
+            .slice(0, 10)
+            .map((p) => ({
+              name: p.name,
+              quantity: p.quantity,
+              revenue: p.revenue.toString(),
+            }));
+
+          const cashMovements = await tx.cashDrawerMovement.findMany({
+            where: {
+              tenantId,
+              createdAt: { gte: startOfDay, lte: endOfDay },
+            },
+            include: {
+              user: {
+                select: { firstName: true, lastName: true, email: true },
+              },
+            },
+          });
+
+          return tx.zReport.create({
+            data: {
+              tenantId,
+              reportDate: startOfDay,
+              reportNumber,
+              closedById: userId,
+
+              totalOrders,
+              totalSales: grossSales,
+              totalDiscount: discounts,
+              totalRefunds: refundedAmount,
+              netSales,
+
+              cashPayments,
+              cashPaymentCount,
+              cardPayments,
+              cardPaymentCount,
+              digitalPayments,
+              digitalPaymentCount,
+
+              dineInSales: sumFinal(dineInOrders),
+              dineInOrders: dineInOrders.length,
+              takeawaySales: sumFinal(takeawayOrders),
+              takeawayOrders: takeawayOrders.length,
+              deliverySales: sumFinal(deliveryOrders),
+              deliveryOrders: deliveryOrders.length,
+
+              cancelledOrders: cancelledOrdersList.length,
+              cancelledOrdersAmount,
+              refundedPayments: refundedPaymentsList.length,
+              refundedAmount,
+
+              openChecks,
+              openChecksAmount,
+
+              openingCash: opening,
+              countedCash: closing,
+              expectedCash,
+              cashDifference,
+
+              topProducts: topProducts as any,
+              staffPerformance: cashMovements.map((m) => ({
+                type: m.type,
+                amount: m.amount.toString(),
+                reason: m.reason,
+                performedBy: `${m.user.firstName} ${m.user.lastName}`,
+                timestamp: m.createdAt,
+              })) as any,
+
+              notes,
+            },
+          });
         },
-        status: 'PAID',
-      },
-      include: {
-        payments: true,
-        orderItems: {
-          include: {
-            product: true,
-          },
-        },
-      },
-    });
-
-    // Calculate totals
-    const totalOrders = orders.length;
-    const grossSales = orders.reduce((sum, order) => sum + Number(order.totalAmount), 0);
-    const discounts = orders.reduce((sum, order) => sum + Number(order.discount), 0);
-    const netSales = orders.reduce((sum, order) => sum + Number(order.finalAmount), 0);
-
-    // Calculate payment method breakdown
-    const allPayments = orders.flatMap((o) => o.payments);
-
-    const cashPaymentsList = allPayments.filter((p) => p.method === 'CASH');
-    const cashPayments = cashPaymentsList.reduce((sum, p) => sum + Number(p.amount), 0);
-    const cashPaymentCount = cashPaymentsList.length;
-
-    const cardPaymentsList = allPayments.filter((p) => p.method === 'CARD');
-    const cardPayments = cardPaymentsList.reduce((sum, p) => sum + Number(p.amount), 0);
-    const cardPaymentCount = cardPaymentsList.length;
-
-    const digitalPaymentsList = allPayments.filter((p) => p.method === 'DIGITAL');
-    const digitalPayments = digitalPaymentsList.reduce((sum, p) => sum + Number(p.amount), 0);
-    const digitalPaymentCount = digitalPaymentsList.length;
-
-    // Order type breakdown
-    const dineInOrders = orders.filter((o) => o.type === 'DINE_IN');
-    const dineInSales = dineInOrders.reduce((sum, o) => sum + Number(o.finalAmount), 0);
-
-    const takeawayOrders = orders.filter((o) => o.type === 'TAKEAWAY');
-    const takeawaySales = takeawayOrders.reduce((sum, o) => sum + Number(o.finalAmount), 0);
-
-    const deliveryOrders = orders.filter((o) => o.type === 'DELIVERY');
-    const deliverySales = deliveryOrders.reduce((sum, o) => sum + Number(o.finalAmount), 0);
-
-    // Cancelled orders in the date range
-    const cancelledOrdersList = await this.prisma.order.findMany({
-      where: {
-        tenantId,
-        createdAt: {
-          gte: startOfDay,
-          lte: endOfDay,
-        },
-        status: 'CANCELLED',
-      },
-      select: {
-        totalAmount: true,
-      },
-    });
-    const cancelledOrders = cancelledOrdersList.length;
-    const cancelledOrdersAmount = cancelledOrdersList.reduce(
-      (sum, o) => sum + Number(o.totalAmount),
-      0,
-    );
-
-    // Cash drawer reconciliation
-    const expectedCash = cashDrawerOpening + cashPayments;
-    const cashDifference = cashDrawerClosing - expectedCash;
-
-    // Get top selling products
-    const productSales = new Map<string, { name: string; quantity: number; revenue: number }>();
-    orders.forEach((order) => {
-      order.orderItems.forEach((item) => {
-        const existing = productSales.get(item.productId) || {
-          name: item.product.name,
-          quantity: 0,
-          revenue: 0,
-        };
-        existing.quantity += item.quantity;
-        existing.revenue += Number(item.subtotal);
-        productSales.set(item.productId, existing);
-      });
-    });
-
-    const topProducts = Array.from(productSales.values())
-      .sort((a, b) => b.revenue - a.revenue)
-      .slice(0, 10);
-
-    // Get cash drawer movements for the day
-    const cashMovements = await this.prisma.cashDrawerMovement.findMany({
-      where: {
-        tenantId,
-        createdAt: {
-          gte: startOfDay,
-          lte: endOfDay,
-        },
-      },
-      include: {
-        user: {
-          select: {
-            firstName: true,
-            lastName: true,
-            email: true,
-          },
-        },
-      },
-    });
-
-    // Create the Z-Report
-    const report = await this.prisma.zReport.create({
-      data: {
-        tenantId,
-        reportDate: new Date(reportDate),
-        reportNumber: `Z-${new Date(reportDate).toISOString().slice(0, 10).replace(/-/g, '')}`,
-        closedById: userId,
-
-        // Sales data
-        totalOrders,
-        totalSales: grossSales,
-        totalDiscount: discounts,
-        netSales,
-
-        // Payment breakdown
-        cashPayments,
-        cashPaymentCount,
-        cardPayments,
-        cardPaymentCount,
-        digitalPayments,
-        digitalPaymentCount,
-
-        // Order type breakdown
-        dineInSales,
-        dineInOrders: dineInOrders.length,
-        takeawaySales,
-        takeawayOrders: takeawayOrders.length,
-        deliverySales,
-        deliveryOrders: deliveryOrders.length,
-
-        // Cancelled orders
-        cancelledOrders,
-        cancelledOrdersAmount,
-
-        // Cash drawer
-        openingCash: cashDrawerOpening,
-        countedCash: cashDrawerClosing,
-        expectedCash,
-        cashDifference,
-
-        // Additional data
-        topProducts: topProducts as any,
-        staffPerformance: cashMovements.map((m) => ({
-          type: m.type,
-          amount: m.amount,
-          reason: m.reason,
-          performedBy: `${m.user.firstName} ${m.user.lastName}`,
-          timestamp: m.createdAt,
-        })) as any,
-
-        notes,
-      },
-    });
-
-    return report;
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (err) {
+      // Translate the Prisma unique-constraint race (two concurrent closes
+      // for the same day) into a friendly 400 instead of a 500.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        throw new BadRequestException('Z-Report already exists for this date');
+      }
+      throw err;
+    }
   }
 
-  /**
-   * Get all Z-Reports for a tenant
-   */
-  async findAll(tenantId: string, query: { page?: number; limit?: number; startDate?: string; endDate?: string }) {
-    const page = query.page || 1;
-    const limit = query.limit || 20;
+  async findAll(
+    tenantId: string,
+    query: { page?: number; limit?: number; startDate?: string; endDate?: string },
+  ) {
+    const page = Math.max(1, query.page || 1);
+    const limit = Math.min(Math.max(1, query.limit || 20), 100);
     const skip = (page - 1) * limit;
 
-    const where: any = { tenantId };
-
+    const where: Prisma.ZReportWhereInput = { tenantId };
     if (query.startDate || query.endDate) {
       where.reportDate = {};
-      if (query.startDate) {
-        where.reportDate.gte = new Date(query.startDate);
-      }
-      if (query.endDate) {
-        where.reportDate.lte = new Date(query.endDate);
-      }
+      if (query.startDate) (where.reportDate as any).gte = new Date(query.startDate);
+      if (query.endDate) (where.reportDate as any).lte = new Date(query.endDate);
     }
 
     const [reports, total] = await Promise.all([
@@ -258,30 +286,19 @@ export class ZReportsService {
     };
   }
 
-  /**
-   * Get a specific Z-Report
-   */
   async findOne(id: string, tenantId: string) {
     const report = await this.prisma.zReport.findFirst({
       where: { id, tenantId },
     });
-
-    if (!report) {
-      throw new NotFoundException('Z-Report not found');
-    }
-
+    if (!report) throw new NotFoundException('Z-Report not found');
     return report;
   }
 
-  /**
-   * Generate PDF for Z-Report
-   */
   async generatePdf(id: string, tenantId: string): Promise<Buffer> {
     const report = await this.findOne(id, tenantId);
 
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-    });
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) throw new NotFoundException('Tenant not found');
 
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({ margin: 50 });
@@ -291,7 +308,6 @@ export class ZReportsService {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
-      // Header
       doc.fontSize(20).text('Z-REPORT', { align: 'center' });
       doc.fontSize(12).text(tenant.name, { align: 'center' });
       doc.moveDown();
@@ -299,40 +315,45 @@ export class ZReportsService {
       doc.fontSize(12).text(`Report Number: ${report.reportNumber}`);
       doc.text(`Date: ${report.reportDate.toLocaleDateString()}`);
       doc.text(`Generated: ${report.createdAt.toLocaleString()}`);
+      if (report.isFinalized) {
+        doc.text(`Finalized: ${report.finalizedAt?.toLocaleString() ?? '-'}`);
+        if (report.payloadHash) doc.text(`Hash: ${report.payloadHash}`);
+      }
       doc.moveDown();
 
-      // Get currency symbol
       const currencySymbol = CURRENCY_SYMBOLS[tenant.currency] || '$';
+      const fmt = (v: any) => Number(v).toFixed(2);
 
-      // Sales Summary
       doc.fontSize(14).text('Sales Summary', { underline: true });
       doc.fontSize(10);
       doc.text(`Total Orders: ${report.totalOrders}`);
-      doc.text(`Total Sales: ${currencySymbol}${report.totalSales.toFixed(2)}`);
-      doc.text(`Discounts: ${currencySymbol}${report.totalDiscount.toFixed(2)}`);
-      doc.text(`Net Sales: ${currencySymbol}${report.netSales.toFixed(2)}`);
+      doc.text(`Total Sales: ${currencySymbol}${fmt(report.totalSales)}`);
+      doc.text(`Discounts: ${currencySymbol}${fmt(report.totalDiscount)}`);
+      doc.text(`Refunds: ${currencySymbol}${fmt(report.totalRefunds)}`);
+      doc.text(`Net Sales: ${currencySymbol}${fmt(report.netSales)}`);
+      if (report.openChecks > 0) {
+        doc.fillColor('red')
+          .text(`Open Checks: ${report.openChecks} (${currencySymbol}${fmt(report.openChecksAmount)})`)
+          .fillColor('black');
+      }
       doc.moveDown();
 
-      // Payment Methods
       doc.fontSize(14).text('Payment Methods', { underline: true });
       doc.fontSize(10);
-      doc.text(`Cash: ${currencySymbol}${report.cashPayments.toFixed(2)}`);
-      doc.text(`Card: ${currencySymbol}${report.cardPayments.toFixed(2)}`);
-      doc.text(`Digital: ${currencySymbol}${report.digitalPayments.toFixed(2)}`);
+      doc.text(`Cash: ${currencySymbol}${fmt(report.cashPayments)}`);
+      doc.text(`Card: ${currencySymbol}${fmt(report.cardPayments)}`);
+      doc.text(`Digital: ${currencySymbol}${fmt(report.digitalPayments)}`);
       doc.moveDown();
 
-      // Cash Drawer
       doc.fontSize(14).text('Cash Drawer Reconciliation', { underline: true });
       doc.fontSize(10);
-      doc.text(`Opening Balance: ${currencySymbol}${report.openingCash.toFixed(2)}`);
-      doc.text(`Cash Sales: ${currencySymbol}${report.cashPayments.toFixed(2)}`);
-      doc.text(`Expected Cash: ${currencySymbol}${report.expectedCash.toFixed(2)}`);
-      doc.text(`Actual Cash: ${currencySymbol}${report.countedCash.toFixed(2)}`);
-      doc.text(`Difference: ${currencySymbol}${report.cashDifference.toFixed(2)}`, {
-        continued: true,
-      });
+      doc.text(`Opening Balance: ${currencySymbol}${fmt(report.openingCash)}`);
+      doc.text(`Cash Sales: ${currencySymbol}${fmt(report.cashPayments)}`);
+      doc.text(`Expected Cash: ${currencySymbol}${fmt(report.expectedCash)}`);
+      doc.text(`Actual Cash: ${currencySymbol}${fmt(report.countedCash)}`);
 
       const cashDiff = Number(report.cashDifference);
+      doc.text(`Difference: ${currencySymbol}${cashDiff.toFixed(2)}`, { continued: true });
       if (cashDiff !== 0) {
         doc.fillColor(cashDiff > 0 ? 'green' : 'red')
           .text(` (${cashDiff > 0 ? 'Over' : 'Short'})`)
@@ -340,14 +361,12 @@ export class ZReportsService {
       }
       doc.moveDown();
 
-      // Notes
       if (report.notes) {
         doc.fontSize(14).text('Notes', { underline: true });
         doc.fontSize(10).text(report.notes);
         doc.moveDown();
       }
 
-      // Footer
       doc.fontSize(8)
         .text(`Generated by ${tenant.name} POS System`, { align: 'center' })
         .text(`Report ID: ${report.id}`, { align: 'center' });
@@ -357,29 +376,62 @@ export class ZReportsService {
   }
 
   /**
-   * Close (finalize) a Z-Report
+   * Finalize a Z-Report. After this succeeds every writing path must assert
+   * `isFinalized === false` before mutating fiscal totals. A SHA-256 payload
+   * hash is stored for tamper-detection audit.
    */
-  async closeReport(id: string, tenantId: string) {
+  async closeReport(id: string, tenantId: string, userId: string) {
     const report = await this.findOne(id, tenantId);
-
-    // Check if report is already exported (indicates it's finalized)
-    if (report.pdfExported) {
+    if (report.isFinalized) {
       throw new BadRequestException('Report is already finalized');
     }
 
-    // Mark report as exported/finalized
-    return this.prisma.zReport.update({
-      where: { id },
+    const payloadHash = this.computePayloadHash(report);
+
+    const result = await this.prisma.zReport.updateMany({
+      where: { id, tenantId, isFinalized: false },
       data: {
+        isFinalized: true,
+        finalizedAt: new Date(),
+        finalizedById: userId,
+        payloadHash,
         pdfExported: true,
-        excelExported: true,
       },
     });
+    if (result.count !== 1) {
+      throw new ConflictException('Report was concurrently finalized');
+    }
+    return this.findOne(id, tenantId);
   }
 
-  /**
-   * Send Z-Report via email
-   */
+  private computePayloadHash(report: any): string {
+    // Canonical subset of fields that matter for audit. Sort keys so the
+    // digest is stable across Prisma return-object property order changes.
+    const canonical = JSON.stringify(
+      {
+        reportNumber: report.reportNumber,
+        reportDate: report.reportDate,
+        totalOrders: report.totalOrders,
+        totalSales: report.totalSales?.toString?.() ?? String(report.totalSales),
+        totalDiscount: report.totalDiscount?.toString?.() ?? String(report.totalDiscount),
+        totalRefunds: report.totalRefunds?.toString?.() ?? String(report.totalRefunds),
+        netSales: report.netSales?.toString?.() ?? String(report.netSales),
+        cashPayments: report.cashPayments?.toString?.() ?? String(report.cashPayments),
+        cardPayments: report.cardPayments?.toString?.() ?? String(report.cardPayments),
+        digitalPayments: report.digitalPayments?.toString?.() ?? String(report.digitalPayments),
+        openingCash: report.openingCash?.toString?.() ?? String(report.openingCash),
+        countedCash: report.countedCash?.toString?.() ?? String(report.countedCash),
+        expectedCash: report.expectedCash?.toString?.() ?? String(report.expectedCash),
+        cashDifference: report.cashDifference?.toString?.() ?? String(report.cashDifference),
+        refundedAmount: report.refundedAmount?.toString?.() ?? String(report.refundedAmount),
+        openChecks: report.openChecks,
+        openChecksAmount: report.openChecksAmount?.toString?.() ?? String(report.openChecksAmount),
+      },
+      Object.keys({}).sort(),
+    );
+    return createHash('sha256').update(canonical).digest('hex');
+  }
+
   async sendReportEmail(
     id: string,
     tenantId: string,
@@ -387,42 +439,33 @@ export class ZReportsService {
   ): Promise<{ success: boolean; message: string }> {
     const report = await this.findOne(id, tenantId);
 
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-    });
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    if (!tenant) throw new NotFoundException('Tenant not found');
 
-    if (!tenant) {
-      throw new NotFoundException('Tenant not found');
-    }
-
-    // Get user who closed the report
-    const closedBy = await this.prisma.user.findUnique({
-      where: { id: report.closedById },
+    const closedBy = await this.prisma.user.findFirst({
+      where: { id: report.closedById, tenantId },
       select: { firstName: true, lastName: true },
     });
 
-    // Determine recipients
     const recipients = toEmails?.length ? toEmails : tenant.reportEmails || [];
-
     if (recipients.length === 0) {
       throw new BadRequestException(
         'No email recipients configured. Please add email addresses in tenant settings or provide them explicitly.',
       );
     }
 
-    // Get currency symbol
     const currencySymbol = CURRENCY_SYMBOLS[tenant.currency] || '$';
-
-    // Parse top products from JSON
     const topProducts = (report.topProducts as any[]) || [];
-
-    // Calculate cash difference details
     const cashDiff = Number(report.cashDifference);
     const isNegativeDifference = cashDiff < 0;
     const isPositiveDifference = cashDiff > 0;
-    const cashDifferenceClass = isNegativeDifference ? 'danger' : isPositiveDifference ? 'warning' : '';
+    const cashDifferenceClass = isNegativeDifference
+      ? 'danger'
+      : isPositiveDifference
+        ? 'warning'
+        : '';
+    const fmt = (v: any) => Number(v).toFixed(2);
 
-    // Format the email context
     const emailContext = {
       restaurantName: tenant.name,
       reportNumber: report.reportNumber,
@@ -430,57 +473,47 @@ export class ZReportsService {
       closingTime: format(new Date(report.closingTime), 'HH:mm'),
       closedByName: closedBy ? `${closedBy.firstName} ${closedBy.lastName}` : 'System',
       currencySymbol,
-
-      // Sales summary
-      totalSales: Number(report.totalSales).toFixed(2),
-      totalDiscount: Number(report.totalDiscount).toFixed(2),
-      totalRefunds: Number(report.totalRefunds).toFixed(2),
-      netSales: Number(report.netSales).toFixed(2),
+      totalSales: fmt(report.totalSales),
+      totalDiscount: fmt(report.totalDiscount),
+      totalRefunds: fmt(report.totalRefunds),
+      netSales: fmt(report.netSales),
       totalOrders: report.totalOrders,
-
-      // Order types
-      dineInSales: Number(report.dineInSales).toFixed(2),
+      dineInSales: fmt(report.dineInSales),
       dineInOrders: report.dineInOrders,
-      takeawaySales: Number(report.takeawaySales).toFixed(2),
+      takeawaySales: fmt(report.takeawaySales),
       takeawayOrders: report.takeawayOrders,
-      deliverySales: Number(report.deliverySales).toFixed(2),
+      deliverySales: fmt(report.deliverySales),
       deliveryOrders: report.deliveryOrders,
-
-      // Payment methods
-      cashPayments: Number(report.cashPayments).toFixed(2),
+      cashPayments: fmt(report.cashPayments),
       cashPaymentCount: report.cashPaymentCount,
-      cardPayments: Number(report.cardPayments).toFixed(2),
+      cardPayments: fmt(report.cardPayments),
       cardPaymentCount: report.cardPaymentCount,
-      digitalPayments: Number(report.digitalPayments).toFixed(2),
+      digitalPayments: fmt(report.digitalPayments),
       digitalPaymentCount: report.digitalPaymentCount,
-
-      // Cash drawer
-      openingCash: Number(report.openingCash).toFixed(2),
-      expectedCash: Number(report.expectedCash).toFixed(2),
-      countedCash: Number(report.countedCash).toFixed(2),
-      cashInOut: Number(report.cashInOut).toFixed(2),
+      openingCash: fmt(report.openingCash),
+      expectedCash: fmt(report.expectedCash),
+      countedCash: fmt(report.countedCash),
+      cashInOut: fmt(report.cashInOut),
       cashDifference: cashDiff.toFixed(2),
       cashDifferenceAbs: Math.abs(cashDiff).toFixed(2),
       cashDifferenceClass,
       isNegativeDifference,
       isPositiveDifference,
-
-      // Cancelled orders
       cancelledOrders: report.cancelledOrders,
-      cancelledOrdersAmount: Number(report.cancelledOrdersAmount).toFixed(2),
-
-      // Top products
+      cancelledOrdersAmount: fmt(report.cancelledOrdersAmount),
+      openChecks: report.openChecks,
+      openChecksAmount: fmt(report.openChecksAmount),
+      refundedPayments: report.refundedPayments,
+      refundedAmount: fmt(report.refundedAmount),
       topProducts: topProducts.slice(0, 5).map((p: any) => ({
         name: p.name || p.productName,
         quantity: p.quantity,
-        revenue: Number(p.revenue).toFixed(2),
+        revenue: fmt(p.revenue),
       })),
-
       currentYear: new Date().getFullYear(),
     };
 
     try {
-      // Send email to all recipients
       const success = await this.emailService.sendEmail({
         to: recipients.join(', '),
         subject: `Z-Report Summary - ${format(new Date(report.reportDate), 'MMM dd, yyyy')} - ${tenant.name}`,
@@ -488,9 +521,11 @@ export class ZReportsService {
         context: emailContext,
       });
 
-      // Update report with email status
-      await this.prisma.zReport.update({
-        where: { id },
+      // emailSent / emailError are audit-side-channel fields, not fiscal,
+      // so updating them post-finalization is safe. Every fiscal-totals
+      // write path is gated by isFinalized elsewhere.
+      await this.prisma.zReport.updateMany({
+        where: { id, tenantId },
         data: {
           emailSent: success,
           emailSentAt: success ? new Date() : null,
@@ -500,47 +535,33 @@ export class ZReportsService {
       });
 
       if (success) {
-        this.logger.log(`Z-Report email sent successfully to ${recipients.join(', ')}`);
-        return { success: true, message: `Email sent successfully to ${recipients.length} recipient(s)` };
-      } else {
-        return { success: false, message: 'Failed to send email. Please check email configuration.' };
+        this.logger.log(`Z-Report email sent to ${recipients.join(', ')}`);
+        return { success: true, message: `Email sent to ${recipients.length} recipient(s)` };
       }
-    } catch (error) {
+      return { success: false, message: 'Failed to send email. Please check email configuration.' };
+    } catch (error: any) {
       this.logger.error(`Failed to send Z-Report email: ${error.message}`);
-
-      // Update report with error
-      await this.prisma.zReport.update({
-        where: { id },
-        data: {
-          emailError: error.message,
-        },
+      await this.prisma.zReport.updateMany({
+        where: { id, tenantId },
+        data: { emailError: error.message },
       });
-
       return { success: false, message: `Failed to send email: ${error.message}` };
     }
   }
 
-  /**
-   * Generate and send Z-Report for a tenant (used by scheduler)
-   */
-  async generateAndSendReport(tenantId: string, userId: string): Promise<{ reportId: string; emailSent: boolean }> {
+  async generateAndSendReport(
+    tenantId: string,
+    userId: string,
+  ): Promise<{ reportId: string; emailSent: boolean }> {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Check if report already exists for today
     const existing = await this.prisma.zReport.findFirst({
-      where: {
-        tenantId,
-        reportDate: today,
-      },
+      where: { tenantId, reportDate: today },
     });
 
-    let report;
-
-    if (existing) {
-      report = existing;
-    } else {
-      // Generate report for today with default values
+    let report = existing;
+    if (!report) {
       report = await this.generateReport(tenantId, userId, {
         reportDate: today.toISOString(),
         cashDrawerOpening: 0,
@@ -549,13 +570,8 @@ export class ZReportsService {
       });
     }
 
-    // Send email if configured
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-    });
-
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
     let emailSent = false;
-
     if (tenant?.reportEmailEnabled && tenant.reportEmails?.length > 0) {
       const result = await this.sendReportEmail(report.id, tenantId);
       emailSent = result.success;

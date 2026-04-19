@@ -1495,6 +1495,14 @@ model ZReport {
   emailRecipients         String[] @default([])    // Who received the email
   emailError              String?                  // Last email error if any
 
+  // Fiscal finalization — once set, totals are locked and every write path
+  // asserts isFinalized=false. payloadHash is a sha256 of the canonical
+  // fiscal payload at finalization time so tampering is detectable on audit.
+  isFinalized   Boolean   @default(false)
+  finalizedAt   DateTime?
+  finalizedById String?
+  payloadHash   String?
+
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
