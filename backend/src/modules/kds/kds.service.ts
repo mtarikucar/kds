@@ -144,24 +144,18 @@ export class KdsService {
     updateDto: UpdateOrderItemStatusDto,
     tenantId: string,
   ) {
-    // Verify order item exists
-    const orderItem = await this.prisma.orderItem.findUnique({
-      where: { id: updateDto.orderItemId },
-      include: {
-        order: true,
-      },
+    // Scope the lookup by tenantId at the DB boundary rather than relying on
+    // a post-fetch check — prevents cross-tenant probing via timing differences
+    // and removes a TOCTOU window.
+    const orderItem = await this.prisma.orderItem.findFirst({
+      where: { id: updateDto.orderItemId, order: { tenantId } },
+      include: { order: true },
     });
 
     if (!orderItem) {
       throw new NotFoundException(`Order item with ID ${updateDto.orderItemId} not found`);
     }
 
-    // Verify order belongs to tenant
-    if (orderItem.order.tenantId !== tenantId) {
-      throw new BadRequestException('Order item does not belong to your tenant');
-    }
-
-    // Update order item status
     const updatedOrderItem = await this.prisma.orderItem.update({
       where: { id: updateDto.orderItemId },
       data: { status: updateDto.status },
@@ -171,20 +165,18 @@ export class KdsService {
       },
     });
 
-    // Check if all items are ready, then update order status
     const allItems = await this.prisma.orderItem.findMany({
-      where: { orderId: orderItem.orderId },
+      where: { orderId: orderItem.orderId, order: { tenantId } },
+      select: { status: true },
     });
 
     const allReady = allItems.every((item) => item.status === OrderItemStatus.READY);
     if (allReady && orderItem.order.status !== OrderStatus.READY) {
-      // Only auto-promote to READY if order doesn't require approval or is already approved
       if (!orderItem.order.requiresApproval || orderItem.order.status !== OrderStatus.PENDING_APPROVAL) {
         await this.updateOrderStatus(orderItem.orderId, OrderStatus.READY, tenantId);
       }
     }
 
-    // Emit item status change via WebSocket
     this.kdsGateway.emitOrderItemStatusChange(
       tenantId,
       updateDto.orderItemId,

@@ -395,8 +395,8 @@ export const usePosSocket = () => {
     socket.on('waiter-request:new', handleWaiterRequestNew);
     socket.on('waiter-request:updated', handleWaiterRequestUpdated);
 
-    // Join POS room
-    socket.emit('join-pos');
+    // Room membership is decided server-side from the JWT role on connect;
+    // no inbound join/leave messages are needed.
 
     return () => {
       socket.off('connect', handleConnect);
@@ -410,7 +410,6 @@ export const usePosSocket = () => {
       socket.off('bill-request:updated', handleBillRequestUpdated);
       socket.off('waiter-request:new', handleWaiterRequestNew);
       socket.off('waiter-request:updated', handleWaiterRequestUpdated);
-      socket.emit('leave-pos');
       disconnectSocket();
     };
   }, [queryClient]);
