@@ -1,5 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsInt, Min, Max } from 'class-validator';
+import { IsEnum, IsOptional, IsString, IsInt, IsIn, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export enum TenantStatus {
@@ -7,6 +7,15 @@ export enum TenantStatus {
   SUSPENDED = 'SUSPENDED',
   DELETED = 'DELETED',
 }
+
+export const TENANT_SORTABLE_FIELDS = [
+  'createdAt',
+  'updatedAt',
+  'name',
+  'status',
+  'subdomain',
+] as const;
+export type TenantSortableField = (typeof TENANT_SORTABLE_FIELDS)[number];
 
 export class TenantFilterDto {
   @ApiPropertyOptional({ description: 'Search by name or email' })
@@ -39,10 +48,14 @@ export class TenantFilterDto {
   @Max(100)
   limit?: number = 20;
 
-  @ApiPropertyOptional({ description: 'Sort by field', default: 'createdAt' })
+  @ApiPropertyOptional({
+    description: 'Sort by field',
+    default: 'createdAt',
+    enum: TENANT_SORTABLE_FIELDS,
+  })
   @IsOptional()
-  @IsString()
-  sortBy?: string = 'createdAt';
+  @IsIn(TENANT_SORTABLE_FIELDS)
+  sortBy?: TenantSortableField = 'createdAt';
 
   @ApiPropertyOptional({ enum: ['asc', 'desc'], default: 'desc' })
   @IsOptional()

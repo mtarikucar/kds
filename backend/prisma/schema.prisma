@@ -116,7 +116,25 @@ model Tenant {
   shiftSwapRequests     ShiftSwapRequest[]
 
   @@index([currentPlanId])
+  @@index([status])
   @@map("tenants")
+}
+
+/**
+ * Subdomains released by deleted/suspended tenants or settings changes
+ * are parked here for a quarantine window to prevent subdomain takeover
+ * (a new tenant picking up a subdomain still referenced by printed QR
+ * codes, outbound emails, cached links).
+ */
+model ReservedSubdomain {
+  id             String   @id @default(uuid())
+  subdomain      String   @unique
+  reason         String   // 'tenant_deleted' | 'tenant_suspended' | 'subdomain_changed'
+  reservedAt     DateTime @default(now())
+  availableAfter DateTime
+
+  @@index([availableAfter])
+  @@map("reserved_subdomains")
 }
 
 model User {

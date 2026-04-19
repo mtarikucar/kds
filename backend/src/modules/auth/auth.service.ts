@@ -13,6 +13,7 @@ import { createHash, randomBytes } from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import * as appleSignin from 'apple-signin-auth';
 import * as Sentry from '@sentry/node';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -20,9 +21,14 @@ import { GoogleAuthDto, AppleAuthDto } from './dto/social-auth.dto';
 import { AuthResponseDto, UserResponseDto } from './dto/auth-response.dto';
 import { ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto } from './dto/password-reset.dto';
 import { UserRole } from '../../common/constants/roles.enum';
+import { TenantStatus } from '../../common/constants/subscription.enum';
 import { EmailService } from '../../common/services/email.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/dto/create-notification.dto';
+import {
+  isSubdomainQuarantined,
+  randomSubdomainSuffix,
+} from '../../common/helpers/subdomain.helper';
 import {
   ResourceAlreadyExistsException,
   ResourceNotFoundException,
@@ -36,6 +42,30 @@ export class AuthService {
 
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
+  }
+
+  /**
+   * Find a free subdomain for a new tenant. Falls back to appending a
+   * cryptographically-strong 6-hex suffix when the preferred slug is taken
+   * or quarantined. Uniqueness is ultimately enforced by the DB unique
+   * index (P2002 is caught by the caller); this just picks a candidate.
+   */
+  private async allocateSubdomain(base: string): Promise<string> {
+    const baseClean = base || 'restaurant';
+    const preferred = baseClean;
+    const preferredTaken =
+      (await isSubdomainQuarantined(this.prisma, preferred)) ||
+      (await this.prisma.tenant.findUnique({ where: { subdomain: preferred } }));
+    if (!preferredTaken) return preferred;
+    // Up to 5 attempts with random suffix — extraordinarily unlikely to collide.
+    for (let i = 0; i < 5; i += 1) {
+      const candidate = `${baseClean}-${randomSubdomainSuffix()}`;
+      const taken =
+        (await isSubdomainQuarantined(this.prisma, candidate)) ||
+        (await this.prisma.tenant.findUnique({ where: { subdomain: candidate } }));
+      if (!taken) return candidate;
+    }
+    throw new Error('Could not allocate a free subdomain');
   }
 
   constructor(
@@ -87,23 +117,13 @@ export class AuthService {
       }
       userRole = UserRole.ADMIN;
 
-      // Generate a subdomain from restaurant name
-      const subdomain = registerDto.restaurantName
+      const baseSubdomain = registerDto.restaurantName
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '');
 
-      // Check if subdomain already exists, if so, append a random string
-      let finalSubdomain = subdomain;
-      const existingTenant = await this.prisma.tenant.findUnique({
-        where: { subdomain },
-      });
+      const finalSubdomain = await this.allocateSubdomain(baseSubdomain);
 
-      if (existingTenant) {
-        finalSubdomain = `${subdomain}-${Math.random().toString(36).substring(2, 8)}`;
-      }
-
-      // Get FREE plan
       const freePlan = await this.prisma.subscriptionPlan.findUnique({
         where: { name: 'FREE' },
       });
@@ -112,40 +132,51 @@ export class AuthService {
         throw new ResourceNotFoundException('FREE subscription plan');
       }
 
-      // Create new tenant with FREE subscription
-      const tenant = await this.prisma.tenant.create({
-        data: {
-          name: registerDto.restaurantName,
-          subdomain: finalSubdomain,
-          paymentRegion: registerDto.paymentRegion || 'INTERNATIONAL',
-          currentPlanId: freePlan.id,
-        },
-      });
-
-      // Create FREE subscription for new tenant
+      // Tenant + FREE subscription must be created atomically so other
+      // modules never observe a tenant without a matching subscription.
       const now = new Date();
       const currentPeriodEnd = new Date(now);
-      currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 10); // FREE plan never expires
+      currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 10);
 
-      await this.prisma.subscription.create({
-        data: {
-          tenantId: tenant.id,
-          planId: freePlan.id,
-          status: 'ACTIVE',
-          billingCycle: 'MONTHLY',
-          paymentProvider: 'EMAIL', // All subscriptions use contact-based flow
-          startDate: now,
-          currentPeriodStart: now,
-          currentPeriodEnd: currentPeriodEnd,
-          isTrialPeriod: false,
-          amount: 0,
-          currency: freePlan.currency,
-          autoRenew: true,
-          cancelAtPeriodEnd: false,
-        },
-      });
-
-      tenantId = tenant.id;
+      try {
+        const tenant = await this.prisma.$transaction(async (tx) => {
+          const created = await tx.tenant.create({
+            data: {
+              name: registerDto.restaurantName,
+              subdomain: finalSubdomain,
+              paymentRegion: registerDto.paymentRegion || 'INTERNATIONAL',
+              currentPlanId: freePlan.id,
+            },
+          });
+          await tx.subscription.create({
+            data: {
+              tenantId: created.id,
+              planId: freePlan.id,
+              status: 'ACTIVE',
+              billingCycle: 'MONTHLY',
+              paymentProvider: 'EMAIL',
+              startDate: now,
+              currentPeriodStart: now,
+              currentPeriodEnd,
+              isTrialPeriod: false,
+              amount: 0,
+              currency: freePlan.currency,
+              autoRenew: true,
+              cancelAtPeriodEnd: false,
+            },
+          });
+          return created;
+        });
+        tenantId = tenant.id;
+      } catch (err) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2002'
+        ) {
+          throw new ResourceAlreadyExistsException('Tenant', 'subdomain', finalSubdomain);
+        }
+        throw err;
+      }
     }
     // Scenario 2: Joining an existing restaurant
     else {
@@ -355,6 +386,7 @@ export class AuthService {
         role: true,
         status: true,
         tenantId: true,
+        tenant: { select: { status: true } },
       },
     });
 
@@ -370,13 +402,19 @@ export class AuthService {
       throw new UnauthorizedException('User account is inactive');
     }
 
+    // Block login if the tenant was suspended/deleted by SuperAdmin — the
+    // user-level `status` flag is unrelated to tenant lifecycle.
+    if (user.tenant?.status !== TenantStatus.ACTIVE) {
+      throw new UnauthorizedException('Your restaurant account is not active');
+    }
+
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
       return null;
     }
 
-    const { password: _, ...result } = user;
+    const { password: _, tenant: __, ...result } = user;
     return result;
   }
 
@@ -400,6 +438,7 @@ export class AuthService {
           role: true,
           status: true,
           tenantId: true,
+          tenant: { select: { status: true } },
         },
       });
 
@@ -407,7 +446,12 @@ export class AuthService {
         throw new UnauthorizedException('User not found or inactive');
       }
 
-      return this.generateTokens(user);
+      if (user.tenant?.status !== TenantStatus.ACTIVE) {
+        throw new UnauthorizedException('Your restaurant account is not active');
+      }
+
+      const { tenant: _t, ...userForToken } = user;
+      return this.generateTokens(userForToken);
     } catch (error) {
       throw new UnauthorizedException('Invalid refresh token');
     }
@@ -1034,20 +1078,11 @@ export class AuthService {
       ? `${firstName}'s Restaurant`
       : `Restaurant ${email.split('@')[0]}`;
 
-    // Generate subdomain
     const baseSubdomain = restaurantName
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
-
-    let subdomain = baseSubdomain;
-    const existingTenant = await this.prisma.tenant.findUnique({
-      where: { subdomain },
-    });
-
-    if (existingTenant) {
-      subdomain = `${baseSubdomain}-${Math.random().toString(36).substring(2, 8)}`;
-    }
+    const subdomain = await this.allocateSubdomain(baseSubdomain);
 
     // Get FREE plan
     const freePlan = await this.prisma.subscriptionPlan.findUnique({
@@ -1058,62 +1093,72 @@ export class AuthService {
       throw new ResourceNotFoundException('FREE subscription plan');
     }
 
-    // Create tenant
-    const tenant = await this.prisma.tenant.create({
-      data: {
-        name: restaurantName,
-        subdomain,
-        paymentRegion: 'INTERNATIONAL',
-        currentPlanId: freePlan.id,
-      },
-    });
-
-    // Create FREE subscription
     const now = new Date();
     const currentPeriodEnd = new Date(now);
     currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 10);
 
-    await this.prisma.subscription.create({
-      data: {
-        tenantId: tenant.id,
-        planId: freePlan.id,
-        status: 'ACTIVE',
-        billingCycle: 'MONTHLY',
-        paymentProvider: 'EMAIL',
-        startDate: now,
-        currentPeriodStart: now,
-        currentPeriodEnd,
-        isTrialPeriod: false,
-        amount: 0,
-        currency: freePlan.currency,
-        autoRenew: true,
-        cancelAtPeriodEnd: false,
-      },
-    });
-
-    // Create user as ADMIN
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        password: '', // No password for social auth users
-        firstName,
-        lastName,
-        role: UserRole.ADMIN,
-        tenantId: tenant.id,
-        googleId,
-        appleId,
-        authProvider,
-        emailVerified: true, // Email is verified by OAuth provider
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        tenantId: true,
-      },
-    });
+    // Tenant + subscription + user in one transaction so a failure midway
+    // does not leave orphaned rows.
+    let user;
+    try {
+      user = await this.prisma.$transaction(async (tx) => {
+        const tenant = await tx.tenant.create({
+          data: {
+            name: restaurantName,
+            subdomain,
+            paymentRegion: 'INTERNATIONAL',
+            currentPlanId: freePlan.id,
+          },
+        });
+        await tx.subscription.create({
+          data: {
+            tenantId: tenant.id,
+            planId: freePlan.id,
+            status: 'ACTIVE',
+            billingCycle: 'MONTHLY',
+            paymentProvider: 'EMAIL',
+            startDate: now,
+            currentPeriodStart: now,
+            currentPeriodEnd,
+            isTrialPeriod: false,
+            amount: 0,
+            currency: freePlan.currency,
+            autoRenew: true,
+            cancelAtPeriodEnd: false,
+          },
+        });
+        return tx.user.create({
+          data: {
+            email,
+            password: '',
+            firstName,
+            lastName,
+            role: UserRole.ADMIN,
+            tenantId: tenant.id,
+            googleId,
+            appleId,
+            authProvider,
+            emailVerified: true,
+          },
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            tenantId: true,
+          },
+        });
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        throw new ResourceAlreadyExistsException('Tenant', 'subdomain', subdomain);
+      }
+      throw err;
+    }
 
     // Track new social auth registration in Sentry
     Sentry.captureMessage(`New user registered via ${authProvider}: ${email}`, {

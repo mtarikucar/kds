@@ -46,6 +46,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         role: true,
         status: true,
         tenantId: true,
+        tenant: { select: { status: true } },
       },
     });
 
@@ -53,6 +54,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User not found or inactive');
     }
 
-    return user;
+    // Block access when the restaurant was suspended/deleted — tenant-level
+    // lifecycle is independent of per-user status.
+    if (user.tenant?.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Your restaurant account is not active');
+    }
+
+    const { tenant: _tenant, ...result } = user;
+    return result;
   }
 }

@@ -99,6 +99,35 @@ export class EmailService {
   }
 
   /**
+   * Send a short plain-text email without a Handlebars template.
+   * Use only for transactional system notices (status changes, etc.) where
+   * a bespoke template would be overkill.
+   */
+  async sendPlainEmail(to: string, subject: string, body: string): Promise<boolean> {
+    try {
+      if (!this.transporter) {
+        this.logger.log(`[EMAIL MOCK] To: ${to}`);
+        this.logger.log(`[EMAIL MOCK] Subject: ${subject}`);
+        this.logger.log(`[EMAIL MOCK] Body: ${body}`);
+        return true;
+      }
+      const from =
+        this.configService.get<string>('EMAIL_FROM') ||
+        this.configService.get<string>('EMAIL_USER');
+      await this.transporter.sendMail({
+        from: `"${this.configService.get<string>('APP_NAME', 'HummyTummy')}" <${from}>`,
+        to,
+        subject,
+        text: body,
+      });
+      return true;
+    } catch (error) {
+      this.logger.error(`Failed to send plain email to ${to}:`, error);
+      return false;
+    }
+  }
+
+  /**
    * Compile Handlebars template
    */
   private async compileTemplate(

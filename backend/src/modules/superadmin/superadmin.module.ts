@@ -26,10 +26,12 @@ import {
 // Guards & Strategies
 import { SuperAdminGuard } from './guards/superadmin.guard';
 import { SuperAdminJwtStrategy } from './strategies/superadmin-jwt.strategy';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
     PassportModule,
+    NotificationsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

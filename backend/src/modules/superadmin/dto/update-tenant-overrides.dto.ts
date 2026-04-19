@@ -1,29 +1,89 @@
-import { IsOptional, IsObject, ValidateNested } from 'class-validator';
+import {
+  IsOptional,
+  ValidateNested,
+  IsBoolean,
+  IsInt,
+  Min,
+} from 'class-validator';
 import { Type } from 'class-transformer';
+
+export class FeatureOverridesDto {
+  @IsOptional()
+  @IsBoolean()
+  advancedReports?: boolean | null;
+
+  @IsOptional()
+  @IsBoolean()
+  multiLocation?: boolean | null;
+
+  @IsOptional()
+  @IsBoolean()
+  customBranding?: boolean | null;
+
+  @IsOptional()
+  @IsBoolean()
+  apiAccess?: boolean | null;
+
+  @IsOptional()
+  @IsBoolean()
+  prioritySupport?: boolean | null;
+
+  @IsOptional()
+  @IsBoolean()
+  inventoryTracking?: boolean | null;
+
+  @IsOptional()
+  @IsBoolean()
+  kdsIntegration?: boolean | null;
+
+  @IsOptional()
+  @IsBoolean()
+  reservationSystem?: boolean | null;
+
+  @IsOptional()
+  @IsBoolean()
+  personnelManagement?: boolean | null;
+
+  @IsOptional()
+  @IsBoolean()
+  deliveryIntegration?: boolean | null;
+}
+
+export class LimitOverridesDto {
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  maxUsers?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  maxTables?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  maxProducts?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  maxCategories?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  maxMonthlyOrders?: number | null;
+}
 
 export class UpdateTenantOverridesDto {
   @IsOptional()
-  @IsObject()
-  featureOverrides?: {
-    advancedReports?: boolean | null;
-    multiLocation?: boolean | null;
-    customBranding?: boolean | null;
-    apiAccess?: boolean | null;
-    prioritySupport?: boolean | null;
-    inventoryTracking?: boolean | null;
-    kdsIntegration?: boolean | null;
-    reservationSystem?: boolean | null;
-    personnelManagement?: boolean | null;
-    deliveryIntegration?: boolean | null;
-  };
+  @ValidateNested()
+  @Type(() => FeatureOverridesDto)
+  featureOverrides?: FeatureOverridesDto;
 
   @IsOptional()
-  @IsObject()
-  limitOverrides?: {
-    maxUsers?: number | null;
-    maxTables?: number | null;
-    maxProducts?: number | null;
-    maxCategories?: number | null;
-    maxMonthlyOrders?: number | null;
-  };
+  @ValidateNested()
+  @Type(() => LimitOverridesDto)
+  limitOverrides?: LimitOverridesDto;
 }
