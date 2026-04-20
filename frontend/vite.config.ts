@@ -68,6 +68,14 @@ export default defineConfig({
   // Environment variables
   envPrefix: ['VITE_', 'TAURI_'],
 
+  esbuild: {
+    // Strip console.* and debugger in production builds. POS/KDS/customer
+    // socket hooks collectively log ~70 console statements containing
+    // orderId, tableId, customer phone, bill totals — fine in dev, PII in
+    // a shared browser in prod.
+    drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : [],
+  },
+
   build: {
     // Tauri uses Chromium on Windows and WebKit on macOS and Linux
     // For web builds (non-Tauri), use modern target that supports BigInt
