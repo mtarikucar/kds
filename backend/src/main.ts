@@ -11,6 +11,7 @@ const cookieParser = require('cookie-parser');
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { initSentry } from './sentry.config';
 import { validateEnv } from './common/helpers/env-validation';
+import { RedisIoAdapter } from './common/adapters/redis-io.adapter';
 
 // Fail-fast env validation BEFORE Sentry / Nest touches anything. Missing
 // JWT_SECRET etc. used to surface as a first-request 500; now they abort.
@@ -117,6 +118,16 @@ async function bootstrap() {
       },
     }),
   );
+
+  // Socket.IO Redis adapter for multi-replica broadcast correctness. When
+  // REDIS_URL is absent we fall back to the in-memory adapter with a warn
+  // log so single-node dev keeps working. Every emit in the codebase uses
+  // `server.to('<room>').emit(...)` which with the default adapter ONLY
+  // reaches sockets on the same replica — horizontal scale-out silently
+  // loses half the events.
+  const redisAdapter = new RedisIoAdapter(app);
+  await redisAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisAdapter);
 
   // Nest calls onModuleDestroy on SIGTERM/SIGINT so Prisma and Redis clients
   // drain cleanly on k8s rolling restarts. Without this, connections leak.
