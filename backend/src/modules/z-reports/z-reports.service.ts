@@ -679,11 +679,22 @@ export class ZReportsService {
     tenantId: string,
     userId: string,
   ): Promise<{ reportId: string; emailSent: boolean }> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Use tenant-timezone startOfDay so the existence check matches the row
+    // generateReport actually writes. A server-local midnight here would
+    // miss for every non-UTC tenant and every scheduler tick within the
+    // closing-window would throw "Z-Report already exists for this date".
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { timezone: true, reportEmailEnabled: true, reportEmails: true },
+    });
+    const timezone = tenant?.timezone || 'UTC';
+    const { startOfDay } = this.computeDayBoundsInTimezone(
+      new Date().toISOString(),
+      timezone,
+    );
 
     const existing = await this.prisma.zReport.findFirst({
-      where: { tenantId, reportDate: today },
+      where: { tenantId, reportDate: startOfDay },
     });
 
     let report = existing;
@@ -692,7 +703,7 @@ export class ZReportsService {
         tenantId,
         userId,
         {
-          reportDate: today.toISOString(),
+          reportDate: startOfDay.toISOString(),
           cashDrawerOpening: 0,
           cashDrawerClosing: 0,
           notes: 'Auto-generated end-of-day report (system-generated; manual close-of-day required for fiscal finalization)',
@@ -701,7 +712,6 @@ export class ZReportsService {
       );
     }
 
-    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
     let emailSent = false;
     if (tenant?.reportEmailEnabled && tenant.reportEmails?.length > 0) {
       const result = await this.sendReportEmail(report.id, tenantId);

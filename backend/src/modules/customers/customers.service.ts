@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/customer.dto';
@@ -97,9 +102,27 @@ export class CustomersService {
   }
 
   async remove(id: string, tenantId: string) {
-    const result = await this.prisma.customer.deleteMany({ where: { id, tenantId } });
-    if (result.count !== 1) throw new NotFoundException('Customer not found');
-    return { id, deleted: true };
+    try {
+      const result = await this.prisma.customer.deleteMany({ where: { id, tenantId } });
+      if (result.count !== 1) throw new NotFoundException('Customer not found');
+      return { id, deleted: true };
+    } catch (err) {
+      // LoyaltyTransaction.customer onDelete is Restrict (migration
+      // 20260420180000) so a customer who has earned points cannot be
+      // hard-deleted — the audit trail would vanish. Translate the P2003
+      // to a clear 409 instead of bubbling up as an opaque 500; the admin
+      // UI should steer operators toward the anonymize/soft-delete flow
+      // (tracked as a deferred follow-up).
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2003'
+      ) {
+        throw new ConflictException(
+          'Cannot delete a customer with loyalty history. Anonymize the record instead.',
+        );
+      }
+      throw err;
+    }
   }
 
   /**

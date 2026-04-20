@@ -113,14 +113,22 @@ export class ZReportSchedulerService {
       // Match if current time is within 0-14 minutes after closing time
       const minutesSinceClosing = currentTimeInMinutes - closingTimeInMinutes;
       if (minutesSinceClosing >= 0 && minutesSinceClosing < 15) {
-        // Check if we haven't already sent a report today
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+        // Check if we haven't already sent a report today IN THE TENANT'S
+        // TIMEZONE. ZReportsService.generateReport writes `reportDate` as
+        // the tenant-local midnight instant; using server-local midnight
+        // here would miss-match for any non-UTC tenant and the scheduler
+        // would then re-enter generateReport every 15min during the
+        // closing window, each time throwing a BadRequestException that
+        // polluted the error logs.
+        const tenantTzMidnight = this.getTenantMidnight(
+          now,
+          tenant.timezone || 'UTC',
+        );
 
         const existingReport = await this.prisma.zReport.findFirst({
           where: {
             tenantId: tenant.id,
-            reportDate: today,
+            reportDate: tenantTzMidnight,
             emailSent: true,
           },
         });
@@ -137,8 +145,52 @@ export class ZReportSchedulerService {
   }
 
   /**
-   * Convert a date to a specific timezone
+   * UTC instant representing "today at 00:00" in the tenant's timezone.
+   * Mirrors ZReportsService.computeDayBoundsInTimezone so the scheduler's
+   * "already sent?" lookup hits the row that generateReport actually
+   * created. Uses Intl.DateTimeFormat + offset correction; falls back to
+   * server-local midnight on an unknown tz string.
    */
+  private getTenantMidnight(now: Date, timezone: string): Date {
+    try {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(now);
+      const y = parseInt(parts.find((p) => p.type === 'year')?.value ?? '1970', 10);
+      const m = parseInt(parts.find((p) => p.type === 'month')?.value ?? '1', 10);
+      const d = parseInt(parts.find((p) => p.type === 'day')?.value ?? '1', 10);
+      const approx = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
+      const probe = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        hour12: false,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }).formatToParts(approx);
+      const get = (t: string) => parseInt(probe.find((p) => p.type === t)?.value ?? '0', 10);
+      const zonedAsUtc = Date.UTC(
+        get('year'),
+        get('month') - 1,
+        get('day'),
+        get('hour') % 24,
+        get('minute'),
+        get('second'),
+      );
+      const offset = zonedAsUtc - approx.getTime();
+      return new Date(approx.getTime() - offset);
+    } catch {
+      const fallback = new Date(now);
+      fallback.setHours(0, 0, 0, 0);
+      return fallback;
+    }
+  }
+
   private getTimeInTimezone(date: Date, timezone: string): Date {
     try {
       const options: Intl.DateTimeFormatOptions = {

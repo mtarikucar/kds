@@ -54,10 +54,13 @@ export const useMarketingAuthStore = create<MarketingAuthState>()(
     }),
     {
       name: 'marketing-auth-storage',
+      // Tokens (both access AND refresh) stay in memory only — persisting
+      // either makes XSS a session-takeover primitive for a long-term
+      // (30-day) stolen refresh. Matches the SuperAdmin store's stance.
+      // On reload we rely on the persisted `user` flag to show the shell
+      // and re-auth via /api/marketing/auth/refresh.
       partialize: (state) => ({
         user: state.user,
-        accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
       }),
     }

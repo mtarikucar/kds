@@ -483,6 +483,7 @@ export class AuthService {
         role: true,
         status: true,
         tenantId: true,
+        tokenVersion: true,
         tenant: { select: { status: true } },
       },
     });
@@ -494,13 +495,27 @@ export class AuthService {
       throw new UnauthorizedException('Your restaurant account is not active');
     }
 
+    // Refresh tokens must also respect tokenVersion revocation. Previously
+    // a password reset bumped tokenVersion and expired the ACCESS tokens,
+    // but a stolen refresh token could still mint fresh access tokens with
+    // the new version stamp. Reject the refresh if the stamp in the token
+    // predates the current version.
+    const refreshVer = (payload as any).ver ?? 0;
+    if (refreshVer !== user.tokenVersion) {
+      await this.prisma.refreshToken.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      throw new UnauthorizedException('Token has been revoked');
+    }
+
     // Revoke the rotated-out token, issue a new pair.
     await this.prisma.refreshToken.update({
       where: { id: stored.id },
       data: { revokedAt: new Date() },
     });
 
-    const { tenant: _t, ...userForToken } = user;
+    const { tenant: _t, tokenVersion: _ver, ...userForToken } = user;
     return this.generateTokens(userForToken, ip, userAgent);
   }
 

@@ -36,21 +36,11 @@ async function bootstrap() {
     app.set('trust proxy', 1);
   }
 
-  // Tighter default JSON body limit on everything EXCEPT the webhook /
-  // upload routes which legitimately need larger payloads. 10MB was a DoS
-  // vector on every POST handler.
-  app.use(
-    bodyParser.json({
-      limit: '100kb',
-      verify: (req: any, _res, buf) => {
-        req.rawBody = buf;
-      },
-    }),
-  );
-  app.use(bodyParser.urlencoded({ limit: '100kb', extended: true }));
-
-  // Webhook endpoints receive signed payloads from external platforms that
-  // can carry full order bodies; allow more here but still bounded.
+  // Body parsers: register path-scoped FIRST so the generic 100KB parser
+  // doesn't match /api/webhooks first (body-parser no-ops on already-parsed
+  // req; the registration order defines the limit). Delivery-platform
+  // webhooks legitimately carry full order bodies (Yemeksepeti line items
+  // can top 200KB); the generic path stays tight to block DoS.
   app.use(
     '/api/webhooks',
     bodyParser.json({
@@ -60,6 +50,15 @@ async function bootstrap() {
       },
     }),
   );
+  app.use(
+    bodyParser.json({
+      limit: '100kb',
+      verify: (req: any, _res, buf) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
+  app.use(bodyParser.urlencoded({ limit: '100kb', extended: true }));
   app.use(cookieParser());
 
   app.use(

@@ -3,9 +3,19 @@ import { persist } from 'zustand/middleware';
 import { User } from '../types';
 
 /**
- * The refresh token is now kept server-side in an httpOnly cookie
- * (set at /api/auth/* by the backend), not in this store. Only the
- * short-lived access token lives here.
+ * Auth store with a split-persistence model:
+ *
+ * - `accessToken` is held in memory ONLY (never persisted). An XSS on the
+ *   admin origin cannot drain the token out of localStorage because it
+ *   isn't there. On reload the SPA calls /api/auth/refresh with the
+ *   httpOnly refresh cookie to mint a fresh access token.
+ *
+ * - `user` + `isAuthenticated` ARE persisted so the app can render the
+ *   authenticated shell immediately on boot (skeleton UI, correct nav)
+ *   while the refresh-token handshake runs. These don't carry credentials.
+ *
+ * - The refresh token itself lives server-side in an httpOnly cookie set
+ *   by /api/auth/*; it never touches JavaScript.
  */
 interface AuthState {
   user: User | null;
@@ -50,9 +60,9 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'auth-storage',
+      // Deliberately NOT persisting accessToken — memory only.
       partialize: (state) => ({
         user: state.user,
-        accessToken: state.accessToken,
         isAuthenticated: state.isAuthenticated,
       }),
     },

@@ -31,12 +31,15 @@ const CORE_SECRETS = [
 
 const RULES: EnvRule[] = [
   { key: 'DATABASE_URL', required: true, minLength: 10 },
-  // JWT realms — all must be present + unique + >= 32 chars
+  // JWT realms — presence is enforced in every environment. Length + cross-realm
+  // uniqueness are enforced only in production so dev setups with the short
+  // .env.example placeholders don't fail to boot. Operators still get a
+  // very-clear error if they ship placeholders to production.
   ...CORE_SECRETS.map((k) => ({
     key: k,
     required: true,
-    minLength: 32,
-    distinctFrom: CORE_SECRETS.filter((x) => x !== k),
+    minLength: IS_PROD ? 32 : undefined,
+    distinctFrom: IS_PROD ? CORE_SECRETS.filter((x) => x !== k) : undefined,
   })),
   // Production-only
   { key: 'CORS_ORIGIN', required: true, prodOnly: true },
@@ -45,6 +48,7 @@ const RULES: EnvRule[] = [
 
 export function validateEnv(): void {
   const errors: string[] = [];
+  const warnings: string[] = [];
 
   for (const rule of RULES) {
     if (rule.prodOnly && !IS_PROD) continue;
@@ -61,6 +65,10 @@ export function validateEnv(): void {
       errors.push(
         `${rule.key} must be at least ${rule.minLength} characters (got ${value.length})`,
       );
+    } else if (!IS_PROD && value.length < 32 && CORE_SECRETS.includes(rule.key)) {
+      warnings.push(
+        `${rule.key} is ${value.length} chars — OK for dev, but < 32 chars will abort boot in production`,
+      );
     }
 
     if (rule.distinctFrom) {
@@ -74,10 +82,17 @@ export function validateEnv(): void {
     }
   }
 
+  if (warnings.length > 0) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `\n[env-validation] warnings (dev mode — production would fail):\n  - ${warnings.join('\n  - ')}\n`,
+    );
+  }
+
   // Placeholder detection — catch .env.example leaking into real envs.
   const placeholders = [
-    'your-super-secret-jwt-key-change-in-production',
-    'your-super-secret-refresh-key',
+    'your-super-secret-jwt-key-change-in-production-32chars',
+    'your-super-secret-refresh-key-change-in-production',
     'change-me-32-chars-minimum-superadmin-jwt-secret',
     'change-me-32-chars-minimum-superadmin-refresh-secret',
     'change-me-32-chars-minimum-at-rest-encryption-key',
