@@ -33,16 +33,30 @@ export class ZReportsService {
     private emailService: EmailService,
   ) {}
 
-  async generateReport(tenantId: string, userId: string, createDto: CreateZReportDto) {
+  async generateReport(
+    tenantId: string,
+    userId: string,
+    createDto: CreateZReportDto,
+    options: { systemGenerated?: boolean } = {},
+  ) {
     const { reportDate, cashDrawerOpening, cashDrawerClosing, notes } = createDto;
+    const systemGenerated = options.systemGenerated === true;
 
-    const startOfDay = new Date(reportDate);
-    startOfDay.setHours(0, 0, 0, 0);
+    // Day boundaries are computed in the tenant's timezone so a UTC server
+    // reporting a tenant's "today" doesn't include orders from the last
+    // 3 hours of the prior local day (or drop the first 3 hours of the
+    // current local day). Falls back to UTC if tenant has no timezone set.
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { timezone: true },
+    });
+    const timezone = tenant?.timezone || 'UTC';
+    const { startOfDay, endOfDay } = this.computeDayBoundsInTimezone(
+      reportDate,
+      timezone,
+    );
 
-    const endOfDay = new Date(reportDate);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    const reportNumber = `Z-${startOfDay.toISOString().slice(0, 10).replace(/-/g, '')}`;
+    const reportNumber = `Z-${this.yyyymmddInTimezone(reportDate, timezone)}`;
 
     try {
       return await this.prisma.$transaction(
@@ -142,10 +156,24 @@ export class ZReportsService {
             ? new Prisma.Decimal(openChecksAgg._sum.finalAmount)
             : new Prisma.Decimal(0);
 
-          const opening = new Prisma.Decimal(cashDrawerOpening);
-          const closing = new Prisma.Decimal(cashDrawerClosing);
-          const expectedCash = opening.add(cashPayments);
-          const cashDifference = closing.sub(expectedCash);
+          // For scheduler-generated reports we don't have real counted
+          // cash in the drawer — so we zero out the opening/closing/
+          // difference rather than writing a phantom shortage equal to
+          // the full day's cash takings. Human admins must close the
+          // day manually to populate these fields with real numbers;
+          // until then the report is an informational snapshot.
+          const opening = systemGenerated
+            ? new Prisma.Decimal(0)
+            : new Prisma.Decimal(cashDrawerOpening);
+          const closing = systemGenerated
+            ? new Prisma.Decimal(0)
+            : new Prisma.Decimal(cashDrawerClosing);
+          const expectedCash = systemGenerated
+            ? new Prisma.Decimal(0)
+            : opening.add(cashPayments);
+          const cashDifference = systemGenerated
+            ? new Prisma.Decimal(0)
+            : closing.sub(expectedCash);
 
           const productSales = new Map<
             string,
@@ -190,6 +218,8 @@ export class ZReportsService {
               reportDate: startOfDay,
               reportNumber,
               closedById: userId,
+              systemGenerated,
+              closingType: systemGenerated ? 'AUTOMATIC' : 'MANUAL',
 
               totalOrders,
               totalSales: grossSales,
@@ -385,6 +415,15 @@ export class ZReportsService {
     if (report.isFinalized) {
       throw new BadRequestException('Report is already finalized');
     }
+    if (report.systemGenerated) {
+      // Auto-generated snapshots don't have real cash-drawer numbers;
+      // finalizing one would lock in zeroes as the fiscal record. Admin
+      // must regenerate via the manual close-of-day flow with actual
+      // opening/closing counted cash before finalization is allowed.
+      throw new BadRequestException(
+        'System-generated reports cannot be finalized. Create a manual close-of-day instead.',
+      );
+    }
 
     const payloadHash = this.computePayloadHash(report);
 
@@ -402,6 +441,93 @@ export class ZReportsService {
       throw new ConflictException('Report was concurrently finalized');
     }
     return this.findOne(id, tenantId);
+  }
+
+  /**
+   * Compute the UTC instants that bound a given local date in a tenant's
+   * timezone. "YYYY-MM-DD in Istanbul" maps to the 24-hour window starting
+   * at 00:00 Istanbul time (which is 21:00 UTC the previous day) and
+   * ending at 23:59:59.999 Istanbul time. Built with Intl.DateTimeFormat
+   * to avoid pulling in a TZ library; falls back to server-local on
+   * unknown tz strings.
+   */
+  private computeDayBoundsInTimezone(
+    reportDateIso: string,
+    timezone: string,
+  ): { startOfDay: Date; endOfDay: Date } {
+    try {
+      const ymd = this.yyyymmddInTimezone(reportDateIso, timezone);
+      const year = parseInt(ymd.slice(0, 4), 10);
+      const month = parseInt(ymd.slice(4, 6), 10);
+      const day = parseInt(ymd.slice(6, 8), 10);
+
+      const startOfDay = this.zonedMoment(year, month, day, 0, 0, 0, timezone);
+      const endOfDay = new Date(
+        this.zonedMoment(year, month, day, 23, 59, 59, timezone).getTime() + 999,
+      );
+      return { startOfDay, endOfDay };
+    } catch {
+      const fallback = new Date(reportDateIso);
+      const startOfDay = new Date(fallback);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(fallback);
+      endOfDay.setHours(23, 59, 59, 999);
+      return { startOfDay, endOfDay };
+    }
+  }
+
+  /** YYYYMMDD string for a date as rendered in a specific timezone. */
+  private yyyymmddInTimezone(iso: string, timezone: string): string {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(new Date(iso));
+    const y = parts.find((p) => p.type === 'year')?.value ?? '1970';
+    const m = parts.find((p) => p.type === 'month')?.value ?? '01';
+    const d = parts.find((p) => p.type === 'day')?.value ?? '01';
+    return `${y}${m}${d}`;
+  }
+
+  /**
+   * Resolve a tenant-local wall-clock (year, month, day, hour, minute, second)
+   * to the UTC Date that represents that instant. We iterate once because
+   * tz offsets can differ by DST around the target date.
+   */
+  private zonedMoment(
+    year: number,
+    month: number,
+    day: number,
+    hour: number,
+    minute: number,
+    second: number,
+    timezone: string,
+  ): Date {
+    // Approximate via UTC then correct for the zone offset.
+    const approx = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour12: false,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    }).formatToParts(approx);
+    const get = (t: string) =>
+      parseInt(parts.find((p) => p.type === t)?.value ?? '0', 10);
+    const zonedAsUtc = Date.UTC(
+      get('year'),
+      get('month') - 1,
+      get('day'),
+      get('hour') % 24,
+      get('minute'),
+      get('second'),
+    );
+    const offset = zonedAsUtc - approx.getTime();
+    return new Date(approx.getTime() - offset);
   }
 
   private computePayloadHash(report: any): string {
@@ -562,12 +688,17 @@ export class ZReportsService {
 
     let report = existing;
     if (!report) {
-      report = await this.generateReport(tenantId, userId, {
-        reportDate: today.toISOString(),
-        cashDrawerOpening: 0,
-        cashDrawerClosing: 0,
-        notes: 'Auto-generated end-of-day report',
-      });
+      report = await this.generateReport(
+        tenantId,
+        userId,
+        {
+          reportDate: today.toISOString(),
+          cashDrawerOpening: 0,
+          cashDrawerClosing: 0,
+          notes: 'Auto-generated end-of-day report (system-generated; manual close-of-day required for fiscal finalization)',
+        },
+        { systemGenerated: true },
+      );
     }
 
     const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });

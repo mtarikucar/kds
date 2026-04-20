@@ -6,6 +6,7 @@ import { ZReportsService } from '../z-reports.service';
 @Injectable()
 export class ZReportSchedulerService {
   private readonly logger = new Logger(ZReportSchedulerService.name);
+  private isRunning = false;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -13,29 +14,55 @@ export class ZReportSchedulerService {
   ) {}
 
   /**
-   * Check every 15 minutes for tenants at their closing time
-   * and generate/send Z-Reports automatically
+   * Check every 15 minutes for tenants at their closing time and
+   * generate/send Z-Reports automatically. Protected by a postgres
+   * advisory lock so horizontally-scaled replicas don't race each
+   * other on the same tenants and emit duplicate fiscal reports /
+   * duplicate emails. Matches the stock-alerts / delivery-polling
+   * / subscription-scheduler pattern already in use.
    */
   @Cron('*/15 * * * *', { name: 'z-report-email-check' })
   async handleZReportEmails() {
-    this.logger.log('Checking for tenants at closing time...');
-
+    if (this.isRunning) return;
+    this.isRunning = true;
     try {
-      const tenantsAtClosingTime = await this.getTenantsAtClosingTime();
-
-      if (tenantsAtClosingTime.length === 0) {
-        this.logger.debug('No tenants at closing time');
+      const [{ locked }] = await this.prisma.$queryRawUnsafe<
+        { locked: boolean }[]
+      >(`SELECT pg_try_advisory_lock(${this.lockId('z-report-scheduler')}) AS locked`);
+      if (!locked) {
+        this.logger.debug('Another replica holds the z-report scheduler lock');
         return;
       }
 
-      this.logger.log(`Found ${tenantsAtClosingTime.length} tenant(s) at closing time`);
+      try {
+        const tenantsAtClosingTime = await this.getTenantsAtClosingTime();
+        if (tenantsAtClosingTime.length === 0) return;
 
-      for (const tenant of tenantsAtClosingTime) {
-        await this.processEndOfDayReport(tenant);
+        this.logger.log(`Found ${tenantsAtClosingTime.length} tenant(s) at closing time`);
+        for (const tenant of tenantsAtClosingTime) {
+          await this.processEndOfDayReport(tenant);
+        }
+      } finally {
+        await this.prisma.$queryRawUnsafe(
+          `SELECT pg_advisory_unlock(${this.lockId('z-report-scheduler')})`,
+        );
       }
-    } catch (error) {
-      this.logger.error(`Failed to process Z-Report emails: ${error.message}`, error.stack);
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to process Z-Report emails: ${error.message}`,
+        error.stack,
+      );
+    } finally {
+      this.isRunning = false;
     }
+  }
+
+  private lockId(name: string): number {
+    let hash = 5381;
+    for (let i = 0; i < name.length; i += 1) {
+      hash = ((hash << 5) + hash + name.charCodeAt(i)) | 0;
+    }
+    return hash;
   }
 
   /**
