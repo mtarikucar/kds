@@ -1,5 +1,6 @@
-import { Module, NestModule, MiddlewareConsumer, RequestMethod } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
@@ -37,7 +38,6 @@ import { PersonnelModule } from './modules/personnel/personnel.module';
 import { StockManagementModule } from './modules/stock-management/stock-management.module';
 import { MarketingModule } from './modules/marketing/marketing.module';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
-import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './common/middleware/input-sanitizer.middleware';
 
 @Module({
   imports: [
@@ -45,22 +45,26 @@ import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './co
       isGlobal: true,
       envFilePath: '.env',
     }),
-    // Rate limiting protection
+    // Single root-level scheduler. Previously `ScheduleModule.forRoot()` was
+    // called in z-reports, delivery-platforms, public-stats, and subscriptions
+    // submodules. Nest tolerated it but every replica still runs every job;
+    // leader-election / distributed locks live in the schedulers themselves.
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRoot([
       {
         name: 'short',
-        ttl: 1000, // 1 second
-        limit: 10, // 10 requests per second
+        ttl: 1000,
+        limit: 10,
       },
       {
         name: 'medium',
-        ttl: 10000, // 10 seconds
-        limit: 50, // 50 requests per 10 seconds
+        ttl: 10000,
+        limit: 50,
       },
       {
         name: 'long',
-        ttl: 60000, // 1 minute
-        limit: 100, // 100 requests per minute
+        ttl: 60000,
+        limit: 100,
       },
     ]),
     PrismaModule,
@@ -99,7 +103,6 @@ import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './co
   controllers: [AppController],
   providers: [
     AppService,
-    // Global rate limiting guard
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
@@ -108,20 +111,11 @@ import { InputSanitizerMiddleware, SqlInjectionPreventionMiddleware } from './co
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    // Apply request logger to all routes
+    // InputSanitizerMiddleware (HTML-escape every request string) and
+    // SqlInjectionPreventionMiddleware (regex pattern theater; Prisma is
+    // parameterized anyway) were removed — they corrupted legitimate input
+    // (O'Brien → O&#x27;Brien, OAuth codes, Apple JWTs) and raised
+    // false-positive 400s on every apostrophe.
     consumer.apply(RequestLoggerMiddleware).forRoutes('*');
-
-    // Apply SQL injection check BEFORE sanitization (so URLs aren't escaped yet)
-    // Exclude desktop CI endpoints from input sanitization (they use API key auth and need raw URLs)
-    consumer
-      .apply(SqlInjectionPreventionMiddleware, InputSanitizerMiddleware)
-      .exclude(
-        { path: 'desktop/ci/releases', method: RequestMethod.POST },
-        { path: 'desktop/ci/releases/:id/publish', method: RequestMethod.POST },
-        // Delivery platform webhooks receive raw payloads from external platforms
-        { path: 'webhooks/delivery/(.*)', method: RequestMethod.POST },
-        { path: 'webhooks/delivery/(.*)', method: RequestMethod.PUT },
-      )
-      .forRoutes('*');
   }
 }

@@ -189,6 +189,11 @@ model User {
   resetTokenHash   String?   @unique
   resetTokenExpiry DateTime?
 
+  // Session revocation: JWT payload carries `ver`; incrementing this field
+  // invalidates every access token issued before the bump. Used on password
+  // reset / suspicious-login / admin lockout.
+  tokenVersion     Int       @default(0)
+
   // Profile
   avatar    String?
   phone     String?
@@ -1030,7 +1035,9 @@ model ApiKey {
 
   // API Key details
   name        String   // User-friendly name (e.g., "Production API", "Mobile App")
-  key         String   @unique  // The actual API key (should be hashed in production)
+  // SHA-256 hash of the issued key. The plaintext is shown to the user once
+  // at creation and never stored; lookup uses keyHash only.
+  keyHash     String   @unique
   keyPrefix   String   // First few characters for identification (e.g., "pk_live_...")
 
   // Permissions & Scopes
@@ -1055,7 +1062,6 @@ model ApiKey {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId])
-  @@index([key])
   @@index([isActive])
   @@map("api_keys")
 }

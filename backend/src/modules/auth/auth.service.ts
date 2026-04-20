@@ -525,12 +525,20 @@ export class AuthService {
     ip?: string,
     userAgent?: string,
   ): Promise<AuthResponseDto> {
+    // Read current tokenVersion so the access token carries the stamp the
+    // JwtStrategy validates against. Bumping User.tokenVersion invalidates
+    // every prior access token for that user.
+    const row = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { tokenVersion: true },
+    });
     const payload = {
       sub: user.id,
       email: user.email,
       role: user.role,
       tenantId: user.tenantId,
       type: 'user' as const,
+      ver: row?.tokenVersion ?? 0,
     };
 
     const accessToken = this.jwtService.sign(payload, {

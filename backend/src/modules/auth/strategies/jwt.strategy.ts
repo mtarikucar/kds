@@ -10,6 +10,9 @@ export interface JwtPayload {
   role: string;
   tenantId: string;
   type?: 'user';
+  /** Token-version stamp. Incrementing User.tokenVersion invalidates every
+   * previously-issued access token. Omitted on legacy tokens — treated as 0. */
+  ver?: number;
 }
 
 @Injectable()
@@ -31,7 +34,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: JwtPayload) {
-    // Reject tokens from other realms (marketing, superadmin) that happen to share the secret.
     if (payload.type && payload.type !== 'user') {
       throw new UnauthorizedException('Invalid token type');
     }
@@ -46,6 +48,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         role: true,
         status: true,
         tenantId: true,
+        tokenVersion: true,
         tenant: { select: { status: true } },
       },
     });
@@ -54,13 +57,19 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User not found or inactive');
     }
 
-    // Block access when the restaurant was suspended/deleted — tenant-level
-    // lifecycle is independent of per-user status.
     if (user.tenant?.status !== 'ACTIVE') {
       throw new UnauthorizedException('Your restaurant account is not active');
     }
 
-    const { tenant: _tenant, ...result } = user;
+    // Token revocation check. Tokens issued before the current tokenVersion
+    // are rejected so password-reset / admin-lockout / suspicious-login
+    // handlers can invalidate all live sessions by bumping the counter.
+    const tokenVer = payload.ver ?? 0;
+    if (tokenVer !== user.tokenVersion) {
+      throw new UnauthorizedException('Token has been revoked');
+    }
+
+    const { tenant: _tenant, tokenVersion: _ver, ...result } = user;
     return result;
   }
 }
