@@ -13,9 +13,16 @@ import {
 } from '../constants/platform-status-map';
 import { PlatformLogDirection, PlatformLogAction } from '../constants/platform.enum';
 
+/** Maximum number of tenants to poll in parallel per tick. */
+const CONCURRENCY = 10;
+
 @Injectable()
 export class OrderPollingScheduler {
   private readonly logger = new Logger(OrderPollingScheduler.name);
+  // Nest `@Interval` schedules the next tick N ms after the previous
+  // fired (not after it completed). If a tick overruns, the next one
+  // would run concurrently and race against itself — this flag skips it.
+  private isRunning = false;
 
   constructor(
     private prisma: PrismaService,
@@ -26,28 +33,63 @@ export class OrderPollingScheduler {
     private logService: DeliveryLogService,
   ) {}
 
-  @Interval(15_000) // Run every 15 seconds
+  @Interval(15_000)
   async pollOrders() {
-    // Get all enabled configs for polling-based platforms
+    if (this.isRunning) {
+      return;
+    }
+    this.isRunning = true;
+    try {
+      // Advisory lock across replicas so horizontal scaling doesn't
+      // double-poll the platforms (and double-bill our API quotas).
+      const [{ locked }] = await this.prisma.$queryRawUnsafe<{ locked: boolean }[]>(
+        `SELECT pg_try_advisory_lock(${this.lockId('order-polling')}) AS locked`,
+      );
+      if (!locked) return;
+
+      try {
+        await this.runOnce();
+      } finally {
+        await this.prisma.$queryRawUnsafe(
+          `SELECT pg_advisory_unlock(${this.lockId('order-polling')})`,
+        );
+      }
+    } finally {
+      this.isRunning = false;
+    }
+  }
+
+  private lockId(name: string): number {
+    let hash = 5381;
+    for (let i = 0; i < name.length; i += 1) {
+      hash = ((hash << 5) + hash + name.charCodeAt(i)) | 0;
+    }
+    return hash;
+  }
+
+  private async runOnce() {
     const configs = await this.prisma.deliveryPlatformConfig.findMany({
       where: {
         isEnabled: true,
+        deletedAt: null,
         platform: { in: [...POLLING_PLATFORMS] },
         errorCount: { lt: CIRCUIT_BREAKER_THRESHOLD },
       },
     });
 
-    for (const config of configs) {
-      // Respect per-platform minimum intervals
+    // Respect per-platform cadence and poll the remaining configs with
+    // bounded concurrency.
+    const eligible = configs.filter((config) => {
       const minInterval = PLATFORM_POLL_INTERVALS[config.platform] || 15_000;
-      if (
-        config.lastOrderPollAt &&
-        Date.now() - config.lastOrderPollAt.getTime() < minInterval
-      ) {
-        continue;
-      }
+      return (
+        !config.lastOrderPollAt ||
+        Date.now() - config.lastOrderPollAt.getTime() >= minInterval
+      );
+    });
 
-      await this.pollPlatform(config);
+    for (let i = 0; i < eligible.length; i += CONCURRENCY) {
+      const batch = eligible.slice(i, i + CONCURRENCY);
+      await Promise.allSettled(batch.map((c) => this.pollPlatform(c)));
     }
   }
 
@@ -56,19 +98,16 @@ export class OrderPollingScheduler {
     if (!adapter.pollNewOrders) return;
 
     try {
-      // Ensure valid token
       const freshConfig = await this.authService.ensureValidToken(config.id);
       if (!freshConfig) return;
 
       const orders = await adapter.pollNewOrders(freshConfig);
 
-      // Update last poll time and reset error count on success
       await this.configService.updateLastPollTime(config.id);
       if (config.errorCount > 0) {
         await this.configService.resetErrorCount(config.id);
       }
 
-      // Process each new order
       for (const normalizedOrder of orders) {
         try {
           await this.orderService.processIncomingOrder(
@@ -85,7 +124,7 @@ export class OrderPollingScheduler {
             direction: PlatformLogDirection.INBOUND,
             action: PlatformLogAction.ORDER_RECEIVED,
             externalId: normalizedOrder.externalOrderId,
-            request: normalizedOrder.rawPayload,
+            request: this.logService.scrubPii(normalizedOrder.rawPayload),
             success: false,
             error: error.message,
             nextRetryAt: new Date(Date.now() + 30_000),

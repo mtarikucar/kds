@@ -14,7 +14,8 @@ export const useLogin = () => {
       return response.data;
     },
     onSuccess: (data) => {
-      login(data.user, data.accessToken, data.refreshToken);
+      // refresh token is stored by the backend as an httpOnly cookie
+      login(data.user, data.accessToken);
       toast.success(i18n.t('common:notifications.loginSuccessful'));
     },
     onError: (error: any) => {
@@ -115,7 +116,7 @@ export const useResetPassword = () => {
 
 export const useChangePassword = () => {
   return useMutation({
-    mutationFn: async (data: { oldPassword: string; newPassword: string }): Promise<{ message: string }> => {
+    mutationFn: async (data: { currentPassword: string; newPassword: string }): Promise<{ message: string }> => {
       const response = await api.post('/auth/change-password', data);
       return response.data;
     },
@@ -132,8 +133,8 @@ export const useVerifyEmail = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (code: string): Promise<{ message: string; verified: boolean }> => {
-      const response = await api.post('/auth/verify-email', { code });
+    mutationFn: async (data: { email: string; code: string }): Promise<{ message: string; verified: boolean }> => {
+      const response = await api.post('/auth/verify-email', data);
       return response.data;
     },
     onSuccess: () => {
@@ -172,7 +173,7 @@ export const useGoogleAuth = () => {
       return response.data;
     },
     onSuccess: (data) => {
-      login(data.user, data.accessToken, data.refreshToken);
+      login(data.user, data.accessToken);
       toast.success(i18n.t('common:notifications.googleLoginSuccessful'));
     },
     onError: (error: any) => {
@@ -191,7 +192,7 @@ export const useAppleAuth = () => {
       return response.data;
     },
     onSuccess: (data) => {
-      login(data.user, data.accessToken, data.refreshToken);
+      login(data.user, data.accessToken);
       toast.success(i18n.t('common:notifications.appleLoginSuccessful'));
     },
     onError: (error: any) => {

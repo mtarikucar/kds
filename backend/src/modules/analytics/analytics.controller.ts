@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
   Request,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -361,6 +362,14 @@ export class AnalyticsController {
 
   // ==================== MOCK DATA ENDPOINTS (DEV ONLY) ====================
 
+  private assertNotProduction() {
+    if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException(
+        'Mock data endpoints are disabled in production',
+      );
+    }
+  }
+
   @Post('mock-data/generate')
   @Roles(UserRole.ADMIN)
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
@@ -371,6 +380,7 @@ export class AnalyticsController {
     @Request() req,
     @Query('days') days?: string,
   ) {
+    this.assertNotProduction();
     const daysNum = days ? parseInt(days, 10) : 7;
     return this.mockDataService.generateAllMockData(req.tenantId, daysNum);
   }
@@ -381,6 +391,7 @@ export class AnalyticsController {
   @ApiOperation({ summary: 'Clear all analytics data (development only)' })
   @ApiResponse({ status: 200, description: 'Data cleared' })
   async clearMockData(@Request() req) {
+    this.assertNotProduction();
     await this.mockDataService.clearAnalyticsData(req.tenantId);
     return { success: true };
   }

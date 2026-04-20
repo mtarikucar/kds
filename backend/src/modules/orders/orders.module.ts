@@ -7,13 +7,16 @@ import { PrismaModule } from '../../prisma/prisma.module';
 import { CustomersModule } from '../customers/customers.module';
 import { SmsSettingsModule } from '../sms-settings/sms-settings.module';
 import { AccountingModule } from '../accounting/accounting.module';
+import { KdsModule } from '../kds/kds.module';
+import { DeliveryPlatformsModule } from '../delivery-platforms/delivery-platforms.module';
+import { StockManagementModule } from '../stock-management/stock-management.module';
 
 @Module({
   imports: [
     PrismaModule,
-    forwardRef(() => import('../kds/kds.module').then(m => m.KdsModule)),
-    forwardRef(() => import('../delivery-platforms/delivery-platforms.module').then(m => m.DeliveryPlatformsModule)),
-    forwardRef(() => import('../stock-management/stock-management.module').then(m => m.StockManagementModule)),
+    forwardRef(() => KdsModule),
+    forwardRef(() => DeliveryPlatformsModule),
+    forwardRef(() => StockManagementModule),
     CustomersModule,
     SmsSettingsModule,
     AccountingModule,

@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AdapterFactory } from '../adapters/adapter-factory';
 import { DeliveryLogService } from './delivery-log.service';
@@ -159,6 +159,18 @@ export class DeliveryMenuSyncService {
     externalItemId: string,
     externalData?: any,
   ) {
+    // Tenant-scoped product check: without this, an admin in tenantA
+    // could supply a tenantB productId and silently create a
+    // cross-tenant mapping (FKs allow it since products are one global
+    // table).
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, tenantId },
+      select: { id: true },
+    });
+    if (!product) {
+      throw new NotFoundException('Product not found in this tenant');
+    }
+
     return this.prisma.menuItemMapping.create({
       data: {
         tenantId,

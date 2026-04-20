@@ -2,29 +2,145 @@ import {
   Injectable,
   UnauthorizedException,
   BadRequestException,
+  ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
+import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../../../prisma/prisma.service';
 import {
   SuperAdminLoginDto,
   SuperAdminLoginResponseDto,
 } from '../dto/login.dto';
-import { Verify2FADto, Setup2FAResponseDto, Enable2FADto } from '../dto/verify-2fa.dto';
+import {
+  Verify2FADto,
+  Setup2FAResponseDto,
+  Enable2FADto,
+} from '../dto/verify-2fa.dto';
 import { SuperAdminAuditService } from './superadmin-audit.service';
 import { AuditAction, EntityType } from '../dto/audit-filter.dto';
 
+/**
+ * TOTP time window. 1 = accept the current 30s step plus one on each
+ * side (so ~90s of drift tolerance), which matches Google's recommended
+ * hardening and is the default for speakeasy. The prior `window: 4`
+ * (≈4.5 minutes) made sniffed codes usable for far too long.
+ */
+const TOTP_WINDOW = 1;
+
+/** Once a TOTP step is accepted we refuse to accept it again for this
+ * many milliseconds, killing naive replay of a sniffed code. Should
+ * cover the generous edge of `TOTP_WINDOW`. */
+const TOTP_REPLAY_LOCK_MS = 90_000;
+
+const BACKUP_CODE_COUNT = 10;
+const BACKUP_CODE_BYTES = 5; // 10 hex chars per code
+
 @Injectable()
 export class SuperAdminAuthService {
+  private readonly logger = new Logger(SuperAdminAuthService.name);
+
   constructor(
     private prisma: PrismaService,
     private jwtService: JwtService,
     private configService: ConfigService,
     private auditService: SuperAdminAuditService,
   ) {}
+
+  private hashSecret(value: string): string {
+    return createHash('sha256').update(value).digest('hex');
+  }
+
+  private bcryptCost(): number {
+    const raw = this.configService.get<string>('BCRYPT_COST');
+    const parsed = raw ? parseInt(raw, 10) : NaN;
+    return Number.isFinite(parsed) && parsed >= 10 && parsed <= 15 ? parsed : 12;
+  }
+
+  /**
+   * Verify a TOTP code against the stored secret, refusing replay of a
+   * code whose step has already been accepted within the replay window.
+   * Returns the accepted step on success so the caller can persist it.
+   */
+  private async verifyTotp(
+    superAdmin: {
+      id: string;
+      twoFactorSecret: string | null;
+      lastTotpStep: bigint | null;
+      lastTotpStepExpiresAt: Date | null;
+    },
+    token: string,
+    secret?: string,
+  ): Promise<boolean> {
+    const effectiveSecret = secret ?? superAdmin.twoFactorSecret;
+    if (!effectiveSecret) return false;
+
+    const delta = speakeasy.totp.verifyDelta({
+      secret: effectiveSecret,
+      encoding: 'base32',
+      token,
+      window: TOTP_WINDOW,
+    });
+    if (!delta) return false;
+
+    // TOTP steps are 30s and anchored at unix epoch.
+    const step = BigInt(Math.floor(Date.now() / 30_000) + delta.delta);
+
+    // Reject replay of a step we've already accepted within the lock.
+    if (
+      superAdmin.lastTotpStep != null &&
+      superAdmin.lastTotpStepExpiresAt &&
+      superAdmin.lastTotpStepExpiresAt > new Date() &&
+      superAdmin.lastTotpStep === step
+    ) {
+      return false;
+    }
+
+    await this.prisma.superAdmin.update({
+      where: { id: superAdmin.id },
+      data: {
+        lastTotpStep: step,
+        lastTotpStepExpiresAt: new Date(Date.now() + TOTP_REPLAY_LOCK_MS),
+      },
+    });
+    return true;
+  }
+
+  private async verifyBackupCode(
+    superAdmin: { id: string; backupCodes: string[] },
+    code: string,
+  ): Promise<boolean> {
+    const normalized = code.replace(/\s+/g, '').toLowerCase();
+    if (!normalized) return false;
+    const hash = this.hashSecret(normalized);
+    if (!superAdmin.backupCodes.includes(hash)) return false;
+    // Burn the used code.
+    await this.prisma.superAdmin.update({
+      where: { id: superAdmin.id },
+      data: {
+        backupCodes: superAdmin.backupCodes.filter((c) => c !== hash),
+      },
+    });
+    return true;
+  }
+
+  private generateBackupCodes(): {
+    plaintext: string[];
+    hashed: string[];
+  } {
+    const plaintext: string[] = [];
+    const hashed: string[] = [];
+    for (let i = 0; i < BACKUP_CODE_COUNT; i += 1) {
+      const code = randomBytes(BACKUP_CODE_BYTES).toString('hex');
+      plaintext.push(code);
+      hashed.push(this.hashSecret(code));
+    }
+    return { plaintext, hashed };
+  }
 
   async login(
     loginDto: SuperAdminLoginDto,
@@ -41,7 +157,6 @@ export class SuperAdminAuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Check if account is locked
     if (superAdmin.lockedUntil && superAdmin.lockedUntil > new Date()) {
       const remainingMinutes = Math.ceil(
         (superAdmin.lockedUntil.getTime() - Date.now()) / 60000,
@@ -51,44 +166,50 @@ export class SuperAdminAuthService {
       );
     }
 
-    // Check if account is active
     if (superAdmin.status !== 'ACTIVE') {
       throw new UnauthorizedException('Account is inactive');
     }
 
-    // Verify password
     const isPasswordValid = await bcrypt.compare(password, superAdmin.password);
-
     if (!isPasswordValid) {
-      // Increment failed login attempts
       const failedLogins = superAdmin.failedLogins + 1;
-      const updateData: any = { failedLogins };
-
-      // Lock account after 5 failed attempts for 30 minutes
+      const updateData: { failedLogins: number; lockedUntil?: Date } = { failedLogins };
       if (failedLogins >= 5) {
         const lockUntil = new Date();
         lockUntil.setMinutes(lockUntil.getMinutes() + 30);
         updateData.lockedUntil = lockUntil;
       }
-
       await this.prisma.superAdmin.update({
         where: { id: superAdmin.id },
         data: updateData,
       });
-
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Reset failed login attempts on successful password verification
+    // 2FA is MANDATORY for superadmins. If an account doesn't yet have
+    // 2FA enabled, refuse the login and direct ops to provision it
+    // out-of-band (seed script or an authenticated superadmin's
+    // user-management flow). This kills the old "password -> self-enroll
+    // -> full access" bootstrap.
+    if (!superAdmin.twoFactorEnabled) {
+      await this.auditService.log({
+        action: AuditAction.LOGIN,
+        entityType: EntityType.SUPER_ADMIN,
+        entityId: superAdmin.id,
+        actorId: superAdmin.id,
+        actorEmail: superAdmin.email,
+        metadata: { ip, userAgent, reason: '2fa_not_enabled' },
+      });
+      throw new ForbiddenException(
+        'Two-factor authentication is required. Contact platform ops to provision 2FA for this account.',
+      );
+    }
+
     await this.prisma.superAdmin.update({
       where: { id: superAdmin.id },
-      data: {
-        failedLogins: 0,
-        lockedUntil: null,
-      },
+      data: { failedLogins: 0, lockedUntil: null },
     });
 
-    // Generate temporary token for 2FA verification or setup
     const tempToken = this.jwtService.sign(
       {
         sub: superAdmin.id,
@@ -101,26 +222,7 @@ export class SuperAdminAuthService {
       },
     );
 
-    // Check if 2FA is enabled
-    if (superAdmin.twoFactorEnabled) {
-      return {
-        requiresTwoFactor: true,
-        tempToken,
-      };
-    }
-
-    // If 2FA is not enabled, return temp token to set up 2FA
-    return {
-      requiresTwoFactor: false,
-      requires2FASetup: true,
-      tempToken,
-      superAdmin: {
-        id: superAdmin.id,
-        email: superAdmin.email,
-        firstName: superAdmin.firstName,
-        lastName: superAdmin.lastName,
-      },
-    };
+    return { requiresTwoFactor: true, tempToken };
   }
 
   async verify2FA(
@@ -130,163 +232,142 @@ export class SuperAdminAuthService {
   ): Promise<SuperAdminLoginResponseDto> {
     const { tempToken, code } = verify2FADto;
 
+    let payload: any;
     try {
-      const payload = this.jwtService.verify(tempToken, {
+      payload = this.jwtService.verify(tempToken, {
         secret: this.configService.get<string>('SUPERADMIN_JWT_SECRET'),
       });
-
-      if (payload.type !== 'superadmin-2fa-pending') {
-        throw new UnauthorizedException('Invalid token');
-      }
-
-      const superAdmin = await this.prisma.superAdmin.findUnique({
-        where: { id: payload.sub },
-      });
-
-      if (!superAdmin || !superAdmin.twoFactorSecret) {
-        throw new UnauthorizedException('Invalid credentials');
-      }
-
-      // Verify TOTP code with wider window for time sync issues
-      const isValid = speakeasy.totp.verify({
-        secret: superAdmin.twoFactorSecret,
-        encoding: 'base32',
-        token: code,
-        window: 1,
-      });
-
-      if (!isValid) {
-        throw new UnauthorizedException('Invalid 2FA code');
-      }
-
-      // Update last login
-      await this.prisma.superAdmin.update({
-        where: { id: superAdmin.id },
-        data: {
-          lastLogin: new Date(),
-          lastLoginIp: ip,
-        },
-      });
-
-      // Log successful login
-      await this.auditService.log({
-        action: AuditAction.LOGIN,
-        entityType: EntityType.SUPER_ADMIN,
-        entityId: superAdmin.id,
-        actorId: superAdmin.id,
-        actorEmail: superAdmin.email,
-        metadata: { ip, userAgent },
-      });
-
-      return this.generateTokens(superAdmin);
-    } catch (error) {
-      if (error instanceof UnauthorizedException) {
-        throw error;
-      }
+    } catch {
       throw new UnauthorizedException('Invalid or expired token');
     }
+    if (payload.type !== 'superadmin-2fa-pending') {
+      throw new UnauthorizedException('Invalid token');
+    }
+
+    const superAdmin = await this.prisma.superAdmin.findUnique({
+      where: { id: payload.sub },
+    });
+    if (!superAdmin || !superAdmin.twoFactorEnabled || !superAdmin.twoFactorSecret) {
+      throw new UnauthorizedException('Invalid credentials');
+    }
+
+    // Accept either a TOTP code or one of the stored backup codes.
+    const isTotp = await this.verifyTotp(
+      {
+        id: superAdmin.id,
+        twoFactorSecret: superAdmin.twoFactorSecret,
+        lastTotpStep: superAdmin.lastTotpStep,
+        lastTotpStepExpiresAt: superAdmin.lastTotpStepExpiresAt,
+      },
+      code,
+    );
+    const isBackup = isTotp
+      ? false
+      : await this.verifyBackupCode(
+          { id: superAdmin.id, backupCodes: superAdmin.backupCodes },
+          code,
+        );
+    if (!isTotp && !isBackup) {
+      throw new UnauthorizedException('Invalid 2FA code');
+    }
+
+    await this.prisma.superAdmin.update({
+      where: { id: superAdmin.id },
+      data: { lastLogin: new Date(), lastLoginIp: ip },
+    });
+
+    await this.auditService.log({
+      action: AuditAction.LOGIN,
+      entityType: EntityType.SUPER_ADMIN,
+      entityId: superAdmin.id,
+      actorId: superAdmin.id,
+      actorEmail: superAdmin.email,
+      metadata: { ip, userAgent, backupCodeUsed: isBackup },
+    });
+
+    return this.generateTokens({
+      ...superAdmin,
+      tokenVersion: superAdmin.tokenVersion,
+    });
   }
 
+  /**
+   * Self-service 2FA setup for an already-authenticated superadmin.
+   * Stores the new secret as `pendingTwoFactorSecret` so the live secret
+   * is only replaced after the first valid TOTP confirms it.
+   */
   async setup2FA(superAdminId: string): Promise<Setup2FAResponseDto> {
     const superAdmin = await this.prisma.superAdmin.findUnique({
       where: { id: superAdminId },
     });
-
     if (!superAdmin) {
       throw new UnauthorizedException('SuperAdmin not found');
     }
 
-    return this.generateAndStore2FASecret(superAdmin);
-  }
-
-  async setup2FAWithToken(tempToken: string): Promise<Setup2FAResponseDto> {
-    try {
-      const payload = this.jwtService.verify(tempToken, {
-        secret: this.configService.get<string>('SUPERADMIN_JWT_SECRET'),
-      });
-
-      if (payload.type !== 'superadmin-2fa-pending') {
-        throw new UnauthorizedException('Invalid token');
-      }
-
-      const superAdmin = await this.prisma.superAdmin.findUnique({
-        where: { id: payload.sub },
-      });
-
-      if (!superAdmin) {
-        throw new UnauthorizedException('SuperAdmin not found');
-      }
-
-      return this.generateAndStore2FASecret(superAdmin);
-    } catch (error) {
-      if (error instanceof UnauthorizedException) {
-        throw error;
-      }
-      throw new UnauthorizedException('Invalid or expired token');
-    }
-  }
-
-  private async generateAndStore2FASecret(
-    superAdmin: { id: string; email: string },
-  ): Promise<Setup2FAResponseDto> {
-    // Generate secret
     const secret = speakeasy.generateSecret({
       name: `KDS SuperAdmin (${superAdmin.email})`,
       issuer: 'KDS',
       length: 32,
     });
 
-    // Store secret temporarily (will be confirmed when enabling 2FA)
     await this.prisma.superAdmin.update({
       where: { id: superAdmin.id },
-      data: {
-        twoFactorSecret: secret.base32,
-      },
+      data: { pendingTwoFactorSecret: secret.base32 },
     });
 
-    // Generate QR code
-    const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url);
+    const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url!);
 
     return {
       secret: secret.base32,
       qrCodeUrl,
-      otpauthUrl: secret.otpauth_url,
+      otpauthUrl: secret.otpauth_url!,
     };
   }
 
+  /**
+   * Confirm the pending 2FA secret (promoting it to the live secret),
+   * generate fresh backup codes, and bump tokenVersion so any sessions
+   * that existed before this change are invalidated. Returns the raw
+   * backup codes exactly once — the caller must save them.
+   */
   async enable2FA(
     superAdminId: string,
     enable2FADto: Enable2FADto,
-  ): Promise<{ message: string }> {
+  ): Promise<{ message: string; backupCodes: string[] }> {
     const superAdmin = await this.prisma.superAdmin.findUnique({
       where: { id: superAdminId },
     });
-
-    if (!superAdmin || !superAdmin.twoFactorSecret) {
+    if (!superAdmin || !superAdmin.pendingTwoFactorSecret) {
       throw new BadRequestException('Please set up 2FA first');
     }
 
-    // Verify the code with wider window for time sync issues
-    const isValid = speakeasy.totp.verify({
-      secret: superAdmin.twoFactorSecret,
-      encoding: 'base32',
-      token: enable2FADto.code,
-      window: 1,
-    });
-
+    const isValid = await this.verifyTotp(
+      {
+        id: superAdmin.id,
+        twoFactorSecret: superAdmin.pendingTwoFactorSecret,
+        lastTotpStep: superAdmin.lastTotpStep,
+        lastTotpStepExpiresAt: superAdmin.lastTotpStepExpiresAt,
+      },
+      enable2FADto.code,
+      superAdmin.pendingTwoFactorSecret,
+    );
     if (!isValid) {
       throw new BadRequestException('Invalid verification code');
     }
 
-    // Enable 2FA
+    const { plaintext, hashed } = this.generateBackupCodes();
+
     await this.prisma.superAdmin.update({
       where: { id: superAdminId },
       data: {
+        twoFactorSecret: superAdmin.pendingTwoFactorSecret,
+        pendingTwoFactorSecret: null,
         twoFactorEnabled: true,
+        backupCodes: hashed,
+        tokenVersion: { increment: 1 },
       },
     });
 
-    // Log 2FA enabled
     await this.auditService.log({
       action: AuditAction.UPDATE,
       entityType: EntityType.SUPER_ADMIN,
@@ -296,72 +377,102 @@ export class SuperAdminAuthService {
       newData: { twoFactorEnabled: true },
     });
 
-    return { message: '2FA enabled successfully' };
+    return { message: '2FA enabled successfully', backupCodes: plaintext };
   }
 
-  async enable2FAWithToken(
-    tempToken: string,
+  /**
+   * Disable 2FA for the authenticated superadmin. Requires the current
+   * password + a current TOTP (or backup code) to reduce the damage if
+   * the session token is stolen.
+   */
+  async disable2FA(
+    superAdminId: string,
+    currentPassword: string,
     code: string,
-  ): Promise<SuperAdminLoginResponseDto> {
-    try {
-      const payload = this.jwtService.verify(tempToken, {
-        secret: this.configService.get<string>('SUPERADMIN_JWT_SECRET'),
-      });
-
-      if (payload.type !== 'superadmin-2fa-pending') {
-        throw new UnauthorizedException('Invalid token');
-      }
-
-      const superAdmin = await this.prisma.superAdmin.findUnique({
-        where: { id: payload.sub },
-      });
-
-      if (!superAdmin || !superAdmin.twoFactorSecret) {
-        throw new BadRequestException('Please set up 2FA first');
-      }
-
-      // Verify the code with wider window for time sync issues
-      const isValid = speakeasy.totp.verify({
-        secret: superAdmin.twoFactorSecret,
-        encoding: 'base32',
-        token: code,
-        window: 1,
-      });
-
-      if (!isValid) {
-        throw new BadRequestException('Invalid verification code');
-      }
-
-      // Enable 2FA
-      await this.prisma.superAdmin.update({
-        where: { id: superAdmin.id },
-        data: {
-          twoFactorEnabled: true,
-          lastLogin: new Date(),
-        },
-      });
-
-      // Log 2FA enabled
-      await this.auditService.log({
-        action: AuditAction.UPDATE,
-        entityType: EntityType.SUPER_ADMIN,
-        entityId: superAdmin.id,
-        actorId: superAdmin.id,
-        actorEmail: superAdmin.email,
-        newData: { twoFactorEnabled: true },
-      });
-
-      // Return tokens since 2FA is now enabled
-      return this.generateTokens(superAdmin);
-    } catch (error) {
-      if (
-        error instanceof UnauthorizedException ||
-        error instanceof BadRequestException
-      ) {
-        throw error;
-      }
-      throw new UnauthorizedException('Invalid or expired token');
+  ): Promise<{ message: string }> {
+    const superAdmin = await this.prisma.superAdmin.findUnique({
+      where: { id: superAdminId },
+    });
+    if (!superAdmin) {
+      throw new UnauthorizedException('SuperAdmin not found');
     }
+    if (!superAdmin.twoFactorEnabled) {
+      throw new BadRequestException('2FA is not enabled');
+    }
+    const passOk = await bcrypt.compare(currentPassword, superAdmin.password);
+    if (!passOk) {
+      throw new BadRequestException('Current password is incorrect');
+    }
+    const isTotp = await this.verifyTotp(
+      {
+        id: superAdmin.id,
+        twoFactorSecret: superAdmin.twoFactorSecret,
+        lastTotpStep: superAdmin.lastTotpStep,
+        lastTotpStepExpiresAt: superAdmin.lastTotpStepExpiresAt,
+      },
+      code,
+    );
+    const isBackup = isTotp
+      ? false
+      : await this.verifyBackupCode(
+          { id: superAdmin.id, backupCodes: superAdmin.backupCodes },
+          code,
+        );
+    if (!isTotp && !isBackup) {
+      throw new BadRequestException('Invalid verification code');
+    }
+
+    await this.prisma.superAdmin.update({
+      where: { id: superAdminId },
+      data: {
+        twoFactorSecret: null,
+        pendingTwoFactorSecret: null,
+        twoFactorEnabled: false,
+        backupCodes: [],
+        tokenVersion: { increment: 1 },
+      },
+    });
+
+    await this.auditService.log({
+      action: AuditAction.UPDATE,
+      entityType: EntityType.SUPER_ADMIN,
+      entityId: superAdminId,
+      actorId: superAdminId,
+      actorEmail: superAdmin.email,
+      newData: { twoFactorEnabled: false },
+    });
+
+    return { message: '2FA disabled successfully' };
+  }
+
+  async regenerateBackupCodes(
+    superAdminId: string,
+    code: string,
+  ): Promise<{ backupCodes: string[] }> {
+    const superAdmin = await this.prisma.superAdmin.findUnique({
+      where: { id: superAdminId },
+    });
+    if (!superAdmin || !superAdmin.twoFactorEnabled) {
+      throw new BadRequestException('2FA is not enabled');
+    }
+    const isTotp = await this.verifyTotp(
+      {
+        id: superAdmin.id,
+        twoFactorSecret: superAdmin.twoFactorSecret,
+        lastTotpStep: superAdmin.lastTotpStep,
+        lastTotpStepExpiresAt: superAdmin.lastTotpStepExpiresAt,
+      },
+      code,
+    );
+    if (!isTotp) {
+      throw new BadRequestException('Invalid verification code');
+    }
+    const { plaintext, hashed } = this.generateBackupCodes();
+    await this.prisma.superAdmin.update({
+      where: { id: superAdminId },
+      data: { backupCodes: hashed },
+    });
+    return { backupCodes: plaintext };
   }
 
   async logout(
@@ -372,6 +483,13 @@ export class SuperAdminAuthService {
     const superAdmin = await this.prisma.superAdmin.findUnique({
       where: { id: superAdminId },
       select: { email: true },
+    });
+
+    // Bump tokenVersion so any outstanding access/refresh tokens are
+    // invalidated on the next guard check.
+    await this.prisma.superAdmin.update({
+      where: { id: superAdminId },
+      data: { tokenVersion: { increment: 1 } },
     });
 
     if (superAdmin) {
@@ -391,27 +509,29 @@ export class SuperAdminAuthService {
   async refreshToken(
     refreshToken: string,
   ): Promise<SuperAdminLoginResponseDto> {
+    let payload: any;
     try {
-      const payload = this.jwtService.verify(refreshToken, {
+      payload = this.jwtService.verify(refreshToken, {
         secret: this.configService.get<string>('SUPERADMIN_JWT_REFRESH_SECRET'),
       });
-
-      if (payload.type !== 'superadmin-refresh') {
-        throw new UnauthorizedException('Invalid token type');
-      }
-
-      const superAdmin = await this.prisma.superAdmin.findUnique({
-        where: { id: payload.sub },
-      });
-
-      if (!superAdmin || superAdmin.status !== 'ACTIVE') {
-        throw new UnauthorizedException('SuperAdmin not found or inactive');
-      }
-
-      return this.generateTokens(superAdmin);
-    } catch (error) {
+    } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
+    if (payload.type !== 'superadmin-refresh') {
+      throw new UnauthorizedException('Invalid token type');
+    }
+
+    const superAdmin = await this.prisma.superAdmin.findUnique({
+      where: { id: payload.sub },
+    });
+    if (!superAdmin || superAdmin.status !== 'ACTIVE') {
+      throw new UnauthorizedException('SuperAdmin not found or inactive');
+    }
+    if (typeof payload.ver === 'number' && payload.ver !== superAdmin.tokenVersion) {
+      throw new UnauthorizedException('Session revoked');
+    }
+
+    return this.generateTokens(superAdmin);
   }
 
   private generateTokens(superAdmin: {
@@ -419,31 +539,29 @@ export class SuperAdminAuthService {
     email: string;
     firstName: string;
     lastName: string;
+    tokenVersion: number;
   }): SuperAdminLoginResponseDto {
+    const basePayload = {
+      sub: superAdmin.id,
+      email: superAdmin.email,
+      ver: superAdmin.tokenVersion,
+    };
     const accessToken = this.jwtService.sign(
-      {
-        sub: superAdmin.id,
-        email: superAdmin.email,
-        type: 'superadmin',
-      },
+      { ...basePayload, type: 'superadmin' },
       {
         secret: this.configService.get<string>('SUPERADMIN_JWT_SECRET'),
-        expiresIn: '1h', // Short-lived access token for security
+        expiresIn: '1h',
+        algorithm: 'HS256',
       },
     );
-
     const refreshToken = this.jwtService.sign(
-      {
-        sub: superAdmin.id,
-        email: superAdmin.email,
-        type: 'superadmin-refresh',
-      },
+      { ...basePayload, type: 'superadmin-refresh' },
       {
         secret: this.configService.get<string>('SUPERADMIN_JWT_REFRESH_SECRET'),
         expiresIn: '7d',
+        algorithm: 'HS256',
       },
     );
-
     return {
       requiresTwoFactor: false,
       accessToken,
@@ -457,19 +575,36 @@ export class SuperAdminAuthService {
     };
   }
 
+  /**
+   * Bootstrap helper intended to be invoked from a one-shot CLI / seed
+   * script, NOT from an HTTP handler. It refuses to run if any superadmin
+   * already exists. Generates a TOTP secret + backup codes alongside the
+   * account so first login can go straight through verify-2fa without
+   * going through any self-serve enrollment endpoint.
+   */
   async createInitialSuperAdmin(
     email: string,
     password: string,
     firstName: string,
     lastName: string,
-  ): Promise<{ id: string; email: string }> {
-    // Check if any superadmin exists
+  ): Promise<{
+    id: string;
+    email: string;
+    otpauthUrl: string;
+    backupCodes: string[];
+  }> {
     const existingCount = await this.prisma.superAdmin.count();
     if (existingCount > 0) {
       throw new BadRequestException('SuperAdmin already exists');
     }
 
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const hashedPassword = await bcrypt.hash(password, this.bcryptCost());
+    const secret = speakeasy.generateSecret({
+      name: `KDS SuperAdmin (${email})`,
+      issuer: 'KDS',
+      length: 32,
+    });
+    const { plaintext, hashed } = this.generateBackupCodes();
 
     const superAdmin = await this.prisma.superAdmin.create({
       data: {
@@ -478,14 +613,18 @@ export class SuperAdminAuthService {
         firstName,
         lastName,
         status: 'ACTIVE',
-        twoFactorEnabled: false, // Will need to set up 2FA on first login
+        twoFactorEnabled: true,
+        twoFactorSecret: secret.base32,
+        backupCodes: hashed,
       },
-      select: {
-        id: true,
-        email: true,
-      },
+      select: { id: true, email: true },
     });
 
-    return superAdmin;
+    return {
+      id: superAdmin.id,
+      email: superAdmin.email,
+      otpauthUrl: secret.otpauth_url!,
+      backupCodes: plaintext,
+    };
   }
 }

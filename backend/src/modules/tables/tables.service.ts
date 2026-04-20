@@ -157,27 +157,24 @@ export class TablesService {
   }
 
   async remove(id: string, tenantId: string) {
-    // Check if table exists and belongs to tenant
-    const table = await this.findOne(id, tenantId);
+    // Atomic remove: verify tenant ownership + count active orders + delete in
+    // a single transaction so an order created between the count and the
+    // delete can't orphan the FK.
+    return this.prisma.$transaction(async (tx) => {
+      const table = await tx.table.findFirst({ where: { id, tenantId } });
+      if (!table) throw new NotFoundException('Table not found');
 
-    // Check if table has active orders
-    const activeOrders = await this.prisma.order.count({
-      where: {
-        tableId: id,
-        status: {
-          notIn: [OrderStatus.PAID, OrderStatus.CANCELLED],
+      const activeOrders = await tx.order.count({
+        where: {
+          tableId: id,
+          tenantId,
+          status: { notIn: [OrderStatus.PAID, OrderStatus.CANCELLED] },
         },
-      },
-    });
-
-    if (activeOrders > 0) {
-      throw new ConflictException(
-        'Cannot delete table with active orders',
-      );
-    }
-
-    return this.prisma.table.delete({
-      where: { id },
+      });
+      if (activeOrders > 0) {
+        throw new ConflictException('Cannot delete table with active orders');
+      }
+      return tx.table.delete({ where: { id } });
     });
   }
 

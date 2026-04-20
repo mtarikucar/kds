@@ -144,7 +144,13 @@ export class RecipesService {
   }
 
   async remove(id: string, tenantId: string) {
-    await this.findOne(id, tenantId);
+    const recipe = await this.findOne(id, tenantId);
+    // Log loudly — deleting a recipe stops ingredient deduction for the
+    // bound product without any other signal.
+    const logger = new (await import('@nestjs/common')).Logger('RecipesService');
+    logger.warn(
+      `Recipe ${recipe.name ?? recipe.id} removed for product ${recipe.productId}; ingredient auto-deduction for this product has stopped.`,
+    );
     return this.prisma.recipe.delete({ where: { id } });
   }
 

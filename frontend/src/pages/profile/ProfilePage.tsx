@@ -81,7 +81,7 @@ const ProfilePage = () => {
 
   const onPasswordSubmit = (data: PasswordFormData) => {
     changePassword({
-      oldPassword: data.currentPassword,
+      currentPassword: data.currentPassword,
       newPassword: data.newPassword,
     }, {
       onSuccess: () => {

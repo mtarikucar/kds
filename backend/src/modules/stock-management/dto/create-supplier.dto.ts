@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEmail, IsBoolean, IsNumber, Min, IsArray, ValidateNested } from 'class-validator';
+import { IsString, IsOptional, IsEmail, IsBoolean, IsNumber, Min, IsArray, ValidateNested, Matches, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PartialType } from '@nestjs/swagger';
@@ -42,6 +42,8 @@ export class CreateSupplierDto {
   @ApiPropertyOptional({ description: 'Supplier phone' })
   @IsString()
   @IsOptional()
+  @MaxLength(20)
+  @Matches(/^\+?[0-9\s\-()]{6,}$/, { message: 'Invalid phone format' })
   phone?: string;
 
   @ApiPropertyOptional({ description: 'Supplier address' })

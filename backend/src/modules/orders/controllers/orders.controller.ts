@@ -92,19 +92,27 @@ export class OrdersController {
   @ApiQuery({ name: 'status', required: false, description: 'Filter by status (comma-separated for multiple: PENDING,PREPARING,READY)' })
   @ApiQuery({ name: 'startDate', required: false, description: 'Filter by start date (ISO format)' })
   @ApiQuery({ name: 'endDate', required: false, description: 'Filter by end date (ISO format)' })
-  @ApiResponse({ status: 200, description: 'List of all orders' })
+  @ApiQuery({ name: 'page', required: false, description: 'Page number (1-based, default 1)' })
+  @ApiQuery({ name: 'limit', required: false, description: 'Page size (default 100, max 500)' })
+  @ApiResponse({ status: 200, description: 'Paginated list of orders' })
   findAll(
     @Request() req,
     @Query('tableId') tableId?: string,
     @Query('status') status?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
   ) {
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
     const statuses = status ? status.split(',').map(s => s.trim()) as OrderStatus[] : undefined;
+    const pageNum = page ? Math.max(1, parseInt(page, 10) || 1) : 1;
+    const limitNum = limit ? parseInt(limit, 10) || 100 : 100;
 
-    return this.ordersService.findAll(req.tenantId, tableId, statuses, start, end);
+    const take = limitNum;
+    const skip = (pageNum - 1) * limitNum;
+    return this.ordersService.findAll(req.tenantId, tableId, statuses, start, end, take, skip);
   }
 
   @Get(':id')

@@ -31,11 +31,6 @@ export class CreateOrderItemDto {
   @IsOptional()
   notes?: string;
 
-  @ApiProperty({ description: 'Unit price at the time of order (server will override with DB price)' })
-  @IsNumber()
-  @Min(0)
-  unitPrice: number;
-
   @ApiPropertyOptional({ type: [OrderItemModifierDto], description: 'Selected modifiers for this item' })
   @IsArray()
   @ValidateNested({ each: true })

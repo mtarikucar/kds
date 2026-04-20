@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
 // Controllers
@@ -23,22 +22,40 @@ import {
   SuperAdminSubscriptionsService,
 } from './services';
 
-// Guards & Strategies
 import { SuperAdminGuard } from './guards/superadmin.guard';
-import { SuperAdminJwtStrategy } from './strategies/superadmin-jwt.strategy';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
   imports: [
-    PassportModule,
+    NotificationsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('SUPERADMIN_JWT_SECRET'),
-        signOptions: {
-          expiresIn: '1h',
-        },
-      }),
       inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const secret = configService.get<string>('SUPERADMIN_JWT_SECRET');
+        const refresh = configService.get<string>('SUPERADMIN_JWT_REFRESH_SECRET');
+        const tenant = configService.get<string>('JWT_SECRET');
+        if (!secret || !refresh) {
+          throw new Error(
+            'SUPERADMIN_JWT_SECRET and SUPERADMIN_JWT_REFRESH_SECRET must be configured',
+          );
+        }
+        if (secret.length < 32 || refresh.length < 32) {
+          throw new Error(
+            'SUPERADMIN_JWT_SECRET / SUPERADMIN_JWT_REFRESH_SECRET must be at least 32 chars',
+          );
+        }
+        if (secret === tenant || refresh === tenant) {
+          throw new Error(
+            'SUPERADMIN_JWT_SECRET must differ from the tenant JWT_SECRET',
+          );
+        }
+        return {
+          secret,
+          signOptions: { expiresIn: '1h', algorithm: 'HS256' },
+          verifyOptions: { algorithms: ['HS256'] },
+        };
+      },
     }),
   ],
   controllers: [
@@ -50,16 +67,13 @@ import { SuperAdminJwtStrategy } from './strategies/superadmin-jwt.strategy';
     SuperAdminAuditController,
   ],
   providers: [
-    // Services
     SuperAdminAuthService,
     SuperAdminAuditService,
     SuperAdminDashboardService,
     SuperAdminTenantsService,
     SuperAdminUsersService,
     SuperAdminSubscriptionsService,
-    // Guards & Strategies
     SuperAdminGuard,
-    SuperAdminJwtStrategy,
   ],
   exports: [
     SuperAdminAuthService,

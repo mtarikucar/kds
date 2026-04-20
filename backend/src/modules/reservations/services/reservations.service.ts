@@ -538,8 +538,24 @@ export class ReservationsService {
     return cancelled;
   }
 
-  async cancelPublic(id: string, tenantId: string) {
+  async cancelPublic(
+    tenantId: string,
+    id: string,
+    proof: { customerPhone: string; reservationNumber: string },
+  ) {
     await this.validateTenant(tenantId);
+
+    const matched = await this.prisma.reservation.findFirst({
+      where: {
+        id,
+        tenantId,
+        customerPhone: proof.customerPhone,
+        reservationNumber: proof.reservationNumber,
+      },
+    });
+    if (!matched) {
+      throw new NotFoundException('Reservation not found');
+    }
 
     const reservation = await this.findOne(id, tenantId);
     const settings = await this.settingsService.getOrCreate(tenantId);

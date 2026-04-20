@@ -1,19 +1,19 @@
-import { IsString, IsNotEmpty, IsOptional, IsEmail, IsNumber, Min, Max, MinLength } from 'class-validator';
+import { IsString, IsNotEmpty, IsOptional, IsEmail, IsUUID } from 'class-validator';
 
+/**
+ * Admin password is deliberately NOT part of this DTO. The conversion
+ * endpoint generates a random password for the new tenant admin and
+ * emails them a welcome message + reset link — sales staff must never
+ * hold plaintext credentials for customer accounts.
+ */
 export class ConvertLeadDto {
   @IsOptional()
-  @IsString()
+  @IsUUID()
   planId?: string;
 
   @IsOptional()
-  @IsString()
+  @IsUUID()
   offerId?: string;
-
-  @IsOptional()
-  @IsNumber()
-  @Min(0)
-  @Max(99999999.99)
-  commissionAmount?: number;
 
   @IsString()
   @IsNotEmpty()
@@ -21,11 +21,6 @@ export class ConvertLeadDto {
 
   @IsEmail()
   adminEmail: string;
-
-  @IsString()
-  @IsNotEmpty()
-  @MinLength(6)
-  adminPassword: string;
 
   @IsString()
   @IsNotEmpty()

@@ -403,8 +403,8 @@ export const usePosSocket = () => {
     socket.on('table:merged', handleTableMergeOrUnmerge);
     socket.on('table:unmerged', handleTableMergeOrUnmerge);
 
-    // Join POS room
-    socket.emit('join-pos');
+    // Room membership is decided server-side from the JWT role on connect;
+    // no inbound join/leave messages are needed.
 
     return () => {
       socket.off('connect', handleConnect);
@@ -420,7 +420,6 @@ export const usePosSocket = () => {
       socket.off('waiter-request:updated', handleWaiterRequestUpdated);
       socket.off('table:merged', handleTableMergeOrUnmerge);
       socket.off('table:unmerged', handleTableMergeOrUnmerge);
-      socket.emit('leave-pos');
       disconnectSocket();
     };
   }, [queryClient]);

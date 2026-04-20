@@ -97,6 +97,27 @@ export default defineConfig({
         '@tauri-apps/plugin-updater',
         '@tauri-apps/plugin-process',
       ],
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          if (id.includes('@huggingface/transformers') || id.includes('onnxruntime')) return 'ml';
+          if (id.includes('three') || id.includes('@react-three')) return 'three';
+          if (id.includes('konva')) return 'konva';
+          if (id.includes('leaflet')) return 'leaflet';
+          if (id.includes('@sentry')) return 'sentry';
+          if (id.includes('framer-motion')) return 'framer';
+          if (id.includes('i18next')) return 'i18n';
+          if (id.includes('@tanstack')) return 'query';
+          if (id.includes('@dnd-kit') || id.includes('@hello-pangea/dnd')) return 'dnd';
+          if (id.includes('react-hook-form') || id.includes('@hookform')) return 'form';
+          if (id.includes('react-joyride') || id.includes('react-floater') || id.includes('react-is')) return 'joyride';
+          if (id.includes('date-fns')) return 'date-fns';
+          if (id.includes('zod')) return 'zod';
+          if (id.includes('socket.io')) return 'socket';
+          return 'vendor';
+        },
+      },
     },
+    chunkSizeWarningLimit: 1000,
   },
 });

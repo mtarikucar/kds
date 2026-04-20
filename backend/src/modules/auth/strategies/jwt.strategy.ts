@@ -9,9 +9,9 @@ export interface JwtPayload {
   email: string;
   role: string;
   tenantId: string;
+  type?: 'user';
   /** Token-version stamp. Incrementing User.tokenVersion invalidates every
-   * previously-issued access/refresh token. Omitted on legacy tokens
-   * issued before this field was added — treated as 0. */
+   * previously-issued access token. Omitted on legacy tokens — treated as 0. */
   ver?: number;
 }
 
@@ -21,14 +21,23 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private configService: ConfigService,
     private prisma: PrismaService,
   ) {
+    const secret = configService.get<string>('JWT_SECRET');
+    if (!secret) {
+      throw new Error('JWT_SECRET is not configured');
+    }
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>('JWT_SECRET'),
+      secretOrKey: secret,
+      algorithms: ['HS256'],
     });
   }
 
   async validate(payload: JwtPayload) {
+    if (payload.type && payload.type !== 'user') {
+      throw new UnauthorizedException('Invalid token type');
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
       select: {
@@ -40,6 +49,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         status: true,
         tenantId: true,
         tokenVersion: true,
+        tenant: { select: { status: true } },
       },
     });
 
@@ -47,16 +57,19 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User not found or inactive');
     }
 
-    // Token revocation check: password reset / admin lockout / suspicious-
-    // login bumps User.tokenVersion, invalidating every token issued
-    // before the bump. Legacy tokens without `ver` default to 0, matching
-    // the default column value so existing sessions don't break.
+    if (user.tenant?.status !== 'ACTIVE') {
+      throw new UnauthorizedException('Your restaurant account is not active');
+    }
+
+    // Token revocation check. Tokens issued before the current tokenVersion
+    // are rejected so password-reset / admin-lockout / suspicious-login
+    // handlers can invalidate all live sessions by bumping the counter.
     const tokenVer = payload.ver ?? 0;
     if (tokenVer !== user.tokenVersion) {
       throw new UnauthorizedException('Token has been revoked');
     }
 
-    const { tokenVersion: _v, ...result } = user;
+    const { tenant: _tenant, tokenVersion: _ver, ...result } = user;
     return result;
   }
 }

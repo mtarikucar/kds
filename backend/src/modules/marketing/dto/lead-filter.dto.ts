@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsInt, IsDateString, Min } from 'class-validator';
+import { IsOptional, IsString, IsInt, IsDateString, Min, Max, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class LeadFilterDto {
@@ -47,7 +47,7 @@ export class LeadFilterDto {
   sortBy?: string;
 
   @IsOptional()
-  @IsString()
+  @IsIn(['asc', 'desc'])
   sortOrder?: 'asc' | 'desc';
 
   @IsOptional()
@@ -60,5 +60,6 @@ export class LeadFilterDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  @Max(100)
   limit?: number;
 }

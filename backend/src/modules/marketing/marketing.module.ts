@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 
 // Controllers
@@ -31,23 +30,43 @@ import {
   MarketingNotificationsService,
 } from './services';
 
-// Guards & Strategies
+// Guards
 import { MarketingGuard } from './guards/marketing.guard';
 import { MarketingRolesGuard } from './guards/marketing-roles.guard';
-import { MarketingJwtStrategy } from './strategies/marketing-jwt.strategy';
 
 @Module({
   imports: [
-    PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('MARKETING_JWT_SECRET'),
-        signOptions: {
-          expiresIn: '8h',
-        },
-      }),
       inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const secret = configService.get<string>('MARKETING_JWT_SECRET');
+        const refresh = configService.get<string>('MARKETING_JWT_REFRESH_SECRET');
+        const tenant = configService.get<string>('JWT_SECRET');
+        const tenantRefresh = configService.get<string>('JWT_REFRESH_SECRET');
+        const superadmin = configService.get<string>('SUPERADMIN_JWT_SECRET');
+        if (!secret || !refresh) {
+          throw new Error(
+            'MARKETING_JWT_SECRET and MARKETING_JWT_REFRESH_SECRET must be configured',
+          );
+        }
+        if (secret.length < 32 || refresh.length < 32) {
+          throw new Error(
+            'MARKETING_JWT_SECRET / MARKETING_JWT_REFRESH_SECRET must be at least 32 chars',
+          );
+        }
+        const others = [tenant, tenantRefresh, superadmin].filter(Boolean);
+        if (secret === refresh || others.includes(secret) || others.includes(refresh)) {
+          throw new Error(
+            'MARKETING_JWT_SECRET / REFRESH must differ from each other and from other realms',
+          );
+        }
+        return {
+          secret,
+          signOptions: { expiresIn: '8h', algorithm: 'HS256' },
+          verifyOptions: { algorithms: ['HS256'] },
+        };
+      },
     }),
   ],
   controllers: [
@@ -74,15 +93,13 @@ import { MarketingJwtStrategy } from './strategies/marketing-jwt.strategy';
     MarketingUsersService,
     MarketingCommissionsService,
     MarketingNotificationsService,
-    // Guards & Strategies
+    // Guards
     MarketingGuard,
     MarketingRolesGuard,
-    MarketingJwtStrategy,
   ],
   exports: [
     MarketingAuthService,
     MarketingUsersService,
-    MarketingNotificationsService,
   ],
 })
 export class MarketingModule {}

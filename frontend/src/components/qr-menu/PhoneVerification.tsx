@@ -76,7 +76,7 @@ const PhoneVerification = ({
       await axios.post(`${API_URL}/customer-public/phone/verify-otp`, {
         phone,
         code,
-        tenantId,
+        sessionId,
       });
 
       toast.success(t('phoneVerification.verified', 'Phone number verified!'));

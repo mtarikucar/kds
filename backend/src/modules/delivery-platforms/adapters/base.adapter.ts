@@ -40,7 +40,21 @@ export abstract class BaseAdapter {
         }
 
         if (attempt < retries) {
-          const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+          // Honour the platform's Retry-After if present; otherwise back
+          // off exponentially. Retry-After can be seconds or an HTTP-date.
+          const retryAfter = error.response?.headers?.['retry-after'];
+          let delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+          if (retryAfter) {
+            const asNum = Number(retryAfter);
+            if (Number.isFinite(asNum)) {
+              delay = Math.min(asNum * 1000, 30_000);
+            } else {
+              const date = Date.parse(retryAfter);
+              if (Number.isFinite(date)) {
+                delay = Math.min(Math.max(date - Date.now(), 0), 30_000);
+              }
+            }
+          }
           this.logger.warn(
             `Request failed (attempt ${attempt + 1}/${retries + 1}), retrying in ${delay}ms: ${error.message}`,
           );
@@ -49,7 +63,7 @@ export abstract class BaseAdapter {
       }
     }
 
-    throw lastError;
+    throw lastError ?? new Error('Request failed without a recorded error');
   }
 
   protected getAuthHeaders(token: string): Record<string, string> {

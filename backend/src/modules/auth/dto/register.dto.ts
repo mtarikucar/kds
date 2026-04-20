@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsString, MinLength, MaxLength, Matches, IsEnum, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsEnum, IsNotEmpty, IsOptional, Matches, IsUUID } from 'class-validator';
 import { UserRole } from '../../../common/constants/roles.enum';
 
 export class RegisterDto {
@@ -8,12 +8,11 @@ export class RegisterDto {
   @IsNotEmpty()
   email: string;
 
-  @ApiProperty({ example: 'Password1', minLength: 8 })
+  @ApiProperty({ example: 'Passw0rd!', minLength: 8 })
   @IsString()
   @MinLength(8)
-  @MaxLength(128)
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/, {
-    message: 'Password must contain at least one uppercase letter, one lowercase letter, and one digit',
+  @Matches(/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
+    message: 'Password must contain at least one lowercase letter, one uppercase letter, and one digit',
   })
   password: string;
 
@@ -38,7 +37,7 @@ export class RegisterDto {
   restaurantName?: string;
 
   @ApiProperty({ example: 'tenant-uuid', required: false })
-  @IsString()
+  @IsUUID()
   @IsOptional()
   tenantId?: string;
 

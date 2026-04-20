@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { KdsGateway } from '../../kds/kds.gateway';
 import { CreateSwapRequestDto } from '../dto/create-swap-request.dto';
@@ -18,6 +24,16 @@ export class ShiftSwapService {
 
     if (dto.requesterAssignmentId === dto.targetAssignmentId) {
       throw new BadRequestException('Cannot swap the same assignment');
+    }
+
+    // Target must actually belong to the caller's tenant — otherwise
+    // the 404 on assignment below quietly leaks that the user exists.
+    const target = await this.prisma.user.findFirst({
+      where: { id: dto.targetId, tenantId, status: 'ACTIVE' },
+      select: { id: true },
+    });
+    if (!target) {
+      throw new BadRequestException('Target user not found');
     }
 
     // Validate requester assignment belongs to requester
@@ -62,9 +78,49 @@ export class ShiftSwapService {
     return result;
   }
 
-  async approve(id: string, tenantId: string, approvedById: string) {
+  /**
+   * Target employee accepts a pending swap. Moves status to
+   * TARGET_ACCEPTED so a manager can then approve it. Rejection is a
+   * terminal transition (TARGET_REJECTED) that dead-ends the swap.
+   */
+  async respondAsTarget(
+    id: string,
+    tenantId: string,
+    userId: string,
+    accept: boolean,
+  ) {
     const request = await this.prisma.shiftSwapRequest.findFirst({
       where: { id, tenantId, status: SwapRequestStatus.PENDING },
+    });
+    if (!request) {
+      throw new NotFoundException('Swap request not found or already processed');
+    }
+    if (request.targetId !== userId) {
+      throw new ForbiddenException('Only the target employee can respond to this swap');
+    }
+    const status = accept
+      ? SwapRequestStatus.TARGET_ACCEPTED
+      : SwapRequestStatus.TARGET_REJECTED;
+
+    const updated = await this.prisma.shiftSwapRequest.update({
+      where: { id },
+      data: {
+        status,
+        targetApproved: accept,
+        targetRespondedAt: new Date(),
+      },
+      include: {
+        requester: { select: { id: true, firstName: true, lastName: true } },
+        target: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+    this.kdsGateway.emitSwapRequestUpdate(tenantId, updated);
+    return updated;
+  }
+
+  async approve(id: string, tenantId: string, approvedById: string) {
+    const request = await this.prisma.shiftSwapRequest.findFirst({
+      where: { id, tenantId, status: SwapRequestStatus.TARGET_ACCEPTED },
       include: {
         requesterAssignment: true,
         requester: { select: { id: true, firstName: true, lastName: true } },
@@ -73,7 +129,14 @@ export class ShiftSwapService {
     });
 
     if (!request) {
-      throw new NotFoundException('Swap request not found or already processed');
+      throw new NotFoundException(
+        'Swap request not found, awaiting target consent, or already processed',
+      );
+    }
+
+    // Manager cannot approve a swap that targets or involves themselves.
+    if (approvedById === request.requesterId || approvedById === request.targetId) {
+      throw new ForbiddenException('Cannot self-approve a swap');
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -164,7 +227,7 @@ export class ShiftSwapService {
       }
 
       return updatedRequest;
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     this.kdsGateway.emitSwapRequestUpdate(tenantId, result);
     return result;
@@ -172,7 +235,13 @@ export class ShiftSwapService {
 
   async reject(id: string, tenantId: string, approvedById: string) {
     const request = await this.prisma.shiftSwapRequest.findFirst({
-      where: { id, tenantId, status: SwapRequestStatus.PENDING },
+      where: {
+        id,
+        tenantId,
+        status: {
+          in: [SwapRequestStatus.PENDING, SwapRequestStatus.TARGET_ACCEPTED],
+        },
+      },
     });
 
     if (!request) {

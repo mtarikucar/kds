@@ -14,6 +14,10 @@ export interface SuperAdminJwtPayload {
   sub: string;
   email: string;
   type: 'superadmin';
+  /** Token version carried at mint time. Must equal the live value on
+   * the SuperAdmin row, otherwise the token is rejected (force-logout
+   * on password/2FA change, explicit logout, etc.). */
+  ver: number;
 }
 
 @Injectable()
@@ -47,6 +51,7 @@ export class SuperAdminGuard implements CanActivate {
         token,
         {
           secret: this.configService.get<string>('SUPERADMIN_JWT_SECRET'),
+          algorithms: ['HS256'],
         },
       );
 
@@ -63,11 +68,16 @@ export class SuperAdminGuard implements CanActivate {
           lastName: true,
           status: true,
           twoFactorEnabled: true,
+          tokenVersion: true,
         },
       });
 
       if (!superAdmin || superAdmin.status !== 'ACTIVE') {
         throw new UnauthorizedException('SuperAdmin not found or inactive');
+      }
+
+      if (typeof payload.ver === 'number' && payload.ver !== superAdmin.tokenVersion) {
+        throw new UnauthorizedException('Session revoked');
       }
 
       request.superAdmin = superAdmin;

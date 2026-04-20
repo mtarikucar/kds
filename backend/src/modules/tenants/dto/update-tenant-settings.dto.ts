@@ -1,36 +1,10 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsIn, IsBoolean, IsArray, IsEmail, Matches, IsNumber, Min, Max, MaxLength, IsUrl, ValidateIf, IsNotIn, MinLength } from 'class-validator';
+import { IsString, IsOptional, IsIn, IsBoolean, IsArray, IsEmail, Matches, IsNumber, Min, Max, MaxLength, ValidateIf, IsNotIn, MinLength } from 'class-validator';
 import {
   SUPPORTED_CURRENCIES,
   SupportedCurrency,
 } from '../../../common/constants/currencies.const';
-
-// Reserved subdomains that cannot be used by tenants
-const RESERVED_SUBDOMAINS = [
-  'www',
-  'app',
-  'api',
-  'admin',
-  'staging',
-  'mail',
-  'smtp',
-  'ftp',
-  'status',
-  'help',
-  'support',
-  'docs',
-  'dashboard',
-  'login',
-  'signup',
-  'register',
-  'auth',
-  'cdn',
-  'static',
-  'assets',
-  'beta',
-  'test',
-  'demo',
-];
+import { RESERVED_SUBDOMAINS, SUBDOMAIN_REGEX } from '../../../common/constants/subdomain.const';
 
 export class UpdateTenantSettingsDto {
   @ApiPropertyOptional({
@@ -44,7 +18,7 @@ export class UpdateTenantSettingsDto {
     message: 'Subdomain must be at least 3 characters',
   })
   @MaxLength(63)
-  @Matches(/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]{1,2}$/, {
+  @Matches(SUBDOMAIN_REGEX, {
     message:
       'Subdomain must contain only lowercase letters, numbers, and hyphens (cannot start or end with hyphen)',
   })

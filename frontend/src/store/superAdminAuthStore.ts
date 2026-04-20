@@ -86,10 +86,13 @@ export const useSuperAdminAuthStore = create<SuperAdminAuthState>()(
     }),
     {
       name: 'superadmin-auth-storage',
+      // refreshToken is deliberately NOT persisted: any XSS on this
+      // origin would otherwise exfiltrate the highest-privilege token
+      // pair. On page reload the access token is reused until it
+      // expires; after that the 401 interceptor bounces to /login.
       partialize: (state) => ({
         superAdmin: state.superAdmin,
         accessToken: state.accessToken,
-        refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
       }),
     }

@@ -6,6 +6,8 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import helmet from 'helmet';
 import * as bodyParser from 'body-parser';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const cookieParser = require('cookie-parser');
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { initSentry } from './sentry.config';
 import { validateEnv } from './common/helpers/env-validation';
@@ -15,7 +17,6 @@ import { RedisIoAdapter } from './common/adapters/redis-io.adapter';
 // secrets previously surfaced as a first-request 500; now abort startup.
 validateEnv();
 
-// Initialize Sentry as early as possible
 initSentry();
 
 // Global unhandled error handlers
@@ -38,7 +39,7 @@ process.on('uncaughtException', (error: Error) => {
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    bodyParser: false, // Disable built-in parser so our custom one with rawBody capture works
+    bodyParser: false,
   });
 
   // Trust proxy so `req.ip`, rate-limiter tracking, and audit-IP columns see
@@ -61,14 +62,21 @@ async function bootstrap() {
     '/api/webhooks',
     bodyParser.json({
       limit: '2mb',
-      verify: (req: any, _res, buf) => { req.rawBody = buf; },
+      verify: (req: any, _res, buf) => {
+        req.rawBody = buf;
+      },
     }),
   );
-  app.use(bodyParser.json({
-    limit: '100kb',
-    verify: (req: any, _res, buf) => { req.rawBody = buf; },
-  }));
+  app.use(
+    bodyParser.json({
+      limit: '100kb',
+      verify: (req: any, _res, buf) => {
+        req.rawBody = buf;
+      },
+    }),
+  );
   app.use(bodyParser.urlencoded({ limit: '100kb', extended: true }));
+  app.use(cookieParser());
 
   // Security headers with Helmet. CSP hardened with frame-ancestors 'none'
   // for clickjacking protection, object-src 'none', base-uri 'self',
@@ -88,47 +96,27 @@ async function bootstrap() {
           formAction: ["'self'"],
         },
       },
-      crossOriginEmbedderPolicy: false, // Allow embedding for QR codes
-      crossOriginResourcePolicy: { policy: 'cross-origin' }, // Allow cross-origin resources
+      crossOriginEmbedderPolicy: false,
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
     }),
   );
 
-  // Serve static files from uploads directory
   app.useStaticAssets(join(__dirname, '..', 'uploads'), {
     prefix: '/uploads/',
   });
 
-  // Global prefix
   app.setGlobalPrefix('api');
 
-  // CORS - properly configured with wildcard subdomain support
   const allowedOrigins = process.env.CORS_ORIGIN
     ? process.env.CORS_ORIGIN.split(',')
     : ['http://localhost:5173'];
 
   app.enableCors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, Postman, etc.)
-      if (!origin) {
-        return callback(null, true);
-      }
-
-      // Check if origin matches allowed origins list
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      // Allow any *.hummytummy.com subdomain (production)
-      if (/^https:\/\/[a-z0-9-]+\.hummytummy\.com$/.test(origin)) {
-        return callback(null, true);
-      }
-
-      // Allow any *.staging.hummytummy.com subdomain (staging)
-      if (/^https:\/\/[a-z0-9-]+\.staging\.hummytummy\.com$/.test(origin)) {
-        return callback(null, true);
-      }
-
-      // Reject other origins
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      if (/^https:\/\/[a-z0-9-]+\.hummytummy\.com$/.test(origin)) return callback(null, true);
+      if (/^https:\/\/[a-z0-9-]+\.staging\.hummytummy\.com$/.test(origin)) return callback(null, true);
       return callback(new Error('Not allowed by CORS'), false);
     },
     credentials: true,
@@ -137,43 +125,18 @@ async function bootstrap() {
     exposedHeaders: ['X-Total-Count', 'X-Request-ID'],
   });
 
-  // Global exception filter
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  // Global validation pipe
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
       transform: true,
-      forbidNonWhitelisted: false, // Allow extra properties (they'll be stripped by whitelist)
+      forbidNonWhitelisted: false,
       transformOptions: {
         enableImplicitConversion: true,
       },
     }),
   );
-
-  // Swagger documentation
-  const config = new DocumentBuilder()
-    .setTitle('HummyTummy API')
-    .setDescription('Cloud-based restaurant management system')
-    .setVersion('1.0')
-    .addBearerAuth()
-    .addTag('auth', 'Authentication endpoints')
-    .addTag('tenants', 'Multi-tenant management')
-    .addTag('users', 'User management')
-    .addTag('menu', 'Menu and products')
-    .addTag('orders', 'Order management')
-    .addTag('tables', 'Table management')
-    .addTag('payments', 'Payment processing')
-    .addTag('kds', 'Kitchen Display System')
-    .addTag('stock', 'Inventory management')
-    .addTag('reports', 'Analytics and reports')
-    .build();
-
-  const document = SwaggerModule.createDocument(app, config);
-  if (process.env.NODE_ENV !== 'production') {
-    SwaggerModule.setup('api/docs', app, document);
-  }
 
   // Socket.IO Redis adapter for multi-replica broadcast correctness. When
   // REDIS_URL is absent we fall back to the in-memory adapter with a warn
@@ -185,14 +148,27 @@ async function bootstrap() {
   await redisAdapter.connectToRedis();
   app.useWebSocketAdapter(redisAdapter);
 
-  // Enable graceful shutdown hooks
+  // Nest calls onModuleDestroy on SIGTERM/SIGINT so Prisma and Redis clients
+  // drain cleanly on k8s rolling restarts. Without this, connections leak.
   app.enableShutdownHooks();
+
+  // Swagger only in non-prod; in prod it reveals the full admin API surface.
+  if (process.env.NODE_ENV !== 'production' || process.env.SWAGGER_ENABLED === 'true') {
+    const config = new DocumentBuilder()
+      .setTitle('HummyTummy API')
+      .setDescription('Cloud-based restaurant management system')
+      .setVersion('1.0')
+      .addBearerAuth()
+      .build();
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api/docs', app, document);
+  }
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
 
+  // eslint-disable-next-line no-console
   console.log(`🚀 Application is running on: http://localhost:${port}`);
-  console.log(`📚 API Documentation: http://localhost:${port}/api/docs`);
 }
 
 bootstrap();

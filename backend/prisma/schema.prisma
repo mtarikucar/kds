@@ -120,8 +120,60 @@ model Tenant {
   marketingCommissions  Commission[]        @relation("MarketingCommissions")
   convertedLead         Lead?               @relation("ConvertedTenant")
 
+  // Previously-orphaned relations (migration 20260420180000 adds the FKs).
+  // Listed here so Prisma keeps the TS-side relation graph in sync.
+  restaurantLayout      RestaurantLayout?
+  payments              Payment[]
+  customerSessions      CustomerSession[]
+  phoneVerifications    PhoneVerification[]
+  waiterRequests        WaiterRequest[]
+  billRequests          BillRequest[]
+  cashDrawerMovements   CashDrawerMovement[]
+  userActivities        UserActivity[]
+  loyaltyTransactions   LoyaltyTransaction[]
+
   @@index([currentPlanId])
+  @@index([status])
   @@map("tenants")
+}
+
+/**
+ * Per-session refresh tokens. Only the sha256 hash is stored so a DB leak
+ * does not yield usable tokens. Each successful refresh rotates the token
+ * (marks the old one revoked, issues a new one). Logout / admin suspend
+ * sets revokedAt on all of a user's tokens.
+ */
+model RefreshToken {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("refresh_tokens")
+}
+
+/**
+ * Subdomains released by deleted/suspended tenants or settings changes
+ * are parked here for a quarantine window to prevent subdomain takeover
+ * (a new tenant picking up a subdomain still referenced by printed QR
+ * codes, outbound emails, cached links).
+ */
+model ReservedSubdomain {
+  id             String   @id @default(uuid())
+  subdomain      String   @unique
+  reason         String   // 'tenant_deleted' | 'tenant_suspended' | 'subdomain_changed'
+  reservedAt     DateTime @default(now())
+  availableAfter DateTime
+
+  @@index([availableAfter])
+  @@map("reserved_subdomains")
 }
 
 model User {
@@ -139,14 +191,25 @@ model User {
   approvedBy    User?     @relation("UserApprover", fields: [approvedById], references: [id], onDelete: SetNull)
   approvedUsers User[]    @relation("UserApprover")
 
-  // Email verification (code-based)
+  // Reactivation audit (when a soft-deleted user is brought back)
+  reactivatedAt    DateTime?
+  reactivatedById  String?
+  reactivatedBy    User?     @relation("UserReactivator", fields: [reactivatedById], references: [id], onDelete: SetNull)
+  reactivatedUsers User[]    @relation("UserReactivator")
+
+  // Email verification (code-based, hashed at rest)
   emailVerified                 Boolean   @default(false)
-  emailVerificationCode         String?   @db.VarChar(6)
+  emailVerificationCodeHash     String?
   emailVerificationCodeExpires  DateTime?
 
-  // Password reset
-  resetToken       String?   @unique
+  // Password reset (token hashed at rest)
+  resetTokenHash   String?   @unique
   resetTokenExpiry DateTime?
+
+  // Session revocation: JWT payload carries `ver`; incrementing this field
+  // invalidates every access token issued before the bump. Used on password
+  // reset / suspicious-login / admin lockout.
+  tokenVersion     Int       @default(0)
 
   // Profile
   avatar    String?
@@ -161,11 +224,6 @@ model User {
   // Onboarding data (persisted for cross-device sync)
   onboardingData Json? // { hasSeenWelcome, tourProgress, skipAllTours }
 
-  // Session revocation: JWT payload carries `ver`; incrementing this field
-  // invalidates every access/refresh token issued before the bump. Used on
-  // password reset / suspicious-login / admin lockout.
-  tokenVersion Int @default(0)
-
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -173,6 +231,7 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
+  refreshTokens                  RefreshToken[]
   orders                         Order[]
   approvedOrders                 Order[] @relation("ApprovedOrders")
   acknowledgedWaiterRequests     WaiterRequest[] @relation("AcknowledgedWaiterRequests")
@@ -421,6 +480,7 @@ model RestaurantLayout {
   worldData Json     // Compressed voxel data including all objects
 
   tenantId  String   @unique
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -458,6 +518,11 @@ model Order {
   requiresApproval Boolean @default(false) // If true, waiter must approve before going to kitchen
   approvedAt       DateTime? // When the order was approved
 
+  // Idempotency flag for recipe/stock deduction. Prevents duplicate
+  // deductions when deductOnStatus is tweaked mid-lifecycle or when
+  // multiple status-change hooks race.
+  stockDeducted Boolean @default(false)
+
   tableId String?
   table   Table?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
 
@@ -494,6 +559,9 @@ model Order {
   @@index([approvedById])
   @@index([source])
   @@index([externalOrderId])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, tableId, status])
   @@map("orders")
 }
 
@@ -554,17 +622,29 @@ model Payment {
   method String  // CASH, CARD, DIGITAL
   status String  @default("PENDING") // PENDING, COMPLETED, FAILED, REFUNDED
 
-  transactionId String?
-  notes         String?
+  transactionId  String?
+  idempotencyKey String?
+  notes          String?
 
-  orderId String
-  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orderId  String
+  order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   createdAt DateTime  @default(now())
   paidAt    DateTime?
 
+  // NOTE: @@unique([orderId, idempotencyKey]) does NOT dedupe null keys in
+  // Postgres (multiple NULLs are considered distinct). Migration
+  // 20260420180000 adds a partial unique index
+  //   CREATE UNIQUE INDEX ... ON payments (order_id, idempotency_key)
+  //     WHERE idempotency_key IS NOT NULL;
+  // so the idempotency guarantee actually holds for keyed requests.
+  @@index([tenantId])
   @@index([orderId])
   @@index([status])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
   @@map("payments")
 }
 
@@ -666,7 +746,10 @@ model Subscription {
   // Subscription details
   status          String   @default("ACTIVE") // ACTIVE, CANCELLED, EXPIRED, PAST_DUE, TRIALING
   billingCycle    String   // MONTHLY, YEARLY
-  paymentProvider String   // STRIPE, PAYTR
+  // Only EMAIL (contact-based WhatsApp/Email) is active today; Stripe
+  // and PayTR were removed in prior commits. Renewals are superadmin-
+  // driven after the tenant contacts support.
+  paymentProvider String   // EMAIL
 
   // Dates
   startDate       DateTime @default(now())
@@ -679,19 +762,6 @@ model Subscription {
   isTrialPeriod Boolean  @default(false)
   trialStart    DateTime?
   trialEnd      DateTime?
-
-  // Payment provider IDs
-  stripeSubscriptionId String? @unique
-  stripeCustomerId     String?
-
-  // PayTR fields
-  paytrMerchantOid    String? @unique
-  paytrPaymentToken   String?
-
-  // Renewal tracking for one-time payments
-  renewalLinkSentAt   DateTime?
-  renewalLinkToken    String?
-  graceEndDate        DateTime?
 
   // Pricing at time of subscription
   amount   Decimal @db.Decimal(10, 2)
@@ -734,14 +804,11 @@ model SubscriptionPayment {
   amount          Decimal @db.Decimal(10, 2)
   currency        String  @default("TRY")
   status          String  @default("PENDING") // PENDING, SUCCEEDED, FAILED, REFUNDED
-  paymentProvider String  // STRIPE, PAYTR
+  // Only EMAIL (contact-based) — external providers removed.
+  paymentProvider String  // EMAIL
 
-  // Provider-specific IDs
-  stripePaymentIntentId String? @unique
-
-  // PayTR fields
-  paytrMerchantOid      String? @unique
-  paytrPaymentToken     String?
+  // Free-form external reference (receipt id, bank transfer id) for audit.
+  externalReference String? @unique
 
   // Payment metadata
   paymentMethod String? // card, bank_transfer, etc.
@@ -808,6 +875,18 @@ model Invoice {
   @@index([status])
   @@index([dueDate])
   @@map("invoices")
+}
+
+/**
+ * Monotonic counter for invoice numbering. Updated atomically inside a
+ * transaction (UPDATE ... RETURNING) so two concurrent invoice writes
+ * never race on the same number.
+ */
+model InvoiceCounter {
+  scope    String @id // e.g. "202604" (year+month)
+  sequence Int    @default(0)
+
+  @@map("invoice_counters")
 }
 
 
@@ -1021,8 +1100,8 @@ model ApiKey {
 
   // API Key details
   name        String   // User-friendly name (e.g., "Production API", "Mobile App")
-  // SHA-256 hash of the issued key. Plaintext shown to admin once at
-  // creation and never stored; lookup uses keyHash only.
+  // SHA-256 hash of the issued key. The plaintext is shown to the user once
+  // at creation and never stored; lookup uses keyHash only.
   keyHash     String   @unique
   keyPrefix   String   // First few characters for identification (e.g., "pk_live_...")
 
@@ -1161,6 +1240,7 @@ model CustomerSession {
   lastActivity DateTime @default(now())
 
   tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1175,8 +1255,15 @@ model CustomerSession {
 model LoyaltyTransaction {
   id          String   @id @default(uuid())
 
+  // Tenant isolation is now explicit. onDelete: Restrict on the customer
+  // relation means a customer with loyalty history can't be hard-deleted;
+  // callers must soft-delete / anonymize + keep the audit trail. Matches
+  // the typical fiscal/regulatory stance on loyalty liabilities.
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   customerId String
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
 
   // Transaction details
   type        String  // EARNED, REDEEMED, EXPIRED, ADJUSTMENT, BONUS, REFERRAL
@@ -1200,6 +1287,8 @@ model LoyaltyTransaction {
 
   createdAt DateTime @default(now())
 
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@index([customerId])
   @@index([createdAt])
   @@index([type])
@@ -1216,6 +1305,7 @@ model PhoneVerification {
   // Session tracking
   sessionId String?
   tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // Rate limiting
   attempts  Int      @default(0)
@@ -1318,13 +1408,15 @@ model UserNotificationRead {
 // ========================================
 
 model WaiterRequest {
-  id      String @id @default(uuid())
-  message String?
-  status  String @default("PENDING") // PENDING, ACKNOWLEDGED, COMPLETED
+  id        String  @id @default(uuid())
+  message   String?
+  status    String  @default("PENDING") // PENDING, ACKNOWLEDGED, COMPLETED
   sessionId String
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  tableId String
-  table   Table @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  tableId String?
+  table   Table?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
 
   acknowledgedAt   DateTime?
   acknowledgedById String?
@@ -1337,6 +1429,8 @@ model WaiterRequest {
   @@index([tableId])
   @@index([status])
   @@index([sessionId])
+  @@index([tenantId])
+  @@index([tenantId, status])
   @@map("waiter_requests")
 }
 
@@ -1344,9 +1438,11 @@ model BillRequest {
   id        String @id @default(uuid())
   status    String @default("PENDING") // PENDING, ACKNOWLEDGED, COMPLETED
   sessionId String
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  tableId String
-  table   Table @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  tableId String?
+  table   Table?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
 
   acknowledgedAt   DateTime?
   acknowledgedById String?
@@ -1359,6 +1455,8 @@ model BillRequest {
   @@index([tableId])
   @@index([status])
   @@index([sessionId])
+  @@index([tenantId])
+  @@index([tenantId, status])
   @@map("bill_requests")
 }
 
@@ -1526,10 +1624,12 @@ model CashDrawerMovement {
   user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
   @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@index([zReportId])
   @@index([userId])
   @@index([createdAt])
@@ -1643,8 +1743,26 @@ model SuperAdmin {
   firstName         String
   lastName          String
   status            String    @default("ACTIVE") // ACTIVE, INACTIVE
-  twoFactorSecret   String?
-  twoFactorEnabled  Boolean   @default(false)
+
+  // 2FA (TOTP)
+  twoFactorSecret          String?
+  twoFactorEnabled         Boolean  @default(false)
+  // Secret that has been generated but not yet confirmed by a successful
+  // TOTP; promoted to twoFactorSecret only after enable2FA verifies it.
+  pendingTwoFactorSecret   String?
+  // One-time recovery codes (sha256-hashed) for when the authenticator
+  // is lost. Each entry gets removed as it is used.
+  backupCodes              String[] @default([])
+  // Replay-protection: records the TOTP time step of the last accepted
+  // code, plus when it expires. A code can only be used once.
+  lastTotpStep             BigInt?
+  lastTotpStepExpiresAt    DateTime?
+
+  // Session revocation: bumped on logout, password change, 2FA change,
+  // account suspension. Access tokens carry this version and are
+  // rejected once they don't match.
+  tokenVersion             Int      @default(0)
+
   lastLogin         DateTime?
   lastLoginIp       String?
   failedLogins      Int       @default(0)
@@ -1688,6 +1806,7 @@ model UserActivity {
   id        String   @id @default(uuid())
   userId    String
   tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   action    String   // LOGIN, LOGOUT, LOGIN_FAILED
   ip        String?
   userAgent String?
@@ -1696,6 +1815,7 @@ model UserActivity {
 
   @@index([userId])
   @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@index([createdAt])
   @@map("user_activities")
 }
@@ -1990,9 +2110,11 @@ model DeliveryPlatformConfig {
   platform  String   // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS
   isEnabled Boolean  @default(false)
 
-  // Authentication
-  credentials    Json?      // Platform-specific API keys/secrets (encrypted at app level)
-  accessToken    String?    // Current access token
+  // Authentication (all three fields hold AES-256-GCM-encrypted JSON;
+  // see common/helpers/encryption.helper.ts). Never log these or return
+  // them from tenant-facing endpoints.
+  credentials    Json?      // { ciphertext, iv, authTag } or null
+  accessToken    String?    // AES-GCM-encrypted bearer token
   tokenExpiresAt DateTime?  // Token expiration time
 
   // Platform identifiers
@@ -2014,6 +2136,10 @@ model DeliveryPlatformConfig {
   autoAccept   Boolean @default(true)  // Auto-accept incoming orders
   notifySound  String? // Custom notification sound identifier
 
+  // Soft delete marker so we don't orphan in-flight orders / mappings
+  // when an admin hits Delete while orders are still syncing.
+  deletedAt DateTime?
+
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -2021,6 +2147,10 @@ model DeliveryPlatformConfig {
   updatedAt DateTime @updatedAt
 
   @@unique([tenantId, platform])
+  // Platform-wide uniqueness: two tenants can't claim the same remote
+  // restaurant id (prior gap allowed disabled tenants to collide with
+  // enabled ones and mis-route webhooks).
+  @@unique([platform, remoteRestaurantId])
   @@index([tenantId])
   @@index([platform])
   @@index([isEnabled])
@@ -2272,6 +2402,7 @@ model PurchaseOrder {
   status        String  @default("DRAFT") // DRAFT, SUBMITTED, PARTIALLY_RECEIVED, RECEIVED, CANCELLED
   notes         String?
   expectedDate  DateTime?
+  createdById   String?
 
   supplierId String
   supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
@@ -2316,12 +2447,14 @@ model PurchaseOrderItem {
 
 model IngredientMovement {
   id            String  @id @default(uuid())
-  type          String  // IN, OUT, ADJUSTMENT, WASTE, ORDER_DEDUCTION, PO_RECEIVE, COUNT_ADJUSTMENT
+  type          String  // IN, OUT, ADJUSTMENT, WASTE, ORDER_DEDUCTION, ORDER_REVERSAL, PO_RECEIVE, PO_CANCEL_REVERSAL, COUNT_ADJUSTMENT
   quantity      Decimal @db.Decimal(10, 3) // Positive for additions, negative for deductions
   costPerUnit   Decimal? @db.Decimal(10, 4)
   notes         String?
   referenceType String? // ORDER, PURCHASE_ORDER, WASTE_LOG, STOCK_COUNT
   referenceId   String?
+  // Audit: who triggered the movement (null for system/scheduler paths).
+  createdById   String?
 
   stockItemId String
   stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
@@ -2345,6 +2478,7 @@ model WasteLog {
   reason   String  // EXPIRED, SPOILED, DAMAGED, OVERPRODUCTION, PREPARATION_WASTE, CUSTOMER_RETURN, OTHER
   notes    String?
   cost     Decimal? @db.Decimal(10, 4) // Calculated cost of waste
+  createdById String?
 
   stockItemId String
   stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
@@ -2366,6 +2500,7 @@ model StockCount {
   name   String?
   status String @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, CANCELLED
   notes  String?
+  createdById String?
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -2409,6 +2544,13 @@ model StockSettings {
   deductOnStatus      String  @default("PREPARING") // Which order status triggers deduction
   lowStockAlertDays   Int     @default(3) // Days before expiry to alert
   poNumberPrefix      String  @default("PO")
+  // When false (default), deductions that would drop a stock item
+  // below zero are refused. When true, negative stock is allowed and
+  // the shortfall is recorded for investigation.
+  allowNegativeStock  Boolean @default(false)
+  // Monotonic per-tenant PO counter; used by purchase-orders.service
+  // to mint collision-free order numbers in a transaction.
+  poSequence          Int     @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -2515,8 +2657,14 @@ model ShiftAssignment {
 
 model ShiftSwapRequest {
   id        String @id @default(uuid())
-  status    String @default("PENDING") // PENDING, APPROVED, REJECTED
+  status    String @default("PENDING") // PENDING, TARGET_ACCEPTED, TARGET_REJECTED, APPROVED, REJECTED
   reason    String?
+
+  // Two-stage approval: the target employee must consent before a
+  // manager can apply the swap. Prior flow let a manager force a swap
+  // onto an unwilling employee.
+  targetRespondedAt DateTime?
+  targetApproved    Boolean?
 
   requesterId            String
   requester              User            @relation("SwapRequester", fields: [requesterId], references: [id], onDelete: Cascade)
@@ -2564,6 +2712,11 @@ model MarketingUser {
   lastLoginIp     String?
   failedLogins    Int       @default(0)
   lockedUntil     DateTime?
+
+  // Session revocation token: carried in access/refresh JWTs; bumped on
+  // logout and on password change so outstanding tokens are invalidated.
+  tokenVersion    Int       @default(0)
+
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 

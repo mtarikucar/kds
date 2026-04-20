@@ -1,16 +1,16 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateOfferDto } from '../dto/create-offer.dto';
 import { UpdateOfferDto } from '../dto/update-offer.dto';
-import { OfferFilterDto } from '../dto/offer-filter.dto';
-import { MarketingNotificationsService } from './marketing-notifications.service';
 
 @Injectable()
 export class MarketingOffersService {
-  constructor(
-    private prisma: PrismaService,
-    private notificationsService: MarketingNotificationsService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   async create(dto: CreateOfferDto, userId: string, userRole: string) {
     // Validate lead exists
@@ -45,32 +45,12 @@ export class MarketingOffersService {
     });
   }
 
-  async findAll(userId: string, userRole: string, filter: OfferFilterDto) {
-    const page = filter.page || 1;
-    const limit = filter.limit || 20;
+  async findAll(userId: string, userRole: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
     const where: any = {};
 
     if (userRole === 'SALES_REP') {
       where.createdById = userId;
-    }
-
-    if (filter.status) {
-      where.status = filter.status;
-    }
-
-    if (filter.leadId) {
-      where.leadId = filter.leadId;
-    }
-
-    if (filter.dateFrom || filter.dateTo) {
-      where.createdAt = {};
-      if (filter.dateFrom) {
-        where.createdAt.gte = new Date(filter.dateFrom);
-      }
-      if (filter.dateTo) {
-        where.createdAt.lte = new Date(filter.dateTo);
-      }
     }
 
     const [offers, total] = await Promise.all([
@@ -136,98 +116,40 @@ export class MarketingOffersService {
   }
 
   async markSent(id: string, userId: string, userRole: string) {
-    const offer = await this.prisma.leadOffer.findUnique({ where: { id } });
+    const offer = await this.prisma.leadOffer.findUnique({
+      where: { id },
+      include: { lead: { select: { status: true, convertedTenantId: true } } },
+    });
 
     if (!offer) throw new NotFoundException('Offer not found');
 
     if (userRole === 'SALES_REP' && offer.createdById !== userId) {
       throw new ForbiddenException('You can only send your own offers');
     }
+    if (offer.status !== 'DRAFT') {
+      throw new BadRequestException('Only draft offers can be sent');
+    }
+    if (offer.lead.convertedTenantId || ['WON', 'LOST'].includes(offer.lead.status)) {
+      throw new BadRequestException('Lead is already closed');
+    }
 
-    const closedStatuses = ['WON', 'LOST'];
-
-    const updatedOffer = await this.prisma.$transaction(async (tx) => {
-      const updated = await tx.leadOffer.update({
+    const [updatedOffer] = await this.prisma.$transaction([
+      this.prisma.leadOffer.update({
         where: { id },
         data: { status: 'SENT', sentAt: new Date() },
-      });
-
-      const lead = await tx.lead.findUnique({ where: { id: offer.leadId } });
-      if (lead && !closedStatuses.includes(lead.status)) {
-        await tx.lead.update({
-          where: { id: offer.leadId },
-          data: { status: 'OFFER_SENT' },
-        });
-      }
-
-      return updated;
-    });
-
-    // Notify the assigned rep that the offer was sent
-    const lead = await this.prisma.lead.findUnique({ where: { id: updatedOffer.leadId }, select: { assignedToId: true, businessName: true } });
-    if (lead?.assignedToId) {
-      this.notificationsService.create({
-        userId: lead.assignedToId,
-        type: 'OFFER_SENT',
-        title: 'Offer sent',
-        message: `Offer sent to "${lead.businessName}"`,
-        metadata: { offerId: id, leadId: updatedOffer.leadId },
-      }).catch(() => {});
-    }
+      }),
+      // Only advance the lead forward; don't clobber a later status.
+      ...(['OFFER_SENT', 'WAITING', 'WON', 'LOST'].includes(offer.lead.status)
+        ? []
+        : [
+            this.prisma.lead.update({
+              where: { id: offer.leadId },
+              data: { status: 'OFFER_SENT' },
+            }),
+          ]),
+    ]);
 
     return updatedOffer;
-  }
-
-  async accept(id: string, userId: string, userRole: string) {
-    const offer = await this.prisma.leadOffer.findUnique({ where: { id } });
-    if (!offer) throw new NotFoundException('Offer not found');
-
-    if (userRole === 'SALES_REP' && offer.createdById !== userId) {
-      throw new ForbiddenException('You can only manage your own offers');
-    }
-
-    if (offer.status !== 'SENT') {
-      throw new BadRequestException('Only sent offers can be accepted');
-    }
-
-    if (offer.validUntil && new Date(offer.validUntil) < new Date()) {
-      throw new BadRequestException('Offer has expired');
-    }
-
-    return this.prisma.$transaction(async (tx) => {
-      const updated = await tx.leadOffer.update({
-        where: { id },
-        data: { status: 'ACCEPTED', respondedAt: new Date() },
-      });
-
-      const lead = await tx.lead.findUnique({ where: { id: offer.leadId } });
-      if (lead && !['WON', 'LOST'].includes(lead.status)) {
-        await tx.lead.update({
-          where: { id: offer.leadId },
-          data: { status: 'WON' },
-        });
-      }
-
-      return updated;
-    });
-  }
-
-  async reject(id: string, userId: string, userRole: string) {
-    const offer = await this.prisma.leadOffer.findUnique({ where: { id } });
-    if (!offer) throw new NotFoundException('Offer not found');
-
-    if (userRole === 'SALES_REP' && offer.createdById !== userId) {
-      throw new ForbiddenException('You can only manage your own offers');
-    }
-
-    if (offer.status !== 'SENT') {
-      throw new BadRequestException('Only sent offers can be rejected');
-    }
-
-    return this.prisma.leadOffer.update({
-      where: { id },
-      data: { status: 'REJECTED', respondedAt: new Date() },
-    });
   }
 
   async delete(id: string) {

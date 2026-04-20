@@ -11,10 +11,13 @@ import * as path from 'path';
 import { PrismaService } from '../../prisma/prisma.service';
 import { randomUUID } from 'crypto';
 
+const ALLOWED_IMAGE_FORMATS = new Set(['jpeg', 'png', 'webp']);
+
 @Injectable()
 export class UploadService {
   private readonly logger = new Logger(UploadService.name);
   private readonly uploadsDir: string;
+  private readonly uploadsRoot: string;
   private readonly baseUrl: string;
   private readonly maxFileSize = 5 * 1024 * 1024; // 5MB
   private readonly allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
@@ -23,13 +26,33 @@ export class UploadService {
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
   ) {
-    this.uploadsDir = path.join(process.cwd(), 'uploads', 'products');
-    // Get base URL from environment or construct from FRONTEND_URL
+    this.uploadsRoot = path.resolve(process.cwd(), 'uploads');
+    this.uploadsDir = path.join(this.uploadsRoot, 'products');
     this.baseUrl = this.configService.get('BACKEND_URL') ||
                    this.configService.get('FRONTEND_URL') ||
                    'http://localhost:3000';
     this.ensureUploadDir();
     this.ensureLogosDir();
+  }
+
+  /**
+   * Magic-byte sniff using sharp.metadata(). Trusting only the client-supplied
+   * Content-Type header lets a `.svg` (XSS via <script>) or `.php` sail past
+   * an ALLOWED_MIME check — sharp throws / returns wrong format on non-image
+   * bytes. We also reject SVG explicitly since it's an XSS vector even when
+   * correctly formatted.
+   */
+  private async assertIsAllowedImage(buffer: Buffer): Promise<void> {
+    let metadata;
+    try {
+      metadata = await sharp(buffer, { failOn: 'error' }).metadata();
+    } catch {
+      throw new BadRequestException('Invalid image file');
+    }
+    const format = metadata.format?.toLowerCase();
+    if (!format || !ALLOWED_IMAGE_FORMATS.has(format)) {
+      throw new BadRequestException('Invalid file type. Only JPEG, PNG, and WebP are allowed');
+    }
   }
 
   private async ensureUploadDir() {
@@ -69,8 +92,8 @@ export class UploadService {
         'Invalid file type. Only JPEG, PNG, and WebP are allowed',
       );
     }
+    await this.assertIsAllowedImage(file.buffer);
 
-    // Generate unique filename
     const uniqueFilename = `${tenantId}-logo-${Date.now()}.png`;
     const logosDir = path.join(process.cwd(), 'uploads', 'logos');
     const filePath = path.join(logosDir, uniqueFilename);
@@ -118,9 +141,12 @@ export class UploadService {
         'Invalid file type. Only JPEG, PNG, and WebP are allowed',
       );
     }
+    await this.assertIsAllowedImage(file.buffer);
 
-    // Generate unique filename
-    const fileExtension = path.extname(file.originalname);
+    // Ignore client-supplied file extension to dodge path-traversal via
+    // crafted filenames; sharp re-encodes to JPEG below so the .jpg suffix
+    // matches the on-disk bytes.
+    const fileExtension = '.jpg';
     const uniqueFilename = `${randomUUID()}${fileExtension}`;
     const tenantDir = path.join(this.uploadsDir, tenantId);
 
@@ -200,14 +226,21 @@ export class UploadService {
       throw new NotFoundException('Image not found');
     }
 
-    // Delete file from filesystem
-    // Extract relative path from absolute URL
+    // Extract relative path from absolute URL and contain within uploadsRoot.
+    // Defense-in-depth: today the url is always constructed server-side, but
+    // a future import path or DB migration could introduce untrusted URLs.
     const urlPath = image.url.replace(this.baseUrl, '');
-    const filePath = path.join(process.cwd(), urlPath);
-    try {
-      await fs.unlink(filePath);
-    } catch (error) {
-      this.logger.warn(`Failed to delete file ${filePath}: ${error.message}`);
+    const resolvedPath = path.resolve(process.cwd(), urlPath.replace(/^\/+/, ''));
+    if (!resolvedPath.startsWith(this.uploadsRoot + path.sep)) {
+      this.logger.warn(
+        `Refusing to delete path outside uploads root: ${resolvedPath}`,
+      );
+    } else {
+      try {
+        await fs.unlink(resolvedPath);
+      } catch (error) {
+        this.logger.warn(`Failed to delete file ${resolvedPath}: ${error.message}`);
+      }
     }
 
     // Delete from database

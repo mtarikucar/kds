@@ -9,10 +9,11 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
-import { v4 as uuidv4 } from 'uuid';
+import { createHash, randomBytes } from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import * as appleSignin from 'apple-signin-auth';
 import * as Sentry from '@sentry/node';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -20,10 +21,16 @@ import { GoogleAuthDto, AppleAuthDto } from './dto/social-auth.dto';
 import { AuthResponseDto, UserResponseDto } from './dto/auth-response.dto';
 import { ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto } from './dto/password-reset.dto';
 import { UserRole } from '../../common/constants/roles.enum';
+import { TenantStatus } from '../../common/constants/subscription.enum';
 import { EmailService } from '../../common/services/email.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/dto/create-notification.dto';
 import {
+  isSubdomainQuarantined,
+  randomSubdomainSuffix,
+} from '../../common/helpers/subdomain.helper';
+import {
+  ResourceAlreadyExistsException,
   ResourceNotFoundException,
   InvalidCredentialsException,
   ValidationException,
@@ -32,6 +39,47 @@ import {
 @Injectable()
 export class AuthService {
   private googleClient: OAuth2Client;
+
+  private hashToken(token: string): string {
+    return createHash('sha256').update(token).digest('hex');
+  }
+
+  /**
+   * bcrypt work factor. 12 is the 2026 baseline; allow tenants to tune via
+   * env so production can bump cost without a code change.
+   */
+  private bcryptCost(): number {
+    const raw = this.configService.get<string>('BCRYPT_COST');
+    const parsed = raw ? parseInt(raw, 10) : NaN;
+    if (Number.isFinite(parsed) && parsed >= 10 && parsed <= 15) {
+      return parsed;
+    }
+    return 12;
+  }
+
+  /**
+   * Find a free subdomain for a new tenant. Falls back to appending a
+   * cryptographically-strong 6-hex suffix when the preferred slug is taken
+   * or quarantined. Uniqueness is ultimately enforced by the DB unique
+   * index (P2002 is caught by the caller); this just picks a candidate.
+   */
+  private async allocateSubdomain(base: string): Promise<string> {
+    const baseClean = base || 'restaurant';
+    const preferred = baseClean;
+    const preferredTaken =
+      (await isSubdomainQuarantined(this.prisma, preferred)) ||
+      (await this.prisma.tenant.findUnique({ where: { subdomain: preferred } }));
+    if (!preferredTaken) return preferred;
+    // Up to 5 attempts with random suffix — extraordinarily unlikely to collide.
+    for (let i = 0; i < 5; i += 1) {
+      const candidate = `${baseClean}-${randomSubdomainSuffix()}`;
+      const taken =
+        (await isSubdomainQuarantined(this.prisma, candidate)) ||
+        (await this.prisma.tenant.findUnique({ where: { subdomain: candidate } }));
+      if (!taken) return candidate;
+    }
+    throw new Error('Could not allocate a free subdomain');
+  }
 
   constructor(
     private prisma: PrismaService,
@@ -54,7 +102,7 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new BadRequestException('Registration failed. Please check your information and try again.');
+      throw new ResourceAlreadyExistsException('User', 'email', registerDto.email);
     }
 
     // Validate registration data
@@ -82,23 +130,13 @@ export class AuthService {
       }
       userRole = UserRole.ADMIN;
 
-      // Generate a subdomain from restaurant name
-      const subdomain = registerDto.restaurantName
+      const baseSubdomain = registerDto.restaurantName
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-|-$/g, '');
 
-      // Check if subdomain already exists, if so, append a random string
-      let finalSubdomain = subdomain;
-      const existingTenant = await this.prisma.tenant.findUnique({
-        where: { subdomain },
-      });
+      const finalSubdomain = await this.allocateSubdomain(baseSubdomain);
 
-      if (existingTenant) {
-        finalSubdomain = `${subdomain}-${Math.random().toString(36).substring(2, 8)}`;
-      }
-
-      // Get FREE plan
       const freePlan = await this.prisma.subscriptionPlan.findUnique({
         where: { name: 'FREE' },
       });
@@ -107,40 +145,51 @@ export class AuthService {
         throw new ResourceNotFoundException('FREE subscription plan');
       }
 
-      // Create new tenant with FREE subscription
-      const tenant = await this.prisma.tenant.create({
-        data: {
-          name: registerDto.restaurantName,
-          subdomain: finalSubdomain,
-          paymentRegion: registerDto.paymentRegion || 'INTERNATIONAL',
-          currentPlanId: freePlan.id,
-        },
-      });
-
-      // Create FREE subscription for new tenant
+      // Tenant + FREE subscription must be created atomically so other
+      // modules never observe a tenant without a matching subscription.
       const now = new Date();
       const currentPeriodEnd = new Date(now);
-      currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 10); // FREE plan never expires
+      currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 10);
 
-      await this.prisma.subscription.create({
-        data: {
-          tenantId: tenant.id,
-          planId: freePlan.id,
-          status: 'ACTIVE',
-          billingCycle: 'MONTHLY',
-          paymentProvider: 'EMAIL', // All subscriptions use contact-based flow
-          startDate: now,
-          currentPeriodStart: now,
-          currentPeriodEnd: currentPeriodEnd,
-          isTrialPeriod: false,
-          amount: 0,
-          currency: freePlan.currency,
-          autoRenew: true,
-          cancelAtPeriodEnd: false,
-        },
-      });
-
-      tenantId = tenant.id;
+      try {
+        const tenant = await this.prisma.$transaction(async (tx) => {
+          const created = await tx.tenant.create({
+            data: {
+              name: registerDto.restaurantName,
+              subdomain: finalSubdomain,
+              paymentRegion: registerDto.paymentRegion || 'INTERNATIONAL',
+              currentPlanId: freePlan.id,
+            },
+          });
+          await tx.subscription.create({
+            data: {
+              tenantId: created.id,
+              planId: freePlan.id,
+              status: 'ACTIVE',
+              billingCycle: 'MONTHLY',
+              paymentProvider: 'EMAIL',
+              startDate: now,
+              currentPeriodStart: now,
+              currentPeriodEnd,
+              isTrialPeriod: false,
+              amount: 0,
+              currency: freePlan.currency,
+              autoRenew: true,
+              cancelAtPeriodEnd: false,
+            },
+          });
+          return created;
+        });
+        tenantId = tenant.id;
+      } catch (err) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2002'
+        ) {
+          throw new ResourceAlreadyExistsException('Tenant', 'subdomain', finalSubdomain);
+        }
+        throw err;
+      }
     }
     // Scenario 2: Joining an existing restaurant
     else {
@@ -153,12 +202,9 @@ export class AuthService {
         throw new ResourceNotFoundException('Tenant', registerDto.tenantId);
       }
 
-      // Only allow non-privileged roles when joining an existing restaurant
-      const allowedJoinRoles = [UserRole.WAITER, UserRole.KITCHEN, UserRole.COURIER];
-      if (userRole && !allowedJoinRoles.includes(userRole)) {
-        throw new ValidationException(
-          `Cannot join existing restaurant as ${userRole}. Allowed roles: ${allowedJoinRoles.join(', ')}`,
-        );
+      // Cannot join as ADMIN (ADMIN creates their own restaurant)
+      if (userRole === UserRole.ADMIN) {
+        throw new ValidationException('Cannot join existing restaurant as ADMIN. ADMIN must create their own restaurant.');
       }
 
       // Default to WAITER if no role provided
@@ -170,7 +216,7 @@ export class AuthService {
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+    const hashedPassword = await bcrypt.hash(registerDto.password, this.bcryptCost());
 
     // Determine user status: ADMIN creating restaurant = ACTIVE, others = PENDING_APPROVAL
     const userStatus = hasRestaurantName ? 'ACTIVE' : 'PENDING_APPROVAL';
@@ -239,7 +285,7 @@ export class AuthService {
     }
 
     // Track successful registration in Sentry
-    Sentry.captureMessage('New user registered', {
+    Sentry.captureMessage(`New user registered: ${user.email}`, {
       level: 'info',
       tags: {
         event: 'user.register',
@@ -249,6 +295,9 @@ export class AuthService {
       extra: {
         userId: user.id,
         tenantId: user.tenantId,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
       },
     });
 
@@ -311,7 +360,7 @@ export class AuthService {
       email: user.email,
     });
 
-    return this.generateTokens(user);
+    return this.generateTokens(user, ip, userAgent);
   }
 
   private async logUserActivity(
@@ -350,97 +399,189 @@ export class AuthService {
         role: true,
         status: true,
         tenantId: true,
+        tenant: { select: { status: true } },
       },
     });
 
+    // Defer all account-state disclosure until after a successful password
+    // check, so the endpoint cannot be used to enumerate registered emails.
     if (!user) {
       return null;
     }
 
-    // Social auth users cannot login with password
-    if (!user.password) {
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
       return null;
     }
 
     if (user.status === 'PENDING_APPROVAL') {
       throw new UnauthorizedException('Hesabınız henüz onaylanmadı. Lütfen yönetici onayını bekleyin.');
     }
-
     if (user.status !== 'ACTIVE') {
       throw new UnauthorizedException('User account is inactive');
     }
-
-    const isPasswordValid = await bcrypt.compare(password, user.password);
-
-    if (!isPasswordValid) {
-      return null;
+    if (user.tenant?.status !== TenantStatus.ACTIVE) {
+      throw new UnauthorizedException('Your restaurant account is not active');
     }
 
-    const { password: _, ...result } = user;
+    const { password: _, tenant: __, ...result } = user;
     return result;
   }
 
-  async refreshToken(refreshToken: string): Promise<AuthResponseDto> {
+  /**
+   * Rotate the refresh token. Verifies the signed JWT, looks it up in the
+   * DB by its hash, revokes it, and issues a fresh access+refresh pair.
+   *
+   * Reuse detection: if the presented token was already revoked, we treat
+   * it as a token-theft signal and revoke every active refresh token for
+   * the user (forcing re-login on every session).
+   */
+  async refreshToken(
+    refreshToken: string,
+    ip?: string,
+    userAgent?: string,
+  ): Promise<AuthResponseDto> {
+    let payload: any;
     try {
-      const payload = this.jwtService.verify(refreshToken, {
+      payload = this.jwtService.verify(refreshToken, {
         secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        algorithms: ['HS256'],
       });
-
-      const user = await this.prisma.user.findUnique({
-        where: { id: payload.sub },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          status: true,
-          tenantId: true,
-        },
-      });
-
-      if (!user || user.status !== 'ACTIVE') {
-        throw new UnauthorizedException('User not found or inactive');
-      }
-
-      return this.generateTokens(user);
-    } catch (error) {
+    } catch (_err) {
       throw new UnauthorizedException('Invalid refresh token');
     }
+
+    if (payload.type && payload.type !== 'user') {
+      throw new UnauthorizedException('Invalid token type');
+    }
+
+    const tokenHash = this.hashToken(refreshToken);
+    const stored = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash },
+    });
+
+    if (!stored || stored.expiresAt <= new Date()) {
+      throw new UnauthorizedException('Invalid refresh token');
+    }
+
+    if (stored.revokedAt) {
+      // Possible replay of a rotated-out token — revoke the entire family.
+      await this.prisma.refreshToken.updateMany({
+        where: { userId: stored.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      throw new UnauthorizedException('Refresh token reuse detected');
+    }
+
+    const user = await this.prisma.user.findUnique({
+      where: { id: stored.userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        role: true,
+        status: true,
+        tenantId: true,
+        tokenVersion: true,
+        tenant: { select: { status: true } },
+      },
+    });
+
+    if (!user || user.status !== 'ACTIVE') {
+      throw new UnauthorizedException('User not found or inactive');
+    }
+    if (user.tenant?.status !== TenantStatus.ACTIVE) {
+      throw new UnauthorizedException('Your restaurant account is not active');
+    }
+
+    // Refresh tokens must also respect tokenVersion revocation. Previously
+    // a password reset bumped tokenVersion and expired the ACCESS tokens,
+    // but a stolen refresh token could still mint fresh access tokens with
+    // the new version stamp. Reject the refresh if the stamp in the token
+    // predates the current version.
+    const refreshVer = (payload as any).ver ?? 0;
+    if (refreshVer !== user.tokenVersion) {
+      await this.prisma.refreshToken.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      throw new UnauthorizedException('Token has been revoked');
+    }
+
+    // Revoke the rotated-out token, issue a new pair.
+    await this.prisma.refreshToken.update({
+      where: { id: stored.id },
+      data: { revokedAt: new Date() },
+    });
+
+    const { tenant: _t, tokenVersion: _ver, ...userForToken } = user;
+    return this.generateTokens(userForToken, ip, userAgent);
   }
 
-  private async generateTokens(user: UserResponseDto): Promise<AuthResponseDto> {
-    // Read current tokenVersion so the JWT payload carries the stamp
-    // JwtStrategy validates against. Bumping User.tokenVersion (on password
-    // reset / admin lockout / suspicious-login) invalidates every prior
-    // access/refresh token immediately.
+  async logout(userId: string, ip?: string, userAgent?: string): Promise<{ message: string }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { tenantId: true },
+    });
+    if (user) {
+      // Revoke every active refresh token, then audit.
+      await this.prisma.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      await this.logUserActivity(userId, user.tenantId, 'LOGOUT', ip, userAgent);
+    }
+    return { message: 'Logged out' };
+  }
+
+  private async generateTokens(
+    user: UserResponseDto,
+    ip?: string,
+    userAgent?: string,
+  ): Promise<AuthResponseDto> {
+    // Read current tokenVersion so the access token carries the stamp the
+    // JwtStrategy validates against. Bumping User.tokenVersion invalidates
+    // every prior access token for that user.
     const row = await this.prisma.user.findUnique({
       where: { id: user.id },
       select: { tokenVersion: true },
     });
-    const basePayload = {
+    const payload = {
       sub: user.id,
       email: user.email,
       role: user.role,
       tenantId: user.tenantId,
+      type: 'user' as const,
       ver: row?.tokenVersion ?? 0,
     };
 
-    const accessToken = this.jwtService.sign(
-      { ...basePayload, type: 'access' },
-      {
-        secret: this.configService.get<string>('JWT_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_EXPIRES_IN') || '1h',
-      },
-    );
+    const accessToken = this.jwtService.sign(payload, {
+      secret: this.configService.get<string>('JWT_SECRET'),
+      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN') || '15m',
+      algorithm: 'HS256',
+    });
 
-    const refreshToken = this.jwtService.sign(
-      { ...basePayload, type: 'refresh' },
-      {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '30d',
+    const refreshExpiresIn =
+      this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '30d';
+    const refreshToken = this.jwtService.sign(payload, {
+      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+      expiresIn: refreshExpiresIn,
+      algorithm: 'HS256',
+    });
+
+    // Persist the hash so we can revoke/rotate server-side.
+    const decoded: any = this.jwtService.decode(refreshToken);
+    const expiresAt = new Date(decoded.exp * 1000);
+    await this.prisma.refreshToken.create({
+      data: {
+        tokenHash: this.hashToken(refreshToken),
+        userId: user.id,
+        expiresAt,
+        ip,
+        userAgent,
       },
-    );
+    });
 
     return {
       accessToken,
@@ -488,22 +629,23 @@ export class AuthService {
       };
     }
 
-    // Generate reset token
-    const resetToken = uuidv4();
+    // Generate high-entropy reset token (sent via email in raw form, stored hashed)
+    const rawToken = randomBytes(32).toString('hex');
+    const resetTokenHash = this.hashToken(rawToken);
     const resetTokenExpiry = new Date();
     resetTokenExpiry.setHours(resetTokenExpiry.getHours() + 1); // Token valid for 1 hour
 
-    // Store token in database
+    // Store only the hash so a DB leak does not yield usable tokens
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
-        resetToken,
+        resetTokenHash,
         resetTokenExpiry,
       },
     });
 
-    // Send password reset email
-    await this.emailService.sendPasswordResetEmail(user.email, resetToken);
+    // Send password reset email with the raw token
+    await this.emailService.sendPasswordResetEmail(user.email, rawToken);
 
     return {
       message: 'If an account with that email exists, a password reset link has been sent.',
@@ -516,27 +658,33 @@ export class AuthService {
   async resetPassword(resetPasswordDto: ResetPasswordDto): Promise<{ message: string }> {
     const { token, newPassword } = resetPasswordDto;
 
-    // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    // Atomic check-and-set: prevents TOCTOU race condition
-    const result = await this.prisma.user.updateMany({
+    // Lookup by the hash of the incoming token (constant-time-ish via unique index)
+    const resetTokenHash = this.hashToken(token);
+    const user = await this.prisma.user.findFirst({
       where: {
-        resetToken: token,
+        resetTokenHash,
         resetTokenExpiry: {
           gt: new Date(), // Token not expired
         },
       },
+    });
+
+    if (!user) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, this.bcryptCost());
+
+    // Update password and clear reset token (invalidate on use)
+    await this.prisma.user.update({
+      where: { id: user.id },
       data: {
         password: hashedPassword,
-        resetToken: null,
+        resetTokenHash: null,
         resetTokenExpiry: null,
       },
     });
-
-    if (result.count === 0) {
-      throw new BadRequestException('Invalid or expired reset token');
-    }
 
     return {
       message: 'Password has been reset successfully',
@@ -569,7 +717,7 @@ export class AuthService {
     }
 
     // Hash new password
-    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    const hashedPassword = await bcrypt.hash(newPassword, this.bcryptCost());
 
     // Update password
     await this.prisma.user.update({
@@ -585,38 +733,18 @@ export class AuthService {
   }
 
   /**
-   * Generate a 6-digit verification code
-   * Ensures uniqueness across active codes
+   * Generate a 6-digit verification code (uniformly distributed via crypto RNG).
+   * Scope is per-user, so no cross-user uniqueness loop is needed.
    */
-  private async generateVerificationCode(): Promise<string> {
-    let code: string;
-    let isUnique = false;
-
-    while (!isUnique) {
-      // Generate 6-digit random number
-      code = Math.floor(100000 + Math.random() * 900000).toString();
-
-      // Check if code is already in use (not expired)
-      const existingUser = await this.prisma.user.findFirst({
-        where: {
-          emailVerificationCode: code,
-          emailVerificationCodeExpires: {
-            gt: new Date(),
-          },
-        },
-      });
-
-      if (!existingUser) {
-        isUnique = true;
-      }
-    }
-
-    return code;
+  private generateVerificationCode(): string {
+    // 1,000,000 values → 0-999,999, formatted as 6 digits
+    const n = randomBytes(4).readUInt32BE(0) % 1_000_000;
+    return n.toString().padStart(6, '0');
   }
 
   /**
    * Send email verification code
-   * Generates a 6-digit code and sends it via email
+   * Generates a 6-digit code, stores its sha256 hash, emails the raw code.
    */
   async sendEmailVerification(userId: string): Promise<{ message: string; codeExpiry: Date }> {
     const user = await this.prisma.user.findUnique({
@@ -635,20 +763,20 @@ export class AuthService {
     }
 
     // Generate 6-digit verification code
-    const verificationCode = await this.generateVerificationCode();
+    const verificationCode = this.generateVerificationCode();
     const codeExpires = new Date();
     codeExpires.setHours(codeExpires.getHours() + 1); // Code valid for 1 hour
 
-    // Store code in database
+    // Store only the hash so a DB leak does not yield usable codes
     await this.prisma.user.update({
       where: { id: user.id },
       data: {
-        emailVerificationCode: verificationCode,
+        emailVerificationCodeHash: this.hashToken(verificationCode),
         emailVerificationCodeExpires: codeExpires,
       },
     });
 
-    // Send verification email with code
+    // Send verification email with raw code
     await this.emailService.sendEmailVerificationCode(
       user.email,
       verificationCode,
@@ -681,20 +809,25 @@ export class AuthService {
   }
 
   /**
-   * Verify email using 6-digit code
+   * Verify email using 6-digit code, scoped to the account identified by email.
    */
-  async verifyEmailWithCode(code: string): Promise<{ message: string; verified: boolean }> {
-    // Find user by verification code
-    const user = await this.prisma.user.findFirst({
-      where: {
-        emailVerificationCode: code,
-        emailVerificationCodeExpires: {
-          gt: new Date(), // Code not expired
-        },
-      },
+  async verifyEmailWithCode(
+    email: string,
+    code: string,
+  ): Promise<{ message: string; verified: boolean }> {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
     });
 
-    if (!user) {
+    // Return the same error for "no user" and "bad code" so the endpoint cannot
+    // be used to enumerate which emails are registered.
+    if (
+      !user ||
+      !user.emailVerificationCodeHash ||
+      !user.emailVerificationCodeExpires ||
+      user.emailVerificationCodeExpires <= new Date() ||
+      user.emailVerificationCodeHash !== this.hashToken(code)
+    ) {
       throw new BadRequestException('Invalid or expired verification code');
     }
 
@@ -703,7 +836,7 @@ export class AuthService {
       where: { id: user.id },
       data: {
         emailVerified: true,
-        emailVerificationCode: null,
+        emailVerificationCodeHash: null,
         emailVerificationCodeExpires: null,
       },
     });
@@ -756,7 +889,22 @@ export class AuthService {
           lastName = payload.family_name || '';
         }
       } catch (idTokenError) {
-        // If ID token verification fails, try as access token
+        // If ID token verification fails, treat the credential as an access
+        // token. We must first verify the audience via the tokeninfo endpoint
+        // — otherwise any valid Google access token issued for any OAuth
+        // client could authenticate as that user here.
+        const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
+        const tokenInfoRes = await fetch(
+          `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(credential)}`,
+        );
+        if (!tokenInfoRes.ok) {
+          throw new UnauthorizedException('Invalid Google token');
+        }
+        const tokenInfo = (await tokenInfoRes.json()) as { aud?: string };
+        if (!clientId || tokenInfo.aud !== clientId) {
+          throw new UnauthorizedException('Google token not issued for this application');
+        }
+
         const response = await fetch(
           `https://www.googleapis.com/oauth2/v3/userinfo`,
           {
@@ -1039,20 +1187,11 @@ export class AuthService {
       ? `${firstName}'s Restaurant`
       : `Restaurant ${email.split('@')[0]}`;
 
-    // Generate subdomain
     const baseSubdomain = restaurantName
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
-
-    let subdomain = baseSubdomain;
-    const existingTenant = await this.prisma.tenant.findUnique({
-      where: { subdomain },
-    });
-
-    if (existingTenant) {
-      subdomain = `${baseSubdomain}-${Math.random().toString(36).substring(2, 8)}`;
-    }
+    const subdomain = await this.allocateSubdomain(baseSubdomain);
 
     // Get FREE plan
     const freePlan = await this.prisma.subscriptionPlan.findUnique({
@@ -1063,62 +1202,72 @@ export class AuthService {
       throw new ResourceNotFoundException('FREE subscription plan');
     }
 
-    // Create tenant
-    const tenant = await this.prisma.tenant.create({
-      data: {
-        name: restaurantName,
-        subdomain,
-        paymentRegion: 'INTERNATIONAL',
-        currentPlanId: freePlan.id,
-      },
-    });
-
-    // Create FREE subscription
     const now = new Date();
     const currentPeriodEnd = new Date(now);
     currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 10);
 
-    await this.prisma.subscription.create({
-      data: {
-        tenantId: tenant.id,
-        planId: freePlan.id,
-        status: 'ACTIVE',
-        billingCycle: 'MONTHLY',
-        paymentProvider: 'EMAIL',
-        startDate: now,
-        currentPeriodStart: now,
-        currentPeriodEnd,
-        isTrialPeriod: false,
-        amount: 0,
-        currency: freePlan.currency,
-        autoRenew: true,
-        cancelAtPeriodEnd: false,
-      },
-    });
-
-    // Create user as ADMIN
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        password: null, // Social auth users cannot login with password
-        firstName,
-        lastName,
-        role: UserRole.ADMIN,
-        tenantId: tenant.id,
-        googleId,
-        appleId,
-        authProvider,
-        emailVerified: true, // Email is verified by OAuth provider
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        tenantId: true,
-      },
-    });
+    // Tenant + subscription + user in one transaction so a failure midway
+    // does not leave orphaned rows.
+    let user;
+    try {
+      user = await this.prisma.$transaction(async (tx) => {
+        const tenant = await tx.tenant.create({
+          data: {
+            name: restaurantName,
+            subdomain,
+            paymentRegion: 'INTERNATIONAL',
+            currentPlanId: freePlan.id,
+          },
+        });
+        await tx.subscription.create({
+          data: {
+            tenantId: tenant.id,
+            planId: freePlan.id,
+            status: 'ACTIVE',
+            billingCycle: 'MONTHLY',
+            paymentProvider: 'EMAIL',
+            startDate: now,
+            currentPeriodStart: now,
+            currentPeriodEnd,
+            isTrialPeriod: false,
+            amount: 0,
+            currency: freePlan.currency,
+            autoRenew: true,
+            cancelAtPeriodEnd: false,
+          },
+        });
+        return tx.user.create({
+          data: {
+            email,
+            password: '',
+            firstName,
+            lastName,
+            role: UserRole.ADMIN,
+            tenantId: tenant.id,
+            googleId,
+            appleId,
+            authProvider,
+            emailVerified: true,
+          },
+          select: {
+            id: true,
+            email: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+            tenantId: true,
+          },
+        });
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        throw new ResourceAlreadyExistsException('Tenant', 'subdomain', subdomain);
+      }
+      throw err;
+    }
 
     // Track new social auth registration in Sentry
     Sentry.captureMessage(`New user registered via ${authProvider}: ${email}`, {

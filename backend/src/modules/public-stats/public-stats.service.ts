@@ -16,7 +16,19 @@ export class PublicStatsService {
   ) {}
 
   private hashIp(ip: string): string {
-    return crypto.createHash('sha256').update(ip).digest('hex').substring(0, 32);
+    // Salt with a server-side secret so a full IPv4 rainbow table (~450GB,
+    // already circulating) cannot re-identify visitors from a DB dump of the
+    // ipHash column.
+    const salt =
+      process.env.IP_HASH_SALT ??
+      process.env.JWT_SECRET ??
+      process.env.APP_SECRET ??
+      '';
+    return crypto
+      .createHash('sha256')
+      .update(`${salt}:${ip}`)
+      .digest('hex')
+      .substring(0, 32);
   }
 
   private parseDeviceType(userAgent: string): string {
@@ -70,22 +82,43 @@ export class PublicStatsService {
 
   async getPublicStats() {
     try {
-      // Return from cache (updated every 5 minutes)
       const cache = await this.prisma.publicStatsCache.findFirst({
         where: { id: 'main' },
       });
-
-      if (cache) {
-        return cache;
-      }
-
-      // Fallback: Calculate live stats
-      return await this.calculateAndCacheStats();
+      const raw = cache ?? (await this.calculateAndCacheStats());
+      return this.toPublicView(raw);
     } catch (error) {
       this.logger.error(`Failed to get public stats: ${error.message}`);
-      // Return default stats if tables don't exist or error occurs
-      return this.getDefaultStats();
+      return this.toPublicView(this.getDefaultStats());
     }
+  }
+
+  /**
+   * Strip competitively-sensitive numbers from the cache row before serving
+   * over the unauthenticated endpoint. Per-tenant revenue / order counts are
+   * computed and cached for internal analytics, but the public endpoint
+   * should only show vanity metrics a competitor cannot use to derive GMV
+   * run-rate or week-over-week order volume. totalRevenue is hidden entirely;
+   * totalOrders is rounded down to the nearest 1,000 for display.
+   */
+  private toPublicView(raw: any) {
+    const totalOrdersRounded = raw.totalOrders
+      ? Math.floor(raw.totalOrders / 1000) * 1000
+      : 0;
+    return {
+      totalViews: raw.totalViews ?? 0,
+      uniqueVisitors: raw.uniqueVisitors ?? 0,
+      totalReviews: raw.totalReviews ?? 0,
+      averageRating: raw.averageRating ?? 0,
+      totalTenants: raw.totalTenants ?? 0,
+      totalOrders: totalOrdersRounded,
+      countryDistribution: raw.countryDistribution ?? {},
+      cityDistribution: raw.cityDistribution ?? {},
+      viewsToday: raw.viewsToday ?? 0,
+      viewsThisWeek: raw.viewsThisWeek ?? 0,
+      viewsThisMonth: raw.viewsThisMonth ?? 0,
+      lastUpdated: raw.lastUpdated ?? new Date(),
+    };
   }
 
   private getDefaultStats() {

@@ -6,6 +6,7 @@ import {
   Patch,
   Param,
   Delete,
+  Query,
   UseGuards,
   Request,
 } from '@nestjs/common';
@@ -15,19 +16,20 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateProfileDto, UpdateEmailDto } from './dto/update-profile.dto';
 import { UpdateOnboardingDto } from './dto/update-onboarding.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { TenantGuard } from '../auth/guards/tenant.guard';
 import { SubscriptionLimitsGuard } from '../../common/guards/subscription-limits.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { CheckLimit } from '../../common/decorators/check-limit.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
 
+/**
+ * JwtAuthGuard, TenantGuard, and RolesGuard are registered globally via
+ * APP_GUARD in AuthModule — controller-level @UseGuards for them would
+ * only cause the same guards to run twice.
+ */
 @ApiTags('users')
 @ApiBearerAuth()
 @Controller('users')
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
@@ -39,61 +41,74 @@ export class UsersController {
   @ApiResponse({ status: 201, description: 'User successfully created' })
   @ApiResponse({ status: 409, description: 'Email already in use' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions or limit reached' })
-  create(@Body() createUserDto: CreateUserDto, @Request() req) {
-    return this.usersService.create(createUserDto, req.tenantId);
+  create(
+    @Body() createUserDto: CreateUserDto,
+    @Request() req,
+    @CurrentUser() actor: { id: string; role: string },
+  ) {
+    return this.usersService.create(createUserDto, req.tenantId, actor);
   }
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get all users (ADMIN, MANAGER)' })
-  @ApiResponse({ status: 200, description: 'List of all users' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
-  findAll(@Request() req) {
-    return this.usersService.findAll(req.tenantId);
+  @ApiResponse({ status: 200, description: 'Paginated list of users' })
+  findAll(
+    @Request() req,
+    @Query('status') status?: string,
+    @Query('role') role?: string,
+    @Query('search') search?: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.usersService.findAll(req.tenantId, {
+      status,
+      role,
+      search,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    });
   }
 
   @Get(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get a user by ID (ADMIN, MANAGER)' })
-  @ApiResponse({ status: 200, description: 'User details' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   findOne(@Param('id') id: string, @Request() req) {
     return this.usersService.findOne(id, req.tenantId);
   }
 
   @Patch(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ summary: 'Update a user (ADMIN, MANAGER)' })
-  @ApiResponse({ status: 200, description: 'User successfully updated' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  @ApiResponse({ status: 409, description: 'Email already in use' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto, @Request() req) {
-    return this.usersService.update(id, updateUserDto, req.tenantId, req.user?.role);
+  @ApiOperation({ summary: 'Update a user (ADMIN, MANAGER; role changes ADMIN-only)' })
+  update(
+    @Param('id') id: string,
+    @Body() updateUserDto: UpdateUserDto,
+    @Request() req,
+    @CurrentUser() actor: { id: string; role: string },
+  ) {
+    return this.usersService.update(id, updateUserDto, req.tenantId, actor);
   }
 
   @Delete(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ summary: 'Delete a user (ADMIN, MANAGER)' })
-  @ApiResponse({ status: 200, description: 'User successfully deleted' })
-  @ApiResponse({ status: 404, description: 'User not found' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
-  remove(@Param('id') id: string, @Request() req) {
-    return this.usersService.remove(id, req.tenantId);
+  @ApiOperation({ summary: 'Soft delete a user (ADMIN, MANAGER)' })
+  remove(
+    @Param('id') id: string,
+    @Request() req,
+    @CurrentUser('id') actorId: string,
+  ) {
+    return this.usersService.remove(id, req.tenantId, actorId);
   }
 
   // Profile endpoints (all authenticated users)
   @Get('me/profile')
   @ApiOperation({ summary: 'Get current user profile' })
-  @ApiResponse({ status: 200, description: 'User profile retrieved' })
   getMyProfile(@CurrentUser('id') userId: string) {
     return this.usersService.getMyProfile(userId);
   }
 
   @Patch('me/profile')
   @ApiOperation({ summary: 'Update current user profile' })
-  @ApiResponse({ status: 200, description: 'Profile successfully updated' })
   updateMyProfile(
     @CurrentUser('id') userId: string,
     @Body() updateProfileDto: UpdateProfileDto,
@@ -103,9 +118,6 @@ export class UsersController {
 
   @Patch('me/email')
   @ApiOperation({ summary: 'Update user email (requires password)' })
-  @ApiResponse({ status: 200, description: 'Email successfully updated' })
-  @ApiResponse({ status: 400, description: 'Invalid password' })
-  @ApiResponse({ status: 409, description: 'Email already in use' })
   updateMyEmail(
     @CurrentUser('id') userId: string,
     @Body() updateEmailDto: UpdateEmailDto,
@@ -116,9 +128,6 @@ export class UsersController {
   @Patch(':id/approve')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Approve a pending user (ADMIN, MANAGER)' })
-  @ApiResponse({ status: 200, description: 'User approved successfully' })
-  @ApiResponse({ status: 404, description: 'User not found or not pending approval' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   approveUser(
     @Param('id') id: string,
     @CurrentUser('id') approverId: string,
@@ -130,9 +139,6 @@ export class UsersController {
   @Patch(':id/reject')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Reject a pending user (ADMIN, MANAGER)' })
-  @ApiResponse({ status: 200, description: 'User rejected successfully' })
-  @ApiResponse({ status: 404, description: 'User not found or not pending approval' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   rejectUser(@Param('id') id: string, @Request() req) {
     return this.usersService.rejectUser(id, req.tenantId);
   }
@@ -142,24 +148,23 @@ export class UsersController {
   @UseGuards(SubscriptionLimitsGuard)
   @CheckLimit({ resource: 'users', action: 'create' })
   @ApiOperation({ summary: 'Reactivate an inactive user (ADMIN, MANAGER)' })
-  @ApiResponse({ status: 200, description: 'User reactivated successfully' })
-  @ApiResponse({ status: 404, description: 'User not found or not inactive' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions or user limit reached' })
-  reactivateUser(@Param('id') id: string, @Request() req) {
-    return this.usersService.reactivateUser(id, req.tenantId);
+  reactivateUser(
+    @Param('id') id: string,
+    @Request() req,
+    @CurrentUser('id') actorId: string,
+  ) {
+    return this.usersService.reactivateUser(id, req.tenantId, actorId);
   }
 
   // Onboarding endpoints
   @Get('me/onboarding')
   @ApiOperation({ summary: 'Get current user onboarding data' })
-  @ApiResponse({ status: 200, description: 'Onboarding data retrieved' })
   getMyOnboarding(@CurrentUser('id') userId: string) {
     return this.usersService.getOnboarding(userId);
   }
 
   @Patch('me/onboarding')
   @ApiOperation({ summary: 'Update current user onboarding data' })
-  @ApiResponse({ status: 200, description: 'Onboarding data updated' })
   updateMyOnboarding(
     @CurrentUser('id') userId: string,
     @Body() updateOnboardingDto: UpdateOnboardingDto,

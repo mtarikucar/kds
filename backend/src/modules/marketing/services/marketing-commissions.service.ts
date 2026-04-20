@@ -1,14 +1,10 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CommissionFilterDto } from '../dto/commission-filter.dto';
-import { MarketingNotificationsService } from './marketing-notifications.service';
 
 @Injectable()
 export class MarketingCommissionsService {
-  constructor(
-    private prisma: PrismaService,
-    private notificationsService: MarketingNotificationsService,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   async findAll(filter: CommissionFilterDto, userId: string, userRole: string) {
     const page = filter.page || 1;
@@ -94,44 +90,57 @@ export class MarketingCommissionsService {
   }
 
   async approve(id: string) {
-    const commission = await this.prisma.$transaction(async (tx) => {
-      const c = await tx.commission.findUnique({ where: { id } });
-      if (!c) throw new NotFoundException('Commission not found');
+    const commission = await this.prisma.commission.findUnique({ where: { id } });
+    if (!commission) throw new NotFoundException('Commission not found');
+    if (commission.status !== 'PENDING') {
+      throw new BadRequestException('Only pending commissions can be approved');
+    }
+    // An amount of zero usually means the auto-calculation had nothing
+    // to apply (FREE-plan conversion, etc.). Require the manager to
+    // set a real amount before approval so accounting has something to
+    // pay out.
+    if (new (commission.amount.constructor as any)(commission.amount).isZero?.() ||
+        Number(commission.amount) === 0) {
+      throw new BadRequestException(
+        'Commission amount is zero. Set an amount before approving.',
+      );
+    }
 
-      if (c.status !== 'PENDING') {
-        throw new BadRequestException('Only PENDING commissions can be approved');
-      }
-
-      return tx.commission.update({
-        where: { id },
-        data: { status: 'APPROVED', approvedAt: new Date() },
-      });
+    return this.prisma.commission.update({
+      where: { id },
+      data: { status: 'APPROVED', approvedAt: new Date() },
     });
+  }
 
-    this.notificationsService.create({
-      userId: commission.marketingUserId,
-      type: 'COMMISSION_APPROVED',
-      title: 'Commission approved',
-      message: `Your commission of ${commission.amount} has been approved`,
-      metadata: { commissionId: id },
-    }).catch(() => {});
-
-    return commission;
+  /**
+   * Set the commission amount. Only valid while still PENDING so
+   * approved/paid rows remain immutable for audit.
+   */
+  async updateAmount(id: string, amount: number) {
+    if (!Number.isFinite(amount) || amount < 0) {
+      throw new BadRequestException('Amount must be a non-negative number');
+    }
+    const commission = await this.prisma.commission.findUnique({ where: { id } });
+    if (!commission) throw new NotFoundException('Commission not found');
+    if (commission.status !== 'PENDING') {
+      throw new BadRequestException('Only pending commissions can be updated');
+    }
+    return this.prisma.commission.update({
+      where: { id },
+      data: { amount },
+    });
   }
 
   async markPaid(id: string) {
-    return this.prisma.$transaction(async (tx) => {
-      const commission = await tx.commission.findUnique({ where: { id } });
-      if (!commission) throw new NotFoundException('Commission not found');
+    const commission = await this.prisma.commission.findUnique({ where: { id } });
+    if (!commission) throw new NotFoundException('Commission not found');
+    if (commission.status !== 'APPROVED') {
+      throw new BadRequestException('Only approved commissions can be marked as paid');
+    }
 
-      if (commission.status !== 'APPROVED') {
-        throw new BadRequestException('Only APPROVED commissions can be marked as paid');
-      }
-
-      return tx.commission.update({
-        where: { id },
-        data: { status: 'PAID', paidAt: new Date() },
-      });
+    return this.prisma.commission.update({
+      where: { id },
+      data: { status: 'PAID', paidAt: new Date() },
     });
   }
 }

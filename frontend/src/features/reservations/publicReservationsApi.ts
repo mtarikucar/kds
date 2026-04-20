@@ -73,8 +73,21 @@ export const useLookupReservation = () => {
 
 export const useCancelPublicReservation = () => {
   return useMutation({
-    mutationFn: async ({ tenantId, id }: { tenantId: string; id: string }) => {
-      const response = await publicApi.patch(`/public/reservations/${tenantId}/${id}/cancel`);
+    mutationFn: async ({
+      tenantId,
+      id,
+      customerPhone,
+      reservationNumber,
+    }: {
+      tenantId: string;
+      id: string;
+      customerPhone: string;
+      reservationNumber: string;
+    }) => {
+      const response = await publicApi.patch(
+        `/public/reservations/${tenantId}/${id}/cancel`,
+        { customerPhone, reservationNumber },
+      );
       return response.data as Reservation;
     },
   });

@@ -1,5 +1,9 @@
-import { IsEmail, IsNotEmpty, IsString, MinLength, MaxLength, Matches } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsString, Matches, MinLength } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
+
+const PASSWORD_COMPLEXITY_REGEX = /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
+const PASSWORD_COMPLEXITY_MESSAGE =
+  'Password must contain at least one lowercase letter, one uppercase letter, and one digit';
 
 export class ForgotPasswordDto {
   @ApiProperty({ example: 'user@example.com' })
@@ -17,10 +21,7 @@ export class ResetPasswordDto {
   @ApiProperty({ minimum: 8 })
   @IsString()
   @MinLength(8)
-  @MaxLength(128)
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/, {
-    message: 'Password must contain at least one uppercase letter, one lowercase letter, and one digit',
-  })
+  @Matches(PASSWORD_COMPLEXITY_REGEX, { message: PASSWORD_COMPLEXITY_MESSAGE })
   @IsNotEmpty()
   newPassword: string;
 }
@@ -34,10 +35,7 @@ export class ChangePasswordDto {
   @ApiProperty({ minimum: 8 })
   @IsString()
   @MinLength(8)
-  @MaxLength(128)
-  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/, {
-    message: 'Password must contain at least one uppercase letter, one lowercase letter, and one digit',
-  })
+  @Matches(PASSWORD_COMPLEXITY_REGEX, { message: PASSWORD_COMPLEXITY_MESSAGE })
   @IsNotEmpty()
   newPassword: string;
 }

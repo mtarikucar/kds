@@ -1,7 +1,8 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
 import * as fs from 'fs';
 import * as path from 'path';
+import PDFDocument from 'pdfkit';
+import { PrismaService } from '../../../prisma/prisma.service';
 
 @Injectable()
 export class InvoicePdfService {
@@ -10,335 +11,215 @@ export class InvoicePdfService {
 
   constructor(private prisma: PrismaService) {
     this.storagePath = path.join(process.cwd(), 'storage', 'invoices');
-    // Ensure storage directory exists
     if (!fs.existsSync(this.storagePath)) {
       fs.mkdirSync(this.storagePath, { recursive: true });
     }
   }
 
   /**
-   * Generate PDF for an invoice
-   * Using simple HTML template for now - can be enhanced with puppeteer or pdfkit
+   * Generate a real PDF (via pdfkit) for the given invoice. The file is
+   * named from the sanitized invoice number so it can be safely served
+   * by filename. The DB row stores only the relative filename (never the
+   * full /api path) so we can regenerate URLs freely.
    */
   async generateInvoicePdf(invoiceId: string): Promise<string> {
-    try {
-      const invoice = await this.prisma.invoice.findUnique({
-        where: { id: invoiceId },
-        include: {
-          subscription: {
-            include: {
-              plan: true,
-              tenant: true,
-            },
-          },
-          payment: true,
-        },
-      });
+    const invoice = await this.prisma.invoice.findUnique({
+      where: { id: invoiceId },
+      include: {
+        subscription: { include: { plan: true, tenant: true } },
+        payment: true,
+      },
+    });
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
 
-      if (!invoice) {
-        throw new NotFoundException('Invoice not found');
+    const safeName = this.sanitizeFilename(`invoice-${invoice.invoiceNumber}.pdf`);
+    const filepath = path.join(this.storagePath, safeName);
+
+    await this.writePdf(filepath, invoice);
+
+    await this.prisma.invoice.update({
+      where: { id: invoiceId },
+      data: { pdfUrl: safeName },
+    });
+
+    this.logger.log(`Invoice PDF generated: ${safeName}`);
+    return safeName;
+  }
+
+  private sanitizeFilename(name: string): string {
+    // Strip path separators and any non-printable chars.
+    return name.replace(/[^A-Za-z0-9._-]/g, '_');
+  }
+
+  private writePdf(filepath: string, invoice: any): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ size: 'A4', margin: 50 });
+      const stream = fs.createWriteStream(filepath);
+      stream.on('error', reject);
+      stream.on('finish', () => resolve());
+      doc.pipe(stream);
+
+      const tenant = invoice.subscription.tenant;
+      const plan = invoice.subscription.plan;
+      const currency = invoice.currency;
+      const money = (v: any) => `${currency} ${Number(v).toFixed(2)}`;
+      const dateStr = (d?: Date | null) =>
+        d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '-';
+
+      // Header
+      doc
+        .fontSize(22)
+        .fillColor('#4F46E5')
+        .text('HummyTummy', 50, 50)
+        .fontSize(10)
+        .fillColor('#666')
+        .text('Subscription Management', 50, 78);
+
+      doc
+        .fontSize(18)
+        .fillColor('#111')
+        .text('INVOICE', 400, 50, { align: 'right' })
+        .fontSize(10)
+        .fillColor('#555')
+        .text(invoice.invoiceNumber, 400, 74, { align: 'right' })
+        .text(`Status: ${invoice.status}`, 400, 88, { align: 'right' });
+
+      doc.moveTo(50, 110).lineTo(545, 110).strokeColor('#E5E7EB').stroke();
+
+      // Bill-to
+      doc
+        .fontSize(9)
+        .fillColor('#888')
+        .text('BILL TO', 50, 130);
+      doc.fontSize(12).fillColor('#111').text(tenant.name, 50, 144);
+      if (tenant.subdomain) {
+        doc.fontSize(10).fillColor('#666').text(tenant.subdomain, 50, 160);
       }
 
-      // Generate HTML content
-      const htmlContent = this.generateInvoiceHtml(invoice);
+      // Dates
+      doc.fontSize(9).fillColor('#888').text('INVOICE DATE', 300, 130);
+      doc.fontSize(10).fillColor('#111').text(dateStr(invoice.createdAt), 300, 144);
+      doc.fontSize(9).fillColor('#888').text('DUE DATE', 430, 130);
+      doc.fontSize(10).fillColor('#111').text(dateStr(invoice.dueDate), 430, 144);
+      if (invoice.paidAt) {
+        doc.fontSize(9).fillColor('#888').text('PAID DATE', 430, 170);
+        doc.fontSize(10).fillColor('#111').text(dateStr(invoice.paidAt), 430, 184);
+      }
 
-      // Save HTML as temporary file (in production, use puppeteer to convert to PDF)
-      const filename = `invoice-${invoice.invoiceNumber}.html`;
-      const filepath = path.join(this.storagePath, filename);
+      // Line items table header
+      const tableTop = 230;
+      doc
+        .rect(50, tableTop, 495, 24)
+        .fillColor('#F3F4F6')
+        .fill();
+      doc
+        .fillColor('#111')
+        .fontSize(10)
+        .text('Description', 60, tableTop + 7)
+        .text('Period', 280, tableTop + 7)
+        .text('Amount', 470, tableTop + 7, { width: 70, align: 'right' });
 
-      fs.writeFileSync(filepath, htmlContent);
+      // Line item
+      const itemY = tableTop + 32;
+      doc
+        .fillColor('#111')
+        .text(plan.displayName, 60, itemY)
+        .fontSize(9)
+        .fillColor('#666')
+        .text(`${invoice.subscription.billingCycle} Subscription`, 60, itemY + 14);
+      doc
+        .fontSize(10)
+        .fillColor('#111')
+        .text(
+          `${dateStr(invoice.periodStart)} → ${dateStr(invoice.periodEnd)}`,
+          280,
+          itemY,
+        );
+      doc.text(money(invoice.subtotal), 470, itemY, { width: 70, align: 'right' });
 
-      // Return URL to access the invoice
-      const invoiceUrl = `/api/invoices/${invoiceId}/download`;
+      doc
+        .moveTo(50, itemY + 40)
+        .lineTo(545, itemY + 40)
+        .strokeColor('#E5E7EB')
+        .stroke();
 
-      // Update invoice with PDF URL
-      await this.prisma.invoice.update({
-        where: { id: invoiceId },
-        data: { pdfUrl: invoiceUrl },
-      });
+      // Totals
+      const totalsY = itemY + 56;
+      const labelX = 380;
+      const valueX = 470;
+      doc.fontSize(10).fillColor('#555');
+      doc.text('Subtotal', labelX, totalsY, { width: 80, align: 'right' });
+      doc
+        .fillColor('#111')
+        .text(money(invoice.subtotal), valueX, totalsY, { width: 70, align: 'right' });
+      if (Number(invoice.tax) > 0) {
+        doc.fillColor('#555').text('Tax', labelX, totalsY + 18, { width: 80, align: 'right' });
+        doc
+          .fillColor('#111')
+          .text(money(invoice.tax), valueX, totalsY + 18, { width: 70, align: 'right' });
+      }
+      const grandY = totalsY + 40;
+      doc
+        .moveTo(labelX, grandY - 4)
+        .lineTo(valueX + 70, grandY - 4)
+        .strokeColor('#111')
+        .stroke();
+      doc
+        .fontSize(12)
+        .fillColor('#111')
+        .text('Total', labelX, grandY + 2, { width: 80, align: 'right' });
+      doc.text(money(invoice.total), valueX, grandY + 2, { width: 70, align: 'right' });
 
-      this.logger.log(`Invoice PDF generated: ${filename}`);
-      return invoiceUrl;
-    } catch (error) {
-      this.logger.error(`Failed to generate invoice PDF: ${error.message}`);
-      throw error;
-    }
+      // Payment info
+      if (invoice.payment) {
+        doc
+          .fontSize(9)
+          .fillColor('#888')
+          .text('PAYMENT', 50, grandY + 40);
+        doc
+          .fontSize(10)
+          .fillColor('#111')
+          .text(`Provider: ${invoice.payment.paymentProvider}`, 50, grandY + 54);
+        if (invoice.payment.externalReference) {
+          doc.text(
+            `Reference: ${invoice.payment.externalReference}`,
+            50,
+            grandY + 68,
+          );
+        }
+      }
+
+      doc
+        .fontSize(9)
+        .fillColor('#888')
+        .text(
+          'Thank you for your business. For questions about this invoice please contact support.',
+          50,
+          760,
+          { width: 495, align: 'center' },
+        );
+
+      doc.end();
+    });
   }
 
   /**
-   * Escape HTML special characters to prevent XSS
-   */
-  private escapeHtml(str: string): string {
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
-  /**
-   * Generate HTML content for invoice
-   */
-  private generateInvoiceHtml(invoice: any): string {
-    const tenant = invoice.subscription.tenant;
-    const plan = invoice.subscription.plan;
-    const tenantName = this.escapeHtml(tenant.name);
-    const tenantEmail = tenant.email ? this.escapeHtml(tenant.email) : null;
-    const tenantAddress = tenant.address ? this.escapeHtml(tenant.address) : null;
-    const planDisplayName = this.escapeHtml(plan.displayName);
-
-    return `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>Invoice ${invoice.invoiceNumber}</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 20px;
-            color: #333;
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            border-bottom: 3px solid #4F46E5;
-            padding-bottom: 20px;
-            margin-bottom: 30px;
-        }
-        .company-name {
-            font-size: 28px;
-            font-weight: bold;
-            color: #4F46E5;
-        }
-        .invoice-title {
-            font-size: 24px;
-            color: #666;
-        }
-        .invoice-number {
-            font-size: 18px;
-            color: #888;
-            margin-top: 5px;
-        }
-        .section {
-            margin-bottom: 30px;
-        }
-        .section-title {
-            font-size: 14px;
-            font-weight: bold;
-            color: #666;
-            text-transform: uppercase;
-            margin-bottom: 10px;
-        }
-        .info-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-        }
-        .table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
-        }
-        .table th {
-            background-color: #F3F4F6;
-            padding: 12px;
-            text-align: left;
-            font-weight: 600;
-            border-bottom: 2px solid #E5E7EB;
-        }
-        .table td {
-            padding: 12px;
-            border-bottom: 1px solid #E5E7EB;
-        }
-        .totals {
-            margin-top: 30px;
-            text-align: right;
-        }
-        .total-row {
-            display: flex;
-            justify-content: flex-end;
-            padding: 8px 0;
-        }
-        .total-label {
-            width: 200px;
-            text-align: right;
-            padding-right: 20px;
-        }
-        .total-value {
-            width: 150px;
-            text-align: right;
-        }
-        .grand-total {
-            font-size: 20px;
-            font-weight: bold;
-            padding-top: 10px;
-            border-top: 2px solid #333;
-            margin-top: 10px;
-        }
-        .status-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 600;
-        }
-        .status-paid {
-            background-color: #DEF7EC;
-            color: #03543F;
-        }
-        .status-open {
-            background-color: #FEF3C7;
-            color: #92400E;
-        }
-        .footer {
-            margin-top: 50px;
-            padding-top: 20px;
-            border-top: 1px solid #E5E7EB;
-            text-align: center;
-            color: #888;
-            font-size: 12px;
-        }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <div>
-            <div class="company-name">HummyTummy</div>
-            <div style="color: #666; margin-top: 5px;">Subscription Management</div>
-        </div>
-        <div style="text-align: right;">
-            <div class="invoice-title">INVOICE</div>
-            <div class="invoice-number">${invoice.invoiceNumber}</div>
-            <div style="margin-top: 10px;">
-                <span class="status-badge status-${invoice.status.toLowerCase()}">
-                    ${invoice.status}
-                </span>
-            </div>
-        </div>
-    </div>
-
-    <div class="section">
-        <div class="section-title">Bill To</div>
-        <div style="font-size: 16px; font-weight: 600;">${tenantName}</div>
-        ${tenantEmail ? `<div style="color: #666;">${tenantEmail}</div>` : ''}
-        ${tenantAddress ? `<div style="color: #666;">${tenantAddress}</div>` : ''}
-    </div>
-
-    <div class="section">
-        <div class="info-row">
-            <div>
-                <div class="section-title">Invoice Date</div>
-                <div>${new Date(invoice.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
-            </div>
-            <div>
-                <div class="section-title">Due Date</div>
-                <div>${invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Due on receipt'}</div>
-            </div>
-            ${invoice.paidAt ? `
-            <div>
-                <div class="section-title">Paid Date</div>
-                <div>${new Date(invoice.paidAt).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
-            </div>
-            ` : ''}
-        </div>
-    </div>
-
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Description</th>
-                <th>Period</th>
-                <th style="text-align: right;">Amount</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>
-                    <strong>${planDisplayName}</strong>
-                    <div style="color: #666; font-size: 14px;">
-                        ${invoice.subscription.billingCycle} Subscription
-                    </div>
-                </td>
-                <td>
-                    ${new Date(invoice.periodStart).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} -
-                    ${new Date(invoice.periodEnd).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </td>
-                <td style="text-align: right;">${invoice.currency} ${Number(invoice.subtotal).toFixed(2)}</td>
-            </tr>
-        </tbody>
-    </table>
-
-    <div class="totals">
-        <div class="total-row">
-            <div class="total-label">Subtotal:</div>
-            <div class="total-value">${invoice.currency} ${Number(invoice.subtotal).toFixed(2)}</div>
-        </div>
-        ${Number(invoice.tax) > 0 ? `
-        <div class="total-row">
-            <div class="total-label">Tax:</div>
-            <div class="total-value">${invoice.currency} ${Number(invoice.tax).toFixed(2)}</div>
-        </div>
-        ` : ''}
-        <div class="total-row grand-total">
-            <div class="total-label">Total:</div>
-            <div class="total-value">${invoice.currency} ${Number(invoice.total).toFixed(2)}</div>
-        </div>
-    </div>
-
-    ${invoice.description ? `
-    <div class="section">
-        <div class="section-title">Notes</div>
-        <div>${invoice.description}</div>
-    </div>
-    ` : ''}
-
-    ${invoice.payment ? `
-    <div class="section">
-        <div class="section-title">Payment Information</div>
-        <div class="info-row">
-            <div>
-                <strong>Payment Method:</strong> ${invoice.payment.paymentProvider}
-            </div>
-            <div>
-                <strong>Payment Date:</strong> ${invoice.payment.paidAt ? new Date(invoice.payment.paidAt).toLocaleDateString() : 'Pending'}
-            </div>
-        </div>
-    </div>
-    ` : ''}
-
-    <div class="footer">
-        <p>Thank you for your business!</p>
-        <p>For questions about this invoice, please contact support@restaurant-pos.com</p>
-    </div>
-</body>
-</html>
-    `;
-  }
-
-  /**
-   * Get invoice file path
+   * Filesystem path on disk for a given invoice number. Tenant-scoped
+   * lookup must happen at the controller layer — this method trusts that
+   * the caller has already authorized access.
    */
   getInvoiceFilePath(invoiceNumber: string): string {
-    return path.join(this.storagePath, `invoice-${invoiceNumber}.html`);
+    const safe = this.sanitizeFilename(`invoice-${invoiceNumber}.pdf`);
+    return path.join(this.storagePath, safe);
   }
 
-  /**
-   * Check if invoice PDF exists
-   */
   invoicePdfExists(invoiceNumber: string): boolean {
-    const filepath = this.getInvoiceFilePath(invoiceNumber);
-    return fs.existsSync(filepath);
+    return fs.existsSync(this.getInvoiceFilePath(invoiceNumber));
   }
 
-  /**
-   * Read invoice file content
-   */
   readInvoiceFile(invoiceNumber: string): Buffer {
-    const filepath = this.getInvoiceFilePath(invoiceNumber);
-    return fs.readFileSync(filepath);
+    return fs.readFileSync(this.getInvoiceFilePath(invoiceNumber));
   }
 }

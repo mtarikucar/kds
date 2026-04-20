@@ -1,30 +1,42 @@
 import { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { initializeSocket, disconnectSocket } from '../../lib/socket';
-import { OrderStatusChangedEvent, NewOrderEvent } from '../../types';
+import { OrderStatusChangedEvent } from '../../types';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
+
+// Single shared AudioContext — Chromium limits concurrent contexts per tab
+// and throws on construction in suspended states after ~6. Reused across
+// every notification click instead of allocating fresh on each order.
+let sharedAudioContext: AudioContext | null = null;
+const getAudioContext = (): AudioContext | null => {
+  if (sharedAudioContext) return sharedAudioContext;
+  try {
+    const Ctor = window.AudioContext || (window as any).webkitAudioContext;
+    if (!Ctor) return null;
+    sharedAudioContext = new Ctor();
+    return sharedAudioContext;
+  } catch {
+    return null;
+  }
+};
 
 export const useKitchenSocket = () => {
   const [isConnected, setIsConnected] = useState(false);
   const queryClient = useQueryClient();
 
-  // Create notification sound using Web Audio API
   const playNotificationSound = () => {
     try {
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const audioContext = getAudioContext();
+      if (!audioContext) return;
       const oscillator = audioContext.createOscillator();
       const gainNode = audioContext.createGain();
-
       oscillator.connect(gainNode);
       gainNode.connect(audioContext.destination);
-
-      oscillator.frequency.value = 800; // Frequency in Hz
+      oscillator.frequency.value = 800;
       oscillator.type = 'sine';
-
       gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
       gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-
       oscillator.start(audioContext.currentTime);
       oscillator.stop(audioContext.currentTime + 0.5);
     } catch (error) {
@@ -86,8 +98,8 @@ export const useKitchenSocket = () => {
     socket.on('order:updated', handleOrderUpdated);
     socket.on('order:status-changed', handleOrderStatusChanged);
 
-    // Join kitchen room
-    socket.emit('join-kitchen');
+    // Room membership is decided server-side from the JWT role on connect;
+    // no inbound join/leave messages are needed.
 
     return () => {
       socket.off('connect', handleConnect);
@@ -95,7 +107,6 @@ export const useKitchenSocket = () => {
       socket.off('order:new', handleNewOrder);
       socket.off('order:updated', handleOrderUpdated);
       socket.off('order:status-changed', handleOrderStatusChanged);
-      socket.emit('leave-kitchen');
       disconnectSocket();
     };
   }, [queryClient]);

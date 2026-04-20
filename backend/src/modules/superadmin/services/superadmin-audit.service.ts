@@ -8,6 +8,19 @@ import {
   EntityType,
 } from '../dto/audit-filter.dto';
 
+/**
+ * Escape a cell for CSV output. Wraps in double quotes and doubles any
+ * embedded quotes; prefixes cells that start with =, +, -, @, \t, \r
+ * with a leading `'` so Excel/Sheets cannot interpret them as formulas
+ * (CSV injection). Tenant names and emails are attacker-controllable.
+ */
+function escapeCsvCell(value: unknown): string {
+  const s = value == null ? '' : String(value);
+  const needsPrefix = /^[=+\-@\t\r]/.test(s);
+  const safe = needsPrefix ? `'${s}` : s;
+  return `"${safe.replace(/"/g, '""')}"`;
+}
+
 export interface AuditLogEntry {
   action: AuditAction;
   entityType: EntityType;
@@ -170,9 +183,10 @@ export class SuperAdminAuditService {
       log.createdAt.toISOString(),
     ]);
 
-    const csv = [headers.join(','), ...rows.map((row) => row.join(','))].join(
-      '\n',
-    );
+    const csv = [
+      headers.map(escapeCsvCell).join(','),
+      ...rows.map((row) => row.map(escapeCsvCell).join(',')),
+    ].join('\n');
 
     return csv;
   }

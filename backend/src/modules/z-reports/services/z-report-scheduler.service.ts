@@ -6,6 +6,7 @@ import { ZReportsService } from '../z-reports.service';
 @Injectable()
 export class ZReportSchedulerService {
   private readonly logger = new Logger(ZReportSchedulerService.name);
+  private isRunning = false;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -13,29 +14,55 @@ export class ZReportSchedulerService {
   ) {}
 
   /**
-   * Check every 15 minutes for tenants at their closing time
-   * and generate/send Z-Reports automatically
+   * Check every 15 minutes for tenants at their closing time and
+   * generate/send Z-Reports automatically. Protected by a postgres
+   * advisory lock so horizontally-scaled replicas don't race each
+   * other on the same tenants and emit duplicate fiscal reports /
+   * duplicate emails. Matches the stock-alerts / delivery-polling
+   * / subscription-scheduler pattern already in use.
    */
   @Cron('*/15 * * * *', { name: 'z-report-email-check' })
   async handleZReportEmails() {
-    this.logger.log('Checking for tenants at closing time...');
-
+    if (this.isRunning) return;
+    this.isRunning = true;
     try {
-      const tenantsAtClosingTime = await this.getTenantsAtClosingTime();
-
-      if (tenantsAtClosingTime.length === 0) {
-        this.logger.debug('No tenants at closing time');
+      const [{ locked }] = await this.prisma.$queryRawUnsafe<
+        { locked: boolean }[]
+      >(`SELECT pg_try_advisory_lock(${this.lockId('z-report-scheduler')}) AS locked`);
+      if (!locked) {
+        this.logger.debug('Another replica holds the z-report scheduler lock');
         return;
       }
 
-      this.logger.log(`Found ${tenantsAtClosingTime.length} tenant(s) at closing time`);
+      try {
+        const tenantsAtClosingTime = await this.getTenantsAtClosingTime();
+        if (tenantsAtClosingTime.length === 0) return;
 
-      for (const tenant of tenantsAtClosingTime) {
-        await this.processEndOfDayReport(tenant);
+        this.logger.log(`Found ${tenantsAtClosingTime.length} tenant(s) at closing time`);
+        for (const tenant of tenantsAtClosingTime) {
+          await this.processEndOfDayReport(tenant);
+        }
+      } finally {
+        await this.prisma.$queryRawUnsafe(
+          `SELECT pg_advisory_unlock(${this.lockId('z-report-scheduler')})`,
+        );
       }
-    } catch (error) {
-      this.logger.error(`Failed to process Z-Report emails: ${error.message}`, error.stack);
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to process Z-Report emails: ${error.message}`,
+        error.stack,
+      );
+    } finally {
+      this.isRunning = false;
     }
+  }
+
+  private lockId(name: string): number {
+    let hash = 5381;
+    for (let i = 0; i < name.length; i += 1) {
+      hash = ((hash << 5) + hash + name.charCodeAt(i)) | 0;
+    }
+    return hash;
   }
 
   /**
@@ -84,20 +111,24 @@ export class ZReportSchedulerService {
       const currentTimeInMinutes = currentHour * 60 + currentMinute;
 
       // Match if current time is within 0-14 minutes after closing time
-      let minutesSinceClosing = currentTimeInMinutes - closingTimeInMinutes;
-      // Handle midnight wraparound (e.g., closing at 23:50, current time 00:05)
-      if (minutesSinceClosing < 0) {
-        minutesSinceClosing += 24 * 60;
-      }
+      const minutesSinceClosing = currentTimeInMinutes - closingTimeInMinutes;
       if (minutesSinceClosing >= 0 && minutesSinceClosing < 15) {
-        // Check if we haven't already sent a report today (in tenant's timezone)
-        const tenantToday = this.getTimeInTimezone(now, tenant.timezone || 'UTC');
-        const today = new Date(tenantToday.getFullYear(), tenantToday.getMonth(), tenantToday.getDate());
+        // Check if we haven't already sent a report today IN THE TENANT'S
+        // TIMEZONE. ZReportsService.generateReport writes `reportDate` as
+        // the tenant-local midnight instant; using server-local midnight
+        // here would miss-match for any non-UTC tenant and the scheduler
+        // would then re-enter generateReport every 15min during the
+        // closing window, each time throwing a BadRequestException that
+        // polluted the error logs.
+        const tenantTzMidnight = this.getTenantMidnight(
+          now,
+          tenant.timezone || 'UTC',
+        );
 
         const existingReport = await this.prisma.zReport.findFirst({
           where: {
             tenantId: tenant.id,
-            reportDate: today,
+            reportDate: tenantTzMidnight,
             emailSent: true,
           },
         });
@@ -114,8 +145,52 @@ export class ZReportSchedulerService {
   }
 
   /**
-   * Convert a date to a specific timezone
+   * UTC instant representing "today at 00:00" in the tenant's timezone.
+   * Mirrors ZReportsService.computeDayBoundsInTimezone so the scheduler's
+   * "already sent?" lookup hits the row that generateReport actually
+   * created. Uses Intl.DateTimeFormat + offset correction; falls back to
+   * server-local midnight on an unknown tz string.
    */
+  private getTenantMidnight(now: Date, timezone: string): Date {
+    try {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      }).formatToParts(now);
+      const y = parseInt(parts.find((p) => p.type === 'year')?.value ?? '1970', 10);
+      const m = parseInt(parts.find((p) => p.type === 'month')?.value ?? '1', 10);
+      const d = parseInt(parts.find((p) => p.type === 'day')?.value ?? '1', 10);
+      const approx = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
+      const probe = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        hour12: false,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }).formatToParts(approx);
+      const get = (t: string) => parseInt(probe.find((p) => p.type === t)?.value ?? '0', 10);
+      const zonedAsUtc = Date.UTC(
+        get('year'),
+        get('month') - 1,
+        get('day'),
+        get('hour') % 24,
+        get('minute'),
+        get('second'),
+      );
+      const offset = zonedAsUtc - approx.getTime();
+      return new Date(approx.getTime() - offset);
+    } catch {
+      const fallback = new Date(now);
+      fallback.setHours(0, 0, 0, 0);
+      return fallback;
+    }
+  }
+
   private getTimeInTimezone(date: Date, timezone: string): Date {
     try {
       const options: Intl.DateTimeFormatOptions = {

@@ -42,7 +42,25 @@ superAdminApi.interceptors.request.use((config) => {
   return config;
 });
 
-// Response interceptor for token refresh
+// Single-flight refresh: when N requests race a 401 we serialize on a
+// shared promise so only one `/refresh` call actually hits the wire. The
+// others wait for its result and retry with the new access token.
+let inFlightRefresh: Promise<string> | null = null;
+
+async function refreshAccessToken(): Promise<string> {
+  const refreshToken = useSuperAdminAuthStore.getState().refreshToken;
+  if (!refreshToken) {
+    throw new Error('No refresh token');
+  }
+  const response = await axios.post(
+    `${API_BASE_URL}/superadmin/auth/refresh`,
+    { refreshToken },
+  );
+  const { accessToken } = response.data;
+  useSuperAdminAuthStore.getState().setAccessToken(accessToken);
+  return accessToken;
+}
+
 superAdminApi.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -50,27 +68,24 @@ superAdminApi.interceptors.response.use(
 
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      const refreshToken = useSuperAdminAuthStore.getState().refreshToken;
-
-      if (refreshToken) {
-        try {
-          const response = await axios.post(`${API_BASE_URL}/superadmin/auth/refresh`, {
-            refreshToken,
+      try {
+        if (!inFlightRefresh) {
+          inFlightRefresh = refreshAccessToken().finally(() => {
+            inFlightRefresh = null;
           });
-
-          const { accessToken } = response.data;
-          useSuperAdminAuthStore.getState().setAccessToken(accessToken);
-          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
-          return superAdminApi(originalRequest);
-        } catch (refreshError) {
-          useSuperAdminAuthStore.getState().logout();
-          window.location.href = import.meta.env.BASE_URL + 'superadmin/login';
         }
+        const accessToken = await inFlightRefresh;
+        originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+        return superAdminApi(originalRequest);
+      } catch (refreshError) {
+        useSuperAdminAuthStore.getState().logout();
+        window.location.href = import.meta.env.BASE_URL + 'superadmin/login';
+        return Promise.reject(refreshError);
       }
     }
 
     return Promise.reject(error);
-  }
+  },
 );
 
 // Auth API

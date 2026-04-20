@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ScheduleModule } from '@nestjs/schedule';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { PublicStatsModule } from '../public-stats/public-stats.module';
 
@@ -23,7 +22,6 @@ import { PlanFeatureGuard } from './guards/plan-feature.guard';
 @Module({
   imports: [
     PrismaModule,
-    ScheduleModule.forRoot(),
     PublicStatsModule,
   ],
   controllers: [

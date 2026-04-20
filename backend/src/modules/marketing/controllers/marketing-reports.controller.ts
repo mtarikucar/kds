@@ -1,7 +1,7 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { MarketingRoute } from '../decorators/marketing-route.decorator';
 import { MarketingGuard } from '../guards/marketing.guard';
 import { MarketingRolesGuard } from '../guards/marketing-roles.guard';
+import { MarketingRoute } from '../decorators/marketing-public.decorator';
 import { MarketingRoles } from '../decorators/marketing-roles.decorator';
 import { MarketingReportsService } from '../services/marketing-reports.service';
 import { ReportFilterDto } from '../dto/report-filter.dto';
@@ -9,6 +9,7 @@ import { ReportFilterDto } from '../dto/report-filter.dto';
 @MarketingRoute()
 @Controller('marketing/reports')
 @UseGuards(MarketingGuard, MarketingRolesGuard)
+@MarketingRoute()
 export class MarketingReportsController {
   constructor(private readonly reportsService: MarketingReportsService) {}
 
@@ -18,6 +19,9 @@ export class MarketingReportsController {
     return this.reportsService.getPerformanceReport(filter);
   }
 
+  // Aggregate reports show data across every rep, so only managers
+  // should see them; otherwise a SALES_REP can read the whole team's
+  // conversion funnel and regional performance.
   @Get('lead-sources')
   @MarketingRoles('SALES_MANAGER')
   getLeadSources(@Query() filter: ReportFilterDto) {

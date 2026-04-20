@@ -93,6 +93,7 @@ export class PaymentsService {
               status: PaymentStatus.COMPLETED,
               notes: createPaymentDto.notes,
               orderId,
+              tenantId,
               paidAt: new Date(),
             },
             include: {
@@ -333,6 +334,7 @@ export class PaymentsService {
             status: PaymentStatus.COMPLETED,
             notes: entry.label || null,
             orderId: orderId,
+            tenantId,
             paidAt: new Date(),
           },
         });

@@ -1,5 +1,6 @@
 import { Controller, Get, Param, Query, NotFoundException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { PosSettingsService } from '../../pos-settings/pos-settings.service';
 import { Public } from '../../auth/decorators/public.decorator';
@@ -13,6 +14,7 @@ export class QrMenuController {
   ) {}
 
   @Public()
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @Get('by-subdomain/:subdomain')
   @ApiOperation({ summary: 'Get public menu by subdomain (no authentication required)' })
   @ApiParam({ name: 'subdomain', description: 'Restaurant subdomain' })
@@ -35,6 +37,7 @@ export class QrMenuController {
   }
 
   @Public()
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @Get(':tenantId')
   @ApiOperation({ summary: 'Get public menu for QR code access (no authentication required)' })
   @ApiQuery({ name: 'tableId', required: false, description: 'Optional table ID for table-specific QR codes' })
@@ -44,8 +47,8 @@ export class QrMenuController {
     @Param('tenantId') tenantId: string,
     @Query('tableId') tableId?: string,
   ) {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { id: tenantId, status: 'ACTIVE' },
       select: {
         id: true,
         name: true,
@@ -60,19 +63,15 @@ export class QrMenuController {
     });
 
     if (!tenant) {
-      return { error: 'Tenant not found' };
+      throw new NotFoundException('Restaurant not found');
     }
 
-    // Get QR settings (will create default if not exists)
-    let settings = await this.prisma.qrMenuSettings.findUnique({
+    // Read QR settings without side-effects. Creating a row on an anonymous
+    // GET would let any caller trigger writes for a known tenantId and seed
+    // default settings without admin intent. A null response uses defaults.
+    const settings = await this.prisma.qrMenuSettings.findUnique({
       where: { tenantId },
     });
-
-    if (!settings) {
-      settings = await this.prisma.qrMenuSettings.create({
-        data: { tenantId },
-      });
-    }
 
     // Get table information if tableId provided
     let table = null;
@@ -207,17 +206,17 @@ export class QrMenuController {
         number: table.number,
       } : null,
       settings: {
-        primaryColor: settings.primaryColor,
-        secondaryColor: settings.secondaryColor,
-        backgroundColor: settings.backgroundColor,
-        fontFamily: settings.fontFamily,
-        logoUrl: settings.logoUrl,
-        showRestaurantInfo: settings.showRestaurantInfo,
-        showPrices: settings.showPrices,
-        showDescription: settings.showDescription,
-        showImages: settings.showImages,
-        layoutStyle: settings.layoutStyle,
-        itemsPerRow: settings.itemsPerRow,
+        primaryColor: settings?.primaryColor ?? '#3B82F6',
+        secondaryColor: settings?.secondaryColor ?? '#F3F4F6',
+        backgroundColor: settings?.backgroundColor ?? '#FFFFFF',
+        fontFamily: settings?.fontFamily ?? 'Inter',
+        logoUrl: settings?.logoUrl ?? null,
+        showRestaurantInfo: settings?.showRestaurantInfo ?? true,
+        showPrices: settings?.showPrices ?? true,
+        showDescription: settings?.showDescription ?? true,
+        showImages: settings?.showImages ?? true,
+        layoutStyle: settings?.layoutStyle ?? 'GRID',
+        itemsPerRow: settings?.itemsPerRow ?? 2,
       },
       enableCustomerOrdering: posSettings.enableCustomerOrdering,
       enableTablelessMode: posSettings.enableTablelessMode,

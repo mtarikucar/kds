@@ -9,18 +9,32 @@ import {
   HttpStatus,
   HttpException,
   UseGuards,
+  BadRequestException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiTags } from '@nestjs/swagger';
 import { Public } from '../../auth/decorators/public.decorator';
-import { WebhookAuthGuard } from '../guards/webhook-auth.guard';
+import {
+  WebhookAuthGuard,
+  WebhookPlatform,
+} from '../guards/webhook-auth.guard';
 import { DeliveryConfigService } from '../services/delivery-config.service';
 import { DeliveryOrderService } from '../services/delivery-order.service';
 import { DeliveryLogService } from '../services/delivery-log.service';
 import { AdapterFactory } from '../adapters/adapter-factory';
-import { DeliveryPlatform, PlatformLogDirection, PlatformLogAction } from '../constants/platform.enum';
+import {
+  DeliveryPlatform,
+  PlatformLogDirection,
+  PlatformLogAction,
+} from '../constants/platform.enum';
+
+// Aggressive throttle on every webhook endpoint so a signature-spraying
+// attacker cannot amplify HMAC CPU cost or DB log writes.
+const WEBHOOK_THROTTLE = { default: { limit: 60, ttl: 60_000 } };
 
 @ApiTags('delivery-webhooks')
 @Public()
+@Throttle(WEBHOOK_THROTTLE)
 @UseGuards(WebhookAuthGuard)
 @Controller('webhooks/delivery')
 export class DeliveryWebhookController {
@@ -33,11 +47,8 @@ export class DeliveryWebhookController {
     private readonly adapterFactory: AdapterFactory,
   ) {}
 
-  /**
-   * Yemeksepeti: Receive new order webhook
-   * POST /webhooks/delivery/yemeksepeti/order/:remoteId
-   */
   @Post('yemeksepeti/order/:remoteId')
+  @WebhookPlatform('YEMEKSEPETI')
   @HttpCode(HttpStatus.OK)
   async yemeksepetiNewOrder(
     @Param('remoteId') remoteId: string,
@@ -57,7 +68,10 @@ export class DeliveryWebhookController {
 
     try {
       const adapter = this.adapterFactory.getAdapter(DeliveryPlatform.YEMEKSEPETI);
-      const normalizedOrder = adapter.parseWebhookOrder!(body);
+      if (!adapter.parseWebhookOrder) {
+        throw new BadRequestException('Adapter cannot parse webhook order');
+      }
+      const normalizedOrder = adapter.parseWebhookOrder(body);
 
       const order = await this.orderService.processIncomingOrder(
         config.tenantId,
@@ -70,21 +84,22 @@ export class DeliveryWebhookController {
 
       return { status: 'ok' };
     } catch (error: any) {
-      this.logger.error(
-        `Failed to process Yemeksepeti webhook: ${error.message}`,
-      );
-
-      await this.logService.log({
-        tenantId: config.tenantId,
-        platform: DeliveryPlatform.YEMEKSEPETI,
-        direction: PlatformLogDirection.INBOUND,
-        action: PlatformLogAction.ORDER_RECEIVED,
-        externalId: body?.id || body?.orderToken,
-        request: body,
-        success: false,
-        error: error.message,
-        nextRetryAt: new Date(Date.now() + 60_000),
-      });
+      this.logger.error(`Failed to process Yemeksepeti webhook: ${error.message}`);
+      // Best-effort — do NOT rethrow from the log path. Also scrub the
+      // PII-heavy raw body before persisting.
+      await this.logService
+        .log({
+          tenantId: config.tenantId,
+          platform: DeliveryPlatform.YEMEKSEPETI,
+          direction: PlatformLogDirection.INBOUND,
+          action: PlatformLogAction.ORDER_RECEIVED,
+          externalId: body?.id || body?.orderToken,
+          request: this.logService.scrubPii(body),
+          success: false,
+          error: error.message,
+          nextRetryAt: new Date(Date.now() + 60_000),
+        })
+        .catch(() => undefined);
 
       throw new HttpException(
         { status: 'error', message: 'Order processing failed' },
@@ -93,11 +108,8 @@ export class DeliveryWebhookController {
     }
   }
 
-  /**
-   * Yemeksepeti: Receive status update webhook
-   * PUT /webhooks/delivery/yemeksepeti/:remoteId/order/:remoteOrderId/status
-   */
   @Put('yemeksepeti/:remoteId/order/:remoteOrderId/status')
+  @WebhookPlatform('YEMEKSEPETI')
   @HttpCode(HttpStatus.OK)
   async yemeksepetiStatusUpdate(
     @Param('remoteId') remoteId: string,
@@ -107,16 +119,11 @@ export class DeliveryWebhookController {
     this.logger.log(
       `Yemeksepeti status update for order ${remoteOrderId}: ${JSON.stringify(body)}`,
     );
-    // Status updates from Yemeksepeti are informational (e.g., courier picked up)
-    // We log them but don't change KDS order status
     return { status: 'ok' };
   }
 
-  /**
-   * Trendyol: Receive new order webhook (v2 integrations)
-   * POST /webhooks/delivery/trendyol/order/:remoteId
-   */
   @Post('trendyol/order/:remoteId')
+  @WebhookPlatform('TRENDYOL')
   @HttpCode(HttpStatus.OK)
   async trendyolNewOrder(
     @Param('remoteId') remoteId: string,
@@ -136,7 +143,10 @@ export class DeliveryWebhookController {
 
     try {
       const adapter = this.adapterFactory.getAdapter(DeliveryPlatform.TRENDYOL);
-      const normalizedOrder = adapter.parseWebhookOrder!(body);
+      if (!adapter.parseWebhookOrder) {
+        throw new BadRequestException('Adapter cannot parse webhook order');
+      }
+      const normalizedOrder = adapter.parseWebhookOrder(body);
 
       const order = await this.orderService.processIncomingOrder(
         config.tenantId,
@@ -149,21 +159,20 @@ export class DeliveryWebhookController {
 
       return { status: 'ok' };
     } catch (error: any) {
-      this.logger.error(
-        `Failed to process Trendyol webhook: ${error.message}`,
-      );
-
-      await this.logService.log({
-        tenantId: config.tenantId,
-        platform: DeliveryPlatform.TRENDYOL,
-        direction: PlatformLogDirection.INBOUND,
-        action: PlatformLogAction.ORDER_RECEIVED,
-        externalId: body?.id || body?.orderId,
-        request: body,
-        success: false,
-        error: error.message,
-        nextRetryAt: new Date(Date.now() + 60_000),
-      });
+      this.logger.error(`Failed to process Trendyol webhook: ${error.message}`);
+      await this.logService
+        .log({
+          tenantId: config.tenantId,
+          platform: DeliveryPlatform.TRENDYOL,
+          direction: PlatformLogDirection.INBOUND,
+          action: PlatformLogAction.ORDER_RECEIVED,
+          externalId: body?.id || body?.orderId,
+          request: this.logService.scrubPii(body),
+          success: false,
+          error: error.message,
+          nextRetryAt: new Date(Date.now() + 60_000),
+        })
+        .catch(() => undefined);
 
       throw new HttpException(
         { status: 'error', message: 'Order processing failed' },

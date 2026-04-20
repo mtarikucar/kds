@@ -15,11 +15,14 @@ export type PlatformActionName =
  * Used by DeliveryStatusSyncService to determine which adapter method to call
  * when an order status changes in KDS.
  */
+// SERVED is a dine-in concept ("brought to the table") and should NOT
+// map to a platform "picked up" state — couriers handle courier pickup
+// themselves. We sync PENDING / PREPARING / READY / CANCELLED; the
+// platform owns the later transitions (picked up, delivered).
 export const STATUS_TO_PLATFORM_ACTION: Record<string, PlatformActionName> = {
   [OrderStatus.PENDING]: 'acceptOrder',
   [OrderStatus.PREPARING]: 'markPreparing',
   [OrderStatus.READY]: 'markReady',
-  [OrderStatus.SERVED]: 'markPickedUp',
   [OrderStatus.CANCELLED]: 'cancelOrder',
 };
 
@@ -30,7 +33,6 @@ export const SYNCABLE_STATUSES = new Set([
   OrderStatus.PENDING,
   OrderStatus.PREPARING,
   OrderStatus.READY,
-  OrderStatus.SERVED,
   OrderStatus.CANCELLED,
 ]);
 

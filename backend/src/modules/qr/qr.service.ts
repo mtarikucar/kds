@@ -1,8 +1,20 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateQrSettingsDto } from './dto/create-qr-settings.dto';
 import { UpdateQrSettingsDto } from './dto/update-qr-settings.dto';
 import * as QRCode from 'qrcode';
+
+// Cap on per-request QR generation. Each PNG takes ~500ms of synchronous
+// CPU; a tenant with 10k tables could DOS the Node process. Legitimate
+// tenants never hit this; chains with >500 physical tables should request
+// per-section in a future UI.
+const MAX_TABLES_PER_REQUEST = 500;
+
+// Valid-subdomain regex. Matches DNS labels (RFC 1035-ish): lowercase ASCII
+// alphanumerics and hyphens, must start/end with alphanumeric, 3-63 chars.
+// Rejects `/`, `?`, `@`, extra dots, uppercase, and control chars so a
+// malicious subdomain like `evil.com#` cannot escape the host.
+const SUBDOMAIN_REGEX = /^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/;
 
 @Injectable()
 export class QrService {
@@ -66,29 +78,36 @@ export class QrService {
   }
 
   async getQrCodes(tenantId: string, baseUrl: string) {
-    // Get tenant info
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
     });
+    if (!tenant) throw new NotFoundException('Tenant not found');
 
-    if (!tenant) {
-      throw new NotFoundException('Tenant not found');
-    }
+    // Validate subdomain before embedding it into the QR URL. Tenants module
+    // should enforce this at write time, but do a defensive check here so a
+    // historical bad-value row doesn't produce a QR that redirects off-host.
+    const hasValidSubdomain = !!tenant.subdomain && SUBDOMAIN_REGEX.test(tenant.subdomain);
 
-    // Get tables
     const tables = await this.prisma.table.findMany({
       where: { tenantId },
       orderBy: { number: 'asc' },
+      take: MAX_TABLES_PER_REQUEST + 1,
     });
+    if (tables.length > MAX_TABLES_PER_REQUEST) {
+      throw new BadRequestException(
+        `QR generation capped at ${MAX_TABLES_PER_REQUEST} tables per request`,
+      );
+    }
 
     // Get settings
     const settings = await this.getSettings(tenantId);
 
     const qrCodes = [];
 
-    // Generate subdomain-based URL if tenant has subdomain, otherwise fallback
+    // Generate subdomain-based URL if tenant has a validated subdomain,
+    // otherwise fall back to the path-based URL.
     const generateMenuUrl = (tableId?: string): string => {
-      if (tenant.subdomain) {
+      if (hasValidSubdomain) {
         // Parse baseUrl to get domain parts
         try {
           const url = new URL(baseUrl);

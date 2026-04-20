@@ -8,40 +8,39 @@ import {
   Param,
   Query,
   UseGuards,
-  HttpCode,
-  HttpStatus,
 } from '@nestjs/common';
-import { MarketingRoute } from '../decorators/marketing-route.decorator';
 import { MarketingGuard } from '../guards/marketing.guard';
 import { MarketingRolesGuard } from '../guards/marketing-roles.guard';
+import { MarketingRoute } from '../decorators/marketing-public.decorator';
 import { CurrentMarketingUser } from '../decorators/current-marketing-user.decorator';
 import { MarketingRoles } from '../decorators/marketing-roles.decorator';
 import { MarketingOffersService } from '../services/marketing-offers.service';
 import { CreateOfferDto } from '../dto/create-offer.dto';
 import { UpdateOfferDto } from '../dto/update-offer.dto';
-import { OfferFilterDto } from '../dto/offer-filter.dto';
+import { MarketingUserPayload } from '../types';
 
-@MarketingRoute()
 @Controller('marketing/offers')
 @UseGuards(MarketingGuard, MarketingRolesGuard)
+@MarketingRoute()
 export class MarketingOffersController {
   constructor(private readonly offersService: MarketingOffersService) {}
 
   @Post()
-  create(@Body() dto: CreateOfferDto, @CurrentMarketingUser() user: any) {
+  create(@Body() dto: CreateOfferDto, @CurrentMarketingUser() user: MarketingUserPayload) {
     return this.offersService.create(dto, user.id, user.role);
   }
 
   @Get()
   findAll(
-    @CurrentMarketingUser() user: any,
-    @Query() filter: OfferFilterDto,
+    @CurrentMarketingUser() user: MarketingUserPayload,
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
   ) {
-    return this.offersService.findAll(user.id, user.role, filter);
+    return this.offersService.findAll(user.id, user.role, page, limit);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string, @CurrentMarketingUser() user: any) {
+  findOne(@Param('id') id: string, @CurrentMarketingUser() user: MarketingUserPayload) {
     return this.offersService.findOne(id, user.id, user.role);
   }
 
@@ -49,26 +48,14 @@ export class MarketingOffersController {
   update(
     @Param('id') id: string,
     @Body() dto: UpdateOfferDto,
-    @CurrentMarketingUser() user: any,
+    @CurrentMarketingUser() user: MarketingUserPayload,
   ) {
     return this.offersService.update(id, dto, user.id, user.role);
   }
 
   @Post(':id/send')
-  markSent(@Param('id') id: string, @CurrentMarketingUser() user: any) {
+  markSent(@Param('id') id: string, @CurrentMarketingUser() user: MarketingUserPayload) {
     return this.offersService.markSent(id, user.id, user.role);
-  }
-
-  @Post(':id/accept')
-  @HttpCode(HttpStatus.OK)
-  accept(@Param('id') id: string, @CurrentMarketingUser() user: any) {
-    return this.offersService.accept(id, user.id, user.role);
-  }
-
-  @Post(':id/reject')
-  @HttpCode(HttpStatus.OK)
-  reject(@Param('id') id: string, @CurrentMarketingUser() user: any) {
-    return this.offersService.reject(id, user.id, user.role);
   }
 
   @Delete(':id')

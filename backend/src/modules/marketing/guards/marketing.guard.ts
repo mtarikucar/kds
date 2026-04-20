@@ -9,13 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { IS_MARKETING_PUBLIC_KEY } from '../decorators/marketing-public.decorator';
 import { PrismaService } from '../../../prisma/prisma.service';
-
-export interface MarketingJwtPayload {
-  sub: string;
-  email: string;
-  role: string;
-  type: 'marketing';
-}
+import { MarketingJwtPayload } from '../types';
 
 @Injectable()
 export class MarketingGuard implements CanActivate {
@@ -44,12 +38,12 @@ export class MarketingGuard implements CanActivate {
     }
 
     try {
-      const payload = await this.jwtService.verifyAsync<MarketingJwtPayload>(
-        token,
-        {
-          secret: this.configService.get<string>('MARKETING_JWT_SECRET'),
-        },
-      );
+      const payload = await this.jwtService.verifyAsync<
+        MarketingJwtPayload & { ver?: number }
+      >(token, {
+        secret: this.configService.get<string>('MARKETING_JWT_SECRET'),
+        algorithms: ['HS256'],
+      });
 
       if (payload.type !== 'marketing') {
         throw new UnauthorizedException('Invalid token type');
@@ -64,6 +58,7 @@ export class MarketingGuard implements CanActivate {
           lastName: true,
           role: true,
           status: true,
+          tokenVersion: true,
         },
       });
 
@@ -71,7 +66,12 @@ export class MarketingGuard implements CanActivate {
         throw new UnauthorizedException('User not found or inactive');
       }
 
-      request.marketingUser = marketingUser;
+      if (typeof payload.ver === 'number' && payload.ver !== marketingUser.tokenVersion) {
+        throw new UnauthorizedException('Session revoked');
+      }
+
+      const { tokenVersion: _v, ...publicFields } = marketingUser;
+      request.marketingUser = publicFields;
       return true;
     } catch (error) {
       if (error instanceof UnauthorizedException) {

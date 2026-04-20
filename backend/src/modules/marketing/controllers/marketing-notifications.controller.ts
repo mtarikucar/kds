@@ -1,5 +1,5 @@
 import { Controller, Get, Patch, Param, Query, UseGuards } from '@nestjs/common';
-import { MarketingRoute } from '../decorators/marketing-route.decorator';
+import { MarketingRoute } from '../decorators/marketing-public.decorator';
 import { MarketingGuard } from '../guards/marketing.guard';
 import { MarketingRolesGuard } from '../guards/marketing-roles.guard';
 import { CurrentMarketingUser } from '../decorators/current-marketing-user.decorator';

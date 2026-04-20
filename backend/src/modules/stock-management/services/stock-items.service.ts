@@ -50,16 +50,20 @@ export class StockItemsService {
 
   async create(dto: CreateStockItemDto, tenantId: string) {
     return this.prisma.stockItem.create({
-      data: { ...dto, tenantId },
+      // Empty-string SKU collides on the @@unique([tenantId, sku])
+      // constraint while null is allowed to repeat. Normalise here.
+      data: { ...dto, sku: dto.sku ? dto.sku : null, tenantId },
       include: { category: true },
     });
   }
 
   async update(id: string, dto: UpdateStockItemDto, tenantId: string) {
     await this.findOne(id, tenantId);
+    const data =
+      'sku' in dto ? { ...dto, sku: dto.sku ? dto.sku : null } : dto;
     return this.prisma.stockItem.update({
       where: { id },
-      data: dto,
+      data,
       include: { category: true },
     });
   }
@@ -79,18 +83,6 @@ export class StockItemsService {
     }
 
     return this.prisma.stockItem.delete({ where: { id } });
-  }
-
-  async findLowStock(tenantId: string) {
-    return this.prisma.stockItem.findMany({
-      where: {
-        tenantId,
-        isActive: true,
-        currentStock: { lte: this.prisma.stockItem.fields.minStock as any },
-      },
-      include: { category: true },
-      orderBy: { currentStock: 'asc' },
-    });
   }
 
   async findLowStockItems(tenantId: string) {

@@ -8,9 +8,9 @@ import {
   Param,
   UseGuards,
 } from '@nestjs/common';
-import { MarketingRoute } from '../decorators/marketing-route.decorator';
 import { MarketingGuard } from '../guards/marketing.guard';
 import { MarketingRolesGuard } from '../guards/marketing-roles.guard';
+import { MarketingRoute } from '../decorators/marketing-public.decorator';
 import { MarketingRoles } from '../decorators/marketing-roles.decorator';
 import { MarketingUsersService } from '../services/marketing-users.service';
 import { CreateMarketingUserDto } from '../dto/create-marketing-user.dto';
@@ -19,6 +19,7 @@ import { UpdateMarketingUserDto } from '../dto/update-marketing-user.dto';
 @MarketingRoute()
 @Controller('marketing/users')
 @UseGuards(MarketingGuard, MarketingRolesGuard)
+@MarketingRoute()
 @MarketingRoles('SALES_MANAGER')
 export class MarketingUsersController {
   constructor(private readonly usersService: MarketingUsersService) {}

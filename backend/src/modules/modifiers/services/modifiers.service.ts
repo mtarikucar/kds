@@ -238,45 +238,39 @@ export class ModifiersService {
     dto: AssignModifiersToProductDto,
     tenantId: string
   ) {
-    // Verify product exists and belongs to tenant
     const product = await this.prisma.product.findFirst({
       where: { id: productId, tenantId },
+      select: { id: true },
     });
-
     if (!product) {
       throw new NotFoundException('Product not found');
     }
 
-    // Verify all groups exist and belong to tenant
-    const groupIds = dto.modifierGroups.map(mg => mg.groupId);
+    const groupIds = dto.modifierGroups.map((mg) => mg.groupId);
     const groups = await this.prisma.modifierGroup.findMany({
-      where: {
-        id: { in: groupIds },
-        tenantId,
-      },
+      where: { id: { in: groupIds }, tenantId },
+      select: { id: true },
     });
-
-    if (groups.length !== groupIds.length) {
+    if (groups.length !== new Set(groupIds).size) {
       throw new BadRequestException('One or more modifier groups are invalid');
     }
 
-    // Remove existing assignments
-    await this.prisma.productModifierGroup.deleteMany({
-      where: { productId },
-    });
+    // Atomic replace: deleteMany + createMany in one transaction so a
+    // mid-flight failure cannot leave the product with zero modifier
+    // groups after stripping the old ones.
+    await this.prisma.$transaction([
+      this.prisma.productModifierGroup.deleteMany({ where: { productId } }),
+      this.prisma.productModifierGroup.createMany({
+        data: dto.modifierGroups.map((mg) => ({
+          productId,
+          groupId: mg.groupId,
+          displayOrder: mg.displayOrder || 0,
+        })),
+      }),
+    ]);
 
-    // Create new assignments
-    await this.prisma.productModifierGroup.createMany({
-      data: dto.modifierGroups.map(mg => ({
-        productId,
-        groupId: mg.groupId,
-        displayOrder: mg.displayOrder || 0,
-      })),
-    });
-
-    // Return updated product with modifiers
-    return this.prisma.product.findUnique({
-      where: { id: productId },
+    return this.prisma.product.findFirst({
+      where: { id: productId, tenantId },
       include: {
         modifierGroups: {
           include: {

@@ -8,9 +8,19 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, UsePipes, ValidationPipe } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../../prisma/prisma.service';
+
+const corsOrigin = () => {
+  if (process.env.CORS_ORIGIN) return process.env.CORS_ORIGIN.split(',');
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'CORS_ORIGIN must be configured for the analytics gateway in production',
+    );
+  }
+  return ['http://localhost:5173'];
+};
 import {
   EdgeDeviceRegisterDto,
   EdgeOccupancyDataDto,
@@ -32,11 +42,16 @@ interface EdgeDeviceConnection {
 }
 
 @Injectable()
+@UsePipes(
+  new ValidationPipe({
+    transform: true,
+    whitelist: true,
+    forbidNonWhitelisted: true,
+  }),
+)
 @WebSocketGateway({
   cors: {
-    origin: process.env.CORS_ORIGIN
-      ? process.env.CORS_ORIGIN.split(',')
-      : ['http://localhost:5173'],
+    origin: corsOrigin(),
     credentials: true,
   },
   namespace: '/analytics-edge',
@@ -47,8 +62,28 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   private readonly logger = new Logger(AnalyticsGateway.name);
 
-  // Track connected edge devices
+  // Track connected edge devices keyed by `${tenantId}:${deviceId}` so
+  // two tenants with the same device id don't evict each other.
   private connectedDevices: Map<string, EdgeDeviceConnection> = new Map();
+
+  private deviceKey(tenantId: string, deviceId: string) {
+    return `${tenantId}:${deviceId}`;
+  }
+
+  /**
+   * Legacy deviceId-only lookup used by sendConfigToDevice /
+   * sendCommandToDevice. Scans the map; unlike a keyed get() it will
+   * also return a device owned by the expected tenant if the caller
+   * provided one.
+   */
+  private findDevice(deviceId: string, tenantId?: string) {
+    for (const d of this.connectedDevices.values()) {
+      if (d.deviceId !== deviceId) continue;
+      if (tenantId && d.tenantId !== tenantId) continue;
+      return d;
+    }
+    return undefined;
+  }
 
   constructor(
     private jwtService: JwtService,
@@ -90,13 +125,12 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
   }
 
   handleDisconnect(client: Socket) {
-    // Find and remove device from connected devices
     const deviceId = client.data.deviceId;
-    if (deviceId) {
-      this.connectedDevices.delete(deviceId);
+    const tenantId = client.data.tenantId;
+    if (deviceId && tenantId) {
+      this.connectedDevices.delete(this.deviceKey(tenantId, deviceId));
 
-      // Update device status in database
-      this.updateDeviceStatus(deviceId, 'OFFLINE').catch((err) => {
+      this.updateDeviceStatus(deviceId, 'OFFLINE', tenantId).catch((err) => {
         this.logger.error(`Failed to update device status: ${err.message}`);
       });
     }
@@ -125,15 +159,17 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
       client.data.deviceId = payload.deviceId;
       client.data.cameraId = payload.cameraId;
 
-      // Track connected device
-      this.connectedDevices.set(payload.deviceId, {
-        socketId: client.id,
-        deviceId: payload.deviceId,
-        cameraId: payload.cameraId,
-        tenantId: payload.tenantId,
-        connectedAt: new Date(),
-        lastHeartbeat: new Date(),
-      });
+      this.connectedDevices.set(
+        this.deviceKey(payload.tenantId, payload.deviceId),
+        {
+          socketId: client.id,
+          deviceId: payload.deviceId,
+          cameraId: payload.cameraId,
+          tenantId: payload.tenantId,
+          connectedAt: new Date(),
+          lastHeartbeat: new Date(),
+        },
+      );
 
       // Update or create edge device in database
       await this.prisma.edgeDevice.upsert({
@@ -259,15 +295,18 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
         return { success: false, error: 'Device not registered' };
       }
 
-      // Update last heartbeat
-      const device = this.connectedDevices.get(deviceId);
+      const device = this.connectedDevices.get(
+        this.deviceKey(client.data.tenantId, deviceId),
+      );
       if (device) {
         device.lastHeartbeat = new Date();
       }
 
-      // Update database
+      // Tenant-scoped write: EdgeDevice.deviceId is only unique per
+      // tenant, so filtering on deviceId alone lets a compromised
+      // device in tenant A overwrite tenant B's device of the same id.
       await this.prisma.edgeDevice.updateMany({
-        where: { deviceId },
+        where: { deviceId, tenantId: client.data.tenantId },
         data: {
           lastHeartbeat: new Date(),
           lastSeenAt: new Date(),
@@ -298,9 +337,8 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
         return { success: false, error: 'Device not registered' };
       }
 
-      // Update device health metrics
       await this.prisma.edgeDevice.updateMany({
-        where: { deviceId },
+        where: { deviceId, tenantId: client.data.tenantId },
         data: {
           lastSeenAt: new Date(),
           cpuUsage: payload.cpuUsage,
@@ -330,8 +368,12 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
   // CONFIGURATION & COMMANDS
   // ========================================
 
-  async sendConfigToDevice(deviceId: string, config: EdgeDeviceConfigDto) {
-    const device = this.connectedDevices.get(deviceId);
+  async sendConfigToDevice(
+    deviceId: string,
+    config: EdgeDeviceConfigDto,
+    tenantId?: string,
+  ) {
+    const device = this.findDevice(deviceId, tenantId);
     if (!device) {
       this.logger.warn(`Cannot send config - device ${deviceId} not connected`);
       return false;
@@ -342,8 +384,12 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
     return true;
   }
 
-  async sendCommandToDevice(deviceId: string, command: EdgeDeviceCommandDto) {
-    const device = this.connectedDevices.get(deviceId);
+  async sendCommandToDevice(
+    deviceId: string,
+    command: EdgeDeviceCommandDto,
+    tenantId?: string,
+  ) {
+    const device = this.findDevice(deviceId, tenantId);
     if (!device) {
       this.logger.warn(`Cannot send command - device ${deviceId} not connected`);
       return false;
@@ -354,8 +400,12 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
     return true;
   }
 
-  async sendCalibrationToDevice(deviceId: string, calibration: CameraCalibrationDto) {
-    const device = this.connectedDevices.get(deviceId);
+  async sendCalibrationToDevice(
+    deviceId: string,
+    calibration: CameraCalibrationDto,
+    tenantId?: string,
+  ) {
+    const device = this.findDevice(deviceId, tenantId);
     if (!device) {
       this.logger.warn(`Cannot send calibration - device ${deviceId} not connected`);
       return false;
@@ -399,9 +449,13 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
   // HELPER METHODS
   // ========================================
 
-  private async updateDeviceStatus(deviceId: string, status: string) {
+  private async updateDeviceStatus(
+    deviceId: string,
+    status: string,
+    tenantId?: string,
+  ) {
     await this.prisma.edgeDevice.updateMany({
-      where: { deviceId },
+      where: tenantId ? { deviceId, tenantId } : { deviceId },
       data: {
         status,
         lastSeenAt: new Date(),
@@ -479,11 +533,14 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
     return Array.from(this.connectedDevices.values());
   }
 
-  isDeviceConnected(deviceId: string): boolean {
-    return this.connectedDevices.has(deviceId);
+  isDeviceConnected(deviceId: string, tenantId?: string): boolean {
+    return !!this.findDevice(deviceId, tenantId);
   }
 
-  getDeviceConnection(deviceId: string): EdgeDeviceConnection | undefined {
-    return this.connectedDevices.get(deviceId);
+  getDeviceConnection(
+    deviceId: string,
+    tenantId?: string,
+  ): EdgeDeviceConnection | undefined {
+    return this.findDevice(deviceId, tenantId);
   }
 }

@@ -1,11 +1,23 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Request } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Request,
+  UseGuards,
+} from '@nestjs/common';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
 import { CustomersService } from './customers.service';
+import { CreateCustomerDto, UpdateCustomerDto } from './dto/customer.dto';
 
 @ApiTags('customers')
 @ApiBearerAuth()
@@ -16,14 +28,23 @@ export class CustomersController {
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  create(@Body() createDto: any, @Request() req) {
+  create(@Body() createDto: CreateCustomerDto, @Request() req) {
     return this.service.create(createDto, req.tenantId);
   }
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
-  findAll(@Request() req) {
-    return this.service.findAll(req.tenantId);
+  findAll(
+    @Request() req,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+  ) {
+    return this.service.findAll(req.tenantId, req.user?.role, {
+      page: page ? parseInt(page, 10) || 1 : 1,
+      limit: limit ? parseInt(limit, 10) || 50 : 50,
+      search,
+    });
   }
 
   @Get(':id')
@@ -34,7 +55,11 @@ export class CustomersController {
 
   @Patch(':id')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  update(@Param('id') id: string, @Body() updateDto: any, @Request() req) {
+  update(
+    @Param('id') id: string,
+    @Body() updateDto: UpdateCustomerDto,
+    @Request() req,
+  ) {
     return this.service.update(id, updateDto, req.tenantId);
   }
 
