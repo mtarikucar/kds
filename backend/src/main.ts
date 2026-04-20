@@ -8,6 +8,12 @@ import helmet from 'helmet';
 import * as bodyParser from 'body-parser';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { initSentry } from './sentry.config';
+import { validateEnv } from './common/helpers/env-validation';
+import { RedisIoAdapter } from './common/adapters/redis-io.adapter';
+
+// Fail-fast env validation BEFORE Sentry / Nest touches anything. Missing
+// secrets previously surfaced as a first-request 500; now abort startup.
+validateEnv();
 
 // Initialize Sentry as early as possible
 initSentry();
@@ -35,14 +41,38 @@ async function bootstrap() {
     bodyParser: false, // Disable built-in parser so our custom one with rawBody capture works
   });
 
-  // Custom body parser with rawBody capture for webhook HMAC verification
+  // Trust proxy so `req.ip`, rate-limiter tracking, and audit-IP columns see
+  // the real client IP behind the load balancer. `true` (permissive) is
+  // spoofable via X-Forwarded-For — operator should pin TRUST_PROXY to exact
+  // hop count or known CIDR. Default 1 = one LB hop.
+  const trustProxy = process.env.TRUST_PROXY;
+  if (trustProxy) {
+    const parsed = Number(trustProxy);
+    app.set('trust proxy', Number.isFinite(parsed) ? parsed : trustProxy);
+  } else {
+    app.set('trust proxy', 1);
+  }
+
+  // Body parsers: register path-scoped /api/webhooks FIRST so the generic
+  // 100KB parser doesn't match it first (body-parser no-ops once a parser
+  // matches). Delivery-platform webhooks can carry 200KB+ line-item bodies;
+  // the generic path stays tight to block DoS.
+  app.use(
+    '/api/webhooks',
+    bodyParser.json({
+      limit: '2mb',
+      verify: (req: any, _res, buf) => { req.rawBody = buf; },
+    }),
+  );
   app.use(bodyParser.json({
-    limit: '10mb',
+    limit: '100kb',
     verify: (req: any, _res, buf) => { req.rawBody = buf; },
   }));
-  app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
+  app.use(bodyParser.urlencoded({ limit: '100kb', extended: true }));
 
-  // Security headers with Helmet
+  // Security headers with Helmet. CSP hardened with frame-ancestors 'none'
+  // for clickjacking protection, object-src 'none', base-uri 'self',
+  // form-action 'self', and connect-src allowing wss: for Socket.IO.
   app.use(
     helmet({
       contentSecurityPolicy: {
@@ -51,6 +81,11 @@ async function bootstrap() {
           styleSrc: ["'self'", "'unsafe-inline'"],
           scriptSrc: ["'self'"],
           imgSrc: ["'self'", 'data:', 'https:'],
+          connectSrc: ["'self'", 'https:', 'wss:'],
+          frameAncestors: ["'none'"],
+          objectSrc: ["'none'"],
+          baseUri: ["'self'"],
+          formAction: ["'self'"],
         },
       },
       crossOriginEmbedderPolicy: false, // Allow embedding for QR codes
@@ -139,6 +174,16 @@ async function bootstrap() {
   if (process.env.NODE_ENV !== 'production') {
     SwaggerModule.setup('api/docs', app, document);
   }
+
+  // Socket.IO Redis adapter for multi-replica broadcast correctness. When
+  // REDIS_URL is absent we fall back to the in-memory adapter with a warn
+  // log so single-node dev keeps working. Every emit in the codebase uses
+  // `server.to('<room>').emit(...)` which with the default adapter ONLY
+  // reaches sockets on the same replica — horizontal scale-out silently
+  // loses half the events.
+  const redisAdapter = new RedisIoAdapter(app);
+  await redisAdapter.connectToRedis();
+  app.useWebSocketAdapter(redisAdapter);
 
   // Enable graceful shutdown hooks
   app.enableShutdownHooks();
