@@ -41,7 +41,7 @@
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/addon-web-links": "^0.12.0",
     "@xterm/xterm": "^6.0.0",
-    "axios": "^1.6.5",
+    "axios": "^1.15.1",
     "clsx": "^2.1.1",
     "date-fns": "^3.0.6",
     "framer-motion": "^12.23.24",

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { Prisma } from '@prisma/client';
 
@@ -33,7 +33,24 @@ export class CustomersService {
 
   async remove(id: string, tenantId: string) {
     await this.findOne(id, tenantId);
-    return this.prisma.customer.delete({ where: { id } });
+    try {
+      return await this.prisma.customer.delete({ where: { id } });
+    } catch (err) {
+      // LoyaltyTransaction.customer may use onDelete: Restrict (migration
+      // 20260420180000) once schema hardening lands. A customer who has
+      // earned a single point throws Prisma P2003 on delete. Translate
+      // to 409 + clear message instead of an opaque 500; admin UI
+      // steers operators to anonymize instead of hard-delete.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2003'
+      ) {
+        throw new ConflictException(
+          'Cannot delete a customer with loyalty history. Anonymize the record instead.',
+        );
+      }
+      throw err;
+    }
   }
 
   // ========================================
