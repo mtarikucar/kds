@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { createHash } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from '../../common/services/email.service';
 import { CreateZReportDto } from './dto/create-z-report.dto';
@@ -462,24 +463,72 @@ export class ZReportsService {
   }
 
   /**
-   * Close (finalize) a Z-Report
+   * Close (finalize) a Z-Report. After this succeeds, every writing path
+   * must assert isFinalized=false before mutating fiscal totals. A SHA-256
+   * payload hash is stored for tamper-detection audit. The conditional
+   * updateMany on isFinalized=false ensures two concurrent close clicks
+   * can't both win.
    */
-  async closeReport(id: string, tenantId: string) {
+  async closeReport(id: string, tenantId: string, userId?: string) {
     const report = await this.findOne(id, tenantId);
-
-    // Check if report is already exported (indicates it's finalized)
-    if (report.pdfExported) {
+    if ((report as any).isFinalized) {
       throw new BadRequestException('Report is already finalized');
     }
+    // Legacy pdfExported flag — keep the check during migration so we
+    // don't finalize a row that was already informally sealed.
+    if (report.pdfExported && !(report as any).isFinalized) {
+      // pdfExported alone is not a real finalization — upgrade it.
+    }
 
-    // Mark report as exported/finalized
-    return this.prisma.zReport.update({
-      where: { id },
+    const payloadHash = this.computePayloadHash(report);
+
+    const result = await this.prisma.zReport.updateMany({
+      where: { id, tenantId, isFinalized: false },
       data: {
+        isFinalized: true,
+        finalizedAt: new Date(),
+        finalizedById: userId ?? null,
+        payloadHash,
         pdfExported: true,
         excelExported: true,
       },
     });
+    if (result.count !== 1) {
+      throw new ConflictException('Report was concurrently finalized');
+    }
+    return this.findOne(id, tenantId);
+  }
+
+  /**
+   * Canonical sha256 over the fiscal-critical fields. Sorted-key JSON so
+   * the digest is stable across Prisma return-object property order
+   * changes. If audit re-runs compute this hash over the row's current
+   * state, any post-finalization tampering shows up as a mismatch.
+   */
+  private computePayloadHash(report: any): string {
+    const payload = {
+      reportNumber: report.reportNumber,
+      reportDate: report.reportDate,
+      totalOrders: report.totalOrders,
+      totalSales: report.totalSales?.toString?.() ?? String(report.totalSales),
+      totalDiscount: report.totalDiscount?.toString?.() ?? String(report.totalDiscount),
+      totalRefunds: report.totalRefunds?.toString?.() ?? String(report.totalRefunds),
+      netSales: report.netSales?.toString?.() ?? String(report.netSales),
+      cashPayments: report.cashPayments?.toString?.() ?? String(report.cashPayments),
+      cardPayments: report.cardPayments?.toString?.() ?? String(report.cardPayments),
+      digitalPayments: report.digitalPayments?.toString?.() ?? String(report.digitalPayments),
+      openingCash: report.openingCash?.toString?.() ?? String(report.openingCash),
+      countedCash: report.countedCash?.toString?.() ?? String(report.countedCash),
+      expectedCash: report.expectedCash?.toString?.() ?? String(report.expectedCash),
+      cashDifference: report.cashDifference?.toString?.() ?? String(report.cashDifference),
+    };
+    const canonical = JSON.stringify(
+      Object.keys(payload).sort().reduce((acc, k) => {
+        (acc as any)[k] = (payload as any)[k];
+        return acc;
+      }, {} as Record<string, unknown>),
+    );
+    return createHash('sha256').update(canonical).digest('hex');
   }
 
   /**

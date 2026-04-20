@@ -76,7 +76,7 @@ export class ZReportsController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Close/finalize a Z-Report' })
   async close(@Req() req, @Param('id') id: string) {
-    return this.zReportsService.closeReport(id, req.user.tenantId);
+    return this.zReportsService.closeReport(id, req.user.tenantId, req.user.id);
   }
 
   @Post(':id/send-email')
