@@ -410,11 +410,20 @@ export class AuthService {
   }
 
   private async generateTokens(user: UserResponseDto): Promise<AuthResponseDto> {
+    // Read current tokenVersion so the JWT payload carries the stamp
+    // JwtStrategy validates against. Bumping User.tokenVersion (on password
+    // reset / admin lockout / suspicious-login) invalidates every prior
+    // access/refresh token immediately.
+    const row = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { tokenVersion: true },
+    });
     const basePayload = {
       sub: user.id,
       email: user.email,
       role: user.role,
       tenantId: user.tenantId,
+      ver: row?.tokenVersion ?? 0,
     };
 
     const accessToken = this.jwtService.sign(

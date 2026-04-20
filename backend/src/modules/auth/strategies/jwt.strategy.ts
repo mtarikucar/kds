@@ -9,6 +9,10 @@ export interface JwtPayload {
   email: string;
   role: string;
   tenantId: string;
+  /** Token-version stamp. Incrementing User.tokenVersion invalidates every
+   * previously-issued access/refresh token. Omitted on legacy tokens
+   * issued before this field was added — treated as 0. */
+  ver?: number;
 }
 
 @Injectable()
@@ -35,6 +39,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         role: true,
         status: true,
         tenantId: true,
+        tokenVersion: true,
       },
     });
 
@@ -42,6 +47,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       throw new UnauthorizedException('User not found or inactive');
     }
 
-    return user;
+    // Token revocation check: password reset / admin lockout / suspicious-
+    // login bumps User.tokenVersion, invalidating every token issued
+    // before the bump. Legacy tokens without `ver` default to 0, matching
+    // the default column value so existing sessions don't break.
+    const tokenVer = payload.ver ?? 0;
+    if (tokenVer !== user.tokenVersion) {
+      throw new UnauthorizedException('Token has been revoked');
+    }
+
+    const { tokenVersion: _v, ...result } = user;
+    return result;
   }
 }
