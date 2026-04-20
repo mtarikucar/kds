@@ -89,6 +89,7 @@ export class LoyaltyService {
 
       const transaction = await tx.loyaltyTransaction.create({
         data: {
+          tenantId,
           customerId,
           type,
           points,

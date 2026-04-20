@@ -115,6 +115,18 @@ model Tenant {
   shiftAssignments      ShiftAssignment[]
   shiftSwapRequests     ShiftSwapRequest[]
 
+  // Previously-orphaned relations (migration 20260420180000 adds the FKs).
+  // Listed here so Prisma keeps the TS-side relation graph in sync.
+  restaurantLayout      RestaurantLayout?
+  payments              Payment[]
+  customerSessions      CustomerSession[]
+  phoneVerifications    PhoneVerification[]
+  waiterRequests        WaiterRequest[]
+  billRequests          BillRequest[]
+  cashDrawerMovements   CashDrawerMovement[]
+  userActivities        UserActivity[]
+  loyaltyTransactions   LoyaltyTransaction[]
+
   @@index([currentPlanId])
   @@index([status])
   @@map("tenants")
@@ -458,6 +470,7 @@ model RestaurantLayout {
   worldData Json     // Compressed voxel data including all objects
 
   tenantId  String   @unique
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -600,16 +613,24 @@ model Payment {
   notes          String?
 
   tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   orderId  String
   order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   createdAt DateTime  @default(now())
   paidAt    DateTime?
 
-  @@unique([orderId, idempotencyKey])
+  // NOTE: @@unique([orderId, idempotencyKey]) does NOT dedupe null keys in
+  // Postgres (multiple NULLs are considered distinct). Migration
+  // 20260420180000 adds a partial unique index
+  //   CREATE UNIQUE INDEX ... ON payments (order_id, idempotency_key)
+  //     WHERE idempotency_key IS NOT NULL;
+  // so the idempotency guarantee actually holds for keyed requests.
   @@index([tenantId])
   @@index([orderId])
   @@index([status])
+  @@index([tenantId, status])
+  @@index([tenantId, createdAt])
   @@map("payments")
 }
 
@@ -1175,6 +1196,7 @@ model CustomerSession {
   lastActivity DateTime @default(now())
 
   tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1189,8 +1211,15 @@ model CustomerSession {
 model LoyaltyTransaction {
   id          String   @id @default(uuid())
 
+  // Tenant isolation is now explicit. onDelete: Restrict on the customer
+  // relation means a customer with loyalty history can't be hard-deleted;
+  // callers must soft-delete / anonymize + keep the audit trail. Matches
+  // the typical fiscal/regulatory stance on loyalty liabilities.
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
   customerId String
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
 
   // Transaction details
   type        String  // EARNED, REDEEMED, EXPIRED, ADJUSTMENT, BONUS, REFERRAL
@@ -1214,6 +1243,8 @@ model LoyaltyTransaction {
 
   createdAt DateTime @default(now())
 
+  @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@index([customerId])
   @@index([createdAt])
   @@index([type])
@@ -1230,6 +1261,7 @@ model PhoneVerification {
   // Session tracking
   sessionId String?
   tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // Rate limiting
   attempts  Int      @default(0)
@@ -1337,6 +1369,7 @@ model WaiterRequest {
   status    String  @default("PENDING") // PENDING, ACKNOWLEDGED, COMPLETED
   sessionId String
   tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   tableId String?
   table   Table?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
@@ -1362,6 +1395,7 @@ model BillRequest {
   status    String @default("PENDING") // PENDING, ACKNOWLEDGED, COMPLETED
   sessionId String
   tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   tableId String?
   table   Table?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
@@ -1544,10 +1578,12 @@ model CashDrawerMovement {
   user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
 
   @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@index([zReportId])
   @@index([userId])
   @@index([createdAt])
@@ -1724,6 +1760,7 @@ model UserActivity {
   id        String   @id @default(uuid())
   userId    String
   tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   action    String   // LOGIN, LOGOUT, LOGIN_FAILED
   ip        String?
   userAgent String?
@@ -1732,6 +1769,7 @@ model UserActivity {
 
   @@index([userId])
   @@index([tenantId])
+  @@index([tenantId, createdAt])
   @@index([createdAt])
   @@map("user_activities")
 }

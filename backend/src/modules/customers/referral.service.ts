@@ -161,6 +161,7 @@ export class ReferralService {
         });
         await tx.loyaltyTransaction.create({
           data: {
+            tenantId,
             customerId,
             type: 'REFERRAL',
             points,
