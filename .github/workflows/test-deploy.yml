@@ -129,6 +129,24 @@ jobs:
           cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/landing-staging:buildcache,mode=max
 
       - name: Deploy to test environment
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          MARKETING_JWT_SECRET: ${{ secrets.MARKETING_JWT_SECRET }}
+          SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.SUPERADMIN_JWT_REFRESH_SECRET }}
+          PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}
+          PAYTR_MERCHANT_KEY: ${{ secrets.PAYTR_MERCHANT_KEY }}
+          PAYTR_MERCHANT_SALT: ${{ secrets.PAYTR_MERCHANT_SALT }}
+          IYZICO_API_KEY: ${{ secrets.IYZICO_API_KEY }}
+          IYZICO_SECRET_KEY: ${{ secrets.IYZICO_SECRET_KEY }}
+          EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
+          EMAIL_USER: ${{ secrets.EMAIL_USER }}
+          EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_FROM: ${{ secrets.EMAIL_FROM }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          DESKTOP_RELEASE_API_KEY: ${{ secrets.DESKTOP_RELEASE_API_KEY }}
         run: |
           echo "=========================================="
           echo "Test Environment Deployment Started"
