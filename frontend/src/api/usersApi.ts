@@ -1,4 +1,5 @@
 import api from '../lib/api';
+import { toArrayPayload } from '../lib/payload';
 
 export interface User {
   id: string;
@@ -35,10 +36,12 @@ export interface UpdateUserData {
 
 export const usersApi = {
   async getAll(): Promise<User[]> {
-    // Backend returns `{ data, meta }` for future pagination; current UI
-    // still consumes a flat array, so we pull `data` here.
+    // Backend currently returns `{ data, meta }`; older deployments
+    // returned a bare array. `toArrayPayload` handles both shapes and
+    // returns `[]` on anything else so a contract drift no longer
+    // crashes the admin users page with "n.filter is not a function".
     const response = await api.get('/users', { params: { limit: 100 } });
-    return response.data.data ?? response.data;
+    return toArrayPayload<User>(response.data);
   },
 
   async getById(id: string): Promise<User> {

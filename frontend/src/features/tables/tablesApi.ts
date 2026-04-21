@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import api from '../../lib/api';
+import { toArrayPayload } from '../../lib/payload';
 import { Table, CreateTableDto, UpdateTableDto, MergeTablesDto, UnmergeTableDto, TableGroupInfo } from '../../types';
 
 export const useTables = () => {
@@ -9,7 +10,10 @@ export const useTables = () => {
     queryKey: ['tables'],
     queryFn: async (): Promise<Table[]> => {
       const response = await api.get('/tables');
-      return response.data;
+      // Defensive normalize — keeps TableManagementPage's `.filter`
+      // calls crash-proof if this endpoint ever migrates to the
+      // paginated `{ data, meta }` envelope (already happened on /orders).
+      return toArrayPayload<Table>(response.data);
     },
   });
 };

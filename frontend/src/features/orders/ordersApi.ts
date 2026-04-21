@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import api from '../../lib/api';
+import { toArrayPayload } from '../../lib/payload';
 import {
   Order,
   CreateOrderDto,
@@ -21,9 +22,10 @@ export const useOrders = (filters?: OrderFilters) => {
     queryKey: ['orders', filters],
     queryFn: async (): Promise<Order[]> => {
       const response = await api.get('/orders', { params: filters });
-      // Server now returns { data, total, page, pageSize }; tolerate the legacy
-      // array shape as well so the hook keeps working during the migration.
-      return Array.isArray(response.data) ? response.data : response.data.data;
+      // Tolerate both bare-array and `{ data, meta }` envelope shapes;
+      // fall back to `[]` on anything else so downstream `.filter/.map`
+      // calls stay safe if the contract drifts again.
+      return toArrayPayload<Order>(response.data);
     },
   });
 };
@@ -243,7 +245,7 @@ export const usePendingOrders = () => {
       const response = await api.get('/orders', {
         params: { status: 'PENDING_APPROVAL' },
       });
-      return response.data;
+      return toArrayPayload<Order>(response.data);
     },
     // Real-time updates via Socket.IO - no polling needed
   });
@@ -281,7 +283,7 @@ export const useWaiterRequests = () => {
     queryKey: ['waiterRequests'],
     queryFn: async (): Promise<WaiterRequest[]> => {
       const response = await api.get('/customer-orders/waiter-requests/tenant/active');
-      return response.data;
+      return toArrayPayload<WaiterRequest>(response.data);
     },
     // Real-time updates delivered via Socket.IO (see usePosSocket).
   });
@@ -338,7 +340,7 @@ export const useBillRequests = () => {
     queryKey: ['billRequests'],
     queryFn: async (): Promise<BillRequest[]> => {
       const response = await api.get('/customer-orders/bill-requests/tenant/active');
-      return response.data;
+      return toArrayPayload<BillRequest>(response.data);
     },
     // Real-time updates delivered via Socket.IO (see usePosSocket).
   });

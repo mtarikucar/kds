@@ -46,21 +46,31 @@ const UserManagementPage = () => {
   const userLimit = checkLimit('maxUsers', users.length);
   const canAddUser = userLimit.allowed;
 
+  // Belt-and-suspenders: even though usersApi.getAll now guarantees an
+  // array, a regression anywhere (setUsers from another code path, a
+  // middleware serializer change, etc.) would land as a page-wide crash
+  // in the useMemo filters below. Normalize once per render so the
+  // `.filter` calls are safe.
+  const safeUsers: User[] = useMemo(
+    () => (Array.isArray(users) ? users : []),
+    [users],
+  );
+
   // Calculate statistics
   const stats = useMemo(() => {
     return {
-      total: users.length,
-      active: users.filter(u => u.status === UserStatus.ACTIVE).length,
-      inactive: users.filter(u => u.status === UserStatus.INACTIVE).length,
-      pending: users.filter(u => u.status === UserStatus.PENDING_APPROVAL).length,
-      admins: users.filter(u => u.role === UserRole.ADMIN).length,
-      managers: users.filter(u => u.role === UserRole.MANAGER).length,
+      total: safeUsers.length,
+      active: safeUsers.filter(u => u.status === UserStatus.ACTIVE).length,
+      inactive: safeUsers.filter(u => u.status === UserStatus.INACTIVE).length,
+      pending: safeUsers.filter(u => u.status === UserStatus.PENDING_APPROVAL).length,
+      admins: safeUsers.filter(u => u.role === UserRole.ADMIN).length,
+      managers: safeUsers.filter(u => u.role === UserRole.MANAGER).length,
     };
-  }, [users]);
+  }, [safeUsers]);
 
   // Filter users by status, role, and search term
   const filteredUsers = useMemo(() => {
-    let result = users;
+    let result = safeUsers;
 
     // Filter by status
     if (statusFilter !== 'all') {
@@ -84,7 +94,7 @@ const UserManagementPage = () => {
     }
 
     return result;
-  }, [users, statusFilter, roleFilter, searchTerm]);
+  }, [safeUsers, statusFilter, roleFilter, searchTerm]);
 
   const form = useForm<UserFormData>({
     resolver: zodResolver(userSchema),

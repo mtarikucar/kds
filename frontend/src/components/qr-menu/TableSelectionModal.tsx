@@ -39,7 +39,16 @@ export default function TableSelectionModal({
       setLoading(true);
       setError(null);
       const response = await api.get(`/tables/public/${tenantId}`);
-      setTables(response.data);
+      // Accept both bare-array and `{ data, meta }` envelope shapes; drop
+      // anything else to `[]` so `.filter` below never crashes the modal.
+      const payload = response.data;
+      if (Array.isArray(payload)) {
+        setTables(payload);
+      } else if (payload && Array.isArray(payload.data)) {
+        setTables(payload.data);
+      } else {
+        setTables([]);
+      }
     } catch (err: any) {
       console.error('Failed to fetch tables:', err);
       setError(err.response?.data?.message || t('errors.failedToLoadTables', 'Failed to load tables'));
@@ -48,7 +57,7 @@ export default function TableSelectionModal({
     }
   };
 
-  const filteredTables = tables.filter((table) =>
+  const filteredTables = (Array.isArray(tables) ? tables : []).filter((table) =>
     table.number.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
