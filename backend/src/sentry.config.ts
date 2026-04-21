@@ -54,6 +54,18 @@ export function initSentry() {
         delete event.request.headers['authorization'];
         delete event.request.headers['cookie'];
         delete event.request.headers['x-api-key'];
+        delete event.request.headers['x-webhook-signature'];
+        delete event.request.headers['x-csrf-token'];
+      }
+
+      // Scrub user PII — the NestJS exception filter attaches
+      // { id, email, tenantId } as user context. email + ip_address are
+      // GDPR/KVKK PII we never want in Sentry's long-term retention;
+      // id is enough to join with the app DB when debugging.
+      if (event.user) {
+        delete event.user.email;
+        delete event.user.ip_address;
+        delete (event.user as any).username;
       }
 
       // Remove sensitive query params

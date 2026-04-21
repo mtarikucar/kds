@@ -16,6 +16,13 @@ import { User } from '../types';
  *
  * - The refresh token itself lives server-side in an httpOnly cookie set
  *   by /api/auth/*; it never touches JavaScript.
+ *
+ * `logout()` stays sync/local so the 401 interceptor in lib/api.ts can
+ * call it without re-entrancy risk. The canonical user-initiated logout
+ * (features/auth/authApi.ts `useLogout`) calls POST /auth/logout FIRST
+ * to revoke the refresh cookie + bump tokenVersion, then calls this
+ * `logout()` to clear local state. For the 401-retry path the refresh
+ * token is already invalid — no point re-contacting the backend.
  */
 interface AuthState {
   user: User | null;

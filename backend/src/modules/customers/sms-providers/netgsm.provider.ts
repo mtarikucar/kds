@@ -41,10 +41,14 @@ export class NetGsmProvider implements SmsProvider {
     });
 
     try {
+      // 10s cap on the upstream. NetGSM outages shouldn't pin a Node
+      // socket indefinitely — the caller treats SMS as fire-and-forget
+      // but we still pay CPU / file descriptors for every open request.
       const response = await fetch(this.apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: params.toString(),
+        signal: AbortSignal.timeout(10_000),
       });
 
       const responseText = await response.text();

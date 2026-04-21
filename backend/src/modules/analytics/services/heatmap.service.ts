@@ -18,6 +18,16 @@ interface HeatmapOptions {
   cellSize?: number;
 }
 
+// Upper bound on the aggregate grid so a caller cannot request, say, a
+// 10,000 × 10,000 grid and force us to allocate 100 million cells. A
+// restaurant floor rarely exceeds 40 × 40 cells at 0.5m resolution.
+const MAX_GRID_DIMENSION = 100;
+
+function clampGridDim(v: number | undefined, fallback: number): number {
+  if (typeof v !== 'number' || !Number.isFinite(v) || v < 1) return fallback;
+  return Math.min(Math.floor(v), MAX_GRID_DIMENSION);
+}
+
 @Injectable()
 export class HeatmapService {
   private readonly logger = new Logger(HeatmapService.name);
@@ -35,10 +45,14 @@ export class HeatmapService {
   ): Promise<HeatmapResponseDto> {
     const {
       granularity = HeatmapGranularity.HOURLY,
-      gridWidth = 20,
-      gridDepth = 20,
+      gridWidth: rawGridWidth = 20,
+      gridDepth: rawGridDepth = 20,
       cellSize = 1.0,
     } = options;
+    // Clamp to MAX_GRID_DIMENSION so a hostile caller can't request a
+    // 10k × 10k grid and make us allocate 100M cells.
+    const gridWidth = clampGridDim(rawGridWidth, 20);
+    const gridDepth = clampGridDim(rawGridDepth, 20);
 
     // Check cache first
     const cached = await this.getCachedHeatmap(
@@ -120,10 +134,14 @@ export class HeatmapService {
   ): Promise<HeatmapResponseDto> {
     const {
       granularity = HeatmapGranularity.HOURLY,
-      gridWidth = 20,
-      gridDepth = 20,
+      gridWidth: rawGridWidth = 20,
+      gridDepth: rawGridDepth = 20,
       cellSize = 1.0,
     } = options;
+    // Clamp to MAX_GRID_DIMENSION so a hostile caller can't request a
+    // 10k × 10k grid and make us allocate 100M cells.
+    const gridWidth = clampGridDim(rawGridWidth, 20);
+    const gridDepth = clampGridDim(rawGridDepth, 20);
 
     // Check cache first
     const cached = await this.getCachedHeatmap(
@@ -200,10 +218,14 @@ export class HeatmapService {
   ): Promise<HeatmapResponseDto> {
     const {
       granularity = HeatmapGranularity.HOURLY,
-      gridWidth = 20,
-      gridDepth = 20,
+      gridWidth: rawGridWidth = 20,
+      gridDepth: rawGridDepth = 20,
       cellSize = 1.0,
     } = options;
+    // Clamp to MAX_GRID_DIMENSION so a hostile caller can't request a
+    // 10k × 10k grid and make us allocate 100M cells.
+    const gridWidth = clampGridDim(rawGridWidth, 20);
+    const gridDepth = clampGridDim(rawGridDepth, 20);
 
     // Fetch traffic flow records with dwell time
     const records = await this.prisma.trafficFlowRecord.findMany({

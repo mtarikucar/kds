@@ -102,13 +102,23 @@ export class ShiftSwapService {
       ? SwapRequestStatus.TARGET_ACCEPTED
       : SwapRequestStatus.TARGET_REJECTED;
 
-    const updated = await this.prisma.shiftSwapRequest.update({
-      where: { id },
+    // Conditional update: only the first caller that still sees status
+    // PENDING wins. A second concurrent respond returns count=0 and we
+    // surface the same "already processed" message as the fast-path find.
+    const claim = await this.prisma.shiftSwapRequest.updateMany({
+      where: { id, tenantId, status: SwapRequestStatus.PENDING },
       data: {
         status,
         targetApproved: accept,
         targetRespondedAt: new Date(),
       },
+    });
+    if (claim.count !== 1) {
+      throw new NotFoundException('Swap request not found or already processed');
+    }
+
+    const updated = await this.prisma.shiftSwapRequest.findFirstOrThrow({
+      where: { id, tenantId },
       include: {
         requester: { select: { id: true, firstName: true, lastName: true } },
         target: { select: { id: true, firstName: true, lastName: true } },
