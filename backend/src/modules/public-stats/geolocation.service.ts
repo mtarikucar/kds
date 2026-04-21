@@ -55,9 +55,11 @@ export class GeolocationService {
     }
 
     try {
-      // Use ip-api.com (free tier: 45 requests/minute)
+      // Use ip-api.com (free tier: 45 requests/minute). HTTPS so an
+      // on-path attacker can't inject a fake country/city — the free tier
+      // serves HTTPS too, just without the `X-Rl` request-budget header.
       const response = await axios.get(
-        `http://ip-api.com/json/${ip}?fields=status,country,countryCode,region,city,lat,lon`,
+        `https://ip-api.com/json/${ip}?fields=status,country,countryCode,region,city,lat,lon`,
         { timeout: 3000 }
       );
 

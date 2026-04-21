@@ -40,6 +40,15 @@ const TOTP_REPLAY_LOCK_MS = 90_000;
 const BACKUP_CODE_COUNT = 10;
 const BACKUP_CODE_BYTES = 5; // 10 hex chars per code
 
+// Dummy bcrypt hash used to normalize response time on the "email not
+// found" path. Without this an attacker can tell a valid SA email from
+// a bogus one by measuring whether bcrypt.compare ran. Computed once at
+// module load with the default cost.
+const DUMMY_SA_BCRYPT_HASH = bcrypt.hashSync(
+  'dummy-password-for-timing-normalization',
+  12,
+);
+
 @Injectable()
 export class SuperAdminAuthService {
   private readonly logger = new Logger(SuperAdminAuthService.name);
@@ -154,6 +163,10 @@ export class SuperAdminAuthService {
     });
 
     if (!superAdmin) {
+      // Run bcrypt against a throwaway hash so the response time does
+      // NOT leak whether the email exists. SA has a tiny population and
+      // leaked timing here is a meaningful enumeration primitive.
+      await bcrypt.compare(password, DUMMY_SA_BCRYPT_HASH).catch(() => false);
       throw new UnauthorizedException('Invalid credentials');
     }
 

@@ -176,21 +176,28 @@ export class CameraService {
   }
 
   /**
-   * Update camera status (called by edge device)
+   * Update camera status (called by edge device). Tenant-scoped so an
+   * authenticated edge device cannot forge status updates for another
+   * tenant's cameras by guessing UUIDs; callers MUST pass the tenantId
+   * that belongs to the device's configuration.
    */
   async updateCameraStatus(
     cameraId: string,
+    tenantId: string,
     status: CameraStatus,
     errorMessage?: string
   ): Promise<void> {
-    await this.prisma.camera.update({
-      where: { id: cameraId },
+    const res = await this.prisma.camera.updateMany({
+      where: { id: cameraId, tenantId },
       data: {
         status,
         lastSeenAt: status === CameraStatus.ONLINE ? new Date() : undefined,
         errorMessage: errorMessage || null,
       },
     });
+    if (res.count !== 1) {
+      throw new NotFoundException(`Camera with ID ${cameraId} not found`);
+    }
   }
 
   /**

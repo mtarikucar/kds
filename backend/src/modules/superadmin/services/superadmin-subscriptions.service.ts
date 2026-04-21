@@ -257,6 +257,41 @@ export class SuperAdminSubscriptionsService {
       if (!plan) {
         throw new NotFoundException('Plan not found');
       }
+      // Downgrade guard: refuse a plan change that would push the tenant
+      // above the new plan's limits. The regular tenant flow already has
+      // this check in SubscriptionService.assertDowngradeAllowed; without
+      // the same guard on the SA path, an ops mistake (FREE-ing a 200-
+      // user tenant) silently leaves the tenant over-quota until the
+      // next guard rejects a new write.
+      const [userCount, tableCount, productCount, categoryCount] =
+        await Promise.all([
+          this.prisma.user.count({
+            where: { tenantId: existing.tenantId, status: 'ACTIVE' },
+          }),
+          this.prisma.table.count({ where: { tenantId: existing.tenantId } }),
+          this.prisma.product.count({ where: { tenantId: existing.tenantId } }),
+          this.prisma.category.count({
+            where: { tenantId: existing.tenantId },
+          }),
+        ]);
+      const violations: string[] = [];
+      if (plan.maxUsers !== -1 && userCount > plan.maxUsers) {
+        violations.push(`users ${userCount}/${plan.maxUsers}`);
+      }
+      if (plan.maxTables !== -1 && tableCount > plan.maxTables) {
+        violations.push(`tables ${tableCount}/${plan.maxTables}`);
+      }
+      if (plan.maxProducts !== -1 && productCount > plan.maxProducts) {
+        violations.push(`products ${productCount}/${plan.maxProducts}`);
+      }
+      if (plan.maxCategories !== -1 && categoryCount > plan.maxCategories) {
+        violations.push(`categories ${categoryCount}/${plan.maxCategories}`);
+      }
+      if (violations.length > 0) {
+        throw new BadRequestException(
+          `Cannot change plan — current usage exceeds new plan limits: ${violations.join(', ')}`,
+        );
+      }
       updateData.planId = updateDto.planId;
     }
 
@@ -316,6 +351,13 @@ export class SuperAdminSubscriptionsService {
 
     if (!subscription) {
       throw new NotFoundException('Subscription not found');
+    }
+
+    // Defend against a negative or 10-year gift that bypasses DTO
+    // validation drift — the DTO SHOULD cap this but the service
+    // re-checks because this endpoint moves real billing dates.
+    if (!Number.isFinite(extendDto.days) || extendDto.days < 1 || extendDto.days > 3650) {
+      throw new BadRequestException('days must be between 1 and 3650');
     }
 
     const newEndDate = new Date(subscription.currentPeriodEnd);

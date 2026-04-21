@@ -7,23 +7,19 @@ export class PosSettingsService {
   constructor(private prisma: PrismaService) {}
 
   async findByTenant(tenantId: string) {
-    let settings = await this.prisma.posSettings.findUnique({
+    // Atomic upsert so two concurrent "first view" calls don't race on
+    // create and hit P2002. The update branch is a no-op when the row
+    // already exists — just returns it.
+    return this.prisma.posSettings.upsert({
       where: { tenantId },
+      update: {},
+      create: {
+        tenantId,
+        enableTablelessMode: false,
+        enableTwoStepCheckout: true, // Default to true for better workflow
+        enableCustomerOrdering: true,
+      },
     });
-
-    // If no settings exist, create default settings
-    if (!settings) {
-      settings = await this.prisma.posSettings.create({
-        data: {
-          tenantId,
-          enableTablelessMode: false,
-          enableTwoStepCheckout: true, // Default to true for better workflow
-          enableCustomerOrdering: true,
-        },
-      });
-    }
-
-    return settings;
   }
 
   async update(tenantId: string, updateDto: UpdatePosSettingsDto) {

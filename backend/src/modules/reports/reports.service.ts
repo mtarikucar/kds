@@ -1,26 +1,40 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrderStatus } from '../../common/constants/order-status.enum';
+import { getTenantMidnight } from '../../common/helpers/timezone.helper';
 
 @Injectable()
 export class ReportsService {
   constructor(private prisma: PrismaService) {}
 
-  private getDateRange(startDate?: Date, endDate?: Date) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date(today);
-    endOfDay.setHours(23, 59, 59, 999);
-
-    return {
-      start: startDate || today,
-      end: endDate || endOfDay,
-    };
+  /**
+   * Look up the tenant timezone and compute today's [start, end) bounds in
+   * that TZ so a report for "today" means the restaurant's day, not the
+   * server pod's day. Defaults to UTC if the tenant has no timezone set.
+   */
+  private async getDateRange(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+  ) {
+    if (startDate && endDate) {
+      return { start: startDate, end: endDate };
+    }
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { timezone: true },
+    });
+    const tz = tenant?.timezone || 'UTC';
+    const now = new Date();
+    const start = startDate ?? getTenantMidnight(now, tz);
+    const end =
+      endDate ??
+      getTenantMidnight(new Date(now.getTime() + 24 * 60 * 60 * 1000), tz);
+    return { start, end };
   }
 
   async getSalesSummary(tenantId: string, startDate?: Date, endDate?: Date) {
-    const dateRange = this.getDateRange(startDate, endDate);
+    const dateRange = await this.getDateRange(tenantId, startDate, endDate);
 
     // Get aggregated order data
     const orderStats = await this.prisma.order.aggregate({
@@ -117,7 +131,7 @@ export class ReportsService {
     endDate?: Date,
     limit: number = 10,
   ) {
-    const dateRange = this.getDateRange(startDate, endDate);
+    const dateRange = await this.getDateRange(tenantId, startDate, endDate);
     const safeLimit = Math.min(Math.max(limit, 1), 100);
 
     // Get top selling products
@@ -187,7 +201,7 @@ export class ReportsService {
     startDate?: Date,
     endDate?: Date,
   ) {
-    const dateRange = this.getDateRange(startDate, endDate);
+    const dateRange = await this.getDateRange(tenantId, startDate, endDate);
 
     const paymentBreakdown = await this.prisma.payment.groupBy({
       by: ['method'],
@@ -270,7 +284,7 @@ export class ReportsService {
    * Get customer analytics report
    */
   async getCustomerAnalytics(tenantId: string, startDate?: Date, endDate?: Date) {
-    const dateRange = this.getDateRange(startDate, endDate);
+    const dateRange = await this.getDateRange(tenantId, startDate, endDate);
 
     // Get customer tier distribution
     const tierDistribution = await this.prisma.customer.groupBy({
@@ -452,7 +466,7 @@ export class ReportsService {
    * Get staff performance report
    */
   async getStaffPerformance(tenantId: string, startDate?: Date, endDate?: Date) {
-    const dateRange = this.getDateRange(startDate, endDate);
+    const dateRange = await this.getDateRange(tenantId, startDate, endDate);
 
     // Get orders grouped by staff
     const staffOrders = await this.prisma.order.groupBy({

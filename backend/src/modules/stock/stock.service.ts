@@ -34,28 +34,72 @@ export class StockService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      let newStock = product.currentStock;
-
+      // Apply the stock change via a conditional update so two concurrent
+      // OUT movements can't both read stock=10 and each decrement — the
+      // second loser sees `count: 0` and we raise insufficient-stock. For
+      // ADJUSTMENT we write the literal quantity (explicit override) and
+      // for IN we just increment.
+      let newStock: number;
       switch (createDto.type) {
-        case StockMovementType.IN:
-          newStock += createDto.quantity;
+        case StockMovementType.IN: {
+          const res = await tx.product.updateMany({
+            where: { id: createDto.productId, tenantId },
+            data: {
+              currentStock: { increment: createDto.quantity },
+            },
+          });
+          if (res.count !== 1) {
+            throw new NotFoundException('Product not found');
+          }
+          const fresh = await tx.product.findUniqueOrThrow({
+            where: { id: createDto.productId },
+            select: { currentStock: true },
+          });
+          newStock = fresh.currentStock;
           break;
-        case StockMovementType.OUT:
-          newStock -= createDto.quantity;
-          if (newStock < 0) {
+        }
+        case StockMovementType.OUT: {
+          const res = await tx.product.updateMany({
+            where: {
+              id: createDto.productId,
+              tenantId,
+              currentStock: { gte: createDto.quantity },
+            },
+            data: {
+              currentStock: { decrement: createDto.quantity },
+            },
+          });
+          if (res.count !== 1) {
             throw new BadRequestException('Insufficient stock');
           }
+          const fresh = await tx.product.findUniqueOrThrow({
+            where: { id: createDto.productId },
+            select: { currentStock: true },
+          });
+          newStock = fresh.currentStock;
           break;
-        case StockMovementType.ADJUSTMENT:
+        }
+        case StockMovementType.ADJUSTMENT: {
+          if (createDto.quantity < 0) {
+            throw new BadRequestException('Adjustment quantity must be >= 0');
+          }
           newStock = createDto.quantity;
+          const res = await tx.product.updateMany({
+            where: { id: createDto.productId, tenantId },
+            data: { currentStock: newStock },
+          });
+          if (res.count !== 1) {
+            throw new NotFoundException('Product not found');
+          }
           break;
+        }
       }
 
-      // Update product stock
+      // Separate write to sync isAvailable — not gated by the previous
+      // conditional so ADJUSTMENT to 0 or IN after 0 flips the flag.
       await tx.product.update({
         where: { id: createDto.productId },
         data: {
-          currentStock: newStock,
           isAvailable: newStock > 0,
         },
       });

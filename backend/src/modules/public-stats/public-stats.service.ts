@@ -18,15 +18,20 @@ export class PublicStatsService {
   private hashIp(ip: string): string {
     // Salt with a server-side secret so a full IPv4 rainbow table (~450GB,
     // already circulating) cannot re-identify visitors from a DB dump of the
-    // ipHash column.
+    // ipHash column. Production must provide IP_HASH_SALT explicitly —
+    // falling back to the empty string makes the hash trivially reversible.
     const salt =
       process.env.IP_HASH_SALT ??
       process.env.JWT_SECRET ??
-      process.env.APP_SECRET ??
-      '';
+      process.env.APP_SECRET;
+    if (!salt && process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'IP_HASH_SALT (or JWT_SECRET/APP_SECRET) must be configured in production',
+      );
+    }
     return crypto
       .createHash('sha256')
-      .update(`${salt}:${ip}`)
+      .update(`${salt ?? 'dev-fallback-salt'}:${ip}`)
       .digest('hex')
       .substring(0, 32);
   }
@@ -122,11 +127,15 @@ export class PublicStatsService {
   }
 
   private getDefaultStats() {
+    // All zeros on cold-start — the UI is responsible for suppressing
+    // misleading values (e.g. hide the rating block when there are no
+    // reviews yet). Previously this shipped a hard-coded 4.8 which was
+    // an obvious consumer-deception / legal risk.
     return {
       totalViews: 0,
       uniqueVisitors: 0,
       totalReviews: 0,
-      averageRating: 4.8,
+      averageRating: 0,
       totalTenants: 0,
       totalOrders: 0,
       totalRevenue: 0,
