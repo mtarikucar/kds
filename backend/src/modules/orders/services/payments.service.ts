@@ -5,6 +5,7 @@ import {
   Optional,
   Logger,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreatePaymentDto } from '../dto/create-payment.dto';
 import { SplitBillDto, SplitType } from '../dto/split-bill.dto';
@@ -52,8 +53,34 @@ export class PaymentsService {
 
         addBreadcrumb('Payment validation passed', 'payment', { orderId });
 
+        // Idempotency fast-path: if the client supplied a key and we've already
+        // recorded a payment for this (orderId, key), return that row instead of
+        // creating a duplicate. The DB has a partial unique index on
+        // (orderId, idempotencyKey) WHERE idempotencyKey IS NOT NULL — this
+        // pre-check is a responsiveness optimization; P2002 below handles the
+        // concurrent-retry race authoritatively.
+        if (createPaymentDto.idempotencyKey) {
+          const existing = await this.prisma.payment.findFirst({
+            where: {
+              orderId,
+              tenantId,
+              idempotencyKey: createPaymentDto.idempotencyKey,
+            },
+            include: {
+              order: {
+                include: {
+                  orderItems: { include: { product: true } },
+                },
+              },
+            },
+          });
+          if (existing) return existing;
+        }
+
         // Create payment and update order status in a transaction
-        const result = await this.prisma.$transaction(async (tx) => {
+        let result;
+        try {
+          result = await this.prisma.$transaction(async (tx) => {
           // Re-fetch order inside transaction for a consistent view
           const order = await tx.order.findFirst({
             where: { id: orderId, tenantId },
@@ -80,9 +107,20 @@ export class PaymentsService {
             );
           }
 
-          // Validate payment amount
-          if (createPaymentDto.amount > Number(order.finalAmount)) {
-            throw new BadRequestException('Payment amount exceeds order total');
+          // Validate payment amount against REMAINING (not total). A partial
+          // payment must not be allowed to push the order into overpayment by
+          // sending a second full-amount payment.
+          const existingPaid = await tx.payment.aggregate({
+            where: { orderId, status: PaymentStatus.COMPLETED },
+            _sum: { amount: true },
+          });
+          const alreadyPaid = new Prisma.Decimal(existingPaid._sum.amount ?? 0);
+          const remaining = new Prisma.Decimal(order.finalAmount).sub(alreadyPaid);
+          // 1-cent rounding tolerance for float-legacy callers.
+          if (new Prisma.Decimal(createPaymentDto.amount).gt(remaining.add('0.01'))) {
+            throw new BadRequestException(
+              `Payment amount exceeds remaining (${remaining.toFixed(2)})`,
+            );
           }
 
           // Create payment
@@ -95,6 +133,11 @@ export class PaymentsService {
               orderId,
               tenantId,
               paidAt: new Date(),
+              // Persist external gateway reference + client-provided idempotency
+              // key so retries of the same request return the same payment row
+              // (enforced by the partial unique index on the schema side).
+              transactionId: createPaymentDto.transactionId,
+              idempotencyKey: createPaymentDto.idempotencyKey,
             },
             include: {
               order: {
@@ -206,7 +249,35 @@ export class PaymentsService {
 
           addBreadcrumb('Payment completed successfully', 'payment', { paymentId: payment.id });
           return payment;
-        });
+          });
+        } catch (err) {
+          // Partial unique index on (orderId, idempotencyKey) WHERE key IS NOT
+          // NULL — a concurrent retry with the same key races to insert and
+          // only one wins. Losers surface the already-stored payment so the
+          // client gets an idempotent response.
+          if (
+            err instanceof Prisma.PrismaClientKnownRequestError &&
+            err.code === 'P2002' &&
+            createPaymentDto.idempotencyKey
+          ) {
+            const existing = await this.prisma.payment.findFirst({
+              where: {
+                orderId,
+                tenantId,
+                idempotencyKey: createPaymentDto.idempotencyKey,
+              },
+              include: {
+                order: {
+                  include: {
+                    orderItems: { include: { product: true } },
+                  },
+                },
+              },
+            });
+            if (existing) return existing;
+          }
+          throw err;
+        }
 
         // Auto-generate invoice AFTER transaction commits
         if (this.salesInvoiceService && this.accountingSettingsService) {
@@ -265,6 +336,64 @@ export class PaymentsService {
       throw new BadRequestException(
         `Invalid payment status transition: ${currentStatus} -> ${status}. Allowed: ${validTransitions.join(', ') || 'none'}`,
       );
+    }
+
+    // REFUNDED requires rolling back the order + customer stats atomically.
+    // Previously this endpoint flipped payment.status alone, leaving the
+    // order as PAID and the customer's lifetime spend inflated — so
+    // reports, loyalty, and accounting all drifted.
+    if (status === PaymentStatus.REFUNDED) {
+      return this.prisma.$transaction(async (tx) => {
+        const updated = await tx.payment.update({
+          where: { id },
+          data: { status: PaymentStatus.REFUNDED, paidAt: null },
+        });
+
+        const completedSum = await tx.payment.aggregate({
+          where: { orderId: payment.orderId, status: PaymentStatus.COMPLETED },
+          _sum: { amount: true },
+        });
+        const stillPaid = new Prisma.Decimal(completedSum._sum.amount ?? 0);
+        const orderAmount = new Prisma.Decimal(payment.order.finalAmount);
+
+        // If the remaining completed payments no longer cover the order,
+        // move the order out of PAID. Treat as CANCELLED so table/stock
+        // invariants match the existing cancellation flows elsewhere.
+        if (stillPaid.lt(orderAmount) && payment.order.status === OrderStatus.PAID) {
+          await tx.order.update({
+            where: { id: payment.orderId },
+            data: { status: OrderStatus.CANCELLED, paidAt: null },
+          });
+
+          if (payment.order.customerId) {
+            const cust = await tx.customer.findUnique({
+              where: { id: payment.order.customerId },
+            });
+            if (cust && cust.totalOrders > 0) {
+              const refundedAmt = new Prisma.Decimal(payment.amount);
+              const newTotalOrders = Math.max(0, cust.totalOrders - 1);
+              const newTotalSpent = Prisma.Decimal.max(
+                new Prisma.Decimal(0),
+                new Prisma.Decimal(cust.totalSpent).sub(refundedAmt),
+              );
+              const newAverage =
+                newTotalOrders > 0
+                  ? newTotalSpent.div(newTotalOrders)
+                  : new Prisma.Decimal(0);
+              await tx.customer.update({
+                where: { id: cust.id },
+                data: {
+                  totalOrders: newTotalOrders,
+                  totalSpent: newTotalSpent,
+                  averageOrder: newAverage,
+                },
+              });
+            }
+          }
+        }
+
+        return updated;
+      });
     }
 
     return this.prisma.payment.update({

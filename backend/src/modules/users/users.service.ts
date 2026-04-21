@@ -242,10 +242,30 @@ export class UsersService {
       data.password = await bcrypt.hash(dto.password, this.bcryptCost());
     }
 
-    return this.prisma.user.update({
-      where: { id },
-      data,
-      select: LIST_SELECT,
+    // If we're flipping a credential (password) or the login identifier
+    // (email), bump tokenVersion and revoke every refresh token for the
+    // target. Without this, the user whose password an admin just reset
+    // would still be usable on their old sessions until JWT exp.
+    const credentialChanged =
+      dto.password !== undefined ||
+      (dto.email !== undefined && dto.email !== existing.email);
+    if (credentialChanged) {
+      data.tokenVersion = { increment: 1 };
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id },
+        data,
+        select: LIST_SELECT,
+      });
+      if (credentialChanged) {
+        await tx.refreshToken.updateMany({
+          where: { userId: id, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      }
+      return updated;
     });
   }
 
@@ -272,20 +292,31 @@ export class UsersService {
       ? target.email
       : `${target.email}+deleted-${id}@tombstone.kds`;
 
-    return this.prisma.user.update({
-      where: { id },
-      data: {
-        status: 'INACTIVE',
-        email: tombstonedEmail,
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        status: true,
-      },
+    // Deactivation revokes every live session: JwtStrategy rejects non-
+    // ACTIVE users, but a stolen refresh token could still be replayed
+    // against the tenant realm unless we invalidate it here.
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id },
+        data: {
+          status: 'INACTIVE',
+          email: tombstonedEmail,
+          tokenVersion: { increment: 1 },
+        },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          status: true,
+        },
+      });
+      await tx.refreshToken.updateMany({
+        where: { userId: id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      return updated;
     });
   }
 
@@ -348,26 +379,37 @@ export class UsersService {
       throw new ConflictException('Email is not available');
     }
 
-    const updatedUser = await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        email: updateEmailDto.email,
-        emailVerified: false,
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        avatar: true,
-        role: true,
-        status: true,
-        emailVerified: true,
-        tenantId: true,
-        createdAt: true,
-        updatedAt: true,
-      },
+    const updatedUser = await this.prisma.$transaction(async (tx) => {
+      const u = await tx.user.update({
+        where: { id: userId },
+        data: {
+          email: updateEmailDto.email,
+          emailVerified: false,
+          // Email changed → force-logout every existing session. Without
+          // this, a compromised old email+password could keep a token
+          // alive after the legitimate owner moved to a new email.
+          tokenVersion: { increment: 1 },
+        },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          avatar: true,
+          role: true,
+          status: true,
+          emailVerified: true,
+          tenantId: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+      });
+      await tx.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      });
+      return u;
     });
 
     try {

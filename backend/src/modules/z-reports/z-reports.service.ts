@@ -1,7 +1,9 @@
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from '../../common/services/email.service';
+import { getTenantDayBounds } from '../../common/helpers/timezone.helper';
 import { CreateZReportDto } from './dto/create-z-report.dto';
 import PDFDocument from 'pdfkit';
 import { format } from 'date-fns';
@@ -43,32 +45,24 @@ export class ZReportsService {
       throw new BadRequestException('Z-Report already exists for this date');
     }
 
-    // Get tenant timezone for accurate date boundaries
+    // Tenant-local day bounds. Uses the shared helper (same as the
+    // scheduler) so a tenant in Istanbul doesn't miss 23:00-00:00 when
+    // the API pod runs in UTC. Half-open interval [start, end) avoids
+    // the prior `.999` fudge.
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
       select: { timezone: true, currency: true },
     });
     const tz = tenant?.timezone || 'UTC';
     const dateStr = new Date(reportDate).toISOString().slice(0, 10);
-
-    // Use Intl to get the offset for the tenant's timezone on this date
-    const refDate = new Date(`${dateStr}T12:00:00Z`);
-    const localStr = refDate.toLocaleString('sv-SE', { timeZone: tz }); // "YYYY-MM-DD HH:MM:SS"
-    const localDate = new Date(localStr.replace(' ', 'T') + 'Z');
-    const offsetMs = refDate.getTime() - localDate.getTime();
-
-    const startOfDay = new Date(`${dateStr}T00:00:00Z`);
-    startOfDay.setTime(startOfDay.getTime() + offsetMs);
-
-    const endOfDay = new Date(`${dateStr}T23:59:59.999Z`);
-    endOfDay.setTime(endOfDay.getTime() + offsetMs);
+    const { start: startOfDay, end: endOfDay } = getTenantDayBounds(dateStr, tz);
 
     const orders = await this.prisma.order.findMany({
       where: {
         tenantId,
         paidAt: {
           gte: startOfDay,
-          lte: endOfDay,
+          lt: endOfDay,
         },
         status: 'PAID',
       },
@@ -135,7 +129,7 @@ export class ZReportsService {
         tenantId,
         createdAt: {
           gte: startOfDay,
-          lte: endOfDay,
+          lt: endOfDay,
         },
         status: 'CANCELLED',
       },
@@ -190,7 +184,7 @@ export class ZReportsService {
         tenantId,
         createdAt: {
           gte: startOfDay,
-          lte: endOfDay,
+          lt: endOfDay,
         },
       },
       include: {
@@ -236,7 +230,7 @@ export class ZReportsService {
     const openOrders = await this.prisma.order.findMany({
       where: {
         tenantId,
-        createdAt: { gte: startOfDay, lte: endOfDay },
+        createdAt: { gte: startOfDay, lt: endOfDay },
         status: { notIn: ['PAID', 'CANCELLED'] },
       },
       select: { finalAmount: true },
@@ -261,8 +255,14 @@ export class ZReportsService {
       ...data,
     }));
 
-    // Create the Z-Report
-    const report = await this.prisma.zReport.create({
+    // Create the Z-Report. The `findFirst` above is a fast-path dedupe;
+    // the schema has `@@unique([tenantId, reportNumber])` and the report
+    // number is deterministic per `(tenant, reportDate)`, so a concurrent
+    // second generate surfaces as P2002 here — translate it to the same
+    // "already exists" business error rather than a raw 500.
+    let report;
+    try {
+      report = await this.prisma.zReport.create({
       data: {
         tenantId,
         reportDate: new Date(reportDate),
@@ -320,7 +320,16 @@ export class ZReportsService {
 
         notes,
       },
-    });
+      });
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        throw new BadRequestException('Z-Report already exists for this date');
+      }
+      throw err;
+    }
 
     return report;
   }

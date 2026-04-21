@@ -16,6 +16,10 @@ import { CreateLeadDto } from '../dto/create-lead.dto';
 import { UpdateLeadDto } from '../dto/update-lead.dto';
 import { LeadFilterDto } from '../dto/lead-filter.dto';
 import { ConvertLeadDto } from '../dto/convert-lead.dto';
+import {
+  isSubdomainQuarantined,
+  randomSubdomainSuffix,
+} from '../../../common/helpers/subdomain.helper';
 
 /**
  * Allowed lead status transitions. Terminal states (WON, LOST) are
@@ -50,6 +54,29 @@ export class MarketingLeadsService {
     const raw = this.configService.get<string>('BCRYPT_COST');
     const parsed = raw ? parseInt(raw, 10) : NaN;
     return Number.isFinite(parsed) && parsed >= 10 && parsed <= 15 ? parsed : 12;
+  }
+
+  /**
+   * Pick a free subdomain for a converted tenant. Mirrors
+   * AuthService.allocateSubdomain: prefer the slug derived from the
+   * restaurant name; on collision or quarantine, tack on a 6-hex suffix.
+   * Uniqueness is also enforced by the DB unique index — the try/catch
+   * on the transaction handles the rare simultaneous-convert race.
+   */
+  private async allocateSubdomain(base: string): Promise<string> {
+    const baseClean = base || 'restaurant';
+    const preferredTaken =
+      (await isSubdomainQuarantined(this.prisma, baseClean)) ||
+      (await this.prisma.tenant.findUnique({ where: { subdomain: baseClean } }));
+    if (!preferredTaken) return baseClean;
+    for (let i = 0; i < 5; i += 1) {
+      const candidate = `${baseClean}-${randomSubdomainSuffix()}`;
+      const taken =
+        (await isSubdomainQuarantined(this.prisma, candidate)) ||
+        (await this.prisma.tenant.findUnique({ where: { subdomain: candidate } }));
+      if (!taken) return candidate;
+    }
+    throw new ConflictException('Could not allocate a free subdomain');
   }
 
   async create(dto: CreateLeadDto, userId: string) {
@@ -394,10 +421,21 @@ export class MarketingLeadsService {
       ? offer?.customPrice ?? plan.monthlyPrice
       : null;
 
+    // Allocate a subdomain up-front (not inside the tx). The auth/QR-menu
+    // flows require a non-null subdomain; marketing-converted tenants
+    // previously got a NULL and broke their own QR-menu URL generation.
+    const baseSubdomain = dto.tenantName
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    const subdomain = await this.allocateSubdomain(baseSubdomain);
+
     const result = await this.prisma.$transaction(async (tx) => {
       const tenant = await tx.tenant.create({
         data: {
           name: dto.tenantName,
+          subdomain,
+          paymentRegion: 'TURKEY',
           ...(plan ? { currentPlanId: plan.id } : {}),
           ...(canTrial
             ? { trialUsed: true, trialStartedAt: trialStart, trialEndsAt: trialEnd }
@@ -492,6 +530,20 @@ export class MarketingLeadsService {
       });
 
       return { lead: updatedLead, tenantId: tenant.id };
+    })
+    .catch((err) => {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        // Subdomain or admin email raced with another request between
+        // our allocator call and the transactional create. Surface a
+        // clear 409 instead of a generic 500.
+        throw new ConflictException(
+          'Could not create tenant — a tenant with that subdomain or an admin with that email was created concurrently. Please retry.',
+        );
+      }
+      throw err;
     });
 
     // Send the welcome email outside the transaction. Failure here

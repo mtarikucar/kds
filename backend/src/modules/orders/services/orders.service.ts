@@ -6,6 +6,7 @@ import {
   forwardRef,
   Optional,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateOrderDto } from '../dto/create-order.dto';
@@ -47,6 +48,38 @@ export class OrdersService {
     const timestamp = Date.now();
     const random = randomUUID().substring(0, 8).toUpperCase();
     return `ORD-${timestamp}-${random}`;
+  }
+
+  /**
+   * Run an order-create call with retries on P2002(orderNumber). Under
+   * multi-replica load two sub-ms POSTs can end up with the same Date.now()
+   * + random suffix; schema unique catches it and we just roll a new
+   * number. Bails with ConflictException after a handful of attempts
+   * rather than looping forever.
+   */
+  private async createWithOrderNumberRetry<T>(
+    op: (orderNumber: string) => Promise<T>,
+  ): Promise<T> {
+    const maxAttempts = 3;
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        return await op(this.generateOrderNumber());
+      } catch (err) {
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          err.code === 'P2002' &&
+          Array.isArray((err.meta as any)?.target) &&
+          (err.meta as any).target.includes('orderNumber')
+        ) {
+          lastErr = err;
+          continue;
+        }
+        throw err;
+      }
+    }
+    this.logger.error(`Failed to allocate order number after ${maxAttempts} tries: ${lastErr}`);
+    throw new BadRequestException('Could not allocate an order number — please retry');
   }
 
   async create(createOrderDto: CreateOrderDto, userId: string, tenantId: string) {
@@ -184,33 +217,32 @@ export class OrdersService {
     const discountRatio = totalAmount > 0 ? discount / totalAmount : 0;
     const adjustedTaxAmount = Math.round(totalTaxAmount * (1 - discountRatio) * 100) / 100;
 
-    // Generate order number
-    const orderNumber = this.generateOrderNumber();
+    // Create order with items — wrapped in a retry so two near-simultaneous
+    // POSTs that happen to mint the same orderNumber don't both 500 out.
+    const createdOrder = await this.createWithOrderNumberRetry((orderNumber) => {
+      const createData: any = {
+        orderNumber,
+        type: createOrderDto.type,
+        status: OrderStatus.PENDING,
+        requiresApproval: false, // POS orders don't require approval
+        totalAmount,
+        discount,
+        finalAmount,
+        taxAmount: adjustedTaxAmount,
+        notes: createOrderDto.notes,
+        customerName: createOrderDto.customerName,
+        userId,
+        tenantId,
+        orderItems: {
+          create: orderItems,
+        },
+      };
 
-    // Create order with items
-    const createData: any = {
-      orderNumber,
-      type: createOrderDto.type,
-      status: OrderStatus.PENDING,
-      requiresApproval: false, // POS orders don't require approval
-      totalAmount,
-      discount,
-      finalAmount,
-      taxAmount: adjustedTaxAmount,
-      notes: createOrderDto.notes,
-      customerName: createOrderDto.customerName,
-      userId,
-      tenantId,
-      orderItems: {
-        create: orderItems,
-      },
-    };
+      if (createOrderDto.tableId) {
+        createData.tableId = createOrderDto.tableId;
+      }
 
-    if (createOrderDto.tableId) {
-      createData.tableId = createOrderDto.tableId;
-    }
-
-    const createdOrder = await this.prisma.order.create({
+      return this.prisma.order.create({
       data: createData,
       include: {
         orderItems: {
@@ -251,6 +283,7 @@ export class OrdersService {
           },
         },
       },
+      });
     });
 
         // Emit new order to kitchen via WebSocket
@@ -464,6 +497,30 @@ export class OrdersService {
         );
       }
 
+      // Fetch modifiers DB-side too — do NOT trust client-sent prices
+      // or IDs. Previously modifiers were silently dropped on update(),
+      // so a customer tweak that removed or reordered modifiers left the
+      // bill wrong.
+      const allModifierIds = updateOrderDto.items.flatMap((item) =>
+        (item.modifiers || []).map((m) => m.modifierId),
+      );
+      const modifiers =
+        allModifierIds.length > 0
+          ? await this.prisma.modifier.findMany({
+              where: {
+                id: { in: allModifierIds },
+                tenantId,
+                isAvailable: true,
+              },
+            })
+          : [];
+      const modifierMap = new Map(modifiers.map((m) => [m.id, m]));
+      for (const modifierId of allModifierIds) {
+        if (!modifierMap.has(modifierId)) {
+          throw new BadRequestException(`Modifier ${modifierId} not found or unavailable`);
+        }
+      }
+
       // Build product price map from DB (never trust client-supplied prices)
       const productMap = new Map(products.map((p) => [p.id, p]));
 
@@ -475,9 +532,17 @@ export class OrdersService {
         const serverPrice = Number(product?.price ?? 0);
         const taxRate = product?.taxRate ?? 10;
 
-        // Calculate modifier total if modifiers are present
         let modifierTotal = 0;
-        // TODO: if modifiers are added to update flow, fetch from DB like create()
+        const itemModifiers = (item.modifiers || []).map((mod) => {
+          const modifier = modifierMap.get(mod.modifierId);
+          const priceAdjustment = Number(modifier?.priceAdjustment || 0);
+          modifierTotal += priceAdjustment * mod.quantity;
+          return {
+            modifierId: mod.modifierId,
+            quantity: mod.quantity,
+            priceAdjustment,
+          };
+        });
 
         const subtotal = item.quantity * (serverPrice + modifierTotal);
         totalAmount += subtotal;
@@ -495,9 +560,11 @@ export class OrdersService {
           quantity: item.quantity,
           unitPrice: serverPrice,
           subtotal,
+          modifierTotal,
           taxRate,
           taxAmount: itemTaxAmount,
           notes: item.notes,
+          modifiers: itemModifiers.length > 0 ? { create: itemModifiers } : undefined,
         };
       });
 
@@ -507,11 +574,6 @@ export class OrdersService {
       // Recalculate tax after discount (proportional)
       const discountRatio = totalAmount > 0 ? discount / totalAmount : 0;
       const adjustedTaxAmount = Math.round(totalTaxAmount * (1 - discountRatio) * 100) / 100;
-
-      // Delete old items and create new ones
-      await this.prisma.orderItem.deleteMany({
-        where: { orderId: id },
-      });
 
       updateData.orderItems = {
         create: orderItems,
@@ -526,7 +588,15 @@ export class OrdersService {
       updateData.finalAmount = Number(order.totalAmount) - updateOrderDto.discount;
     }
 
-    const updatedOrder = await this.prisma.order.update({
+    // Atomic replace of the item set: a crash between the deleteMany
+    // and the nested create previously produced empty orders. Same tx
+    // covers the order.update so a validation failure doesn't leave
+    // the order without its items.
+    const updatedOrder = await this.prisma.$transaction(async (tx) => {
+      if (updateData.orderItems) {
+        await tx.orderItem.deleteMany({ where: { orderId: id } });
+      }
+      return tx.order.update({
       where: { id },
       data: updateData,
       include: {
@@ -557,6 +627,7 @@ export class OrdersService {
           },
         },
       },
+      });
     });
 
     // Always emit to kitchen via WebSocket when order is updated

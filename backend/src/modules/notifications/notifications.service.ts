@@ -131,6 +131,13 @@ export class NotificationsService {
 
   /**
    * Send notification to all ADMIN and MANAGER users in a tenant
+   *
+   * Previously this fanned out one `createAndSend` per admin which
+   * produced N DB writes, N JSON serializations, N socket emits. With
+   * 50 managers that's 50 roundtrips per reservation/customer event. We
+   * now batch-insert via `createMany` (single DB write) then re-fetch
+   * the rows to emit over websocket. Falls back gracefully if zero
+   * admins are configured.
    */
   async notifyAdmins(
     tenantId: string,
@@ -141,7 +148,6 @@ export class NotificationsService {
       data?: any;
     },
   ) {
-    // Find all ADMIN and MANAGER users in the tenant
     const admins = await this.prisma.user.findMany({
       where: {
         tenantId,
@@ -150,21 +156,35 @@ export class NotificationsService {
       },
       select: { id: true },
     });
+    if (admins.length === 0) return [];
 
-    // Create and send notification to each admin
-    const notifications = await Promise.all(
-      admins.map((admin) =>
-        this.createAndSend({
-          title: notificationData.title,
-          message: notificationData.message,
-          type: notificationData.type,
-          tenantId,
-          userId: admin.id,
-          data: notificationData.data,
-        }),
-      ),
-    );
+    const createdAt = new Date();
+    await this.prisma.notification.createMany({
+      data: admins.map((admin) => ({
+        title: notificationData.title,
+        message: notificationData.message,
+        type: notificationData.type,
+        tenantId,
+        userId: admin.id,
+        isGlobal: false,
+        priority: 'NORMAL',
+        data: notificationData.data,
+        createdAt,
+      })),
+    });
 
+    // Re-read so we have ids + schema-computed columns to ship to the UI.
+    const notifications = await this.prisma.notification.findMany({
+      where: {
+        tenantId,
+        userId: { in: admins.map((a) => a.id) },
+        createdAt,
+        title: notificationData.title,
+      },
+    });
+    for (const n of notifications) {
+      this.notificationsGateway.sendNotificationToUser(n.userId!, n);
+    }
     return notifications;
   }
 }

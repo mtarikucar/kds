@@ -547,11 +547,11 @@ export class CustomerOrdersService {
       for (const pmg of product.modifierGroups) {
         const group = pmg.group;
         if (!group.isActive) continue;
+        const groupModifierIds = group.modifiers.map((m) => m.id);
+        const selectedCount = itemModifierIds.filter((id) =>
+          groupModifierIds.includes(id),
+        ).length;
         if (group.isRequired || group.minSelections > 0) {
-          const groupModifierIds = group.modifiers.map((m) => m.id);
-          const selectedCount = itemModifierIds.filter((id) =>
-            groupModifierIds.includes(id),
-          ).length;
           const minRequired = group.isRequired
             ? Math.max(1, group.minSelections)
             : group.minSelections;
@@ -560,6 +560,14 @@ export class CustomerOrdersService {
               `Product "${product.name}" requires at least ${minRequired} selection(s) from "${group.displayName}"`,
             );
           }
+        }
+        // Upper bound too — a 0-priced "extra sauce" entry shouldn't be
+        // selectable 100 times just because only `minSelections` was
+        // enforced. `maxSelections <= 0` means "no upper bound".
+        if (group.maxSelections > 0 && selectedCount > group.maxSelections) {
+          throw new BadRequestException(
+            `Product "${product.name}" allows at most ${group.maxSelections} selection(s) from "${group.displayName}"`,
+          );
         }
       }
     }

@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsArray, ValidateNested, IsNumber, Min, Max, ArrayMinSize, ArrayMaxSize, MaxLength } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsArray, ValidateNested, IsNumber, IsInt, Min, Max, ArrayMinSize, ArrayMaxSize, MaxLength } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { OrderType } from '../../../common/constants/order-status.enum';
@@ -8,9 +8,10 @@ export class OrderItemModifierDto {
   @IsString()
   modifierId: string;
 
-  @ApiProperty({ description: 'Quantity of modifier', minimum: 1, default: 1 })
-  @IsNumber()
+  @ApiProperty({ description: 'Quantity of modifier', minimum: 1, maximum: 20, default: 1 })
+  @IsInt()
   @Min(1)
+  @Max(20)
   quantity: number;
 }
 
@@ -33,6 +34,7 @@ export class CreateOrderItemDto {
 
   @ApiPropertyOptional({ type: [OrderItemModifierDto], description: 'Selected modifiers for this item' })
   @IsArray()
+  @ArrayMaxSize(20)
   @ValidateNested({ each: true })
   @Type(() => OrderItemModifierDto)
   @IsOptional()

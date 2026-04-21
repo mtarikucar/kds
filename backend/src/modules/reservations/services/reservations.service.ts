@@ -1,4 +1,5 @@
-import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { NotificationsService } from '../../notifications/notifications.service';
 import { NotificationType } from '../../notifications/dto/create-notification.dto';
@@ -29,11 +30,16 @@ export class ReservationsService {
     return tenant;
   }
 
-  private async generateReservationNumber(tenantId: string, date: string): Promise<string> {
+  private async generateReservationNumber(
+    tenantId: string,
+    date: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<string> {
     const dateStr = date.replace(/-/g, '').substring(0, 8);
     const prefix = `R-${dateStr}`;
 
-    const lastReservation = await this.prisma.reservation.findFirst({
+    const client = tx ?? this.prisma;
+    const lastReservation = await client.reservation.findFirst({
       where: {
         tenantId,
         reservationNumber: { startsWith: prefix },
@@ -44,7 +50,10 @@ export class ReservationsService {
     let nextNum = 1;
     if (lastReservation) {
       const lastNum = parseInt(lastReservation.reservationNumber.split('-').pop() || '0', 10);
-      nextNum = lastNum + 1;
+      // Defensive: parseInt returns NaN for empty/garbled strings;
+      // `NaN + 1 === NaN` would pad to the literal "NaN" and collide
+      // forever. Treat an unparseable tail as "start a new sequence".
+      nextNum = Number.isFinite(lastNum) ? lastNum + 1 : 1;
     }
 
     return `${prefix}-${String(nextNum).padStart(3, '0')}`;
@@ -121,85 +130,125 @@ export class ReservationsService {
       }
     }
 
-    const reservationNumber = await this.generateReservationNumber(tenantId, dto.date);
-
     const status = settings.requireApproval ? ReservationStatus.PENDING : ReservationStatus.CONFIRMED;
     const confirmedAt = settings.requireApproval ? undefined : new Date();
 
-    const reservation = await this.prisma.$transaction(async (tx) => {
-      // Check table time overlap inside transaction
-      if (dto.tableId) {
-        const existingTableReservations = await tx.reservation.findMany({
-          where: {
-            tenantId,
-            tableId: dto.tableId,
-            date: new Date(dto.date),
-            status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED, ReservationStatus.SEATED] },
+    // Serializable isolation so the overlap-check + insert is effectively
+    // atomic: two concurrent requests for the same table/time block each
+    // other via the SERIALIZABLE guarantee, and we only accept the first.
+    // The reservation-number allocation is ALSO a hot race, so we retry
+    // on the (tenantId, reservationNumber) unique index via a small loop —
+    // between findFirst's max-seen and our insert another row can land.
+    const MAX_NUMBER_RETRIES = 5;
+    let reservation: any;
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < MAX_NUMBER_RETRIES; attempt++) {
+      try {
+        reservation = await this.prisma.$transaction(
+          async (tx) => {
+            // Check table time overlap inside transaction
+            if (dto.tableId) {
+              const existingTableReservations = await tx.reservation.findMany({
+                where: {
+                  tenantId,
+                  tableId: dto.tableId,
+                  date: new Date(dto.date),
+                  status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED, ReservationStatus.SEATED] },
+                },
+              });
+
+              const requestStart = this.timeToMinutes(dto.startTime);
+              const requestEnd = this.timeToMinutes(dto.endTime);
+
+              for (const res of existingTableReservations) {
+                const resStart = this.timeToMinutes(res.startTime);
+                const resEnd = this.timeToMinutes(res.endTime);
+                if (requestStart < resEnd && requestEnd > resStart) {
+                  throw new BadRequestException('This table is already reserved for the selected time period');
+                }
+              }
+            }
+
+            // Check slot availability inside transaction
+            if (settings.maxReservationsPerSlot) {
+              const existingCount = await tx.reservation.count({
+                where: {
+                  tenantId,
+                  date: new Date(dto.date),
+                  startTime: dto.startTime,
+                  status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED, ReservationStatus.SEATED] },
+                },
+              });
+
+              if (existingCount >= settings.maxReservationsPerSlot) {
+                throw new BadRequestException('This time slot is fully booked');
+              }
+            }
+
+            // Duplicate reservation check inside transaction: same phone + same day + overlapping time
+            const existingDuplicate = await tx.reservation.findFirst({
+              where: {
+                tenantId,
+                customerPhone: dto.customerPhone,
+                date: new Date(dto.date),
+                startTime: dto.startTime,
+                status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] },
+              },
+            });
+
+            if (existingDuplicate) {
+              throw new BadRequestException('You already have a reservation for this time slot');
+            }
+
+            // Allocate number INSIDE the tx so our "max seen" scan sees
+            // concurrent inserts that haven't committed yet (under
+            // SERIALIZABLE isolation, the loser aborts).
+            const reservationNumber = await this.generateReservationNumber(
+              tenantId,
+              dto.date,
+              tx,
+            );
+
+            return tx.reservation.create({
+              data: {
+                reservationNumber,
+                date: new Date(dto.date),
+                startTime: dto.startTime,
+                endTime: dto.endTime,
+                guestCount: dto.guestCount,
+                customerName: dto.customerName,
+                customerPhone: dto.customerPhone,
+                customerEmail: dto.customerEmail,
+                notes: dto.notes,
+                tableId: dto.tableId,
+                tenantId,
+                status,
+                confirmedAt,
+              },
+              include: { table: true },
+            });
           },
-        });
-
-        const requestStart = this.timeToMinutes(dto.startTime);
-        const requestEnd = this.timeToMinutes(dto.endTime);
-
-        for (const res of existingTableReservations) {
-          const resStart = this.timeToMinutes(res.startTime);
-          const resEnd = this.timeToMinutes(res.endTime);
-          if (requestStart < resEnd && requestEnd > resStart) {
-            throw new BadRequestException('This table is already reserved for the selected time period');
-          }
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        );
+        break;
+      } catch (err) {
+        // P2002 on reservationNumber OR Postgres SERIALIZATION_FAILURE
+        // (40001 via P2034 in Prisma) — retry with a fresh sequence.
+        if (
+          err instanceof Prisma.PrismaClientKnownRequestError &&
+          (err.code === 'P2002' || err.code === 'P2034')
+        ) {
+          lastErr = err;
+          continue;
         }
+        throw err;
       }
-
-      // Check slot availability inside transaction
-      if (settings.maxReservationsPerSlot) {
-        const existingCount = await tx.reservation.count({
-          where: {
-            tenantId,
-            date: new Date(dto.date),
-            startTime: dto.startTime,
-            status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED, ReservationStatus.SEATED] },
-          },
-        });
-
-        if (existingCount >= settings.maxReservationsPerSlot) {
-          throw new BadRequestException('This time slot is fully booked');
-        }
-      }
-
-      // Duplicate reservation check inside transaction: same phone + same day + overlapping time
-      const existingDuplicate = await tx.reservation.findFirst({
-        where: {
-          tenantId,
-          customerPhone: dto.customerPhone,
-          date: new Date(dto.date),
-          startTime: dto.startTime,
-          status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] },
-        },
-      });
-
-      if (existingDuplicate) {
-        throw new BadRequestException('You already have a reservation for this time slot');
-      }
-
-      return tx.reservation.create({
-        data: {
-          reservationNumber,
-          date: new Date(dto.date),
-          startTime: dto.startTime,
-          endTime: dto.endTime,
-          guestCount: dto.guestCount,
-          customerName: dto.customerName,
-          customerPhone: dto.customerPhone,
-          customerEmail: dto.customerEmail,
-          notes: dto.notes,
-          tableId: dto.tableId,
-          tenantId,
-          status,
-          confirmedAt,
-        },
-        include: { table: true },
-      });
-    });
+    }
+    if (!reservation) {
+      throw new ConflictException(
+        'Could not allocate a reservation number — please retry',
+      );
+    }
 
     // Notify admins
     try {

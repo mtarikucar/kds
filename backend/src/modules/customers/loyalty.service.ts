@@ -114,7 +114,42 @@ export class LoyaltyService {
     orderNumber: string,
     orderAmount: number,
   ) {
+    // Idempotency: at most one EARNED row per (customer, order). Without
+    // this a retry of the payment flow would credit points twice for the
+    // same sale. Tenant-scoped via relation filter so a bogus orderId
+    // from another tenant can't skip the check.
+    const existing = await this.prisma.loyaltyTransaction.findFirst({
+      where: {
+        customerId,
+        orderId,
+        type: LoyaltyTransactionType.EARNED,
+        customer: { tenantId },
+      },
+    });
+    if (existing) {
+      return {
+        transaction: existing,
+        newBalance: (
+          await this.prisma.customer.findFirst({
+            where: { id: customerId, tenantId },
+            select: { loyaltyPoints: true },
+          })
+        )?.loyaltyPoints ?? 0,
+      };
+    }
+
     const points = Math.floor(orderAmount * LOYALTY_CONFIG.pointsPerCurrencyUnit);
+    if (points <= 0) {
+      return {
+        transaction: null,
+        newBalance: (
+          await this.prisma.customer.findFirst({
+            where: { id: customerId, tenantId },
+            select: { loyaltyPoints: true },
+          })
+        )?.loyaltyPoints ?? 0,
+      };
+    }
     return this.awardPoints(
       customerId,
       tenantId,
@@ -153,6 +188,27 @@ export class LoyaltyService {
   }
 
   async awardWelcomeBonus(customerId: string, tenantId: string) {
+    // Idempotency: at most one welcome BONUS per customer. The public
+    // `identify` endpoint races two concurrent taps → both saw
+    // totalOrders=0/points=0 and both credited — producing duplicate
+    // welcome gifts. A description-qualified findFirst inside the tx is
+    // the cheapest stable check that doesn't require a schema change.
+    const existing = await this.prisma.loyaltyTransaction.findFirst({
+      where: {
+        customerId,
+        type: LoyaltyTransactionType.BONUS,
+        description: { startsWith: 'Welcome bonus:' },
+        customer: { tenantId },
+      },
+    });
+    if (existing) {
+      const customer = await this.prisma.customer.findFirst({
+        where: { id: customerId, tenantId },
+        select: { loyaltyPoints: true },
+      });
+      return { transaction: existing, newBalance: customer?.loyaltyPoints ?? 0 };
+    }
+
     return this.awardPoints(
       customerId,
       tenantId,

@@ -36,6 +36,16 @@ import {
   ValidationException,
 } from '../../common/exceptions';
 
+// Dummy bcrypt hash used to normalize timing between "user not found" and
+// "bad password" paths. bcrypt.compare against this hash takes the same
+// work-factor cost as a real password check, so an attacker cannot use
+// response-time deltas to enumerate which emails are registered.
+// Computed once at module load with cost 12 (matches the default).
+const DUMMY_BCRYPT_HASH = bcrypt.hashSync(
+  'dummy-password-for-timing-normalization',
+  12,
+);
+
 @Injectable()
 export class AuthService {
   private googleClient: OAuth2Client;
@@ -405,7 +415,11 @@ export class AuthService {
 
     // Defer all account-state disclosure until after a successful password
     // check, so the endpoint cannot be used to enumerate registered emails.
+    // When there is no matching user we STILL run bcrypt.compare against a
+    // throwaway hash so the response time does not leak registration state
+    // (timing-based email enumeration).
     if (!user) {
+      await bcrypt.compare(password, DUMMY_BCRYPT_HASH).catch(() => false);
       return null;
     }
 
@@ -676,15 +690,25 @@ export class AuthService {
     // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, this.bcryptCost());
 
-    // Update password and clear reset token (invalidate on use)
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: {
-        password: hashedPassword,
-        resetTokenHash: null,
-        resetTokenExpiry: null,
-      },
-    });
+    // Update password, clear reset token, and bump tokenVersion so every
+    // access/refresh token issued before the reset is invalidated on its
+    // next guard check. Refresh tokens are revoked in the same transaction
+    // so a stolen one can't mint fresh access tokens after the reset.
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          password: hashedPassword,
+          resetTokenHash: null,
+          resetTokenExpiry: null,
+          tokenVersion: { increment: 1 },
+        },
+      }),
+      this.prisma.refreshToken.updateMany({
+        where: { userId: user.id, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
 
     return {
       message: 'Password has been reset successfully',
@@ -719,13 +743,21 @@ export class AuthService {
     // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, this.bcryptCost());
 
-    // Update password
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        password: hashedPassword,
-      },
-    });
+    // Update password + bump tokenVersion + revoke refresh tokens so all
+    // prior sessions (including on other devices) are force-logged-out.
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          password: hashedPassword,
+          tokenVersion: { increment: 1 },
+        },
+      }),
+      this.prisma.refreshToken.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
 
     return {
       message: 'Password changed successfully',

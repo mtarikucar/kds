@@ -6,11 +6,14 @@ import {
   IsOptional,
   IsInt,
   Min,
+  Max,
   IsNumber,
   IsEnum,
   Length,
   MaxLength,
   Matches,
+  ArrayMinSize,
+  ArrayMaxSize,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
@@ -27,6 +30,7 @@ export class OrderItemModifierDto {
   @ApiProperty({ example: 1 })
   @IsInt()
   @Min(1)
+  @Max(20)
   quantity: number;
 }
 
@@ -39,6 +43,10 @@ export class CreateOrderItemDto {
   @ApiProperty({ example: 2 })
   @IsInt()
   @Min(1)
+  // Per-line cap. A legitimate order never orders 100 of one item; an
+  // attacker otherwise drives INT overflow / massive subtotal computation
+  // on a single line with a single request.
+  @Max(99)
   quantity: number;
 
   @ApiProperty({ example: 'No onions, extra sauce', required: false })
@@ -49,6 +57,7 @@ export class CreateOrderItemDto {
 
   @ApiProperty({ type: [OrderItemModifierDto], required: false })
   @IsArray()
+  @ArrayMaxSize(20)
   @ValidateNested({ each: true })
   @Type(() => OrderItemModifierDto)
   @IsOptional()
@@ -81,6 +90,10 @@ export class CreateCustomerOrderDto {
 
   @ApiProperty({ type: [CreateOrderItemDto] })
   @IsArray()
+  // A customer order can realistically span a dozen dishes, not a hundred.
+  // Without these sizes, a public QR endpoint becomes a cheap DoS vector.
+  @ArrayMinSize(1)
+  @ArrayMaxSize(50)
   @ValidateNested({ each: true })
   @Type(() => CreateOrderItemDto)
   items: CreateOrderItemDto[];
