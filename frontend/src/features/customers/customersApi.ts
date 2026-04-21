@@ -2,13 +2,22 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import api from '../../lib/api';
+import { toArrayPayload } from '../../lib/payload';
+import { Customer } from '../../types';
 
 export const useCustomers = () => {
   return useQuery({
     queryKey: ['customers'],
-    queryFn: async () => {
+    queryFn: async (): Promise<Customer[]> => {
+      // Backend returns `{ data: Customer[], total, page, pageSize }`.
+      // Unwrap here so pages like CustomersPage — which is eager-loaded
+      // and lives in the MAIN bundle — can call `.filter` directly.
+      // Before this, `const { data: customers = [] } = useCustomers()`
+      // destructured the envelope object (not the array) into `customers`
+      // and the first `.filter` on render crashed the whole shell with
+      // "TypeError: n.filter is not a function".
       const response = await api.get('/customers');
-      return response.data;
+      return toArrayPayload<Customer>(response.data);
     },
   });
 };
