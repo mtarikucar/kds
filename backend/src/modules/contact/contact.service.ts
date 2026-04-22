@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateContactDto } from './dto/create-contact.dto';
 import { MailerService } from './mailer.service';
+import { paginated } from '../../common/pagination';
 
 @Injectable()
 export class ContactService {
@@ -65,7 +66,7 @@ export class ContactService {
       }),
       this.prisma.contactMessage.count(),
     ]);
-    return { data, total, page: safePage, pageSize: safeLimit };
+    return paginated(data, total, safePage, safeLimit);
   }
 
   async findOne(id: string) {

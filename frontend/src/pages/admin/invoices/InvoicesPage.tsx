@@ -35,8 +35,8 @@ const InvoicesPage = () => {
   const { mutateAsync: syncInvoice } = useSyncInvoice();
   const { mutateAsync: cancelInvoice } = useCancelInvoice();
 
-  const invoices = data?.items || [];
-  const totalPages = data?.totalPages || 1;
+  const invoices = data?.data ?? [];
+  const totalPages = data?.meta.totalPages ?? 1;
 
   const handleSync = async (id: string) => {
     try {

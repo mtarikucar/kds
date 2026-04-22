@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
+import type { PaginatedResponse } from '../../types';
 import { AccountingSettings, SalesInvoice } from './types';
 
 export const useGetAccountingSettings = () =>
@@ -24,9 +25,9 @@ export const useTestAccountingConnection = () =>
   });
 
 export const useGetSalesInvoices = (params?: Record<string, any>) =>
-  useQuery<{ data: SalesInvoice[]; total: number }>({
+  useQuery<PaginatedResponse<SalesInvoice>>({
     queryKey: ['salesInvoices', params],
-    queryFn: async () => (await api.get('/sales-invoices', { params })).data,
+    queryFn: async () => (await api.get<PaginatedResponse<SalesInvoice>>('/sales-invoices', { params })).data,
   });
 
 export const useSyncInvoice = () => {

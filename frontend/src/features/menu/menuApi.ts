@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import api from '../../lib/api';
-import { toArrayPayload } from '../../lib/payload';
 import {
   Category,
   Product,
@@ -18,8 +17,8 @@ export const useCategories = () => {
   return useQuery({
     queryKey: ['categories'],
     queryFn: async (): Promise<Category[]> => {
-      const response = await api.get('/menu/categories');
-      return toArrayPayload<Category>(response.data);
+      const response = await api.get<Category[]>('/menu/categories');
+      return response.data;
     },
   });
 };
@@ -99,8 +98,8 @@ export const useProducts = (filters?: ProductFilters) => {
   return useQuery({
     queryKey: ['products', filters],
     queryFn: async (): Promise<Product[]> => {
-      const response = await api.get('/menu/products', { params: filters });
-      return toArrayPayload<Product>(response.data);
+      const response = await api.get<Product[]>('/menu/products', { params: filters });
+      return response.data;
     },
   });
 };

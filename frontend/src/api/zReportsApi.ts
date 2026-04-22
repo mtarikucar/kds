@@ -1,5 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
+import type { PaginatedResponse } from '../types';
 
 export interface CreateZReportDto {
   reportDate: string;
@@ -30,13 +31,7 @@ export interface ZReport {
   createdAt: string;
 }
 
-export interface ZReportsListResponse {
-  data: ZReport[];
-  total: number;
-  page: number;
-  limit: number;
-  pages: number;
-}
+export type ZReportsListResponse = PaginatedResponse<ZReport>;
 
 /**
  * Generate a new Z-Report

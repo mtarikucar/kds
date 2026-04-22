@@ -5,6 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from '../../common/services/email.service';
 import { getTenantDayBounds } from '../../common/helpers/timezone.helper';
 import { CreateZReportDto } from './dto/create-z-report.dto';
+import { paginated } from '../../common/pagination';
 import PDFDocument from 'pdfkit';
 import { format } from 'date-fns';
 
@@ -364,13 +365,7 @@ export class ZReportsService {
       this.prisma.zReport.count({ where }),
     ]);
 
-    return {
-      data: reports,
-      total,
-      page,
-      limit,
-      pages: Math.ceil(total / limit),
-    };
+    return paginated(reports, total, page, limit);
   }
 
   /**

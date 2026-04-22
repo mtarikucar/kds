@@ -1,5 +1,5 @@
 import api from '../lib/api';
-import { toArrayPayload } from '../lib/payload';
+import type { PaginatedResponse } from '../types';
 
 export interface User {
   id: string;
@@ -35,13 +35,9 @@ export interface UpdateUserData {
 }
 
 export const usersApi = {
-  async getAll(): Promise<User[]> {
-    // Backend currently returns `{ data, meta }`; older deployments
-    // returned a bare array. `toArrayPayload` handles both shapes and
-    // returns `[]` on anything else so a contract drift no longer
-    // crashes the admin users page with "n.filter is not a function".
-    const response = await api.get('/users', { params: { limit: 100 } });
-    return toArrayPayload<User>(response.data);
+  async getAll(): Promise<PaginatedResponse<User>> {
+    const response = await api.get<PaginatedResponse<User>>('/users', { params: { limit: 100 } });
+    return response.data;
   },
 
   async getById(id: string): Promise<User> {

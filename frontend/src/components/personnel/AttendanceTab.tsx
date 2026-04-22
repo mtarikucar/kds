@@ -304,10 +304,10 @@ const AttendanceTab = () => {
                   </tbody>
                 </table>
               </div>
-              {history && history.totalPages > 1 && (
+              {history && history.meta.totalPages > 1 && (
                 <div className="p-4 border-t border-gray-100 flex items-center justify-between text-sm text-gray-500">
-                  <span>{t('common.total')}: {history.total}</span>
-                  <span>{t('common.page')} {history.page} / {history.totalPages}</span>
+                  <span>{t('common.total')}: {history.meta.total}</span>
+                  <span>{t('common.page')} {history.meta.page} / {history.meta.totalPages}</span>
                 </div>
               )}
             </div>

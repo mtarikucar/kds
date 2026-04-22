@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import api from '../../lib/api';
-import { toArrayPayload } from '../../lib/payload';
 import {
   Order,
   CreateOrderDto,
@@ -21,11 +20,8 @@ export const useOrders = (filters?: OrderFilters) => {
   return useQuery({
     queryKey: ['orders', filters],
     queryFn: async (): Promise<Order[]> => {
-      const response = await api.get('/orders', { params: filters });
-      // Tolerate both bare-array and `{ data, meta }` envelope shapes;
-      // fall back to `[]` on anything else so downstream `.filter/.map`
-      // calls stay safe if the contract drifts again.
-      return toArrayPayload<Order>(response.data);
+      const response = await api.get<Order[]>('/orders', { params: filters });
+      return response.data;
     },
   });
 };
@@ -242,10 +238,10 @@ export const usePendingOrders = () => {
   return useQuery({
     queryKey: ['orders', 'pending'],
     queryFn: async (): Promise<Order[]> => {
-      const response = await api.get('/orders', {
+      const response = await api.get<Order[]>('/orders', {
         params: { status: 'PENDING_APPROVAL' },
       });
-      return toArrayPayload<Order>(response.data);
+      return response.data;
     },
     // Real-time updates via Socket.IO - no polling needed
   });
@@ -282,8 +278,8 @@ export const useWaiterRequests = () => {
   return useQuery({
     queryKey: ['waiterRequests'],
     queryFn: async (): Promise<WaiterRequest[]> => {
-      const response = await api.get('/customer-orders/waiter-requests/tenant/active');
-      return toArrayPayload<WaiterRequest>(response.data);
+      const response = await api.get<WaiterRequest[]>('/customer-orders/waiter-requests/tenant/active');
+      return response.data;
     },
     // Real-time updates delivered via Socket.IO (see usePosSocket).
   });
@@ -339,8 +335,8 @@ export const useBillRequests = () => {
   return useQuery({
     queryKey: ['billRequests'],
     queryFn: async (): Promise<BillRequest[]> => {
-      const response = await api.get('/customer-orders/bill-requests/tenant/active');
-      return toArrayPayload<BillRequest>(response.data);
+      const response = await api.get<BillRequest[]>('/customer-orders/bill-requests/tenant/active');
+      return response.data;
     },
     // Real-time updates delivered via Socket.IO (see usePosSocket).
   });

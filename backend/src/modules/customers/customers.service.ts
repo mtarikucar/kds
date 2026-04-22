@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/customer.dto';
 import { normalizePhone } from './customers.helpers';
+import { paginated } from '../../common/pagination';
 
 const WAITER_CUSTOMER_SELECT = {
   id: true,
@@ -71,7 +72,7 @@ export class CustomersService {
       this.prisma.customer.count({ where }),
     ]);
 
-    return { data, total, page, pageSize: limit };
+    return paginated(data, total, page, limit);
   }
 
   async findOne(id: string, tenantId: string) {

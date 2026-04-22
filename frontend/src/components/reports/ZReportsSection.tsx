@@ -272,12 +272,12 @@ const ZReportsSection = () => {
             </div>
 
             {/* Pagination */}
-            {reportsData && reportsData.pages > 1 && (
+            {reportsData && reportsData.meta.totalPages > 1 && (
               <div className="p-4 border-t flex items-center justify-between">
                 <p className="text-sm text-slate-600">
                   {t('common:showingPage', 'Page {{page}} of {{total}}', {
                     page,
-                    total: reportsData.pages,
+                    total: reportsData.meta.totalPages,
                   })}
                 </p>
                 <div className="flex gap-2">
@@ -292,8 +292,8 @@ const ZReportsSection = () => {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => setPage((p) => Math.min(reportsData.pages, p + 1))}
-                    disabled={page === reportsData.pages}
+                    onClick={() => setPage((p) => Math.min(reportsData.meta.totalPages, p + 1))}
+                    disabled={page === reportsData.meta.totalPages}
                   >
                     {t('common:next', 'Next')}
                   </Button>

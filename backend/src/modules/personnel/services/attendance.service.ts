@@ -3,6 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { KdsGateway } from '../../kds/kds.gateway';
 import { AttendanceStatus } from '../constants/personnel.enum';
 import { AttendanceQueryDto, AttendanceSummaryQueryDto } from '../dto/attendance-query.dto';
+import { paginated } from '../../../common/pagination';
 
 @Injectable()
 export class AttendanceService {
@@ -269,7 +270,7 @@ export class AttendanceService {
       this.prisma.attendance.count({ where }),
     ]);
 
-    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+    return paginated(data, total, page, limit);
   }
 
   async getAttendanceSummary(tenantId: string, query: AttendanceSummaryQueryDto) {

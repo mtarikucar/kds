@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../../lib/api';
 import i18n from '../../i18n/config';
 import { toast } from 'sonner';
+import type { PaginatedResponse } from '../../types';
 import type {
   Attendance,
   AttendanceSummary,
@@ -42,22 +43,14 @@ export const useAttendanceToday = () => {
   });
 };
 
-interface PaginatedAttendance {
-  data: Attendance[];
-  total: number;
-  page: number;
-  limit: number;
-  totalPages: number;
-}
-
 export const useAttendanceList = (
   params?: { startDate?: string; endDate?: string; userId?: string; status?: string; page?: number; limit?: number },
   options?: { enabled?: boolean },
 ) => {
-  return useQuery<PaginatedAttendance>({
+  return useQuery<PaginatedResponse<Attendance>>({
     queryKey: ['personnel', 'attendance', 'history', params],
     queryFn: async () => {
-      const response = await api.get('/personnel/attendance', { params });
+      const response = await api.get<PaginatedResponse<Attendance>>('/personnel/attendance', { params });
       return response.data;
     },
     enabled: options?.enabled,

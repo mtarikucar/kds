@@ -5,6 +5,7 @@ import { TaxCalculationService } from './tax-calculation.service';
 import { AccountingSyncService } from './accounting-sync.service';
 import { CreateSalesInvoiceDto, InvoiceQueryDto } from '../dto/create-sales-invoice.dto';
 import { InvoiceStatus } from '../constants/accounting.enum';
+import { paginated } from '../../../common/pagination';
 
 @Injectable()
 export class SalesInvoiceService {
@@ -130,7 +131,7 @@ export class SalesInvoiceService {
     const page = Number(query.page) || 1;
     const limit = Number(query.limit) || 20;
 
-    const [items, total] = await Promise.all([
+    const [invoices, total] = await Promise.all([
       this.prisma.salesInvoice.findMany({
         where,
         include: { items: true },
@@ -141,7 +142,7 @@ export class SalesInvoiceService {
       this.prisma.salesInvoice.count({ where }),
     ]);
 
-    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+    return paginated(invoices, total, page, limit);
   }
 
   async findOne(id: string, tenantId: string) {

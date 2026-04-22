@@ -13,7 +13,8 @@ import { useCurrency, SUPPORTED_CURRENCIES } from '../../hooks/useCurrency';
 const CustomersPage = () => {
   const { t } = useTranslation('customers');
   const navigate = useNavigate();
-  const { data: customers = [], isLoading } = useCustomers();
+  const { data: customersPage, isLoading } = useCustomers();
+  const customers: Customer[] = customersPage?.data ?? [];
   const { mutate: deleteCustomer } = useDeleteCustomer();
   const currencyCode = useCurrency();
   const [searchTerm, setSearchTerm] = useState('');
