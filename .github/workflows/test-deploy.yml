@@ -239,7 +239,7 @@ jobs:
             DESKTOP_RELEASE_API_KEY=${DESKTOP_RELEASE_API_KEY}
             ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY}
             MARKETING_JWT_REFRESH_SECRET=${MARKETING_JWT_REFRESH_SECRET}
-            ENVFILE
+          ENVFILE
 
             # Login to GitHub Container Registry
             echo "Logging in to GitHub Container Registry..." 
