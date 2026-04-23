@@ -102,6 +102,8 @@ jobs:
           file: ./frontend/Dockerfile
           target: production
           push: true
+          no-cache: true
+          pull: true
           tags: ghcr.io/${{ github.repository }}/frontend-staging:latest,ghcr.io/${{ github.repository }}/frontend-staging:${{ steps.commit_info.outputs.commit_sha }}
           build-args: |
             VITE_API_URL=https://staging.hummytummy.com/api
@@ -112,8 +114,6 @@ jobs:
             VITE_APP_VERSION=${{ steps.version_info.outputs.version }}
             VITE_BUILD_TIME=${{ steps.version_info.outputs.build_time }}
             VITE_COMMIT_SHA=${{ steps.commit_info.outputs.commit_sha }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/frontend-staging:buildcache
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/frontend-staging:buildcache,mode=max
 
       - name: Build and push landing image
         uses: docker/build-push-action@v5
@@ -162,8 +162,8 @@ jobs:
           echo "Trigger: ${{ github.event_name }}"
           echo ""
 
-          ssh root@${{ env.SERVER_HOST }} << EOF
-            set -e
+          ssh -o LogLevel=VERBOSE root@${{ env.SERVER_HOST }} bash -s << EOF
+            set -euxo pipefail
             cd ${{ env.PROJECT_PATH }}
 
             # Create database backup
@@ -251,13 +251,46 @@ jobs:
             docker pull ghcr.io/${{ github.repository }}/frontend-staging:latest
             docker pull ghcr.io/${{ github.repository }}/landing-staging:latest
 
+            # Capture image IDs the server just resolved :latest to, so we can verify
+            # the containers actually end up running these exact images and not a
+            # previously-cached variant.
+            FRONTEND_IMAGE_ID=\$(docker image inspect ghcr.io/${{ github.repository }}/frontend-staging:latest --format '{{.Id}}')
+            BACKEND_IMAGE_ID=\$(docker image inspect ghcr.io/${{ github.repository }}/backend-staging:latest --format '{{.Id}}')
+            echo "Expected frontend image: \$FRONTEND_IMAGE_ID"
+            echo "Expected backend image:  \$BACKEND_IMAGE_ID"
+
             # Force recreate all containers with new images
             echo "Recreating containers with new images..."
             docker-compose -f docker-compose.staging.yml up -d --force-recreate
 
+            # Compose up -d returns before containers are fully spawned; give Docker a
+            # moment to replace the old containers before we inspect them.
+            sleep 5
+
+            # Verify each app container is actually running the freshly pulled image.
+            # Previous deploys reported success while silently keeping the old image;
+            # this digest check catches that exact failure mode.
+            FRONTEND_RUNNING_ID=\$(docker inspect kds_frontend_staging --format '{{.Image}}')
+            BACKEND_RUNNING_ID=\$(docker inspect kds_backend_staging --format '{{.Image}}')
+            echo "Frontend running image:  \$FRONTEND_RUNNING_ID"
+            echo "Backend running image:   \$BACKEND_RUNNING_ID"
+            if [ "\$FRONTEND_RUNNING_ID" != "\$FRONTEND_IMAGE_ID" ]; then
+              echo "ERROR: kds_frontend_staging is NOT running the image we just pulled" >&2
+              echo "  expected: \$FRONTEND_IMAGE_ID" >&2
+              echo "  running:  \$FRONTEND_RUNNING_ID" >&2
+              exit 1
+            fi
+            if [ "\$BACKEND_RUNNING_ID" != "\$BACKEND_IMAGE_ID" ]; then
+              echo "ERROR: kds_backend_staging is NOT running the image we just pulled" >&2
+              echo "  expected: \$BACKEND_IMAGE_ID" >&2
+              echo "  running:  \$BACKEND_RUNNING_ID" >&2
+              exit 1
+            fi
+            echo "Digest check passed: both app containers are on the freshly pulled images."
+
             # Run database migrations
             echo "Running database migrations..."
-            sleep 10
+            sleep 5
             docker exec kds_backend_staging npx prisma migrate deploy || echo "Migration failed or no new migrations"
 
             echo ""
