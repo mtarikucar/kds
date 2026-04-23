@@ -101,7 +101,8 @@ services:
     container_name: kds_frontend_staging
     restart: always
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - '5175:80'
     healthcheck:
