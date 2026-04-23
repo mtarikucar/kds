@@ -281,6 +281,7 @@ jobs:
           ENVFILE
 
             # Run deployment
+            grep -q REDIS_PASSWORD .env.production || echo "REDIS_PASSWORD=redispass123" >> .env.production
             ./scripts/deploy-production.sh deploy
 
             if [ \$? -ne 0 ]; then
