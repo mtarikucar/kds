@@ -94,28 +94,39 @@ export class HttpExceptionFilter implements ExceptionFilter {
     // Log the error
     this.logError(exception, request, statusCode, requestId);
 
-    // Send 5xx errors to Sentry (server errors, not client errors)
+    // Send 5xx errors to Sentry (server errors, not client errors).
+    // Wrap the Sentry calls themselves — if the transport is down or
+    // misconfigured, a throw here would mask the original 500 and turn
+    // the response into a generic Nest internal error, hiding the true
+    // cause from both the user and the logs.
     if (statusCode >= 500 && exception instanceof Error) {
-      setContext('http', {
-        url: request.url,
-        method: request.method,
-        headers: {
-          'user-agent': request.headers['user-agent'],
-          'content-type': request.headers['content-type'],
-        },
-        statusCode,
-        requestId,
-      });
-      setContext('user', {
-        id: (request as any).user?.id,
-        email: (request as any).user?.email,
-        tenantId: (request as any).user?.tenantId,
-      });
-      captureException(exception, {
-        requestId,
-        path: request.url,
-        method: request.method,
-      });
+      try {
+        setContext('http', {
+          url: request.url,
+          method: request.method,
+          headers: {
+            'user-agent': request.headers['user-agent'],
+            'content-type': request.headers['content-type'],
+          },
+          statusCode,
+          requestId,
+        });
+        setContext('user', {
+          id: (request as any).user?.id,
+          email: (request as any).user?.email,
+          tenantId: (request as any).user?.tenantId,
+        });
+        captureException(exception, {
+          requestId,
+          path: request.url,
+          method: request.method,
+        });
+      } catch (sentryErr) {
+        this.logger.error(
+          'Sentry capture failed; original exception preserved',
+          (sentryErr as Error)?.stack,
+        );
+      }
     }
 
     // Send response
