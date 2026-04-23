@@ -240,7 +240,12 @@ export const useGetTenantInvoices = () => {
     queryKey: subscriptionKeys.tenantInvoices(),
     queryFn: async (): Promise<Invoice[]> => {
       const response = await api.get('/subscriptions/tenant/invoices');
-      return response.data;
+      const data = response.data;
+      // Backend returns { items, meta } - unwrap to array
+      if (data && Array.isArray(data.items)) return data.items;
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.data)) return data.data;
+      return [];
     },
   });
 };
