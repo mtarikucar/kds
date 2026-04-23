@@ -15,6 +15,18 @@ export interface EncryptedPayload {
   authTag: string;
 }
 
+/**
+ * Domain-specific error for decryption failures so callers can catch
+ * ciphertext corruption / tampered payloads separately from genuine
+ * programmer bugs without swallowing everything as `Error`.
+ */
+export class DecryptionError extends Error {
+  constructor(message: string, public readonly cause?: unknown) {
+    super(message);
+    this.name = 'DecryptionError';
+  }
+}
+
 function requireMasterKey(): Buffer {
   const raw = process.env.ENCRYPTION_MASTER_KEY;
   if (!raw) {
@@ -43,16 +55,40 @@ export function encryptJson(value: unknown): EncryptedPayload {
 
 export function decryptJson<T = unknown>(payload: EncryptedPayload): T {
   const key = requireMasterKey();
-  const iv = Buffer.from(payload.iv, 'base64url');
-  const authTag = Buffer.from(payload.authTag, 'base64url');
-  const ciphertext = Buffer.from(payload.ciphertext, 'base64url');
-  const decipher = createDecipheriv('aes-256-gcm', key, iv);
-  decipher.setAuthTag(authTag);
-  const plaintext = Buffer.concat([
-    decipher.update(ciphertext),
-    decipher.final(),
-  ]);
-  return JSON.parse(plaintext.toString('utf8')) as T;
+
+  // Any of the steps below can throw on corrupted / tampered ciphertext:
+  // - `setAuthTag` with wrong length bytes
+  // - `decipher.final()` when GCM auth tag doesn't match (tampered payload)
+  // - `JSON.parse` if the decrypted bytes aren't valid JSON (key rotated
+  //   without re-encrypting, or the column was written by a different
+  //   codepath). One unhandled throw used to kill the whole request with
+  //   a raw crypto stack trace.
+  let plaintext: Buffer;
+  try {
+    const iv = Buffer.from(payload.iv, 'base64url');
+    const authTag = Buffer.from(payload.authTag, 'base64url');
+    const ciphertext = Buffer.from(payload.ciphertext, 'base64url');
+    const decipher = createDecipheriv('aes-256-gcm', key, iv);
+    decipher.setAuthTag(authTag);
+    plaintext = Buffer.concat([
+      decipher.update(ciphertext),
+      decipher.final(),
+    ]);
+  } catch (cause) {
+    throw new DecryptionError(
+      'Failed to decrypt payload (corrupted ciphertext, wrong key, or tampered auth tag)',
+      cause,
+    );
+  }
+
+  try {
+    return JSON.parse(plaintext.toString('utf8')) as T;
+  } catch (cause) {
+    throw new DecryptionError(
+      'Decrypted payload is not valid JSON',
+      cause,
+    );
+  }
 }
 
 export function isEncryptedPayload(value: unknown): value is EncryptedPayload {
