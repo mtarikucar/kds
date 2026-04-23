@@ -8,6 +8,7 @@ import {
   MinLength,
 } from 'class-validator';
 import { UserRole } from '../../../common/constants/roles.enum';
+import { EmptyStringToUndefined } from '../../../common/dto/transforms';
 
 /**
  * Status transitions deliberately live on dedicated endpoints
@@ -17,11 +18,13 @@ import { UserRole } from '../../../common/constants/roles.enum';
  */
 export class UpdateUserDto {
   @ApiPropertyOptional({ example: 'user@restaurant.com' })
+  @EmptyStringToUndefined()
   @IsOptional()
   @IsEmail()
   email?: string;
 
   @ApiPropertyOptional({ example: 'Passw0rd!' })
+  @EmptyStringToUndefined()
   @IsOptional()
   @IsString()
   @MinLength(8)
