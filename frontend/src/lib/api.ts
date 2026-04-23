@@ -1,7 +1,8 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
+import { API_URL } from './env';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL = API_URL;
 
 // withCredentials: true so the httpOnly refresh cookie is sent on
 // /auth/refresh and /auth/logout (backend sets it on /api/auth path).
