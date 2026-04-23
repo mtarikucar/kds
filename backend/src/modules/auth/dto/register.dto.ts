@@ -1,6 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsEmail, IsString, MinLength, IsEnum, IsNotEmpty, IsOptional, Matches, IsUUID } from 'class-validator';
 import { UserRole } from '../../../common/constants/roles.enum';
+import { EmptyStringToUndefined } from '../../../common/dto/transforms';
 
 export class RegisterDto {
   @ApiProperty({ example: 'admin@restaurant.com' })
@@ -32,16 +33,19 @@ export class RegisterDto {
   role?: UserRole;
 
   @ApiProperty({ example: 'My Restaurant', required: false })
+  @EmptyStringToUndefined()
   @IsString()
   @IsOptional()
   restaurantName?: string;
 
   @ApiProperty({ example: 'tenant-uuid', required: false })
+  @EmptyStringToUndefined()
   @IsUUID()
   @IsOptional()
   tenantId?: string;
 
   @ApiProperty({ example: 'INTERNATIONAL', enum: ['TURKEY', 'INTERNATIONAL'], required: false })
+  @EmptyStringToUndefined()
   @IsString()
   @IsOptional()
   paymentRegion?: string;

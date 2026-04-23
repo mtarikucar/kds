@@ -2,6 +2,7 @@ import { IsString, IsOptional, IsEnum, IsArray, ValidateNested, IsNumber, IsInt,
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { OrderType } from '../../../common/constants/order-status.enum';
+import { EmptyStringToNumber } from '../../../common/dto/transforms';
 
 export class OrderItemModifierDto {
   @ApiProperty({ description: 'Modifier ID' })
@@ -63,6 +64,7 @@ export class CreateOrderDto {
   notes?: string;
 
   @ApiPropertyOptional({ description: 'Discount amount', minimum: 0 })
+  @EmptyStringToNumber()
   @IsNumber()
   @Min(0)
   @IsOptional()

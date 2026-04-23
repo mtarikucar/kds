@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsString, IsBoolean, IsOptional, IsNotEmpty, IsUrl, Matches } from 'class-validator';
+import { EmptyStringToUndefined, StringToBoolean } from '../../../common/dto/transforms';
 
 export class CreateReleaseDto {
   @ApiProperty({ example: '0.2.6', description: 'Semantic version number (synced with web app)' })
@@ -19,52 +20,62 @@ export class CreateReleaseDto {
   releaseNotes: string;
 
   @ApiProperty({ required: false, description: 'Detailed changelog in markdown' })
+  @EmptyStringToUndefined()
   @IsOptional()
   @IsString()
   changelog?: string;
 
   @ApiProperty({ required: false, default: false, description: 'Whether the release is published' })
+  @StringToBoolean()
   @IsOptional()
   @IsBoolean()
   published?: boolean;
 
   // Platform URLs
   @ApiProperty({ required: false, description: 'Windows installer URL (GitHub Release)' })
+  @EmptyStringToUndefined()
   @IsOptional()
   @IsUrl()
   windowsUrl?: string;
 
   @ApiProperty({ required: false, description: 'Windows installer signature' })
+  @EmptyStringToUndefined()
   @IsOptional()
   @IsString()
   windowsSignature?: string;
 
   @ApiProperty({ required: false, description: 'macOS ARM installer URL' })
+  @EmptyStringToUndefined()
   @IsOptional()
   @IsUrl()
   macArmUrl?: string;
 
   @ApiProperty({ required: false, description: 'macOS ARM installer signature' })
+  @EmptyStringToUndefined()
   @IsOptional()
   @IsString()
   macArmSignature?: string;
 
   @ApiProperty({ required: false, description: 'macOS Intel installer URL' })
+  @EmptyStringToUndefined()
   @IsOptional()
   @IsUrl()
   macIntelUrl?: string;
 
   @ApiProperty({ required: false, description: 'macOS Intel installer signature' })
+  @EmptyStringToUndefined()
   @IsOptional()
   @IsString()
   macIntelSignature?: string;
 
   @ApiProperty({ required: false, description: 'Linux installer URL' })
+  @EmptyStringToUndefined()
   @IsOptional()
   @IsUrl()
   linuxUrl?: string;
 
   @ApiProperty({ required: false, description: 'Linux installer signature' })
+  @EmptyStringToUndefined()
   @IsOptional()
   @IsString()
   linuxSignature?: string;

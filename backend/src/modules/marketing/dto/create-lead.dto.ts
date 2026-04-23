@@ -8,6 +8,7 @@ import {
   IsDateString,
   Min,
 } from 'class-validator';
+import { EmptyStringToNumber } from '../../../common/dto/transforms';
 
 export enum BusinessType {
   CAFE = 'CAFE',
@@ -71,11 +72,13 @@ export class CreateLeadDto {
   @IsEnum(BusinessType)
   businessType: BusinessType;
 
+  @EmptyStringToNumber()
   @IsOptional()
   @IsInt()
   @Min(0)
   tableCount?: number;
 
+  @EmptyStringToNumber()
   @IsOptional()
   @IsInt()
   @Min(0)

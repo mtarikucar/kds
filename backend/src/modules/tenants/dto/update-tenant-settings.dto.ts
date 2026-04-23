@@ -5,12 +5,14 @@ import {
   SupportedCurrency,
 } from '../../../common/constants/currencies.const';
 import { RESERVED_SUBDOMAINS, SUBDOMAIN_REGEX } from '../../../common/constants/subdomain.const';
+import { EmptyStringToUndefined } from '../../../common/dto/transforms';
 
 export class UpdateTenantSettingsDto {
   @ApiPropertyOptional({
     description: 'Custom subdomain for QR menu URL (Pro feature)',
     example: 'my-restaurant',
   })
+  @EmptyStringToUndefined()
   @ValidateIf((o) => o.subdomain !== null)
   @IsString()
   @IsOptional()
@@ -41,6 +43,7 @@ export class UpdateTenantSettingsDto {
     description: 'Store closing time (HH:mm format)',
     example: '23:00',
   })
+  @EmptyStringToUndefined()
   @IsString()
   @IsOptional()
   @Matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, {

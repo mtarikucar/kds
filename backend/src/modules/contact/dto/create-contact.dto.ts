@@ -8,6 +8,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
+import { EmptyStringToUndefined } from '../../../common/dto/transforms';
 
 // Reject CRLF in any field that flows into SMTP headers (`to:`, `subject:`
 // interpolation). Without this a submitted `name = "Foo\r\nBcc: victim@x"`
@@ -30,6 +31,7 @@ export class CreateContactDto {
   email: string;
 
   @ApiPropertyOptional({ example: '+1234567890' })
+  @EmptyStringToUndefined()
   @IsOptional()
   @IsString()
   @MaxLength(20)

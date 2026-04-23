@@ -1,8 +1,9 @@
 import { IsBoolean, IsOptional, IsString, IsInt, Min, IsIn } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { EmptyStringToNumber, StringToBoolean } from '../../../common/dto/transforms';
 
 export class UpdateAccountingSettingsDto {
-  @ApiPropertyOptional() @IsBoolean() @IsOptional() autoGenerateInvoice?: boolean;
+  @ApiPropertyOptional() @StringToBoolean() @IsBoolean() @IsOptional() autoGenerateInvoice?: boolean;
 
   @ApiPropertyOptional() @IsString() @IsOptional() companyName?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() companyTaxId?: string;
@@ -12,7 +13,7 @@ export class UpdateAccountingSettingsDto {
   @ApiPropertyOptional() @IsString() @IsOptional() companyEmail?: string;
 
   @ApiPropertyOptional() @IsString() @IsOptional() @IsIn(['NONE', 'PARASUT', 'LOGO', 'FORIBA']) provider?: string;
-  @ApiPropertyOptional() @IsBoolean() @IsOptional() autoSync?: boolean;
+  @ApiPropertyOptional() @StringToBoolean() @IsBoolean() @IsOptional() autoSync?: boolean;
 
   @ApiPropertyOptional() @IsString() @IsOptional() parasutCompanyId?: string;
   @ApiPropertyOptional() @IsString() @IsOptional() parasutClientId?: string;
@@ -31,6 +32,6 @@ export class UpdateAccountingSettingsDto {
   @ApiPropertyOptional() @IsString() @IsOptional() foribaServiceType?: string;
 
   @ApiPropertyOptional() @IsString() @IsOptional() invoicePrefix?: string;
-  @ApiPropertyOptional() @IsInt() @Min(1) @IsOptional() nextInvoiceNumber?: number;
-  @ApiPropertyOptional() @IsInt() @Min(0) @IsOptional() defaultPaymentTermDays?: number;
+  @ApiPropertyOptional() @EmptyStringToNumber() @IsInt() @Min(1) @IsOptional() nextInvoiceNumber?: number;
+  @ApiPropertyOptional() @EmptyStringToNumber() @IsInt() @Min(0) @IsOptional() defaultPaymentTermDays?: number;
 }

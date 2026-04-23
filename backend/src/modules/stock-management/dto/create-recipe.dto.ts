@@ -1,6 +1,7 @@
 import { IsString, IsOptional, IsNumber, IsArray, ArrayMinSize, ValidateNested, Min } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { EmptyStringToNumber } from '../../../common/dto/transforms';
 
 export class RecipeIngredientDto {
   @ApiProperty({ description: 'Stock item ID' })
@@ -29,6 +30,7 @@ export class CreateRecipeDto {
   notes?: string;
 
   @ApiPropertyOptional({ description: 'Number of portions this recipe makes', minimum: 1 })
+  @EmptyStringToNumber()
   @IsNumber()
   @Min(1)
   @IsOptional()

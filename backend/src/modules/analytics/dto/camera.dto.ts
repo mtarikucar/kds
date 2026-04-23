@@ -1,6 +1,7 @@
 import { IsString, IsOptional, IsEnum, IsNumber, IsObject, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CameraStreamType, CameraStatus } from '../enums/analytics.enum';
+import { EmptyStringToNumber } from '../../../common/dto/transforms';
 
 export class CreateCameraDto {
   @ApiProperty({ description: 'Camera name', example: 'Main Entrance Camera' })
@@ -26,21 +27,25 @@ export class CreateCameraDto {
   streamType?: CameraStreamType;
 
   @ApiPropertyOptional({ description: 'Voxel X position' })
+  @EmptyStringToNumber()
   @IsNumber()
   @IsOptional()
   voxelX?: number;
 
   @ApiPropertyOptional({ description: 'Voxel Y position (height)', default: 2.5 })
+  @EmptyStringToNumber()
   @IsNumber()
   @IsOptional()
   voxelY?: number;
 
   @ApiPropertyOptional({ description: 'Voxel Z position' })
+  @EmptyStringToNumber()
   @IsNumber()
   @IsOptional()
   voxelZ?: number;
 
   @ApiPropertyOptional({ description: 'Horizontal rotation in degrees', default: 0, minimum: 0, maximum: 360 })
+  @EmptyStringToNumber()
   @IsNumber()
   @Min(0)
   @Max(360)
@@ -48,6 +53,7 @@ export class CreateCameraDto {
   rotationY?: number;
 
   @ApiPropertyOptional({ description: 'Field of view in degrees', default: 90, minimum: 30, maximum: 180 })
+  @EmptyStringToNumber()
   @IsNumber()
   @Min(30)
   @Max(180)
@@ -92,21 +98,25 @@ export class UpdateCameraDto {
   status?: CameraStatus;
 
   @ApiPropertyOptional()
+  @EmptyStringToNumber()
   @IsNumber()
   @IsOptional()
   voxelX?: number;
 
   @ApiPropertyOptional()
+  @EmptyStringToNumber()
   @IsNumber()
   @IsOptional()
   voxelY?: number;
 
   @ApiPropertyOptional()
+  @EmptyStringToNumber()
   @IsNumber()
   @IsOptional()
   voxelZ?: number;
 
   @ApiPropertyOptional()
+  @EmptyStringToNumber()
   @IsNumber()
   @Min(0)
   @Max(360)
@@ -114,6 +124,7 @@ export class UpdateCameraDto {
   rotationY?: number;
 
   @ApiPropertyOptional()
+  @EmptyStringToNumber()
   @IsNumber()
   @Min(30)
   @Max(180)

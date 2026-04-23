@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, IsEnum, IsOptional, IsBoolean, IsDateString } from 'class-validator';
+import { EmptyStringToUndefined, StringToBoolean } from '../../../common/dto/transforms';
 
 export enum NotificationType {
   INFO = 'INFO',
@@ -62,6 +63,7 @@ export class CreateNotificationDto {
     example: false,
     default: false,
   })
+  @StringToBoolean()
   @IsOptional()
   @IsBoolean()
   isGlobal?: boolean;
@@ -87,6 +89,7 @@ export class CreateNotificationDto {
     description: 'Notification expiry date',
     example: '2024-01-01T00:00:00Z',
   })
+  @EmptyStringToUndefined()
   @IsOptional()
   @IsDateString()
   expiresAt?: string;

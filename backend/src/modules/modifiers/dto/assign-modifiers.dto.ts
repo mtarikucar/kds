@@ -10,6 +10,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
+import { EmptyStringToNumber } from '../../../common/dto/transforms';
 
 export class AssignModifierGroupDto {
   @ApiProperty({ example: 'uuid-of-modifier-group' })
@@ -18,6 +19,7 @@ export class AssignModifierGroupDto {
   groupId: string;
 
   @ApiProperty({ example: 0, default: 0 })
+  @EmptyStringToNumber()
   @IsOptional()
   @IsInt()
   @Min(0)

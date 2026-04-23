@@ -1,5 +1,6 @@
 import { IsOptional, IsString, IsInt, IsDateString, Min, Max, IsIn } from 'class-validator';
 import { Type } from 'class-transformer';
+import { EmptyStringToUndefined } from '../../../common/dto/transforms';
 
 export class LeadFilterDto {
   @IsOptional()
@@ -34,10 +35,12 @@ export class LeadFilterDto {
   @IsString()
   priority?: string;
 
+  @EmptyStringToUndefined()
   @IsOptional()
   @IsDateString()
   dateFrom?: string;
 
+  @EmptyStringToUndefined()
   @IsOptional()
   @IsDateString()
   dateTo?: string;

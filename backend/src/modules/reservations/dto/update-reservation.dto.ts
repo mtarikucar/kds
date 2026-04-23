@@ -1,5 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, IsInt, IsOptional, IsDateString, Min, Max, IsEmail, Matches } from 'class-validator';
+import { EmptyStringToNumber } from '../../../common/dto/transforms';
 
 export class UpdateReservationDto {
   @ApiPropertyOptional()
@@ -20,6 +21,7 @@ export class UpdateReservationDto {
   endTime?: string;
 
   @ApiPropertyOptional()
+  @EmptyStringToNumber()
   @IsOptional()
   @IsInt()
   @Min(1)

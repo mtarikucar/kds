@@ -1,4 +1,5 @@
 import { IsString, IsNotEmpty, IsOptional, IsNumber, IsInt, IsDateString, Min } from 'class-validator';
+import { EmptyStringToNumber } from '../../../common/dto/transforms';
 
 export class CreateOfferDto {
   @IsString()
@@ -9,16 +10,19 @@ export class CreateOfferDto {
   @IsString()
   planId?: string;
 
+  @EmptyStringToNumber()
   @IsOptional()
   @IsNumber()
   @Min(0)
   customPrice?: number;
 
+  @EmptyStringToNumber()
   @IsOptional()
   @IsNumber()
   @Min(0)
   discount?: number;
 
+  @EmptyStringToNumber()
   @IsOptional()
   @IsInt()
   @Min(0)

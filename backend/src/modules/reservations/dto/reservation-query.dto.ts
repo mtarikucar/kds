@@ -2,9 +2,11 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsOptional, IsString, IsDateString, IsEnum, IsInt, Min, Max } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ReservationStatus } from '../constants/reservation-status.enum';
+import { EmptyStringToUndefined } from '../../../common/dto/transforms';
 
 export class ReservationQueryDto {
   @ApiPropertyOptional()
+  @EmptyStringToUndefined()
   @IsOptional()
   @IsDateString()
   date?: string;

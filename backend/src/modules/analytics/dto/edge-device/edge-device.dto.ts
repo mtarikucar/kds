@@ -11,6 +11,7 @@ import {
   IsObject,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { EmptyStringToNumber } from '../../../../common/dto/transforms';
 
 // Enums
 export enum PersonState {
@@ -89,10 +90,12 @@ export class DetectionDto {
   @Max(1)
   confidence: number;
 
+  @EmptyStringToNumber()
   @IsOptional()
   @IsNumber()
   velocityX?: number;
 
+  @EmptyStringToNumber()
   @IsOptional()
   @IsNumber()
   velocityZ?: number;
@@ -132,40 +135,48 @@ export class EdgeHealthStatusDto {
   @IsDateString()
   timestamp: string;
 
+  @EmptyStringToNumber()
   @IsNumber()
   @IsOptional()
   uptime?: number;
 
+  @EmptyStringToNumber()
   @IsNumber()
   @IsOptional()
   framesProcessed?: number;
 
+  @EmptyStringToNumber()
   @IsNumber()
   @IsOptional()
   detectionsTotal?: number;
 
+  @EmptyStringToNumber()
   @IsNumber()
   @IsOptional()
   @Min(0)
   @Max(100)
   cpuUsage?: number;
 
+  @EmptyStringToNumber()
   @IsNumber()
   @IsOptional()
   @Min(0)
   @Max(100)
   memoryUsage?: number;
 
+  @EmptyStringToNumber()
   @IsNumber()
   @IsOptional()
   @Min(0)
   @Max(100)
   gpuUsage?: number;
 
+  @EmptyStringToNumber()
   @IsNumber()
   @IsOptional()
   temperature?: number;
 
+  @EmptyStringToNumber()
   @IsNumber()
   @IsOptional()
   fps?: number;
@@ -226,10 +237,12 @@ export class EdgeDeviceConfigDto {
   @IsString()
   cameraUrl?: string;
 
+  @EmptyStringToNumber()
   @IsOptional()
   @IsNumber()
   fps?: number;
 
+  @EmptyStringToNumber()
   @IsOptional()
   @IsNumber()
   @Min(0)

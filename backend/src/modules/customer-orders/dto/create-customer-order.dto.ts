@@ -18,6 +18,7 @@ import {
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { OrderType } from '../../../common/constants/order-status.enum';
+import { EmptyStringToNumber, EmptyStringToUndefined } from '../../../common/dto/transforms';
 
 const PHONE_REGEX = /^\+?[1-9]\d{7,14}$/;
 
@@ -82,6 +83,7 @@ export class CreateCustomerOrderDto {
   sessionId: string;
 
   @ApiProperty({ required: false })
+  @EmptyStringToUndefined()
   @IsString()
   @IsOptional()
   @MaxLength(20)
@@ -105,11 +107,13 @@ export class CreateCustomerOrderDto {
   notes?: string;
 
   @ApiPropertyOptional()
+  @EmptyStringToNumber()
   @IsNumber()
   @IsOptional()
   latitude?: number;
 
   @ApiPropertyOptional()
+  @EmptyStringToNumber()
   @IsNumber()
   @IsOptional()
   longitude?: number;
