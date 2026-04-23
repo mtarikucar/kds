@@ -1,0 +1,4 @@
+BACKEND_IMAGE=kds-backend:latest
+FRONTEND_IMAGE=kds-frontend:latest
+LANDING_IMAGE=kds-landing:latest
+TIMESTAMP=20260409_142740
