@@ -681,6 +681,7 @@ export class AuthService {
           gt: new Date(), // Token not expired
         },
       },
+      select: { id: true },
     });
 
     if (!user) {
@@ -690,13 +691,18 @@ export class AuthService {
     // Hash new password
     const hashedPassword = await bcrypt.hash(newPassword, this.bcryptCost());
 
-    // Update password, clear reset token, and bump tokenVersion so every
-    // access/refresh token issued before the reset is invalidated on its
-    // next guard check. Refresh tokens are revoked in the same transaction
-    // so a stolen one can't mint fresh access tokens after the reset.
-    await this.prisma.$transaction([
-      this.prisma.user.update({
-        where: { id: user.id },
+    // Atomic consume: the update filters on `resetTokenHash` too, so two
+    // concurrent requests with the same token can't both succeed. The first
+    // transaction nulls the hash; the second one's updateMany sees zero
+    // affected rows and we reject it as already-used. Without this guard
+    // the race window between findFirst and update allowed the same token
+    // to mint two password changes in parallel.
+    //
+    // We also revoke refresh tokens in the same transaction so a stolen
+    // token can't mint fresh access tokens after the reset.
+    const [updateResult] = await this.prisma.$transaction([
+      this.prisma.user.updateMany({
+        where: { id: user.id, resetTokenHash },
         data: {
           password: hashedPassword,
           resetTokenHash: null,
@@ -709,6 +715,11 @@ export class AuthService {
         data: { revokedAt: new Date() },
       }),
     ]);
+
+    if (updateResult.count === 0) {
+      // Lost the race: another request already consumed this token.
+      throw new BadRequestException('Invalid or expired reset token');
+    }
 
     return {
       message: 'Password has been reset successfully',

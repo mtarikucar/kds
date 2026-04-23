@@ -7,6 +7,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import * as Sentry from '@sentry/node';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserRole } from '../../common/constants/roles.enum';
 
@@ -74,7 +75,16 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.logger.warn(`Client ${client.id} rejected: no valid authentication`);
       client.disconnect();
     } catch (error: any) {
+      // Log AND report: previously any unexpected throw here (DB connection
+      // blip, JWT library regression, undefined property access) showed up
+      // only as a terse "authentication error: ..." warn line with no stack,
+      // making post-mortems guesswork. Sentry keeps the full trace so we can
+      // tell a bad token apart from a Prisma outage.
       this.logger.warn(`Client ${client.id} authentication error: ${error.message}`);
+      Sentry.captureException(error, {
+        tags: { source: 'kds-gateway', phase: 'handleConnection' },
+        extra: { socketId: client.id },
+      });
       client.disconnect();
     }
   }
