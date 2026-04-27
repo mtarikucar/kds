@@ -31,6 +31,7 @@ import {
   CameraCalibrationDto,
   PersonState,
 } from '../dto/edge-device';
+import { decryptString } from '../../../common/helpers/encryption.helper';
 
 interface EdgeDeviceConnection {
   socketId: string;
@@ -475,7 +476,13 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     return {
       cameraId: camera.id,
-      cameraUrl: camera.streamUrl,
+      // The streamUrl is AES-GCM-encrypted at rest (see camera.service.ts:53).
+      // The edge device receives it over a TLS-protected, JWT-authenticated
+      // WebSocket and uses it directly as an RTSP URL, so it must be
+      // decrypted here. The admin-facing API path already does this in
+      // camera.service.ts; forgetting it here previously broke camera
+      // analytics end-to-end.
+      cameraUrl: camera.streamUrl ? decryptString(camera.streamUrl) : '',
       calibration: camera.calibrationData as EdgeDeviceConfigDto['calibration'],
     };
   }
