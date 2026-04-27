@@ -58,22 +58,6 @@ export class HardwareService {
   }
 
   /**
-   * Get status of a specific device
-   */
-  static async getDeviceStatus(deviceId: string): Promise<DeviceStatus> {
-    if (!isTauri()) {
-      throw new Error('Hardware service only available in desktop mode');
-    }
-
-    try {
-      return await invoke<DeviceStatus>('get_device_status', { deviceId });
-    } catch (error) {
-      console.error('Failed to get device status:', error);
-      throw error;
-    }
-  }
-
-  /**
    * Connect to a specific device
    */
   static async connectDevice(deviceId: string): Promise<string> {
@@ -173,30 +157,6 @@ export class HardwareService {
       return await invoke<string>('open_cash_drawer', { deviceId });
     } catch (error) {
       console.error('Failed to open cash drawer:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Call a restaurant pager
-   */
-  static async callPager(
-    deviceId: string,
-    pagerNumber: number,
-    alertType?: string
-  ): Promise<string> {
-    if (!isTauri()) {
-      throw new Error('Hardware control only available in desktop mode');
-    }
-
-    try {
-      return await invoke<string>('call_pager', {
-        deviceId,
-        pagerNumber,
-        alertType,
-      });
-    } catch (error) {
-      console.error('Failed to call pager:', error);
       throw error;
     }
   }
