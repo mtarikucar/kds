@@ -2,6 +2,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod bluetooth;
+mod escpos;
+mod hardware;
 
 use bluetooth::{BluetoothManager, PrinterCommand, ScannedDevice};
 use std::sync::Arc;
