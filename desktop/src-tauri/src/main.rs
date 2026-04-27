@@ -55,17 +55,54 @@ async fn scan_devices(
 
 /// Connect to a Bluetooth device
 #[tauri::command]
-async fn connect_device(device_id: String, state: State<'_, AppState>) -> Result<String, String> {
+async fn connect_device(
+    device_id: String,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
     let bt = state.bluetooth.lock().await;
     let manager = bt
         .as_ref()
         .ok_or("Bluetooth not initialized")?;
 
-    manager
-        .connect_device(&device_id)
-        .await
-        .map_err(|e| e.to_string())?;
+    let result = manager.connect_device(&device_id).await;
 
+    // Reflect the outcome in HardwareManager's status cache and emit a
+    // hardware-event so the UI can update its DeviceStatusIndicator
+    // without polling list_devices.
+    let mut hw = state.hardware.write().await;
+    if let Some(status) = hw.statuses.get_mut(&device_id) {
+        let device_name = status.name.clone();
+        match &result {
+            Ok(_) => {
+                status.mark_connected();
+                drop(hw);
+                hardware::events::emit(
+                    &app,
+                    hardware::events::HardwareEvent::DeviceConnected {
+                        device_id: device_id.clone(),
+                        device_name,
+                        timestamp: chrono::Utc::now(),
+                    },
+                );
+            }
+            Err(e) => {
+                let msg = e.to_string();
+                status.mark_error(msg.clone());
+                drop(hw);
+                hardware::events::emit(
+                    &app,
+                    hardware::events::HardwareEvent::ConnectionError {
+                        device_id: device_id.clone(),
+                        error: msg,
+                        timestamp: chrono::Utc::now(),
+                    },
+                );
+            }
+        }
+    }
+
+    result.map_err(|e| e.to_string())?;
     Ok(format!("Connected to device: {}", device_id))
 }
 
@@ -73,6 +110,7 @@ async fn connect_device(device_id: String, state: State<'_, AppState>) -> Result
 #[tauri::command]
 async fn disconnect_device(
     device_id: String,
+    app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     let bt = state.bluetooth.lock().await;
@@ -84,6 +122,22 @@ async fn disconnect_device(
         .disconnect_device(&device_id)
         .await
         .map_err(|e| e.to_string())?;
+
+    // Update status + emit DeviceDisconnected event.
+    let mut hw = state.hardware.write().await;
+    if let Some(status) = hw.statuses.get_mut(&device_id) {
+        let device_name = status.name.clone();
+        status.mark_disconnected();
+        drop(hw);
+        hardware::events::emit(
+            &app,
+            hardware::events::HardwareEvent::DeviceDisconnected {
+                device_id: device_id.clone(),
+                device_name,
+                timestamp: chrono::Utc::now(),
+            },
+        );
+    }
 
     Ok(format!("Disconnected from device: {}", device_id))
 }
