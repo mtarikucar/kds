@@ -690,6 +690,11 @@ model StockMovement {
   @@index([tenantId])
   @@index([productId])
   @@index([userId])
+  // Hot list query: "movements for tenant X in date-range Y". The
+  // single-column @@index([tenantId]) above is fine for tenant-scope
+  // alone; this compound index serves the date-bounded variant
+  // without a sequential scan over the tenant's history.
+  @@index([tenantId, createdAt])
   @@map("stock_movements")
 }
 
@@ -2486,6 +2491,10 @@ model IngredientMovement {
   @@index([type])
   @@index([referenceType, referenceId])
   @@index([createdAt])
+  // Same rationale as StockMovement — date-bounded per-tenant queries
+  // (cost reports, waste reports, "last 30 days for this tenant") are
+  // the dominant access pattern.
+  @@index([tenantId, createdAt])
   @@map("ingredient_movements")
 }
 
