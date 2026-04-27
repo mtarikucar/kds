@@ -127,7 +127,7 @@ export class PaymentsService {
 
           // Build the receipt snapshot before payment.create so it's persisted
           // in the same transaction. Fail-soft: if tenant or order data is
-          // unexpectedly missing pieces, fall back to null rather than
+          // unexpectedly missing pieces, fall back to JsonNull rather than
           // crashing the payment — this is a reprint convenience, not the
           // source of truth for accounting.
           let receiptSnapshot: Prisma.InputJsonValue | typeof Prisma.JsonNull =
@@ -141,15 +141,32 @@ export class PaymentsService {
               where: { id: orderId, tenantId },
               include: {
                 orderItems: {
-                  include: { product: true, modifiers: true },
+                  include: {
+                    product: true,
+                    modifiers: { include: { modifier: true } },
+                  },
                 },
                 table: true,
               },
             });
             if (tenantRow && orderForSnap) {
+              // Adapter: schema uses `subtotal` for the line total and
+              // OrderItemModifier wraps Modifier — flatten to the builder's
+              // simpler input contract.
+              const orderForBuilder = {
+                ...orderForSnap,
+                orderItems: orderForSnap.orderItems.map((oi: any) => ({
+                  ...oi,
+                  totalPrice: oi.subtotal,
+                  modifiers: (oi.modifiers ?? []).map((om: any) => ({
+                    name: om.modifier?.name ?? '',
+                    additionalPrice: om.priceAdjustment,
+                  })),
+                })),
+              };
               receiptSnapshot = this.receiptSnapshotBuilder.buildReceiptSnapshot({
                 tenant: tenantRow,
-                order: orderForSnap as any,
+                order: orderForBuilder as any,
                 payment: {
                   method: createPaymentDto.method,
                   transactionId: createPaymentDto.transactionId ?? null,

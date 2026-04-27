@@ -23,6 +23,7 @@ import { StockDeductionService } from '../../stock-management/services/stock-ded
 import { SmsNotificationService } from '../../sms-settings/sms-notification.service';
 import { TaxCalculationService } from '../../accounting/services/tax-calculation.service';
 import { withTransaction, addBreadcrumb } from '../../../common/utils/tracing';
+import { ReceiptSnapshotBuilder } from './receipt-snapshot.builder';
 
 @Injectable()
 export class OrdersService {
@@ -30,6 +31,7 @@ export class OrdersService {
 
   constructor(
     private prisma: PrismaService,
+    private receiptSnapshotBuilder: ReceiptSnapshotBuilder,
     @Inject(forwardRef(() => KdsGateway))
     private kdsGateway: KdsGateway,
     @Optional()
@@ -285,6 +287,39 @@ export class OrdersService {
       },
       });
     });
+
+        // Build the kitchen ticket snapshot now that the order has its
+        // generated orderNumber. Fail-soft: if the builder throws, keep the
+        // snapshot null and log — order creation must not fail because of a
+        // reprint convenience. Note: snapshot is written via update outside
+        // the order.create call because we don't have the orderNumber yet at
+        // create-time (it's allocated by the retry helper).
+        try {
+          const orderForBuilder = {
+            ...createdOrder,
+            orderItems: createdOrder.orderItems.map((oi: any) => ({
+              ...oi,
+              totalPrice: oi.subtotal,
+              modifiers: (oi.modifiers ?? []).map((om: any) => ({
+                name: om.modifier?.name ?? '',
+                additionalPrice: om.priceAdjustment,
+              })),
+            })),
+          };
+          const kitchenTicketSnapshot =
+            this.receiptSnapshotBuilder.buildKitchenTicketSnapshot({
+              order: orderForBuilder as any,
+            }) as unknown as Prisma.InputJsonValue;
+          await this.prisma.order.update({
+            where: { id: createdOrder.id },
+            data: { kitchenTicketSnapshot },
+          });
+          (createdOrder as any).kitchenTicketSnapshot = kitchenTicketSnapshot;
+        } catch (snapErr) {
+          this.logger.warn(
+            `Failed to build kitchen ticket snapshot for order ${createdOrder.orderNumber}: ${(snapErr as Error).message}`,
+          );
+        }
 
         // Emit new order to kitchen via WebSocket
         this.kdsGateway.emitNewOrder(tenantId, createdOrder);

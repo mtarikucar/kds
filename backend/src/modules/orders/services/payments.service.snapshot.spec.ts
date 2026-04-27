@@ -41,6 +41,8 @@ describe('PaymentsService — receipt snapshot persistence', () => {
     tenantId: tenant.id,
   };
 
+  // Mirrors the schema shape (subtotal, OrderItemModifier wrapping Modifier).
+  // The payments.service adapter flattens this into the builder's contract.
   const orderWithIncludes = {
     ...baseOrder,
     table: { number: '5' },
@@ -48,17 +50,20 @@ describe('PaymentsService — receipt snapshot persistence', () => {
       {
         quantity: 2,
         unitPrice: new Prisma.Decimal('30.00'),
-        totalPrice: new Prisma.Decimal('60.00'),
+        subtotal: new Prisma.Decimal('60.00'),
         notes: null,
         product: { name: 'Adana Kebap' },
         modifiers: [
-          { name: 'Acılı', additionalPrice: new Prisma.Decimal('0.00') },
+          {
+            priceAdjustment: new Prisma.Decimal('0.00'),
+            modifier: { name: 'Acılı' },
+          },
         ],
       },
       {
         quantity: 1,
         unitPrice: new Prisma.Decimal('40.00'),
-        totalPrice: new Prisma.Decimal('40.00'),
+        subtotal: new Prisma.Decimal('40.00'),
         notes: 'no salt',
         product: { name: 'Pide' },
         modifiers: [],
