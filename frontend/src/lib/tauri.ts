@@ -60,6 +60,58 @@ export class HardwareService {
   }
 
   /**
+   * Persist a new device row in `~/.kds/hardware.json` (or update an
+   * existing one with the same `id`). Per-machine config — each POS
+   * terminal has its own paired hardware. The frontend
+   * IntegrationsSettingsPage save flow calls this AFTER a successful
+   * backend integration write, so the tenant-level metadata and the
+   * per-terminal pairing stay in sync.
+   *
+   * The `device` shape is the JSON the Rust side deserializes into
+   * `hardware::config::DeviceConfig`. Matching field names + tagged
+   * connection union are documented in `frontend/src/types/hardware.ts`.
+   */
+  static async addDevice(device: {
+    id: string;
+    name: string;
+    device_type: string;
+    enabled: boolean;
+    auto_connect: boolean;
+    connection: { connection_type: string; config: Record<string, any> };
+    settings?: Record<string, any>;
+  }): Promise<unknown> {
+    if (!isTauri()) {
+      console.warn('addDevice only available in desktop mode');
+      return null;
+    }
+
+    try {
+      return await invoke('add_device', { device });
+    } catch (error) {
+      console.error('Failed to add device:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Drop a device row from `~/.kds/hardware.json`. Disconnect first if
+   * still connected; the caller can `disconnectDevice` separately to
+   * be explicit (we do that in IntegrationsSettingsPage's delete flow).
+   */
+  static async removeDevice(deviceId: string): Promise<string> {
+    if (!isTauri()) {
+      throw new Error('Hardware service only available in desktop mode');
+    }
+
+    try {
+      return await invoke<string>('remove_device', { deviceId });
+    } catch (error) {
+      console.error('Failed to remove device:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Connect to a specific device
    */
   static async connectDevice(deviceId: string): Promise<string> {
