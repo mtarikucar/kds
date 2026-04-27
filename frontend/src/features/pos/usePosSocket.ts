@@ -3,6 +3,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { initializeSocket, disconnectSocket } from '../../lib/socket';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
+import { HardwareService, isTauri } from '../../lib/tauri';
+import { useUiStore } from '../../store/uiStore';
 
 export const usePosSocket = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -46,6 +48,26 @@ export const usePosSocket = () => {
 
     const handleNewOrder = (event: any) => {
       console.log('[POS Socket] New order received:', event);
+
+      // Auto-print kitchen ticket on the desktop POS terminal. Gated on
+      // isTauri() and a configured default kitchen printer; web users
+      // see no prints. Failures are logged but never surface to the
+      // operator — the snapshot is persisted on the backend so the
+      // ticket can be reprinted from the order detail view.
+      // Skip pending-approval orders: those go to kitchen only after a
+      // waiter approves, at which point they're emitted as a status
+      // change rather than order:new.
+      if (isTauri() && !event.requiresApproval) {
+        const kitchenPrinterId = useUiStore.getState().defaultKitchenPrinterId;
+        if (kitchenPrinterId && event.kitchenTicketSnapshot) {
+          HardwareService.printKitchenOrder(
+            kitchenPrinterId,
+            event.kitchenTicketSnapshot,
+          ).catch((err) => {
+            console.error('Kitchen ticket print failed:', err);
+          });
+        }
+      }
 
       // Pure Socket.IO Push: Directly inject order into React Query cache
       // No API calls, instant UI updates
