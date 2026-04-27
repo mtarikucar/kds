@@ -78,7 +78,7 @@ interface OrderItemInput {
   totalPrice: DecimalLike;
   notes: string | null;
   product: { name: string };
-  modifiers: Array<{ name: string; additionalPrice?: DecimalLike }>;
+  modifiers: Array<{ name: string }>;
 }
 
 interface OrderInput {
@@ -143,6 +143,30 @@ export class ReceiptSnapshotBuilder {
         paidAt: (payment.paidAt ?? new Date()).toISOString(),
       },
       printedAt: new Date().toISOString(),
+    };
+  }
+
+  /**
+   * Adapter from the schema-shape order (with `OrderItem.subtotal` and
+   * nested `OrderItemModifier.modifier`) to this builder's flatter
+   * `OrderInput` contract. Centralized here so payments + orders services
+   * don't drift if the schema evolves.
+   *
+   * The caller is responsible for ensuring the prisma include pulled in
+   * `orderItems.modifiers.modifier` and `table` — without those the
+   * adapter still works but the snapshot will have empty modifiers and
+   * a null tableNumber.
+   */
+  static toBuilderOrder(orderRow: any): OrderInput {
+    return {
+      ...orderRow,
+      orderItems: (orderRow.orderItems ?? []).map((oi: any) => ({
+        ...oi,
+        totalPrice: oi.subtotal,
+        modifiers: (oi.modifiers ?? []).map((om: any) => ({
+          name: om.modifier?.name ?? '',
+        })),
+      })),
     };
   }
 

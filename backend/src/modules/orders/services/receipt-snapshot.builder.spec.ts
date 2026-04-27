@@ -12,7 +12,7 @@ type ItemFixture = {
   totalPrice: Prisma.Decimal;
   notes: string | null;
   product: { name: string };
-  modifiers: Array<{ name: string; additionalPrice?: Prisma.Decimal }>;
+  modifiers: Array<{ name: string }>;
 };
 type OrderFixture = {
   id: string;
@@ -57,9 +57,7 @@ const order: OrderFixture = {
       totalPrice: new Prisma.Decimal('60.00'),
       notes: null,
       product: { name: 'Adana Kebap' },
-      modifiers: [
-        { name: 'Acılı', additionalPrice: new Prisma.Decimal('0.00') },
-      ],
+      modifiers: [{ name: 'Acılı' }],
     },
     {
       quantity: 1,

@@ -150,23 +150,9 @@ export class PaymentsService {
               },
             });
             if (tenantRow && orderForSnap) {
-              // Adapter: schema uses `subtotal` for the line total and
-              // OrderItemModifier wraps Modifier — flatten to the builder's
-              // simpler input contract.
-              const orderForBuilder = {
-                ...orderForSnap,
-                orderItems: orderForSnap.orderItems.map((oi: any) => ({
-                  ...oi,
-                  totalPrice: oi.subtotal,
-                  modifiers: (oi.modifiers ?? []).map((om: any) => ({
-                    name: om.modifier?.name ?? '',
-                    additionalPrice: om.priceAdjustment,
-                  })),
-                })),
-              };
               receiptSnapshot = this.receiptSnapshotBuilder.buildReceiptSnapshot({
                 tenant: tenantRow,
-                order: orderForBuilder as any,
+                order: ReceiptSnapshotBuilder.toBuilderOrder(orderForSnap),
                 payment: {
                   method: createPaymentDto.method,
                   transactionId: createPaymentDto.transactionId ?? null,

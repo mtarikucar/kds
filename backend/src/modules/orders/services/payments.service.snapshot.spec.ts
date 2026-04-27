@@ -140,6 +140,7 @@ describe('PaymentsService — receipt snapshot persistence', () => {
     const callArg = (prisma.payment.create as jest.Mock).mock.calls[0][0];
     const snapshot = callArg.data.receiptSnapshot;
 
+    expect(callArg.data).toHaveProperty('receiptSnapshot');
     expect(snapshot).toBeDefined();
     expect(snapshot).not.toBeNull();
     expect(snapshot.version).toBe(1);
@@ -149,6 +150,12 @@ describe('PaymentsService — receipt snapshot persistence', () => {
     expect(snapshot.payment.method).toBe('CASH');
     expect(Array.isArray(snapshot.items)).toBe(true);
     expect(snapshot.items).toHaveLength(2);
+    // Verify the schema-to-builder adapter correctly flattened
+    // OrderItemModifier.modifier.name → modifiers[].name. Without this
+    // assertion, a schema rename of `priceAdjustment` or `modifier` would
+    // pass tests silently.
+    expect(snapshot.items[0].modifiers).toEqual(['Acılı']);
+    expect(snapshot.items[1].modifiers).toEqual([]);
   });
 
   it('still creates the payment if tenant lookup returns null (graceful degrade)', async () => {
