@@ -25,6 +25,15 @@ interface UiState {
   resetTour: (tourId: string) => void;
   setSkipAllTours: (skip: boolean) => void;
   resetAllOnboarding: () => void;
+
+  // Per-machine hardware preferences. Persisted in localStorage so each
+  // POS terminal remembers its own paired printer / drawer / kitchen
+  // printer; not synced to the backend (each terminal has its own
+  // hardware).
+  defaultReceiptPrinterId: string | null;
+  defaultKitchenPrinterId: string | null;
+  setDefaultReceiptPrinterId: (id: string | null) => void;
+  setDefaultKitchenPrinterId: (id: string | null) => void;
 }
 
 const initialOnboardingState: OnboardingState = {
@@ -97,6 +106,16 @@ export const useUiStore = create<UiState>()(
 
       resetAllOnboarding: () => {
         set({ onboarding: initialOnboardingState });
+      },
+
+      // Per-machine hardware preferences
+      defaultReceiptPrinterId: null,
+      defaultKitchenPrinterId: null,
+      setDefaultReceiptPrinterId: (id) => {
+        set({ defaultReceiptPrinterId: id });
+      },
+      setDefaultKitchenPrinterId: (id) => {
+        set({ defaultKitchenPrinterId: id });
       },
     }),
     {

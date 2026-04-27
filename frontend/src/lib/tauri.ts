@@ -11,7 +11,9 @@ import type {
   HardwareConfig,
   HardwareEvent,
   ReceiptData as NewReceiptData,
+  ReceiptSnapshot,
   KitchenOrderData,
+  KitchenTicketSnapshot,
   TextAlignment,
   TextStyle,
   BarcodeType,
@@ -106,11 +108,14 @@ export class HardwareService {
   }
 
   /**
-   * Print receipt to a specific printer device
+   * Print a receipt by passing the backend-persisted snapshot directly.
+   * The Rust side accepts the same versioned shape (ReceiptSnapshot) so
+   * no client-side translation is needed — the JSON from
+   * Payment.receiptSnapshot ships through unchanged.
    */
   static async printReceipt(
     deviceId: string,
-    receipt: NewReceiptData
+    receipt: ReceiptSnapshot
   ): Promise<string> {
     if (!isTauri()) {
       console.warn('Hardware printing only available in desktop mode');
@@ -127,18 +132,20 @@ export class HardwareService {
   }
 
   /**
-   * Print kitchen order to a specific printer device
+   * Print a kitchen ticket from the backend-persisted snapshot.
+   * Same pass-through pattern as printReceipt — Rust accepts
+   * KitchenTicketSnapshot directly from Order.kitchenTicketSnapshot.
    */
   static async printKitchenOrder(
     deviceId: string,
-    order: KitchenOrderData
+    ticket: KitchenTicketSnapshot
   ): Promise<string> {
     if (!isTauri()) {
       throw new Error('Hardware printing only available in desktop mode');
     }
 
     try {
-      return await invoke<string>('print_kitchen_order', { deviceId, order });
+      return await invoke<string>('print_kitchen_order', { deviceId, ticket });
     } catch (error) {
       console.error('Failed to print kitchen order:', error);
       throw error;

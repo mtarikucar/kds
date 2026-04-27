@@ -437,6 +437,13 @@ export interface Payment {
   tenantId: string;
   createdAt: string;
   updatedAt: string;
+  // Versioned receipt content captured at payment-create time. Backend
+  // builds via ReceiptSnapshotBuilder; desktop Tauri app accepts the
+  // shape directly via HardwareService.printReceipt. See
+  // frontend/src/types/hardware.ts for the ReceiptSnapshot interface
+  // and backend/src/modules/orders/services/receipt-snapshot.builder.ts
+  // for the producer.
+  receiptSnapshot?: import('./hardware').ReceiptSnapshot | null;
 }
 
 export interface CreatePaymentDto {

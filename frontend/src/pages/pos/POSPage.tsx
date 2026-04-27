@@ -21,10 +21,12 @@ import BillSplitModal from '../../components/pos/BillSplitModal';
 import { useTables, useUpdateTableStatus, useMergeTables, useUnmergeTable, useUnmergeAll } from '../../features/tables/tablesApi';
 import { useGetPosSettings } from '../../features/pos/posApi';
 import { usePosSocket } from '../../features/pos/usePosSocket';
-import { Product, Table, TableStatus, OrderType, OrderStatus, SplitType, SplitPaymentEntry } from '../../types';
+import { Product, Table, TableStatus, OrderType, OrderStatus, SplitType, SplitPaymentEntry, Payment } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { useResponsive } from '../../hooks/useResponsive';
 import Spinner from '../../components/ui/Spinner';
+import { HardwareService, isTauri } from '../../lib/tauri';
+import { useUiStore } from '../../store/uiStore';
 
 // View state type
 type POSView = 'table-selection' | 'order';
@@ -485,7 +487,29 @@ const POSPage = () => {
         customerPhone: data.customerPhone || undefined,
       },
       {
-        onSuccess: () => {
+        onSuccess: (payment: Payment) => {
+          // Auto-print on the desktop POS terminal. Gated on isTauri()
+          // and a configured default printer; web users see no prints.
+          // Failures are toasted but never block payment success — the
+          // snapshot is persisted on the backend so a manual reprint is
+          // always available.
+          if (isTauri()) {
+            const printerId = useUiStore.getState().defaultReceiptPrinterId;
+            if (printerId && payment.receiptSnapshot) {
+              HardwareService.printReceipt(printerId, payment.receiptSnapshot)
+                .catch((err) => {
+                  console.error('Receipt print failed:', err);
+                  toast.error(t('pos.payment.receiptPrintFailed', 'Receipt print failed — payment recorded; reprint available.'));
+                });
+            }
+            // Pop the cash drawer for cash payments.
+            if (printerId && data.method === 'CASH') {
+              HardwareService.openCashDrawer(printerId).catch((err) => {
+                console.error('Cash drawer open failed:', err);
+              });
+            }
+          }
+
           // Refetch orders to update the list
           refetchOrders();
 
