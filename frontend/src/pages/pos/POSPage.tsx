@@ -490,16 +490,36 @@ const POSPage = () => {
         onSuccess: (payment: Payment) => {
           // Auto-print on the desktop POS terminal. Gated on isTauri()
           // and a configured default printer; web users see no prints.
-          // Failures are toasted but never block payment success — the
-          // snapshot is persisted on the backend so a manual reprint is
-          // always available.
+          // Failures are toasted with a one-tap Reprint action — the
+          // snapshot is persisted on the backend so a manual reprint
+          // never re-derives content (it matches the original
+          // byte-for-byte even if the order is edited later).
           if (isTauri()) {
             const printerId = useUiStore.getState().defaultReceiptPrinterId;
             if (printerId && payment.receiptSnapshot) {
-              HardwareService.printReceipt(printerId, payment.receiptSnapshot)
+              const snapshot = payment.receiptSnapshot;
+              HardwareService.printReceipt(printerId, snapshot)
                 .catch((err) => {
                   console.error('Receipt print failed:', err);
-                  toast.error(t('pos.payment.receiptPrintFailed', 'Receipt print failed — payment recorded; reprint available.'));
+                  toast.error(
+                    t('pos.payment.receiptPrintFailed', 'Receipt print failed — payment recorded.'),
+                    {
+                      action: {
+                        label: t('pos.reprint.label', 'Reprint Receipt'),
+                        onClick: () => {
+                          HardwareService.printReceipt(printerId, snapshot).catch(
+                            (e) => {
+                              console.error('Reprint failed:', e);
+                              toast.error(
+                                t('pos.reprint.failed', 'Reprint failed — check printer connection'),
+                              );
+                            },
+                          );
+                        },
+                      },
+                      duration: 10_000,
+                    },
+                  );
                 });
             }
             // Pop the cash drawer for cash payments.
