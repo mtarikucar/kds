@@ -348,6 +348,13 @@ const POSPage = () => {
           quantity: m.quantity,
         })),
       })),
+      // Stable per-click idempotency key. Backend dedupes by
+      // (tenantId, idempotencyKey) so a double-tap on a slow network
+      // returns the existing order instead of creating a duplicate.
+      // Generated here (in the click handler) — NOT in render — so it
+      // doesn't change between Axios's first request and any 401-refresh
+      // retry of the same logical action.
+      idempotencyKey: crypto.randomUUID(),
     };
 
     // Update existing order if currentOrderId exists, otherwise create new
@@ -424,6 +431,13 @@ const POSPage = () => {
           quantity: m.quantity,
         })),
       })),
+      // Stable per-click idempotency key. Backend dedupes by
+      // (tenantId, idempotencyKey) so a double-tap on a slow network
+      // returns the existing order instead of creating a duplicate.
+      // Generated here (in the click handler) — NOT in render — so it
+      // doesn't change between Axios's first request and any 401-refresh
+      // retry of the same logical action.
+      idempotencyKey: crypto.randomUUID(),
     };
 
     // Update existing order if currentOrderId exists, otherwise create new
@@ -485,6 +499,10 @@ const POSPage = () => {
         method: data.method as any,
         transactionId: data.transactionId,
         customerPhone: data.customerPhone || undefined,
+        // Same idempotency rationale as createOrder: backend has a partial
+        // unique index on (orderId, idempotencyKey) — a double-tap or
+        // 401-retry returns the existing payment instead of charging twice.
+        idempotencyKey: crypto.randomUUID(),
       },
       {
         onSuccess: (payment: Payment) => {

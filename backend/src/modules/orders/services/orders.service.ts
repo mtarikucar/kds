@@ -105,6 +105,40 @@ export class OrdersService {
           itemCount: createOrderDto.items.length,
         });
 
+        // Idempotency fast-path: if the client supplied a key and we've
+        // already recorded an order for this (tenantId, key), return the
+        // existing row instead of creating a duplicate. The DB has a
+        // partial unique index on (tenantId, idempotencyKey) WHERE key
+        // IS NOT NULL — this pre-check is the responsiveness path; the
+        // P2002 catch in createWithOrderNumberRetry handles concurrent
+        // retries authoritatively.
+        if (createOrderDto.idempotencyKey) {
+          const existing = await this.prisma.order.findFirst({
+            where: { tenantId, idempotencyKey: createOrderDto.idempotencyKey },
+            include: {
+              orderItems: {
+                include: {
+                  product: { select: { id: true, name: true, price: true, image: true } },
+                  modifiers: {
+                    include: {
+                      modifier: { select: { id: true, name: true, priceAdjustment: true } },
+                    },
+                  },
+                },
+              },
+              table: { select: { id: true, number: true, section: true } },
+              user: { select: { id: true, firstName: true, lastName: true } },
+            },
+          });
+          if (existing) {
+            addBreadcrumb('Idempotency hit — returning existing order', 'order', {
+              orderId: existing.id,
+              orderNumber: existing.orderNumber,
+            });
+            return existing;
+          }
+        }
+
         // Validate table if provided
         if (createOrderDto.tableId) {
           const table = await this.prisma.table.findFirst({
@@ -235,6 +269,7 @@ export class OrdersService {
         customerName: createOrderDto.customerName,
         userId,
         tenantId,
+        idempotencyKey: createOrderDto.idempotencyKey,
         orderItems: {
           create: orderItems,
         },

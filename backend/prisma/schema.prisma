@@ -516,6 +516,13 @@ model Order {
   // and survives later edits to items/modifiers. Owned by ReceiptSnapshotBuilder.
   kitchenTicketSnapshot Json?
 
+  // Client-generated UUID for double-tap / retry deduplication. The
+  // partial unique index on (tenantId, idempotencyKey) is added by the
+  // companion migration — Prisma's @@unique would also dedupe NULLs
+  // (Postgres treats them as distinct), so the partial index is the
+  // mechanism that actually enforces the guarantee for keyed requests.
+  idempotencyKey String?
+
   // Customer ordering fields
   sessionId        String? // UUID for customer session tracking
   customerPhone    String? // Optional customer phone
