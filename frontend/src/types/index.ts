@@ -400,6 +400,14 @@ export interface CreateOrderDto {
   items: CreateOrderItemDto[];
   notes?: string;
   discount?: number;
+  /**
+   * Client-generated UUID — same value across retries of the same logical
+   * "Send to Kitchen" click so a double-tap or 401-refresh-retry never
+   * creates duplicate orders. Backend dedupes by (tenantId, idempotencyKey)
+   * via a partial unique index. Optional: legacy callers without one still
+   * succeed (just without the dedup guarantee).
+   */
+  idempotencyKey?: string;
 }
 
 export interface UpdateOrderDto {
@@ -437,6 +445,13 @@ export interface Payment {
   tenantId: string;
   createdAt: string;
   updatedAt: string;
+  // Versioned receipt content captured at payment-create time. Backend
+  // builds via ReceiptSnapshotBuilder; desktop Tauri app accepts the
+  // shape directly via HardwareService.printReceipt. See
+  // frontend/src/types/hardware.ts for the ReceiptSnapshot interface
+  // and backend/src/modules/orders/services/receipt-snapshot.builder.ts
+  // for the producer.
+  receiptSnapshot?: import('./hardware').ReceiptSnapshot | null;
 }
 
 export interface CreatePaymentDto {
@@ -445,6 +460,14 @@ export interface CreatePaymentDto {
   method: PaymentMethod;
   transactionId?: string;
   customerPhone?: string;
+  /**
+   * Client-generated UUID for the "Confirm Payment" click. Backend has
+   * a partial unique index on (orderId, idempotencyKey) — repeating the
+   * same key returns the existing payment row instead of creating a
+   * second one. See payments.service.ts:62-78 for the fast-path read
+   * and the P2002 catch that handles the concurrent-retry race.
+   */
+  idempotencyKey?: string;
 }
 
 export interface UpdatePaymentDto {

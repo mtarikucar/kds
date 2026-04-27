@@ -21,10 +21,12 @@ import BillSplitModal from '../../components/pos/BillSplitModal';
 import { useTables, useUpdateTableStatus, useMergeTables, useUnmergeTable, useUnmergeAll } from '../../features/tables/tablesApi';
 import { useGetPosSettings } from '../../features/pos/posApi';
 import { usePosSocket } from '../../features/pos/usePosSocket';
-import { Product, Table, TableStatus, OrderType, OrderStatus, SplitType, SplitPaymentEntry } from '../../types';
+import { Product, Table, TableStatus, OrderType, OrderStatus, SplitType, SplitPaymentEntry, Payment } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import { useResponsive } from '../../hooks/useResponsive';
 import Spinner from '../../components/ui/Spinner';
+import { HardwareService, isTauri } from '../../lib/tauri';
+import { useUiStore } from '../../store/uiStore';
 
 // View state type
 type POSView = 'table-selection' | 'order';
@@ -346,6 +348,13 @@ const POSPage = () => {
           quantity: m.quantity,
         })),
       })),
+      // Stable per-click idempotency key. Backend dedupes by
+      // (tenantId, idempotencyKey) so a double-tap on a slow network
+      // returns the existing order instead of creating a duplicate.
+      // Generated here (in the click handler) — NOT in render — so it
+      // doesn't change between Axios's first request and any 401-refresh
+      // retry of the same logical action.
+      idempotencyKey: crypto.randomUUID(),
     };
 
     // Update existing order if currentOrderId exists, otherwise create new
@@ -422,6 +431,13 @@ const POSPage = () => {
           quantity: m.quantity,
         })),
       })),
+      // Stable per-click idempotency key. Backend dedupes by
+      // (tenantId, idempotencyKey) so a double-tap on a slow network
+      // returns the existing order instead of creating a duplicate.
+      // Generated here (in the click handler) — NOT in render — so it
+      // doesn't change between Axios's first request and any 401-refresh
+      // retry of the same logical action.
+      idempotencyKey: crypto.randomUUID(),
     };
 
     // Update existing order if currentOrderId exists, otherwise create new
@@ -483,9 +499,55 @@ const POSPage = () => {
         method: data.method as any,
         transactionId: data.transactionId,
         customerPhone: data.customerPhone || undefined,
+        // Same idempotency rationale as createOrder: backend has a partial
+        // unique index on (orderId, idempotencyKey) — a double-tap or
+        // 401-retry returns the existing payment instead of charging twice.
+        idempotencyKey: crypto.randomUUID(),
       },
       {
-        onSuccess: () => {
+        onSuccess: (payment: Payment) => {
+          // Auto-print on the desktop POS terminal. Gated on isTauri()
+          // and a configured default printer; web users see no prints.
+          // Failures are toasted with a one-tap Reprint action — the
+          // snapshot is persisted on the backend so a manual reprint
+          // never re-derives content (it matches the original
+          // byte-for-byte even if the order is edited later).
+          if (isTauri()) {
+            const printerId = useUiStore.getState().defaultReceiptPrinterId;
+            if (printerId && payment.receiptSnapshot) {
+              const snapshot = payment.receiptSnapshot;
+              HardwareService.printReceipt(printerId, snapshot)
+                .catch((err) => {
+                  console.error('Receipt print failed:', err);
+                  toast.error(
+                    t('pos.payment.receiptPrintFailed', 'Receipt print failed — payment recorded.'),
+                    {
+                      action: {
+                        label: t('pos.reprint.label', 'Reprint Receipt'),
+                        onClick: () => {
+                          HardwareService.printReceipt(printerId, snapshot).catch(
+                            (e) => {
+                              console.error('Reprint failed:', e);
+                              toast.error(
+                                t('pos.reprint.failed', 'Reprint failed — check printer connection'),
+                              );
+                            },
+                          );
+                        },
+                      },
+                      duration: 10_000,
+                    },
+                  );
+                });
+            }
+            // Pop the cash drawer for cash payments.
+            if (printerId && data.method === 'CASH') {
+              HardwareService.openCashDrawer(printerId).catch((err) => {
+                console.error('Cash drawer open failed:', err);
+              });
+            }
+          }
+
           // Refetch orders to update the list
           refetchOrders();
 

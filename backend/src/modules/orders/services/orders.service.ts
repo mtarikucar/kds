@@ -23,6 +23,7 @@ import { StockDeductionService } from '../../stock-management/services/stock-ded
 import { SmsNotificationService } from '../../sms-settings/sms-notification.service';
 import { TaxCalculationService } from '../../accounting/services/tax-calculation.service';
 import { withTransaction, addBreadcrumb } from '../../../common/utils/tracing';
+import { ReceiptSnapshotBuilder } from './receipt-snapshot.builder';
 
 @Injectable()
 export class OrdersService {
@@ -30,6 +31,7 @@ export class OrdersService {
 
   constructor(
     private prisma: PrismaService,
+    private receiptSnapshotBuilder: ReceiptSnapshotBuilder,
     @Inject(forwardRef(() => KdsGateway))
     private kdsGateway: KdsGateway,
     @Optional()
@@ -102,6 +104,40 @@ export class OrdersService {
           type: createOrderDto.type,
           itemCount: createOrderDto.items.length,
         });
+
+        // Idempotency fast-path: if the client supplied a key and we've
+        // already recorded an order for this (tenantId, key), return the
+        // existing row instead of creating a duplicate. The DB has a
+        // partial unique index on (tenantId, idempotencyKey) WHERE key
+        // IS NOT NULL — this pre-check is the responsiveness path; the
+        // P2002 catch in createWithOrderNumberRetry handles concurrent
+        // retries authoritatively.
+        if (createOrderDto.idempotencyKey) {
+          const existing = await this.prisma.order.findFirst({
+            where: { tenantId, idempotencyKey: createOrderDto.idempotencyKey },
+            include: {
+              orderItems: {
+                include: {
+                  product: { select: { id: true, name: true, price: true, image: true } },
+                  modifiers: {
+                    include: {
+                      modifier: { select: { id: true, name: true, priceAdjustment: true } },
+                    },
+                  },
+                },
+              },
+              table: { select: { id: true, number: true, section: true } },
+              user: { select: { id: true, firstName: true, lastName: true } },
+            },
+          });
+          if (existing) {
+            addBreadcrumb('Idempotency hit — returning existing order', 'order', {
+              orderId: existing.id,
+              orderNumber: existing.orderNumber,
+            });
+            return existing;
+          }
+        }
 
         // Validate table if provided
         if (createOrderDto.tableId) {
@@ -233,6 +269,7 @@ export class OrdersService {
         customerName: createOrderDto.customerName,
         userId,
         tenantId,
+        idempotencyKey: createOrderDto.idempotencyKey,
         orderItems: {
           create: orderItems,
         },
@@ -285,6 +322,34 @@ export class OrdersService {
       },
       });
     });
+
+        // Build the kitchen ticket snapshot now that the order has its
+        // generated orderNumber. The snapshot is written via a separate
+        // order.update call because the orderNumber is allocated by the
+        // retry helper inside order.create — we can't include the snapshot
+        // in the create payload without a chicken-and-egg problem.
+        //
+        // Note: this is a second query, not atomic with order.create. That
+        // matches the existing pattern in this method (stockDeduction, sms
+        // notifications also run as separate post-create operations).
+        // Fail-soft: a builder error logs and leaves the snapshot null —
+        // reprintability is a convenience, not source of truth.
+        try {
+          const kitchenTicketSnapshot =
+            this.receiptSnapshotBuilder.buildKitchenTicketSnapshot({
+              order: ReceiptSnapshotBuilder.toBuilderOrder(createdOrder),
+            }) as unknown as Prisma.InputJsonValue;
+          await this.prisma.order.update({
+            where: { id: createdOrder.id },
+            data: { kitchenTicketSnapshot },
+          });
+          (createdOrder as any).kitchenTicketSnapshot = kitchenTicketSnapshot;
+        } catch (snapErr) {
+          this.logger.warn(
+            `Failed to build kitchen ticket snapshot for order ${createdOrder.orderNumber}: ${(snapErr as Error).message}`,
+          );
+          (createdOrder as any).kitchenTicketSnapshot = null;
+        }
 
         // Emit new order to kitchen via WebSocket
         this.kdsGateway.emitNewOrder(tenantId, createdOrder);

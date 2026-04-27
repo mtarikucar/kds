@@ -512,6 +512,17 @@ model Order {
   externalOrderId String?   // Platform's order ID/token for status sync
   externalData    Json?     // Raw platform payload for audit trail
 
+  // Captured at order-create time so the kitchen ticket is reprintable
+  // and survives later edits to items/modifiers. Owned by ReceiptSnapshotBuilder.
+  kitchenTicketSnapshot Json?
+
+  // Client-generated UUID for double-tap / retry deduplication. The
+  // partial unique index on (tenantId, idempotencyKey) is added by the
+  // companion migration — Prisma's @@unique would also dedupe NULLs
+  // (Postgres treats them as distinct), so the partial index is the
+  // mechanism that actually enforces the guarantee for keyed requests.
+  idempotencyKey String?
+
   // Customer ordering fields
   sessionId        String? // UUID for customer session tracking
   customerPhone    String? // Optional customer phone
@@ -626,6 +637,12 @@ model Payment {
   idempotencyKey String?
   notes          String?
 
+  // Captured at payment-create time so receipts remain reprintable even if
+  // the printer was offline, and survive future product/menu/tenant edits.
+  // Shape is owned by ReceiptSnapshotBuilder; see services/receipt-snapshot.builder.ts.
+  // Versioned via the `version` field inside the JSON.
+  receiptSnapshot Json?
+
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   orderId  String
@@ -673,6 +690,11 @@ model StockMovement {
   @@index([tenantId])
   @@index([productId])
   @@index([userId])
+  // Hot list query: "movements for tenant X in date-range Y". The
+  // single-column @@index([tenantId]) above is fine for tenant-scope
+  // alone; this compound index serves the date-bounded variant
+  // without a sequential scan over the tenant's history.
+  @@index([tenantId, createdAt])
   @@map("stock_movements")
 }
 
@@ -2469,6 +2491,10 @@ model IngredientMovement {
   @@index([type])
   @@index([referenceType, referenceId])
   @@index([createdAt])
+  // Same rationale as StockMovement — date-bounded per-tenant queries
+  // (cost reports, waste reports, "last 30 days for this tenant") are
+  // the dominant access pattern.
+  @@index([tenantId, createdAt])
   @@map("ingredient_movements")
 }
 
