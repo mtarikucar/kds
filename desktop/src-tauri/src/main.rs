@@ -6,13 +6,17 @@ mod escpos;
 mod hardware;
 
 use bluetooth::{BluetoothManager, PrinterCommand, ScannedDevice};
+use hardware::config::DeviceConfig;
+use hardware::status::DeviceStatus;
+use hardware::HardwareManager;
 use std::sync::Arc;
-use tauri::{Manager, State};
+use tauri::State;
 use tokio::sync::Mutex;
 
-/// Application state holding the Bluetooth manager
+/// Application state holding the Bluetooth manager + hardware manager.
 struct AppState {
     bluetooth: Arc<Mutex<Option<BluetoothManager>>>,
+    hardware: HardwareManager,
 }
 
 /// Initialize Bluetooth manager
@@ -425,10 +429,200 @@ fn build_kitchen_ticket_commands(t: &KitchenTicketSnapshot) -> Vec<PrinterComman
     cmds
 }
 
+// ============================================================================
+// Hardware-suite Tauri commands
+// ============================================================================
+//
+// These back the `HardwareService` calls in `frontend/src/lib/tauri.ts` that
+// the React `IntegrationsSettingsPage` and `HardwareDeviceCard` UI invoke.
+// All read/write the persisted `hardware.json` via `hardware::*` helpers.
+
+/// Initialize the hardware subsystem. Loads `~/.kds/hardware.json`,
+/// populates the per-device status cache, and lazy-initializes the BLE
+/// manager so the connect flow has somewhere to land. The `backend_url`
+/// argument is accepted for forwards compatibility with future telemetry
+/// uploads but is not used today.
+#[tauri::command]
+async fn initialize_hardware(
+    _backend_url: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    // Reload hardware.json so the in-memory state matches the file. Useful
+    // when an external editor changed the file between sessions.
+    let fresh = hardware::init_manager().await;
+    {
+        let mut guard = state.hardware.write().await;
+        let inner = fresh.read().await;
+        guard.config = inner.config.clone();
+        guard.statuses = inner.statuses.clone();
+    }
+
+    // Boot BLE if we have any Bluetooth devices configured (lazy init keeps
+    // the app launchable on machines that lack BLE adapters entirely).
+    let has_bluetooth = {
+        let guard = state.hardware.read().await;
+        guard.config.devices.iter().any(|d| {
+            matches!(
+                d.connection,
+                hardware::config::ConnectionConfig::Bluetooth(_)
+            )
+        })
+    };
+    if has_bluetooth {
+        let mut bt = state.bluetooth.lock().await;
+        if bt.is_none() {
+            *bt = Some(
+                BluetoothManager::new()
+                    .await
+                    .map_err(|e| e.to_string())?,
+            );
+        }
+    }
+
+    Ok("Hardware initialized".to_string())
+}
+
+/// List all configured devices with their current runtime status.
+#[tauri::command]
+async fn list_devices(state: State<'_, AppState>) -> Result<Vec<DeviceStatus>, String> {
+    Ok(hardware::list_statuses(&state.hardware).await)
+}
+
+/// Look up a single device's status by id.
+#[tauri::command]
+async fn get_device_status(
+    device_id: String,
+    state: State<'_, AppState>,
+) -> Result<DeviceStatus, String> {
+    hardware::get_status(&state.hardware, &device_id)
+        .await
+        .ok_or_else(|| format!("Device not found: {}", device_id))
+}
+
+/// Persist a new device row (or update an existing one with the same id).
+/// Returns the saved row so the frontend can echo it back into the list.
+#[tauri::command]
+async fn add_device(
+    device: DeviceConfig,
+    state: State<'_, AppState>,
+) -> Result<DeviceConfig, String> {
+    hardware::upsert_device(&state.hardware, device).await
+}
+
+/// Drop a device row + its status from the persisted config.
+#[tauri::command]
+async fn remove_device(
+    device_id: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    hardware::remove_device(&state.hardware, &device_id).await?;
+    Ok(format!("Device {} removed", device_id))
+}
+
+/// Run a printer-specific test: prints a small receipt showcasing the
+/// CP-857 Turkish character set so the operator can confirm the printer
+/// is paired correctly and the code page is accepted.
+#[tauri::command]
+async fn test_device(
+    device_id: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let bt = state.bluetooth.lock().await;
+    let manager = bt
+        .as_ref()
+        .ok_or("Bluetooth not initialized — call initialize_hardware first")?;
+
+    let test_commands = vec![
+        PrinterCommand::Initialize,
+        PrinterCommand::Align(1),
+        PrinterCommand::Bold(true),
+        PrinterCommand::TextSize(2, 2),
+        PrinterCommand::TextLine("Test Receipt".to_string()),
+        PrinterCommand::Bold(false),
+        PrinterCommand::TextSize(1, 1),
+        PrinterCommand::Feed(1),
+        PrinterCommand::Align(0),
+        PrinterCommand::TextLine("--------------------------------".to_string()),
+        // Smoke-test the Turkish letter set end-to-end.
+        PrinterCommand::TextLine("Türkçe karakter testi".to_string()),
+        PrinterCommand::TextLine("ÇĞİÖŞÜ çğıöşü".to_string()),
+        PrinterCommand::TextLine("Adana Şiş Künefe Pide".to_string()),
+        PrinterCommand::TextLine("Hesap: 123,45 TL".to_string()),
+        PrinterCommand::TextLine("--------------------------------".to_string()),
+        PrinterCommand::Align(1),
+        PrinterCommand::TextLine("If you can read this,".to_string()),
+        PrinterCommand::TextLine("CP-857 is working.".to_string()),
+        PrinterCommand::Feed(3),
+        PrinterCommand::Cut,
+    ];
+
+    manager
+        .print(&device_id, test_commands)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    Ok("Test print sent".to_string())
+}
+
+// ----------------------------------------------------------------------------
+// Legacy printer commands kept for the deprecated `PrinterService` path
+// (`frontend/src/components/desktop/PrinterSettings.tsx`). Implemented as
+// thin filters over the new hardware suite — when PrinterSettings.tsx is
+// replaced these can be deleted.
+// ----------------------------------------------------------------------------
+
+#[derive(serde::Serialize)]
+struct LegacyPrinterInfo {
+    name: String,
+    port: String,
+    status: String,
+}
+
+#[tauri::command]
+async fn list_printers(state: State<'_, AppState>) -> Result<Vec<LegacyPrinterInfo>, String> {
+    let guard = state.hardware.read().await;
+    let printers = guard
+        .config
+        .devices
+        .iter()
+        .filter(|d| {
+            matches!(
+                d.device_type,
+                hardware::config::DeviceType::ThermalPrinter
+            )
+        })
+        .map(|d| LegacyPrinterInfo {
+            name: d.name.clone(),
+            port: d.id.clone(),
+            status: guard
+                .statuses
+                .get(&d.id)
+                .map(|s| format!("{:?}", s.connection_status))
+                .unwrap_or_else(|| "Unknown".to_string()),
+        })
+        .collect();
+    Ok(printers)
+}
+
+#[tauri::command]
+async fn set_printer(port: String, state: State<'_, AppState>) -> Result<String, String> {
+    let mut guard = state.hardware.write().await;
+    guard.config.default_printer_port = Some(port.clone());
+    hardware::config::save(&guard.config).map_err(|e| e.to_string())?;
+    Ok(format!("Default printer set to {}", port))
+}
+
+#[tauri::command]
+async fn get_printer(state: State<'_, AppState>) -> Result<Option<String>, String> {
+    Ok(state.hardware.read().await.config.default_printer_port.clone())
+}
+
 fn main() {
+    let hardware = tauri::async_runtime::block_on(async { hardware::init_manager().await });
     tauri::Builder::default()
         .manage(AppState {
             bluetooth: Arc::new(Mutex::new(None)),
+            hardware,
         })
         .invoke_handler(tauri::generate_handler![
             init_bluetooth,
@@ -441,6 +635,17 @@ fn main() {
             print_receipt,
             print_kitchen_order,
             open_cash_drawer,
+            // hardware-suite commands
+            initialize_hardware,
+            list_devices,
+            get_device_status,
+            add_device,
+            remove_device,
+            test_device,
+            // legacy printer-service shims (kept until PrinterSettings.tsx replaced)
+            list_printers,
+            set_printer,
+            get_printer,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
