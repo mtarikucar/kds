@@ -324,7 +324,12 @@ export class PaymentsService {
           throw err;
         }
 
-        // Auto-generate invoice AFTER transaction commits
+        // Auto-generate invoice AFTER transaction commits. Failure is
+        // tagged REVENUE_SYNC_FAILED so it's grep-able in logs/Sentry —
+        // the order is paid, the receipt snapshot is persisted, but the
+        // accounting integration didn't reflect this revenue. Operator
+        // can manually generate the invoice from the order detail page.
+        // Bounded retry is a separate ticket (queue + DLQ).
         if (this.salesInvoiceService && this.accountingSettingsService) {
           try {
             const accSettings = await this.accountingSettingsService.findByTenant(tenantId);
@@ -332,7 +337,17 @@ export class PaymentsService {
               await this.salesInvoiceService.createFromOrder(orderId, tenantId);
             }
           } catch (err) {
-            this.logger.error(`Auto-invoice generation failed for order ${orderId}: ${err.message}`, err.stack);
+            const message = err instanceof Error ? err.message : String(err);
+            const stack = err instanceof Error ? err.stack : undefined;
+            this.logger.error(
+              `REVENUE_SYNC_FAILED auto-invoice generation failed for order ${orderId} (tenant ${tenantId}): ${message}`,
+              stack,
+            );
+            addBreadcrumb('REVENUE_SYNC_FAILED', 'payment', {
+              orderId,
+              tenantId,
+              error: message,
+            });
           }
         }
 
