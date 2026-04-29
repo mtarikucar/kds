@@ -16,6 +16,7 @@ import { CustomersService } from '../../customers/customers.service';
 import { withTransaction, addBreadcrumb } from '../../../common/utils/tracing';
 import { SalesInvoiceService } from '../../accounting/services/sales-invoice.service';
 import { AccountingSettingsService } from '../../accounting/services/accounting-settings.service';
+import { ReceiptSnapshotBuilder } from './receipt-snapshot.builder';
 
 @Injectable()
 export class PaymentsService {
@@ -25,6 +26,7 @@ export class PaymentsService {
     private prisma: PrismaService,
     private ordersService: OrdersService,
     private customersService: CustomersService,
+    private receiptSnapshotBuilder: ReceiptSnapshotBuilder,
     @Optional()
     private salesInvoiceService?: SalesInvoiceService,
     @Optional()
@@ -123,6 +125,48 @@ export class PaymentsService {
             );
           }
 
+          // Build the receipt snapshot before payment.create so it's persisted
+          // in the same transaction. Fail-soft: if tenant or order data is
+          // unexpectedly missing pieces, fall back to JsonNull rather than
+          // crashing the payment — this is a reprint convenience, not the
+          // source of truth for accounting.
+          let receiptSnapshot: Prisma.InputJsonValue | typeof Prisma.JsonNull =
+            Prisma.JsonNull;
+          try {
+            const tenantRow = await tx.tenant.findUnique({
+              where: { id: tenantId },
+              select: { id: true, name: true, currency: true },
+            });
+            const orderForSnap = await tx.order.findFirst({
+              where: { id: orderId, tenantId },
+              include: {
+                orderItems: {
+                  include: {
+                    product: true,
+                    modifiers: { include: { modifier: true } },
+                  },
+                },
+                table: true,
+              },
+            });
+            if (tenantRow && orderForSnap) {
+              receiptSnapshot = this.receiptSnapshotBuilder.buildReceiptSnapshot({
+                tenant: tenantRow,
+                order: ReceiptSnapshotBuilder.toBuilderOrder(orderForSnap),
+                payment: {
+                  method: createPaymentDto.method,
+                  transactionId: createPaymentDto.transactionId ?? null,
+                  paidAt: new Date(),
+                },
+              }) as unknown as Prisma.InputJsonValue;
+            }
+          } catch (snapErr) {
+            this.logger.warn(
+              `Failed to build receipt snapshot for order ${orderId}: ${(snapErr as Error).message}`,
+            );
+            receiptSnapshot = Prisma.JsonNull;
+          }
+
           // Create payment
           const payment = await tx.payment.create({
             data: {
@@ -138,6 +182,7 @@ export class PaymentsService {
               // (enforced by the partial unique index on the schema side).
               transactionId: createPaymentDto.transactionId,
               idempotencyKey: createPaymentDto.idempotencyKey,
+              receiptSnapshot,
             },
             include: {
               order: {

@@ -512,6 +512,10 @@ model Order {
   externalOrderId String?   // Platform's order ID/token for status sync
   externalData    Json?     // Raw platform payload for audit trail
 
+  // Captured at order-create time so the kitchen ticket is reprintable
+  // and survives later edits to items/modifiers. Owned by ReceiptSnapshotBuilder.
+  kitchenTicketSnapshot Json?
+
   // Customer ordering fields
   sessionId        String? // UUID for customer session tracking
   customerPhone    String? // Optional customer phone
@@ -625,6 +629,12 @@ model Payment {
   transactionId  String?
   idempotencyKey String?
   notes          String?
+
+  // Captured at payment-create time so receipts remain reprintable even if
+  // the printer was offline, and survive future product/menu/tenant edits.
+  // Shape is owned by ReceiptSnapshotBuilder; see services/receipt-snapshot.builder.ts.
+  // Versioned via the `version` field inside the JSON.
+  receiptSnapshot Json?
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)

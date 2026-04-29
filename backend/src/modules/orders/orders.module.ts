@@ -1,6 +1,7 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { OrdersService } from './services/orders.service';
 import { PaymentsService } from './services/payments.service';
+import { ReceiptSnapshotBuilder } from './services/receipt-snapshot.builder';
 import { OrdersController } from './controllers/orders.controller';
 import { PaymentsController } from './controllers/payments.controller';
 import { PrismaModule } from '../../prisma/prisma.module';
@@ -22,7 +23,7 @@ import { StockManagementModule } from '../stock-management/stock-management.modu
     AccountingModule,
   ],
   controllers: [OrdersController, PaymentsController],
-  providers: [OrdersService, PaymentsService],
-  exports: [OrdersService, PaymentsService],
+  providers: [OrdersService, PaymentsService, ReceiptSnapshotBuilder],
+  exports: [OrdersService, PaymentsService, ReceiptSnapshotBuilder],
 })
 export class OrdersModule {}
