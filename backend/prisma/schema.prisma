@@ -540,7 +540,10 @@ model Order {
   // Relations
   orderItems OrderItem[]
   payments   Payment[]
-  salesInvoice   SalesInvoice?
+  // Pluralized: progressive flow generates one SalesInvoice per
+  // Payment; the legacy single-payment flow still produces one
+  // invoice per order. Both shapes are valid in this list.
+  salesInvoices  SalesInvoice[]
 
   @@unique([tenantId, orderNumber])
   @@index([tenantId])
@@ -631,6 +634,16 @@ model Payment {
   orderId  String
   order    Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
+  // Customer this specific Payment belongs to. Set by progressive
+  // payments (each diner can hand the waiter their own phone for
+  // loyalty) and by the legacy single-payment flow (customer of
+  // record for the whole bill). NULL means the payment was anonymous.
+  // The order.customerId remains "primary customer on the bill" for
+  // legacy display; this column lets per-customer stats stay clean
+  // when a single order has multiple paying customers.
+  customerId String?
+  customer   Customer? @relation("CustomerPayments", fields: [customerId], references: [id], onDelete: SetNull)
+
   createdAt DateTime  @default(now())
   paidAt    DateTime?
 
@@ -638,6 +651,15 @@ model Payment {
   // Populated only by payByItems(); empty for whole-bill and split-bill
   // payments. See OrderItemPayment for the integrity rules.
   orderItemPayments OrderItemPayment[]
+
+  // Per-payment invoice(s) — Turkish e-fatura per-customer. Each
+  // progressive payment can have at most one SalesInvoice (enforced
+  // by the partial unique index `sales_invoices_paymentId_notnull_key`
+  // in migration 20260513140000). Modelled as a 1-to-many here purely
+  // because Prisma's 1-to-1 defining-side validator wants @unique on
+  // a nullable column, which would inflate the index footprint.
+  // Consumers should expect at most one row.
+  salesInvoices     SalesInvoice[]
 
   // NOTE: @@unique([orderId, idempotencyKey]) does NOT dedupe null keys in
   // Postgres (multiple NULLs are considered distinct). Migration
@@ -1295,6 +1317,7 @@ model Customer {
 
   // Relations
   orders Order[] @relation("CustomerOrders")
+  payments Payment[] @relation("CustomerPayments")
   sessions CustomerSession[]
   loyaltyTransactions LoyaltyTransaction[]
   referralsMade CustomerReferral[] @relation("ReferralsMade")
@@ -3087,8 +3110,17 @@ model SalesInvoice {
 
   taxBreakdown   Json?
 
-  orderId        String?  @unique
+  orderId        String?
   order          Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  // When the invoice corresponds to a single Payment row (progressive
+  // / per-customer flow), paymentId links to it so each customer can
+  // get their own KDV breakdown. Order-level invoices (single payment
+  // closing the whole bill, or splitBill) leave paymentId null. The
+  // partial unique constraint (one invoice per payment) is enforced
+  // by a unique index defined in the migration; Prisma's @unique on
+  // a nullable column would block multiple NULLs in Postgres.
+  paymentId      String?
+  payment        Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
   paymentMethod  String?
 
   externalId     String?
@@ -3113,6 +3145,7 @@ model SalesInvoice {
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId])
   @@index([orderId])
+  @@index([paymentId])
   @@index([status])
   @@index([issueDate])
   @@map("sales_invoices")

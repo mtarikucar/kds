@@ -12,6 +12,7 @@ import { PaymentsService } from '../services/payments.service';
 import { CreatePaymentDto } from '../dto/create-payment.dto';
 import { SplitBillDto } from '../dto/split-bill.dto';
 import { PayItemsDto } from '../dto/pay-items.dto';
+import { WriteOffOrderDto } from '../dto/write-off.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
@@ -91,5 +92,25 @@ export class PaymentsController {
   @ApiResponse({ status: 404, description: 'Order not found' })
   getPayableItems(@Param('orderId') orderId: string, @Request() req) {
     return this.paymentsService.getPayableItems(orderId, req.tenantId);
+  }
+
+  @Post('write-off')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary:
+      'Absorb the remaining balance as a house loss (no-show, comp). MANAGER+ only.',
+  })
+  @ApiResponse({ status: 201, description: 'Order written off, table released' })
+  @ApiResponse({
+    status: 400,
+    description: 'Order is already paid, cancelled, or has nothing left to write off',
+  })
+  @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+  writeOff(
+    @Param('orderId') orderId: string,
+    @Body() dto: WriteOffOrderDto,
+    @Request() req,
+  ) {
+    return this.paymentsService.writeOff(orderId, dto, req.tenantId);
   }
 }

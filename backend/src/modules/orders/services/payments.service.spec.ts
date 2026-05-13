@@ -722,6 +722,120 @@ describe('PaymentsService — progressive per-item payments', () => {
       expect(b.itemTotal).toBe('50.00');
     });
 
+    it('writeOff: closes order via HOUSE payment, no CRM stat bump', async () => {
+      // 2/3 paid via progressive; manager writes off the rest. Expected:
+      // - one HOUSE Payment with remaining amount
+      // - order → PAID, table → AVAILABLE
+      // - no customer.totalSpent bump (it's not real revenue)
+      const order = makeOrder({
+        finalAmount: new Prisma.Decimal('100.00'),
+        totalAmount: new Prisma.Decimal('100.00'),
+      });
+      (prisma.order.findFirst as unknown as jest.Mock).mockResolvedValue(order);
+      // Already paid 60 of 100 → 40 to be written off.
+      (prisma.payment.aggregate as unknown as jest.Mock).mockResolvedValue({
+        _sum: { amount: new Prisma.Decimal('60.00') },
+      });
+      (prisma.payment.findFirst as unknown as jest.Mock).mockResolvedValueOnce(null); // no prior idempotent match
+      (prisma.payment.create as unknown as jest.Mock).mockImplementation(
+        async ({ data }: any) => ({
+          id: 'payment-house-1',
+          ...data,
+          status: PaymentStatus.COMPLETED,
+          paidAt: new Date(),
+        }),
+      );
+      (prisma.order.count as unknown as jest.Mock).mockResolvedValue(0);
+
+      const result = await (svc as any).writeOff(
+        ORDER_ID,
+        { reason: 'no-show' },
+        TENANT_ID,
+      );
+
+      const createCall = (prisma.payment.create as unknown as jest.Mock).mock.calls[0][0];
+      expect(createCall.data.method).toBe('HOUSE');
+      expect(new Prisma.Decimal(createCall.data.amount).toFixed(2)).toBe('40.00');
+      expect(createCall.data.notes).toBe('no-show');
+      // No customer stat bump.
+      expect(prisma.customer.update).not.toHaveBeenCalled();
+      // Order flipped to PAID.
+      expect(prisma.order.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: OrderStatus.PAID }),
+        }),
+      );
+      expect(result.orderFullyPaid).toBe(true);
+    });
+
+    it('per-payment customer linkage bumps stats by THIS payment only', async () => {
+      // Customer A pays 25, customer B pays 75 with their own phone.
+      // Each gets their own Customer record bumped by their own slice.
+      const order = makeOrder({
+        finalAmount: new Prisma.Decimal('100.00'),
+        totalAmount: new Prisma.Decimal('100.00'),
+      });
+      const itemA = makeItem('item-A', 1, '25.00');
+      const itemB = makeItem('item-B', 1, '75.00');
+      (order as any).orderItems = [itemA, itemB];
+
+      (prisma.order.findFirst as unknown as jest.Mock).mockResolvedValue(order);
+      (prisma.orderItemPayment.groupBy as unknown as jest.Mock).mockResolvedValue([]);
+      (prisma.orderItemPayment.aggregate as unknown as jest.Mock).mockResolvedValue({
+        _sum: { amount: new Prisma.Decimal('0') },
+      });
+      (prisma.payment.create as unknown as jest.Mock).mockImplementation(
+        async ({ data }: any) => ({
+          id: 'p-A',
+          ...data,
+          status: PaymentStatus.COMPLETED,
+          paidAt: new Date(),
+        }),
+      );
+      (prisma.customer.findFirst as unknown as jest.Mock).mockResolvedValue(null);
+      (prisma.customer.create as unknown as jest.Mock).mockResolvedValue({
+        id: 'cust-A',
+        phone: '+905551112233',
+        totalOrders: 0,
+        totalSpent: new Prisma.Decimal('0'),
+      });
+      (prisma.customer.findUnique as unknown as jest.Mock).mockResolvedValue({
+        id: 'cust-A',
+        totalOrders: 0,
+        totalSpent: new Prisma.Decimal('0'),
+      });
+      (prisma.payment.count as unknown as jest.Mock).mockResolvedValue(0);
+      (prisma.payment.aggregate as unknown as jest.Mock).mockResolvedValue({
+        _sum: { amount: new Prisma.Decimal('25.00') },
+      });
+      (prisma.order.findFirst as unknown as jest.Mock)
+        .mockResolvedValueOnce(order)
+        .mockResolvedValueOnce({
+          ...order,
+          orderItems: [
+            { ...itemA, product: { name: 'A' }, modifiers: [], orderItemPayments: [{ quantity: 1 }] },
+            { ...itemB, product: { name: 'B' }, modifiers: [], orderItemPayments: [] },
+          ],
+          payments: [],
+        });
+
+      await svc.payByItems(
+        ORDER_ID,
+        {
+          items: [{ orderItemId: 'item-A', quantity: 1 }],
+          method: 'CASH' as any,
+          customerPhone: '+905551112233',
+        },
+        TENANT_ID,
+      );
+
+      // Stats bump = payment.amount (25), not order.finalAmount (100).
+      const updateCalls = (prisma.customer.update as unknown as jest.Mock).mock.calls;
+      const bumpCall = updateCalls.find((c) => c[0]?.data?.totalSpent);
+      expect(bumpCall).toBeDefined();
+      expect(new Prisma.Decimal(bumpCall[0].data.totalSpent).toFixed(2)).toBe('25.00');
+    });
+
     it('itemTotal applies discount pro-rata', async () => {
       // 100 TL total, 10 TL discount → 90 TL final. 50 TL line gets
       // 90% factor = 45.00 itemTotal.

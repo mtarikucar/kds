@@ -594,6 +594,21 @@ export class OrdersService {
       updateData.finalAmount = finalAmount;
       updateData.taxAmount = adjustedTaxAmount;
     } else if (updateOrderDto.discount !== undefined) {
+      // Mid-service discount block: a discount change re-bases the
+      // per-unit math, but already-recorded OrderItemPayment snapshots
+      // wouldn't be retroactively re-priced — the first payer would
+      // silently overpay their share and there's no auto-rebalance.
+      // Block it instead; manager must refund first or apply the
+      // discount before anyone has paid.
+      const allocCount = await this.prisma.orderItemPayment.count({
+        where: { tenantId, orderItem: { orderId: id } },
+      });
+      if (allocCount > 0) {
+        throw new ConflictException(
+          'Cannot change the order discount once any per-item payment has been collected. ' +
+            'Refund the existing payment(s) first, then re-apply the discount.',
+        );
+      }
       // Only discount is being updated. Use Decimal arithmetic so large
       // bills (over ~70 000 TL) don't lose precision in IEEE-754 — the
       // `Number(order.totalAmount)` cast in the prior implementation
@@ -625,18 +640,25 @@ export class OrdersService {
         throw new BadRequestException('Cannot update paid or cancelled orders');
       }
       if (updateData.orderItems) {
-        // Block item rewrites when any item already has a per-item
-        // payment recorded. Deleting an OrderItem that still has an
-        // OrderItemPayment row would either fail at the DB level (FK is
-        // Restrict) or, worse, leave the payment dangling. Either way
-        // the customer who already paid for their share would lose
-        // visibility into what they paid for. Refund the payment first.
+        // The whole-order rewrite path drops every existing OrderItem
+        // and recreates the requested set. If any of the items being
+        // dropped has an OrderItemPayment row, the FK Restrict would
+        // fire on the deleteMany — and even if the cascade allowed it,
+        // a customer who already paid for their share would lose the
+        // audit trail of what they bought.
+        //
+        // For surgical changes (waiter wants to remove ONE unpaid item
+        // from a table where other customers already paid) use the
+        // dedicated `DELETE /orders/:orderId/items/:itemId` endpoint
+        // which preserves untouched allocations.
         const paidItemCount = await tx.orderItemPayment.count({
           where: { tenantId, orderItem: { orderId: id } },
         });
         if (paidItemCount > 0) {
           throw new ConflictException(
-            'Cannot rewrite items on an order with partial per-item payments. Refund the corresponding payment(s) first.',
+            'Cannot rewrite the full item set when partial per-item payments exist. ' +
+              'Use DELETE /orders/:orderId/items/:itemId to drop a single unpaid item, ' +
+              'or refund the payment(s) first.',
           );
         }
         await tx.orderItem.deleteMany({ where: { orderId: id } });
@@ -858,6 +880,93 @@ export class OrdersService {
 
     return this.prisma.order.delete({
       where: { id },
+    });
+  }
+
+  /**
+   * Remove a single OrderItem from an open order — used when a waiter
+   * needs to cancel ONE customer's unpaid line without touching the
+   * other customers' already-recorded per-item payments.
+   *
+   * Rules:
+   *  - Order must be open (not PAID / CANCELLED / requiresApproval pending).
+   *  - The target item must have zero COMPLETED OrderItemPayment rows. If
+   *    even one unit has been paid for, refund first.
+   *  - On success, order totals (totalAmount / finalAmount / taxAmount)
+   *    are recomputed from the surviving items so the rest of the bill
+   *    settles cleanly. Discount stays put.
+   */
+  async removeItem(orderId: string, itemId: string, tenantId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findFirst({
+        where: { id: orderId, tenantId },
+        include: { orderItems: true },
+      });
+      if (!order) {
+        throw new NotFoundException(`Order ${orderId} not found`);
+      }
+      if (order.status === OrderStatus.PAID || order.status === OrderStatus.CANCELLED) {
+        throw new BadRequestException('Cannot modify a paid or cancelled order');
+      }
+      if (order.requiresApproval && order.status === OrderStatus.PENDING_APPROVAL) {
+        throw new BadRequestException(
+          'Order requires approval before items can be modified.',
+        );
+      }
+
+      const item = order.orderItems.find((i) => i.id === itemId);
+      if (!item) {
+        throw new NotFoundException(`Item ${itemId} not found on this order`);
+      }
+      if (order.orderItems.length === 1) {
+        throw new BadRequestException(
+          'Cannot remove the last item from an order; cancel the order instead.',
+        );
+      }
+
+      const allocations = await tx.orderItemPayment.count({
+        where: { orderItemId: itemId },
+      });
+      if (allocations > 0) {
+        throw new ConflictException(
+          'This item has been partially paid for. Refund the corresponding payment(s) first.',
+        );
+      }
+
+      await tx.orderItem.delete({ where: { id: itemId } });
+
+      // Recompute totals from the surviving items so the order math
+      // stays self-consistent. taxAmount mirrors the order-create
+      // pattern: pro-rata discount applied to the gross tax sum.
+      const remaining = order.orderItems.filter((i) => i.id !== itemId);
+      const newTotal = remaining.reduce<Prisma.Decimal>(
+        (s, i) => s.add(new Prisma.Decimal(i.subtotal)),
+        new Prisma.Decimal(0),
+      );
+      const grossTax = remaining.reduce<Prisma.Decimal>(
+        (s, i) => s.add(new Prisma.Decimal(i.taxAmount)),
+        new Prisma.Decimal(0),
+      );
+      const discount = new Prisma.Decimal(order.discount);
+      const cappedDiscount = discount.gt(newTotal) ? newTotal : discount;
+      const newFinal = newTotal.sub(cappedDiscount);
+      const discountRatio = newTotal.gt(0) ? cappedDiscount.div(newTotal) : new Prisma.Decimal(0);
+      const adjustedTax = grossTax
+        .mul(new Prisma.Decimal(1).sub(discountRatio))
+        .toDecimalPlaces(2);
+
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          totalAmount: newTotal,
+          discount: cappedDiscount,
+          finalAmount: newFinal,
+          taxAmount: adjustedTax,
+        },
+        include: { orderItems: { include: { product: true } } },
+      });
+
+      return updated;
     });
   }
 

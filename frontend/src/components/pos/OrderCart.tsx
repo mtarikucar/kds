@@ -91,9 +91,15 @@ const OrderCart = ({
               size="sm"
               onClick={onSplitBill}
               title={t('billSplit.splitButton')}
-              className="text-slate-500 hover:text-emerald-600"
+              // Label alongside the icon so a waiter on a tablet (where
+              // title tooltips don't trigger on touch) can tell the
+              // split-bill and pay-by-customer buttons apart.
+              className="text-slate-500 hover:text-emerald-600 gap-1.5"
             >
               <Split className="h-4 w-4" />
+              <span className="hidden sm:inline text-xs font-medium">
+                {t('billSplit.splitButton')}
+              </span>
             </Button>
           )}
           {hasActiveOrder && hasSelectedTable && onProgressivePay && (
@@ -102,9 +108,12 @@ const OrderCart = ({
               size="sm"
               onClick={onProgressivePay}
               title={t('progressive.buttonTitle')}
-              className="text-slate-500 hover:text-indigo-600"
+              className="text-slate-500 hover:text-indigo-600 gap-1.5"
             >
               <Users className="h-4 w-4" />
+              <span className="hidden sm:inline text-xs font-medium">
+                {t('progressive.buttonTitle')}
+              </span>
             </Button>
           )}
           {hasActiveOrder && hasSelectedTable && onTransferTable && (

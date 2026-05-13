@@ -236,7 +236,7 @@
   "progressive": {
     "title": "Adım Adım Ödeme",
     "buttonTitle": "Müşteriye Göre Öde",
-    "subtitle": "Müşterinin ödediği ürünleri seçin — kalanı diğerleri öder",
+    "subtitle": "Müşterinin ödeyeceği ürünleri seçin — kalanı diğerleri öder",
     "summary": "Toplam {{total}} • Ödenen {{paid}} • Kalan {{remaining}}",
     "unpaidItems": "Ödenmemiş Ürünler",
     "paidItems": "Ödenmiş Ürünler",

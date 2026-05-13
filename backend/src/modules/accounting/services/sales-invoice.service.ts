@@ -22,12 +22,18 @@ export class SalesInvoiceService {
       include: {
         orderItems: { include: { product: true } },
         payments: { where: { status: 'COMPLETED' } },
-        salesInvoice: true,
+        // Only the order-level invoice (paymentId null) blocks a
+        // second createFromOrder call. Per-payment invoices created
+        // by createFromPayment are separate fataralar and don't count
+        // against the "one invoice per order" gate.
+        salesInvoices: { where: { paymentId: null } },
       },
     });
 
     if (!order) throw new NotFoundException('Paid order not found');
-    if (order.salesInvoice) throw new BadRequestException('Invoice already exists for this order');
+    if (order.salesInvoices.length > 0) {
+      throw new BadRequestException('Invoice already exists for this order');
+    }
 
     // Read the non-secret settings once outside the tx — only the counter
     // mint + invoice create need to share rollback semantics. This keeps
@@ -130,6 +136,149 @@ export class SalesInvoiceService {
     }
 
     return invoice;
+  }
+
+  /**
+   * Create a fatura scoped to a single Payment (progressive payment
+   * flow). Line items are derived from the Payment's OrderItemPayment
+   * allocations so each customer's invoice shows exactly what they
+   * paid for, with the right unit count and KDV breakdown. Method on
+   * the invoice = this Payment's method (CASH / CARD / DIGITAL /
+   * HOUSE), which is what Turkish e-fatura needs.
+   *
+   * Idempotent against the partial unique index
+   * `sales_invoices_paymentId_notnull_key` — a retry returns the
+   * existing invoice instead of duplicating it.
+   */
+  async createFromPayment(paymentId: string, tenantId: string) {
+    const payment = await this.prisma.payment.findFirst({
+      where: { id: paymentId, tenantId, status: 'COMPLETED' },
+      include: {
+        orderItemPayments: {
+          include: { orderItem: { include: { product: true } } },
+        },
+        order: true,
+        salesInvoices: true,
+      },
+    });
+
+    if (!payment) throw new NotFoundException('Completed payment not found');
+    if (payment.salesInvoices.length > 0) return payment.salesInvoices[0];
+    if (payment.orderItemPayments.length === 0) {
+      throw new BadRequestException(
+        'Per-payment invoice requires the Payment to have at least one OrderItemPayment allocation. ' +
+          'Use createFromOrder for order-level invoices.',
+      );
+    }
+
+    const settings = await this.settingsService.findByTenant(tenantId);
+
+    // Build invoice lines from the per-item allocations. Each
+    // allocation row carries (orderItemId, quantity, amount). We
+    // derive unitPrice and tax from the parent OrderItem at its
+    // captured rate.
+    const invoiceItems = payment.orderItemPayments.map((alloc) => {
+      const item = alloc.orderItem;
+      if (!item.quantity || item.quantity <= 0) {
+        throw new BadRequestException(
+          `Invoice cannot be generated: order item "${item.product?.name ?? item.id}" has non-positive quantity`,
+        );
+      }
+      const lineTotal = Number(alloc.amount);
+      const taxRate = item.taxRate ?? 10;
+      const tax = this.taxService.extractTax(lineTotal, taxRate);
+      return {
+        description: item.product?.name || 'Ürün',
+        quantity: alloc.quantity,
+        unitPrice: alloc.quantity > 0
+          ? Math.round((tax.subtotalExcludingTax / alloc.quantity) * 100) / 100
+          : 0,
+        taxRate,
+        taxAmount: tax.taxAmount,
+        subtotal: tax.subtotalExcludingTax,
+        total: lineTotal,
+      };
+    });
+
+    const subtotal = invoiceItems.reduce((s, i) => s + i.subtotal, 0);
+    const taxAmount = invoiceItems.reduce((s, i) => s + i.taxAmount, 0);
+    const totalAmount = Number(payment.amount);
+
+    const taxBreakdown: Record<number, { taxableAmount: number; taxAmount: number }> = {};
+    for (const item of invoiceItems) {
+      if (!taxBreakdown[item.taxRate]) {
+        taxBreakdown[item.taxRate] = { taxableAmount: 0, taxAmount: 0 };
+      }
+      taxBreakdown[item.taxRate].taxableAmount += item.subtotal;
+      taxBreakdown[item.taxRate].taxAmount += item.taxAmount;
+    }
+
+    try {
+      const invoice = await this.prisma.$transaction(async (tx) => {
+        const invoiceNumber = await this.settingsService.getNextInvoiceNumber(
+          tenantId,
+          tx,
+        );
+        return tx.salesInvoice.create({
+          data: {
+            invoiceNumber,
+            status: InvoiceStatus.ISSUED,
+            customerName: payment.order.customerName,
+            customerPhone: payment.order.customerPhone,
+            subtotal: Math.round(subtotal * 100) / 100,
+            taxAmount: Math.round(taxAmount * 100) / 100,
+            totalAmount,
+            // Pro-rata discount portion of this payment, derived from
+            // (totalAmount − subtotal − taxAmount). Negative noise is
+            // clamped at 0.
+            discount: 0,
+            taxBreakdown,
+            orderId: payment.orderId,
+            paymentId: payment.id,
+            paymentMethod: payment.method,
+            issueDate: new Date(),
+            dueDate: settings.defaultPaymentTermDays > 0
+              ? new Date(Date.now() + settings.defaultPaymentTermDays * 86400000)
+              : new Date(),
+            tenantId,
+            items: {
+              create: invoiceItems.map((item) => ({
+                description: item.description,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                taxRate: item.taxRate,
+                taxAmount: item.taxAmount,
+                subtotal: item.subtotal,
+                total: item.total,
+              })),
+            },
+          },
+          include: { items: true },
+        });
+      });
+
+      if (this.syncService) {
+        const accSettings = await this.settingsService.findByTenant(tenantId);
+        if (accSettings.autoSync && accSettings.provider !== 'NONE') {
+          this.syncService.syncInvoice(invoice.id, tenantId).catch((err) => {
+            console.error('Auto-sync failed:', err.message);
+          });
+        }
+      }
+
+      return invoice;
+    } catch (err: any) {
+      // Idempotency: partial unique on paymentId means a retry hits
+      // P2002 and we return the winning row.
+      if (err?.code === 'P2002') {
+        const existing = await this.prisma.salesInvoice.findFirst({
+          where: { paymentId, tenantId },
+          include: { items: true },
+        });
+        if (existing) return existing;
+      }
+      throw err;
+    }
   }
 
   async findAll(tenantId: string, query: InvoiceQueryDto) {

@@ -13,7 +13,7 @@ import AwaitingPaymentSection from '../../components/pos/AwaitingPaymentSection'
 import PendingOrdersPanel from '../../components/pos/PendingOrdersPanel';
 import WaiterRequestsPanel from '../../components/pos/WaiterRequestsPanel';
 import BillRequestsPanel from '../../components/pos/BillRequestsPanel';
-import { useCreateOrder, useUpdateOrder, useOrders, useTransferTableOrders, useSplitBill } from '../../features/orders/ordersApi';
+import { useCreateOrder, useUpdateOrder, useOrders, useTransferTableOrders, useSplitBill, useGroupBillSummary } from '../../features/orders/ordersApi';
 import { useCreatePayment, usePendingOrders, useWaiterRequests, useBillRequests } from '../../features/orders/ordersApi';
 import TransferTableModal from '../../components/pos/TransferTableModal';
 import TableMergeModal from '../../components/pos/TableMergeModal';
@@ -165,6 +165,12 @@ const POSPage = () => {
   const readyOrServedOrders = tableOrders?.filter(
     (order) => order.status === OrderStatus.SERVED || order.status === OrderStatus.READY
   ) || [];
+
+  // When the selected table is part of a merged group, pull the
+  // group-wide order list so the progressive-payment tab strip can
+  // surface every table's open orders, not just the one we clicked.
+  // Hook fires only when groupId is non-null (handled by enabled:!!).
+  const { data: groupSummary } = useGroupBillSummary(selectedTable?.groupId ?? null);
 
   // Find the current order for payment eligibility check
   const currentOrder = useMemo(() => {
@@ -1075,19 +1081,40 @@ const POSPage = () => {
       )}
 
       {/* Progressive ("Dutch-style") Payment Modal */}
-      {tableOrders && (
-        <ProgressiveSplitModal
-          isOpen={isProgressiveModalOpen}
-          onClose={() => setIsProgressiveModalOpen(false)}
-          orders={tableOrders
-            .filter((o) => o.status !== 'PAID' && o.status !== 'CANCELLED')
-            .map((o) => ({
-              id: o.id,
-              orderNumber: o.orderNumber,
-              tableNumber: selectedTable?.number,
-            }))}
-        />
-      )}
+      {/*
+       * Source of orders:
+       *  - Standalone table: just tableOrders (active, this table).
+       *  - Merged group (selectedTable.groupId set): all active orders
+       *    across every table in the group, so the modal's tab strip
+       *    actually has >1 entry. groupBillSummary returns table
+       *    numbers per order so each tab can show its source table.
+       */}
+      {(() => {
+        const groupId = selectedTable?.groupId ?? null;
+        // Hooks fire unconditionally; gate the modal render on isOpen
+        // so we don't pay for the network call when it's closed.
+        const groupOrders = (groupSummary?.orders || []).map((o) => ({
+          id: o.id,
+          orderNumber: o.orderNumber,
+          tableNumber: groupSummary?.tables.find((t) => t.id === o.tableId)?.number,
+        }));
+        const standaloneOrders = (tableOrders || [])
+          .filter((o) => o.status !== 'PAID' && o.status !== 'CANCELLED')
+          .map((o) => ({
+            id: o.id,
+            orderNumber: o.orderNumber,
+            tableNumber: selectedTable?.number,
+          }));
+        const orders = groupId && groupSummary ? groupOrders : standaloneOrders;
+        if (!orders.length) return null;
+        return (
+          <ProgressiveSplitModal
+            isOpen={isProgressiveModalOpen}
+            onClose={() => setIsProgressiveModalOpen(false)}
+            orders={orders}
+          />
+        );
+      })()}
     </div>
   );
 };

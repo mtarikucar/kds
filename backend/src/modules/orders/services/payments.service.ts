@@ -180,11 +180,88 @@ export class PaymentsService {
   }
 
   /**
+   * Per-Payment customer linkage for the progressive flow. Each diner
+   * can hand the waiter their own phone; their customer.totalSpent
+   * gets bumped by ONLY this payment's amount, not the whole order.
+   *
+   * totalOrders semantics: incremented only the FIRST time this
+   * customer appears on this order (so a single diner paying with
+   * three swipes doesn't show up as +3 orders in their lifetime).
+   */
+  private async linkCustomerForPayment(
+    tx: Prisma.TransactionClient,
+    payment: { id: string; orderId: string; tenantId: string; amount: Prisma.Decimal | number | string },
+    phone: string,
+  ): Promise<void> {
+    let customer = await tx.customer.findFirst({
+      where: { phone, tenantId: payment.tenantId },
+    });
+    if (!customer) {
+      customer = await tx.customer.create({
+        data: {
+          phone,
+          name: `Customer ${phone}`,
+          tenantId: payment.tenantId,
+        },
+      });
+    }
+
+    // Link the payment row to the customer for audit / per-customer
+    // history reads. The Payment.customerId column was added in the
+    // 20260513150000_payment_customer_link migration.
+    await tx.payment.update({
+      where: { id: payment.id },
+      data: { customerId: customer.id },
+    });
+
+    // Has this customer already paid for this order? Count any prior
+    // completed Payment on the same order with the same customerId.
+    // If so we only bump totalSpent (no double-count of totalOrders).
+    const priorOnThisOrder = await tx.payment.count({
+      where: {
+        orderId: payment.orderId,
+        status: PaymentStatus.COMPLETED,
+        customerId: customer.id,
+        id: { not: payment.id },
+      },
+    });
+
+    const amount = new Prisma.Decimal(payment.amount);
+    const newTotalSpent = new Prisma.Decimal(customer.totalSpent).add(amount);
+    const newTotalOrders =
+      priorOnThisOrder === 0 ? customer.totalOrders + 1 : customer.totalOrders;
+    const newAverage =
+      newTotalOrders > 0
+        ? newTotalSpent.div(newTotalOrders)
+        : new Prisma.Decimal(0);
+
+    await tx.customer.update({
+      where: { id: customer.id },
+      data: {
+        totalSpent: newTotalSpent,
+        totalOrders: newTotalOrders,
+        averageOrder: newAverage,
+        lastVisit: new Date(),
+      },
+    });
+  }
+
+  /**
    * Run the bounded-retry / Sentry-instrumented auto-invoice trigger.
    * Shared by all three payment paths so we don't end up with three
    * subtly different retry policies.
+   *
+   * If `paymentId` is supplied, generates a per-Payment fatura (Turkish
+   * e-fatura compliance: each customer in a progressive flow gets
+   * their own invoice with the correct payment method + KDV lines for
+   * only what they bought). Otherwise generates an order-level
+   * invoice (the legacy single-payment / split-bill flow).
    */
-  private async maybeGenerateAutoInvoice(orderId: string, tenantId: string): Promise<void> {
+  private async maybeGenerateAutoInvoice(
+    orderId: string,
+    tenantId: string,
+    paymentId?: string,
+  ): Promise<void> {
     if (!this.salesInvoiceService || !this.accountingSettingsService) return;
     try {
       const accSettings = await this.accountingSettingsService.findByTenant(tenantId);
@@ -192,7 +269,11 @@ export class PaymentsService {
       let lastErr: unknown;
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          await this.salesInvoiceService.createFromOrder(orderId, tenantId);
+          if (paymentId) {
+            await this.salesInvoiceService.createFromPayment(paymentId, tenantId);
+          } else {
+            await this.salesInvoiceService.createFromOrder(orderId, tenantId);
+          }
           lastErr = undefined;
           break;
         } catch (err) {
@@ -515,19 +596,65 @@ export class PaymentsService {
         const orderAmount = new Prisma.Decimal(payment.order.finalAmount);
 
         // If the remaining completed payments no longer cover the order,
-        // move the order out of PAID. Treat as CANCELLED so table/stock
-        // invariants match the existing cancellation flows elsewhere.
+        // we need to back the order out of PAID. The right target state
+        // depends on whether ANY completed payment survives the refund:
+        //
+        //  - Other completed payments exist (typical for progressive
+        //    flow: A and B already paid for their share, C refunds his)
+        //    → drop back to SERVED. Table stays OCCUPIED. The remaining
+        //    customers' allocations are intact; the items C originally
+        //    paid for are re-payable. NO stock reversal — the order is
+        //    not cancelled, the food was served.
+        //
+        //  - Zero completed payments left (the refunded payment was the
+        //    only one; the order was paid in a single Payment.create
+        //    that has now been refunded) → CANCELLED + stock reversal.
+        //    This is the legacy single-payment flow.
+        //
+        // Customer-stats rollback is always per-Payment.amount, never
+        // per-order finalAmount — only the refunded payment's
+        // contribution should be undone.
         if (stillPaid.lt(orderAmount) && payment.order.status === OrderStatus.PAID) {
-          await tx.order.update({
-            where: { id: payment.orderId },
-            data: {
-              status: OrderStatus.CANCELLED,
-              paidAt: null,
-              cancelledAt: new Date(),
+          const otherCompletedCount = await tx.payment.count({
+            where: {
+              orderId: payment.orderId,
+              status: PaymentStatus.COMPLETED,
+              id: { not: id },
             },
           });
-          orderMovedToCancelled = true;
 
+          if (otherCompletedCount === 0) {
+            // Full unwind: nothing left, treat as if the order was cancelled.
+            await tx.order.update({
+              where: { id: payment.orderId },
+              data: {
+                status: OrderStatus.CANCELLED,
+                paidAt: null,
+                cancelledAt: new Date(),
+              },
+            });
+            orderMovedToCancelled = true;
+          } else {
+            // Partial unwind: there are still paying customers. Back
+            // the order to SERVED and keep the table occupied. Don't
+            // touch cancelledAt; this is not a cancellation.
+            await tx.order.update({
+              where: { id: payment.orderId },
+              data: {
+                status: OrderStatus.SERVED,
+                paidAt: null,
+              },
+            });
+            if (payment.order.tableId) {
+              await tx.table.update({
+                where: { id: payment.order.tableId },
+                data: { status: TableStatus.OCCUPIED },
+              });
+            }
+          }
+
+          // Roll back THIS payment's contribution to customer stats —
+          // regardless of which branch we took.
           if (payment.order.customerId) {
             const cust = await tx.customer.findUnique({
               where: { id: payment.order.customerId },
@@ -861,6 +988,7 @@ export class PaymentsService {
         let payment: Awaited<ReturnType<typeof this.prisma.payment.create>>;
         let isFullyPaid = false;
         let allocations: Array<{ orderItemId: string; quantity: number; amount: string }>;
+        let replayedFromInnerCatch = false;
 
         try {
           const txResult = await this.prisma.$transaction(async (tx) => {
@@ -1033,6 +1161,23 @@ export class PaymentsService {
               })),
             });
 
+            // Per-payment CRM linkage. Each diner's phone goes to
+            // THEIR Customer record with stats bumped by ONLY this
+            // payment's amount (not the whole order finalAmount as
+            // the legacy single-payment flow does).
+            if (dto.customerPhone) {
+              await this.linkCustomerForPayment(
+                tx,
+                {
+                  id: payment.id,
+                  orderId,
+                  tenantId,
+                  amount: payment.amount,
+                },
+                dto.customerPhone,
+              );
+            }
+
             // Check whether the order is now fully paid.
             const totalPaid = await tx.payment.aggregate({
               where: { orderId, status: PaymentStatus.COMPLETED },
@@ -1043,7 +1188,12 @@ export class PaymentsService {
             const fullyPaid = totalPaidAmount.gte(orderAmount);
 
             if (fullyPaid) {
-              await this.finalizeFullyPaid(tx, order, dto.customerPhone, orderAmount);
+              // bumpCustomerStats:false because each progressive
+              // payment already did its own per-customer bump above.
+              // We don't want the closing payment to double-count.
+              await this.finalizeFullyPaid(tx, order, dto.customerPhone, orderAmount, {
+                bumpCustomerStats: false,
+              });
             }
 
             return {
@@ -1066,6 +1216,7 @@ export class PaymentsService {
           // remaining-items summary below instead of trusting the
           // (always-false) inner replay flag.
           isFullyPaid = txResult.isFullyPaid;
+          replayedFromInnerCatch = txResult.replayed;
         } catch (err) {
           if (
             err instanceof Prisma.PrismaClientKnownRequestError &&
@@ -1099,11 +1250,13 @@ export class PaymentsService {
         // by design (we no longer trust the inner branch's flag).
         const orderFullyPaid = isFullyPaid || remaining.remainingQuantity === 0;
 
-        // Auto-invoice only on the original PAID transition. The
-        // replay path skips because the first call already triggered
-        // it, and SalesInvoice.orderId is unique anyway.
-        if (isFullyPaid) {
-          await this.maybeGenerateAutoInvoice(orderId, tenantId);
+        // Every successful payByItems gets its own per-Payment fatura
+        // (Turkish e-fatura compliance: customer-A's invoice carries
+        // A's payment method + only the items A bought). Idempotent
+        // against the partial unique on SalesInvoice.paymentId — a
+        // replay returns the existing invoice.
+        if (!replayedFromInnerCatch) {
+          await this.maybeGenerateAutoInvoice(orderId, tenantId, payment.id);
         }
 
         addBreadcrumb('Per-item payment completed', 'payment', {
@@ -1126,6 +1279,134 @@ export class PaymentsService {
    * Pure read; safe to call from a polling client (though we expect
    * websocket invalidation, not polling, on the actual frontend).
    */
+  /**
+   * Write off the remaining balance on an order as a house loss.
+   * Used by managers to close abandoned tables, comp meals, or absorb
+   * disputes — anywhere the restaurant is eating the cost rather than
+   * trying to collect.
+   *
+   * Mechanics:
+   *  - Creates a single Payment with method = HOUSE, amount = exact
+   *    remaining (finalAmount − sum(completed payments)), notes = reason.
+   *  - Calls finalizeFullyPaid with bumpCustomerStats:false so the
+   *    write-off doesn't pollute customer.totalSpent (no real money
+   *    changed hands; the customer who didn't pay shouldn't get loyalty
+   *    credit for the unpaid portion).
+   *  - Order flips to PAID, table is released, auto-invoice fires
+   *    via the same path as a normal close.
+   *
+   * Idempotent against the same `idempotencyKey` (defaults to a
+   * deterministic value if not supplied so an accidental double-click
+   * doesn't create two HOUSE payments).
+   */
+  async writeOff(
+    orderId: string,
+    dto: { reason?: string; idempotencyKey?: string },
+    tenantId: string,
+  ) {
+    return withTransaction(
+      {
+        name: 'payment.writeOff',
+        op: 'payment',
+        tags: { 'tenant.id': tenantId, 'order.id': orderId },
+      },
+      async () => {
+        addBreadcrumb('Starting write-off', 'payment', { orderId, reason: dto.reason });
+
+        await this.ordersService.findOne(orderId, tenantId);
+
+        // Idempotency fast-path
+        const idemKey = dto.idempotencyKey ?? `writeoff:${orderId}`;
+        const existing = await this.prisma.payment.findFirst({
+          where: { orderId, tenantId, idempotencyKey: idemKey },
+        });
+        if (existing) {
+          return {
+            payment: existing,
+            orderFullyPaid: true,
+            writtenOffAmount: existing.amount.toFixed(2),
+          };
+        }
+
+        const result = await this.prisma.$transaction(async (tx) => {
+          await this.acquireOrderLock(tx, orderId, tenantId);
+
+          const order = await tx.order.findFirst({
+            where: { id: orderId, tenantId },
+          });
+          if (!order) throw new NotFoundException('Order not found');
+          if (order.status === OrderStatus.PAID) {
+            throw new BadRequestException('Order is already paid in full');
+          }
+          if (order.status === OrderStatus.CANCELLED) {
+            throw new BadRequestException('Cannot write off a cancelled order');
+          }
+
+          const completedSum = await tx.payment.aggregate({
+            where: { orderId, status: PaymentStatus.COMPLETED },
+            _sum: { amount: true },
+          });
+          const alreadyPaid = new Prisma.Decimal(completedSum._sum.amount ?? 0);
+          const finalAmount = new Prisma.Decimal(order.finalAmount);
+          const remaining = finalAmount.sub(alreadyPaid);
+          if (remaining.lte(0)) {
+            throw new BadRequestException(
+              'Nothing to write off — the order is already fully paid.',
+            );
+          }
+
+          let payment: Awaited<ReturnType<typeof tx.payment.create>>;
+          try {
+            payment = await tx.payment.create({
+              data: {
+                amount: remaining,
+                method: 'HOUSE',
+                status: PaymentStatus.COMPLETED,
+                notes: dto.reason ?? 'House write-off',
+                orderId,
+                tenantId,
+                paidAt: new Date(),
+                idempotencyKey: idemKey,
+              },
+            });
+          } catch (err) {
+            if (
+              err instanceof Prisma.PrismaClientKnownRequestError &&
+              err.code === 'P2002'
+            ) {
+              const dup = await tx.payment.findFirst({
+                where: { orderId, tenantId, idempotencyKey: idemKey },
+              });
+              if (dup) return { payment: dup, fullyPaid: true };
+            }
+            throw err;
+          }
+
+          // No bumpCustomerStats — this isn't real revenue. Also no
+          // customerPhone — write-off has no payer to link.
+          await this.finalizeFullyPaid(tx, order, undefined, finalAmount, {
+            bumpCustomerStats: false,
+          });
+
+          return { payment, fullyPaid: true };
+        });
+
+        // Fire the auto-invoice path so the books reflect the
+        // write-off; the invoice line for HOUSE shows up correctly
+        // in accounting because Payment.method is the source.
+        await this.maybeGenerateAutoInvoice(orderId, tenantId);
+
+        addBreadcrumb('Write-off completed', 'payment', { paymentId: result.payment.id });
+
+        return {
+          payment: result.payment,
+          orderFullyPaid: true,
+          writtenOffAmount: result.payment.amount.toFixed(2),
+        };
+      },
+    );
+  }
+
   async getPayableItems(orderId: string, tenantId: string) {
     // Single query — the (id, tenantId) where filter is the same
     // tenancy check ordersService.findOne would do; folding them into
