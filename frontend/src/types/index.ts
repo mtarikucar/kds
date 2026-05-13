@@ -230,6 +230,8 @@ export interface SplitBillDto {
   numberOfParts?: number;
   payments: SplitPaymentEntry[];
   customerPhone?: string;
+  /** Batch-level idempotency key auto-filled by useSplitBill. */
+  idempotencyKey?: string;
 }
 
 export interface GroupBillSummary {
@@ -284,7 +286,15 @@ export interface PayableItem {
   paidQuantity: number;
   remainingQuantity: number;
   unitPrice: string;
+  /** Per-unit value after pro-rata discount (server-rounded, 2dp). */
   unitTotal: string;
+  /**
+   * Authoritative discount-adjusted line total for all units. Use this
+   * (× selectedQty / quantity proportion if needed) for any display
+   * total so the UI never drifts from what the server will actually
+   * charge on the closing payment.
+   */
+  itemTotal: string;
   modifierLabels: string[];
 }
 
@@ -492,6 +502,13 @@ export interface CreatePaymentDto {
   method: PaymentMethod;
   transactionId?: string;
   customerPhone?: string;
+  /**
+   * Client-generated idempotency key. The hook auto-fills with a UUID
+   * per submit if absent; declared here so the cast in ordersApi is
+   * no longer needed.
+   */
+  idempotencyKey?: string;
+  notes?: string;
 }
 
 export interface UpdatePaymentDto {

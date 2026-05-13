@@ -182,8 +182,7 @@ export const useCreatePayment = () => {
       // dedupe extends to the wire layer, not just to the DB write.
       const body = {
         ...paymentData,
-        idempotencyKey:
-          (paymentData as any).idempotencyKey ?? crypto.randomUUID(),
+        idempotencyKey: paymentData.idempotencyKey ?? crypto.randomUUID(),
       };
       const response = await api.post(`/orders/${orderId}/payments`, body);
       return response.data;
@@ -222,7 +221,7 @@ export const useSplitBill = () => {
       // `${batchKey}:${index}` (or honors explicit per-entry keys).
       const bodyWithKey = {
         ...body,
-        idempotencyKey: (body as any).idempotencyKey ?? crypto.randomUUID(),
+        idempotencyKey: body.idempotencyKey ?? crypto.randomUUID(),
       };
       const response = await api.post(
         `/orders/${orderId}/payments/split`,

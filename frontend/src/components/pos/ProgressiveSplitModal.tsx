@@ -27,13 +27,24 @@ interface ProgressiveSplitModalProps {
   orders: Array<{ id: string; orderNumber: string; tableNumber?: string }>;
 }
 
-const METHODS = [
-  { value: 'CASH' as const, icon: Banknote },
-  { value: 'CARD' as const, icon: CreditCard },
-  { value: 'DIGITAL' as const, icon: Smartphone },
+type PaymentMethod = 'CASH' | 'CARD' | 'DIGITAL';
+
+const METHODS: Array<{ value: PaymentMethod; icon: typeof Banknote }> = [
+  { value: 'CASH', icon: Banknote },
+  { value: 'CARD', icon: CreditCard },
+  { value: 'DIGITAL', icon: Smartphone },
 ];
 
-type PaymentMethod = 'CASH' | 'CARD' | 'DIGITAL';
+/**
+ * Static map keeps i18n keys exhaustive. If PaymentMethod grows
+ * (e.g. WALLET, LOYALTY) the union widens and TS will flag the
+ * missing arm here rather than silently rendering a raw key.
+ */
+const METHOD_LABEL_KEY: Record<PaymentMethod, string> = {
+  CASH: 'progressive.method.CASH',
+  CARD: 'progressive.method.CARD',
+  DIGITAL: 'progressive.method.DIGITAL',
+};
 
 const ProgressiveSplitModal = ({
   isOpen,
@@ -89,8 +100,11 @@ const ProgressiveSplitModal = ({
   );
 
   // Anchor the selected-total math in integer kuruş so we don't drift
-  // by floats. The unitTotal strings from the backend already include
-  // any pro-rata discount.
+  // by floats. When the customer's selection closes the last remaining
+  // units of a line item, we mirror the server's last-unit-eats-residual
+  // rule: amount = itemTotal − sum(prior allocations as derived from
+  // paidQuantity × perUnit). For any partial-take, we fall back to
+  // perUnit × selectedQty (the server uses the same path).
   const selectedTotalKurus = useMemo(() => {
     if (!payable) return 0;
     let sum = 0;
@@ -98,7 +112,14 @@ const ProgressiveSplitModal = ({
       const qty = selections[item.orderItemId] ?? 0;
       if (qty <= 0) continue;
       const perUnitKurus = Math.round(parseFloat(item.unitTotal) * 100);
-      sum += perUnitKurus * qty;
+      const closesLastUnits = item.paidQuantity + qty === item.quantity;
+      if (closesLastUnits) {
+        const itemTotalKurus = Math.round(parseFloat(item.itemTotal) * 100);
+        const priorKurus = perUnitKurus * item.paidQuantity;
+        sum += Math.max(0, itemTotalKurus - priorKurus);
+      } else {
+        sum += perUnitKurus * qty;
+      }
     }
     return sum;
   }, [payable, selections]);
@@ -413,7 +434,7 @@ const ProgressiveSplitModal = ({
                     >
                       <Icon className="h-5 w-5" />
                       <span className="text-sm font-medium">
-                        {t(`progressive.method.${value}`)}
+                        {t(METHOD_LABEL_KEY[value])}
                       </span>
                     </button>
                   ))}

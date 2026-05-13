@@ -670,7 +670,11 @@ model OrderItemPayment {
   id           String   @id @default(uuid())
 
   paymentId    String
-  payment      Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  // RESTRICT: Payment is never hard-deleted (refund flips to REFUNDED).
+  // The authorized free-the-units path is the explicit deleteMany in
+  // PaymentsService.updateStatus REFUNDED branch; cascade would silently
+  // nuke audit if a future hard-delete were ever added.
+  payment      Payment  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
 
   orderItemId  String
   orderItem    OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict)

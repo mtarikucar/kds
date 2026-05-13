@@ -28,10 +28,16 @@ CREATE INDEX "order_item_payments_tenantId_idx"    ON "order_item_payments"("ten
 CREATE INDEX "order_item_payments_orderItemId_paymentId_idx"
   ON "order_item_payments"("orderItemId", "paymentId");
 
+-- RESTRICT, not CASCADE: Payment rows are never hard-deleted today
+-- (refund flips to REFUNDED), so cascade is dormant. If a future
+-- hard-delete path is added, cascade would silently nuke the per-item
+-- audit trail along with the Payment. The REFUNDED branch in
+-- PaymentsService.updateStatus does an explicit deleteMany on the
+-- allocations inside the same tx — that's the authorized path.
 ALTER TABLE "order_item_payments"
   ADD CONSTRAINT "order_item_payments_paymentId_fkey"
   FOREIGN KEY ("paymentId") REFERENCES "payments"("id")
-  ON DELETE CASCADE ON UPDATE CASCADE;
+  ON DELETE RESTRICT ON UPDATE CASCADE;
 
 ALTER TABLE "order_item_payments"
   ADD CONSTRAINT "order_item_payments_orderItemId_fkey"

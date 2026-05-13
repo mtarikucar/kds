@@ -64,6 +64,7 @@ export class PayItemsDto {
   @EmptyStringToUndefined()
   @IsString()
   @IsOptional()
+  @Length(4, 32)
   customerPhone?: string;
 
   @ApiPropertyOptional({

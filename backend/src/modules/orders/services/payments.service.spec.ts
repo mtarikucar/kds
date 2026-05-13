@@ -714,9 +714,42 @@ describe('PaymentsService — progressive per-item payments', () => {
       const a = summary.items.find((i) => i.orderItemId === 'item-A')!;
       expect(a.paidQuantity).toBe(1);
       expect(a.remainingQuantity).toBe(1);
+      expect(a.unitTotal).toBe('25.00');
+      expect(a.itemTotal).toBe('50.00'); // server-authoritative discount-adjusted line total
       const b = summary.items.find((i) => i.orderItemId === 'item-B')!;
       expect(b.paidQuantity).toBe(0);
       expect(b.remainingQuantity).toBe(1);
+      expect(b.itemTotal).toBe('50.00');
+    });
+
+    it('itemTotal applies discount pro-rata', async () => {
+      // 100 TL total, 10 TL discount → 90 TL final. 50 TL line gets
+      // 90% factor = 45.00 itemTotal.
+      (prisma.order.findFirst as unknown as jest.Mock).mockResolvedValue({
+        ...makeOrder({
+          totalAmount: new Prisma.Decimal('100.00'),
+          discount: new Prisma.Decimal('10.00'),
+          finalAmount: new Prisma.Decimal('90.00'),
+        }),
+        orderItems: [
+          {
+            ...makeItem('item-A', 1, '50.00'),
+            product: { name: 'A' },
+            modifiers: [],
+            orderItemPayments: [],
+          },
+          {
+            ...makeItem('item-B', 1, '50.00'),
+            product: { name: 'B' },
+            modifiers: [],
+            orderItemPayments: [],
+          },
+        ],
+        payments: [],
+      });
+
+      const summary = await svc.getPayableItems(ORDER_ID, TENANT_ID);
+      expect(summary.items.every((i) => i.itemTotal === '45.00')).toBe(true);
     });
   });
 });

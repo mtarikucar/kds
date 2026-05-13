@@ -73,13 +73,19 @@ export class PaymentsService {
    * `payByItems()`. Keeps the three payment paths in sync — drift
    * between them caused several bugs in the prior code.
    *
-   * @param tx              active transaction client
-   * @param order           the order being closed (id, tableId, customerId, finalAmount, tenantId)
-   * @param customerPhone   optional phone to link/create a customer
-   * @param customerStatsAmount  amount to credit to customer's totalSpent
-   *                             (usually order.finalAmount; passed explicitly
-   *                             so callers can pass a Decimal they already
-   *                             have without re-instantiating)
+   * Caller contract: only invoke when the CURRENT payment closes the
+   * order (i.e. sum(completed payments) ≥ order.finalAmount). The
+   * `closingAmount` credited to the customer is the full order
+   * finalAmount, never a partial slice — partial-payment paths must
+   * NOT call this helper.
+   *
+   * @param tx             active transaction client
+   * @param order          the order being closed (id, tableId, customerId,
+   *                       customerPhone, finalAmount, tenantId)
+   * @param customerPhone  optional phone to link/create a customer
+   * @param closingAmount  amount to credit to customer's totalSpent
+   *                       (= order.finalAmount; passed explicitly so
+   *                       callers reuse a Decimal already in scope)
    */
   private async finalizeFullyPaid(
     tx: Prisma.TransactionClient,
@@ -92,7 +98,7 @@ export class PaymentsService {
       tenantId: string;
     },
     customerPhone: string | undefined,
-    customerStatsAmount: Prisma.Decimal,
+    closingAmount: Prisma.Decimal,
     opts: { bumpCustomerStats?: boolean } = { bumpCustomerStats: true },
   ): Promise<void> {
     // Resolve customer link (use existing customerId from order if already linked).
@@ -157,7 +163,7 @@ export class PaymentsService {
       if (customer) {
         const newTotalOrders = customer.totalOrders + 1;
         const newTotalSpent = new Prisma.Decimal(customer.totalSpent).add(
-          customerStatsAmount,
+          closingAmount,
         );
         const newAverageOrder = newTotalSpent.div(newTotalOrders);
         await tx.customer.update({
@@ -197,10 +203,11 @@ export class PaymentsService {
         }
       }
       if (lastErr) {
-        const msg = (lastErr as any)?.message ?? String(lastErr);
+        const msg = lastErr instanceof Error ? lastErr.message : String(lastErr);
+        const stack = lastErr instanceof Error ? lastErr.stack : undefined;
         this.logger.error(
           `REVENUE_SYNC_FAILED: auto-invoice for order ${orderId}: ${msg}`,
-          (lastErr as any)?.stack,
+          stack,
         );
         Sentry.captureException(lastErr, {
           tags: { event: 'REVENUE_SYNC_FAILED', tenantId },
@@ -1120,8 +1127,9 @@ export class PaymentsService {
    * websocket invalidation, not polling, on the actual frontend).
    */
   async getPayableItems(orderId: string, tenantId: string) {
-    await this.ordersService.findOne(orderId, tenantId);
-
+    // Single query — the (id, tenantId) where filter is the same
+    // tenancy check ordersService.findOne would do; folding them into
+    // one round-trip saves a DB hit on the polling read path.
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, tenantId },
       include: {
@@ -1160,6 +1168,11 @@ export class PaymentsService {
       );
       const remainingQuantity = item.quantity - paidQuantity;
       const perUnit = this.perUnitGross(item).mul(this.discountMultiplier(order));
+      // itemTotal is the authoritative discount-adjusted line total
+      // used server-side for last-unit residual settlement. Exposing
+      // it lets the UI display the same number the server will charge
+      // (per-unit × quantity drifts on sub-kuruş rounding).
+      const itemTotal = this.itemTotalWithDiscount(item, order);
       return {
         orderItemId: item.id,
         productName: item.product?.name ?? null,
@@ -1168,6 +1181,7 @@ export class PaymentsService {
         remainingQuantity,
         unitPrice: new Prisma.Decimal(item.unitPrice).toFixed(2),
         unitTotal: perUnit.toFixed(2),
+        itemTotal: itemTotal.toFixed(2),
         modifierLabels: (item.modifiers || []).map(
           (m) => m.modifier?.displayName || m.modifier?.name || '',
         ).filter(Boolean),
@@ -1253,26 +1267,47 @@ export class PaymentsService {
       })
     );
 
-    const totalAmount = allOrders.reduce((sum, o) => sum + Number(o.finalAmount), 0);
-    const totalPaid = allOrders.reduce((sum, o) =>
-      sum + o.payments.reduce((ps, p) => ps + Number(p.amount), 0), 0
+    // Group bill totals in Decimal end-to-end so cross-table groups
+    // crossing ~₺70k don't drift on the kuruş (Number loses precision
+    // past 2^53/100 = ~₺90B but cumulative add/sub error shows up much
+    // earlier when summing many invoices).
+    const totalAmount = allOrders.reduce<Prisma.Decimal>(
+      (sum, o) => sum.add(new Prisma.Decimal(o.finalAmount)),
+      new Prisma.Decimal(0),
     );
+    const totalPaid = allOrders.reduce<Prisma.Decimal>(
+      (sum, o) =>
+        sum.add(
+          o.payments.reduce<Prisma.Decimal>(
+            (ps, p) => ps.add(new Prisma.Decimal(p.amount)),
+            new Prisma.Decimal(0),
+          ),
+        ),
+      new Prisma.Decimal(0),
+    );
+    const remainingAmount = totalAmount.sub(totalPaid);
 
     return {
       groupId,
       tables: tables.map(t => ({ id: t.id, number: t.number })),
-      orders: allOrders.map(o => ({
-        id: o.id,
-        orderNumber: o.orderNumber,
-        tableId: o.tableId,
-        finalAmount: Number(o.finalAmount),
-        paidAmount: o.payments.reduce((s, p) => s + Number(p.amount), 0),
-      })),
+      orders: allOrders.map(o => {
+        const paid = o.payments.reduce<Prisma.Decimal>(
+          (s, p) => s.add(new Prisma.Decimal(p.amount)),
+          new Prisma.Decimal(0),
+        );
+        return {
+          id: o.id,
+          orderNumber: o.orderNumber,
+          tableId: o.tableId,
+          finalAmount: Number(o.finalAmount),
+          paidAmount: paid.toNumber(),
+        };
+      }),
       items: allItems,
       summary: {
-        totalAmount,
-        totalPaid,
-        remainingAmount: totalAmount - totalPaid,
+        totalAmount: totalAmount.toNumber(),
+        totalPaid: totalPaid.toNumber(),
+        remainingAmount: remainingAmount.toNumber(),
       },
     };
   }
