@@ -140,6 +140,7 @@ model Tenant {
   // Listed here so Prisma keeps the TS-side relation graph in sync.
   payments              Payment[]
   orderItemPayments     OrderItemPayment[]
+  pendingSelfPayments   PendingSelfPayment[]
   customerSessions      CustomerSession[]
   phoneVerifications    PhoneVerification[]
   waiterRequests        WaiterRequest[]
@@ -719,6 +720,38 @@ model OrderItemPayment {
   // aggregates by orderItemId, then joins to payment.status.
   @@index([orderItemId, paymentId])
   @@map("order_item_payments")
+}
+
+// Self-pay (QR-menu customer paying their own table) intent record.
+// Persisted before the PayTR token request; the webhook reads this
+// row to know which OrderItem units to settle once the customer
+// finishes 3DS on PayTR's hosted page. merchantOid prefix "SP"
+// distinguishes self-pay from subscription "SUB" in the shared
+// PaytrWebhookController dispatcher.
+model PendingSelfPayment {
+  id              String    @id @default(uuid())
+  merchantOid     String    @unique
+  sessionId       String
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  // [{ orderId, items: [{ orderItemId, quantity }] }, ...]
+  itemsByOrder    Json
+
+  amount          Decimal   @db.Decimal(10, 2)
+  status          String    @default("PENDING") // PENDING, SUCCEEDED, FAILED, EXPIRED
+  failureReason   String?
+  paytrToken      String?
+  customerPhone   String?
+
+  expiresAt       DateTime
+  createdAt       DateTime  @default(now())
+  succeededAt     DateTime?
+
+  @@index([sessionId])
+  @@index([tenantId])
+  @@index([expiresAt])
+  @@map("pending_self_payments")
 }
 
 // ========================================

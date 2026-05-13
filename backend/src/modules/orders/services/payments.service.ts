@@ -884,6 +884,23 @@ export class PaymentsService {
    * the embedded tax (and double-counts modifiers).
    * Likewise `order.totalAmount = sum(orderItem.subtotal)`.
    */
+  /**
+   * Public wrapper used by the customer self-pay path (QR-menu PayTR
+   * flow) to compute the amount it will charge before requesting a
+   * PayTR token. Mirrors the per-unit math used inside payByItems so
+   * the server-side amount is consistent across staff and customer
+   * payment paths.
+   *
+   * Returns the discount-adjusted per-unit value of an OrderItem
+   * (subtotal/quantity × discountMultiplier). Caller scales by qty.
+   */
+  public derivePerUnitNet(
+    item: { quantity: number; subtotal: Prisma.Decimal | number | string },
+    order: { discount: Prisma.Decimal | number | string; totalAmount: Prisma.Decimal | number | string },
+  ): Prisma.Decimal {
+    return this.perUnitGross(item).mul(this.discountMultiplier(order));
+  }
+
   private perUnitGross(item: {
     quantity: number;
     subtotal: Prisma.Decimal | number | string;

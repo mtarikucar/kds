@@ -761,6 +761,36 @@
     "requestSuccess": "تم إرسال طلب الفاتورة!",
     "requestError": "فشل طلب الفاتورة"
   },
+  "payment": {
+    "payNow": "ادفع الآن",
+    "title": "الدفع الآن",
+    "subtitle": "اختر العناصر التي ستدفعها — دفع آمن بالبطاقة",
+    "phoneOptional": "الهاتف (اختياري — لنقاط الولاء)",
+    "totalToPay": "المبلغ المستحق",
+    "payWithPaytr": "ادفع عبر PayTR",
+    "payEverything": "اختر كل المتبقي",
+    "remaining": "المتبقي",
+    "tabOrder": "الطلب",
+    "unitsRemaining": "{{paid}} / {{total}} مدفوع",
+    "redirectingToPayTR": "يتم تحويلك إلى صفحة PayTR الآمنة…",
+    "intentFailed": "تعذّر بدء الدفع. حاول مرة أخرى.",
+    "noOpenItems": "لا توجد عناصر للدفع على هذه الطاولة.",
+    "paytrNote": "يتم الدفع على صفحة PayTR الآمنة. لا تُحفظ بيانات بطاقتك هنا.",
+    "result": {
+      "checking": "جارٍ تأكيد دفعك…",
+      "checkingDetail": "بانتظار تأكيد PayTR. قد يستغرق بضع ثوانٍ.",
+      "checkError": "تعذّر الاتصال بالخادم. إعادة المحاولة…",
+      "success": "تم استلام الدفع!",
+      "youPaid": "دفعت",
+      "successWithRemaining": "المتبقي على الطاولة",
+      "failed": "فشل الدفع",
+      "failedDetail": "لم يتم الخصم من بطاقتك. يمكنك المحاولة مرة أخرى من صفحة طلباتي.",
+      "tryAgain": "حاول مرة أخرى",
+      "backToOrders": "العودة إلى طلباتي",
+      "payRemaining": "دفع المتبقي",
+      "enjoy": "بالهناء والشفاء! 🍽️"
+    }
+  },
   "orderStatus": {
     "pendingApproval": "في انتظار الموافقة",
     "pending": "مؤكد",

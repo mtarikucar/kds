@@ -759,6 +759,36 @@
     "requestSuccess": "Hesap isteği gönderildi!",
     "requestError": "Hesap isteği gönderilemedi"
   },
+  "payment": {
+    "payNow": "Ödemeye Geç",
+    "title": "Şimdi Öde",
+    "subtitle": "Ödeyeceğin ürünleri seç — kartla güvenli ödeme",
+    "phoneOptional": "Telefon (opsiyonel — sadakat puanı için)",
+    "totalToPay": "Ödenecek Tutar",
+    "payWithPaytr": "PayTR ile Öde",
+    "payEverything": "Kalanın hepsini seç",
+    "remaining": "Kalan",
+    "tabOrder": "Sipariş",
+    "unitsRemaining": "{{paid}} / {{total}} ödendi",
+    "redirectingToPayTR": "PayTR güvenli ödeme sayfasına yönlendiriliyorsun...",
+    "intentFailed": "Ödeme başlatılamadı. Lütfen tekrar deneyin.",
+    "noOpenItems": "Bu masada ödenecek açık ürün yok.",
+    "paytrNote": "Ödemeniz PayTR'nin güvenli sayfasında alınır. Kart bilgileri bu sayfada saklanmaz.",
+    "result": {
+      "checking": "Ödemen onaylanıyor...",
+      "checkingDetail": "PayTR'den onay bekleniyor. Birkaç saniye sürebilir.",
+      "checkError": "Sunucuya ulaşılamadı, tekrar deneniyor...",
+      "success": "Ödeme alındı!",
+      "youPaid": "Ödediğin tutar",
+      "successWithRemaining": "Masada kalan",
+      "failed": "Ödeme başarısız",
+      "failedDetail": "Kartından çekim yapılmadı. Siparişlerim sayfasından tekrar deneyebilirsin.",
+      "tryAgain": "Tekrar Dene",
+      "backToOrders": "Siparişlerime Dön",
+      "payRemaining": "Kalanı Öde",
+      "enjoy": "Afiyet olsun! 🍽️"
+    }
+  },
   "orderStatus": {
     "pendingApproval": "Onay Bekleniyor",
     "pending": "Onaylandı",

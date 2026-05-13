@@ -741,6 +741,36 @@
     "requestSuccess": "Hisob so'rovi yuborildi!",
     "requestError": "Hisob so'rab bo'lmadi"
   },
+  "payment": {
+    "payNow": "Hozir to'la",
+    "title": "Hozir to'lash",
+    "subtitle": "To'lamoqchi bo'lgan mahsulotlarni tanlang — xavfsiz karta orqali",
+    "phoneOptional": "Telefon (ixtiyoriy — sodiqlik uchun)",
+    "totalToPay": "To'lov summasi",
+    "payWithPaytr": "PayTR orqali to'lash",
+    "payEverything": "Hammasini tanlash",
+    "remaining": "Qoldiq",
+    "tabOrder": "Buyurtma",
+    "unitsRemaining": "{{paid}} / {{total}} to'langan",
+    "redirectingToPayTR": "PayTR xavfsiz to'lov sahifasiga yo'naltirilmoqda…",
+    "intentFailed": "To'lov boshlanmadi. Qaytadan urinib ko'ring.",
+    "noOpenItems": "Bu stolda to'lanmagan mahsulot yo'q.",
+    "paytrNote": "To'lov PayTR xavfsiz sahifasida amalga oshiriladi. Karta ma'lumotlari saqlanmaydi.",
+    "result": {
+      "checking": "To'lovingiz tasdiqlanmoqda…",
+      "checkingDetail": "PayTR tasdig'i kutilmoqda. Bir necha soniya olishi mumkin.",
+      "checkError": "Serverga ulanib bo'lmadi. Qayta urinib ko'rilmoqda…",
+      "success": "To'lov qabul qilindi!",
+      "youPaid": "Siz to'ladingiz",
+      "successWithRemaining": "Stolda qoldiq",
+      "failed": "To'lov muvaffaqiyatsiz",
+      "failedDetail": "Kartangizdan yechib olinmadi. Buyurtmalarim sahifasidan qayta urinib ko'ring.",
+      "tryAgain": "Qayta urinib ko'r",
+      "backToOrders": "Buyurtmalarimga qaytish",
+      "payRemaining": "Qoldig'ini to'la",
+      "enjoy": "Yoqimli ishtaha! 🍽️"
+    }
+  },
   "orderStatus": {
     "pendingApproval": "Tasdiqlash kutilmoqda",
     "pending": "Tasdiqlangan",

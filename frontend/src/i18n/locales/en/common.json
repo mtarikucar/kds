@@ -759,6 +759,36 @@
     "requestSuccess": "Bill request sent!",
     "requestError": "Failed to request bill"
   },
+  "payment": {
+    "payNow": "Pay Now",
+    "title": "Pay Now",
+    "subtitle": "Select what you'll pay for — secure card payment",
+    "phoneOptional": "Phone (optional — for loyalty)",
+    "totalToPay": "You will pay",
+    "payWithPaytr": "Pay with PayTR",
+    "payEverything": "Select everything remaining",
+    "remaining": "Remaining",
+    "tabOrder": "Order",
+    "unitsRemaining": "{{paid}} / {{total}} paid",
+    "redirectingToPayTR": "Redirecting to PayTR secure payment…",
+    "intentFailed": "Couldn't start payment. Please try again.",
+    "noOpenItems": "Nothing to pay on this table.",
+    "paytrNote": "Your payment is taken on PayTR's secure page. Card details never touch this site.",
+    "result": {
+      "checking": "Confirming your payment…",
+      "checkingDetail": "Waiting for PayTR to confirm. This usually takes a few seconds.",
+      "checkError": "Couldn't reach the server. Retrying…",
+      "success": "Payment received!",
+      "youPaid": "You paid",
+      "successWithRemaining": "Remaining on table",
+      "failed": "Payment failed",
+      "failedDetail": "Your card was not charged. You can try again from your orders page.",
+      "tryAgain": "Try Again",
+      "backToOrders": "Back to my orders",
+      "payRemaining": "Pay the rest",
+      "enjoy": "Enjoy your meal! 🍽️"
+    }
+  },
   "orderStatus": {
     "pendingApproval": "Awaiting Approval",
     "pending": "Confirmed",

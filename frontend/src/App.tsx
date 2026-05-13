@@ -41,6 +41,7 @@ import CustomerDetailPage from './pages/customers/CustomerDetailPage';
 const QRMenuPage = lazy(() => import('./pages/qr-menu/QRMenuPage'));
 const CartPage = lazy(() => import('./pages/qr-menu/CartPage'));
 const OrderTrackingPage = lazy(() => import('./pages/qr-menu/OrderTrackingPage'));
+const QrPaymentResultPage = lazy(() => import('./pages/qr-menu/QrPaymentResultPage'));
 const LoyaltyPage = lazy(() => import('./pages/qr-menu/LoyaltyPage'));
 const SubdomainQRMenuPage = lazy(() => import('./pages/qr-menu/SubdomainQRMenuPage'));
 const SubdomainCartPage = lazy(() => import('./pages/qr-menu/SubdomainCartPage'));
@@ -128,6 +129,7 @@ function App() {
           <Route path="/cart" element={<SubdomainCartPage subdomain={subdomainInfo.subdomain} />} />
           <Route path="/orders" element={<SubdomainOrdersPage subdomain={subdomainInfo.subdomain} />} />
           <Route path="/loyalty" element={<SubdomainLoyaltyPage subdomain={subdomainInfo.subdomain} />} />
+          <Route path="/payment-result" element={<QrPaymentResultPage subdomain={subdomainInfo.subdomain} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
@@ -151,6 +153,7 @@ function App() {
       <Route path="/qr-menu/:tenantId/cart" element={<CartPage />} />
       <Route path="/qr-menu/:tenantId/orders" element={<OrderTrackingPage />} />
       <Route path="/qr-menu/:tenantId/loyalty" element={<LoyaltyPage />} />
+      <Route path="/qr-menu/:tenantId/payment-result" element={<QrPaymentResultPage />} />
       <Route path="/reserve/:tenantId" element={<PublicReservationPage />} />
       <Route path="/reserve/:tenantId/lookup" element={<ReservationLookupPage />} />
 

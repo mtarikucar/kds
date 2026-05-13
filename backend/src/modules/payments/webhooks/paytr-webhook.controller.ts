@@ -16,6 +16,7 @@ import { verifyCallbackHash } from './paytr-hash.util';
 import { BillingService } from '../../subscriptions/services/billing.service';
 import { NotificationService } from '../../subscriptions/services/notification.service';
 import { PaytrIpAllowlistGuard } from './paytr-ip-allowlist.guard';
+import { CustomerSelfPayService } from '../../customer-orders/services/customer-self-pay.service';
 import { encryptString } from '../../../common/helpers/encryption.helper';
 import { captureException } from '../../../sentry.config';
 import {
@@ -66,6 +67,7 @@ export class PaytrWebhookController {
     private readonly config: ConfigService,
     private readonly billing: BillingService,
     private readonly notifications: NotificationService,
+    private readonly selfPay: CustomerSelfPayService,
   ) {}
 
   @Post()
@@ -98,6 +100,20 @@ export class PaytrWebhookController {
     ) {
       this.logger.warn(`Rejected PayTR callback with bad hash for oid=${merchantOid}`);
       return 'FAIL';
+    }
+
+    // Dispatch by merchantOid prefix: "SP" → customer self-pay
+    // (QR-menu restaurant-order flow), default → subscription flow.
+    if (merchantOid.startsWith('SP')) {
+      if (status === 'success') {
+        await this.selfPay.handleWebhookSuccess(merchantOid, body.payment_type);
+      } else {
+        await this.selfPay.handleWebhookFailure(
+          merchantOid,
+          body.failed_reason_msg ?? body.failed_reason_code,
+        );
+      }
+      return 'OK';
     }
 
     const payment = await this.prisma.subscriptionPayment.findUnique({
