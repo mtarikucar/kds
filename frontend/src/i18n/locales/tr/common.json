@@ -390,57 +390,6 @@
     "gridView": "Liste Görünümü",
     "floorPlan": "Kat Planı"
   },
-  "voxel": {
-    "layoutSaved": "Kat planı başarıyla kaydedildi",
-    "layoutSaveError": "Kat planı kaydedilemedi",
-    "positionUpdateError": "Masa konumu güncellenemedi",
-    "saving": "Kaydediliyor...",
-    "save": "Kaydet",
-    "tools": {
-      "select": "Seç",
-      "move": "Taşı",
-      "rotate": "Döndür",
-      "delete": "Sil",
-      "undo": "Geri Al",
-      "redo": "Yinele",
-      "floor": "Zemin",
-      "table": "Masa",
-      "stair": "Merdiven"
-    },
-    "library": {
-      "title": "Mobilya Kütüphanesi"
-    },
-    "procgen": {
-      "tableStyle": "Masa Stili",
-      "casual": "Günlük",
-      "casualDesc": "Açık ahşap, modern stil",
-      "formal": "Resmi",
-      "formalDesc": "Koyu ahşap, klasik ayaklar",
-      "modern": "Modern",
-      "modernDesc": "Metal, yuvarlak üstler",
-      "bistro": "Bistro",
-      "bistroDesc": "Koyu ahşap, sütun",
-      "autoGenerate": "Otomatik Oluştur",
-      "generateChairs": "Sandalye Oluştur",
-      "generateDecor": "Dekor Oluştur",
-      "snapSettings": "Yapışma Ayarları",
-      "enableSnap": "Yapışmayı Etkinleştir",
-      "showGuides": "Kılavuzları Göster",
-      "gridSize": "Izgara Boyutu",
-      "units": "birim"
-    },
-    "map2d": {
-      "zoomIn": "Yakınlaştır",
-      "zoomOut": "Uzaklaştır",
-      "toggleGrid": "Izgarayı Aç/Kapat",
-      "toggleSnap": "Izgaraya Yapış",
-      "resetView": "Görünümü Sıfırla",
-      "properties": "Özellikler",
-      "rotation": "Döndürme",
-      "units": "birim",
-      "helpText": "Kaydır ile yakınlaştır • Shift+sürükle ile kaydır • Tıkla ile seç"
-    }
-  },
   "pos": {
     "floorPlan": {
       "title": "Kat Planı",
@@ -765,6 +714,8 @@
   "cart": {
     "title": "Sepetim",
     "items": "Ürün",
+    "item_one": "{{count}} Ürün",
+    "item_other": "{{count}} Ürün",
     "empty": "Sepetiniz boş",
     "emptyDescription": "Başlamak için lezzetli ürünler ekleyin",
     "backToMenu": "Menüye Dön",

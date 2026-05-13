@@ -32,11 +32,11 @@ export interface PlanConfig {
 export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
   [SubscriptionPlanType.FREE]: {
     name: SubscriptionPlanType.FREE,
-    displayName: 'Free Plan',
-    description: 'Perfect for small restaurants getting started',
+    displayName: 'Ücretsiz',
+    description: 'Yeni başlayan küçük restoranlar için',
     monthlyPrice: 0,
     yearlyPrice: 0,
-    currency: 'USD',
+    currency: 'TRY',
     trialDays: 0,
     limits: {
       maxUsers: 2,
@@ -60,11 +60,13 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
   },
   [SubscriptionPlanType.BASIC]: {
     name: SubscriptionPlanType.BASIC,
-    displayName: 'Basic Plan',
-    description: 'Great for growing restaurants',
-    monthlyPrice: 29.99,
-    yearlyPrice: 299.99,
-    currency: 'USD',
+    displayName: 'Başlangıç',
+    description: 'Büyüyen restoranlar için ideal',
+    // TRY prices are KDV-inclusive (advertised gross). BillingService
+    // reverse-engineers the KDV split when issuing invoices.
+    monthlyPrice: 299,
+    yearlyPrice: 2990,
+    currency: 'TRY',
     trialDays: 14,
     limits: {
       maxUsers: 5,
@@ -88,11 +90,11 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
   },
   [SubscriptionPlanType.PRO]: {
     name: SubscriptionPlanType.PRO,
-    displayName: 'Pro Plan',
-    description: 'For established restaurants with multiple locations',
-    monthlyPrice: 79.99,
-    yearlyPrice: 799.99,
-    currency: 'USD',
+    displayName: 'Profesyonel',
+    description: 'Çok şubeli yerleşik restoranlar için',
+    monthlyPrice: 799,
+    yearlyPrice: 7990,
+    currency: 'TRY',
     trialDays: 14,
     limits: {
       maxUsers: 15,
@@ -116,11 +118,11 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
   },
   [SubscriptionPlanType.BUSINESS]: {
     name: SubscriptionPlanType.BUSINESS,
-    displayName: 'Business Plan',
-    description: 'Enterprise solution for large restaurant chains',
-    monthlyPrice: 199.99,
-    yearlyPrice: 1999.99,
-    currency: 'USD',
+    displayName: 'Kurumsal',
+    description: 'Büyük restoran zincirleri için kurumsal çözüm',
+    monthlyPrice: 1999,
+    yearlyPrice: 19990,
+    currency: 'TRY',
     trialDays: 14,
     limits: {
       maxUsers: -1, // unlimited

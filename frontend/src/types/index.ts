@@ -179,14 +179,9 @@ export interface Table {
   number: string;
   capacity: number;
   section?: string;
-  status: string;
+  status: TableStatus;
   groupId?: string | null;
   tenantId: string;
-  // Voxel position fields (null = not yet placed on floor plan)
-  voxelX?: number | null;
-  voxelY?: number | null;
-  voxelZ?: number | null;
-  voxelRotation?: number | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -210,7 +205,7 @@ export interface UnmergeTableDto {
 
 export interface TableGroupInfo {
   groupId: string;
-  tables: { id: string; number: string; capacity: number; section?: string; status: string }[];
+  tables: { id: string; number: string; capacity: number; section?: string; status: TableStatus }[];
   orders: any[];
   summary: {
     totalOrders: number;
@@ -254,6 +249,8 @@ export interface GroupBillSummary {
     tableNumber?: string;
     productName?: string;
     quantity: number;
+    paidQuantity?: number;
+    remainingQuantity?: number;
     unitPrice: number;
     subtotal: number;
     modifiers?: { name?: string; price: number }[];
@@ -263,6 +260,56 @@ export interface GroupBillSummary {
     totalPaid: number;
     remainingAmount: number;
   };
+}
+
+// Progressive ("Dutch-style") payment types
+export interface PayItemEntry {
+  orderItemId: string;
+  quantity: number;
+}
+
+export interface PayItemsDto {
+  items: PayItemEntry[];
+  method: string; // 'CASH' | 'CARD' | 'DIGITAL'
+  notes?: string;
+  transactionId?: string;
+  customerPhone?: string;
+  idempotencyKey?: string;
+}
+
+export interface PayableItem {
+  orderItemId: string;
+  productName: string | null;
+  quantity: number;
+  paidQuantity: number;
+  remainingQuantity: number;
+  unitPrice: string;
+  unitTotal: string;
+  modifierLabels: string[];
+}
+
+export interface PayableItemsSummary {
+  orderId: string;
+  finalAmount: string;
+  paidAmount: string;
+  remainingAmount: string;
+  remainingQuantity: number;
+  items: PayableItem[];
+  payments: Array<{
+    id: string;
+    amount: string;
+    method: string;
+    notes: string | null;
+    paidAt: string | null;
+    allocations: Array<{ orderItemId: string; quantity: number; amount: string }>;
+  }>;
+}
+
+export interface PayItemsResponse {
+  payment: Payment;
+  itemAllocations: Array<{ orderItemId: string; quantity: number; amount: string }>;
+  orderFullyPaid: boolean;
+  remaining: PayableItemsSummary;
 }
 
 export interface PublicTable {
@@ -579,6 +626,8 @@ export enum SubscriptionStatus {
   EXPIRED = 'EXPIRED',
   PAST_DUE = 'PAST_DUE',
   TRIALING = 'TRIALING',
+  /** Pre-activation state between PayTR intent and webhook confirmation. */
+  PENDING = 'PENDING',
 }
 
 export enum BillingCycle {
@@ -617,6 +666,9 @@ export interface PlanFeatures {
   kdsIntegration: boolean;
   reservationSystem: boolean;
   personnelManagement: boolean;
+  /** Delivery-platform (Yemeksepeti, Getir, etc.) integration — added
+   *  to backend SubscriptionPlan schema; the frontend type was lagging. */
+  deliveryIntegration: boolean;
 }
 
 export interface Plan {
@@ -651,6 +703,11 @@ export interface TenantOverrides {
 export interface EffectiveFeatures {
   features: PlanFeatures;
   limits: PlanLimits;
+  /**
+   * Plan IDs the tenant hasn't yet trialed and can still claim a free
+   * 14-day trial on. UI uses this to badge plan cards.
+   */
+  trialEligiblePlanIds?: string[];
 }
 
 export interface Subscription {

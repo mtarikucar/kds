@@ -113,7 +113,7 @@ export function HardwareDeviceCard({
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
+            <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
               <MoreVertical className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -168,7 +168,7 @@ export function HardwareDeviceCard({
           </Button>
         ) : (
           <Button
-            variant="default"
+            variant="primary"
             className="flex-1"
             onClick={handleConnect}
             disabled={isConnecting}

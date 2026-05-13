@@ -11,16 +11,15 @@ export function createTestQueryClient() {
     defaultOptions: {
       queries: {
         retry: false,
-        cacheTime: 0,
+        // React Query v5 renamed `cacheTime` to `gcTime`. 0 = drop cache
+        // entries immediately so each test gets a fresh fetch. The
+        // top-level `logger` field is also gone in v5 — silence by
+        // intercepting console.error in the test setup instead.
+        gcTime: 0,
       },
       mutations: {
         retry: false,
       },
-    },
-    logger: {
-      log: console.log,
-      warn: console.warn,
-      error: () => {}, // Suppress errors in tests
     },
   });
 }

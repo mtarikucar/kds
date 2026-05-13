@@ -437,8 +437,15 @@ export class MarketingLeadsService {
           subdomain,
           paymentRegion: 'TURKEY',
           ...(plan ? { currentPlanId: plan.id } : {}),
-          ...(canTrial
-            ? { trialUsed: true, trialStartedAt: trialStart, trialEndsAt: trialEnd }
+          ...(canTrial && plan
+            ? {
+                trialUsed: true,
+                trialStartedAt: trialStart,
+                trialEndsAt: trialEnd,
+                // Per-plan trial registry stays consistent with the
+                // PaymentsService/SubscriptionService flows.
+                usedTrialPlanIds: [plan.id],
+              }
             : {}),
         },
       });
@@ -463,7 +470,11 @@ export class MarketingLeadsService {
             planId: plan.id,
             status: canTrial ? 'TRIALING' : 'ACTIVE',
             billingCycle,
-            paymentProvider: 'EMAIL',
+            // Marketing-converted tenants are TURKEY by definition (line
+            // above sets paymentRegion: 'TURKEY'); stamp PAYTR so future
+            // renewals route through the self-serve flow instead of the
+            // legacy contact-based path.
+            paymentProvider: 'PAYTR',
             startDate: now,
             currentPeriodStart: now,
             currentPeriodEnd,

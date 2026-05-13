@@ -124,15 +124,21 @@ export class ZReportsService {
     const counterOrders = orders.filter((o) => o.type === 'COUNTER');
     const counterSales = counterOrders.reduce((sum, o) => sum + Number(o.finalAmount), 0);
 
-    // Cancelled orders in the date range
+    // Cancelled orders that *closed* during the reporting day. Originally
+    // this filtered on createdAt — but PAID orders use paidAt (the event
+    // time), so the two halves of the report disagreed on what "today"
+    // means (a 23:58 order cancelled at 00:03 leaked into the prior day's
+    // cancellation count). Now we use cancelledAt, falling back to
+    // createdAt for legacy rows written before the column existed so
+    // historical numbers don't suddenly drop to zero.
     const cancelledOrdersList = await this.prisma.order.findMany({
       where: {
         tenantId,
-        createdAt: {
-          gte: startOfDay,
-          lt: endOfDay,
-        },
         status: 'CANCELLED',
+        OR: [
+          { cancelledAt: { gte: startOfDay, lt: endOfDay } },
+          { cancelledAt: null, createdAt: { gte: startOfDay, lt: endOfDay } },
+        ],
       },
       select: {
         totalAmount: true,
@@ -646,9 +652,11 @@ export class ZReportsService {
         context: emailContext,
       });
 
-      // Update report with email status
-      await this.prisma.zReport.update({
-        where: { id },
+      // Update report with email status — compound WHERE IDOR guard
+      // (B41-B45 pattern). `closeReport` already uses updateMany with
+      // tenant scoping; this email-status write must match.
+      await this.prisma.zReport.updateMany({
+        where: { id, tenantId },
         data: {
           emailSent: success,
           emailSentAt: success ? new Date() : null,

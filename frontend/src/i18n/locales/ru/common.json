@@ -102,7 +102,8 @@
   },
   "statuses": {
     "active": "Активный",
-    "inactive": "Неактивный"
+    "inactive": "Неактивный",
+    "pending_approval": "Ожидает подтверждения"
   },
   "messages": {
     "welcome": "Добро пожаловать",
@@ -117,7 +118,9 @@
     "operationSuccessful": "Операция успешно завершена",
     "operationFailed": "Операция не удалась",
     "tryAgain": "Пожалуйста, попробуйте снова",
-    "contactSupport": "Пожалуйста, свяжитесь с поддержкой"
+    "contactSupport": "Пожалуйста, свяжитесь с поддержкой",
+    "confirmDeleteCustomer": "Вы уверены, что хотите удалить клиента",
+    "actionCannotBeUndone": "Это действие невозможно отменить."
   },
   "notifications": {
     "loginSuccessful": "Вход выполнен успешно",
@@ -199,7 +202,9 @@
     "modifierUpdatedSuccessfully": "Модификатор успешно обновлен",
     "modifierDeletedSuccessfully": "Модификатор успешно удален",
     "productModifiersUpdatedSuccessfully": "Модификаторы продукта успешно обновлены",
-    "modifierGroupRemovedFromProduct": "Группа модификаторов удалена из продукта"
+    "modifierGroupRemovedFromProduct": "Группа модификаторов удалена из продукта",
+    "registrationPendingApproval": "Регистрация прошла успешно. Ваша учётная запись ожидает подтверждения администратором.",
+    "scheduledDowngradeCancelled": "Запланированное понижение тарифа отменено"
   },
   "time": {
     "today": "Сегодня",
@@ -252,7 +257,10 @@
     "order_many": "{{count}} заказов",
     "table_one": "{{count}} стол",
     "table_few": "{{count}} стола",
-    "table_many": "{{count}} столов"
+    "table_many": "{{count}} столов",
+    "item_other": "{{count}} позиций",
+    "order_other": "{{count}} заказов",
+    "table_other": "{{count}} столиков"
   },
   "admin": {
     "userManagement": "Управление пользователями",
@@ -352,7 +360,44 @@
     "popupBlocked": "Всплывающее окно заблокировано. Разрешите всплывающие окна для печати QR-кодов.",
     "noQRCodesForPrinting": "QR-коды для печати не найдены. Убедитесь, что QR-коды загружены.",
     "noTablesFound": "Столы не найдены. Сначала добавьте столы.",
-    "noQRCodesToDownload": "QR-коды для скачивания не найдены"
+    "noQRCodesToDownload": "QR-коды для скачивания не найдены",
+    "noUsersFoundDescription": "Добавьте первого сотрудника, чтобы начать управлять персоналом ресторана.",
+    "addFirstUser": "Добавить первого пользователя",
+    "totalUsers": "Всего пользователей",
+    "activeUsers": "Активные пользователи",
+    "admins": "Администраторы",
+    "managers": "Менеджеры",
+    "invalidEmail": "Пожалуйста, введите корректный адрес электронной почты",
+    "passwordMinLength": "Пароль должен содержать не менее 6 символов",
+    "firstNameRequired": "Имя обязательно для заполнения",
+    "lastNameRequired": "Фамилия обязательна для заполнения",
+    "emailPlaceholder": "Введите адрес электронной почты",
+    "passwordPlaceholder": "Введите пароль",
+    "firstNamePlaceholder": "Введите имя",
+    "lastNamePlaceholder": "Введите фамилию",
+    "pendingApproval": "Ожидает подтверждения",
+    "approveUser": "Одобрить пользователя",
+    "rejectUser": "Отклонить пользователя",
+    "userApproved": "Пользователь успешно одобрен",
+    "userRejected": "Пользователь успешно отклонён",
+    "userApproveFailed": "Не удалось одобрить пользователя",
+    "userRejectFailed": "Не удалось отклонить пользователя",
+    "allUsers": "Все пользователи",
+    "noUsersInFilter": "Нет пользователей по этому фильтру",
+    "noUsersInFilterDescription": "Нет пользователей, соответствующих заданным условиям фильтра.",
+    "showAllUsers": "Показать всех пользователей",
+    "searchUsers": "Поиск по имени или email...",
+    "allRoles": "Все роли",
+    "filterByRole": "Фильтр по роли",
+    "person_other": "{{count}} человек",
+    "user_other": "{{count}} пользователей",
+    "noTablesFoundDescription": "Добавьте столики в разделе «Управление столиками», чтобы сгенерировать QR-коды для конкретных столиков.",
+    "totalQRCodes": "Всего QR-кодов",
+    "noTables": "Столиков пока нет",
+    "noTablesDescription": "Добавьте первый столик, чтобы начать управлять размещением гостей",
+    "addFirstTable": "Добавить первый столик",
+    "gridView": "Сетка",
+    "floorPlan": "План зала"
   },
   "qrDesigner": {
     "quickColorThemes": "Быстрые цветовые темы",
@@ -630,7 +675,14 @@
     "selectUpTo": "Выберите до {{max}}",
     "selectMultiple": "Выберите несколько",
     "specialInstructions": "Особые пожелания",
-    "productImage": "Изображение продукта"
+    "productImage": "Изображение продукта",
+    "wifi": "Wi-Fi",
+    "wifiNetwork": "Сеть Wi-Fi",
+    "wifiPassword": "Пароль",
+    "copyPassword": "Скопировать пароль",
+    "passwordCopied": "Пароль скопирован!",
+    "socialMedia": "Подпишитесь на нас",
+    "connectWithUs": "Свяжитесь с нами"
   },
   "qr": {
     "shareText": "Посмотрите наше меню",
@@ -673,7 +725,9 @@
     "specialNotes": "Особые примечания",
     "continueShopping": "Продолжить покупки",
     "viewCart": "Посмотреть корзину",
-    "cart": "Корзина"
+    "cart": "Корзина",
+    "item_one": "{{count}} позиция",
+    "item_other": "{{count}} позиций"
   },
   "orders": {
     "title": "Мои заказы",
@@ -748,5 +802,22 @@
     "referrals": "Рефералы",
     "pointsEarned": "Заработано баллов",
     "noReferralCode": "Свяжитесь с поддержкой для получения реферального кода"
+  },
+  "pos": {
+    "floorPlan": {
+      "title": "План зала",
+      "available": "Свободен",
+      "occupied": "Занят",
+      "reserved": "Забронирован",
+      "fullscreen": "Во весь экран",
+      "exitFullscreen": "Выйти из полноэкранного режима",
+      "helpText2d": "Нажмите на столик, чтобы выбрать • Прокрутка — масштаб • Shift+перетаскивание — панорама",
+      "helpText3d": "Нажмите на столик, чтобы выбрать • Перетаскивание — поворот • Прокрутка — масштаб"
+    },
+    "minimap": {
+      "switchTo2D": "Переключиться на 2D-вид",
+      "switchTo3D": "Переключиться на 3D-вид",
+      "clickToSwitch": "Нажмите, чтобы переключить"
+    }
   }
 }

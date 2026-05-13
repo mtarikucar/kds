@@ -14,6 +14,9 @@ import {
   BillRequest,
   SplitBillDto,
   GroupBillSummary,
+  PayItemsDto,
+  PayItemsResponse,
+  PayableItemsSummary,
 } from '../../types';
 
 export const useOrders = (filters?: OrderFilters) => {
@@ -171,7 +174,18 @@ export const useCreatePayment = () => {
   return useMutation({
     mutationFn: async (data: CreatePaymentDto): Promise<Payment> => {
       const { orderId, ...paymentData } = data;
-      const response = await api.post(`/orders/${orderId}/payments`, paymentData);
+      // Generate a stable client-side idempotency key per submit. If the
+      // network blips and the user (or React-Query retry) re-fires this
+      // mutation, the backend's partial unique index on
+      // payments(orderId, idempotencyKey) returns the original payment
+      // instead of duplicating it. The client controls the key so the
+      // dedupe extends to the wire layer, not just to the DB write.
+      const body = {
+        ...paymentData,
+        idempotencyKey:
+          (paymentData as any).idempotencyKey ?? crypto.randomUUID(),
+      };
+      const response = await api.post(`/orders/${orderId}/payments`, body);
       return response.data;
     },
     onSuccess: () => {
@@ -203,7 +217,17 @@ export const useSplitBill = () => {
   return useMutation({
     mutationFn: async (data: SplitBillDto & { orderId: string }) => {
       const { orderId, ...body } = data;
-      const response = await api.post(`/orders/${orderId}/payments/split`, body);
+      // Batch-level key so a retried split-bill submit recovers the
+      // exact prior payment set. Backend derives per-entry keys as
+      // `${batchKey}:${index}` (or honors explicit per-entry keys).
+      const bodyWithKey = {
+        ...body,
+        idempotencyKey: (body as any).idempotencyKey ?? crypto.randomUUID(),
+      };
+      const response = await api.post(
+        `/orders/${orderId}/payments/split`,
+        bodyWithKey,
+      );
       return response.data;
     },
     onSuccess: () => {
@@ -227,6 +251,61 @@ export const useGroupBillSummary = (groupId: string | null) => {
       return response.data;
     },
     enabled: !!groupId,
+  });
+};
+
+// ========================================
+// PROGRESSIVE ("DUTCH-STYLE") PAYMENTS
+// ========================================
+
+export const usePayableItems = (orderId: string | null) => {
+  return useQuery({
+    queryKey: ['payableItems', orderId],
+    queryFn: async (): Promise<PayableItemsSummary> => {
+      const response = await api.get(`/orders/${orderId}/payments/payable-items`);
+      return response.data;
+    },
+    enabled: !!orderId,
+    // Real-time invalidation comes from usePosSocket on order:updated.
+  });
+};
+
+export const usePayByItems = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (
+      data: PayItemsDto & { orderId: string },
+    ): Promise<PayItemsResponse> => {
+      const { orderId, ...body } = data;
+      // Client-side idempotency key so a network retry recovers the
+      // same payment instead of double-charging. Mirrors useCreatePayment.
+      const bodyWithKey = {
+        ...body,
+        idempotencyKey: body.idempotencyKey ?? crypto.randomUUID(),
+      };
+      const response = await api.post(
+        `/orders/${orderId}/payments/items`,
+        bodyWithKey,
+      );
+      return response.data;
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['orders'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      queryClient.invalidateQueries({ queryKey: ['tableGroup'] });
+      queryClient.invalidateQueries({ queryKey: ['groupBillSummary'] });
+      queryClient.invalidateQueries({
+        queryKey: ['payableItems', variables.orderId],
+      });
+      toast.success(i18n.t('pos:progressive.paymentRecorded'));
+    },
+    onError: (error: any) => {
+      toast.error(
+        error.response?.data?.message || i18n.t('pos:progressive.paymentFailed'),
+      );
+    },
   });
 };
 

@@ -26,14 +26,25 @@ export class IngredientMovementsController {
   @ApiQuery({ name: 'type', required: false })
   @ApiQuery({ name: 'startDate', required: false })
   @ApiQuery({ name: 'endDate', required: false })
+  @ApiQuery({ name: 'limit', required: false, description: 'Default 500, max 5000' })
+  @ApiQuery({ name: 'offset', required: false })
   findAll(
     @Request() req,
     @Query('stockItemId') stockItemId?: string,
     @Query('type') type?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
   ) {
-    return this.service.findAll(req.tenantId, { stockItemId, type, startDate, endDate });
+    return this.service.findAll(req.tenantId, {
+      stockItemId,
+      type,
+      startDate,
+      endDate,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      offset: offset ? parseInt(offset, 10) : undefined,
+    });
   }
 
   @Post()

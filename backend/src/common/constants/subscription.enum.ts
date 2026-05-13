@@ -11,6 +11,11 @@ export enum SubscriptionStatus {
   EXPIRED = 'EXPIRED',
   PAST_DUE = 'PAST_DUE',
   TRIALING = 'TRIALING',
+  // Pre-activation state used between PayTR intent creation and webhook
+  // confirmation. PENDING subscriptions don't grant feature access and
+  // don't appear in the partial-unique (tenantId) WHERE status IN
+  // (ACTIVE, TRIALING) index, so a tenant may have at most one in flight.
+  PENDING = 'PENDING',
 }
 
 export enum BillingCycle {

@@ -224,5 +224,62 @@
     "splitFailed": "Hisobni bo'lib bo'lmadi",
     "amountMismatch": "Bo'lingan summalar jamiga teng bo'lishi kerak",
     "collectAll": "Barcha to'lovlarni qabul qilish"
+  },
+  "progressive": {
+    "title": "Mijoz bo'yicha to'lov",
+    "buttonTitle": "Mijoz bo'yicha to'la",
+    "subtitle": "Bu mijoz to'layotgan mahsulotlarni tanlang — qolgani boshqalar uchun ochiq qoladi",
+    "summary": "Jami {{total}} • To'langan {{paid}} • Qoldiq {{remaining}}",
+    "unpaidItems": "To'lanmagan mahsulotlar",
+    "paidItems": "To'langan mahsulotlar",
+    "unitsRemaining": "{{paid}} / {{total}} dona to'langan",
+    "selectedTotal": "Tanlangan jami",
+    "customerLabel": "Mijoz nomi (ixtiyoriy)",
+    "customerLabelPlaceholder": "Masalan: Ali",
+    "transactionId": "Havola raqami (karta/raqamli uchun)",
+    "payAndContinue": "To'la va davom et",
+    "done": "Tayyor",
+    "cancel": "Bekor qilish",
+    "noSelection": "Kamida bitta mahsulot tanlang",
+    "paymentRecorded": "To'lov qayd etildi",
+    "paymentFailed": "To'lovni qayd etib bo'lmadi",
+    "fullyPaid": "Buyurtma to'liq to'landi",
+    "tabOrder": "Buyurtma {{number}}",
+    "remainingItems": "Qolgan mahsulotlar",
+    "remainingAmount": "Qolgan summa",
+    "cannotCancelPartiallyPaid": "Bu buyurtmada qisman to'lov bor — avval qaytaring.",
+    "noUnpaidItems": "Barcha mahsulotlar to'langan.",
+    "method": {
+      "CASH": "Naqd",
+      "CARD": "Karta",
+      "DIGITAL": "Raqamli"
+    }
+  },
+  "awaitingPayment": {
+    "title": "To'lov kutilmoqda",
+    "collectPayment": "To'lovni qabul qilish",
+    "orderTotal": "Buyurtma jami"
+  },
+  "dineInPaymentRequiresServed": "Zalda buyurtmalar uchun to'lov faqat taom uzatilgandan so'ng amalga oshiriladi",
+  "dineInPaymentRequiresReadyOrServed": "Zalda buyurtmalar uchun to'lov faqat tayyor yoki uzatilgan holatda amalga oshiriladi",
+  "noActiveOrder": "Avval buyurtma yarating",
+  "transfer": {
+    "title": "Stol buyurtmalarini ko'chirish",
+    "buttonTitle": "Buyurtmalarni boshqa stolga ko'chirish",
+    "sourceTable": "Asl stol",
+    "activeOrders": "Faol buyurtmalar",
+    "selectTarget": "Buyurtmalarni ko'chirish uchun maqsadli stolni tanlang:",
+    "noAvailableTables": "Ko'chirish uchun mavjud stollar yo'q",
+    "willMerge": "Buyurtmalar birlashtiriladi",
+    "from": "Qaerdan",
+    "to": "Qaerga",
+    "ordersToTransfer": "Ko'chiriladigan buyurtmalar",
+    "mergeWarningTitle": "Maqsadli stolda faol buyurtmalar bor",
+    "mergeWarningDescription": "Buyurtmalar ushbu stoldagi mavjud buyurtmalar bilan birlashtiriladi.",
+    "confirmText": "{{sourceTable}} stolidan {{targetTable}} stoliga {{count}} ta buyurtma ko'chirilsinmi?",
+    "confirm": "Ko'chirish",
+    "success": "Buyurtmalar {{sourceTable}} stolidan {{targetTable}} stoliga ko'chirildi",
+    "failed": "Buyurtmalarni ko'chirish amalga oshmadi",
+    "socketNotification": "{{sourceTable}} stolidan {{targetTable}} stoliga {{count}} ta buyurtma ko'chirildi"
   }
 }

@@ -18,6 +18,7 @@ import { useCreatePayment, usePendingOrders, useWaiterRequests, useBillRequests 
 import TransferTableModal from '../../components/pos/TransferTableModal';
 import TableMergeModal from '../../components/pos/TableMergeModal';
 import BillSplitModal from '../../components/pos/BillSplitModal';
+import ProgressiveSplitModal from '../../components/pos/ProgressiveSplitModal';
 import { useTables, useUpdateTableStatus, useMergeTables, useUnmergeTable, useUnmergeAll } from '../../features/tables/tablesApi';
 import { useGetPosSettings } from '../../features/pos/posApi';
 import { usePosSocket } from '../../features/pos/usePosSocket';
@@ -42,7 +43,45 @@ const POSPage = () => {
   const [currentView, setCurrentView] = useState<POSView>('table-selection');
 
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  // Cart persisted in localStorage so an accidental tab close / refresh
+  // doesn't wipe an in-progress order. Key is per-user implicit (the
+  // axios client wires the JWT, and a different login on the same
+  // device would just see this stale cart — acceptable since the table
+  // selector must be re-chosen anyway). A 12h TTL caps how stale that
+  // cart can get: product prices and stock change overnight, and a
+  // morning cashier seeing yesterday's lunch order is worse than empty.
+  const CART_TTL_MS = 12 * 60 * 60 * 1000;
+  const [cartItems, setCartItems] = useState<CartItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('pos_cart');
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      // Backwards-compat: older runs persisted a bare array. Treat those
+      // as expired (no timestamp = age unknown) so we don't carry over
+      // arbitrarily-old carts on first upgrade.
+      if (!parsed || !Array.isArray(parsed.items) || typeof parsed.savedAt !== 'number') {
+        localStorage.removeItem('pos_cart');
+        return [];
+      }
+      if (Date.now() - parsed.savedAt > CART_TTL_MS) {
+        localStorage.removeItem('pos_cart');
+        return [];
+      }
+      return parsed.items as CartItem[];
+    } catch {
+      return [];
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        'pos_cart',
+        JSON.stringify({ items: cartItems, savedAt: Date.now() }),
+      );
+    } catch {
+      // Storage unavailable (private mode, quota exceeded) — drop silently.
+    }
+  }, [cartItems]);
   const [discount, setDiscount] = useState(0);
   const [customerName, setCustomerName] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
@@ -60,6 +99,7 @@ const POSPage = () => {
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false);
   const [isMergeModalOpen, setIsMergeModalOpen] = useState(false);
   const [isBillSplitModalOpen, setIsBillSplitModalOpen] = useState(false);
+  const [isProgressiveModalOpen, setIsProgressiveModalOpen] = useState(false);
 
   // Responsive hook
   const { isDesktop } = useResponsive();
@@ -485,9 +525,17 @@ const POSPage = () => {
         customerPhone: data.customerPhone || undefined,
       },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
           // Refetch orders to update the list
-          refetchOrders();
+          // Re-fetch fresh table orders BEFORE deciding whether to free
+          // the table — `tableOrders` from useGetTableOrders is a stale
+          // snapshot captured at render time. If a new order arrived
+          // between the user opening payment and confirming, the snapshot
+          // wouldn't include it and we'd incorrectly mark the table
+          // AVAILABLE, letting another guest sit down on top of an
+          // unpaid bill. The await guarantees we work with current state.
+          const refreshed = await refetchOrders();
+          const freshOrders = refreshed.data ?? tableOrders ?? [];
 
           // Check if this was an existing order payment (from AwaitingPayment section)
           const wasExistingOrderPayment = !!payingOrderId;
@@ -498,14 +546,14 @@ const POSPage = () => {
           setPayingOrderAmount(null);
 
           // Always check for remaining unpaid orders before marking table as available
-          const remainingOrders = tableOrders?.filter(
+          const remainingOrders = freshOrders.filter(
             (order) =>
               order.id !== orderIdToPay &&
               order.status !== OrderStatus.PAID &&
               order.status !== OrderStatus.CANCELLED
           );
 
-          const hasRemainingOrders = remainingOrders && remainingOrders.length > 0;
+          const hasRemainingOrders = remainingOrders.length > 0;
 
           if (wasExistingOrderPayment) {
             // For existing order payments (READY/SERVED), only mark available if no remaining orders
@@ -869,6 +917,7 @@ const POSPage = () => {
                     onTransferTable={handleTransferTable}
                     onMergeTables={() => setIsMergeModalOpen(true)}
                     onSplitBill={() => setIsBillSplitModalOpen(true)}
+                    onProgressivePay={() => setIsProgressiveModalOpen(true)}
                     isCheckingOut={isCreatingOrder || isUpdatingOrder}
                     isTwoStepCheckout={isTwoStepCheckout}
                     hasActiveOrder={!!currentOrderId}
@@ -1022,6 +1071,21 @@ const POSPage = () => {
           orders={tableOrders}
           onConfirm={handleBillSplit}
           isLoading={isSplitting}
+        />
+      )}
+
+      {/* Progressive ("Dutch-style") Payment Modal */}
+      {tableOrders && (
+        <ProgressiveSplitModal
+          isOpen={isProgressiveModalOpen}
+          onClose={() => setIsProgressiveModalOpen(false)}
+          orders={tableOrders
+            .filter((o) => o.status !== 'PAID' && o.status !== 'CANCELLED')
+            .map((o) => ({
+              id: o.id,
+              orderNumber: o.orderNumber,
+              tableNumber: selectedTable?.number,
+            }))}
         />
       )}
     </div>

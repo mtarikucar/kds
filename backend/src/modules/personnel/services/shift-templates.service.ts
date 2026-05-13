@@ -41,10 +41,15 @@ export class ShiftTemplatesService {
       throw new NotFoundException('Shift template not found');
     }
 
-    return this.prisma.shiftTemplate.update({
-      where: { id },
+    // Compound WHERE IDOR guard (B41-B45 pattern).
+    const claim = await this.prisma.shiftTemplate.updateMany({
+      where: { id, tenantId },
       data: dto,
     });
+    if (claim.count === 0) {
+      throw new NotFoundException('Shift template not found');
+    }
+    return this.prisma.shiftTemplate.findUnique({ where: { id } });
   }
 
   async remove(id: string, tenantId: string) {
@@ -69,6 +74,7 @@ export class ShiftTemplatesService {
       );
     }
 
-    return this.prisma.shiftTemplate.delete({ where: { id } });
+    // Compound WHERE delete (B41-B45 pattern).
+    return this.prisma.shiftTemplate.delete({ where: { id, tenantId } });
   }
 }

@@ -7,7 +7,7 @@ let socket: Socket | null = null;
 let notificationSocket: Socket | null = null;
 
 /**
- * Refcount so simultaneous POS + KDS + Voxel + Notifications mounts share
+ * Refcount so simultaneous POS + KDS + Notifications mounts share
  * one socket and nobody yanks it out from under a sibling hook. The last
  * unmount calls disconnectSocket(); everything before that just decrements.
  */

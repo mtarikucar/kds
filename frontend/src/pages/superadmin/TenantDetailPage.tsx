@@ -580,7 +580,7 @@ export default function TenantDetailPage() {
               </p>
 
               <div className="space-y-2 mb-6">
-                {plans?.map((plan: { id: string; displayName: string; price: number; currency: string; billingCycle: string; isActive: boolean }) => (
+                {plans?.map((plan) => (
                   <label
                     key={plan.id}
                     className={`flex items-center justify-between p-4 border rounded-xl cursor-pointer transition-colors ${

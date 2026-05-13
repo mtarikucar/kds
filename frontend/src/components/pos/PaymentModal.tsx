@@ -164,6 +164,12 @@ const PaymentModal = ({
             variant="primary"
             className="flex-1"
             isLoading={isLoading}
+            // Belt-and-suspenders: Button's own `isLoading` already
+            // shows a spinner, but Button doesn't disable on its own —
+            // a double-tap on touch screens would fire two submits
+            // and the backend dedupes via idempotency key, but the
+            // second call still consumes a slot in the throttler.
+            disabled={isLoading}
           >
             {t('payment.confirmPayment')}
           </Button>

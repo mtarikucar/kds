@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import marketingApi from '../../features/marketing/api/marketingApi';
 import { useMarketingAuthStore } from '../../store/marketingAuthStore';
 import type { Commission } from '../../features/marketing/types';
+import { fmtDate } from '../../features/marketing/utils/format';
 
 const statusColors: Record<string, string> = {
   PENDING: 'bg-yellow-100 text-yellow-800',
@@ -167,7 +168,7 @@ export default function CommissionsPage() {
                       {c.marketingUser ? `${c.marketingUser.firstName} ${c.marketingUser.lastName}` : '-'}
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell text-gray-400 text-xs">
-                      {new Date(c.createdAt).toLocaleDateString()}
+                      {fmtDate(c.createdAt)}
                     </td>
                     {isManager && (
                       <td className="px-4 py-3">

@@ -23,10 +23,26 @@ model Tenant {
 
   // Subscription details
   currentPlanId   String?
-  paymentRegion   String   @default("INTERNATIONAL") // TURKEY, INTERNATIONAL
+  paymentRegion   String   @default("TURKEY") // TURKEY → PayTR, INTERNATIONAL → contact-based EMAIL
+  // Legacy "ever used any trial" flag. Kept for backward-compat with
+  // reporting queries and the marketing-leads converter. Per-plan
+  // trial eligibility lives in `usedTrialPlanIds` below.
   trialUsed       Boolean  @default(false)
+  // Plans the tenant has already trialed. Per-plan trial model lets a
+  // tenant try BASIC, decline, then later try PRO. Eligibility check:
+  //   !usedTrialPlanIds.includes(targetPlanId)
+  usedTrialPlanIds String[] @default([])
   trialStartedAt  DateTime?
   trialEndsAt     DateTime?
+
+  // PayTR recurring-payment token (saved-card reference, encrypted at rest).
+  // Issued by PayTR on the first successful payment; used by the renewal
+  // scheduler to auto-charge without re-collecting card details.
+  paytrRecurringToken String?
+
+  // Turkish tax identifier (Vergi No for B2B / TC Kimlik for B2C). Required
+  // on KDV-compliant invoices for Turkish tenants.
+  taxId           String?
 
   // Currency settings
   currency        String   @default("TRY") // USD, EUR, GBP, TRY, CAD, AUD
@@ -122,8 +138,8 @@ model Tenant {
 
   // Previously-orphaned relations (migration 20260420180000 adds the FKs).
   // Listed here so Prisma keeps the TS-side relation graph in sync.
-  restaurantLayout      RestaurantLayout?
   payments              Payment[]
+  orderItemPayments     OrderItemPayment[]
   customerSessions      CustomerSession[]
   phoneVerifications    PhoneVerification[]
   waiterRequests        WaiterRequest[]
@@ -443,12 +459,6 @@ model Table {
   // Table grouping (merge/split)
   groupId String? // Shared UUID for merged tables; null = standalone
 
-  // Voxel world position
-  voxelX        Int?
-  voxelY        Int?     @default(0)
-  voxelZ        Int?
-  voxelRotation Int?     @default(0) // 0, 90, 180, 270 degrees
-
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -469,24 +479,6 @@ model Table {
   @@index([tenantId])
   @@index([tenantId, groupId])
   @@map("tables")
-}
-
-model RestaurantLayout {
-  id        String   @id @default(uuid())
-  name      String   @default("Main Floor")
-  width     Int      @default(32)
-  height    Int      @default(8)
-  depth     Int      @default(32)
-  worldData Json     // Compressed voxel data including all objects
-
-  tenantId  String   @unique
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([tenantId])
-  @@map("restaurant_layouts")
 }
 
 // ========================================
@@ -543,6 +535,7 @@ model Order {
   paidAt       DateTime?
   preparingAt  DateTime?
   readyAt      DateTime?
+  cancelledAt  DateTime?
 
   // Relations
   orderItems OrderItem[]
@@ -562,6 +555,12 @@ model Order {
   @@index([tenantId, status])
   @@index([tenantId, createdAt])
   @@index([tenantId, tableId, status])
+  // Reports / z-report hot path: WHERE tenantId AND status='PAID' AND
+  // paidAt BETWEEN ?. With the prior [tenantId, status] + [tenantId, createdAt]
+  // pair, Postgres had to filter by paidAt in-memory on every report query.
+  @@index([tenantId, status, paidAt])
+  // Cancelled-order section of the z-report keys on cancelledAt.
+  @@index([tenantId, status, cancelledAt])
   @@map("orders")
 }
 
@@ -586,7 +585,8 @@ model OrderItem {
   updatedAt DateTime @updatedAt
 
   // Relations
-  modifiers OrderItemModifier[]
+  modifiers         OrderItemModifier[]
+  orderItemPayments OrderItemPayment[]
 
   @@index([orderId])
   @@index([productId])
@@ -634,6 +634,11 @@ model Payment {
   createdAt DateTime  @default(now())
   paidAt    DateTime?
 
+  // Per-item allocations for progressive ("Dutch-style") payments.
+  // Populated only by payByItems(); empty for whole-bill and split-bill
+  // payments. See OrderItemPayment for the integrity rules.
+  orderItemPayments OrderItemPayment[]
+
   // NOTE: @@unique([orderId, idempotencyKey]) does NOT dedupe null keys in
   // Postgres (multiple NULLs are considered distinct). Migration
   // 20260420180000 adds a partial unique index
@@ -646,6 +651,48 @@ model Payment {
   @@index([tenantId, status])
   @@index([tenantId, createdAt])
   @@map("payments")
+}
+
+// Links a Payment to the specific OrderItem units it settled. Enables
+// per-customer "I paid for what I ate" flows where the same order is
+// closed across multiple payments over time. Quantity-level granularity
+// (one row per N-units paid, not one row per OrderItem) supports paying
+// 1 of 2 cocktails from a single OrderItem with quantity=2.
+//
+// Integrity (enforced at the service layer inside the payment tx):
+//   sum(quantity) WHERE orderItemId = X AND payment.status = COMPLETED
+//     <= orderItem.quantity
+//
+// Refund: when a Payment flips to REFUNDED, the related rows are
+// `deleteMany`'d in the same tx so the units become payable again.
+// (Payment is not deleted; the audit row stays.)
+model OrderItemPayment {
+  id           String   @id @default(uuid())
+
+  paymentId    String
+  payment      Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  orderItemId  String
+  orderItem    OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+
+  quantity     Int
+
+  // Snapshot of this allocation's contribution to Payment.amount. Stored,
+  // not derived, so refund accounting and audits stay stable.
+  amount       Decimal  @db.Decimal(10, 2)
+
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  createdAt    DateTime @default(now())
+
+  @@index([paymentId])
+  @@index([orderItemId])
+  @@index([tenantId])
+  // Hot read path for "which items on this order are paid?" — service
+  // aggregates by orderItemId, then joins to payment.status.
+  @@index([orderItemId, paymentId])
+  @@map("order_item_payments")
 }
 
 // ========================================
@@ -729,6 +776,7 @@ model SubscriptionPlan {
   subscriptions           Subscription[]
   currentPlanTenants      Tenant[]             @relation("CurrentPlan")
   scheduledDowngrades     Subscription[]       @relation("ScheduledDowngrade")
+  pendingPlanChanges      PendingPlanChange[]  @relation("PendingPlanChange")
   leadOffers              LeadOffer[]
 
   @@map("subscription_plans")
@@ -744,12 +792,21 @@ model Subscription {
   plan   SubscriptionPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
 
   // Subscription details
-  status          String   @default("ACTIVE") // ACTIVE, CANCELLED, EXPIRED, PAST_DUE, TRIALING
+  //
+  // Lifecycle: PENDING → ACTIVE → (TRIALING ends) → PAST_DUE → EXPIRED
+  //                          ↘ CANCELLED
+  //
+  // Important: PAST_DUE is a *grace period* — feature access stays
+  // unlocked for 7 days after the trial ends or a renewal charge fails,
+  // giving the tenant time to reach for /payments/create-intent. The
+  // `past-due-subscriptions` cron then promotes PAST_DUE → EXPIRED
+  // which cuts access. PlanFeatureGuard treats ACTIVE/TRIALING/PAST_DUE
+  // identically as "live"; only EXPIRED/CANCELLED block access.
+  status          String   @default("ACTIVE") // ACTIVE, CANCELLED, EXPIRED, PAST_DUE, TRIALING, PENDING
   billingCycle    String   // MONTHLY, YEARLY
-  // Only EMAIL (contact-based WhatsApp/Email) is active today; Stripe
-  // and PayTR were removed in prior commits. Renewals are superadmin-
-  // driven after the tenant contacts support.
-  paymentProvider String   // EMAIL
+  // PAYTR for Turkish tenants (self-serve via hosted iFrame + webhook);
+  // EMAIL for INTERNATIONAL tenants (contact-based, superadmin-driven).
+  paymentProvider String   // PAYTR, EMAIL
 
   // Dates
   startDate       DateTime @default(now())
@@ -785,6 +842,7 @@ model Subscription {
   // Relations
   payments           SubscriptionPayment[]
   invoices           Invoice[]
+  pendingPlanChanges PendingPlanChange[]
 
   @@index([tenantId])
   @@index([planId])
@@ -804,11 +862,18 @@ model SubscriptionPayment {
   amount          Decimal @db.Decimal(10, 2)
   currency        String  @default("TRY")
   status          String  @default("PENDING") // PENDING, SUCCEEDED, FAILED, REFUNDED
-  // Only EMAIL (contact-based) — external providers removed.
-  paymentProvider String  // EMAIL
+  paymentProvider String  // PAYTR, EMAIL
 
   // Free-form external reference (receipt id, bank transfer id) for audit.
   externalReference String? @unique
+
+  // PayTR merchant_oid — idempotency key tying our payment row to PayTR's
+  // transaction. Generated server-side as `SUB-${tenantId}-${ts}` before the
+  // token request; webhooks match on this value.
+  paytrMerchantOid String? @unique
+  // Short-lived token returned by PayTR get-token; persisted only for
+  // debugging webhook callbacks. Not used after success.
+  paytrToken       String?
 
   // Payment metadata
   paymentMethod String? // card, bank_transfer, etc.
@@ -832,7 +897,30 @@ model SubscriptionPayment {
   @@index([subscriptionId])
   @@index([status])
   @@index([createdAt])
+  @@index([paytrMerchantOid])
   @@map("subscription_payments")
+}
+
+/**
+ * Holds an upgrade target between intent creation and webhook confirmation.
+ * When a tenant initiates a plan change that requires payment, we record
+ * the target here keyed by merchantOid. The webhook reads it on success
+ * and calls applyUpgrade() — keeps the intent endpoint stateless about
+ * what plan was being purchased.
+ */
+model PendingPlanChange {
+  id              String   @id @default(uuid())
+  subscriptionId  String
+  subscription    Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  targetPlanId    String
+  targetPlan      SubscriptionPlan @relation("PendingPlanChange", fields: [targetPlanId], references: [id], onDelete: Restrict)
+  billingCycle    String   // MONTHLY, YEARLY
+  merchantOid     String   @unique
+  expiresAt       DateTime
+  createdAt       DateTime @default(now())
+
+  @@index([subscriptionId])
+  @@map("pending_plan_changes")
 }
 
 model Invoice {
@@ -869,6 +957,11 @@ model Invoice {
   description String?
   notes       String?
   pdfUrl      String?
+
+  // Snapshot of tenant taxId at issuance (Vergi No / TC Kimlik). Frozen
+  // here so future taxId edits on the tenant don't retroactively rewrite
+  // historical invoices.
+  taxIdSnapshot String?
 
   @@index([subscriptionId])
   @@index([invoiceNumber])
@@ -1056,6 +1149,9 @@ model Reservation {
   @@index([tenantId, date])
   @@index([tenantId, status])
   @@index([tableId])
+  // Overlap-check query: WHERE tenantId AND tableId AND date AND
+  // startTime/endTime range. tableId+date+startTime covers it.
+  @@index([tenantId, tableId, date, startTime])
   @@map("reservations")
 }
 
@@ -1383,6 +1479,10 @@ model Notification {
   @@index([tenantId])
   @@index([userId])
   @@index([createdAt])
+  // Hot query: WHERE tenantId AND (userId=? OR isGlobal=true) AND
+  // (expiresAt IS NULL OR expiresAt > now()). Composite covers the
+  // tenant scope + global vs targeted + expiry filter in one index.
+  @@index([tenantId, isGlobal, expiresAt])
   @@map("notifications")
 }
 
@@ -1834,10 +1934,6 @@ model Camera {
   // Floor plan calibration
   calibrationData Json?    // {corners: [{imageX, imageY, floorX, floorZ}], homographyMatrix: [...]}
 
-  // Camera position in voxel world (for 3D visualization)
-  voxelX          Float?
-  voxelY          Float?   @default(2.5)  // Camera height (meters)
-  voxelZ          Float?
   rotationY       Float?   @default(0)    // Horizontal rotation (degrees)
   fov             Float?   @default(90)   // Field of view (degrees)
 
@@ -2469,6 +2565,8 @@ model IngredientMovement {
   @@index([type])
   @@index([referenceType, referenceId])
   @@index([createdAt])
+  // Stock-history report: WHERE stockItemId AND createdAt BETWEEN ?.
+  @@index([stockItemId, createdAt])
   @@map("ingredient_movements")
 }
 

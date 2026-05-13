@@ -1,5 +1,8 @@
 import { useMemo } from 'react';
-import { HeatmapColorScheme } from '../../voxel-world/components/HeatmapOverlay';
+
+// Locally defined since the voxel-world feature was removed; the heatmap
+// legend itself is plain 2D and doesn't need the 3D module's types.
+export type HeatmapColorScheme = 'viridis' | 'plasma' | 'coolwarm' | 'heat' | 'blues';
 
 interface HeatmapLegendProps {
   colorScheme: HeatmapColorScheme;

@@ -145,14 +145,38 @@ export class TablesService {
   }
 
   async updateStatus(id: string, updateStatusDto: UpdateTableStatusDto, tenantId: string) {
-    // Check if table exists and belongs to tenant
-    await this.findOne(id, tenantId);
+    // Atomic status transition with active-order guard. Without the
+    // transaction + count check, two waiters clicking "Mark AVAILABLE"
+    // moments apart can both succeed even if a new order was just
+    // created — leaving the table free to be seated again while an
+    // unpaid bill is still open.
+    return this.prisma.$transaction(async (tx) => {
+      const table = await tx.table.findFirst({ where: { id, tenantId } });
+      if (!table) throw new NotFoundException('Table not found');
 
-    return this.prisma.table.update({
-      where: { id },
-      data: {
-        status: updateStatusDto.status,
-      },
+      // Marking AVAILABLE must not happen while active orders are open.
+      // The frontend already filters for this, but two concurrent waiters
+      // or a stale snapshot can both submit — backend is the canonical
+      // gatekeeper.
+      if (updateStatusDto.status === TableStatus.AVAILABLE) {
+        const activeOrders = await tx.order.count({
+          where: {
+            tableId: id,
+            tenantId,
+            status: { notIn: [OrderStatus.PAID, OrderStatus.CANCELLED] },
+          },
+        });
+        if (activeOrders > 0) {
+          throw new ConflictException(
+            'Cannot mark table AVAILABLE while it has active orders',
+          );
+        }
+      }
+
+      return tx.table.update({
+        where: { id },
+        data: { status: updateStatusDto.status },
+      });
     });
   }
 

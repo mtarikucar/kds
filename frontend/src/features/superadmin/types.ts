@@ -192,6 +192,9 @@ export interface SubscriptionPlan {
   inventoryTracking: boolean;
   kdsIntegration: boolean;
   reservationSystem: boolean;
+  // PlansPage form added this toggle in 2026-04 but the type wasn't
+  // bumped, so reads/writes through the interface looked invalid to TS.
+  personnelManagement?: boolean;
   isActive: boolean;
   discountPercentage?: number;
   discountLabel?: string;

@@ -42,7 +42,8 @@
       "trial": "Deneme",
       "cancelled": "İptal Edildi",
       "expired": "Süresi Doldu",
-      "pastDue": "Gecikmiş"
+      "pastDue": "Gecikmiş",
+      "pending": "Beklemede"
     },
     "invoiceStatus": {
       "paid": "Ödendi",
@@ -127,6 +128,114 @@
       "faqCancelAnytimeAnswer": "Evet, aboneliğinizi istediğiniz zaman iptal edebilirsiniz. Fatura döneminizin sonuna kadar erişiminiz devam eder.",
       "faqFreeTrial": "Ücretsiz deneme var mı?",
       "faqFreeTrialAnswer": "Evet, çoğu ücretli plan 14 günlük ücretsiz deneme içerir. Deneme süresi bitene kadar ücret alınmaz."
+    },
+    "checkout": {
+      "redirecting": "Güvenli ödeme sayfasına yönlendiriliyorsunuz...",
+      "preparing": "Ödemeniz hazırlanıyor...",
+      "missingLink": "Ödeme bağlantısı oluşturulamadı. Lütfen tekrar deneyin.",
+      "errorTitle": "Ödeme başlatılamadı",
+      "backToPlans": "Planlara dön",
+      "confirmTitle": "Güvenli ödemeye yönlendiriliyorsunuz",
+      "confirmBody": "Ödeme PayTR güvenli altyapısında alınacak. Kart bilgileriniz uygulamamıza ulaşmaz.",
+      "secureNote": "SSL şifreli, PCI-DSS uyumlu PayTR sayfası",
+      "proceedNow": "PayTR'ye devam et ({{seconds}})",
+      "cancel": "İptal et"
+    },
+    "invoiceCard": {
+      "paid": "Ödendi",
+      "open": "Bekliyor",
+      "period": "Dönem",
+      "paidOn": "Ödeme tarihi",
+      "total": "Toplam",
+      "view": "Görüntüle",
+      "download": "İndir"
+    },
+    "invoiceViewer": {
+      "title": "Fatura önizleme",
+      "loading": "Fatura yükleniyor...",
+      "loadFailed": "Fatura yüklenemedi",
+      "close": "Kapat"
+    },
+    "paymentResult": {
+      "confirming": "Ödemeniz onaylanıyor",
+      "confirmingHint": "PayTR'den bildirim bekleniyor. Bu birkaç saniye sürebilir.",
+      "confirmingStage2": "İşlem birkaç saniye daha sürebilir...",
+      "confirmingStage3": "Hâlâ bağlanıyor. Bu durum bazen 30 saniyeye kadar sürer.",
+      "successTitle": "Ödeme başarılı",
+      "successBody": "Aboneliğiniz aktif edildi. Hemen kullanmaya başlayabilirsiniz.",
+      "failTitle": "Ödeme tamamlanamadı",
+      "failBody": "Ödeme işleminiz başarısız oldu. Tekrar denemek için planlar sayfasına dönebilirsiniz.",
+      "goToSubscription": "Aboneliğe git",
+      "tryAgain": "Tekrar dene"
+    },
+    "statusBanner": {
+      "trialCountdown": "{{plan}} deneme süreniz {{days}} gün içinde bitiyor",
+      "gracePeriod": "Ödemeniz alınamadı — {{days}} gün içinde ödeme yapın yoksa hesabınız ücretsiz plana düşürülecek",
+      "subscribeNow": "Aboneliği başlat",
+      "payNow": "Şimdi öde",
+      "dismiss": "Kapat"
+    },
+    "usage": {
+      "users": "Kullanıcılar",
+      "tables": "Masalar",
+      "products": "Ürünler",
+      "categories": "Kategoriler",
+      "monthlyOrders": "Bu ay sipariş",
+      "nearingLimit": "%{{pct}} dolu — plan yükseltme gerekebilir"
+    },
+    "comparison": {
+      "toggle": "Tüm özellikleri karşılaştır",
+      "featureHeader": "Özellik",
+      "limitsGroup": "Sınırlar",
+      "featuresGroup": "Özellikler",
+      "limits": {
+        "maxUsers": "Kullanıcı sayısı",
+        "maxTables": "Masa sayısı",
+        "maxProducts": "Ürün sayısı",
+        "maxCategories": "Kategori sayısı",
+        "maxMonthlyOrders": "Aylık sipariş"
+      },
+      "features": {
+        "kdsIntegration": "KDS entegrasyonu",
+        "inventoryTracking": "Stok takibi",
+        "advancedReports": "Gelişmiş raporlar",
+        "reservationSystem": "Rezervasyon sistemi",
+        "personnelManagement": "Personel yönetimi",
+        "deliveryIntegration": "Yemek platformu entegrasyonu",
+        "multiLocation": "Çoklu şube",
+        "customBranding": "Özel marka",
+        "apiAccess": "API erişimi",
+        "prioritySupport": "Öncelikli destek"
+      }
+    },
+    "payNow": "Şimdi öde",
+    "taxIdReminder": {
+      "title": "Fatura bilgilerini tamamla",
+      "body": "KDV uyumlu fatura için Vergi No veya TC Kimlik No gerekli. Hesabınıza bilgi eklemeden devam ederseniz faturanız bu alan olmadan basılır.",
+      "fillNow": "Şimdi Doldur",
+      "skip": "Şimdilik geç"
+    },
+    "limitWarning": {
+      "near": "{{resource}}: {{current}}/{{limit}} ({{remaining}} kaldı). Limite yaklaşıyorsunuz.",
+      "full": "{{resource}} limitiniz doldu ({{limit}}). Yeni eklemek için plan yükseltmeniz gerek.",
+      "upgrade": "Şimdi yükselt →"
+    },
+    "cancelModal": {
+      "title": "Aboneliği iptal et",
+      "reasonPrompt": "Neden ayrılıyorsunuz? Geri bildiriminiz hizmetimizi geliştirmemize yardımcı olur.",
+      "reasons": {
+        "tooExpensive": "Fiyatı yüksek",
+        "missingFeature": "İhtiyacım olan özellik eksik",
+        "switchedProvider": "Başka bir hizmete geçtim",
+        "temporary": "Geçici olarak ihtiyacım yok",
+        "other": "Diğer"
+      },
+      "otherPlaceholder": "Lütfen kısaca açıklayın...",
+      "immediate": "Hemen iptal et (dönem sonunu beklemeden)",
+      "warnImmediate": "Aboneliğiniz hemen iptal edilecek ve tüm ücretli özelliklere erişiminiz kesilecek.",
+      "warnPeriodEnd": "Aboneliğiniz {{date}} tarihinde sona erecek; o tarihe kadar tüm özelliklere erişiminiz devam eder.",
+      "keep": "Aboneliğimi koru",
+      "confirm": "İptal et"
     },
     "scheduledDowngrade": {
       "title": "Planlanmış Plan Değişikliği",

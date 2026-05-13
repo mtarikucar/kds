@@ -87,18 +87,23 @@ export class ReferralService {
     }
 
     // Per-tenant daily cap on referral grants to cap loyalty-point farming.
+    // The cap check MUST run inside the same Serializable transaction as
+    // the referral insert; doing it outside leaves a window where 200+
+    // concurrent requests all see "below cap" and all succeed
+    // (200 × bonus = ~30k farmable points per attack burst).
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60_000);
-    const todayCount = await this.prisma.customerReferral.count({
-      where: {
-        referrer: { tenantId },
-        createdAt: { gte: oneDayAgo },
-      },
-    });
-    if (todayCount >= this.DAILY_TENANT_CAP) {
-      throw new ForbiddenException('Daily referral limit reached');
-    }
 
     return this.prisma.$transaction(async (tx) => {
+      const todayCount = await tx.customerReferral.count({
+        where: {
+          referrer: { tenantId },
+          createdAt: { gte: oneDayAgo },
+        },
+      });
+      if (todayCount >= this.DAILY_TENANT_CAP) {
+        throw new ForbiddenException('Daily referral limit reached');
+      }
+
       const referrer = await tx.customer.findFirst({
         where: { referralCode: code, tenantId },
         select: { id: true, name: true },

@@ -87,6 +87,9 @@ export const useCreateSubscription = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
+      // Plan attached → effective features changed; sidebar / feature
+      // gates need to re-fetch to reflect the new plan's flags.
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.effectiveFeatures() });
       toast.success(i18n.t('common:notifications.subscriptionCreatedSuccessfully'));
     },
     onError: (error: any) => {
@@ -113,6 +116,7 @@ export const useUpdateSubscription = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.detail(variables.id) });
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.effectiveFeatures() });
       toast.success(i18n.t('common:notifications.updatedSuccessfully'));
     },
     onError: (error: any) => {
@@ -163,6 +167,10 @@ export const useChangePlan = () => {
         toast.success(i18n.t('common:notifications.downgradeScheduled', { date }));
         queryClient.invalidateQueries({ queryKey: subscriptionKeys.scheduledDowngrade(variables.id) });
         queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
+        // Scheduled downgrade doesn't change features yet (effective at
+        // period end), but the UI banner depends on the scheduled state
+        // visible via effective-features as well in some screens.
+        queryClient.invalidateQueries({ queryKey: subscriptionKeys.effectiveFeatures() });
       } else if (result.type === 'upgrade' && result.requiresPayment) {
         // Upgrade requires payment - will be redirected
         toast.info(i18n.t('common:notifications.redirectingToPayment'));
@@ -194,6 +202,9 @@ export const useCancelSubscription = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.detail(variables.id) });
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
+      // Immediate-cancel locks features (status moves to CANCELLED, guard
+      // blocks); effective-features must re-render to reflect that.
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.effectiveFeatures() });
       toast.success(i18n.t('common:notifications.subscriptionCancelledSuccessfully'));
     },
     onError: (error: any) => {
@@ -214,6 +225,8 @@ export const useReactivateSubscription = () => {
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.detail(id) });
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
+      // Reactivation flips status back to ACTIVE → feature gates unlock.
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.effectiveFeatures() });
       toast.success(i18n.t('common:notifications.subscriptionReactivatedSuccessfully'));
     },
     onError: (error: any) => {

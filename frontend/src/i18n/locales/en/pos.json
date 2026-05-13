@@ -233,6 +233,36 @@
     "amountMismatch": "Split amounts must equal the total",
     "collectAll": "Collect All Payments"
   },
+  "progressive": {
+    "title": "Pay by Customer",
+    "buttonTitle": "Pay by Customer",
+    "subtitle": "Select the items this customer is paying for — the rest stays open for the others",
+    "summary": "Total {{total}} • Paid {{paid}} • Remaining {{remaining}}",
+    "unpaidItems": "Unpaid Items",
+    "paidItems": "Paid Items",
+    "unitsRemaining": "{{paid}} / {{total}} units paid",
+    "selectedTotal": "Selected Total",
+    "customerLabel": "Customer Name (optional)",
+    "customerLabelPlaceholder": "e.g. Alex",
+    "transactionId": "Reference No (card/digital)",
+    "payAndContinue": "Charge & Continue",
+    "done": "Done",
+    "cancel": "Cancel",
+    "noSelection": "Select at least one item",
+    "paymentRecorded": "Payment recorded",
+    "paymentFailed": "Payment failed",
+    "fullyPaid": "Order fully paid",
+    "tabOrder": "Order {{number}}",
+    "remainingItems": "Remaining Items",
+    "remainingAmount": "Remaining Amount",
+    "cannotCancelPartiallyPaid": "This order has partial per-item payments — refund them first.",
+    "noUnpaidItems": "All items paid.",
+    "method": {
+      "CASH": "Cash",
+      "CARD": "Card",
+      "DIGITAL": "Digital"
+    }
+  },
   "transfer": {
     "title": "Transfer Table Orders",
     "buttonTitle": "Transfer orders to another table",

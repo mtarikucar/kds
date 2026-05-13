@@ -161,7 +161,14 @@ describe('HttpExceptionFilter', () => {
       expect(response.error).toBe('DatabaseValidationError');
     });
 
-    it('should handle generic errors', () => {
+    it('should mask generic errors in production with a stable message', () => {
+      // Filter intentionally hides the raw exception message in non-dev
+      // environments so internal details (file paths, SQL fragments)
+      // can't leak to clients. The development branch is exercised in
+      // the "should include stack trace in development mode" test below.
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = 'production';
+
       const exception = new Error('Something went wrong');
 
       filter.catch(exception, mockArgumentsHost);
@@ -169,8 +176,10 @@ describe('HttpExceptionFilter', () => {
       expect(mockResponse.status).toHaveBeenCalledWith(HttpStatus.INTERNAL_SERVER_ERROR);
 
       const response = mockResponse.json.mock.calls[0][0];
-      expect(response.message).toBe('Something went wrong');
+      expect(response.message).toBe('An unexpected error occurred');
       expect(response.statusCode).toBe(HttpStatus.INTERNAL_SERVER_ERROR);
+
+      process.env.NODE_ENV = originalEnv;
     });
 
     it('should include stack trace in development mode', () => {

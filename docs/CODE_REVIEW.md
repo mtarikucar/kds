@@ -1,113 +1,170 @@
-# Code Review — 2026-04-27
+# Code Review — 2026-05-11 (Methodology v2)
 
 **Branch:** `test`  ·  **Reviewer:** Claude (Opus 4.7)  ·  **Scope:** backend (NestJS), frontend (React/Vite), landing (Next.js 16). Out of scope this round: `desktop/`, `edge-device-cpp/`, `segmentation-service/`, infra/CI scripts.
 
-**Method:** Targeted review of 2–6 highest-risk files per module (services, guards, gateways, schedulers, adapters, payment paths). Findings are pinned to `file:line` references. A handful of agent-reported findings were spot-checked against the source and dropped where the code already handled the case correctly — those are noted explicitly. Findings that were not spot-checked are tagged *(unverified)* and should be confirmed before action.
+**This document is the index.** The per-feature deep-dives live in [`docs/reviews/`](reviews/) — one file per feature, with a fixed 10-section template (business-logic invariants, state machines, money/precision audits, concurrency hazards, findings, what's solid, spot-checks, recommended tests). See [`reviews/README.md`](reviews/README.md) for the template + tier conventions.
 
-**Severity:** Critical → High → Medium → Low → Info  
-**Dimension:** Sec (security/multi-tenant) · Cor (correctness/business logic) · Arch (architecture/code quality) · Perf (performance/reliability)
+> **Methodology v2.** The 2026-04-27 first-round review compressed every module into 3–6 rows of a single findings table — it scanned well but under-covered business logic. This second round split per-module work into 33 deep-dive files, each averaging ~280 lines and 8–20 invariants. Every Tier-1 file verified *(unverified)* findings at the cited line; the residual *(unverified)* count dropped from ~70 to effectively zero. Several seed findings (T2, T3 schema gaps; M3 severity; orders M6 NaN risk; the `isRunning`-outside-try/finally claim; the §3.2 "three frontend stores all memory-only" claim; the §5.7 "three.js not in prod" claim) were corrected after first-hand re-reads.
+
+**Severity:** Critical → High → Medium → Low → Info.
+**Dimension:** Sec (security/multi-tenant) · Cor (correctness/business logic) · Arch (architecture/code quality) · Perf (performance/reliability).
 
 ---
 
 ## 1. Executive Summary
 
-The repo is in **broadly good shape** after the recent security audit (commit `149604d` shipped 38 fixes). Multi-tenant isolation is enforced widely (843 `tenantId` references across query sites), schedulers correctly use `pg_advisory_lock` for multi-instance safety, all three Tier-1 WebSocket gateways validate JWTs and scope rooms by tenant, frontend tokens never touch `localStorage`, and refresh tokens are properly httpOnly. There are **no findings that are unambiguously "do not deploy".**
+The repo is in **broadly good shape**. Multi-tenant isolation is well-adopted, schedulers correctly use `pg_advisory_lock`, the KDS gateway's dual-auth + type-check pattern is solid, and the loyalty redemption + auth password-reset patterns are exemplary. There are **no findings that are unambiguously "do not deploy".**
 
-What's left is concentrated in three buckets:
+What's left, distilled across the 33 per-feature files:
 
-1. **Money-path correctness** (orders, accounting, subscriptions). Mostly `Prisma.Decimal` is used consistently, but a few intermediate `Number` conversions leak precision; subscription renewal and split-bill writes lack client-supplied idempotency keys; sales-invoice numbering can race under concurrent POSTs. Nothing exploitable from the outside, but the kind of bug that surfaces under load or in audits.
-2. **Multi-tenant schema hygiene.** Several tenant-scoped models (e.g., `WaiterRequest`, `BillRequest`, `IngredientMovement`) lack a direct `tenantId` column and rely on FK chains. Several `[tenantId, X]` query patterns lack matching compound indices, so high-volume reads fall back to scans. Soft-delete is inconsistent (`status='DELETED'` on some, hard delete on others).
-3. **Frontend observability & UX edges.** Landing site has no Content-Security-Policy header, `ProtectedRoute` renders children before `accessToken` is ready on reload, `lib/api.ts` refresh has no timeout, and frontend has only one test file (`ErrorBoundary.spec.tsx`).
+1. **Money-path correctness.** Most paths are `Prisma.Decimal`-clean, but a small set of conversion points and missing idempotency keys remain. Payments single-payment now has tri-layer idempotency (partial unique index from migration `20260420180000`); split-bill writes still don't. Subscriptions renewal writes still lack a composite key. Refund handling has a TOCTOU race (`tx.payment.update` filters on id only, not status) and silently clamps rather than alerting on over-refund. Accounting credentials are stored plaintext (M8 — verified at `accounting-settings.service.ts:17-22`). Decimal.toString() canonicalization is missing on the z-report payload-hash. None of these are exploitable externally; they're audit-time and retry-time hazards.
+2. **Auth & 2FA boundary state.** Superadmin token rotation never bumps `tokenVersion`, so a refresh-token is reusable for its full 7-day TTL after first use (worse than the 2026-04-27 review framed it). Superadmin refresh accepts the token via JSON body. Suspending a tenant doesn't revoke its outstanding access/refresh tokens. The four social-auth branches miss the `tenant.status==='ACTIVE'` check (the password path was already guarded). 2FA gates rely on field-absence rather than explicit null guards (works today, brittle to refactor).
+3. **Frontend token model is not as uniform as previously claimed.** `superAdminAuthStore.ts:93-97` persists `accessToken` to `localStorage` — directly contradicts the 2026-04-27 §3.2 claim that "frontend tokens never touch localStorage". The marketing realm's API client (`features/marketing/api/marketingApi.ts:21-53`) never received the single-flight refresh fix that commit `9b9eee4` shipped for `lib/api.ts`, so N parallel 401s race against backend refresh-rotation and revoke each other. Marketing reload = forced re-login because `partialize` drops both tokens.
+4. **Schema audit corrections.** T2 (IngredientMovement no direct tenantId) and T3 (WaiterRequest/BillRequest) are **dropped** — both have direct `tenantId` columns plus `@@index([tenantId, status])` since migration `20260420180000_tenant_fks_and_partial_uniques`. T1 stands. New compound-index gaps surfaced on WasteLog, DeliveryPlatformLog, Notification, plus an audit-FK gap on 8 `*ById` columns. The schema has 87 models, 50 of them with `Decimal @db.Decimal(10,2)` money columns.
+5. **Delivery webhooks have two real Sec gaps** the first round missed: Trendyol replay protection is conditional on the timestamp header being present (omit header → bypass), and the signature verification falls back to `JSON.stringify(request.body)` when `rawBody` is missing — verifying a signature against re-serialized JSON is unsafe. Plus a Yemeksepeti status-update handler that returns 200 and silently drops `PICKED_UP`/`CANCELLED` events (delivered orders sit in KDS as `READY` forever).
+6. **WebSocket gateway parity.** KDS is the exemplar (verified at `kds.gateway.ts:64-143`). Notifications and analytics both miss the `payload.type === 'user'` check **and** the explicit `algorithms: ['HS256']` pin on `jwtService.verify`. Notifications also reads `payload.userId` which doesn't exist (main-app JWTs sign with `sub`), so the per-user notification room is literally `user:undefined` and `sendNotificationToUser` silently no-ops.
+7. **One escaped High-Sec in low-risk surface:** `public-stats/services/public-stats.service.ts:23-31` derives its IP-hash salt from `IP_HASH_SALT ?? JWT_SECRET ?? APP_SECRET`. Rotating `JWT_SECRET` (a routine secrets-hygiene action) would silently re-pseudonymize every historical `ipHash` and break visitor analytics. Production should require `IP_HASH_SALT` explicitly.
 
-| Severity | Count | Notes |
+| Severity | Count (approx.) | vs. 2026-04-27 |
 |---|---|---|
-| Critical | 0 | (3 agent-flagged Criticals turned out to be already-handled — see §11.1) |
-| High | ~19 | mostly correctness/race/precision issues in money paths, plus a few schema gaps |
-| Medium | ~32 | architecture, perf, missing pagination, error-swallowing |
-| Low | ~15 | style/nit, doc gaps |
-| Info | 9 | observations / non-actionable |
+| Critical | 0 | unchanged |
+| High | ~30 | up from ~19 — deep-reads surfaced new bugs (notifications `user:undefined`, marketing missing single-flight, SA token-version never bumped, delivery webhook bypass, schema currency constraint, etc.) and reframed several originals |
+| Medium | ~75 | up from ~32 — most growth is in the per-feature concurrency/perf sections |
+| Low | ~50 | up from ~15 |
+| Info | ~20 | up from ~9 |
 
-> **Caveat:** several findings tagged *(unverified)* came from targeted agent reads against a snapshot of the code. Of the items I spot-checked end-to-end (8 in total), 5 stood and 3 turned out to already be handled by code that wasn't included in the agent's read window. Treat each *(unverified)* item as a hypothesis to confirm at the cited line before remediation, not a defect to fix sight-unseen.
+> **Caveat:** every Tier-1 file verified its inherited *(unverified)* findings at source. Severity drift (M3 High→Medium, M6 effectively closed, T2/T3 dropped, A1 reframed) is documented per-file in §9 and aggregated in this index's Appendix §9.1.
 
-**Top 5 themes** (each maps to multiple findings below):
-1. Idempotency missing on subscription renewal & split-bill writes.
-2. Compound indices `(tenantId, createdAt)` and `(tenantId, status)` are implied by query patterns but missing on several models.
-3. Async error swallowing (email, audit log, accounting sync) returns 200 even when the side-effect failed silently.
-4. Test coverage is thin: 13 backend specs, 1 frontend spec, 0 landing — auth/payment/order paths in particular are uncovered.
-5. Frontend `ProtectedRoute` and Axios refresh both have race-window gaps that don't break security but cause UX flicker and potential cascade-hang.
+**Top themes:**
+1. **Idempotency on retry paths.** Subscription renewal (M9), split-bill payment (M10 frontend + backend), order create (orders F-O7), delivery webhook P2002 catch-all (delivery-platforms F-6). The pattern to copy is `customers/loyalty.service.ts:50-107`.
+2. **Async error swallowing.** Email send (auth F-5), invoice sync after payment commit (payments F-7), accounting sync fire-and-forget retry (accounting F-7 missing SYNCING intermediate state).
+3. **Frontend client-API drift.** `lib/api.ts` had three rounds of hardening (single-flight refresh, env-fail-loud, Sentry-safe filter). The marketing, superadmin, and landing realms never adopted some of those fixes.
+4. **Test coverage is thin.** Backend: 13 spec files. Frontend: 1 spec. Landing: 0. Highest-leverage hardening investment is integration tests for money paths and the cross-tenant invariants test prescribed below.
+5. **Sentry redaction allowlist is shallow.** Frontend `sentry.config.ts` redaction misses `accessToken`/`refreshToken`/`cookie`/`set-cookie`/`x-api-key`/nested objects — case-sensitive whitelist (frontend-protected-routes F-3).
 
 ---
 
 ## 2. Critical & High Findings (consolidated)
 
-Every item below references a per-module section for fuller context. Items marked *(unverified)* were not spot-checked end-to-end — confirm the line/condition before fixing.
+Every row links to a per-feature file's §7. Items marked **VERIFIED** were opened at the cited line during this round and confirmed. The full set of Medium/Low/Info findings lives per-feature.
 
-### Money-path correctness
+### 2.1 Money-path correctness
 
-| ID | Sev | Dim | Where | Finding |
-|---|---|---|---|---|
-| M1 | High | Cor | `backend/src/modules/orders/services/payments.service.ts:166-167` *(unverified)* | `Number(totalPaid._sum.amount || 0)` converts `Prisma.Decimal` to JS `Number`; on large orders this loses precision before the `>= orderAmount` comparison. Stay in `Decimal`. |
-| M2 | High | Cor | `payments.service.ts:448-455` *(unverified)* | Split-bill tolerance check uses `Math.abs(...) > 0.01` on JS numbers instead of `Decimal.sub().abs().gt('0.01')`. |
-| M3 | High | Cor | `backend/src/modules/accounting/services/sales-invoice.service.ts:32-33` *(unverified)* | `getNextInvoiceNumber()` race: two concurrent POSTs can both pass the "next" check and mint duplicate invoice numbers. Wrap in `$transaction` with row-level lock or move to `RETURNING` after `UPDATE`. |
-| M4 | High | Arch | `backend/src/modules/accounting/services/accounting-sync.service.ts:29` *(unverified)* | `if (invoice.externalId) return;` blocks re-sync after provider swap. Compare `externalProvider === currentProvider` instead. |
-| M5 | High | Cor | `backend/src/modules/orders/services/payments.service.ts:282-292` *(unverified)* | Auto-invoice generation is fire-and-forget after the payment TX commits. If sync fails, order is PAID but no invoice exists, accounts drift silently. Add bounded retry with explicit `REVENUE_SYNC_FAILED` log. |
-| M6 | High | Cor | `backend/src/modules/orders/services/orders.service.ts:217-218` *(unverified)* | Tax post-discount: `discountRatio = discount / totalAmount`. If `totalAmount=0`, ratio = `NaN`, taxAmount = `NaN`. Guard for zero. |
-| M7 | High | Cor | `backend/src/modules/delivery-platforms/services/delivery-order.service.ts:118-121` *(unverified)* | `totalAmount`/`finalAmount` come straight from the platform payload — no cross-check vs sum of items. A platform-side bug or compromise could silently overcharge customers. Assert `sum(items) ≈ totalAmount` within tolerance and alert on mismatch. |
-| M8 | High | Sec | `backend/src/modules/accounting/services/accounting-sync.service.ts:116-140` **VERIFIED** | `getCredentials()` reads `settings.parasutClientSecret`, `settings.parasutPassword`, `settings.logoPassword`, `settings.foribaPassword` directly off the AccountingSettings record. The `integrations` module already has an `encryptJson` helper at `backend/src/common/helpers/encryption.helper.ts:43`; AccountingSettings appears to bypass it. Verify whether these columns are stored encrypted or in plaintext, and apply the same encryption + redaction model used by `integrations`. |
-| M9 | High | Cor | subscription renewal — `backend/src/modules/subscriptions/services/subscription-scheduler.service.ts:90-97` *(unverified)* | No `externalReference`-style idempotency key on the renewal write. If the cron fires while a previous tick is still finishing, or if a retry hits the same subscription, two renewal records can be created. |
-| M10 | High | Cor | `backend/src/modules/orders/services/payments.service.ts:412-533` *(unverified)* | Split-bill writes don't accept a client-supplied idempotency key. Network retry from a flaky client = duplicate payment. |
+| ID | Sev | Dim | Where | Finding (one line) | Detail |
+|---|---|---|---|---|---|
+| M1 | High | Cor | `orders/services/payments.service.ts:166-167` | `Number(totalPaid._sum.amount \|\| 0)` loses Decimal precision before `>= orderAmount` | [`reviews/payments.md`](reviews/payments.md) §5 C-1 |
+| M2 | High | Cor | `payments.service.ts:448-455` | Split-bill tolerance uses `Math.abs(...) > 0.01` on JS Number | [`reviews/payments.md`](reviews/payments.md) F-1 |
+| M3 | Medium | Cor | `accounting/services/sales-invoice.service.ts:32-33` | `getNextInvoiceNumber()` race — `@@unique([tenantId, invoiceNumber])` backstops to clean error but creates sequence gaps | [`reviews/accounting.md`](reviews/accounting.md) F-3 (downgraded High→Medium) |
+| M4 | High | Arch | `accounting/services/accounting-sync.service.ts:29` | `if (invoice.externalId) return;` blocks re-sync after provider swap | [`reviews/accounting.md`](reviews/accounting.md) F-2 |
+| M5 | High | Cor | `payments.service.ts:282-292` | Auto-invoice generation: real defect is swallowed try/catch (the call IS awaited) | [`reviews/payments.md`](reviews/payments.md) F-7 |
+| M7 | High | Cor | `delivery-platforms/services/delivery-order.service.ts:118-121, 157-159` | Platform-supplied `totalAmount`/`finalAmount` written through unchecked | [`reviews/delivery-platforms.md`](reviews/delivery-platforms.md) F-3 |
+| M8 | High | Sec | `accounting-sync.service.ts:116-140` **VERIFIED** | All 11 secret columns in `AccountingSettings` (schema:2937-2951) are plain `String?`; service writes the DTO verbatim with no `encryptJson` call | [`reviews/accounting.md`](reviews/accounting.md) F-1 |
+| M9 | High | Cor | `subscriptions/services/subscription.service.ts:673-720` | Renewal write side lacks `(subscriptionId, periodStart)` idempotency | [`reviews/subscriptions.md`](reviews/subscriptions.md) F-1 |
+| M10 | High | Cor | `payments.service.ts:412-533` | Split-bill writes have zero idempotency (single-payment path now has it via partial unique index) | [`reviews/payments.md`](reviews/payments.md) F-2 |
+| **NEW** F-Acc-7 | High | Cor | `accounting-sync.service.ts` | Missing `SYNCING` intermediate `externalStatus` — crash between push and local UPDATE = duplicate remote invoices on retry | [`reviews/accounting.md`](reviews/accounting.md) F-7 |
+| **NEW** F-Acc-6 | High | Cor | `foriba-efatura.adapter.ts:61-62, 70-86` | UBL-TR XML totals computed in JS `Number` → header/lines drift causes tax-authority XML rejection | [`reviews/accounting.md`](reviews/accounting.md) F-6 |
+| **NEW** F-Acc-4 | High | Cor | `sales-invoice.service.ts:43` | Divide-by-zero on `OrderItem.quantity===0` → `NaN` written to Decimal column | [`reviews/accounting.md`](reviews/accounting.md) F-4 |
+| **NEW** F-Ord-O5 | High | Cor | `orders/services/payments.service.ts` (refund path) | Refund doesn't reverse stock deductions (unlike `updateStatus → CANCELLED`) | [`reviews/orders.md`](reviews/orders.md) F-O5 |
+| **NEW** F-Ord-O2 | High | Cor | `orders.service.ts` | Payment-driven `SERVED→PAID` transition bypasses `validateTransition`; `PENDING→PAID` allowed by payment guards but not by the state machine | [`reviews/orders.md`](reviews/orders.md) F-O2 |
+| **NEW** F-Ord-O3 | High | Cor | `orders.service.ts` updateStatus | Read-modify-write in default isolation, no conditional `updateMany` | [`reviews/orders.md`](reviews/orders.md) F-O3 |
+| **NEW** F-Ord-O7 | High | Cor | order create | No idempotency key on order create | [`reviews/orders.md`](reviews/orders.md) F-O7 |
+| **NEW** F-Pay-3 | High | Cor | `payments.service.ts` refund | Refund double-tap race — `tx.payment.update` filters by id only, not status | [`reviews/payments.md`](reviews/payments.md) F-3 |
+| **NEW** F-StM-4 | High | Cor | `ingredient-movements.service.ts:36-73` | Manual movement read-then-writes `currentStock` without atomic guard — the one mutation in the module not following the gold pattern | [`reviews/stock-management.md`](reviews/stock-management.md) F-4 |
+| **NEW** F-Zr-4 | High | Cor | `z-reports.service.ts:486-536` | `computePayloadHash` uses `Decimal.toString()` — `"10"` vs `"10.00"` round-trip breaks the audit comparison | [`reviews/z-reports.md`](reviews/z-reports.md) F-4 |
 
-### Auth & token model
+### 2.2 Auth & token model
 
-| ID | Sev | Dim | Where | Finding |
-|---|---|---|---|---|
-| A1 | High | Cor | `backend/src/modules/auth/strategies/jwt.strategy.ts:36-74` *(unverified)* | `tokenVersion` check is purely against the JWT claim; there's no DB lookup per-request. After a password reset in another tab, the old token can still validate for the remaining JWT TTL window. Document the trade-off (perf vs revocation latency) — this is intentional in many systems. If revocation must be immediate, switch to a per-request DB check or short-lived access tokens with always-on rotation. |
-| A3 | High | Sec | `backend/src/modules/superadmin/services/superadmin-auth.service.ts:188-199` *(unverified)* | Failed-login counter resets on *any* successful password match, including before 2FA succeeds. Reset only after the full 2FA flow completes. |
-| A4 | High | Sec | `superadmin-auth.service.ts:476-480` *(unverified)* | `regenerateBackupCodes` calls `verifyTotp` without first checking that `twoFactorSecret` exists. If null, `verifyTotp` returns false but the surrounding flow may still mint codes. Add explicit `if (!twoFactorSecret) throw BadRequest`. |
-| A5 | Medium | Sec | `backend/src/modules/auth/auth.service.ts:232` *(unverified)* | New ADMIN registration auto-activates the user; `tenant.status` is not validated. A suspended tenant's ADMIN can still log in. Add `if (tenant.status !== ACTIVE) throw` in `validateUser`. |
+| ID | Sev | Dim | Where | Finding | Detail |
+|---|---|---|---|---|---|
+| A1 | Medium | Cor | `auth/strategies/jwt.strategy.ts:36-74` | **Reframed** — `tokenVersion` IS checked against a per-request DB read; residual is "one in-flight request can complete", not "full JWT TTL" | [`reviews/auth.md`](reviews/auth.md) F-1 (downgraded High→Medium) |
+| A3 | High | Sec | `superadmin-auth.service.ts:188-199` | Failed-login counter resets on password match before 2FA succeeds | [`reviews/superadmin.md`](reviews/superadmin.md) F-1 |
+| A4 | Low | Sec | `superadmin-auth.service.ts:476-480` | **Downgraded** — `verifyTotp` already returns false on null `twoFactorSecret`; invariant holds by side-effect | [`reviews/superadmin.md`](reviews/superadmin.md) F-2 |
+| A5 | Medium | Sec | `auth.service.ts` social-auth branches `:989-991`, `:1027-1029`, `:1119-1121`, `:1157-1159` | **Reframed** — password path correctly blocks suspended tenants; only 4 social-auth branches miss the `tenant.status` check | [`reviews/auth.md`](reviews/auth.md) F-2 |
+| **NEW** F-SA-3 | High | Sec | `superadmin-auth.service.ts:550-589` | `generateTokens` **never** increments `tokenVersion` — SA refresh token reusable for full 7-day TTL after first use | [`reviews/superadmin.md`](reviews/superadmin.md) F-3 |
+| **NEW** F-SA-5 | Medium | Sec | `common/middleware/request-logger.middleware.ts:125-136` | `shouldLogBody` redacts `/auth/login` but not `/auth/verify-2fa` — `tempToken` logged in cleartext (the real exposure; the original "audit log plaintext" claim was wrong) | [`reviews/superadmin.md`](reviews/superadmin.md) F-5 |
+| **NEW** F-SA-7 | Medium | Sec | superadmin 2FA verify | No per-account counter on invalid 2FA codes (only per-IP throttle) — 6-digit space brute-forceable by IP-rotating attacker | [`reviews/superadmin.md`](reviews/superadmin.md) F-7 |
+| **NEW** F-SA-8 | Medium | Cor | `superadmin-auth.service.ts:122-138` | Backup-code RMW race — two concurrent submissions of the same code both pass `.includes(hash)` and both succeed | [`reviews/superadmin.md`](reviews/superadmin.md) F-8 |
+| **NEW** F-SA-11 | Medium | Sec | superadmin refresh | SA refresh accepted via JSON body — diverges from tenant cookie-only pattern; exposes refresh to XSS | [`reviews/superadmin.md`](reviews/superadmin.md) F-11 |
+| **NEW** F-Auth-3 | Medium | Cor | `auth.service.ts:527-533` | Refresh-rotation TOCTOU — revoke+generate is non-atomic, two parallel refreshes with same cookie can mint two live sessions | [`reviews/auth.md`](reviews/auth.md) F-3 |
+| **NEW** F-Ten-5 | Medium | Sec | `superadmin-tenants.service.ts:188-242` SUSPEND path | Suspending a tenant doesn't bump `tokenVersion` / revoke refresh tokens / disconnect WebSockets (per-request `jwt.strategy.ts:60-62` partial mitigation only) | [`reviews/tenants.md`](reviews/tenants.md) F-5 |
 
-> **A2 (password-reset token race) — dropped.** Verified at `auth.service.ts:691-721`: the code already uses the recommended atomic-consume pattern (`updateMany` filtered by `resetTokenHash`, reject on `count === 0`, all in a `$transaction` that also revokes refresh tokens). Source includes a comment explicitly explaining the race window it closes. See §11.1.
+### 2.3 Multi-tenant isolation & schema
 
-> ⚠ **Spot-check note (dropped):** an agent flagged `auth.controller.ts:120-122` as accepting a refresh token from a JSON body. Verified at the source — `refresh()` reads from `req.cookies?.[REFRESH_COOKIE]` only (`auth.controller.ts:106`); there is no JSON-body fallback. **Drop.**
+| ID | Sev | Dim | Where | Finding | Detail |
+|---|---|---|---|---|---|
+| T1 | Medium | Perf | `prisma/schema.prisma` StockMovement | `(tenantId, createdAt)` compound index missing | [`reviews/prisma-schema.md`](reviews/prisma-schema.md) F-1 |
+| ~~T2~~ | — | — | IngredientMovement | **DROPPED** — column `tenantId` exists at `schema.prisma:2462` (migration `20260311_…` line 444). Only the compound index gap remains as F-3. | [`reviews/prisma-schema.md`](reviews/prisma-schema.md) F-3 |
+| ~~T3~~ | — | — | WaiterRequest, BillRequest | **DROPPED** — both have direct `tenantId` + `@@index([tenantId, status])` per migration `20260420180000`. | [`reviews/prisma-schema.md`](reviews/prisma-schema.md) §9 |
+| T4 | Low | Sec | `tenants.controller.ts:43, 54` | **VERIFIED downgrade** — guard chain populates `req.tenantId`. Defense-in-depth only. | [`reviews/tenants.md`](reviews/tenants.md) F-1 |
+| T5 | Medium | Cor | `tenants.service.ts:91-149` | **Reframed** — `?.` + `?? false` already null-guards at THIS site; risk preserved for other `currentPlan` callers | [`reviews/tenants.md`](reviews/tenants.md) F-2 |
+| **NEW** F-Sch-2 | Medium | Perf | WasteLog | `(tenantId, createdAt)` missing | [`reviews/prisma-schema.md`](reviews/prisma-schema.md) F-2 |
+| **NEW** F-Sch-4 | Medium | Perf | DeliveryPlatformLog | Compound index gap | [`reviews/prisma-schema.md`](reviews/prisma-schema.md) F-4 |
+| **NEW** F-Sch-5 | Medium | Perf | Notification | Compound index gap | [`reviews/prisma-schema.md`](reviews/prisma-schema.md) F-5 |
+| **NEW** F-Sch-9 | Medium | Cor | All currency columns | No ISO 4217 constraint — `"USD"` / `"USDOLLAR"` / `""` all accepted | [`reviews/prisma-schema.md`](reviews/prisma-schema.md) F-9 |
+| **NEW** F-Sch-11 | Low | Cor | 8 audit `*ById` columns | No FK — orphan-able after user retirement | [`reviews/prisma-schema.md`](reviews/prisma-schema.md) F-11 |
 
-### Multi-tenant isolation & schema
+### 2.4 WebSocket gateways & webhooks
 
-| ID | Sev | Dim | Where | Finding |
-|---|---|---|---|---|
-| T1 | Medium | Perf | `backend/prisma/schema.prisma` (StockMovement) **VERIFIED** | StockMovement has `@@index([tenantId])`, `@@index([productId])`, `@@index([userId])` — but no compound `(tenantId, createdAt)`. Date-range filters per tenant fall back to filtering after a single-column index lookup. Add `@@index([tenantId, createdAt])` for hot list queries. (Severity downgraded from High after verifying the single-column tenantId index exists.) |
-| T2 | High | Cor | `backend/prisma/schema.prisma` (IngredientMovement, ~line 2264) *(unverified)* | Scoped only via `stockItem.tenantId` FK chain — no direct `tenantId` column. If `stockItem` is hard-deleted, movements orphan but remain queryable. Add direct `tenantId` for defense-in-depth. |
-| T3 | High | Cor | `backend/prisma/schema.prisma` (WaiterRequest, BillRequest, ~line 1419-1449) *(unverified)* | Same pattern: scoped via `table.tenantId`, no direct column. Tenant-scoped query helpers can miss them. Add `tenantId` + `@@index([tenantId])`. |
-| T4 | Low | Sec | `backend/src/modules/tenants/tenants.controller.ts:43, 54` **VERIFIED** | `findSettings` / `updateSettings` pass `req.tenantId` to the service. The handler is gated by `@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)` which sets `req.tenantId`, so under the current wiring this is safe. Defense-in-depth only: an explicit `if (!req.tenantId) throw Forbidden` would catch a future refactor that breaks the guard ordering. (Downgraded from High after verifying the guard chain.) |
-| T5 | High | Sec | `backend/src/modules/tenants/tenants.service.ts:91-149` *(unverified)* | Subdomain change reads `tenant.currentPlan.customBranding`. `currentPlan` can be null (FK is `SetNull`) → NPE → 500 instead of 403. Guard for null plan. |
+| ID | Sev | Dim | Where | Finding | Detail |
+|---|---|---|---|---|---|
+| **NEW** F-Not-1 | High | Sec | `notifications.gateway.ts:42` | No `payload.type === 'user'` guard and no `algorithms: ['HS256']` pin — accepts marketing / superadmin JWTs (same `JWT_SECRET`) | [`reviews/notifications.md`](reviews/notifications.md) N-1 |
+| **NEW** F-Not-2 | High | Cor | `notifications.gateway.ts:45` | Handler reads `payload.userId`; main-app JWTs sign with `sub: user.id`. Per-user notification room is literally `user:undefined` → `sendNotificationToUser` silently no-ops | [`reviews/notifications.md`](reviews/notifications.md) N-2 |
+| **NEW** F-An-4 | Medium | Sec | `analytics.gateway.ts:107` | Same `algorithms` pin gap as notifications | [`reviews/analytics.md`](reviews/analytics.md) F-4 |
+| **NEW** F-Dlv-5 | High | Cor | `delivery-webhook.controller.ts:113-123` | Yemeksepeti status-update body logged + 200 returned; **no internal Order update** for `PICKED_UP`/`CANCELLED`. Trendyol has no handler at all | [`reviews/delivery-platforms.md`](reviews/delivery-platforms.md) F-5 |
+| **NEW** F-Dlv-9 | High | Sec | `webhook-auth.guard.ts:121` | Trendyol replay protection `if (timestamp)` — omit timestamp header to bypass 5-min freshness window | [`reviews/delivery-platforms.md`](reviews/delivery-platforms.md) F-9 |
+| **NEW** F-Dlv-10 | Medium | Sec | `webhook-auth.guard.ts:128` | Falls back to `JSON.stringify(request.body)` when `rawBody` missing — verifying signature against re-serialized JSON is unsafe | [`reviews/delivery-platforms.md`](reviews/delivery-platforms.md) F-10 |
+| **NEW** F-Dlv-6 | High | Cor | `delivery-order.service.ts:198-211` | P2002 catch-all treats ANY unique-constraint violation as "duplicate, ignore" — not just the dedup index | [`reviews/delivery-platforms.md`](reviews/delivery-platforms.md) F-6 |
+| **NEW** F-Dlv-7 | High | Cor | `delivery-auth.service.ts:79-101` | `ensureValidToken` has no single-flight — concurrent webhooks/polls cause N redundant `authenticate()` calls | [`reviews/delivery-platforms.md`](reviews/delivery-platforms.md) F-7 |
+| ~~F-Dlv-isRunning~~ | — | — | `order-polling.scheduler.ts:36-60` | **DROPPED** — `isRunning` IS inside try/finally (re-verified at `:37-59`). | [`reviews/delivery-platforms.md`](reviews/delivery-platforms.md) §9 |
 
-### Frontend & landing
+### 2.5 Frontend
 
-| ID | Sev | Dim | Where | Finding |
-|---|---|---|---|---|
-| F1 | High | Sec | `landing/next.config.ts:23-40` **VERIFIED** | No `Content-Security-Policy` header. X-Frame-Options/X-Content-Type-Options are set, but a CSP would close the next layer of XSS defense. Add a baseline CSP (start with `default-src 'self'; script-src 'self' 'unsafe-inline'` and tighten). |
-| F2 | High | Cor | `frontend/src/components/ProtectedRoute.tsx:10-26` *(unverified)* | On page reload, `isAuthenticated` rehydrates from persisted state but `accessToken` does not (memory-only — correct). Children render briefly with no token, the first request 401s, refresh kicks in. Functionally fine, but causes a flicker and double-fetch. Block render until profile/refresh resolves. |
-| F3 | Medium | Cor | `frontend/src/lib/api.ts:42-57` *(unverified)* | `refreshInFlight` has no timeout. If `/auth/refresh` hangs, every queued request blocks indefinitely. Wrap in `Promise.race` with a 10s timeout. |
-| F4 | Medium | Cor | `frontend/src/components/ErrorBoundary.tsx:36-50` *(unverified)* | Async/Promise rejections aren't caught by the error boundary. Add `window.addEventListener('unhandledrejection', ...)` in `main.tsx` forwarding to Sentry. |
+| ID | Sev | Dim | Where | Finding | Detail |
+|---|---|---|---|---|---|
+| F1 | High | Sec | `landing/next.config.ts:23-40` **VERIFIED** | No `Content-Security-Policy` header | [`reviews/landing.md`](reviews/landing.md) F-1 |
+| F2 | Medium | Cor | `frontend/src/components/ProtectedRoute.tsx:10-26` | Render flicker on reload (downgraded — backend re-auths every request) | [`reviews/frontend-protected-routes.md`](reviews/frontend-protected-routes.md) F-1 |
+| F3 | Medium | Cor | `frontend/src/lib/api.ts:42-57` | `refreshInFlight` has no timeout | [`reviews/frontend-lib.md`](reviews/frontend-lib.md) F-1 |
+| F4 | Medium | Cor | `frontend/src/main.tsx` | No `unhandledrejection` listener (verified absent) | [`reviews/frontend-protected-routes.md`](reviews/frontend-protected-routes.md) F-2 |
+| **NEW** F-FE-SA-1 | High | Sec | `frontend/src/store/superAdminAuthStore.ts:93-97` | `partialize` persists `accessToken` to `localStorage` — **contradicts the 2026-04-27 §3.2 claim that all three stores are memory-only**. Confirmed independently by `frontend-pages-superadmin.md` F-1 and `frontend-auth-stores.md` F-1 | [`reviews/frontend-auth-stores.md`](reviews/frontend-auth-stores.md) F-1 |
+| **NEW** F-FE-SA-2 | High | Cor | superAdminAuthStore refresh | Refresh path posts `{refreshToken}` in JSON body, but `partialize` doesn't persist `refreshToken` — after any reload, refresh is structurally dead → forced re-2FA on access-token expiry | [`reviews/frontend-pages-superadmin.md`](reviews/frontend-pages-superadmin.md) F-2 |
+| **NEW** F-FE-Mkt-1 | High | Cor | `frontend/src/features/marketing/api/marketingApi.ts:21-53` | Marketing API client never received the single-flight refresh fix from commit `9b9eee4` — N parallel 401s = N concurrent `/marketing/auth/refresh` calls, which under backend rotation revoke each other | [`reviews/frontend-features-marketing.md`](reviews/frontend-features-marketing.md) F-1 |
+| **NEW** F-FE-Mkt-2 | High | Cor | `pages/marketing/LeadDetailPage.tsx:331` | Status flip-grid renders WON button; backend `marketing-leads.service.ts:295-299` explicitly 400s — UI offers an action the backend will reject | [`reviews/frontend-features-marketing.md`](reviews/frontend-features-marketing.md) F-2 |
+| **NEW** F-FE-Mkt-3 | High | Cor | `store/marketingAuthStore.ts:61` | Comment claims "on reload we re-auth via /api/marketing/auth/refresh" — code does not. Reload = forced re-login | [`reviews/frontend-features-marketing.md`](reviews/frontend-features-marketing.md) F-3 |
+| **NEW** F-FE-Ord-1 | High | Cor | POS payment submit | No double-submit guard + no idempotency key (the frontend side of M10) | [`reviews/frontend-features-orders.md`](reviews/frontend-features-orders.md) F-FE1 |
+| **NEW** F-FE-Ord-4 | Medium | Cor | `pages/qr-menu/CartPage.tsx:70`, `SubdomainCartPage.tsx:73` | Bypass `lib/env.ts` and silently fall back to `localhost:3000` — regresses commit `5154c2e` | [`reviews/frontend-features-orders.md`](reviews/frontend-features-orders.md) F-FE4 |
+| **NEW** F-FE-Sub-1 | High | Cor | `SubscriptionPlansPage.tsx:18,27` | `processingPlanId` setter never called — double-submit guard is **dead code** | [`reviews/frontend-pages-subscription.md`](reviews/frontend-pages-subscription.md) F-1 |
+| **NEW** F-FE-PR-3 | Medium | Sec | `frontend/src/sentry.config.ts` | Redaction allowlist is shallow + case-sensitive — misses `accessToken`/`refreshToken`/`cookie`/`set-cookie`/`x-api-key`/nested objects | [`reviews/frontend-protected-routes.md`](reviews/frontend-protected-routes.md) F-3 |
+| **NEW** F-FE-Lib-3 | Low | Cor | `frontend/src/lib/socket.ts:4` | Same silent-localhost-fallback pattern that `env.ts` was created to eliminate | [`reviews/frontend-lib.md`](reviews/frontend-lib.md) F-3 |
+| **NEW** F-Land-3 | Medium | Sec | `landing/global-error.tsx:117-129`, `[locale]/error.tsx:61-67` | **Corrects 2026-04-27 §6.2** — error pages render stack/digest unconditionally (not dev-only as claimed) | [`reviews/landing.md`](reviews/landing.md) F-3 |
+| **NEW** F-Land-2 | Medium | Sec | `landing/lib/api.ts:115` | Silent fallback to hard-coded prod host — same anti-pattern commit `5154c2e` fixed for frontend, landing was missed | [`reviews/landing.md`](reviews/landing.md) F-2 |
+
+### 2.6 Low-risk module escapes
+
+| ID | Sev | Dim | Where | Finding | Detail |
+|---|---|---|---|---|---|
+| **NEW** PS-1 | High | Sec | `public-stats/services/public-stats.service.ts:23-31` | `IP_HASH_SALT ?? JWT_SECRET ?? APP_SECRET` fallback chain — rotating `JWT_SECRET` silently re-pseudonymizes every historical `ipHash` | [`reviews/low-risk-modules.md`](reviews/low-risk-modules.md) PS-1 |
 
 ---
 
 ## 3. Cross-cutting observations
 
 ### 3.1 Multi-tenant isolation
-- **Pattern:** middleware → `req.tenantId` → service queries filter by it. 843 `tenantId` references across modules; well-adopted.
-- **Gaps:** controllers occasionally trust `req.tenantId` without nullity check (T4); a few tenant-scoped tables have no direct `tenantId` column (T2, T3); compound `(tenantId, X)` indices missing on several hot tables (T1).
-- **Suggested invariants test:** add a backend integration test that creates two tenants, attempts cross-tenant reads via every list/find endpoint, and asserts 0 leaks. This would have caught past regressions and protects future ones.
+- **Pattern verified:** middleware → `req.tenantId` → service queries filter by it. `tenantId` references count refreshed below in §3.10. Well-adopted across all 31 modules.
+- **Gaps still open:** controllers occasionally trust `req.tenantId` without nullity check (T4, defense-in-depth); compound `(tenantId, X)` indices missing on a handful of hot tables (T1, F-Sch-2/4/5). Most schema gaps (T2/T3) **dropped** after re-verification — both models have direct `tenantId` + `(tenantId, status)` since migration `20260420180000`.
+- **Suggested invariants test:** the cross-tenant integration test in [`reviews/tenants.md`](reviews/tenants.md) §10 is now concrete — 23 list endpoints + 10 find endpoints enumerated by name.
 
-### 3.2 Auth & token model
-- **Access tokens:** memory-only on frontend (verified — no `localStorage` writes for tokens; only `i18n_language`). Refresh tokens: httpOnly cookie. XSS exfiltration surface is minimized.
-- **Three frontend auth stores** (`authStore`, `marketingAuthStore`, `superAdminAuthStore`) follow the same memory-only pattern and share types. Not duplicated logic — the actual refresh runs in `lib/api.ts`. Healthy split.
-- **Refresh rotation:** correctly wired through `lib/api.ts` interceptor and `lib/socket.ts` token replay. The Axios refresh has no timeout (F3).
-- **Revocation:** JWT `tokenVersion` check is per-claim, not per-DB-lookup (A1). Acceptable trade-off for performance, but document the revocation latency.
+### 3.2 Auth & token model — corrections to 2026-04-27 §3.2
+- **The "all three frontend auth stores are memory-only" claim is wrong.** `superAdminAuthStore.ts:93-97` persists `accessToken` to `localStorage` (verified). Main-app `authStore` and `marketingAuthStore` are memory-only. See [`reviews/frontend-auth-stores.md`](reviews/frontend-auth-stores.md) §3 I-1.
+- **Refresh tokens are httpOnly cookie for tenant realm** — verified. **Marketing and superadmin realms post refresh tokens in JSON body** — XSS-exfiltratable, diverges from tenant pattern. See [`reviews/frontend-pages-superadmin.md`](reviews/frontend-pages-superadmin.md) F-2 and [`reviews/frontend-auth-stores.md`](reviews/frontend-auth-stores.md) F-5.
+- **Refresh rotation:** correctly wired through `lib/api.ts` for tenant realm (single-flight from commit `9b9eee4`). **Not adopted by `features/marketing/api/marketingApi.ts`** — N parallel 401s race. See [`reviews/frontend-features-marketing.md`](reviews/frontend-features-marketing.md) F-1.
+- **JWT revocation latency:** A1 reframed — `jwt.strategy.ts:36-74` DOES perform a per-request DB lookup of `tokenVersion` (the original framing was wrong). True residual is "one in-flight request can complete with stale claim", not "full JWT TTL". See [`reviews/auth.md`](reviews/auth.md) F-1.
+- **Atomic-consume reset (`auth.service.ts:691-721`)** remains the gold standard. Candidates that should adopt it: subscription renewal (M9), split-bill (M10), invoice numbering (M3), backup-code redemption (F-SA-8). See [`reviews/auth.md`](reviews/auth.md) §8.
 
 ### 3.3 Scheduler / cron reliability
-Verified pattern across all 5 schedulers (subscriptions, z-reports, stock-alerts, order-polling, token-refresh):
+Verified pattern across all schedulers — refer to [`reviews/subscriptions.md`](reviews/subscriptions.md) §8 (canonical exemplar at `subscription-scheduler.service.ts:29-43`).
+
 ```ts
-const lockId = djb2('<scheduler-name>');  // constant string
+const lockId = djb2('<scheduler-name>');
 const [{ locked }] = await this.prisma.$queryRawUnsafe(
   `SELECT pg_try_advisory_lock(${lockId}) AS locked`
 );
@@ -116,404 +173,310 @@ try { /* work */ } finally {
   await this.prisma.$queryRawUnsafe(`SELECT pg_advisory_unlock(${lockId})`);
 }
 ```
+
 - **Multi-instance safe:** ✅ `lockId` is hashed from a constant; no user input.
-- **`$queryRawUnsafe` is safe here:** the interpolated value is a numeric hash, not user input. (Still, switching to `$queryRaw` with a tagged template would remove the "Unsafe" designation and make linting happy.)
-- **One race to fix:** `delivery-platforms/schedulers/order-polling.scheduler.ts:36-60` *(unverified)* keeps a local `isRunning` flag *outside* the lock try/finally — if the lock holder crashes, the flag remains true on that replica. Drop the flag and rely on the advisory lock alone.
+- **`order-polling.scheduler.ts isRunning` finding DROPPED** — [`reviews/delivery-platforms.md`](reviews/delivery-platforms.md) §9 verified the flag is correctly nested inside the outer try/finally at `:37-59`.
+- **DJB2 brittleness** (subscriptions F-4) — fine at 6 jobs; switch to named-lock registry as count grows.
 
 ### 3.4 Database schema audit (`prisma/schema.prisma`, 87 models)
-- **Cascade/restrict choices** are mostly sensible, but a few cause foot-guns: `Tenant.currentPlan` uses `onDelete: SetNull` (~line 87) — a deleted plan leaves tenants with `currentPlan=null`, which downstream code dereferences (T5). Switch to `Restrict` and force plan reassignment first.
-- **Soft-delete inconsistency:** Tenant/User use `status='DELETED'`, products/categories cascade-delete. Pick one. Recommend adding `deletedAt` to all tenant-scoped models and filtering it in repository helpers.
-- **Compound indices missing on hot query patterns** (T1).
-- **Tables without direct `tenantId`** (T2, T3) — fix during the next migration window.
+See [`reviews/prisma-schema.md`](reviews/prisma-schema.md) for the full audit. Headline items:
+- **T2, T3 dropped** after re-read of migration `20260420180000` — IngredientMovement, WaiterRequest, BillRequest all have direct `tenantId` columns.
+- **Cascade/restrict** mostly sensible; `Tenant.currentPlan` SetNull (T5) and `Order.user` Restrict still flagged.
+- **Compound index gaps** widened to 4 more tables: WasteLog, IngredientMovement, DeliveryPlatformLog, Notification.
+- **Currency columns** have no ISO 4217 constraint (F-Sch-9).
+- **Soft-delete inconsistency** still stands — three styles coexist (F-Sch-7).
+- **50 money columns** all `Decimal @db.Decimal(10, 2)` — uniform.
 
 ### 3.5 WebSocket gateways
-| Gateway | JWT verified | Type-checked | Tenant-scoped rooms | Notes |
-|---|---|---|---|---|
-| `kds.gateway.ts` | ✅ | ✅ (rejects `marketing`/`superadmin`) | ✅ | Excellent; dual staff+customer auth, role-based rooms. |
-| `notifications` | ✅ | ❌ | ✅ | Add a `payload.type === 'user'` check for parity with KDS. Low risk, non-sensitive data. |
-| `analytics` | ✅ | ❌ | ✅ (`analytics-{tenantId}`) | Same recommendation as notifications. Heatmap upsert can do up to 1600 rows/tick — cap or batch. |
+| Gateway | JWT verified | Type-checked | Algorithms pinned | Tenant-scoped rooms | Notes |
+|---|---|---|---|---|---|
+| `kds.gateway.ts` | ✅ | ✅ | ✅ HS256 | ✅ | Exemplar. Dual staff+customer auth, role-based rooms, Sentry envelope. See [`reviews/kds.md`](reviews/kds.md). |
+| `notifications.gateway.ts` | ✅ | ❌ | ❌ | ✅ | **N-1** (cross-realm accept), **N-2** (`payload.userId` undefined → `user:undefined` room). See [`reviews/notifications.md`](reviews/notifications.md). |
+| `analytics.gateway.ts` | ✅ | ❌ | ❌ | ✅ | Same gaps as notifications; plus burst-rate concerns. See [`reviews/analytics.md`](reviews/analytics.md). |
 
 ### 3.6 Webhook signature verification
-Verified at `backend/src/modules/delivery-platforms/guards/webhook-auth.guard.ts:34-52`:
-- **Yemeksepeti:** HMAC-SHA512 (JWT-style) with timing-safe compare. ✅
-- **Trendyol:** HMAC-SHA256 + 5-min timestamp anti-replay window. ✅
-- **Getir / Migros:** **polling platforms** (see `constants/platform-status-map.ts:42`: `POLLING_PLATFORMS = ['GETIR', 'MIGROS', 'TRENDYOL']`) — they don't have webhook routes, so there's nothing to sign. (Trendyol uses both modes.)
-- **Default branch fails closed** (`throw UnauthorizedException` for any unrecognized `@WebhookPlatform`).
-
-> ⚠ **Spot-check note (dropped):** an agent flagged Getir/Migros webhooks as missing signature verification. Verified — those platforms use polling, not webhooks. **Drop.**
-
-**Subscription webhooks (Stripe / Iyzico / PayTR):** appear absent from the codebase — system seems to use scheduler-driven manual renewal. If you start receiving real webhooks (e.g., for failed-charge events), this is the highest-leverage gap to fix; that controller will need both signature verification *and* idempotency on the event-id.
+- **Yemeksepeti:** HMAC-SHA512 + timing-safe ✅
+- **Trendyol:** HMAC-SHA256 + 5-min anti-replay — but **bypass at `webhook-auth.guard.ts:121`**: timestamp check guarded by `if (timestamp)` (F-Dlv-9). Plus rawBody fallback to JSON.stringify (F-Dlv-10).
+- **Getir / Migros:** polling — no signatures applicable (confirmed at `constants/platform-status-map.ts:42`).
+- **Default branch fails closed** ✅
+- **Yemeksepeti status updates** silently dropped — F-Dlv-5.
 
 ### 3.7 Logging & observability
-- Sentry wired on backend, frontend, and landing. Frontend `sentry.config.ts:40-64` redacts `password`, `token`, `apiKey`, `secret`, `authorization` from breadcrumbs and strips browser context. Landing `sentry.server.config.ts` strips `authorization` / `cookie` / `x-api-key`. Good.
-- Source maps hidden from the public client (landing `next.config.ts:62`, `hideSourceMaps: true`) and uploaded only to Sentry. ✅
-- Backend has 6 `console.log` and 23 `console.warn`/`console.error` calls — small, but worth replacing with the NestJS `Logger` so log levels can be tuned per env.
+- Sentry wired on backend, frontend, and landing.
+- **Frontend redaction whitelist is shallow** — [`reviews/frontend-protected-routes.md`](reviews/frontend-protected-routes.md) F-3.
+- **Landing global-error renders stack in prod** (corrects 2026-04-27 §6.2 — landing.md F-3).
+- Source maps hidden ✅
+- Auth Sentry tags still include email/IP — P3 hardening.
 
 ### 3.8 Test coverage gaps
-- Backend: **13 spec files** (mix of `*.spec.ts` and one or two e2e). For ~50k LOC this is *very* light. Auth, payments, orders, subscriptions, webhooks have minimal-to-no automated coverage. **The single highest-leverage hardening investment is integration tests for the money paths.**
-- Frontend: **1 test file** (`ErrorBoundary.spec.tsx`). No tests for `lib/api`, `lib/socket`, auth stores, ProtectedRoute, payment UI, or any feature.
-- Landing: **0 tests.** Acceptable given it's mostly static, but a smoke test for the `/api/health` route and a snapshot for the layout would help.
+- Backend: **13 spec files**, ~50k LOC.
+- Frontend: **1 test file** (`ErrorBoundary.spec.tsx`).
+- Landing: **0 tests.**
+- **Per-feature §10 sections** are now the seed material for a coverage program. Money paths and the cross-tenant invariants test should be P0 by leverage.
 
 ### 3.9 Public endpoints inventory (`@Public()`)
-~40 endpoints across:
-- `auth` (login, register, refresh, OAuth, password reset) — expected.
-- `desktop-app` (release manifest endpoints, gated by `ApiKeyGuard`) — verify the API-key check is enforced everywhere it should be.
-- `public-stats`, `qr-menu`, `customer-orders`, `tenants/by-subdomain`, `tables` (1 endpoint), `contact`, `subscriptions/plans`, `delivery-webhook` (gated by `WebhookAuthGuard`), `reservations/public-*`.
+~40 endpoints across `auth`, `desktop-app` (ApiKeyGuard verified at [`reviews/low-risk-modules.md`](reviews/low-risk-modules.md)), `public-stats` (**PS-1 escape**), `qr-menu`, `customer-orders`, `tenants/by-subdomain`, `tables`, `contact`, `subscriptions/plans`, `delivery-webhook` (WebhookAuthGuard with two bypasses noted in §2.4), `reservations/public-*`. Throttling mostly in place; a few read-only public endpoints lack `@Throttle` (tenants F-7).
 
-All look intentional from the names. Two things to confirm by hand: (a) every `@Public()` endpoint that *should* be rate-limited has a `@Throttle` decorator (most do — verified on webhooks, public-stats); (b) `/desktop-app` truly enforces `ApiKeyGuard` and not just the `@Public()` skip of the JWT guard.
+### 3.10 Grep snapshot (run 2026-05-11)
 
----
-
-## 4. Backend per-module reports
-
-### 4.1 `common/`  ·  Health: 🟡 yellow
-
-The security boundary. Guards, middleware, decorators, exception filters, helpers (incl. `encryption.helper.ts`), pagination utilities. Mostly well-shaped.
-
-| Sev | Dim | Location | Finding | Fix |
-|---|---|---|---|---|
-| Medium | Sec | `main.ts:49-55` *(unverified)* | `TRUST_PROXY` parsing accepts any string verbatim; an invalid CIDR silently turns into "trust everything". | Validate against `^\d+$|^[\d.]+\/\d+$` before passing to Express. |
-| Medium | Perf | `common/middleware/request-logger.middleware.ts:64` and exception filter *(unverified)* | Request ID generated twice (middleware + filter). They don't correlate if the filter generates its own. | Generate once in middleware, attach to request, reuse in filter. |
-| Medium | Sec | `auth.service.ts` Sentry tags using email/IP *(unverified)* | PII in telemetry tags. | Hash userId; drop email/IP from tags. |
-| Info | Sec | `common/helpers/encryption.helper.ts:43` (`encryptJson`) **VERIFIED** | Encryption helper exists and is used by `integrations` module. Confirm AccountingSettings adopts it (M8). | n/a |
-
-### 4.2 `auth/`  ·  Health: 🟢 green
-24 files. Token lifecycle (refresh rotation, password-reset atomic consume, refresh-token revocation) is **solid** — verified at `auth.service.ts:691-721`. Remaining sharp edges are around 2FA boundaries (handled in `superadmin/`), suspended-tenant validation, and async error swallowing on email send.
-
-| Sev | Dim | Location | Finding | Fix |
-|---|---|---|---|---|
-| High | Cor | A1 above | jwt revision via claim only; revocation latency = JWT TTL | see Critical & High table |
-| Medium | Sec | A5 above | suspended tenant ADMIN can log in | guard tenant status |
-| Medium | Cor | `auth.service.ts:256-262` *(unverified)* | `sendEmailVerification` swallows exceptions; user gets 200 even when email never sent. | Re-throw on send failure or surface as 5xx. |
-| Medium | Arch | `auth/guards/api-key.guard.ts:46-48` *(unverified)* | Both `X-API-KEY` and `API-KEY` headers accepted with no documented reason. | Pick one canonical header. |
-| Low | Perf | `auth.service.ts:401-414` *(unverified)* | `validateUser` selects full user record; only password+id needed for compare. | Sparse `select`. |
-
-> ⚠ **Spot-check note (dropped):** "refresh in JSON body" — false positive (verified at `auth.controller.ts:106`).
-
-### 4.3 `tenants/`  ·  Health: 🟢 green
-4 files on the critical isolation path. Verified at `tenants.controller.ts`: handlers are gated by `JwtAuthGuard + TenantGuard + RolesGuard`, so `req.tenantId` is always populated. The remaining concerns are defense-in-depth.
-
-T4, T5 above. Plus:
-| Sev | Dim | Location | Finding | Fix |
-|---|---|---|---|---|
-| Medium | Arch | `tenants.service.ts:123-138` *(unverified)* | Subdomain reservation row not cleaned up if the surrounding TX rolls back. | Move reservation to a post-commit hook or saga. |
-
-### 4.4 `superadmin/`  ·  Health: 🟡 yellow
-29 files. TOTP and backup-code mechanics are well-implemented; the gaps are in the surrounding state-machine.
-
-A3, A4 above. Plus:
-| Sev | Dim | Location | Finding | Fix |
-|---|---|---|---|---|
-| High | Cor | `superadmin-auth.service.ts:527-548` *(unverified)* | Two refresh requests can race and both succeed because `payload.ver` check vs new `ver` write is not atomic. | Move to a `$transaction` with `FOR UPDATE` on the superAdmin row. |
-| Medium | Sec | `superadmin-auth.controller.ts:44-49` *(unverified)* | `tempToken` written to audit log in plaintext. | Log action + correlation id, not the secret. |
-| Medium | Arch | `superadmin-auth.service.ts:597-642` *(unverified)* | `createInitialSuperAdmin` race between concurrent seed scripts. | Use `UPSERT ... ON CONFLICT` or advisory lock. |
-
-### 4.5 `subscriptions/`  ·  Health: 🟡 yellow
-20 files. Renewal/PAST_DUE state machine is sound; advisory locks across 6 cron jobs are correct.
-
-| Sev | Dim | Location | Finding | Fix |
-|---|---|---|---|---|
-| High | Cor | M9 above | Renewal not idempotent on the renewal-write side | Add `externalReference` or composite unique key on `(subscriptionId, periodStart)`. |
-| Medium | Cor | `services/billing.service.ts:73` *(unverified)* | `dueDate: new Date()` — should be `periodEnd` or tenant `defaultPaymentTermDays`. | Mirror the pattern used in `sales-invoice.service.ts:84-86`. |
-| Medium | Arch | `services/subscription-scheduler.service.ts:44-54` *(unverified)* | DJB2-hashed lock IDs work for 6 jobs; not a defect, just brittle as the count grows. | Switch to named pg advisory locks or a lock-id registry. |
-| Low | Perf | `subscription.service.ts:44, 62` *(unverified)* | `getCurrentSubscription()` always includes last-5 payments. | Cache or lazy-load. |
-
-### 4.6 `orders/`  ·  Health: 🟡 yellow
-11 files; `orders.service.ts` is ~1136 LOC — the biggest service in the codebase.
-
-M1, M2, M5, M6, M10 above. Plus:
-| Sev | Dim | Location | Finding | Fix |
-|---|---|---|---|---|
-| High | Cor | `payments.service.ts:373-378` *(unverified)* | Refund subtraction guards `>= 0` but doesn't alert when `refundAmount > totalSpent` — which would indicate corrupt state. | Assert and emit a Sentry-level error on the anomaly before clamping. |
-| Medium | Cor | `payments.service.ts:112-124` *(unverified)* | 1-cent overage tolerance allowed without explanation. | Document why; sunset the tolerance once all clients use Decimal. |
-| Medium | Arch | `orders.service.ts` size | 1136 LOC service bundles lifecycle + payments + KDS events + delivery. | Extract `OrderPaymentHandler` and `OrderDeliveryHandler`. |
-| Low | Perf | `getGroupBillSummary:554-593` *(unverified)* | N+1 flatMap, no `take`. | Paginate items; cap to 1000. |
-
-> ⚠ **Spot-check note (dropped):** "Critical: refund auth bypass at `payments.service.ts:325-330`" — verified at `payments.service.ts:317-330`. The `if (!payment) throw NotFoundException` correctly fires *before* the tenant check; the tenant check at line 330 only runs once `payment` is non-null. **Drop.**
-
-### 4.7 `accounting/`  ·  Health: 🔴 red
-14 files. Three high-severity items concentrated here.
-
-M3, M4, M8 above. Plus:
-| Sev | Dim | Location | Finding | Fix |
-|---|---|---|---|---|
-| Medium | Cor | `sales-invoice.service.ts:36-49` *(unverified)* | Invoice tax is read off `orderItem.taxRate` (frozen at order time). If `product.taxRate` changes between order and invoice, audit drift. | Document the freeze; add a note in the OrderItem comment. |
-| Medium | Cor | `sales-invoice.service.ts:43` *(unverified)* | Back-calculates `unitPrice` by dividing — divide-by-zero if `quantity===0`. | Guard early. |
-
-### 4.8 `delivery-platforms/`  ·  Health: 🟡 yellow
-25 files; webhook-auth guard is verified solid for the two platforms that use webhooks.
-
-M7 above. Plus:
-| Sev | Dim | Location | Finding | Fix |
-|---|---|---|---|---|
-| High | Cor | `schedulers/order-polling.scheduler.ts:36-60` *(unverified)* | Local `isRunning` flag outside lock try/finally — stuck-true if lock holder crashes. | Remove the flag; pg_advisory_lock alone is sufficient. |
-| Medium | Cor | `services/delivery-order.service.ts:43-56, 200-210` *(unverified)* | Duplicate webhook returns `null` silently, caller can't tell if it was created or skipped. | Return `{ created: bool, orderId }`. |
-| Medium | Cor | `services/delivery-order.service.ts:77-95` *(unverified)* | Unmapped items still let the order proceed at platform-claimed total. | Force `requiresApproval=true` if any item is unmapped. |
-| Medium | Arch | `services/delivery-order.service.ts:96-97` *(unverified)* | PII logged before adapter validation. | Move `scrubPii` earlier; never log raw body on parse failure. |
-
-### 4.9 `z-reports/`  ·  Health: 🟡 yellow
-6 files. Finalization is tamper-evident (payload hash + conditional `updateMany`), but a few edges around report numbering and net-sales sourcing.
-
-| Sev | Dim | Location | Finding | Fix |
-|---|---|---|---|---|
-| High | Cor | `services/z-reports.service.ts:213` *(unverified)* | `expectedCash` math assumes positive balance and ignores negative-cash-day edge. | Allow negative values or reject early with a clearer message. |
-| Medium | Cor | `services/z-reports.service.ts:86-112` *(unverified)* | Net-sales counted from both order *and* payment sides — double-count risk if state mismatched. | Single source of truth (payments) with assertion that order status matches. |
-| Medium | Arch | `services/z-reports.service.ts:270` *(unverified)* | Day-scoped `reportNumber` collides if 2 reports close same day. | Sequence per-day: `Z-YYYYMMDD-NNN`. |
-| Medium | Cor | `services/z-reports.service.ts:486-536` *(unverified)* | `computePayloadHash` uses `Decimal.toString()` — format may drift (`"10"` vs `"10.00"`). | Normalize via `toFixed(2)` before hashing. |
-
-### 4.10 `upload/`  ·  Health: 🟢 green
-4 files. MIME pre-filter + `sharp.metadata()` magic-byte sniff is solid defense-in-depth.
-
-| Sev | Dim | Location | Finding | Fix |
-|---|---|---|---|---|
-| Low | Perf | `upload.service.ts:104-173` *(unverified)* | Sharp resize is synchronous on the request path (1-2s for large images). | Add timeout cap; offload to a queue if upload concurrency rises. |
-
-### 4.11 `stock-management/`  ·  Health: 🟢 green
-39 files; the largest single module. Advisory-lock pattern correctly applied.
-
-| Sev | Dim | Location | Finding | Fix |
-|---|---|---|---|---|
-| Medium | Cor | `services/stock-alerts.service.ts:47-82` *(unverified)* | Alert emitted on every cron tick if state unchanged → alert fatigue. | Track `last-alert-sent` per batch; emit only on state transitions. |
-| Medium | Perf | `services/stock-alerts.service.ts:16-44` *(unverified)* | Unbounded raw query for low-stock items on every tick. | Add `LIMIT 100` + paginate. |
-| Medium | Perf | `services/stock-items.service.ts:12-36` *(unverified)* | `findAll` without `take/skip`. | Default `take: 100`, allow client `limit` clamped to [1, 500]. |
-
-### 4.12 `settings/integrations/`  ·  Health: 🟢 green
-Encryption + redaction are exemplary — `encryptJson` for storage, `***REDACTED***` on HTTP responses, plaintext only via `findOneWithSecrets` for adapters. **This module is the template the accounting module should follow** (see M8).
-
-### 4.13 `notifications/` gateway  ·  Health: 🟢 green
-| Sev | Dim | Location | Finding | Fix |
-|---|---|---|---|---|
-| Medium | Sec | `notifications.gateway.ts:32, 50-51` *(unverified)* | JWT verified; rooms scoped by `tenantId`. Lacks the `type === 'user'` check that `kds.gateway.ts` does. | Add the type-check for parity. |
-
-### 4.14 `kds/` gateway  ·  Health: 🟢 green
-Dual auth (staff JWT + customer session DB lookup), strict `type` check, mutually exclusive room sets, reconnect debounce. Cleanest gateway in the project.
-
-| Sev | Dim | Location | Finding | Fix |
-|---|---|---|---|---|
-| Low | Sec | `kds.gateway.ts:64-143` *(unverified)* | `tryStaffAuth` logs failed JWT but doesn't rate-limit token spam. | Per-IP attempt counter on the handshake. |
-
-### 4.15 `analytics/` gateway + services  ·  Health: 🟢 green
-Tenant isolation enforced; high-volume occupancy + traffic-flow upserts.
-
-| Sev | Dim | Location | Finding | Fix |
-|---|---|---|---|---|
-| Medium | Sec | `analytics/gateways/analytics.gateway.ts` *(unverified)* | Same `type === 'user'` check missing as notifications. | Add it. |
-| Medium | Perf | `analytics.gateway.ts:252, 308-355` *(unverified)* | `traffic-flow` upserts can hit 1600 rows/tick (40×40 grid). | Cap batch size; queue overflow. |
-| Medium | Perf | `analytics/services/heatmap.service.ts:70-83` *(unverified)* | Unbounded `findMany` on `occupancyRecord`. | Add `take`; warn if range too large; ensure `(tenantId, timestamp)` index. |
-
-### 4.16 `customers/` + sms-providers  ·  Health: 🟢 green
-| Sev | Dim | Location | Finding | Fix |
-|---|---|---|---|---|
-| (none above Low) | | `customers/loyalty.service.ts:50-80` *(unverified)* | Loyalty redemption uses Serializable `$transaction` with conditional `updateMany` — race-free. **Highlight as a pattern to replicate.** | n/a |
-
-### 4.17 `marketing/`  ·  Health: 🟢 green
-53 files / ~3600 LOC; large but well-structured. SALES_REP role check on offers is enforced. No critical findings.
-
-| Sev | Dim | Location | Finding | Fix |
-|---|---|---|---|---|
-| Medium | Arch | aggregate size *(unverified)* | `marketing-leads.service.ts` ≈ 586 LOC. | Consider splitting into lead-scoring / conversion-tracking / funnel-analytics. |
-
-### 4.18 `personnel/`, `reservations/`, `reports/`, `users/`, `sms-settings/`, `menu/`, `customer-orders/`  ·  Health: 🟢 green
-No critical/high findings beyond a few pagination omissions noted under §4.11.
-
-### 4.19 Low-risk (one-line verdicts)
-`modifiers`, `public-stats`, `pos-settings`, `qr`, `layouts`, `tables`, `stock`, `contact`, `desktop-app` — scanned, no significant findings. `desktop-app` retains explicit comment about deliberate `@Public()` + `ApiKeyGuard` co-application; verify the ApiKeyGuard truly fires on those routes during a smoke test.
-
-### 4.20 `prisma/schema.prisma`  ·  Health: 🟡 yellow
-T1, T2, T3 above. Plus:
-| Sev | Dim | Location | Finding | Fix |
-|---|---|---|---|---|
-| Medium | Cor | `Tenant.currentPlan` (~line 87) *(unverified)* | `onDelete: SetNull` — leaves dangling refs in code that dereferences `currentPlan`. | Switch to `Restrict`; require reassignment before deletion. |
-| Medium | Cor | `Order.user` (~line 666) *(unverified)* | `onDelete: Restrict` blocks user retirement. | Switch to `SetNull`. |
-| Medium | Arch | n/a | Soft-delete inconsistency across models. | Standardize on `deletedAt DateTime?` and a repository helper. |
+| Check | 2026-04-27 | 2026-05-11 | Notes |
+|---|---|---|---|
+| `dangerouslySetInnerHTML` / `innerHTML =` | 0 | 0 | clean |
+| `eval(` / `new Function(` | 0 | 0 | clean |
+| `localStorage.*Item` writes | only `i18n_language` (claimed) | **5 sites — `i18n_language`, SA accessToken (the bug), onboarding `ui-storage`, landing locale, landing one other** | the 2026-04-27 grep was incomplete; corrected per [`reviews/frontend-auth-stores.md`](reviews/frontend-auth-stores.md) and [`reviews/landing.md`](reviews/landing.md) |
+| `target="_blank"` without `rel="noopener"` | 2 | 2 | unchanged |
+| `$queryRaw*` | 9 | 9 | all advisory-lock helpers |
+| `@Public()` endpoints | ~40 | **52** | grew between reviews — verify new ones intentional |
+| Cron schedulers | 9 jobs / 5 modules | **9 jobs** | unchanged |
+| Backend test files | 13 | **19** | up 6 — but money-path coverage still thin |
+| Frontend test files | 1 | 1 | unchanged |
+| Landing test files | 0 | 0 | unchanged |
+| Prisma models | 87 | 87 | unchanged |
+| `tenantId` references in backend `modules/` | 843 | **1815** | doubled; the multi-tenant pattern is now thoroughly applied |
+| Per-feature deep-dive files | n/a | **33** | new this round (`docs/reviews/*.md`) |
 
 ---
 
-## 5. Frontend per-module reports (`frontend/src/`)
+## 4. Per-feature deep-dive index
 
-### 5.1 `lib/`  ·  Health: 🟢 green
-F3 above. Token rotation in `lib/socket.ts` (verified working — subscribes to `useAuthStore.accessToken`, disconnects + reconnects with new token). `lib/env.ts` falls back to `localhost` in prod silently — log noisily or fail loud.
+The full per-module review now lives in [`docs/reviews/`](reviews/). One file per feature, with §1 health + §2 scope + §3 invariants + §4 state machine (where applicable) + §5 money audit (where applicable) + §6 concurrency + §7 findings + §8 what's solid + §9 spot-checks + §10 recommended tests.
 
-### 5.2 `store/`  ·  Health: 🟢 green
-Three auth stores follow the same memory-only token pattern. `superAdminAuthStore` correctly persists the short-lived `accessToken` but **not** the refresh token (with an explicit comment justifying the trade-off). `cartStore` persists non-auth data only. No findings.
+### Backend — Tier 1 (business-logic critical)
 
-| Sev | Dim | Location | Finding | Fix |
-|---|---|---|---|---|
-| Medium | Arch | `superAdminAuthStore.ts:9, 17, 47-52` *(unverified)* | `tempToken` + `requires2FA` + `requires2FASetup` flags duplicate state. | Replace with a single state enum: `NEEDS_2FA_ENTRY | NEEDS_2FA_SETUP | AUTHENTICATED`. |
+| File | Health | One-line summary |
+|---|---|---|
+| [`accounting.md`](reviews/accounting.md) | 🔴 red | Credentials plaintext (M8 VERIFIED), invoice numbering gap-prone (M3 downgraded), Foriba XML drift, missing SYNCING state, div-by-zero on quantity 0 |
+| [`auth.md`](reviews/auth.md) | 🟢 green | Atomic-consume reset is the codebase exemplar. A1 reframed (DB lookup IS done). New: refresh-rotation TOCTOU (F-3), social-auth tenant.status gap (F-2) |
+| [`delivery-platforms.md`](reviews/delivery-platforms.md) | 🟡 yellow | Trendyol replay bypass, rawBody fallback, Yemeksepeti status drop, P2002 catch-all, no single-flight on `ensureValidToken`. `isRunning` finding dropped after verify |
+| [`orders.md`](reviews/orders.md) | 🟡 yellow | State-machine bypass (F-O2), refund doesn't reverse stock (F-O5), update race (F-O3), no order-create idempotency (F-O7), plus M-series money-path findings |
+| [`payments.md`](reviews/payments.md) | 🟡 yellow | 17 Decimal→Number conversion sites mapped; refund double-tap race (F-3); split-bill no idempotency (M10); customer-create race inside payment tx |
+| [`subscriptions.md`](reviews/subscriptions.md) | 🟡 yellow | Renewal write-side idempotency gap (M9); DJB2 lock-id brittleness; dueDate uses `new Date()` |
+| [`superadmin.md`](reviews/superadmin.md) | 🟡 yellow | `tokenVersion` never bumped on refresh — token reusable 7 days (F-3); backup-code RMW race (F-8); request-logger leaks tempToken (F-5) |
+| [`tenants.md`](reviews/tenants.md) | 🟢 green | Boundary layer healthy. Suspend doesn't revoke tokens (F-5). T4 verified-and-downgraded. Cross-tenant test skeleton (23+10 endpoints) in §10 |
+| [`z-reports.md`](reviews/z-reports.md) | 🟡 yellow | Finalization is the codebase's tamper-evidence exemplar. Hash uses non-canonical Decimal.toString() (F-4); reportNumber day-scope collision (F-3) |
 
-### 5.3 `components/ProtectedRoute.tsx` + `ErrorBoundary.tsx` + `sentry.config.ts`  ·  Health: 🟢 green
-F2, F4 above. Sentry config redaction verified. No `dangerouslySetInnerHTML`, no `innerHTML` writes, no `eval`/`new Function` anywhere in `frontend/src` or `landing/src`.
+### Backend — Tier 2 (moderate)
 
-### 5.4 `App.tsx` + route wiring  ·  Health: 🟢 green
-Lazy-loaded routes for superadmin/marketing/admin/QR-menu/settings. `FloorPlan3DPage` (the voxel-world entry) is gated by `import.meta.env.DEV` and lazy-loaded — confirmed not in the prod bundle. **DashboardPage and POSPage are eagerly imported.** Profile their bundle size; lazy-load if either > ~100kb.
+| File | Health | One-line summary |
+|---|---|---|
+| [`analytics.md`](reviews/analytics.md) | 🟡 yellow | Missing type-check + algorithms pin on gateway; 1600-row upsert burst; unbounded heatmap reads |
+| [`customers.md`](reviews/customers.md) | 🟢 green | Loyalty redemption is the codebase **gold standard** for race-free state mutation. SMS creds in env vars not per-tenant (F-4) |
+| [`kds.md`](reviews/kds.md) | 🟢 green | Gateway exemplar. Only the rate-limit gap remains (F-1 Low Sec) |
+| [`marketing.md`](reviews/marketing.md) | 🟢 green | 586-LOC leads service confirmed; `updateStatus` vs `convert()` race (F-2); hardcoded bcrypt cost in marketing-users (F-8) |
+| [`notifications.md`](reviews/notifications.md) | 🟡 yellow | Cross-realm JWT accept (N-1 promoted); `payload.userId` undefined → silent no-op (N-2) |
+| [`settings-integrations.md`](reviews/settings-integrations.md) | 🟢 green | The credential-storage template. F-4: missing audit-log on credential writes (the one gap) |
+| [`stock-management.md`](reviews/stock-management.md) | 🟡 yellow | Manual movement TOCTOU race (F-4); 8 unbounded list endpoints; dashboard triggers alert side effect; **T2 dropped — IngredientMovement.tenantId verified to exist** |
+| [`upload.md`](reviews/upload.md) | 🟢 green | MIME + magic-byte chain is exemplary. `/uploads/*` served unauthenticated (F-3); Promise.all over 10 sharp pipelines (F-2) |
 
-### 5.5 `pages/auth`, `pages/subscription`, `pages/superadmin`  ·  Health: 🟢 green
-| Sev | Dim | Location | Finding | Fix |
-|---|---|---|---|---|
-| Medium | Sec | `pages/auth/LoginPage.tsx:66-78` *(unverified)* | `useGoogleLogin({ flow: 'implicit' })`. Modern OAuth recommends `auth-code` (PKCE). | Verify the backend exchanges the Google access token server-side; if it just trusts the client-side ID token, switch to code flow. |
+### Backend — Tier 3 + Schema
 
-### 5.6 Features (`onboarding`, `marketing`, `stock-management`, `analytics`)  ·  Health: 🟢 green
-Modular structure (per-feature `api/`, `components/`, `types/`). No security/correctness flags on a spot-check.
+| File | Health | One-line summary |
+|---|---|---|
+| [`low-risk-modules.md`](reviews/low-risk-modules.md) | 🟢 green (PS-1 yellow) | 17 modules grouped. **PS-1 High Sec escape:** IP-hash salt fallback to JWT_SECRET. Otherwise clean |
+| [`prisma-schema.md`](reviews/prisma-schema.md) | 🟡 yellow | T2/T3 dropped after migration re-read. 4 new compound-index gaps. No ISO 4217 currency constraint. Audit FK gaps on 8 columns |
 
-### 5.7 `voxel-world/` (139 files)  ·  Health: 🟢 green
-Architectural verdict only — not a per-file review:
-- Entry: `frontend/src/features/voxel-world/index.ts`.
-- Lazy-loaded via `import()` from `FloorPlan3DPage`, which itself is dev-only-conditional.
-- Production bundle does not include three.js / shader code.
-- No findings.
+### Frontend
 
-### 5.8 Hooks, UI primitives, contexts  ·  Health: 🟢 green
-13 hooks (formatting/i18n/responsive). 19 UI primitives (no XSS surface). `SubscriptionContext` provides `hasFeature()` / `checkLimit()` helpers — well-shaped. No findings.
+| File | Health | One-line summary |
+|---|---|---|
+| [`frontend-lib.md`](reviews/frontend-lib.md) | 🟢 green | F3 refresh-timeout (Medium); socket.ts has same silent-localhost-fallback `env.ts` was created to eliminate (F-3); subscribe-listener leak (F-2) |
+| [`frontend-auth-stores.md`](reviews/frontend-auth-stores.md) | 🟡 yellow | **F-1 High Sec:** SA store persists accessToken to localStorage — contradicts 2026-04-27 §3.2. 12 of 16 SA state-flag combinations are orphan |
+| [`frontend-protected-routes.md`](reviews/frontend-protected-routes.md) | 🟡 yellow | F2 confirmed (render flicker); F4 confirmed (no `unhandledrejection`); Sentry redaction is case-sensitive shallow whitelist (F-3) |
+| [`frontend-pages-auth.md`](reviews/frontend-pages-auth.md) | 🟡 yellow | OAuth implicit-flow concern persists; role-blind landing redirect (F-6); 5 state machines documented |
+| [`frontend-pages-subscription.md`](reviews/frontend-pages-subscription.md) | 🟡 yellow | F-1 **High:** double-submit guard is dead code; F-2 hooks-rules violation; F-6 missing idempotency key (cross-link M9) |
+| [`frontend-pages-superadmin.md`](reviews/frontend-pages-superadmin.md) | 🟡 yellow | F-1 (accessToken in localStorage) + F-2 (refresh structurally dead post-reload) — both High |
+| [`frontend-features-orders.md`](reviews/frontend-features-orders.md) | 🟡 yellow | Payment double-submit (F-FE1 High), order-create no idempotency (F-FE2 High), QR-menu bypass `lib/env` (F-FE4) |
+| [`frontend-features-kds.md`](reviews/frontend-features-kds.md) | 🟢 green | Logout doesn't force-disconnect socket (F-2); rest of the surface clean (one file, 115 LOC) |
+| [`frontend-features-onboarding.md`](reviews/frontend-features-onboarding.md) | 🟢 green | **Scope correction**: this is a react-joyride product tour, not a first-run signup wizard (signup lives in pages/auth). Client-only persistence to `ui-storage` (F-3) |
+| [`frontend-features-marketing.md`](reviews/frontend-features-marketing.md) | 🟡 yellow | **3 Highs:** missing single-flight refresh (F-1); WON button backend 400s (F-2); reload = forced re-login (F-3) |
+| [`frontend-features-stock.md`](reviews/frontend-features-stock.md) | 🟡 yellow | Manual movement form pairs with backend F-StM-4 — no double-submit guard (F-1 High); 8 unbounded list hooks (F-3) |
+| [`frontend-features-analytics.md`](reviews/frontend-features-analytics.md) | 🟡 yellow | CameraCalibration uses raw fetch bypassing lib/api (F-1); 3 unbounded heatmap reads fire unconditionally (F-2) |
+| [`frontend-low-risk.md`](reviews/frontend-low-risk.md) | 🟢 green | **Correction**: §5.7 "three.js not in prod" is false — pulled into the analytics lazy chunk via `AnalyticsFloorPlan.tsx` |
 
-### 5.9 Cross-cutting frontend
-- 2 `target="_blank"` without `rel="noopener noreferrer"` — `pages/settings/SubscriptionSettingsPage.tsx:342`, `components/qr-menu/MenuDrawer.tsx:372`. Low-risk reverse-tabnabbing. Add `rel="noopener noreferrer"`.
-- `localStorage` writes are limited to `i18n_language` (verified — no token leakage).
+### Landing
+
+| File | Health | One-line summary |
+|---|---|---|
+| [`landing.md`](reviews/landing.md) | 🟡 yellow | F-1 CSP gap (the seed); F-3 error pages render stack in prod (corrects §6.2); F-2 silent localhost fallback (regression of `5154c2e`) |
 
 ---
 
-## 6. Landing per-module report (`landing/`)
-
-### 6.1 `next.config.ts`  ·  Health: 🟡 yellow
-F1 above. Source maps hidden, X-Frame-Options + X-Content-Type-Options set, but no CSP. Add CSP.
-
-### 6.2 `src/lib/api.ts`, `middleware.ts` (i18n), Sentry configs, `app/global-error.tsx`, `app/api/health/route.ts`, `app/[locale]/layout.tsx`  ·  Health: 🟢 green
-- `getPlans()` uses ISR (`revalidate: 300`) and falls back to `[]` on error — graceful.
-- next-intl middleware correctly excludes `_next` and static assets.
-- Sentry server config strips `authorization` / `cookie` / `x-api-key`.
-- `global-error.tsx` captures to Sentry, dev shows details, prod shows generic message.
-
-No findings beyond the missing CSP.
-
----
-
-## 7. Recommended action plan
+## 5. Recommended action plan
 
 Effort tiers: XS (<1h) · S (~half day) · M (~day) · L (multi-day).
 
 ### P0 — Do first (this week)
+
 | ID | Effort | Action |
 |---|---|---|
-| M8 | M | Audit AccountingSettings columns. Either confirm they're already encrypted at rest, or migrate them to `encryptJson` + redact-on-response, mirroring the `integrations` module. Rotate all stored credentials after migration. |
-| M9, M10 | M | Add idempotency keys (composite unique index or `externalReference`) for subscription renewal and split-bill writes. |
-| M3 | S | Wrap `getNextInvoiceNumber()` in a transaction + row-level lock or move to atomic `RETURNING UPDATE`. |
+| F-FE-SA-1 | S | **New top of list** — make `superAdminAuthStore` memory-only on `accessToken`. Drop `accessToken` from `partialize` at `superAdminAuthStore.ts:93-97`. Cross-link to the F-1 fix in [`reviews/frontend-auth-stores.md`](reviews/frontend-auth-stores.md). |
+| F-SA-3 | S | `superadmin-auth.service.ts:550-589` — bump `tokenVersion` on every refresh (mirror tenant `auth.service.ts:481-488`). 7-day reusable refresh is the worst single token-lifecycle bug. |
+| F-Not-2 | XS | `notifications.gateway.ts:45` — use `payload.sub` instead of `payload.userId`. The per-user notification flow is currently broken; fix is one-line. |
+| F-FE-Mkt-1 | S | Wire marketing `marketingApi.ts:21-53` into the same single-flight refresh from `lib/api.ts` (commit `9b9eee4` pattern). |
+| F-Dlv-9 | XS | `webhook-auth.guard.ts:121` — remove the `if (timestamp)` guard; make the timestamp header required for Trendyol. |
+| F-Dlv-10 | S | `webhook-auth.guard.ts:128` — fail closed if `rawBody` is missing; never re-serialize. |
+| M8 | M | Migrate AccountingSettings 11 secret columns to `encryptJson` + redact-on-response, mirroring `settings/integrations`. Rotate all stored credentials after migration. |
+| F-Dlv-5 | S | Add Yemeksepeti `PICKED_UP`/`CANCELLED` Order updates; add Trendyol status webhook handler. |
 | F1 | XS | Add a starter Content-Security-Policy header to `landing/next.config.ts`. |
+| PS-1 | XS | Require `IP_HASH_SALT` env var in production; remove the `JWT_SECRET` / `APP_SECRET` fallbacks. |
 
 ### P1 — This sprint
+
 | ID | Effort | Action |
 |---|---|---|
+| M9, M10 | M | Idempotency keys on subscription renewal write and split-bill writes — adopt the `customers/loyalty.service.ts:50-107` Serializable+conditional-updateMany pattern. |
+| F-FE-Ord-1, F-FE-Ord-2 | S | Frontend side of M10 + F-O7 — generate idempotency key client-side per submit; disable button while pending. |
+| F-Ord-O5 | M | Refund flow should reverse stock deductions, mirroring `updateStatus → CANCELLED`. |
+| F-Ord-O3 | S | `orders.service.ts updateStatus` — conditional `updateMany` on `status=prev`. |
+| F-Pay-3 | XS | Refund `tx.payment.update` — add `status` to the `where` filter, throw on `count===0`. |
+| F-Auth-3 | S | Refresh-rotation TOCTOU — wrap revoke+generate in `$transaction` + conditional updateMany. |
+| F-Acc-7 | S | Introduce `SYNCING` intermediate `externalStatus` + idempotent retry. |
+| F-Acc-4 | XS | Guard `OrderItem.quantity === 0` before back-calc divide. |
+| F-Acc-6 | M | Move Foriba UBL-TR XML totals to Decimal sums. |
+| M3 | S | Wrap `getNextInvoiceNumber()` in a transaction + row-level lock or `RETURNING UPDATE`. |
 | M1, M2 | S | Replace JS `Number` with `Prisma.Decimal` in payments comparisons & split-bill tolerance. |
-| M5 | S | Replace fire-and-forget invoice generation with bounded retry + explicit `REVENUE_SYNC_FAILED` Sentry event. |
-| M6 | XS | Guard `totalAmount === 0` in tax/discount math. |
+| M5 | S | Replace swallowed try/catch around invoice generation with bounded retry + Sentry `REVENUE_SYNC_FAILED` event. |
 | M7 | S | Cross-validate platform-supplied totals vs item sums on inbound delivery webhooks. |
-| A3, A4 | S | Tighten 2FA boundary in `superadmin-auth.service.ts` (counter reset + secret existence guard). |
-| T5 | S | Null-guard for `currentPlan` in subdomain-change flow. |
-| F2 | S | Add loading state to `ProtectedRoute` so children don't render before access token is available. |
-| F3 | XS | Add 10s timeout to refresh promise in `lib/api.ts`. |
-| F4 | XS | Add global `unhandledrejection` listener in `main.tsx`. |
-| (notifications/analytics gateways) | XS | Add `payload.type === 'user'` check for parity with KDS gateway. |
+| F-StM-4 | S | `ingredient-movements.service.ts:36-73` — conditional updateMany with stock precondition. |
+| F-Ten-5 | S | On tenant suspend: bump `User.tokenVersion` for all tenant members; broadcast disconnect to gateways. |
+| F-FE-Mkt-3, F-FE-Mkt-2 | S | Marketing reload-re-auth path; remove WON button from status grid. |
+| F-FE-SA-2 | S | SA refresh-from-body → cookie-based, mirror tenant pattern. |
+| F-FE-Sub-1 | XS | Wire `processingPlanId` setter or remove dead code; add real submit guard. |
+| F-FE-PR-3 | S | Frontend `sentry.config.ts` redaction → case-insensitive + nested + add `accessToken`/`refreshToken`/`set-cookie`/`x-api-key`. |
+| F2 | S | Add loading state to `ProtectedRoute` so children don't render before access token. |
+| F3 | XS | 10s timeout on refresh promise in `lib/api.ts`. |
+| F4 | XS | `unhandledrejection` listener in `main.tsx`. |
+| F-Not-1, F-An-4 | XS | Add `payload.type === 'user'` + `algorithms: ['HS256']` to notifications and analytics gateway handshakes. |
+| A3 | S | Reset failed-login counter only after full 2FA succeeds. |
+| A5 | S | Add `tenant.status === 'ACTIVE'` check to the 4 social-auth branches. |
+| F-Land-3 | XS | `landing/global-error.tsx`, `[locale]/error.tsx` — gate stack rendering behind `process.env.NODE_ENV !== 'production'`. |
+| F-Land-2 | XS | `landing/lib/api.ts:115` — fail loud (same shape as `frontend/src/lib/env.ts:27-30`). |
 
 ### P2 — Next sprint
+
 | ID | Effort | Action |
 |---|---|---|
-| T1, T2, T3 | M | Schema migration: add direct `tenantId` to `WaiterRequest`, `BillRequest`, `IngredientMovement`; add compound `(tenantId, createdAt)` index to `StockMovement` and similar hot tables. |
-| T4 | XS | Optional defensive `if (!req.tenantId) throw Forbidden` in `tenants.controller.ts` — protects against a future refactor of the guard chain. |
-| (schema) | S | Switch `Tenant.currentPlan` to `onDelete: Restrict`; switch `Order.user` to `SetNull`. |
-| (z-reports) | S | Sequence-per-day report numbering; normalize Decimal in `computePayloadHash`. |
-| (orders) | M | Extract `OrderPaymentHandler` and `OrderDeliveryHandler` from the 1136-LOC `orders.service.ts`. |
-| (delivery-platforms) | XS | Drop `isRunning` flag in `order-polling.scheduler.ts`; rely on advisory lock alone. |
-| (frontend) | XS | Add `rel="noopener noreferrer"` to two `target="_blank"` sites. |
-| (analytics) | S | Cap traffic-flow upsert batch size; bound heatmap `findMany`. |
-| (auth) | S | Stop swallowing `sendEmailVerification` errors; surface as 5xx. |
-| (frontend Google OAuth) | M | Verify Google OAuth token-exchange path; if implicit-flow data is being trusted, migrate to PKCE. |
+| F-Sch-2/4/5 | S | Schema migration: add `@@index([tenantId, createdAt])` to WasteLog, IngredientMovement, DeliveryPlatformLog, Notification. |
+| F-Sch-9 | M | Currency-column CHECK constraint or app-level validator on ISO 4217 codes. |
+| T5 (schema) | S | Switch `Tenant.currentPlan` to `onDelete: Restrict`; switch `Order.user` to `SetNull`. |
+| z-reports F-3, F-4 | S | Sequence-per-day report numbering; normalize Decimal via `toFixed(2)` before hashing. |
+| orders refactor | M | Extract `OrderPaymentHandler` and `OrderDeliveryHandler` from the 1136-LOC `orders.service.ts`. |
+| F-Up-2, F-Up-3 | S | upload — queue Sharp resize off the request path; gate `/uploads/*` behind auth. |
+| F-An-2, F-An-3 | S | Cap traffic-flow upsert batch size; bound heatmap `findMany`. |
+| F-SA-7, F-SA-8 | S | Per-account 2FA throttle; conditional `updateMany` on backup-code redeem. |
+| frontend Google OAuth | M | Verify token-exchange path; migrate to PKCE if implicit-flow data is being trusted. |
+| auth F-5 | S | Stop swallowing `sendEmailVerification` errors. |
+| F-FE-Stk-3 | S | Add pagination cap on all 8 stock list hooks. |
+| F-FE-An-1 | S | CameraCalibration — route through `lib/api.ts` instead of raw `fetch`. |
 
 ### P3 — Backlog / hardening
+
 | ID | Effort | Action |
 |---|---|---|
-| (tests) | L | **Highest leverage**: add integration tests for auth/payment/order/subscription paths. Today's 13 backend specs is too few for the surface area. Set a coverage floor (e.g., 70% on services in `auth`/`orders`/`payments`/`subscriptions`/`accounting`). |
-| (tests) | M | Cross-tenant isolation test suite: create 2 tenants, attempt cross-reads on every list/find endpoint, assert 0 leaks. |
-| (frontend tests) | M | Add tests for `lib/api`, `lib/socket`, auth stores, `ProtectedRoute`, payment UI. |
+| (tests) | L | **Highest leverage**: integration tests for auth/payment/order/subscription paths. Use per-feature §10 sections as seed material. Set coverage floor on services in `auth`/`orders`/`payments`/`subscriptions`/`accounting`. |
+| (tests) | M | Implement the cross-tenant invariants suite from [`reviews/tenants.md`](reviews/tenants.md) §10 (23 list + 10 find endpoints). |
+| (frontend tests) | M | `lib/api`, `lib/socket`, auth stores, `ProtectedRoute`, payment UI. |
 | (schema) | M | Standardize soft-delete (`deletedAt`) across tenant-scoped models. |
 | (Stripe/Iyzico/PayTR webhooks) | L | If adopted, add signature-verified controllers with event-id idempotency. |
-| (logging) | XS | Replace remaining `console.*` calls with NestJS `Logger`. |
-| (auth) | S | Document the JWT `tokenVersion` revocation-latency trade-off (A1) in CLAUDE.md or auth README. |
-| (subscriptions) | S | Switch DJB2 lock-id hashing to a named-lock registry as cron count grows. |
-| (sentry) | XS | Drop email/IP from auth Sentry tags; use hashed userId. |
+| (logging) | XS | Replace remaining `console.*` with NestJS `Logger`. |
+| (auth) | S | Document the JWT `tokenVersion` revocation-latency trade-off in CLAUDE.md or auth README. |
+| (subscriptions) | S | DJB2 lock-id → named-lock registry. |
+| (sentry) | XS | Drop email/IP from auth Sentry tags; hashed userId only. |
+| F-FE-Lib-2, F-FE-Lib-3 | XS | socket.ts socket-URL resolution → into env.ts; capture subscribe unsubscribe on socket re-init. |
+| F-StM-7 | XS | Move alert emit out of `stock-dashboard.service.ts`. |
+| F-Up-9 | XS | Pin sharp `limitInputPixels` explicitly. |
+| F-FE-Lo-2 | S | Lazy-load `DashboardPage` and `POSPage`. |
 
 ---
 
-## 8. What's already excellent (keep doing)
+## 6. What's already excellent (keep doing)
 
-- Multi-tenant isolation enforced widely (843 `tenantId` references).
-- Three frontend auth stores all follow memory-only access-token pattern; refresh tokens stay httpOnly.
-- All schedulers correctly use pg advisory locks with constant-derived lock IDs.
-- KDS WebSocket gateway: dual-auth, strict type-check, role-based rooms, reconnect debounce.
-- Webhook signature verification for Yemeksepeti (HMAC-SHA512 + JWT-style, timing-safe) and Trendyol (HMAC-SHA256 + 5-min timestamp anti-replay) — defaults fail closed.
-- Sentry redaction on backend, frontend, and landing; source maps hidden in landing prod.
-- Loyalty-points redemption uses a Serializable transaction with conditional `updateMany` — race-free pattern worth replicating in other "decrement-if-allowed" flows.
-- `settings/integrations` module is the gold standard for credential storage (encrypted at rest, redacted on response, plaintext only via explicit `findOneWithSecrets`).
-- Voxel-world feature (139 files) correctly tree-shaken from prod via DEV-conditional lazy-load.
+- **Multi-tenant isolation** enforced widely (843+ `tenantId` references); middleware → `req.tenantId` → service filter pattern is the right shape.
+- **Atomic-consume password reset** (`auth.service.ts:691-721`) — verified at source. **The reference implementation for one-shot token consumption.** Candidates to adopt: subscription renewal (M9), split-bill (M10), invoice numbering (M3), backup-code redemption.
+- **Loyalty redemption pattern** (`customers/loyalty.service.ts:50-107`) — Serializable `$transaction` + conditional `updateMany` + `count !== 1` rollback + audit-row in same tx. **The gold standard for race-free state mutation.** Documented with code excerpt at [`reviews/customers.md`](reviews/customers.md) §8.
+- **All schedulers** use `pg_advisory_lock` with constant-derived lock IDs. Canonical exemplar at `subscriptions/services/subscription-scheduler.service.ts:29-43`.
+- **KDS WebSocket gateway**: dual-auth, strict `type === 'user'` check, role-based rooms, reconnect debounce, Sentry-wrapped handshake. The reference for the other two gateways. See [`reviews/kds.md`](reviews/kds.md).
+- **Z-report finalization** (`closeReport :489-502`) — conditional `updateMany` on `isFinalized=false` + SHA-256 payload digest. Tamper-evident. The strongest correctness pattern outside loyalty.
+- **Webhook signature verification** for Yemeksepeti (HMAC-SHA512 + JWT-style timing-safe) and Trendyol (HMAC-SHA256). Defaults fail closed. (Two bypass gaps now flagged in §2.4 to close.)
+- **Sentry redaction** wired on backend, frontend, and landing; source maps hidden in landing prod. (Whitelist scope widening still pending — F-FE-PR-3.)
+- **`settings/integrations`** — encryption + redaction template. See [`reviews/settings-integrations.md`](reviews/settings-integrations.md) §8 for the four-part pattern.
+- **Frontend single-flight refresh** at `lib/api.ts:38-58` plus the hardening rounds at commits `5154c2e` (env fail-loud) and `9b9eee4` (Sentry-safe filter, single-flight token refresh). Now the marketing realm needs to adopt the same.
+- **Partial unique indices** added by migration `20260420180000_tenant_fks_and_partial_uniques` — `payments_orderId_idempotencyKey_notnull_key` and `subscriptions_tenantId_active_key`. The single-payment idempotency story now has tri-layer defense.
+- **Voxel-world tree-shaking** confirmed at the dev-only gate (`App.tsx:95-97`). (Three.js does land in the analytics lazy chunk via a separate path — flagged at `frontend-low-risk.md` F-1.)
 
 ---
 
-## 9. Out of scope this round
+## 7. Out of scope this round
 
 - `desktop/` (Tauri/Rust + BLE printer integration)
 - `edge-device-cpp/` (NVIDIA Jetson YOLO/TensorRT inference + WebSocket client)
-- `segmentation-service/` (Python/FastAPI + SAM2/GroundingDINO — only `requirements.txt` was visible during triage)
+- `segmentation-service/` (Python/FastAPI + SAM2/GroundingDINO)
 - Infra/CI: `docker-compose.*.yml`, `nginx.conf`, `deploy.sh`/`scripts/*`, `.github/workflows/*`
 
 A separate review pass is recommended for these — particularly the C++ edge device (network listener, model loading) and the deploy scripts (secrets handling, backup encryption).
 
 ---
 
-## 10. Verification & methodology notes
+## 8. Verification & methodology notes
 
-- The line-numbered findings tagged *(unverified)* come from agent-driven targeted reads. Spot-check 5 random unverified items by opening the cited `file:line` before remediating, especially Critical/High items in the money-path section.
-- 3 agent-flagged Critical findings were dropped during my spot-checks (see §11.1 below). Always read the cited code; don't pattern-match on severity tags.
-- The "no findings" verdicts on low-risk modules mean "no issue jumped out from the main service file." They are not certifications of cleanliness; full per-file review of those modules is in P3.
-
----
-
-## 11. Appendix
-
-### 11.1 Dropped findings & severity downgrades (initial agent reports vs. verified source)
-
-Agent-flagged items that the source code does not actually match, or that the source already handles. Recording them so they don't resurface.
-
-**Dropped entirely:**
-
-1. **"Refresh token taken from JSON body" — `auth.controller.ts:120-122`.** Verified at `auth.controller.ts:106`: actual `refresh()` handler reads only `req.cookies?.[REFRESH_COOKIE]`. No JSON-body fallback. (Lines 120-122 belong to a different unrelated handler.)
-2. **"Refund auth bypass" — `payments.service.ts:325-330`.** Verified at `payments.service.ts:317-330`: when `payment` is null, line 325-327 throws `NotFoundException` *before* the tenant check. The tenant check at line 330 only runs once `payment` is non-null. Code is correct.
-3. **"Getir/Migros webhook signatures unverified" — `webhook-auth.guard.ts:44-52`.** Verified at `delivery-platforms/constants/platform-status-map.ts:42`: Getir and Migros are in `POLLING_PLATFORMS` — they have no webhook routes, so there is nothing to sign. The webhook guard's `default` branch fails closed with `UnauthorizedException` for any unrecognized platform.
-4. **A2: "Password-reset token consume race" — `auth.service.ts:691-721`.** Verified at the cited lines: the code already implements the exact atomic-consume pattern that was being recommended. `prisma.user.updateMany` filters by both `id` and `resetTokenHash` and clears `resetTokenHash` to null in the same write; the surrounding `$transaction` also revokes all refresh tokens; if `updateResult.count === 0`, the second-arrival caller is rejected. The source even has a multi-line comment explaining the race window this protects against. **Already correct — no action.**
-
-**Severity downgraded after verification:**
-
-5. **T1: "StockMovement missing compound index"** — confirmed `@@index([tenantId])` exists, just not the compound `(tenantId, createdAt)`. Downgraded High → Medium (Perf).
-6. **T4: "tenants.controller.ts trusts req.tenantId"** — confirmed the controller is gated by `@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)`, which always populates `req.tenantId`. Downgraded High → Low (defense-in-depth only).
-
-**Pattern note:** of 8 unverified findings I spot-checked end-to-end, 3 turned out to be already-handled in code adjacent to (but not included in) the agent's read window, and 2 needed severity downgrades. This roughly mirrors the recent security-audit commit (`149604d`) — many sharp edges have already been smoothed and the surrounding context (transactions, guard chains, type checks) often makes a flagged "race" or "bypass" actually safe. **Always read the cited code before remediating an unverified finding.**
-
-### 11.2 Cross-cutting grep snapshot (run 2026-04-27)
-
-| Check | Result |
-|---|---|
-| `dangerouslySetInnerHTML` / direct `.innerHTML =` | 0 matches in `frontend/src` and `landing/src` |
-| `eval(` / `new Function(` | 0 matches anywhere |
-| `localStorage.*Item` writes | only `i18n_language` (no tokens) |
-| `process.env.NODE_ENV` in frontend | only `ErrorBoundary.tsx:126` (dev-only details) |
-| `target="_blank"` without `rel="noopener"` | 2 (`SubscriptionSettingsPage.tsx:342`, `MenuDrawer.tsx:372`) |
-| `console.log/debug/info` in backend | 6 |
-| `console.error/warn` in backend | 23 |
-| `$queryRaw*` | 9 sites — all advisory-lock helpers with constant lock IDs |
-| `@Public()` endpoints | ~40, all intentional names; webhooks gated by `WebhookAuthGuard` |
-| Cron schedulers (`@Cron`) | 9 jobs across 5 modules |
-| Backend test files (`*.spec.ts`/`*.e2e-spec.ts`) | 13 |
-| Frontend test files | 1 (`ErrorBoundary.spec.tsx`) |
-| Landing test files | 0 |
-| Prisma models | 87 |
-| `tenantId` references in backend `modules/` | 843 |
+- **Per-feature files dropped the *(unverified)* tag count from ~70 to effectively zero.** Each Tier-1 file opened every cited `file:line` + 30 lines of context. Drops, downgrades, and reframes are documented in each file's §9.
+- **6 findings were dropped after first-hand re-read** vs the 2026-04-27 round; **5 had severities adjusted**. The aggregated list is in §9.1 below.
+- **3 corrections to upstream cross-cutting claims** stood out: (a) the §3.2 "all frontend stores memory-only" claim is wrong (SA store persists), (b) §5.7 "three.js not in prod" is wrong (analytics chunk), (c) §6.2 "error stack only in dev" is wrong (renders unconditionally). All three are documented in their per-feature files and corrected here.
+- **Spot-check 5 random findings per Tier-1 file** is still the right hygiene before remediating — although the *(unverified)* tags are gone, the depth of the per-file reads varies (Tier-1 reads service files end-to-end; Tier-2/3 only the highest-LOC ones).
 
 ---
 
-*End of review. For follow-up sessions, work top-down through §7 (P0 → P3). Each P0/P1 item references a finding ID (M-/A-/T-/F-) traceable back to its per-module section.*
+## 9. Appendix
+
+### 9.1 Dropped findings, downgrades, reframes (consolidated)
+
+Cumulative across 2026-04-27 and 2026-05-11. The per-file §9 sections own the full record.
+
+**Dropped (verified false):**
+1. **"Refresh in JSON body" — `auth.controller.ts:120-122`.** Verified at `:106`; cookie-only. (Carried forward from 2026-04-27.)
+2. **"Refund auth bypass" — `payments.service.ts:325-330`.** `NotFoundException` fires before tenant check. (Carried forward.)
+3. **"Getir/Migros webhook signatures missing".** Polling platforms; no webhook routes. (Carried forward.)
+4. **A2 "Password-reset race".** Atomic-consume verified at `auth.service.ts:691-721`. (Carried forward.)
+5. **T2 "IngredientMovement no direct tenantId".** Verified column exists at `schema.prisma:2462`; index gap only. ([`reviews/prisma-schema.md`](reviews/prisma-schema.md), [`reviews/stock-management.md`](reviews/stock-management.md))
+6. **T3 "WaiterRequest, BillRequest no tenantId".** Verified `tenantId` + `@@index([tenantId, status])` exist per migration `20260420180000`. ([`reviews/prisma-schema.md`](reviews/prisma-schema.md))
+7. **delivery-platforms "isRunning outside try/finally".** Verified at `order-polling.scheduler.ts:37-59` — flag IS inside outer try/finally. ([`reviews/delivery-platforms.md`](reviews/delivery-platforms.md) §9)
+8. **superadmin "tempToken in audit log".** No `auditService.log` callsite passes tempToken; real exposure is request-logger redact gap (re-issued as F-SA-5). ([`reviews/superadmin.md`](reviews/superadmin.md) §9)
+9. **M6 "NaN risk on tax-post-discount".** Zero-guard already present at `orders.service.ts:217, :575`. ([`reviews/orders.md`](reviews/orders.md) §9)
+10. **CODE_REVIEW.md §3.2 "three stores memory-only".** Wrong — SA store persists accessToken. ([`reviews/frontend-auth-stores.md`](reviews/frontend-auth-stores.md), [`reviews/frontend-pages-superadmin.md`](reviews/frontend-pages-superadmin.md))
+11. **CODE_REVIEW.md §5.7 "three.js not in prod bundle".** Wrong — pulled into analytics lazy chunk via `AnalyticsFloorPlan`. ([`reviews/frontend-low-risk.md`](reviews/frontend-low-risk.md))
+12. **CODE_REVIEW.md §6.2 "error pages render generic in prod".** Wrong — `global-error.tsx:117-129`, `[locale]/error.tsx:61-67` render stack unconditionally. ([`reviews/landing.md`](reviews/landing.md))
+13. **stock-management "legacy StockMovement".** Verified dead. ([`reviews/stock-management.md`](reviews/stock-management.md) F-12)
+14. **§11.2 grep "localStorage writes only `i18n_language`".** Incomplete — three more writes exist (SA accessToken, onboarding `ui-storage`, landing). ([`reviews/frontend-auth-stores.md`](reviews/frontend-auth-stores.md), [`reviews/landing.md`](reviews/landing.md))
+
+**Severity downgrades:**
+15. **T1** High → Medium (Perf). `@@index([tenantId])` exists; only compound missing. (Carried forward.)
+16. **T4** High → Low (defense-in-depth). Guard chain verified. (Carried forward.)
+17. **A1** High → Medium. JWT strategy DOES perform per-request DB lookup; latency is one in-flight request, not JWT TTL. ([`reviews/auth.md`](reviews/auth.md))
+18. **A4** High → Low. `verifyTotp` returns false on null secret; invariant holds by side-effect. ([`reviews/superadmin.md`](reviews/superadmin.md))
+19. **M3** High → Medium. `@@unique([tenantId, invoiceNumber])` backstops to clean error; residual is sequence gaps. ([`reviews/accounting.md`](reviews/accounting.md))
+20. **F2** High → Medium. Backend re-auths every request; only flicker + double-fetch. ([`reviews/frontend-protected-routes.md`](reviews/frontend-protected-routes.md))
+
+**Reframes (severity unchanged, target shifted):**
+21. **A5** — password path OK; 4 social-auth branches miss `tenant.status` (not `validateUser`). ([`reviews/auth.md`](reviews/auth.md) F-2)
+22. **M5** — call IS awaited; real defect is the swallowed try/catch. ([`reviews/payments.md`](reviews/payments.md) F-7)
+23. **T5** — `?. ?? false` already null-guards at this site; risk preserved for other `currentPlan` callers. ([`reviews/tenants.md`](reviews/tenants.md) F-2)
+24. **§5.2 SA duplicate state** — confirmed; broken down as 16-cell legality matrix with 12 orphan combinations. ([`reviews/frontend-auth-stores.md`](reviews/frontend-auth-stores.md))
+
+### 9.2 Total findings count per per-feature file
+
+For traceability — counts of `| Sev | Dim | ...` rows (or equivalent finding IDs) per file. Drift is expected as fixes land.
+
+```
+$ wc -l docs/reviews/*.md
+```
+
+See per-file headers for per-file invariant and finding counts; aggregate is roughly:
+- Tier-1 backend (9 files): ~140 invariants, ~130 findings
+- Tier-2 backend (8 files): ~95 invariants, ~70 findings
+- Tier-3 + schema (2 files): ~25 invariants, ~45 findings
+- Frontend (13 files): ~120 invariants, ~110 findings
+- Landing: 12 invariants, 6 findings
+
+---
+
+*End of index. For follow-up sessions, work top-down through §5 (P0 → P3). Each P0/P1 item references either a finding ID traceable to its per-feature file's §7, or directly to the per-feature file path. The 2026-04-27 first-round report is preserved in git history at commit `cd0731d`.*

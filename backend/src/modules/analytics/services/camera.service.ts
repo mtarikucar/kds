@@ -52,9 +52,6 @@ export class CameraService {
         // the fly. Only the redacted form flows back to the admin UI.
         streamUrl: encryptString(dto.streamUrl),
         streamType: dto.streamType || 'RTSP',
-        voxelX: dto.voxelX,
-        voxelY: dto.voxelY ?? 2.5,
-        voxelZ: dto.voxelZ,
         rotationY: dto.rotationY ?? 0,
         fov: dto.fov ?? 90,
         calibrationData: dto.calibrationData as Prisma.InputJsonValue | undefined,
@@ -139,9 +136,6 @@ export class CameraService {
         ...(dto.streamUrl !== undefined && { streamUrl: encryptString(dto.streamUrl) }),
         ...(dto.streamType !== undefined && { streamType: dto.streamType }),
         ...(dto.status !== undefined && { status: dto.status }),
-        ...(dto.voxelX !== undefined && { voxelX: dto.voxelX }),
-        ...(dto.voxelY !== undefined && { voxelY: dto.voxelY }),
-        ...(dto.voxelZ !== undefined && { voxelZ: dto.voxelZ }),
         ...(dto.rotationY !== undefined && { rotationY: dto.rotationY }),
         ...(dto.fov !== undefined && { fov: dto.fov }),
         ...(dto.calibrationData !== undefined && { calibrationData: dto.calibrationData as Prisma.InputJsonValue }),
@@ -299,9 +293,6 @@ export class CameraService {
     streamUrl: string;
     streamType: string;
     status: string;
-    voxelX: number | null;
-    voxelY: number | null;
-    voxelZ: number | null;
     rotationY: number | null;
     fov: number | null;
     calibrationData: unknown;
@@ -320,10 +311,6 @@ export class CameraService {
       streamUrl: redactStreamUrl(decrypted),
       streamType: camera.streamType as CameraResponseDto['streamType'],
       status: camera.status as CameraResponseDto['status'],
-      // Preserve legitimate zero coordinates (`|| undefined` threw away 0).
-      voxelX: camera.voxelX ?? undefined,
-      voxelY: camera.voxelY ?? undefined,
-      voxelZ: camera.voxelZ ?? undefined,
       rotationY: camera.rotationY ?? undefined,
       fov: camera.fov ?? undefined,
       calibrationData: camera.calibrationData as Record<string, unknown> | undefined,

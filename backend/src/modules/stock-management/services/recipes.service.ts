@@ -97,15 +97,20 @@ export class RecipesService {
     const recipe = await this.findOne(id, tenantId);
 
     return this.prisma.$transaction(async (tx) => {
-      // Update recipe fields
-      await tx.recipe.update({
-        where: { id },
+      // Defence-in-depth: even though findOne above checked tenant, the
+      // mutation itself must filter by tenantId so a regression that
+      // drops the pre-check can't expose cross-tenant writes.
+      const updated = await tx.recipe.updateMany({
+        where: { id, tenantId },
         data: {
           name: dto.name,
           notes: dto.notes,
           yield: dto.yield,
         },
       });
+      if (updated.count === 0) {
+        throw new BadRequestException('Recipe not found');
+      }
 
       // Replace ingredients if provided
       if (dto.ingredients) {

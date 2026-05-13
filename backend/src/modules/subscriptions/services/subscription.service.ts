@@ -14,6 +14,7 @@ import {
   SubscriptionStatus,
   BillingCycle,
   PaymentProvider,
+  PaymentRegion,
   SubscriptionPlanType,
 } from '../../../common/constants/subscription.enum';
 import { CreateSubscriptionDto } from '../dto/create-subscription.dto';
@@ -31,14 +32,65 @@ export class SubscriptionService {
   ) {}
 
   /**
+   * Pick the payment provider stamped onto a Subscription / Payment row
+   * from the tenant's billing region. Turkish tenants run through PayTR
+   * (self-serve, recurring); INTERNATIONAL tenants stay on the
+   * contact-based EMAIL flow.
+   */
+  private providerForRegion(paymentRegion: string): PaymentProvider {
+    return paymentRegion === PaymentRegion.TURKEY
+      ? PaymentProvider.PAYTR
+      : PaymentProvider.EMAIL;
+  }
+
+  /**
+   * Best-effort trial-started email. Always called post-commit so a
+   * mail-server hiccup never blocks the subscription create. Looks up
+   * the tenant's ADMIN to find a recipient — if none exists, we silently
+   * skip (the customer can still see TRIALING in-app).
+   */
+  private async notifyTrialStarted(
+    tenantId: string,
+    planDisplayName: string,
+    trialDays: number,
+  ): Promise<void> {
+    try {
+      const admin = await this.prisma.user.findFirst({
+        where: { tenantId, role: 'ADMIN' },
+        select: { email: true, tenant: { select: { name: true } } },
+      });
+      if (!admin?.email || !admin.tenant) return;
+      await this.notificationService.sendTrialStarted(
+        admin.email,
+        admin.tenant.name,
+        planDisplayName,
+        trialDays,
+      );
+    } catch (err: any) {
+      this.logger.error(
+        `trial-started notification failed for tenant=${tenantId}: ${err?.message}`,
+      );
+    }
+  }
+
+  /**
    * Latest subscription row for a tenant, regardless of status. Callers
    * decide how to present PAST_DUE / EXPIRED / CANCELLED states; returning
    * `null` only for tenants that have never subscribed avoids the
    * dead-end "no subscription → try to create → already has one" UX.
    */
   async getCurrentSubscription(tenantId: string) {
+    // Exclude PENDING — those are unconfirmed PayTR intents that haven't
+    // been activated yet. Surfacing them would mislead the UI into
+    // showing "you have a subscription" for a tenant whose webhook
+    // never arrived. The orphan sweeper rolls them to EXPIRED after
+    // 24h; until then the user should still see their last real
+    // subscription (or none).
     return this.prisma.subscription.findFirst({
-      where: { tenantId },
+      where: {
+        tenantId,
+        status: { not: SubscriptionStatus.PENDING },
+      },
       include: {
         plan: true,
         payments: { orderBy: { createdAt: 'desc' }, take: 5 },
@@ -101,8 +153,13 @@ export class SubscriptionService {
       throw new BadRequestException('Invalid billing cycle');
     }
 
+    // Per-plan trial: a tenant can trial each paid plan once. The legacy
+    // `trialUsed` boolean is preserved as a coarser "ever-trialed" flag
+    // for reporting, but eligibility uses the per-plan array so a tenant
+    // who trialed BASIC can still trial PRO.
+    const hasTrialedThisPlan = tenant.usedTrialPlanIds?.includes(plan.id) ?? false;
     const canUseTrial =
-      !tenant.trialUsed &&
+      !hasTrialedThisPlan &&
       plan.trialDays > 0 &&
       plan.name !== SubscriptionPlanType.FREE;
     const isTrialPeriod = canUseTrial;
@@ -125,15 +182,16 @@ export class SubscriptionService {
     // The DB has a partial unique index on (tenantId) where status IN
     // (ACTIVE, TRIALING), so any concurrent create throws P2002 and the
     // loser's changes are rolled back.
+    const provider = this.providerForRegion(tenant.paymentRegion);
     try {
-      return await this.prisma.$transaction(async (tx) => {
+      const result = await this.prisma.$transaction(async (tx) => {
         const subscription = await tx.subscription.create({
           data: {
             tenantId,
             planId: dto.planId,
             status: isTrialPeriod ? SubscriptionStatus.TRIALING : SubscriptionStatus.ACTIVE,
             billingCycle: dto.billingCycle,
-            paymentProvider: PaymentProvider.EMAIL,
+            paymentProvider: provider,
             startDate: now,
             currentPeriodStart,
             currentPeriodEnd,
@@ -155,11 +213,20 @@ export class SubscriptionService {
             trialUsed: isTrialPeriod ? true : tenant.trialUsed,
             trialStartedAt: isTrialPeriod ? trialStart : tenant.trialStartedAt,
             trialEndsAt: isTrialPeriod ? trialEnd : tenant.trialEndsAt,
+            // Stamp per-plan trial registry whenever we actually start a trial.
+            ...(isTrialPeriod ? { usedTrialPlanIds: { push: plan.id } } : {}),
           },
         });
 
         return subscription;
       });
+
+      // Fire-and-forget welcome email (only when we actually started a trial).
+      if (isTrialPeriod) {
+        void this.notifyTrialStarted(tenantId, plan.displayName, plan.trialDays);
+      }
+
+      return result;
     } catch (err) {
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
@@ -172,13 +239,195 @@ export class SubscriptionService {
   }
 
   /**
+   * Start a card-free trial of a paid plan, atomically replacing any
+   * existing FREE subscription. Used by PaymentsService.createIntent —
+   * the standard registration flow gives every tenant a permanent FREE
+   * subscription, so the normal `createSubscription` path would hit the
+   * partial-unique index on (tenantId) WHERE status IN (ACTIVE, TRIALING).
+   *
+   * Contract:
+   *   - Eligible only when the tenant currently has no live subscription
+   *     OR the live one is on the FREE plan.
+   *   - Trial-eligibility (`trialUsed=false`, `plan.trialDays > 0`,
+   *     `plan !== FREE`) is the caller's responsibility — by the time we
+   *     get here, PaymentsService has already gated.
+   *   - Calling-user email-verified check happens here (closing the
+   *     dual-user inconsistency that the ADMIN-only check in
+   *     createSubscription used to introduce).
+   *   - Single transaction: CANCEL old FREE sub, create new TRIALING sub,
+   *     stamp `trialUsed`/`trialStartedAt`/`trialEndsAt` on the tenant.
+   */
+  async startTrialFromIntent(params: {
+    tenantId: string;
+    callingUserId: string;
+    planId: string;
+    billingCycle: BillingCycle;
+  }) {
+    const { tenantId, callingUserId, planId, billingCycle } = params;
+
+    const callingUser = await this.prisma.user.findUnique({
+      where: { id: callingUserId },
+      select: { emailVerified: true },
+    });
+    if (!callingUser) {
+      throw new NotFoundException('Calling user not found');
+    }
+    if (!callingUser.emailVerified) {
+      throw new BadRequestException(
+        'Email must be verified before starting a trial. Please check your inbox for the verification code.',
+      );
+    }
+
+    const plan = await this.prisma.subscriptionPlan.findUnique({
+      where: { id: planId },
+    });
+    if (!plan || !plan.isActive) {
+      throw new NotFoundException('Plan not found or inactive');
+    }
+    // Defence-in-depth: PaymentsService is the only known caller and it
+    // already gates trialDays/plan-name/usedTrialPlanIds, but a future
+    // caller (or a bug) could land us here on an ineligible plan. Reject
+    // explicitly instead of silently creating a zero-day "trial" that
+    // would burn the tenant's per-plan trial slot.
+    if (plan.name === SubscriptionPlanType.FREE) {
+      throw new BadRequestException('Cannot start trial on FREE plan');
+    }
+    if (plan.trialDays <= 0) {
+      throw new BadRequestException('Plan does not offer a trial');
+    }
+
+    // Per-plan eligibility check (mirrors PaymentsService) so direct
+    // calls don't bypass the lifetime-per-plan rule.
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { usedTrialPlanIds: true },
+    });
+    if (!tenant) {
+      throw new NotFoundException('Tenant not found');
+    }
+    if (tenant.usedTrialPlanIds?.includes(plan.id)) {
+      throw new BadRequestException(
+        'Tenant has already trialed this plan',
+      );
+    }
+
+    const now = new Date();
+    const trialEnd = addDays(now, plan.trialDays);
+    const amount =
+      billingCycle === BillingCycle.MONTHLY ? plan.monthlyPrice : plan.yearlyPrice;
+
+    try {
+      const subscription = await this.prisma.$transaction(async (tx) => {
+        // Find the live subscription, if any. Only FREE is allowed to
+        // exist here — anything paid means the trial path shouldn't have
+        // been reached, so we treat it as a programming error.
+        const live = await tx.subscription.findFirst({
+          where: {
+            tenantId,
+            status: { in: ['ACTIVE', 'TRIALING', 'PAST_DUE'] },
+          },
+          include: { plan: true },
+        });
+
+        if (live && live.plan.name !== SubscriptionPlanType.FREE) {
+          throw new BadRequestException(
+            'Cannot start trial: tenant already has a paid subscription',
+          );
+        }
+
+        // Cancel the existing FREE sub (audit trail preserved) so the
+        // partial-unique (tenantId) WHERE status IN (ACTIVE, TRIALING)
+        // doesn't collide with the new TRIALING row.
+        if (live) {
+          await tx.subscription.update({
+            where: { id: live.id },
+            data: {
+              status: SubscriptionStatus.CANCELLED,
+              endedAt: now,
+              cancellationReason: 'Replaced by paid-plan trial',
+            },
+          });
+        }
+
+        const subscription = await tx.subscription.create({
+          data: {
+            tenantId,
+            planId: plan.id,
+            status: SubscriptionStatus.TRIALING,
+            billingCycle,
+            paymentProvider: PaymentProvider.PAYTR,
+            startDate: now,
+            currentPeriodStart: now,
+            currentPeriodEnd: trialEnd,
+            isTrialPeriod: true,
+            trialStart: now,
+            trialEnd,
+            amount,
+            currency: plan.currency,
+            autoRenew: true,
+            cancelAtPeriodEnd: false,
+          },
+          include: { plan: true },
+        });
+
+        // Append this plan to the per-plan trial registry. `trialUsed`
+        // stays true for legacy reporting; `usedTrialPlanIds` is the
+        // canonical source for future eligibility checks (per-plan model).
+        await tx.tenant.update({
+          where: { id: tenantId },
+          data: {
+            currentPlanId: plan.id,
+            trialUsed: true,
+            trialStartedAt: now,
+            trialEndsAt: trialEnd,
+            usedTrialPlanIds: { push: plan.id },
+          },
+        });
+
+        return subscription;
+      });
+
+      // Fire-and-forget welcome email. Failures are logged but don't
+      // unwind the trial creation.
+      void this.notifyTrialStarted(tenantId, plan.displayName, plan.trialDays);
+
+      return subscription;
+    } catch (err) {
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2002'
+      ) {
+        throw new BadRequestException(
+          'Tenant already has an active subscription',
+        );
+      }
+      throw err;
+    }
+  }
+
+  /**
    * Compute the impact of a plan change without mutating state.
    * Returns either a downgrade scheduled for period end, or the
    * proration numbers the admin needs to collect off-platform before
    * an upgrade can be applied via `applyUpgrade`.
+   *
+   * Only valid on subscriptions with a live billing period — PAST_DUE
+   * and EXPIRED produce negative proration (currentPeriodEnd already
+   * passed), and CANCELLED has no meaningful current plan to switch
+   * from. UI routes those statuses to a fresh checkout instead.
    */
   async changePlan(subscriptionId: string, tenantId: string, dto: ChangePlanDto) {
     const subscription = await this.getSubscriptionById(subscriptionId, tenantId);
+
+    if (
+      subscription.status !== SubscriptionStatus.ACTIVE &&
+      subscription.status !== SubscriptionStatus.TRIALING
+    ) {
+      throw new BadRequestException(
+        'Plan change is only available on active or trialing subscriptions. ' +
+          'Please start a new subscription instead.',
+      );
+    }
 
     const currentPlan = subscription.plan;
     const newPlan = await this.prisma.subscriptionPlan.findUnique({
@@ -358,7 +607,9 @@ export class SubscriptionService {
         data: { currentPlanId: newPlanId },
       });
 
-      // Audit row: we took payment (or confirmed) for this upgrade.
+      // Audit row: we took payment (or confirmed) for this upgrade. The
+      // PayTR webhook bypasses this method; if we get here via the
+      // superadmin manual path, EMAIL is correct regardless of region.
       const payment = await tx.subscriptionPayment.create({
         data: {
           subscriptionId,
@@ -371,6 +622,7 @@ export class SubscriptionService {
         },
       });
 
+      const isTRY = newPlan.currency.toUpperCase() === 'TRY';
       await this.billingService.createInvoice(
         tx,
         subscriptionId,
@@ -379,7 +631,9 @@ export class SubscriptionService {
         newPlan.currency,
         now,
         newPeriodEnd,
-        `Upgrade to ${newPlan.displayName}`,
+        isTRY
+          ? `${newPlan.displayName} planına yükseltme`
+          : `Upgrade to ${newPlan.displayName}`,
       );
 
       return updated;
@@ -525,10 +779,21 @@ export class SubscriptionService {
           cancellationReason: reason,
         };
 
-    const updated = await this.prisma.subscription.update({
-      where: { id: subscriptionId },
-      data,
-      include: { plan: true, tenant: true },
+    // Wipe the stored PayTR recurring token on cancellation so a future
+    // resubscribe doesn't pick up a stale card binding — and so the
+    // renewal cron can't even theoretically charge a cancelled tenant
+    // if `autoRenew=false` is ever bypassed.
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const sub = await tx.subscription.update({
+        where: { id: subscriptionId },
+        data,
+        include: { plan: true, tenant: true },
+      });
+      await tx.tenant.update({
+        where: { id: subscription.tenantId },
+        data: { paytrRecurringToken: null },
+      });
+      return sub;
     });
 
     const adminUser = await this.prisma.user.findFirst({
@@ -695,6 +960,12 @@ export class SubscriptionService {
         },
       });
 
+      // Invoice description picks language from currency — TR for TRY
+      // (PayTR / contact-based both target Turkish tenants), EN for
+      // anything else. confirmContactRenewal is called by the manual
+      // EMAIL flow but the description has to be coherent with what
+      // the auto-charge path writes in subscription-scheduler.
+      const isTRY = subscription.currency.toUpperCase() === 'TRY';
       await this.billingService.createInvoice(
         tx,
         subscriptionId,
@@ -703,7 +974,9 @@ export class SubscriptionService {
         subscription.currency,
         newPeriodStart,
         newPeriodEnd,
-        `Renewal — ${subscription.plan.displayName}`,
+        isTRY
+          ? `${subscription.plan.displayName} planı yenileme`
+          : `Renewal — ${subscription.plan.displayName}`,
       );
 
       return tx.subscription.update({
@@ -819,6 +1092,18 @@ export class SubscriptionService {
     const limitOverrides =
       (tenant.limitOverrides as Record<string, number>) || null;
 
+    // Per-plan trial eligibility — the UI uses this to surface a
+    // "14 gün ücretsiz dene" CTA on each plan card the tenant hasn't
+    // trialed yet. Paid plans only (FREE has trialDays=0 anyway).
+    const allPaidPlans = await this.prisma.subscriptionPlan.findMany({
+      where: { isActive: true, name: { not: SubscriptionPlanType.FREE } },
+      select: { id: true, trialDays: true },
+    });
+    const usedTrialPlanIds = tenant.usedTrialPlanIds ?? [];
+    const trialEligiblePlanIds = allPaidPlans
+      .filter((p) => p.trialDays > 0 && !usedTrialPlanIds.includes(p.id))
+      .map((p) => p.id);
+
     const features = {
       advancedReports: featureOverrides?.advancedReports ?? plan.advancedReports,
       multiLocation: featureOverrides?.multiLocation ?? plan.multiLocation,
@@ -842,7 +1127,7 @@ export class SubscriptionService {
       maxCategories: limitOverrides?.maxCategories ?? plan.maxCategories,
       maxMonthlyOrders: limitOverrides?.maxMonthlyOrders ?? plan.maxMonthlyOrders,
     };
-    return { features, limits };
+    return { features, limits, trialEligiblePlanIds };
   }
 
   async getPlanByName(name: SubscriptionPlanType) {
@@ -864,18 +1149,40 @@ export class SubscriptionService {
         isTrialPeriod: true,
         trialEnd: { lte: now },
       },
+      include: { plan: true, tenant: true },
     });
 
     let failed = 0;
     for (const subscription of expiredTrials) {
       try {
+        // Flip `isTrialPeriod` off alongside the status — UI uses the
+        // flag to decide whether to show "trial ends in N days", and
+        // leaving it true on PAST_DUE makes the dashboard claim a
+        // trial is ongoing after it has expired.
         await this.prisma.subscription.update({
           where: { id: subscription.id },
           data: {
             status: SubscriptionStatus.PAST_DUE,
+            isTrialPeriod: false,
           },
         });
         this.logger.log(`Trial subscription ${subscription.id} moved to PAST_DUE`);
+
+        // Best-effort trial-expired email; failure here mustn't block the
+        // status transition (the cron must remain idempotent).
+        const admin = await this.prisma.user.findFirst({
+          where: { tenantId: subscription.tenantId, role: 'ADMIN' },
+          select: { email: true },
+        });
+        if (admin?.email) {
+          await this.notificationService
+            .sendTrialExpired(admin.email, subscription.tenant.name, subscription.plan.displayName)
+            .catch((err: any) =>
+              this.logger.error(
+                `trial-expired notification failed for sub ${subscription.id}: ${err?.message}`,
+              ),
+            );
+        }
       } catch (err: any) {
         failed += 1;
         this.logger.error(

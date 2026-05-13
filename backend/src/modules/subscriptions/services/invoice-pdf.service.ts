@@ -64,9 +64,52 @@ export class InvoicePdfService {
       const tenant = invoice.subscription.tenant;
       const plan = invoice.subscription.plan;
       const currency = invoice.currency;
+      const isTRY = currency.toUpperCase() === 'TRY';
       const money = (v: any) => `${currency} ${Number(v).toFixed(2)}`;
       const dateStr = (d?: Date | null) =>
-        d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : '-';
+        d
+          ? new Date(d).toLocaleDateString(isTRY ? 'tr-TR' : 'en-US', {
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+            })
+          : '-';
+      // TR/EN labels — Turkish invoices need TR copy for KDV compliance.
+      const L = isTRY
+        ? {
+            tagline: 'Abonelik Yönetimi',
+            invoice: 'FATURA',
+            status: 'Durum',
+            billTo: 'ALICI',
+            taxIdLabel: 'Vergi No / TC Kimlik No',
+            invoiceDate: 'FATURA TARİHİ',
+            dueDate: 'SON ÖDEME TARİHİ',
+            paidDate: 'ÖDEME TARİHİ',
+            description: 'Açıklama',
+            period: 'Dönem',
+            amount: 'Tutar',
+            subtotal: 'Ara toplam',
+            kdv: 'KDV (%20)',
+            total: 'Genel toplam',
+            subscriptionLine: `${invoice.subscription.billingCycle === 'MONTHLY' ? 'Aylık' : 'Yıllık'} abonelik`,
+          }
+        : {
+            tagline: 'Subscription Management',
+            invoice: 'INVOICE',
+            status: 'Status',
+            billTo: 'BILL TO',
+            taxIdLabel: 'Tax ID',
+            invoiceDate: 'INVOICE DATE',
+            dueDate: 'DUE DATE',
+            paidDate: 'PAID DATE',
+            description: 'Description',
+            period: 'Period',
+            amount: 'Amount',
+            subtotal: 'Subtotal',
+            kdv: 'Tax',
+            total: 'Total',
+            subscriptionLine: `${invoice.subscription.billingCycle} Subscription`,
+          };
 
       // Header
       doc
@@ -75,51 +118,55 @@ export class InvoicePdfService {
         .text('HummyTummy', 50, 50)
         .fontSize(10)
         .fillColor('#666')
-        .text('Subscription Management', 50, 78);
+        .text(L.tagline, 50, 78);
 
       doc
         .fontSize(18)
         .fillColor('#111')
-        .text('INVOICE', 400, 50, { align: 'right' })
+        .text(L.invoice, 400, 50, { align: 'right' })
         .fontSize(10)
         .fillColor('#555')
         .text(invoice.invoiceNumber, 400, 74, { align: 'right' })
-        .text(`Status: ${invoice.status}`, 400, 88, { align: 'right' });
+        .text(`${L.status}: ${invoice.status}`, 400, 88, { align: 'right' });
 
       doc.moveTo(50, 110).lineTo(545, 110).strokeColor('#E5E7EB').stroke();
 
       // Bill-to
-      doc
-        .fontSize(9)
-        .fillColor('#888')
-        .text('BILL TO', 50, 130);
+      doc.fontSize(9).fillColor('#888').text(L.billTo, 50, 130);
       doc.fontSize(12).fillColor('#111').text(tenant.name, 50, 144);
+      let billToY = 160;
       if (tenant.subdomain) {
-        doc.fontSize(10).fillColor('#666').text(tenant.subdomain, 50, 160);
+        doc.fontSize(10).fillColor('#666').text(tenant.subdomain, 50, billToY);
+        billToY += 14;
+      }
+      // Tax ID printed from the snapshot (frozen at invoice issuance) so
+      // future taxId edits don't retroactively rewrite history.
+      if (invoice.taxIdSnapshot) {
+        doc
+          .fontSize(9)
+          .fillColor('#888')
+          .text(`${L.taxIdLabel}: ${invoice.taxIdSnapshot}`, 50, billToY);
       }
 
       // Dates
-      doc.fontSize(9).fillColor('#888').text('INVOICE DATE', 300, 130);
+      doc.fontSize(9).fillColor('#888').text(L.invoiceDate, 300, 130);
       doc.fontSize(10).fillColor('#111').text(dateStr(invoice.createdAt), 300, 144);
-      doc.fontSize(9).fillColor('#888').text('DUE DATE', 430, 130);
+      doc.fontSize(9).fillColor('#888').text(L.dueDate, 430, 130);
       doc.fontSize(10).fillColor('#111').text(dateStr(invoice.dueDate), 430, 144);
       if (invoice.paidAt) {
-        doc.fontSize(9).fillColor('#888').text('PAID DATE', 430, 170);
+        doc.fontSize(9).fillColor('#888').text(L.paidDate, 430, 170);
         doc.fontSize(10).fillColor('#111').text(dateStr(invoice.paidAt), 430, 184);
       }
 
       // Line items table header
       const tableTop = 230;
-      doc
-        .rect(50, tableTop, 495, 24)
-        .fillColor('#F3F4F6')
-        .fill();
+      doc.rect(50, tableTop, 495, 24).fillColor('#F3F4F6').fill();
       doc
         .fillColor('#111')
         .fontSize(10)
-        .text('Description', 60, tableTop + 7)
-        .text('Period', 280, tableTop + 7)
-        .text('Amount', 470, tableTop + 7, { width: 70, align: 'right' });
+        .text(L.description, 60, tableTop + 7)
+        .text(L.period, 280, tableTop + 7)
+        .text(L.amount, 470, tableTop + 7, { width: 70, align: 'right' });
 
       // Line item
       const itemY = tableTop + 32;
@@ -128,7 +175,7 @@ export class InvoicePdfService {
         .text(plan.displayName, 60, itemY)
         .fontSize(9)
         .fillColor('#666')
-        .text(`${invoice.subscription.billingCycle} Subscription`, 60, itemY + 14);
+        .text(L.subscriptionLine, 60, itemY + 14);
       doc
         .fontSize(10)
         .fillColor('#111')
@@ -150,12 +197,12 @@ export class InvoicePdfService {
       const labelX = 380;
       const valueX = 470;
       doc.fontSize(10).fillColor('#555');
-      doc.text('Subtotal', labelX, totalsY, { width: 80, align: 'right' });
+      doc.text(L.subtotal, labelX, totalsY, { width: 80, align: 'right' });
       doc
         .fillColor('#111')
         .text(money(invoice.subtotal), valueX, totalsY, { width: 70, align: 'right' });
       if (Number(invoice.tax) > 0) {
-        doc.fillColor('#555').text('Tax', labelX, totalsY + 18, { width: 80, align: 'right' });
+        doc.fillColor('#555').text(L.kdv, labelX, totalsY + 18, { width: 80, align: 'right' });
         doc
           .fillColor('#111')
           .text(money(invoice.tax), valueX, totalsY + 18, { width: 70, align: 'right' });
@@ -169,7 +216,7 @@ export class InvoicePdfService {
       doc
         .fontSize(12)
         .fillColor('#111')
-        .text('Total', labelX, grandY + 2, { width: 80, align: 'right' });
+        .text(L.total, labelX, grandY + 2, { width: 80, align: 'right' });
       doc.text(money(invoice.total), valueX, grandY + 2, { width: 70, align: 'right' });
 
       // Payment info
@@ -177,14 +224,18 @@ export class InvoicePdfService {
         doc
           .fontSize(9)
           .fillColor('#888')
-          .text('PAYMENT', 50, grandY + 40);
+          .text(isTRY ? 'ÖDEME BİLGİSİ' : 'PAYMENT', 50, grandY + 40);
         doc
           .fontSize(10)
           .fillColor('#111')
-          .text(`Provider: ${invoice.payment.paymentProvider}`, 50, grandY + 54);
+          .text(
+            `${isTRY ? 'Sağlayıcı' : 'Provider'}: ${invoice.payment.paymentProvider}`,
+            50,
+            grandY + 54,
+          );
         if (invoice.payment.externalReference) {
           doc.text(
-            `Reference: ${invoice.payment.externalReference}`,
+            `${isTRY ? 'Referans' : 'Reference'}: ${invoice.payment.externalReference}`,
             50,
             grandY + 68,
           );
@@ -195,7 +246,9 @@ export class InvoicePdfService {
         .fontSize(9)
         .fillColor('#888')
         .text(
-          'Thank you for your business. For questions about this invoice please contact support.',
+          isTRY
+            ? 'Tercihiniz için teşekkür ederiz. Faturayla ilgili sorularınız için destek ekibimize ulaşabilirsiniz.'
+            : 'Thank you for your business. For questions about this invoice please contact support.',
           50,
           760,
           { width: 495, align: 'center' },

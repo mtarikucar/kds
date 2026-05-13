@@ -161,6 +161,10 @@ export const useCustomerBehavior = (params: DateRangeParams) => {
 
 // ==================== INSIGHTS HOOKS ====================
 
+// Index signature lets InsightFilters flow through the generic
+// analyticsKeys.insightList() (typed as Record<string, unknown>) without
+// a cast. Adding it here also matches how filters get spread into the
+// axios `params` object at the call site.
 export interface InsightFilters {
   type?: string;
   category?: string;
@@ -168,6 +172,7 @@ export interface InsightFilters {
   status?: string;
   limit?: number;
   offset?: number;
+  [key: string]: unknown;
 }
 
 export const useInsights = (filters?: InsightFilters) => {

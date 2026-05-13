@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { PlusIcon, CheckIcon, ClockIcon, ExclamationTriangleIcon, PencilSquareIcon, TrashIcon, PlayIcon } from '@heroicons/react/24/outline';
 import marketingApi from '../../features/marketing/api/marketingApi';
 import type { MarketingTask } from '../../features/marketing/types';
+import { fmtDate } from '../../features/marketing/utils/format';
 
 const priorityColors: Record<string, string> = {
   LOW: 'text-gray-500',
@@ -366,7 +367,7 @@ export default function TasksPage() {
                 </div>
                 <div className="text-right flex-shrink-0">
                   <p className={`text-xs ${isOverdue ? 'text-red-600 font-medium' : 'text-gray-400'}`}>
-                    {new Date(task.dueDate).toLocaleDateString()}
+                    {fmtDate(task.dueDate)}
                   </p>
                   {task.assignedTo && (
                     <p className="text-xs text-gray-400 mt-0.5">

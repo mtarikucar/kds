@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   Inject,
   forwardRef,
   Optional,
@@ -210,7 +211,17 @@ export class OrdersService {
       };
     });
 
-    const discount = createOrderDto.discount || 0;
+    // Cap the discount at the order total — discount > total would mint a
+    // negative finalAmount and effectively pay the customer. DTO `@Min(0)`
+    // blocks negative discounts but not over-discounts, and a free-form
+    // admin field can hit this even on legit flows (typo, copy/paste).
+    const requestedDiscount = createOrderDto.discount || 0;
+    if (requestedDiscount > totalAmount) {
+      throw new BadRequestException(
+        `Discount (${requestedDiscount}) cannot exceed order total (${totalAmount}).`,
+      );
+    }
+    const discount = requestedDiscount;
     const finalAmount = totalAmount - discount;
 
     // Recalculate tax after discount (proportional)
@@ -583,9 +594,14 @@ export class OrdersService {
       updateData.finalAmount = finalAmount;
       updateData.taxAmount = adjustedTaxAmount;
     } else if (updateOrderDto.discount !== undefined) {
-      // Only discount is being updated
+      // Only discount is being updated. Use Decimal arithmetic so large
+      // bills (over ~70 000 TL) don't lose precision in IEEE-754 — the
+      // `Number(order.totalAmount)` cast in the prior implementation
+      // dropped the second-cent on big-ticket orders.
       updateData.discount = updateOrderDto.discount;
-      updateData.finalAmount = Number(order.totalAmount) - updateOrderDto.discount;
+      updateData.finalAmount = new Prisma.Decimal(order.totalAmount).sub(
+        new Prisma.Decimal(updateOrderDto.discount),
+      );
     }
 
     // Atomic replace of the item set: a crash between the deleteMany
@@ -593,7 +609,36 @@ export class OrdersService {
     // covers the order.update so a validation failure doesn't leave
     // the order without its items.
     const updatedOrder = await this.prisma.$transaction(async (tx) => {
+      // Re-verify status inside the transaction: a concurrent cancel /
+      // pay between the findOne above and this write could otherwise let
+      // us layer new items onto a PAID/CANCELLED order (corrupting the
+      // audit trail). The terminal statuses are guarded at line 468 but
+      // only against the stale snapshot.
+      const stillEditable = await tx.order.count({
+        where: {
+          id,
+          tenantId,
+          status: { notIn: [OrderStatus.PAID, OrderStatus.CANCELLED] },
+        },
+      });
+      if (stillEditable === 0) {
+        throw new BadRequestException('Cannot update paid or cancelled orders');
+      }
       if (updateData.orderItems) {
+        // Block item rewrites when any item already has a per-item
+        // payment recorded. Deleting an OrderItem that still has an
+        // OrderItemPayment row would either fail at the DB level (FK is
+        // Restrict) or, worse, leave the payment dangling. Either way
+        // the customer who already paid for their share would lose
+        // visibility into what they paid for. Refund the payment first.
+        const paidItemCount = await tx.orderItemPayment.count({
+          where: { tenantId, orderItem: { orderId: id } },
+        });
+        if (paidItemCount > 0) {
+          throw new ConflictException(
+            'Cannot rewrite items on an order with partial per-item payments. Refund the corresponding payment(s) first.',
+          );
+        }
         await tx.orderItem.deleteMany({ where: { orderId: id } });
       }
       return tx.order.update({
@@ -663,14 +708,42 @@ export class OrdersService {
       // Validate state transition using state machine (STRICT mode)
       validateTransition(order.status as OrderStatus, updateStatusDto.status);
 
+      // Block CANCELLED if there are any per-item payments. A CANCELLED
+      // order with active OrderItemPayment rows leaves the customer who
+      // already paid for their share without a refund trail — refund
+      // the payment(s) explicitly instead, which also frees the items.
+      if (updateStatusDto.status === OrderStatus.CANCELLED) {
+        const paidItemCount = await tx.orderItemPayment.count({
+          where: { tenantId, orderItem: { orderId: id } },
+        });
+        if (paidItemCount > 0) {
+          throw new ConflictException(
+            'Cannot cancel an order with partial per-item payments. Refund the corresponding payment(s) first.',
+          );
+        }
+      }
+
       // Build update data with status timestamps
       const statusUpdateData: any = { status: updateStatusDto.status };
       if (updateStatusDto.status === OrderStatus.PREPARING) statusUpdateData.preparingAt = new Date();
       if (updateStatusDto.status === OrderStatus.READY) statusUpdateData.readyAt = new Date();
+      if (updateStatusDto.status === OrderStatus.CANCELLED) statusUpdateData.cancelledAt = new Date();
 
-      const updated = await tx.order.update({
-        where: { id },
+      // Conditional write: include the observed `order.status` in the
+      // where filter so two concurrent transitions can't both pass the
+      // (stale) validateTransition above and both write. Mirrors the
+      // race-safe pattern in customers/loyalty.service.ts:50-107.
+      const writeResult = await tx.order.updateMany({
+        where: { id, status: order.status },
         data: statusUpdateData,
+      });
+      if (writeResult.count === 0) {
+        throw new BadRequestException(
+          `Order state changed mid-flight; please retry. Expected ${order.status}, found something else.`,
+        );
+      }
+      const updated = await tx.order.findUniqueOrThrow({
+        where: { id },
         include: {
           orderItems: { include: { product: true } },
           table: true,

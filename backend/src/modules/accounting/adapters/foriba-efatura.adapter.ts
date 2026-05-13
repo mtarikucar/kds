@@ -1,5 +1,7 @@
 import { Logger } from '@nestjs/common';
 import axios, { AxiosInstance } from 'axios';
+import { Prisma } from '@prisma/client';
+import * as crypto from 'crypto';
 import { AccountingAdapter, AccountingInvoiceData } from './accounting-adapter.interface';
 
 export class ForibaEfaturaAdapter implements AccountingAdapter {
@@ -58,22 +60,39 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
 
   private generateUblTrXml(invoice: AccountingInvoiceData): string {
     const uuid = crypto.randomUUID();
-    const totalExcTax = invoice.items.reduce((s, i) => s + i.unitPrice * i.quantity, 0);
-    const totalTax = invoice.items.reduce((s, i) => s + (i.unitPrice * i.quantity * i.taxRate) / 100, 0);
 
-    const lineItems = invoice.items
+    // UBL-TR rejects XML where header totals don't match the line items
+    // bit-for-bit. JS Number was accumulating rounding error across the
+    // reduce + per-line calculations, so the tax authority bounced random
+    // submissions back. Stay in Prisma.Decimal end-to-end and only call
+    // toFixed(2) at serialization time.
+    const lineTotals = invoice.items.map((i) => {
+      const qty = new Prisma.Decimal(i.quantity);
+      const unit = new Prisma.Decimal(i.unitPrice);
+      const rate = new Prisma.Decimal(i.taxRate);
+      const lineExt = unit.mul(qty);
+      const lineTax = lineExt.mul(rate).div(100);
+      return { lineExt, lineTax, rate, unit, qty, item: i };
+    });
+
+    const totalExcTax = lineTotals
+      .reduce<Prisma.Decimal>((s, l) => s.add(l.lineExt), new Prisma.Decimal(0));
+    const totalTax = lineTotals
+      .reduce<Prisma.Decimal>((s, l) => s.add(l.lineTax), new Prisma.Decimal(0));
+
+    const lineItems = lineTotals
       .map(
-        (item, index) => `
+        ({ lineExt, lineTax, rate, unit, qty, item }, index) => `
       <cac:InvoiceLine>
         <cbc:ID>${index + 1}</cbc:ID>
-        <cbc:InvoicedQuantity unitCode="C62">${item.quantity}</cbc:InvoicedQuantity>
-        <cbc:LineExtensionAmount currencyID="${invoice.currency}">${(item.unitPrice * item.quantity).toFixed(2)}</cbc:LineExtensionAmount>
+        <cbc:InvoicedQuantity unitCode="C62">${qty.toString()}</cbc:InvoicedQuantity>
+        <cbc:LineExtensionAmount currencyID="${invoice.currency}">${lineExt.toFixed(2)}</cbc:LineExtensionAmount>
         <cac:TaxTotal>
-          <cbc:TaxAmount currencyID="${invoice.currency}">${((item.unitPrice * item.quantity * item.taxRate) / 100).toFixed(2)}</cbc:TaxAmount>
+          <cbc:TaxAmount currencyID="${invoice.currency}">${lineTax.toFixed(2)}</cbc:TaxAmount>
           <cac:TaxSubtotal>
-            <cbc:TaxableAmount currencyID="${invoice.currency}">${(item.unitPrice * item.quantity).toFixed(2)}</cbc:TaxableAmount>
-            <cbc:TaxAmount currencyID="${invoice.currency}">${((item.unitPrice * item.quantity * item.taxRate) / 100).toFixed(2)}</cbc:TaxAmount>
-            <cbc:Percent>${item.taxRate}</cbc:Percent>
+            <cbc:TaxableAmount currencyID="${invoice.currency}">${lineExt.toFixed(2)}</cbc:TaxableAmount>
+            <cbc:TaxAmount currencyID="${invoice.currency}">${lineTax.toFixed(2)}</cbc:TaxAmount>
+            <cbc:Percent>${rate.toString()}</cbc:Percent>
             <cac:TaxCategory>
               <cac:TaxScheme>
                 <cbc:Name>KDV</cbc:Name>
@@ -83,7 +102,7 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
           </cac:TaxSubtotal>
         </cac:TaxTotal>
         <cac:Item><cbc:Name>${this.escapeXml(item.description)}</cbc:Name></cac:Item>
-        <cac:Price><cbc:PriceAmount currencyID="${invoice.currency}">${item.unitPrice.toFixed(2)}</cbc:PriceAmount></cac:Price>
+        <cac:Price><cbc:PriceAmount currencyID="${invoice.currency}">${unit.toFixed(2)}</cbc:PriceAmount></cac:Price>
       </cac:InvoiceLine>`,
       )
       .join('\n');
@@ -111,8 +130,8 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
   <cac:LegalMonetaryTotal>
     <cbc:LineExtensionAmount currencyID="${invoice.currency}">${totalExcTax.toFixed(2)}</cbc:LineExtensionAmount>
     <cbc:TaxExclusiveAmount currencyID="${invoice.currency}">${totalExcTax.toFixed(2)}</cbc:TaxExclusiveAmount>
-    <cbc:TaxInclusiveAmount currencyID="${invoice.currency}">${invoice.totalAmount.toFixed(2)}</cbc:TaxInclusiveAmount>
-    <cbc:PayableAmount currencyID="${invoice.currency}">${invoice.totalAmount.toFixed(2)}</cbc:PayableAmount>
+    <cbc:TaxInclusiveAmount currencyID="${invoice.currency}">${new Prisma.Decimal(invoice.totalAmount).toFixed(2)}</cbc:TaxInclusiveAmount>
+    <cbc:PayableAmount currencyID="${invoice.currency}">${new Prisma.Decimal(invoice.totalAmount).toFixed(2)}</cbc:PayableAmount>
   </cac:LegalMonetaryTotal>
   ${lineItems}
 </Invoice>`;

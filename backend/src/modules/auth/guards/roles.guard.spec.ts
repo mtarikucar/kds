@@ -1,7 +1,24 @@
-import { ExecutionContext } from '@nestjs/common';
+import { ExecutionContext, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { RolesGuard } from './roles.guard';
 import { UserRole } from '../../../common/constants/roles.enum';
+import { ROLES_KEY } from '../decorators/roles.decorator';
+
+/**
+ * Build a `getAllAndOverride` mock that only returns the test-supplied
+ * roles when the lookup is for ROLES_KEY. The guard also consults the
+ * bypass helper (IS_PUBLIC_KEY etc.) — without keyed mocking, every
+ * lookup would falsely return the role list and the guard would short-
+ * circuit through the bypass path, never reaching the role check.
+ */
+function rolesReflector(requiredRoles: UserRole[] | undefined): Reflector {
+  const r = new Reflector();
+  jest.spyOn(r, 'getAllAndOverride').mockImplementation((key: any) => {
+    if (key === ROLES_KEY) return requiredRoles;
+    return undefined;
+  });
+  return r;
+}
 
 describe('RolesGuard', () => {
   let guard: RolesGuard;
@@ -19,14 +36,10 @@ describe('RolesGuard', () => {
     } as any;
   };
 
-  beforeEach(() => {
-    reflector = new Reflector();
-    guard = new RolesGuard(reflector);
-  });
-
   describe('canActivate', () => {
     it('should return true if no roles are required', () => {
-      jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(undefined);
+      reflector = rolesReflector(undefined);
+      guard = new RolesGuard(reflector);
 
       const context = mockExecutionContext({ role: UserRole.WAITER });
 
@@ -34,43 +47,43 @@ describe('RolesGuard', () => {
     });
 
     it('should return true if user has required role', () => {
-      jest
-        .spyOn(reflector, 'getAllAndOverride')
-        .mockReturnValue([UserRole.ADMIN]);
+      reflector = rolesReflector([UserRole.ADMIN]);
+      guard = new RolesGuard(reflector);
 
       const context = mockExecutionContext({ role: UserRole.ADMIN });
 
       expect(guard.canActivate(context)).toBe(true);
     });
 
-    it('should return false if user does not have required role', () => {
-      jest
-        .spyOn(reflector, 'getAllAndOverride')
-        .mockReturnValue([UserRole.ADMIN]);
+    it('should throw ForbiddenException if user does not have required role', () => {
+      // The guard throws rather than returning false so Nest's exception
+      // filter can render a 403 with the right message; bool returns
+      // would surface as a generic 500. Updated 2026-05 to match the
+      // production behaviour.
+      reflector = rolesReflector([UserRole.ADMIN]);
+      guard = new RolesGuard(reflector);
 
       const context = mockExecutionContext({ role: UserRole.WAITER });
 
-      expect(guard.canActivate(context)).toBe(false);
+      expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
     });
 
     it('should return true if user has one of multiple required roles', () => {
-      jest
-        .spyOn(reflector, 'getAllAndOverride')
-        .mockReturnValue([UserRole.ADMIN, UserRole.MANAGER]);
+      reflector = rolesReflector([UserRole.ADMIN, UserRole.MANAGER]);
+      guard = new RolesGuard(reflector);
 
       const context = mockExecutionContext({ role: UserRole.MANAGER });
 
       expect(guard.canActivate(context)).toBe(true);
     });
 
-    it('should return false if user is not authenticated', () => {
-      jest
-        .spyOn(reflector, 'getAllAndOverride')
-        .mockReturnValue([UserRole.ADMIN]);
+    it('should throw ForbiddenException if user is not authenticated', () => {
+      reflector = rolesReflector([UserRole.ADMIN]);
+      guard = new RolesGuard(reflector);
 
       const context = mockExecutionContext(null);
 
-      expect(guard.canActivate(context)).toBe(false);
+      expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
     });
   });
 });

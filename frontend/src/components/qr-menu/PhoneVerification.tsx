@@ -123,7 +123,7 @@ const PhoneVerification = ({
               onChange={(e) => setPhone(e.target.value)}
               placeholder="+905551234567"
               className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-opacity-50 text-lg"
-              style={{ focusRing: primaryColor }}
+              style={{ ['--tw-ring-color' as any]: primaryColor }}
               disabled={isLoading}
               autoFocus
             />
@@ -181,7 +181,7 @@ const PhoneVerification = ({
             onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
             placeholder="000000"
             className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-opacity-50 text-lg text-center tracking-widest font-mono"
-            style={{ focusRing: primaryColor }}
+            style={{ ['--tw-ring-color' as any]: primaryColor }}
             disabled={isLoading}
             autoFocus
             maxLength={6}

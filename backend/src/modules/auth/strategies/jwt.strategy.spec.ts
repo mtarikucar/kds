@@ -63,13 +63,22 @@ describe('JwtStrategy', () => {
         passwordResetExpires: null,
         lastLoginAt: null,
         phoneNumber: null,
+        // jwt.strategy joins through tenant.status — without an ACTIVE
+        // tenant on the mock, every validate() call throws "restaurant
+        // account is not active". tokenVersion=0 must match the
+        // payload.ver=0 default below.
+        tokenVersion: 0,
+        tenant: { status: 'ACTIVE' },
       };
 
       prisma.user.findUnique.mockResolvedValue(fullUser as any);
 
       const result = await strategy.validate(payload);
 
-      expect(result).toEqual(fullUser);
+      // The strategy strips `tenant` and `tokenVersion` from the
+      // returned user, so we compare against that subset.
+      const { tenant: _t, tokenVersion: _v, ...expected } = fullUser as any;
+      expect(result).toEqual(expected);
       expect(prisma.user.findUnique).toHaveBeenCalled();
     });
 
@@ -108,6 +117,12 @@ describe('JwtStrategy', () => {
         passwordResetExpires: null,
         lastLoginAt: null,
         phoneNumber: null,
+        // jwt.strategy joins through tenant.status — without an ACTIVE
+        // tenant on the mock, every validate() call throws "restaurant
+        // account is not active". tokenVersion=0 must match the
+        // payload.ver=0 default below.
+        tokenVersion: 0,
+        tenant: { status: 'ACTIVE' },
       };
 
       prisma.user.findUnique.mockResolvedValue(fullUser as any);

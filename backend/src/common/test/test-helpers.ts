@@ -2,7 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppModule } from '../../app.module';
 import { PrismaService } from '../../prisma/prisma.service';
-import * as request from 'supertest';
+import request from 'supertest';
 
 /**
  * Test Helpers for E2E and Integration Tests
@@ -48,7 +48,7 @@ export async function getAuthToken(
   email: string = 'test@example.com',
   password: string = 'password123',
 ): Promise<string> {
-  const response = await request.default(app.getHttpServer())
+  const response = await request(app.getHttpServer())
     .post('/api/auth/login')
     .send({ email, password })
     .expect(200);

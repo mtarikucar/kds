@@ -116,17 +116,28 @@ export class WebhookAuthGuard implements CanActivate {
     }
 
     // Require + enforce a timestamp header so replayed signatures
-    // become useless after the window lapses.
+    // become useless after the window lapses. The previous version
+    // skipped the freshness check when the header was absent, which
+    // let an attacker bypass the 5-min window by simply omitting it.
     const timestamp = request.headers['x-webhook-timestamp'];
-    if (timestamp) {
-      const ts = Number(timestamp);
-      if (!Number.isFinite(ts) || Math.abs(Date.now() / 1000 - ts) > WEBHOOK_MAX_AGE_SECONDS) {
-        throw new UnauthorizedException('Stale webhook timestamp');
-      }
+    if (!timestamp) {
+      throw new UnauthorizedException('Missing webhook timestamp');
+    }
+    const ts = Number(timestamp);
+    if (!Number.isFinite(ts) || Math.abs(Date.now() / 1000 - ts) > WEBHOOK_MAX_AGE_SECONDS) {
+      throw new UnauthorizedException('Stale webhook timestamp');
     }
 
-    const body = request.rawBody?.toString('utf8') || JSON.stringify(request.body);
-    const signedPayload = timestamp ? `${timestamp}.${body}` : body;
+    // Fail closed if rawBody is missing: re-serializing via JSON.stringify
+    // is not byte-identical to what the sender signed (key ordering,
+    // whitespace, number formatting). Verifying against a re-serialized
+    // payload effectively disables signature checking.
+    if (!request.rawBody) {
+      this.logger.error('Trendyol webhook missing rawBody — refusing to verify against re-serialized JSON');
+      throw new UnauthorizedException('Webhook body capture missing');
+    }
+    const body = request.rawBody.toString('utf8');
+    const signedPayload = `${timestamp}.${body}`;
     const expectedSignature = createHmac('sha256', webhookSecret)
       .update(signedPayload)
       .digest('hex');

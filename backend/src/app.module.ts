@@ -17,6 +17,7 @@ import { KdsModule } from './modules/kds/kds.module';
 import { StockModule } from './modules/stock/stock.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
+import { PaymentsModule } from './modules/payments/payments.module';
 import { UploadModule } from './modules/upload/upload.module';
 import { QrModule } from './modules/qr/qr.module';
 import { PosSettingsModule } from './modules/pos-settings/pos-settings.module';
@@ -29,7 +30,6 @@ import { ModifiersModule } from './modules/modifiers/modifiers.module';
 import { CustomerOrdersModule } from './modules/customer-orders/customer-orders.module';
 import { DesktopAppModule } from './modules/desktop-app/desktop-app.module';
 import { PublicStatsModule } from './modules/public-stats/public-stats.module';
-import { LayoutsModule } from './modules/layouts/layouts.module';
 import { SuperAdminModule } from './modules/superadmin/superadmin.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { ReservationsModule } from './modules/reservations/reservations.module';
@@ -73,6 +73,7 @@ import { RequestLoggerMiddleware } from './common/middleware/request-logger.midd
     CommonModule,
     AuthModule,
     SubscriptionsModule,
+    PaymentsModule,
     TenantsModule,
     UsersModule,
     MenuModule,
@@ -93,7 +94,6 @@ import { RequestLoggerMiddleware } from './common/middleware/request-logger.midd
     CustomerOrdersModule,
     DesktopAppModule,
     PublicStatsModule,
-    LayoutsModule,
     SuperAdminModule,
     AnalyticsModule,
     ReservationsModule,

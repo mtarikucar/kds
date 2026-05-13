@@ -127,14 +127,30 @@ export class SuperAdminAuthService {
     if (!normalized) return false;
     const hash = this.hashSecret(normalized);
     if (!superAdmin.backupCodes.includes(hash)) return false;
-    // Burn the used code.
-    await this.prisma.superAdmin.update({
-      where: { id: superAdmin.id },
-      data: {
-        backupCodes: superAdmin.backupCodes.filter((c) => c !== hash),
+    // Atomic single-use: two concurrent backup-code logins could both
+    // pass the includes() check above, then both run the update — the
+    // second write overwrites the first, but *both* sessions get issued
+    // (replay). Run the read-and-write in one Serializable transaction
+    // so the second arrival sees the first's pruned array. count===0
+    // means "code already consumed".
+    const consumed = await this.prisma.$transaction(
+      async (tx) => {
+        const fresh = await tx.superAdmin.findUnique({
+          where: { id: superAdmin.id },
+          select: { backupCodes: true },
+        });
+        if (!fresh || !fresh.backupCodes.includes(hash)) return false;
+        await tx.superAdmin.update({
+          where: { id: superAdmin.id },
+          data: {
+            backupCodes: fresh.backupCodes.filter((c) => c !== hash),
+          },
+        });
+        return true;
       },
-    });
-    return true;
+      { isolationLevel: 'Serializable' as any },
+    );
+    return consumed;
   }
 
   private generateBackupCodes(): {
@@ -218,10 +234,12 @@ export class SuperAdminAuthService {
       );
     }
 
-    await this.prisma.superAdmin.update({
-      where: { id: superAdmin.id },
-      data: { failedLogins: 0, lockedUntil: null },
-    });
+    // NOTE: failedLogins / lockedUntil are NOT reset here. Resetting after
+    // password match but before 2FA verification let an attacker who
+    // knows the password endlessly retry 2FA codes — each failed 2FA
+    // attempt wouldn't increment the lockout counter because the counter
+    // was already cleared. The reset happens in verify2FA() instead,
+    // after the TOTP/backup-code verification succeeds.
 
     const tempToken = this.jwtService.sign(
       {
@@ -284,9 +302,17 @@ export class SuperAdminAuthService {
       throw new UnauthorizedException('Invalid 2FA code');
     }
 
+    // Reset lockout counters only after the FULL login completes (password
+    // + 2FA). Doing this here instead of post-password closes a brute-force
+    // window on the 2FA code.
     await this.prisma.superAdmin.update({
       where: { id: superAdmin.id },
-      data: { lastLogin: new Date(), lastLoginIp: ip },
+      data: {
+        lastLogin: new Date(),
+        lastLoginIp: ip,
+        failedLogins: 0,
+        lockedUntil: null,
+      },
     });
 
     await this.auditService.log({
@@ -533,15 +559,30 @@ export class SuperAdminAuthService {
     if (payload.type !== 'superadmin-refresh') {
       throw new UnauthorizedException('Invalid token type');
     }
+    if (typeof payload.ver !== 'number') {
+      // Old tokens without a `ver` claim can't be safely rotated — force
+      // re-login rather than minting a fresh pair against unknown state.
+      throw new UnauthorizedException('Refresh token missing version claim');
+    }
 
+    // Atomic rotate: bump tokenVersion only if the presented token matches
+    // the current value. Two concurrent refreshes with the same cookie hit
+    // updateMany with the same `where`; exactly one count===1 wins. Without
+    // this bump, the old refresh remained valid for its full 7-day TTL
+    // after first use (docs/reviews/superadmin.md F-3).
+    const rotated = await this.prisma.superAdmin.updateMany({
+      where: { id: payload.sub, tokenVersion: payload.ver, status: 'ACTIVE' },
+      data: { tokenVersion: { increment: 1 } },
+    });
+    if (rotated.count === 0) {
+      throw new UnauthorizedException('Session revoked');
+    }
     const superAdmin = await this.prisma.superAdmin.findUnique({
       where: { id: payload.sub },
     });
-    if (!superAdmin || superAdmin.status !== 'ACTIVE') {
-      throw new UnauthorizedException('SuperAdmin not found or inactive');
-    }
-    if (typeof payload.ver === 'number' && payload.ver !== superAdmin.tokenVersion) {
-      throw new UnauthorizedException('Session revoked');
+    if (!superAdmin) {
+      // Race: row deleted between the update and the read. Treat as revoked.
+      throw new UnauthorizedException('SuperAdmin not found');
     }
 
     return this.generateTokens(superAdmin);

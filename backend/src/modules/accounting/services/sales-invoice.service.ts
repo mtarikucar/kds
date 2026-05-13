@@ -29,13 +29,23 @@ export class SalesInvoiceService {
     if (!order) throw new NotFoundException('Paid order not found');
     if (order.salesInvoice) throw new BadRequestException('Invoice already exists for this order');
 
-    const invoiceNumber = await this.settingsService.getNextInvoiceNumber(tenantId);
+    // Read the non-secret settings once outside the tx — only the counter
+    // mint + invoice create need to share rollback semantics. This keeps
+    // the transaction short.
     const settings = await this.settingsService.findByTenant(tenantId);
 
     const invoiceItems = order.orderItems.map((item) => {
       const lineTotal = Number(item.subtotal);
       const taxRate = item.taxRate ?? 10;
       const tax = this.taxService.extractTax(lineTotal, taxRate);
+
+      // quantity===0 would back-calc unitPrice as NaN and persist into the
+      // Decimal column, breaking downstream math and tax-authority XML.
+      if (!item.quantity || item.quantity <= 0) {
+        throw new BadRequestException(
+          `Invoice cannot be generated: order item "${item.product?.name ?? item.id}" has non-positive quantity`,
+        );
+      }
 
       return {
         description: item.product?.name || 'Ürün',
@@ -64,7 +74,15 @@ export class SalesInvoiceService {
 
     const paymentMethod = order.payments[0]?.method || null;
 
-    const invoice = await this.prisma.salesInvoice.create({
+    // Mint the invoice number inside the same transaction as the create.
+    // If the create fails (e.g. DTO validation upstream of the DB) the
+    // number-increment is rolled back too — no audit gap.
+    const invoice = await this.prisma.$transaction(async (tx) => {
+      const invoiceNumber = await this.settingsService.getNextInvoiceNumber(
+        tenantId,
+        tx,
+      );
+      return tx.salesInvoice.create({
       data: {
         invoiceNumber,
         status: InvoiceStatus.ISSUED,
@@ -98,6 +116,7 @@ export class SalesInvoiceService {
         },
       },
       include: { items: true },
+    });
     });
 
     // Auto-sync if enabled

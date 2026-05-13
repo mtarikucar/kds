@@ -23,6 +23,9 @@ export interface TenantSettings {
   socialTiktok?: string;
   socialYoutube?: string;
   socialWhatsapp?: string;
+  /** Turkish tax identifier (Vergi No / TC Kimlik No) — required for
+   *  KDV-compliant invoices. */
+  taxId?: string;
 }
 
 export interface UpdateTenantSettingsDto {
@@ -45,6 +48,8 @@ export interface UpdateTenantSettingsDto {
   socialTiktok?: string;
   socialYoutube?: string;
   socialWhatsapp?: string;
+  /** `null` clears the stored value; `undefined` leaves it untouched. */
+  taxId?: string | null;
 }
 
 export const SUPPORTED_CURRENCIES = [

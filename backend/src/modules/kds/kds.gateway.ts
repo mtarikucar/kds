@@ -120,6 +120,22 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.data.tenantId = tenantId;
     client.data.role = role;
     client.data.userType = 'staff';
+    client.data.tokenExp = payload.exp;
+
+    // Auto-disconnect at JWT expiry so a long-running KDS terminal that
+    // hasn't refreshed its token can't keep streaming kitchen events
+    // forever. The frontend retries with the new token on reconnect.
+    if (payload.exp && typeof payload.exp === 'number') {
+      const msToExpiry = payload.exp * 1000 - Date.now();
+      if (msToExpiry > 0 && msToExpiry < 0x7fffffff) {
+        setTimeout(() => {
+          if (client.connected) {
+            this.logger.log(`Staff client ${client.id} token expired; disconnecting.`);
+            client.disconnect(true);
+          }
+        }, msToExpiry).unref?.();
+      }
+    }
 
     // Role-based room membership — sockets receive only the events relevant
     // to their role instead of every kitchen + POS event regardless of job.

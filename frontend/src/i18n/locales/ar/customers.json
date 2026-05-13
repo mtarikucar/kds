@@ -46,6 +46,13 @@
     "lastVisit": "آخر زيارة",
     "referralCode": "رمز الإحالة",
     "tags": "العلامات",
-    "tagsPlaceholder": "VIP، منتظم، إلخ."
+    "tagsPlaceholder": "VIP، منتظم، إلخ.",
+    "manageCustomers": "إدارة قاعدة بيانات العملاء وبرامج الولاء",
+    "noCustomersDescription": "ابدأ ببناء قاعدة بيانات عملائك بإضافة أول عميل.",
+    "noSearchResults": "لا توجد نتائج",
+    "noSearchResultsDescription": "حاول تعديل كلمات البحث للعثور على ما تبحث عنه.",
+    "addFirstCustomer": "إضافة أول عميل",
+    "orders": "الطلبات",
+    "points": "النقاط"
   }
 }

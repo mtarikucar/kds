@@ -28,11 +28,14 @@ export class SubscriptionLimitsGuard implements CanActivate {
       throw new ForbiddenException('Tenant not found');
     }
 
-    // Get current subscription
+    // Get current subscription. PAST_DUE counts as live here — it's
+    // the 7-day grace window where `PlanFeatureGuard` still grants
+    // feature access. Limiting CRUD during grace would be punitive and
+    // inconsistent with the feature guard.
     const subscription = await this.prisma.subscription.findFirst({
       where: {
         tenantId,
-        status: { in: ['ACTIVE', 'TRIALING'] },
+        status: { in: ['ACTIVE', 'TRIALING', 'PAST_DUE'] },
       },
       include: { plan: true },
     });

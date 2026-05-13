@@ -61,19 +61,25 @@ export class CategoriesService {
     // Check if category exists and belongs to tenant
     await this.findOne(id, tenantId);
 
-    return this.prisma.category.update({
-      where: { id },
+    // Compound WHERE — IDOR guard (B41-B45 pattern).
+    const claim = await this.prisma.category.updateMany({
+      where: { id, tenantId },
       data: updateCategoryDto,
     });
+    if (claim.count === 0) {
+      throw new ConflictException('Category not found');
+    }
+    return this.prisma.category.findUnique({ where: { id } });
   }
 
   async remove(id: string, tenantId: string) {
     // Check if category exists and belongs to tenant
     await this.findOne(id, tenantId);
 
-    // Check if category has products
-    const category = await this.prisma.category.findUnique({
-      where: { id },
+    // Tenant-filtered findFirst — findUnique by id alone was cross-tenant
+    // readable, which leaked product counts. Now compound.
+    const category = await this.prisma.category.findFirst({
+      where: { id, tenantId },
       include: {
         _count: {
           select: { products: true },
@@ -81,14 +87,14 @@ export class CategoriesService {
       },
     });
 
-    if (category._count.products > 0) {
+    if (category && category._count.products > 0) {
       throw new ConflictException(
         'Cannot delete category with existing products. Please delete or reassign products first.',
       );
     }
 
     return this.prisma.category.delete({
-      where: { id },
+      where: { id, tenantId },
     });
   }
 }

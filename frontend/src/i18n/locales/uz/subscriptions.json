@@ -41,7 +41,8 @@
       "trial": "Sinov davri",
       "cancelled": "Bekor qilingan",
       "expired": "Muddati tugagan",
-      "pastDue": "Muddat o'tgan"
+      "pastDue": "Muddat o'tgan",
+      "pending": "Kutilmoqda"
     },
     "invoiceStatus": {
       "paid": "To'langan",
@@ -151,6 +152,171 @@
         "thankYou": "Xaridingiz uchun rahmat",
         "goToDashboard": "Boshqaruv paneliga o'tish"
       }
+    },
+    "savePercent": "{{percent}}% tejang",
+    "changePlanTitle": "Tarifingizni o'zgartiring",
+    "currentPlanLabel": "Joriy tarif",
+    "backToSubscription": "Obunaga qaytish",
+    "upgrade": "Yangilash",
+    "confirmUpgradeTitle": "Tarifni yangilash",
+    "confirmDowngradeTitle": "Tarifni pasaytirish",
+    "upgradeMessage": "Yangi tarifingiz darhol faollashtiriladi. Qolgan davr uchun proporsional farq hisoblanadi.",
+    "downgradeMessage": "Tarifni pasaytirish joriy hisob-kitob davri tugagandan so'ng kuchga kiradi.",
+    "downgradeEffectiveDate": "Kuchga kirish sanasi: {{date}}",
+    "confirmUpgrade": "Yangilashni tasdiqlash",
+    "confirmDowngrade": "Pasaytirishni tasdiqlash",
+    "scheduledDowngradeWarning": "Sizda rejalashtirilgan tarif o'zgarishi mavjud",
+    "scheduledDowngradeInfo": "{{date}} sanasida {{plan}} tarifiga o'tkazilasiz.",
+    "checkout": {
+      "redirecting": "Xavfsiz to'lov sahifasiga yo'naltirilmoqdasiz...",
+      "preparing": "To'lovingiz tayyorlanmoqda...",
+      "missingLink": "To'lov havolasi yaratilmadi. Qaytadan urinib ko'ring.",
+      "errorTitle": "To'lovni boshlab bo'lmadi",
+      "backToPlans": "Tariflarga qaytish",
+      "confirmTitle": "Xavfsiz to'lovga yo'naltirilmoqda",
+      "confirmBody": "To'lov PayTRning xavfsiz infratuzilmasi orqali amalga oshiriladi. Karta ma'lumotlaringiz ilovamizga yetib bormaydi.",
+      "secureNote": "SSL bilan shifrlangan, PCI-DSS talablariga mos PayTR sahifasi",
+      "proceedNow": "PayTRga davom etish ({{seconds}})",
+      "cancel": "Bekor qilish"
+    },
+    "invoiceCard": {
+      "paid": "To'langan",
+      "open": "Ochiq",
+      "period": "Davr",
+      "paidOn": "To'langan sana",
+      "total": "Jami",
+      "view": "Ko'rish",
+      "download": "Yuklab olish"
+    },
+    "invoiceViewer": {
+      "title": "Hisob-fakturani ko'rib chiqish",
+      "loading": "Hisob-faktura yuklanmoqda...",
+      "loadFailed": "Hisob-fakturani yuklab bo'lmadi",
+      "close": "Yopish"
+    },
+    "paymentResult": {
+      "confirming": "To'lovingiz tasdiqlanmoqda",
+      "confirmingHint": "PayTR tasdiqlashi kutilmoqda. Bu bir necha soniya davom etishi mumkin.",
+      "confirmingStage2": "Tranzaksiya yana bir necha soniya davom etishi mumkin...",
+      "confirmingStage3": "Hali ulanmoqda. Ba'zan bu 30 soniyagacha cho'zilishi mumkin.",
+      "successTitle": "To'lov muvaffaqiyatli",
+      "successBody": "Obunangiz faol. Darhol foydalanishni boshlashingiz mumkin.",
+      "failTitle": "To'lov yakunlanmadi",
+      "failBody": "To'lovingiz amalga oshmadi. Qaytadan urinib ko'rish uchun tariflarga qayting.",
+      "goToSubscription": "Obunaga o'tish",
+      "tryAgain": "Qaytadan urinib ko'rish"
+    },
+    "statusBanner": {
+      "trialCountdown": "{{plan}} sinov muddatingiz {{days}} kunda tugaydi",
+      "gracePeriod": "To'lovingiz qabul qilinmadi — {{days}} kun ichida to'lang, aks holda hisobingiz bepul tarifga tushiriladi",
+      "subscribeNow": "Obunani boshlash",
+      "payNow": "Hozir to'lash",
+      "dismiss": "Yopish"
+    },
+    "usage": {
+      "users": "Foydalanuvchilar",
+      "tables": "Stollar",
+      "products": "Mahsulotlar",
+      "categories": "Kategoriyalar",
+      "monthlyOrders": "Shu oydagi buyurtmalar",
+      "nearingLimit": "{{pct}}% ishlatilgan — tarifni yangilashni o'ylab ko'ring"
+    },
+    "comparison": {
+      "toggle": "Barcha imkoniyatlarni solishtirish",
+      "featureHeader": "Imkoniyat",
+      "limitsGroup": "Cheklovlar",
+      "featuresGroup": "Imkoniyatlar",
+      "limits": {
+        "maxUsers": "Foydalanuvchilar",
+        "maxTables": "Stollar",
+        "maxProducts": "Mahsulotlar",
+        "maxCategories": "Kategoriyalar",
+        "maxMonthlyOrders": "Oylik buyurtmalar"
+      },
+      "features": {
+        "kdsIntegration": "KDS integratsiyasi",
+        "inventoryTracking": "Ombor nazorati",
+        "advancedReports": "Kengaytirilgan hisobotlar",
+        "reservationSystem": "Bronlash tizimi",
+        "personnelManagement": "Xodimlarni boshqarish",
+        "deliveryIntegration": "Yetkazib berish platformalari",
+        "multiLocation": "Bir nechta filial",
+        "customBranding": "Maxsus brending",
+        "apiAccess": "API ruxsati",
+        "prioritySupport": "Ustuvor qo'llab-quvvatlash"
+      }
+    },
+    "payNow": "Hozir to'lash",
+    "taxIdReminder": {
+      "title": "Hisob-faktura ma'lumotlarini to'ldiring",
+      "body": "Hisob-fakturangiz soliq raqami (Vergi No / TC Kimlik No) bilan to'liqroq bo'ladi. Usiz ham davom etishingiz mumkin; hisob-fakturada bu satr ko'rsatilmaydi.",
+      "fillNow": "Hozir to'ldirish",
+      "skip": "Hozircha o'tkazib yuborish"
+    },
+    "limitWarning": {
+      "near": "{{resource}}: {{current}}/{{limit}} ({{remaining}} ta qoldi). Limitga yaqinlashmoqdasiz.",
+      "full": "{{resource}} limitiga yetdingiz ({{limit}}). Ko'proq qo'shish uchun tarifingizni yangilang.",
+      "upgrade": "Hozir yangilash →"
+    },
+    "cancelModal": {
+      "title": "Obunani bekor qilish",
+      "reasonPrompt": "Nima uchun ketmoqchisiz? Sizning fikringiz bizni yaxshilashga yordam beradi.",
+      "reasons": {
+        "tooExpensive": "Juda qimmat",
+        "missingFeature": "Menga kerakli imkoniyat yo'q",
+        "switchedProvider": "Boshqa xizmatga o'tdim",
+        "temporary": "Endi kerak emas (vaqtinchalik)",
+        "other": "Boshqa"
+      },
+      "otherPlaceholder": "Sababini qisqacha yozing...",
+      "immediate": "Darhol bekor qilish (davr oxirini kutmasdan)",
+      "warnImmediate": "Obunangiz darhol bekor qilinadi va pullik imkoniyatlardan foydalana olmaysiz.",
+      "warnPeriodEnd": "Obunangiz {{date}} sanasida tugaydi; shu vaqtgacha to'liq ruxsat saqlanadi.",
+      "keep": "Obunamni saqlab qolish",
+      "confirm": "Obunani bekor qilish"
+    },
+    "scheduledDowngrade": {
+      "title": "Rejalashtirilgan tarif o'zgarishi",
+      "description": "Sizda rejalashtirilgan tarif pasaytirish bor. Boshqa o'zgartirish kiritmoqchi bo'lsangiz, avval uni bekor qiling.",
+      "scheduled": "Rejalashtirilgan",
+      "downgradingTo": "Pasaytiriladigan tarif",
+      "scheduledFor": "Kuchga kirish sanasi",
+      "cancelDowngrade": "Pasaytirishni bekor qilish",
+      "cancelTitle": "Rejalashtirilgan pasaytirish bekor qilinsinmi?",
+      "cancelConfirm": "Ushbu rejalashtirilgan pasaytirishni bekor qilishga ishonchingiz komilmi? Joriy tarifingiz saqlanadi.",
+      "keepCurrentPlan": "Joriy tarifni saqlash"
+    },
+    "upgradeRequired": "Yangilash talab qilinadi",
+    "featureNotAvailable": "{{feature}} imkoniyati joriy tarifingizda mavjud emas.",
+    "upgradeToAccess": "Ushbu imkoniyatdan foydalanish uchun {{plan}} tarifiga o'ting.",
+    "featureRequiresPlan": "Bu imkoniyat {{plan}} tarifini talab qiladi.",
+    "limitReached": "Limitga yetildi ({{current}}/{{limit}})",
+    "limitReachedDescription": "Joriy tarifingizdagi {{resource}} limitiga yetdingiz ({{current}}/{{limit}}).",
+    "featureAdvancedReports": "Kengaytirilgan hisobotlar",
+    "featureMultiLocation": "Bir nechta filialni qo'llab-quvvatlash",
+    "featureCustomBranding": "Maxsus brending",
+    "featureApiAccess": "API ruxsati",
+    "featurePrioritySupport": "Ustuvor qo'llab-quvvatlash",
+    "featureInventoryTracking": "Ombor nazorati",
+    "featureKdsIntegration": "KDS integratsiyasi",
+    "contact": {
+      "title": "Biz bilan bog'lanish",
+      "subtitle": "Obuna so'rovingiz bo'yicha biz bilan bog'laning",
+      "whatsapp": "WhatsApp orqali bog'lanish",
+      "email": "Email yuborish",
+      "phone": "Telefon",
+      "selectedPlan": "Tanlangan tarif",
+      "planDetails": "Tarif tafsilotlari",
+      "contactUs": "Biz bilan bog'lanish",
+      "thankYou": "Rahmat!",
+      "thankYouMessage": "So'rovingiz qabul qilindi. Imkon qadar tezroq siz bilan bog'lanamiz.",
+      "note": "WhatsApp yoki email orqali bog'langaningizda, jamoamiz tez orada sizga murojaat qiladi va to'lov jarayonini yakunlashda yordam beradi.",
+      "back": "Orqaga",
+      "backToContact": "Bog'lanishga qaytish",
+      "loading": "Yuklanmoqda...",
+      "error": "Xatolik yuz berdi",
+      "missingInfo": "Ma'lumotlar yetishmayapti",
+      "upgradeFrom": "Yangilanmoqda:"
     }
   }
 }

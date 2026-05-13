@@ -1,7 +1,31 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrderStatus } from '../../common/constants/order-status.enum';
 import { getTenantMidnight } from '../../common/helpers/timezone.helper';
+
+/**
+ * Convert a Prisma Decimal to a JSON-safe number while preserving full
+ * cent precision. Floating-point arithmetic on Decimal values previously
+ * accumulated rounding error: 0.1+0.2=0.30000000000000004 on every
+ * `+= Number(order.finalAmount)`. Going through .toFixed(2) is the safest
+ * way to land back in JS-number land without leaking IEEE-754 dust into
+ * the reports payload.
+ */
+function decimalToCents(d: Prisma.Decimal | number | null | undefined): number {
+  if (d == null) return 0;
+  // Round to the smallest currency unit. Prisma Decimal supports
+  // `.mul(100).round().toNumber()` which is exact for the 2-decimal
+  // monetary scale we use; intermediate value stays within MAX_SAFE_INTEGER
+  // for the foreseeable future (90 quadrillion kuruş).
+  const dec = d instanceof Prisma.Decimal ? d : new Prisma.Decimal(d);
+  return dec.mul(100).round().toNumber();
+}
+
+function centsToCurrency(cents: number): number {
+  // /100 is exact for values < 2^53/100 ≈ 90 trillion units.
+  return Math.round(cents) / 100;
+}
 
 @Injectable()
 export class ReportsService {
@@ -53,10 +77,12 @@ export class ReportsService {
       _count: true,
     });
 
-    const totalSales = Number(orderStats._sum.finalAmount || 0);
+    const totalSalesCents = decimalToCents(orderStats._sum.finalAmount);
+    const totalSales = centsToCurrency(totalSalesCents);
     const totalOrders = orderStats._count;
-    const averageOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
-    const totalDiscount = Number(orderStats._sum.discount || 0);
+    const averageOrderValue =
+      totalOrders > 0 ? centsToCurrency(Math.round(totalSalesCents / totalOrders)) : 0;
+    const totalDiscount = centsToCurrency(decimalToCents(orderStats._sum.discount));
 
     // Get payment method breakdown
     const paymentBreakdown = await this.prisma.payment.groupBy({
@@ -80,7 +106,7 @@ export class ReportsService {
 
     const paymentMethodBreakdown = paymentBreakdown.map((pm) => ({
       method: pm.method,
-      total: Number(pm._sum.amount || 0),
+      total: centsToCurrency(decimalToCents(pm._sum.amount)),
       count: pm._count,
     }));
 
@@ -100,17 +126,24 @@ export class ReportsService {
       },
     });
 
-    const dailyMap = new Map<string, { sales: number; orders: number }>();
+    // Accumulate in integer cents so a long tail of orders doesn't bleed
+    // IEEE-754 dust into the daily totals (which the dashboard then
+    // diffs day-over-day and renders as "0.000001" deltas).
+    const dailyMap = new Map<string, { salesCents: number; orders: number }>();
     paidOrders.forEach((order) => {
       const dateKey = order.createdAt.toISOString().slice(0, 10);
-      const existing = dailyMap.get(dateKey) || { sales: 0, orders: 0 };
-      existing.sales += Number(order.finalAmount);
+      const existing = dailyMap.get(dateKey) || { salesCents: 0, orders: 0 };
+      existing.salesCents += decimalToCents(order.finalAmount);
       existing.orders += 1;
       dailyMap.set(dateKey, existing);
     });
 
     const dailySales = Array.from(dailyMap.entries())
-      .map(([date, data]) => ({ date, sales: data.sales, orders: data.orders }))
+      .map(([date, data]) => ({
+        date,
+        sales: centsToCurrency(data.salesCents),
+        orders: data.orders,
+      }))
       .sort((a, b) => a.date.localeCompare(b.date));
 
     return {
@@ -236,12 +269,21 @@ export class ReportsService {
   }
 
   async getOrdersByHour(tenantId: string, date?: Date) {
-    // Clone the caller-supplied Date so we never mutate a shared reference.
-    const targetDate = new Date(date ?? Date.now());
-    targetDate.setHours(0, 0, 0, 0);
-
-    const endDate = new Date(targetDate);
-    endDate.setHours(23, 59, 59, 999);
+    // Day boundaries and the hour-of-day grouping below must use the
+    // tenant's timezone, not the server pod's. Otherwise an Istanbul
+    // tenant on a UTC pod loses the 21:00-23:59 hour of orders to "the
+    // next day" and sees peaks shifted by 3 slots in the chart.
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { timezone: true },
+    });
+    const tz = tenant?.timezone || 'UTC';
+    const anchor = date ?? new Date();
+    const targetDate = getTenantMidnight(anchor, tz);
+    const endDate = getTenantMidnight(
+      new Date(anchor.getTime() + 24 * 60 * 60 * 1000),
+      tz,
+    );
 
     const orders = await this.prisma.order.findMany({
       where: {
@@ -249,7 +291,7 @@ export class ReportsService {
         status: OrderStatus.PAID,
         createdAt: {
           gte: targetDate,
-          lte: endDate,
+          lt: endDate,
         },
       },
       select: {
@@ -258,16 +300,26 @@ export class ReportsService {
       },
     });
 
-    // Group by hour
+    // Group by hour. Accumulate in integer cents so the long tail of
+    // restaurant orders doesn't pollute the chart with IEEE-754 dust.
     const hourlyData = new Array(24).fill(0).map(() => ({
       orderCount: 0,
-      totalSales: 0,
+      totalSalesCents: 0,
     }));
 
+    // `Intl.DateTimeFormat` resolves the hour-of-day in the tenant tz
+    // for each order; cheaper than spinning up a TZ-aware lib and still
+    // correct across DST transitions because Intl handles them.
+    const hourFmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      hour: '2-digit',
+      hour12: false,
+    });
     orders.forEach((order) => {
-      const hour = order.createdAt.getHours();
+      const hourStr = hourFmt.format(order.createdAt);
+      const hour = parseInt(hourStr, 10) % 24;
       hourlyData[hour].orderCount++;
-      hourlyData[hour].totalSales += Number(order.finalAmount);
+      hourlyData[hour].totalSalesCents += decimalToCents(order.finalAmount);
     });
 
     return {
@@ -275,7 +327,7 @@ export class ReportsService {
       hourlyData: hourlyData.map((data, hour) => ({
         hour,
         orderCount: data.orderCount,
-        totalSales: data.totalSales,
+        totalSales: centsToCurrency(data.totalSalesCents),
       })),
     };
   }
@@ -406,11 +458,14 @@ export class ReportsService {
     // Get out of stock items
     const outOfStockItems = products.filter((p) => p.currentStock <= 0);
 
-    // Calculate total stock value
-    const totalStockValue = products.reduce(
-      (sum, p) => sum + p.currentStock * Number(p.price),
+    // Total stock value. Multiplying-and-accumulating Decimal prices in
+    // JS Number drifts after a few hundred line items; do the sum in
+    // integer cents and convert once at the end.
+    const totalStockValueCents = products.reduce(
+      (sum, p) => sum + p.currentStock * decimalToCents(p.price),
       0,
     );
+    const totalStockValue = centsToCurrency(totalStockValueCents);
 
     // Get recent stock movements
     const recentMovements = await this.prisma.stockMovement.findMany({
@@ -446,7 +501,7 @@ export class ReportsService {
         categoryName: p.category?.name,
         currentStock: p.currentStock,
         price: Number(p.price),
-        stockValue: p.currentStock * Number(p.price),
+        stockValue: centsToCurrency(p.currentStock * decimalToCents(p.price)),
         isLowStock: p.currentStock > 0 && p.currentStock < LOW_STOCK_THRESHOLD,
         isOutOfStock: p.currentStock <= 0,
       })),

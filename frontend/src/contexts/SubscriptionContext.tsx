@@ -21,7 +21,14 @@ interface SubscriptionContextType {
   isLoading: boolean;
   hasFeature: (feature: keyof PlanFeatures) => boolean;
   checkLimit: (resource: keyof PlanLimits, currentCount: number) => LimitCheckResult;
+  /** ACTIVE or TRIALING — full paid access. */
   isSubscriptionActive: boolean;
+  /**
+   * PAST_DUE — 7-day grace period after trial expiry / failed renewal.
+   * Backend `PlanFeatureGuard` still grants feature access here, so the
+   * UI should show a "renew now" banner without locking the user out.
+   */
+  isInGracePeriod: boolean;
 }
 
 // Create context with default values
@@ -32,6 +39,7 @@ const SubscriptionContext = createContext<SubscriptionContextType>({
   hasFeature: () => false,
   checkLimit: () => ({ allowed: false, current: 0, limit: 0, remaining: 0 }),
   isSubscriptionActive: false,
+  isInGracePeriod: false,
 });
 
 // Provider component
@@ -91,6 +99,12 @@ export const SubscriptionProvider = ({ children }: SubscriptionProviderProps) =>
     return subscription.status === 'ACTIVE' || subscription.status === 'TRIALING';
   }, [subscription]);
 
+  // PAST_DUE — backend grants 7-day feature access while the user
+  // is expected to renew. UI surfaces this as a banner, not a lockout.
+  const isInGracePeriod = useMemo(() => {
+    return subscription?.status === 'PAST_DUE';
+  }, [subscription]);
+
   const value = useMemo(
     () => ({
       subscription: subscription ?? null,
@@ -99,8 +113,9 @@ export const SubscriptionProvider = ({ children }: SubscriptionProviderProps) =>
       hasFeature,
       checkLimit,
       isSubscriptionActive,
+      isInGracePeriod,
     }),
-    [subscription, plan, isLoading, isSubscriptionActive, effectiveFeatures]
+    [subscription, plan, isLoading, isSubscriptionActive, isInGracePeriod, effectiveFeatures]
   );
 
   return (

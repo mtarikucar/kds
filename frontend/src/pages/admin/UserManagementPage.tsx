@@ -174,7 +174,10 @@ const UserManagementPage = () => {
           firstName: data.firstName,
           lastName: data.lastName,
           role: data.role,
-          status: data.status as 'ACTIVE' | 'INACTIVE' | undefined,
+          // Status transitions are routed through /approve, /reject,
+          // /reactivate, DELETE — the generic PATCH ignores it. We
+          // drop the field at the boundary instead of letting it travel
+          // as silently-no-op JSON.
         };
         if (data.password) {
           updateData.password = data.password;

@@ -44,6 +44,17 @@ const RULES: EnvRule[] = [
   // Production-only
   { key: 'CORS_ORIGIN', required: true, prodOnly: true },
   { key: 'SENTRY_DSN', required: false, prodOnly: true },
+  // PayTR — required in production because the Turkish payment flow is
+  // useless without them. Dev can run without (PaymentsService throws a
+  // clear "credentials not configured" error if the user actually tries
+  // to check out without setting them).
+  { key: 'PAYTR_MERCHANT_ID', required: true, prodOnly: true },
+  { key: 'PAYTR_MERCHANT_KEY', required: true, prodOnly: true, minLength: 8 },
+  { key: 'PAYTR_MERCHANT_SALT', required: true, prodOnly: true, minLength: 8 },
+  { key: 'PAYTR_OK_URL', required: true, prodOnly: true, minLength: 10 },
+  { key: 'PAYTR_FAIL_URL', required: true, prodOnly: true, minLength: 10 },
+  // PAYTR_TEST_MODE defaults to "1" in adapter; PAYTR_WEBHOOK_ALLOWED_IPS
+  // is optional defence-in-depth.
 ];
 
 export function validateEnv(): void {

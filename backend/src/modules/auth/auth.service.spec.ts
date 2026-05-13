@@ -2,8 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import {
-  ConflictException,
-  BadRequestException,
   UnauthorizedException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
@@ -15,6 +13,11 @@ import { mockPrismaClient, MockPrismaClient } from '../../common/test/prisma-moc
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { UserRole } from '../../common/constants/roles.enum';
+import {
+  ResourceAlreadyExistsException,
+  ValidationException,
+  InvalidCredentialsException,
+} from '../../common/exceptions';
 
 describe('AuthService', () => {
   let service: AuthService;
@@ -25,6 +28,13 @@ describe('AuthService', () => {
   const mockJwtService = {
     sign: jest.fn(),
     verify: jest.fn(),
+    // The refresh-token flow persists the hashed token to the DB and
+    // needs the `exp` claim to compute the expiry — auth.service.ts
+    // calls `jwtService.decode(refreshToken)` to read it back. Return a
+    // far-future exp so the resulting Date is sane in any test run.
+    decode: jest.fn(() => ({
+      exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30,
+    })),
   };
 
   const mockConfigService = {
@@ -78,10 +88,30 @@ describe('AuthService', () => {
     service = module.get<AuthService>(AuthService);
     jwtService = module.get<JwtService>(JwtService);
     configService = module.get<ConfigService>(ConfigService);
+
+    // The register path wraps tenant+subscription creation in
+    // $transaction(async tx => ...). mockDeep returns undefined by
+    // default, so we replay the callback against the same mock client
+    // and return whatever the callback resolves to — this matches the
+    // real Prisma behaviour closely enough for these unit tests.
+    (prisma.$transaction as any).mockImplementation(async (arg: any) => {
+      if (typeof arg === 'function') return arg(prisma);
+      return Promise.all(arg);
+    });
+    // Re-arm jwtService.decode after the per-test mock reset (afterEach
+    // resets the queue, which would otherwise leave generateTokens
+    // dereferencing undefined.exp on the next test).
+    mockJwtService.decode.mockImplementation(() => ({
+      exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 30,
+    }));
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    // `clearAllMocks` only resets call history. `resetAllMocks` also
+    // empties the `mockReturnValueOnce` queue, which prior tests in this
+    // file leaked into successor tests — refreshToken kept seeing the
+    // tail of register's queued tokens.
+    jest.resetAllMocks();
   });
 
   describe('register', () => {
@@ -161,7 +191,7 @@ describe('AuthService', () => {
 
       prisma.user.findUnique.mockResolvedValue({ id: 'existing-user' } as any);
 
-      await expect(service.register(registerDto)).rejects.toThrow(ConflictException);
+      await expect(service.register(registerDto)).rejects.toThrow(ResourceAlreadyExistsException);
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { email: registerDto.email },
       });
@@ -179,7 +209,7 @@ describe('AuthService', () => {
 
       prisma.user.findUnique.mockResolvedValue(null);
 
-      await expect(service.register(registerDto)).rejects.toThrow(BadRequestException);
+      await expect(service.register(registerDto)).rejects.toThrow(ValidationException);
     });
 
     it('should throw BadRequestException if neither restaurantName nor tenantId provided', async () => {
@@ -192,7 +222,7 @@ describe('AuthService', () => {
 
       prisma.user.findUnique.mockResolvedValue(null);
 
-      await expect(service.register(registerDto)).rejects.toThrow(BadRequestException);
+      await expect(service.register(registerDto)).rejects.toThrow(ValidationException);
     });
 
     it('should successfully register a user joining existing tenant', async () => {
@@ -227,11 +257,15 @@ describe('AuthService', () => {
 
       const result = await service.register(registerDto);
 
-      expect(result).toEqual({
-        accessToken: 'access-token',
-        refreshToken: 'refresh-token',
-        user: mockUser,
-      });
+      // Non-ADMIN users joining an existing tenant land in
+      // PENDING_APPROVAL — no tokens issued until the restaurant's
+      // admin approves them. The response carries `pendingApproval: true`
+      // and null tokens so the frontend can show "waiting" instead of
+      // logging in. Tokens are minted at /auth/approve, not here.
+      expect(result.accessToken).toBeNull();
+      expect(result.refreshToken).toBeNull();
+      expect((result as any).pendingApproval).toBe(true);
+      expect(result.user.email).toBe(registerDto.email);
 
       expect(prisma.tenant.findUnique).toHaveBeenCalledWith({
         where: { id: registerDto.tenantId },
@@ -255,6 +289,10 @@ describe('AuthService', () => {
         role: UserRole.ADMIN,
         status: 'ACTIVE',
         tenantId: 'tenant-1',
+        tokenVersion: 0,
+        // auth.service.login() now requires user.tenant.status === ACTIVE
+        // before issuing tokens — suspended restaurants don't get a JWT.
+        tenant: { status: 'ACTIVE' },
       };
 
       prisma.user.findUnique.mockResolvedValue(mockUser as any);
@@ -268,7 +306,7 @@ describe('AuthService', () => {
       expect(result.user.email).toBe(loginDto.email);
     });
 
-    it('should throw UnauthorizedException for invalid credentials', async () => {
+    it('should throw InvalidCredentialsException for unknown email', async () => {
       const loginDto: LoginDto = {
         email: 'test@test.com',
         password: 'wrongpassword',
@@ -276,7 +314,11 @@ describe('AuthService', () => {
 
       prisma.user.findUnique.mockResolvedValue(null);
 
-      await expect(service.login(loginDto)).rejects.toThrow(UnauthorizedException);
+      // auth.service throws the typed InvalidCredentialsException (which
+      // extends BusinessException, not UnauthorizedException). The
+      // http-exception filter renders it as 401, but unit-level tests
+      // assert on the typed exception itself.
+      await expect(service.login(loginDto)).rejects.toThrow(InvalidCredentialsException);
     });
 
     it('should throw UnauthorizedException for inactive user', async () => {
@@ -316,6 +358,10 @@ describe('AuthService', () => {
         role: UserRole.ADMIN,
         status: 'ACTIVE',
         tenantId: 'tenant-1',
+        tokenVersion: 0,
+        // auth.service.login() now requires user.tenant.status === ACTIVE
+        // before issuing tokens — suspended restaurants don't get a JWT.
+        tenant: { status: 'ACTIVE' },
       };
 
       prisma.user.findUnique.mockResolvedValue(mockUser as any);
@@ -345,6 +391,10 @@ describe('AuthService', () => {
         role: UserRole.ADMIN,
         status: 'ACTIVE',
         tenantId: 'tenant-1',
+        tokenVersion: 0,
+        // auth.service.login() now requires user.tenant.status === ACTIVE
+        // before issuing tokens — suspended restaurants don't get a JWT.
+        tenant: { status: 'ACTIVE' },
       };
 
       prisma.user.findUnique.mockResolvedValue(mockUser as any);
@@ -373,11 +423,30 @@ describe('AuthService', () => {
         role: UserRole.ADMIN,
         status: 'ACTIVE',
         tenantId: 'tenant-1',
+        tokenVersion: 0,
+        // auth.service.login() now requires user.tenant.status === ACTIVE
+        // before issuing tokens — suspended restaurants don't get a JWT.
+        tenant: { status: 'ACTIVE' },
       };
 
       mockJwtService.verify.mockReturnValue(mockPayload);
       prisma.user.findUnique.mockResolvedValue(mockUser as any);
       mockJwtService.sign.mockReturnValueOnce('new-access-token').mockReturnValueOnce('new-refresh-token');
+
+      // auth.service.refreshToken hashes the token, atomically revokes
+      // the old refresh row, and re-fetches it to issue a new pair. The
+      // findUnique result must look ACTIVE-and-unexpired for the flow
+      // to continue past line 499.
+      (prisma.refreshToken.updateMany as any).mockResolvedValue({ count: 1 });
+      (prisma.refreshToken.findUnique as any).mockResolvedValue({
+        id: 'rt-1',
+        userId: 'user-1',
+        tokenHash: 'irrelevant-hash',
+        expiresAt: new Date(Date.now() + 1000 * 60 * 60),
+        revokedAt: null,
+      });
+      // create() is invoked to persist the new refresh token.
+      (prisma.refreshToken.create as any).mockResolvedValue({ id: 'rt-2' });
 
       const result = await service.refreshToken(refreshToken);
 

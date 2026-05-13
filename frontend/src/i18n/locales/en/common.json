@@ -390,57 +390,6 @@
     "gridView": "Grid View",
     "floorPlan": "Floor Plan"
   },
-  "voxel": {
-    "layoutSaved": "Floor plan saved successfully",
-    "layoutSaveError": "Failed to save floor plan",
-    "positionUpdateError": "Failed to update table position",
-    "saving": "Saving...",
-    "save": "Save",
-    "tools": {
-      "select": "Select",
-      "move": "Move",
-      "rotate": "Rotate",
-      "delete": "Delete",
-      "undo": "Undo",
-      "redo": "Redo",
-      "floor": "Floor",
-      "table": "Table",
-      "stair": "Stair"
-    },
-    "library": {
-      "title": "Furniture Library"
-    },
-    "procgen": {
-      "tableStyle": "Table Style",
-      "casual": "Casual",
-      "casualDesc": "Light wood, modern style",
-      "formal": "Formal",
-      "formalDesc": "Dark wood, classic legs",
-      "modern": "Modern",
-      "modernDesc": "Metal, round tops",
-      "bistro": "Bistro",
-      "bistroDesc": "Dark wood, pedestal",
-      "autoGenerate": "Auto-Generate",
-      "generateChairs": "Generate Chairs",
-      "generateDecor": "Generate Decor",
-      "snapSettings": "Snap Settings",
-      "enableSnap": "Enable Snap",
-      "showGuides": "Show Guides",
-      "gridSize": "Grid Size",
-      "units": "units"
-    },
-    "map2d": {
-      "zoomIn": "Zoom In",
-      "zoomOut": "Zoom Out",
-      "toggleGrid": "Toggle Grid",
-      "toggleSnap": "Snap to Grid",
-      "resetView": "Reset View",
-      "properties": "Properties",
-      "rotation": "Rotation",
-      "units": "units",
-      "helpText": "Scroll to zoom • Shift+drag to pan • Click to select"
-    }
-  },
   "pos": {
     "floorPlan": {
       "title": "Floor Plan",

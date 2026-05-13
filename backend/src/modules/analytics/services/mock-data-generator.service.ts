@@ -6,8 +6,6 @@ import { PersonState, InsightType, InsightCategory, InsightSeverity } from '../e
 interface TableInfo {
   id: string;
   number: string;
-  voxelX: number | null;
-  voxelZ: number | null;
   capacity: number;
 }
 
@@ -385,11 +383,7 @@ export class MockDataGeneratorService {
         description: `Table ${randomTable.number} has only 35% utilization over the past week, significantly below the restaurant average of 65%.`,
         recommendation: `Consider repositioning Table ${randomTable.number} to a more visible location or promoting it for larger groups.`,
         affectedTableIds: [randomTable.id],
-        affectedAreaData: randomTable.voxelX !== null && randomTable.voxelZ !== null ? {
-          x: randomTable.voxelX,
-          z: randomTable.voxelZ,
-          radius: 2,
-        } : null,
+        affectedAreaData: null,
         supportingData: {
           currentUtilization: 35,
           avgUtilization: 65,
@@ -546,8 +540,6 @@ export class MockDataGeneratorService {
       select: {
         id: true,
         number: true,
-        voxelX: true,
-        voxelZ: true,
         capacity: true,
       },
     });
@@ -577,14 +569,13 @@ export class MockDataGeneratorService {
   }
 
   private generateOccupancyPoint(table: TableInfo, trackingId: string): OccupancyPoint {
-    // Position near table with some randomness
     const offsetX = (Math.random() - 0.5) * 1.5;
     const offsetZ = (Math.random() - 0.5) * 1.5;
 
     return {
       trackingId,
-      positionX: (table.voxelX ?? 0) + offsetX,
-      positionZ: (table.voxelZ ?? 0) + offsetZ,
+      positionX: offsetX,
+      positionZ: offsetZ,
       state: Math.random() > 0.1 ? PersonState.SITTING : PersonState.STANDING,
       tableId: table.id,
       confidence: 0.85 + Math.random() * 0.15,

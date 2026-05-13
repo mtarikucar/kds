@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import { ChevronLeftIcon, ChevronRightIcon, XMarkIcon, PlusIcon } from '@heroicons/react/24/outline';
 import marketingApi from '../../features/marketing/api/marketingApi';
@@ -45,6 +46,8 @@ const emptyForm = {
 
 export default function CalendarPage() {
   const queryClient = useQueryClient();
+  const { i18n } = useTranslation();
+  const locale = i18n.language || 'tr';
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [form, setForm] = useState({ ...emptyForm });
@@ -140,7 +143,7 @@ export default function CalendarPage() {
 
   const selectedDayTasks = selectedDate ? (tasksByDate[selectedDate] || []) : [];
 
-  const monthName = currentDate.toLocaleString('en', { month: 'long', year: 'numeric' });
+  const monthName = currentDate.toLocaleString(locale, { month: 'long', year: 'numeric' });
 
   return (
     <div className="space-y-4">
@@ -231,7 +234,7 @@ export default function CalendarPage() {
             {/* Modal header */}
             <div className="flex items-center justify-between p-4 border-b">
               <h3 className="text-base font-semibold text-gray-900">
-                {new Date(selectedDate + 'T00:00:00').toLocaleDateString('en', {
+                {new Date(selectedDate + 'T00:00:00').toLocaleDateString(locale, {
                   weekday: 'long',
                   month: 'long',
                   day: 'numeric',

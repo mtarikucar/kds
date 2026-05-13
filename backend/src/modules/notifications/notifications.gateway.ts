@@ -39,19 +39,57 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
 
       // Verify JWT token
       try {
-        const payload = this.jwtService.verify(token);
+        const payload = this.jwtService.verify(token, { algorithms: ['HS256'] });
 
-        // Store user info in socket data
-        client.data.userId = payload.userId;
+        // Reject non-main-app tokens. Marketing + superadmin realms sign
+        // against the same secret; without this check they'd silently join
+        // the tenant notification stream. Mirrors kds.gateway.ts:105-110.
+        if (payload.type && payload.type !== 'user') {
+          this.logger.warn(
+            `Notifications JWT rejected for ${client.id}: unsupported token type '${payload.type}'`,
+          );
+          client.disconnect();
+          return;
+        }
+
+        // Main-app JWTs carry the user id in `sub`, not `userId`. Reading
+        // the wrong key turned `user:${...}` into the literal `user:undefined`
+        // room, so sendNotificationToUser() silently no-op'd.
+        const userId = payload.sub;
+        if (!userId || !payload.tenantId) {
+          this.logger.warn(
+            `Notifications JWT rejected for ${client.id}: missing sub/tenantId`,
+          );
+          client.disconnect();
+          return;
+        }
+
+        client.data.userId = userId;
         client.data.tenantId = payload.tenantId;
         client.data.role = payload.role;
+        client.data.tokenExp = payload.exp;
 
-        // Join user-specific and tenant-specific rooms
-        client.join(`user:${payload.userId}`);
+        client.join(`user:${userId}`);
         client.join(`tenant:${payload.tenantId}`);
 
+        // Auto-disconnect at token expiry so an idle long-lived socket
+        // can't keep receiving emits after its JWT becomes invalid. Pure
+        // server-push gateway (no @SubscribeMessage handlers) so the
+        // expiry timer is the only enforcement point.
+        if (payload.exp && typeof payload.exp === 'number') {
+          const msToExpiry = payload.exp * 1000 - Date.now();
+          if (msToExpiry > 0 && msToExpiry < 0x7fffffff) {
+            setTimeout(() => {
+              if (client.connected) {
+                this.logger.log(`Client ${client.id} token expired; disconnecting.`);
+                client.disconnect(true);
+              }
+            }, msToExpiry).unref?.();
+          }
+        }
+
         this.logger.log(
-          `Client ${client.id} connected (User: ${payload.userId}, Tenant: ${payload.tenantId})`
+          `Client ${client.id} connected (User: ${userId}, Tenant: ${payload.tenantId})`,
         );
       } catch (error) {
         this.logger.error(`JWT authentication failed for client ${client.id}: ${error.message}`);

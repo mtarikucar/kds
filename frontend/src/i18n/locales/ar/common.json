@@ -102,7 +102,8 @@
   },
   "statuses": {
     "active": "نشط",
-    "inactive": "غير نشط"
+    "inactive": "غير نشط",
+    "pending_approval": "بانتظار الموافقة"
   },
   "messages": {
     "welcome": "مرحباً",
@@ -117,7 +118,9 @@
     "operationSuccessful": "تمت العملية بنجاح",
     "operationFailed": "فشلت العملية",
     "tryAgain": "يرجى المحاولة مرة أخرى",
-    "contactSupport": "يرجى التواصل مع الدعم الفني"
+    "contactSupport": "يرجى التواصل مع الدعم الفني",
+    "confirmDeleteCustomer": "هل أنت متأكد من حذف العميل",
+    "actionCannotBeUndone": "لا يمكن التراجع عن هذا الإجراء."
   },
   "notifications": {
     "loginSuccessful": "تم تسجيل الدخول بنجاح",
@@ -199,7 +202,9 @@
     "modifierUpdatedSuccessfully": "تم تحديث الخيار بنجاح",
     "modifierDeletedSuccessfully": "تم حذف الخيار بنجاح",
     "productModifiersUpdatedSuccessfully": "تم تحديث خيارات المنتج بنجاح",
-    "modifierGroupRemovedFromProduct": "تم إزالة مجموعة الخيارات من المنتج"
+    "modifierGroupRemovedFromProduct": "تم إزالة مجموعة الخيارات من المنتج",
+    "registrationPendingApproval": "تم التسجيل بنجاح. حسابك قيد مراجعة المسؤول.",
+    "scheduledDowngradeCancelled": "تم إلغاء التخفيض المجدول"
   },
   "time": {
     "today": "اليوم",
@@ -367,7 +372,42 @@
     "popupBlocked": "تم حظر النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة لهذا الموقع لطباعة رموز QR.",
     "noQRCodesForPrinting": "لم يتم العثور على رموز QR للطباعة. يرجى التأكد من تحميل رموز QR.",
     "noTablesFound": "لم يتم العثور على طاولات. يرجى إضافة طاولات أولاً.",
-    "noQRCodesToDownload": "لم يتم العثور على رموز QR للتحميل"
+    "noQRCodesToDownload": "لم يتم العثور على رموز QR للتحميل",
+    "noUsersFoundDescription": "أضف أول عضو في الفريق للبدء في إدارة موظفي مطعمك.",
+    "addFirstUser": "إضافة أول مستخدم",
+    "totalUsers": "إجمالي المستخدمين",
+    "activeUsers": "المستخدمون النشطون",
+    "admins": "المسؤولون",
+    "managers": "المديرون",
+    "invalidEmail": "يرجى إدخال عنوان بريد إلكتروني صالح",
+    "passwordMinLength": "يجب أن تتكون كلمة المرور من 6 أحرف على الأقل",
+    "firstNameRequired": "الاسم الأول مطلوب",
+    "lastNameRequired": "اسم العائلة مطلوب",
+    "emailPlaceholder": "أدخل عنوان البريد الإلكتروني",
+    "passwordPlaceholder": "أدخل كلمة المرور",
+    "firstNamePlaceholder": "أدخل الاسم الأول",
+    "lastNamePlaceholder": "أدخل اسم العائلة",
+    "pendingApproval": "بانتظار الموافقة",
+    "approveUser": "الموافقة على المستخدم",
+    "rejectUser": "رفض المستخدم",
+    "userApproved": "تمت الموافقة على المستخدم بنجاح",
+    "userRejected": "تم رفض المستخدم بنجاح",
+    "userApproveFailed": "فشل في الموافقة على المستخدم",
+    "userRejectFailed": "فشل في رفض المستخدم",
+    "allUsers": "جميع المستخدمين",
+    "noUsersInFilter": "لا يوجد مستخدمون في هذا التصفية",
+    "noUsersInFilterDescription": "لا يوجد مستخدمون يطابقون معايير التصفية هذه.",
+    "showAllUsers": "عرض جميع المستخدمين",
+    "searchUsers": "البحث بالاسم أو البريد الإلكتروني...",
+    "allRoles": "جميع الأدوار",
+    "filterByRole": "تصفية حسب الدور",
+    "noTablesFoundDescription": "أضف الطاولات في قسم إدارة الطاولات لإنشاء رموز QR خاصة بكل طاولة.",
+    "totalQRCodes": "إجمالي رموز QR",
+    "noTables": "لا توجد طاولات بعد",
+    "noTablesDescription": "أضف أول طاولة لبدء إدارة جلوس عملاء مطعمك",
+    "addFirstTable": "إضافة أول طاولة",
+    "gridView": "عرض الشبكة",
+    "floorPlan": "مخطط القاعة"
   },
   "qrDesigner": {
     "quickColorThemes": "سمات الألوان السريعة",
@@ -645,7 +685,14 @@
     "selectUpTo": "اختر حتى {{max}}",
     "selectMultiple": "اختر متعدد",
     "specialInstructions": "تعليمات خاصة",
-    "productImage": "صورة المنتج"
+    "productImage": "صورة المنتج",
+    "wifi": "واي فاي",
+    "wifiNetwork": "شبكة الواي فاي",
+    "wifiPassword": "كلمة المرور",
+    "copyPassword": "نسخ كلمة المرور",
+    "passwordCopied": "تم نسخ كلمة المرور!",
+    "socialMedia": "تابعنا",
+    "connectWithUs": "تواصل معنا"
   },
   "qr": {
     "shareText": "اطلع على قائمتنا",
@@ -688,7 +735,9 @@
     "specialNotes": "ملاحظات خاصة",
     "continueShopping": "مواصلة التسوق",
     "viewCart": "عرض السلة",
-    "cart": "السلة"
+    "cart": "السلة",
+    "item_one": "{{count}} عنصر",
+    "item_other": "{{count}} عناصر"
   },
   "orders": {
     "title": "طلباتي",
@@ -763,5 +812,22 @@
     "referrals": "الإحالات",
     "pointsEarned": "النقاط المكتسبة",
     "noReferralCode": "تواصل مع الدعم للحصول على رمز الإحالة الخاص بك"
+  },
+  "pos": {
+    "floorPlan": {
+      "title": "مخطط القاعة",
+      "available": "متاحة",
+      "occupied": "مشغولة",
+      "reserved": "محجوزة",
+      "fullscreen": "ملء الشاشة",
+      "exitFullscreen": "الخروج من ملء الشاشة",
+      "helpText2d": "انقر على الطاولة للاختيار • مرر للتكبير • Shift+اسحب للتحريك",
+      "helpText3d": "انقر على الطاولة للاختيار • اسحب لتدوير العرض • مرر للتكبير"
+    },
+    "minimap": {
+      "switchTo2D": "التبديل إلى عرض ثنائي الأبعاد",
+      "switchTo3D": "التبديل إلى عرض ثلاثي الأبعاد",
+      "clickToSwitch": "انقر للتبديل"
+    }
   }
 }

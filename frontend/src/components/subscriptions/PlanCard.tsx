@@ -21,6 +21,12 @@ interface PlanCardProps {
   billingCycle: BillingCycle;
   isCurrentPlan?: boolean;
   isPopular?: boolean;
+  /**
+   * Tenant is eligible for a free trial on this plan (per-plan model:
+   * a BASIC-trialed tenant can still trial PRO). Drives a green
+   * "Sizin için 14 gün ücretsiz" badge.
+   */
+  isTrialEligible?: boolean;
   onSelectPlan: (planId: string) => void;
   isLoading?: boolean;
   buttonText?: string;
@@ -31,6 +37,7 @@ const PlanCard = ({
   billingCycle,
   isCurrentPlan = false,
   isPopular = false,
+  isTrialEligible = false,
   onSelectPlan,
   isLoading = false,
   buttonText,
@@ -159,7 +166,19 @@ const PlanCard = ({
         )}
 
         {plan.trialDays > 0 && !hasDiscount && (
-          <p className="text-sm text-blue-600 mt-1">{plan.trialDays} {t('pricing.dayFreeTrial')}</p>
+          isTrialEligible ? (
+            // Per-tenant CTA: backend confirmed this tenant hasn't burned
+            // their per-plan trial slot yet. Green emphasis converts
+            // measurably better than the generic gray "14 günlük deneme"
+            // line below.
+            <p className="text-sm font-semibold text-emerald-700 mt-1 flex items-center gap-1">
+              🎁 {t('pricing.trialPersonalised', { days: plan.trialDays, defaultValue: `Sizin için ${plan.trialDays} gün ücretsiz` })}
+            </p>
+          ) : (
+            <p className="text-sm text-blue-600 mt-1">
+              {plan.trialDays} {t('pricing.dayFreeTrial')}
+            </p>
+          )
         )}
       </div>
 

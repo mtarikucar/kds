@@ -18,6 +18,7 @@ import { ChangePasswordDto } from '../dto/change-password.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
 import { MarketingUserPayload } from '../types';
+import { getClientIp } from '../../../common/helpers/client-ip.helper';
 
 // Marketing realm carries platform-wide sales data; treating its auth
 // surface as tightly as the superadmin realm is appropriate.
@@ -34,7 +35,7 @@ export class MarketingAuthController {
   @MarketingPublic()
   @Throttle(LOGIN_THROTTLE)
   login(@Body() dto: MarketingLoginDto, @Req() req: Request) {
-    const ip = req.ip || req.headers['x-forwarded-for']?.toString();
+    const ip = getClientIp(req);
     return this.authService.login(dto, ip);
   }
 

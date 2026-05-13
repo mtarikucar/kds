@@ -46,6 +46,13 @@
     "lastVisit": "Oxirgi tashrif",
     "referralCode": "Referal kod",
     "tags": "Teglar",
-    "tagsPlaceholder": "VIP, Doimiy va h.k."
+    "tagsPlaceholder": "VIP, Doimiy va h.k.",
+    "manageCustomers": "Mijozlar bazasi va sodiqlik dasturlarini boshqaring",
+    "noCustomersDescription": "Birinchi mijozingizni qo'shib mijozlar bazasini yaratishni boshlang.",
+    "noSearchResults": "Natijalar topilmadi",
+    "noSearchResultsDescription": "Qidirayotgan narsangizni topish uchun qidiruv so'rovini o'zgartirib ko'ring.",
+    "addFirstCustomer": "Birinchi mijozni qo'shish",
+    "orders": "buyurtmalar",
+    "points": "ball"
   }
 }

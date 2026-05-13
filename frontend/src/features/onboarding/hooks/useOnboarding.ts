@@ -137,11 +137,10 @@ export function useOnboarding(): UseOnboardingReturn {
 
       // Handle step changes
       if (type === EVENTS.STEP_AFTER) {
-        // Don't process if it was a close action
-        if (action === ACTIONS.CLOSE) {
-          return;
-        }
-
+        // The CLOSE branch above already returned — react-joyride's typing
+        // for STEP_AFTER doesn't include 'close' in the action union, so
+        // a redundant check here is a TS error. The defence is at the top
+        // of this callback, which is the earliest point we know about it.
         const nextIndex = action === ACTIONS.PREV ? index - 1 : index + 1;
 
         if (nextIndex >= 0 && nextIndex < steps.length) {

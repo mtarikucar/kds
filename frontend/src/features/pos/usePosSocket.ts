@@ -160,6 +160,10 @@ export const usePosSocket = () => {
 
       // 3. Invalidate tables to update status (lightweight operation)
       queryClient.invalidateQueries({ queryKey: ['tables'] });
+
+      // 4. Invalidate payable-items so the progressive payment modal
+      //    reflects another waiter's per-item payment in real time.
+      queryClient.invalidateQueries({ queryKey: ['payableItems'] });
     };
 
     const handleOrderStatusChanged = (event: any) => {
@@ -195,6 +199,9 @@ export const usePosSocket = () => {
 
       // Invalidate tables to update status (lightweight operation)
       queryClient.invalidateQueries({ queryKey: ['tables'] });
+      // Same reason as in handleOrderUpdated — keep progressive-payment
+      // modal in sync across waiters.
+      queryClient.invalidateQueries({ queryKey: ['payableItems'] });
     };
 
     const handleOrderItemStatusChanged = (event: any) => {

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,37 +15,37 @@
 </head>
 <body>
   <div class="header">
-    <h1>✓ Payment Received</h1>
+    <h1>✓ Ödemeniz alındı</h1>
   </div>
   <div class="content">
-    <p>Hi {{tenantName}},</p>
+    <p>Merhaba {{tenantName}},</p>
 
-    <p>Thank you! We've successfully received your payment.</p>
+    <p>Ödemenizi başarıyla aldık. Teşekkür ederiz.</p>
 
     <div class="receipt">
-      <h3>Payment Receipt</h3>
+      <h3>Ödeme Makbuzu</h3>
       <div class="receipt-row">
-        <span>Invoice Number:</span>
+        <span>Fatura Numarası:</span>
         <span><strong>{{invoiceNumber}}</strong></span>
       </div>
       <div class="receipt-row">
-        <span>Payment Date:</span>
+        <span>Ödeme Tarihi:</span>
         <span>{{paymentDate}}</span>
       </div>
       <div class="receipt-row">
-        <span>Amount Paid:</span>
+        <span>Ödenen Tutar:</span>
         <span><strong>{{currency}} {{amount}}</strong></span>
       </div>
     </div>
 
-    <p>Your invoice is available in your account dashboard.</p>
+    <p>Faturanız hesabınızdan görüntülenebilir.</p>
 
-    <a href="https://your-app-url.com/invoices/{{invoiceNumber}}" class="button">View Invoice</a>
+    <a href="{{appUrl}}/admin/settings/subscription" class="button">Faturayı görüntüle</a>
 
-    <p>Thank you for your business!</p>
+    <p>Tercihiniz için teşekkür ederiz.</p>
 
-    <p>Best regards,<br>
-    The HummyTummy Team</p>
+    <p>Saygılarımızla,<br>
+    HummyTummy Ekibi</p>
   </div>
 </body>
 </html>

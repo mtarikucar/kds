@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #DC2626; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
+    .button { display: inline-block; padding: 12px 30px; background: #DC2626; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+    .alert { background: #FEE2E2; padding: 15px; border-left: 4px solid #DC2626; margin: 20px 0; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Ödemeniz başarısız oldu</h1>
+  </div>
+  <div class="content">
+    <p>Merhaba {{tenantName}},</p>
+
+    <div class="alert">
+      <strong>{{currency}} {{amount}} tutarındaki ödeme alınamadı.</strong>
+      <br>Sebep: {{reason}}
+    </div>
+
+    <p>Aboneliğiniz 7 günlük ödeme bekleme süresine alındı. Bu süre içinde ödeme yapmazsanız hesabınız otomatik olarak ücretsiz plana geçirilecek.</p>
+
+    <a href="{{appUrl}}/subscription/plans" class="button">Şimdi öde</a>
+
+    <p>Saygılarımızla,<br>HummyTummy Ekibi</p>
+  </div>
+</body>
+</html>

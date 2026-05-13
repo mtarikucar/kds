@@ -102,7 +102,8 @@
   },
   "statuses": {
     "active": "Faol",
-    "inactive": "Nofaol"
+    "inactive": "Nofaol",
+    "pending_approval": "Tasdiqlash kutilmoqda"
   },
   "messages": {
     "welcome": "Xush kelibsiz",
@@ -117,7 +118,9 @@
     "operationSuccessful": "Operatsiya muvaffaqiyatli bajarildi",
     "operationFailed": "Operatsiya amalga oshmadi",
     "tryAgain": "Iltimos, qayta urinib ko'ring",
-    "contactSupport": "Iltimos, qo'llab-quvvatlash xizmatiga murojaat qiling"
+    "contactSupport": "Iltimos, qo'llab-quvvatlash xizmatiga murojaat qiling",
+    "confirmDeleteCustomer": "Mijozni o'chirishga ishonchingiz komilmi",
+    "actionCannotBeUndone": "Bu amalni qaytarib bo'lmaydi."
   },
   "notifications": {
     "loginSuccessful": "Muvaffaqiyatli kirildi",
@@ -199,7 +202,9 @@
     "modifierUpdatedSuccessfully": "Modifikator muvaffaqiyatli yangilandi",
     "modifierDeletedSuccessfully": "Modifikator muvaffaqiyatli o'chirildi",
     "productModifiersUpdatedSuccessfully": "Mahsulot modifikatorlari muvaffaqiyatli yangilandi",
-    "modifierGroupRemovedFromProduct": "Modifikator guruhi mahsulotdan olib tashlandi"
+    "modifierGroupRemovedFromProduct": "Modifikator guruhi mahsulotdan olib tashlandi",
+    "registrationPendingApproval": "Ro'yxatdan o'tish muvaffaqiyatli. Hisobingiz administrator tasdiqlashini kutmoqda.",
+    "scheduledDowngradeCancelled": "Rejalashtirilgan tarif pasaytirish bekor qilindi"
   },
   "time": {
     "today": "Bugun",
@@ -347,7 +352,42 @@
     "popupBlocked": "Qalqib chiquvchi oyna bloklandi. QR kodlarni chop etish uchun qalqib chiquvchi oynalarga ruxsat bering.",
     "noQRCodesForPrinting": "Chop etish uchun QR kodlar topilmadi. QR kodlar yuklangan ekanligiga ishonch hosil qiling.",
     "noTablesFound": "Stollar topilmadi. Avval stollarni qo'shing.",
-    "noQRCodesToDownload": "Yuklab olish uchun QR kodlar topilmadi"
+    "noQRCodesToDownload": "Yuklab olish uchun QR kodlar topilmadi",
+    "noUsersFoundDescription": "Restoran xodimlarini boshqarishni boshlash uchun birinchi jamoa a'zongizni qo'shing.",
+    "addFirstUser": "Birinchi foydalanuvchini qo'shish",
+    "totalUsers": "Jami foydalanuvchilar",
+    "activeUsers": "Faol foydalanuvchilar",
+    "admins": "Administratorlar",
+    "managers": "Menejerlar",
+    "invalidEmail": "Yaroqli elektron pochta manzilini kiriting",
+    "passwordMinLength": "Parol kamida 6 belgidan iborat bo'lishi kerak",
+    "firstNameRequired": "Ism majburiy",
+    "lastNameRequired": "Familiya majburiy",
+    "emailPlaceholder": "Elektron pochta manzilini kiriting",
+    "passwordPlaceholder": "Parolni kiriting",
+    "firstNamePlaceholder": "Ismni kiriting",
+    "lastNamePlaceholder": "Familiyani kiriting",
+    "pendingApproval": "Tasdiqlash kutilmoqda",
+    "approveUser": "Foydalanuvchini tasdiqlash",
+    "rejectUser": "Foydalanuvchini rad etish",
+    "userApproved": "Foydalanuvchi muvaffaqiyatli tasdiqlandi",
+    "userRejected": "Foydalanuvchi muvaffaqiyatli rad etildi",
+    "userApproveFailed": "Foydalanuvchini tasdiqlash amalga oshmadi",
+    "userRejectFailed": "Foydalanuvchini rad etish amalga oshmadi",
+    "allUsers": "Barcha foydalanuvchilar",
+    "noUsersInFilter": "Ushbu filtrda foydalanuvchilar yo'q",
+    "noUsersInFilterDescription": "Ushbu filtr mezoniga mos foydalanuvchilar yo'q.",
+    "showAllUsers": "Barcha foydalanuvchilarni ko'rsatish",
+    "searchUsers": "Ism yoki elektron pochta bo'yicha qidirish...",
+    "allRoles": "Barcha rollar",
+    "filterByRole": "Rol bo'yicha filtrlash",
+    "noTablesFoundDescription": "Stolga xos QR kodlarni yaratish uchun Stollarni boshqarish bo'limida stollar qo'shing.",
+    "totalQRCodes": "Jami QR kodlar",
+    "noTables": "Hozircha stollar yo'q",
+    "noTablesDescription": "Restoran o'rindiqlarini boshqarishni boshlash uchun birinchi stolingizni qo'shing",
+    "addFirstTable": "Birinchi stolni qo'shish",
+    "gridView": "Katakli ko'rinish",
+    "floorPlan": "Zal rejasi"
   },
   "qrDesigner": {
     "quickColorThemes": "Tez rang temalari",
@@ -625,7 +665,14 @@
     "selectUpTo": "{{max}} tagacha tanlang",
     "selectMultiple": "Bir nechtasini tanlang",
     "specialInstructions": "Maxsus ko'rsatmalar",
-    "productImage": "Mahsulot rasmi"
+    "productImage": "Mahsulot rasmi",
+    "wifi": "WiFi",
+    "wifiNetwork": "WiFi tarmog'i",
+    "wifiPassword": "Parol",
+    "copyPassword": "Parolni nusxalash",
+    "passwordCopied": "Parol nusxalandi!",
+    "socialMedia": "Bizni kuzating",
+    "connectWithUs": "Biz bilan bog'laning"
   },
   "qr": {
     "shareText": "Menyumizni ko'ring",
@@ -668,7 +715,9 @@
     "specialNotes": "Maxsus eslatmalar",
     "continueShopping": "Xaridni davom ettirish",
     "viewCart": "Savatni ko'rish",
-    "cart": "Savat"
+    "cart": "Savat",
+    "item_one": "{{count}} mahsulot",
+    "item_other": "{{count}} mahsulot"
   },
   "orders": {
     "title": "Mening buyurtmalarim",
@@ -743,5 +792,22 @@
     "referrals": "Referallar",
     "pointsEarned": "To'plangan ballar",
     "noReferralCode": "Referal kodingizni olish uchun qo'llab-quvvatlash bilan bog'laning"
+  },
+  "pos": {
+    "floorPlan": {
+      "title": "Zal rejasi",
+      "available": "Bo'sh",
+      "occupied": "Band",
+      "reserved": "Bron qilingan",
+      "fullscreen": "To'liq ekran",
+      "exitFullscreen": "To'liq ekrandan chiqish",
+      "helpText2d": "Stolni tanlash uchun bosing • Masshtablash uchun aylantiring • Surish uchun Shift+sudrash",
+      "helpText3d": "Stolni tanlash uchun bosing • Ko'rinishni aylantirish uchun sudrang • Masshtablash uchun aylantiring"
+    },
+    "minimap": {
+      "switchTo2D": "2D ko'rinishga o'tish",
+      "switchTo3D": "3D ko'rinishga o'tish",
+      "clickToSwitch": "O'tish uchun bosing"
+    }
   }
 }

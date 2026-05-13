@@ -2,6 +2,24 @@ import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
+// Refcount how many Modal instances currently want body scroll locked.
+// Without this, a nested modal closing earlier than the outer one would
+// restore body scroll while the outer modal is still on screen — the
+// backdrop suddenly scrolls under the visible modal.
+let scrollLockRefcount = 0;
+function acquireScrollLock() {
+  scrollLockRefcount += 1;
+  if (scrollLockRefcount === 1) {
+    document.body.style.overflow = 'hidden';
+  }
+}
+function releaseScrollLock() {
+  scrollLockRefcount = Math.max(0, scrollLockRefcount - 1);
+  if (scrollLockRefcount === 0) {
+    document.body.style.overflow = 'unset';
+  }
+}
+
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -26,12 +44,12 @@ const Modal: React.FC<ModalProps> = ({
 
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
+      acquireScrollLock();
     }
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
+      if (isOpen) releaseScrollLock();
     };
   }, [isOpen, onClose]);
 

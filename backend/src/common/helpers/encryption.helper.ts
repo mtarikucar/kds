@@ -110,9 +110,30 @@ export function encryptString(value: string): string {
 
 export function decryptString(blob: string): string {
   if (!blob.startsWith('v1:')) {
-    // Legacy plaintext — accept during migration but warn.
+    // Legacy plaintext — accept during migration but flag once per process
+    // so the operator notices unencrypted rows still in the DB.
+    warnPlaintextFallback();
     return blob;
   }
-  const [, iv, authTag, ciphertext] = blob.split(':');
+  const parts = blob.split(':');
+  if (parts.length !== 4) {
+    // Defensive: a malformed `v1:` blob would otherwise feed undefined values
+    // into Buffer.from() and surface as a cryptic crypto stack trace.
+    throw new DecryptionError(
+      `Malformed encrypted blob: expected 4 colon-separated parts, got ${parts.length}`,
+    );
+  }
+  const [, iv, authTag, ciphertext] = parts;
   return decryptJson<string>({ iv, authTag, ciphertext });
+}
+
+let _plaintextWarned = false;
+function warnPlaintextFallback() {
+  if (_plaintextWarned) return;
+  _plaintextWarned = true;
+  // eslint-disable-next-line no-console
+  console.warn(
+    '[encryption] decryptString received unencrypted legacy plaintext — ' +
+      're-encrypt those rows before disabling the fallback.',
+  );
 }
