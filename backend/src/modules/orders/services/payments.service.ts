@@ -87,11 +87,13 @@ export class PaymentsService {
       id: string;
       tableId: string | null;
       customerId: string | null;
+      customerPhone?: string | null;
       finalAmount: Prisma.Decimal | number | string;
       tenantId: string;
     },
     customerPhone: string | undefined,
     customerStatsAmount: Prisma.Decimal,
+    opts: { bumpCustomerStats?: boolean } = { bumpCustomerStats: true },
   ): Promise<void> {
     // Resolve customer link (use existing customerId from order if already linked).
     let customerId: string | null = order.customerId;
@@ -111,13 +113,20 @@ export class PaymentsService {
       customerId = customer.id;
     }
 
+    // Never overwrite a customerPhone already stored on the order — a
+    // wrong/typo phone on the closing payment would otherwise clobber
+    // the linkage made at order creation time (or by the customer
+    // self-order flow).
+    const phoneToWrite =
+      customerPhone && !order.customerPhone ? customerPhone : undefined;
+
     await tx.order.update({
       where: { id: order.id },
       data: {
         status: OrderStatus.PAID,
         paidAt: new Date(),
         ...(customerId && customerId !== order.customerId && { customerId }),
-        ...(customerPhone && { customerPhone }),
+        ...(phoneToWrite && { customerPhone: phoneToWrite }),
       },
     });
 
@@ -138,8 +147,12 @@ export class PaymentsService {
       }
     }
 
-    // Bump customer lifetime stats.
-    if (customerId) {
+    // Bump customer lifetime stats. Opt-out exists because the prior
+    // splitBill behaviour did NOT touch customer.totalSpent (the
+    // DTO had a customerPhone field but the service never used it).
+    // Keeping the helper opt-in for that path avoids silently
+    // inflating CRM totals on the first deploy after the refactor.
+    if (opts.bumpCustomerStats !== false && customerId) {
       const customer = await tx.customer.findUnique({ where: { id: customerId } });
       if (customer) {
         const newTotalOrders = customer.totalOrders + 1;
@@ -476,8 +489,14 @@ export class PaymentsService {
         // (Payment is not deleted, only flipped to REFUNDED), but the
         // units become payable again because subsequent reads filter on
         // payment.status = COMPLETED.
+        //
+        // Filter by paymentId alone: the Payment row was already
+        // authenticated by tenantId at line 376, and a tenantId guard
+        // here would silently strand rows in the (impossible-today
+        // but possible-tomorrow) world where allocation.tenantId
+        // drifts from payment.tenantId.
         await tx.orderItemPayment.deleteMany({
-          where: { paymentId: id, tenantId },
+          where: { paymentId: id },
         });
         const updated = await tx.payment.findUnique({ where: { id } });
 
@@ -690,7 +709,13 @@ export class PaymentsService {
       const isFullyPaid = totalPaidAmount.gte(orderAmount);
 
       if (isFullyPaid) {
-        await this.finalizeFullyPaid(tx, order, dto.customerPhone, orderAmount);
+        // Preserve pre-refactor splitBill semantics: customer stats
+        // were NOT bumped here. payByItems opts in, create() always
+        // bumped — splitBill stays opt-out to avoid a behaviour drift
+        // on the first deploy.
+        await this.finalizeFullyPaid(tx, order, dto.customerPhone, orderAmount, {
+          bumpCustomerStats: false,
+        });
       }
 
       return { payments, isFullyPaid };
@@ -714,21 +739,23 @@ export class PaymentsService {
   // ========================================
 
   /**
-   * Per-unit pre-discount value (subtotal + modifiers + tax) for an
-   * OrderItem. Computed in Decimal; the caller scales by the units
-   * being paid for.
+   * Per-unit pre-discount value for an OrderItem.
+   *
+   * NOTE on tax: prices in this codebase are KDV-INCLUSIVE
+   * (orders.service.ts:190-198 — `subtotal = qty * (price + modifierTotal)`,
+   * then `taxAmount` is *extracted* from that subtotal via
+   * `taxCalculationService.extractTax`). So `subtotal` already contains
+   * both modifier value and tax — we MUST NOT add `taxAmount` or
+   * `modifierTotal` on top, or every per-item payment overstates by
+   * the embedded tax (and double-counts modifiers).
+   * Likewise `order.totalAmount = sum(orderItem.subtotal)`.
    */
   private perUnitGross(item: {
     quantity: number;
     subtotal: Prisma.Decimal | number | string;
-    modifierTotal: Prisma.Decimal | number | string;
-    taxAmount: Prisma.Decimal | number | string;
   }): Prisma.Decimal {
-    const total = new Prisma.Decimal(item.subtotal)
-      .add(new Prisma.Decimal(item.modifierTotal))
-      .add(new Prisma.Decimal(item.taxAmount));
     if (item.quantity <= 0) return new Prisma.Decimal(0);
-    return total.div(item.quantity);
+    return new Prisma.Decimal(item.subtotal).div(item.quantity);
   }
 
   /**
@@ -751,24 +778,18 @@ export class PaymentsService {
   }
 
   /**
-   * Discount-adjusted total for an OrderItem (all units).
+   * Discount-adjusted total for an OrderItem (all units). See the tax
+   * note on `perUnitGross` — `subtotal` is the authoritative total
+   * value of the item (KDV-inclusive, modifier-inclusive).
    */
   private itemTotalWithDiscount(
-    item: {
-      quantity: number;
-      subtotal: Prisma.Decimal | number | string;
-      modifierTotal: Prisma.Decimal | number | string;
-      taxAmount: Prisma.Decimal | number | string;
-    },
+    item: { subtotal: Prisma.Decimal | number | string },
     order: {
       discount: Prisma.Decimal | number | string;
       totalAmount: Prisma.Decimal | number | string;
     },
   ): Prisma.Decimal {
-    const gross = new Prisma.Decimal(item.subtotal)
-      .add(new Prisma.Decimal(item.modifierTotal))
-      .add(new Prisma.Decimal(item.taxAmount));
-    return gross.mul(this.discountMultiplier(order));
+    return new Prisma.Decimal(item.subtotal).mul(this.discountMultiplier(order));
   }
 
   /**
@@ -974,6 +995,11 @@ export class PaymentsService {
                   include: { orderItemPayments: true },
                 });
                 if (existing) {
+                  // Concurrent retry collided on the idempotency key; reuse
+                  // the winning payment. The order's PAID/remaining state
+                  // is re-derived from the fresh summary fetched outside
+                  // the tx — the original call (or another writer) already
+                  // ran finalizeFullyPaid if it was the closing payment.
                   return {
                     payment: existing,
                     allocations: existing.orderItemPayments.map((a) => ({
@@ -981,8 +1007,8 @@ export class PaymentsService {
                       quantity: a.quantity,
                       amount: a.amount.toFixed(2),
                     })),
-                    isFullyPaid: false, // recompute below from remaining query
-                    fromIdempotentReplay: true,
+                    isFullyPaid: false,
+                    replayed: true,
                   };
                 }
               }
@@ -1021,12 +1047,17 @@ export class PaymentsService {
                 amount: r.amount.toFixed(2),
               })),
               isFullyPaid: fullyPaid,
-              fromIdempotentReplay: false,
+              replayed: false,
             };
           });
 
           payment = txResult.payment;
           allocations = txResult.allocations;
+          // On an in-tx idempotent replay, the original call (or a
+          // concurrent writer) already ran finalizeFullyPaid if it
+          // was the closing payment — we re-derive that from the
+          // remaining-items summary below instead of trusting the
+          // (always-false) inner replay flag.
           isFullyPaid = txResult.isFullyPaid;
         } catch (err) {
           if (
@@ -1055,20 +1086,28 @@ export class PaymentsService {
           throw err;
         }
 
+        const remaining = await this.getPayableItems(orderId, tenantId);
+        // Authoritative "fully paid" derives from the freshly-read
+        // summary. An in-tx idempotency replay returns isFullyPaid=false
+        // by design (we no longer trust the inner branch's flag).
+        const orderFullyPaid = isFullyPaid || remaining.remainingQuantity === 0;
+
+        // Auto-invoice only on the original PAID transition. The
+        // replay path skips because the first call already triggered
+        // it, and SalesInvoice.orderId is unique anyway.
         if (isFullyPaid) {
           await this.maybeGenerateAutoInvoice(orderId, tenantId);
         }
 
-        const remaining = await this.getPayableItems(orderId, tenantId);
         addBreadcrumb('Per-item payment completed', 'payment', {
           paymentId: payment.id,
-          isFullyPaid,
+          orderFullyPaid,
         });
 
         return {
           payment,
           itemAllocations: allocations,
-          orderFullyPaid: isFullyPaid,
+          orderFullyPaid,
           remaining,
         };
       },

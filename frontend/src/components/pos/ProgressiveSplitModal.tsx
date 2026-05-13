@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Banknote,
@@ -54,6 +54,12 @@ const ProgressiveSplitModal = ({
   const [customerLabel, setCustomerLabel] = useState('');
   const [method, setMethod] = useState<PaymentMethod>('CASH');
   const [transactionId, setTransactionId] = useState('');
+  // Synchronous re-entry guard: `payByItems.isPending` flips on
+  // React commit, leaving a tiny window where a rapid double-click
+  // can fire two submits with two different idempotency keys → two
+  // charges. The ref flips inside the same task so the second click
+  // bails before reaching mutateAsync.
+  const inflight = useRef(false);
 
   // Reset state whenever the modal opens or the active order changes.
   useEffect(() => {
@@ -70,10 +76,15 @@ const ProgressiveSplitModal = ({
   }, [isOpen]);
 
   useEffect(() => {
+    // When switching tabs in a merged-table group, clear customer
+    // context too — otherwise the previous customer's name / card
+    // ref bleeds into the next order's first payment.
     setSelections({});
+    setCustomerLabel('');
+    setTransactionId('');
   }, [activeOrderId]);
 
-  const { data: payable, isLoading } = usePayableItems(
+  const { data: payable, isLoading, isFetching } = usePayableItems(
     isOpen ? activeOrderId : null,
   );
 
@@ -130,11 +141,13 @@ const ProgressiveSplitModal = ({
 
   const submit = async (closeAfter: boolean) => {
     if (!activeOrderId || totalSelectedUnits === 0) return;
+    if (inflight.current) return; // double-click guard, see ref decl above
     const items = Object.entries(selections)
       .filter(([, qty]) => qty > 0)
       .map(([orderItemId, quantity]) => ({ orderItemId, quantity }));
     if (items.length === 0) return;
 
+    inflight.current = true;
     try {
       await payByItems.mutateAsync({
         orderId: activeOrderId,
@@ -153,6 +166,8 @@ const ProgressiveSplitModal = ({
       }
     } catch {
       // Toast handled inside the mutation onError.
+    } finally {
+      inflight.current = false;
     }
   };
 
@@ -162,6 +177,11 @@ const ProgressiveSplitModal = ({
     !activeOrderId ||
     totalSelectedUnits === 0 ||
     payByItems.isPending ||
+    // Block submit while the post-payment refetch is in flight —
+    // otherwise the unpaidItems list still reflects the pre-payment
+    // snapshot and the user can select-all into rows the backend
+    // already settled.
+    isFetching ||
     allPaid;
 
   return (
