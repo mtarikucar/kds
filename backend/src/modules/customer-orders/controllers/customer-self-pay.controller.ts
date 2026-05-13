@@ -58,6 +58,8 @@ export class CustomerSelfPayController {
     @Body() dto: CreatePayIntentDto,
     @Req() req: any,
     @Headers('x-forwarded-for') forwardedFor?: string,
+    @Headers('origin') origin?: string,
+    @Headers('referer') referer?: string,
   ) {
     // Real client IP, with proxy header preferred over the socket.
     const ip =
@@ -65,7 +67,12 @@ export class CustomerSelfPayController {
       req?.ip ||
       req?.connection?.remoteAddress ||
       '0.0.0.0';
-    return this.service.createPayIntent(sessionId, dto, ip);
+    // Origin lets the backend send PayTR's redirect URLs back to the
+    // same host the QR menu was opened on (subdomain restaurants would
+    // otherwise bounce back to the wrong host). Fall back to Referer
+    // when Origin isn't sent (older WebViews).
+    const returnOrigin = origin || (referer ? new URL(referer).origin : undefined);
+    return this.service.createPayIntent(sessionId, dto, ip, returnOrigin);
   }
 
   @Get('pay-status')

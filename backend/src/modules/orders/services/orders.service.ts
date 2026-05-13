@@ -609,6 +609,33 @@ export class OrdersService {
             'Refund the existing payment(s) first, then re-apply the discount.',
         );
       }
+      // Self-pay race window: a customer might be sitting in PayTR's
+      // iFrame right now with a pre-discount token. Changing the
+      // discount under them would charge X at PayTR but settle a
+      // different X' on our side, leaving the books out of sync.
+      // Block the change until any open intent on this order
+      // resolves (expires, succeeds, or fails). We grab all PENDING
+      // intents for the tenant (always small — TTL is 1h) and
+      // filter the JSON itemsByOrder array client-side; Postgres'
+      // JSON path operators are awkward across Prisma versions.
+      const pendingIntents = await this.prisma.pendingSelfPayment.findMany({
+        where: {
+          tenantId,
+          status: 'PENDING',
+          expiresAt: { gt: new Date() },
+        },
+        select: { itemsByOrder: true },
+      });
+      const intentTouchesThisOrder = pendingIntents.some((intent) => {
+        const buckets = intent.itemsByOrder as Array<{ orderId: string }>;
+        return Array.isArray(buckets) && buckets.some((b) => b?.orderId === id);
+      });
+      if (intentTouchesThisOrder) {
+        throw new ConflictException(
+          'A customer is currently paying for this order via PayTR. ' +
+            'Wait until their payment finalizes (or expires after 1 hour) before changing the discount.',
+        );
+      }
       // Only discount is being updated. Use Decimal arithmetic so large
       // bills (over ~70 000 TL) don't lose precision in IEEE-754 — the
       // `Number(order.totalAmount)` cast in the prior implementation

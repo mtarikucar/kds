@@ -28,6 +28,9 @@ const SelfPayModal: React.FC<SelfPayModalProps> = ({
   const { t } = useTranslation('common');
   const { data: payable, isLoading } = useSessionPayableItems(
     isOpen ? sessionId : null,
+    // Refresh every 5s while the modal is open — picks up waiter
+    // edits and sibling-customer payments without a full reopen.
+    { pollWhileOpen: isOpen },
   );
   const createIntent = useCreatePayIntent();
 

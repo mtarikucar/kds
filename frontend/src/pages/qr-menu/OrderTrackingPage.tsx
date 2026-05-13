@@ -22,9 +22,14 @@ const OrderTrackingPage = () => {
 
   const paymentRegion = (menuData?.tenant as any)?.paymentRegion;
   const isTurkey = paymentRegion === 'TURKEY';
-  // Self-pay is dine-in only for v1 — needs a tableId so the server
-  // can find the session's open orders.
-  const canSelfPay = isTurkey && !!tableId && !!sessionId;
+  // Self-pay shows up whenever there's a session on a Turkey-region
+  // tenant. The backend further restricts items to:
+  //  - dine-in (tableId present): every open order on that table
+  //  - takeaway/counter (no tableId): only this session's own orders
+  // The modal also returns gracefully when there's nothing to pay,
+  // so we don't gate the button on order presence — let the customer
+  // tap and see "nothing to pay" rather than hiding the affordance.
+  const canSelfPay = isTurkey && !!sessionId;
 
   useEffect(() => {
     const fetchOrders = async () => {

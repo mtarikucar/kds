@@ -786,7 +786,15 @@
       "tryAgain": "Tekrar Dene",
       "backToOrders": "Siparişlerime Dön",
       "payRemaining": "Kalanı Öde",
-      "enjoy": "Afiyet olsun! 🍽️"
+      "enjoy": "Afiyet olsun! 🍽️",
+      "expired": "Ödeme oturumu süresi doldu",
+      "expiredDetail": "Ödeme sayfasında çok uzun süre kaldınız. Kartınızdan çekim yapılmadı; siparişlerinizden yeni bir ödeme başlatın.",
+      "errors": {
+        "expired": "Ödeme oturumu süresi doldu. Kartınızdan çekim yapılmadı.",
+        "paytr_token_error": "Ödeme servisine ulaşılamadı. Lütfen birkaç saniye sonra tekrar deneyin.",
+        "settlement_error": "Ödeme alındı ama kayıt sırasında bir sorun oluştu. Garsona haber verin — restoran ödemenizi manuel olarak işleyecek.",
+        "paytr_reported_failure": "Bankanız ödemeyi onaylamadı. Farklı bir kart ile tekrar deneyin."
+      }
     }
   },
   "orderStatus": {

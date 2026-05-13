@@ -25,7 +25,9 @@ const SubdomainOrdersPage: React.FC<SubdomainOrdersPageProps> = ({ subdomain }) 
   const [isSelfPayOpen, setIsSelfPayOpen] = useState(false);
 
   const paymentRegion = (menuData?.tenant as any)?.paymentRegion;
-  const canSelfPay = paymentRegion === 'TURKEY' && !!tableId && !!sessionId;
+  // See OrderTrackingPage for the rationale — Turkey + sessionId is
+  // enough; backend decides table-wide vs session-only scope.
+  const canSelfPay = paymentRegion === 'TURKEY' && !!sessionId;
 
   useEffect(() => {
     const fetchOrders = async () => {

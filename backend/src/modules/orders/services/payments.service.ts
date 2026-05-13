@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   Optional,
   Logger,
   Inject,
@@ -1068,10 +1069,49 @@ export class PaymentsService {
               paidAgg.map((r) => [r.orderItemId, r._sum.quantity ?? 0]),
             );
 
+            // Pending PayTR self-pay intents reserve units. The waiter
+            // calling payByItems should not be able to take cash for
+            // items a customer is currently paying for via PayTR —
+            // both would book Payments and the second one's webhook
+            // would 0-remaining-fail with no auto-refund. Read directly
+            // (separate scope = single-query, race window is tiny vs.
+            // the 1h intent TTL).
+            const pendingIntents = await tx.pendingSelfPayment.findMany({
+              where: {
+                tenantId,
+                status: 'PENDING',
+                expiresAt: { gt: new Date() },
+              },
+              select: { itemsByOrder: true },
+            });
+            const reservedByItem = new Map<string, number>();
+            for (const intent of pendingIntents) {
+              const buckets = intent.itemsByOrder as Array<{
+                orderId: string;
+                items?: Array<{ orderItemId: string; quantity: number }>;
+              }>;
+              if (!Array.isArray(buckets)) continue;
+              for (const bucket of buckets) {
+                if (bucket.orderId !== orderId) continue;
+                for (const it of bucket.items || []) {
+                  reservedByItem.set(
+                    it.orderItemId,
+                    (reservedByItem.get(it.orderItemId) ?? 0) + it.quantity,
+                  );
+                }
+              }
+            }
+
             // Validate that requested quantities don't exceed remaining.
             for (const entry of dto.items) {
               const item = itemsById.get(entry.orderItemId)!;
               const alreadyPaid = paidByItem.get(entry.orderItemId) ?? 0;
+              const reserved = reservedByItem.get(entry.orderItemId) ?? 0;
+              if (reserved > 0 && entry.quantity > item.quantity - alreadyPaid - reserved) {
+                throw new ConflictException(
+                  `Item ${entry.orderItemId} has ${reserved} unit(s) currently being paid by a customer via PayTR — wait for that intent to finalize (max 1 hour) before collecting at the POS.`,
+                );
+              }
               const remaining = item.quantity - alreadyPaid;
               if (entry.quantity > remaining) {
                 throw new BadRequestException(

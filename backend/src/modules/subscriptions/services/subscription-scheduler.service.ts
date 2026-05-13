@@ -419,4 +419,46 @@ export class SubscriptionSchedulerService {
       );
     });
   }
+
+  /**
+   * Customer self-pay (QR-menu PayTR) intent sweeper.
+   *
+   * Every 30 minutes, flip PENDING `PendingSelfPayment` rows whose
+   * `expiresAt` has passed into `EXPIRED`. Two problems this solves:
+   *
+   *  1. Customers who abandon the PayTR iframe (close tab, time out
+   *     on 3DS) leave PENDING intents that the frontend's
+   *     /payment-result page would otherwise poll forever.
+   *
+   *  2. A late PayTR webhook arriving AFTER we've flipped to EXPIRED
+   *     is correctly distinguished from a real-time PENDING — the
+   *     self-pay webhook handler short-circuits on any non-PENDING
+   *     status, but EXPIRED is the truth (customer abandoned),
+   *     whereas an undeclared phantom-PENDING would silently drop
+   *     a late success.
+   *
+   * Reservation impact: PENDING intents hold OrderItem units (see
+   * customer-self-pay.service `subtractReservations`) so a second
+   * customer can't pay the same units. Sweeping to EXPIRED releases
+   * those units back to the payable pool.
+   */
+  @Cron('*/30 * * * *', { name: 'self-pay-orphan-cleanup' })
+  async handleSelfPayOrphanCleanup() {
+    await this.withJobLock('self-pay-orphan-cleanup', async () => {
+      const now = new Date();
+      const expired = await this.prisma.pendingSelfPayment.updateMany({
+        where: {
+          status: 'PENDING',
+          expiresAt: { lte: now },
+        },
+        data: {
+          status: 'EXPIRED',
+          failureReason: 'expired',
+        },
+      });
+      if (expired.count > 0) {
+        this.logger.log(`Self-pay orphan cleanup: expired=${expired.count}`);
+      }
+    });
+  }
 }

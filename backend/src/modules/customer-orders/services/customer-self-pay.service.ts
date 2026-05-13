@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   Logger,
@@ -20,9 +21,73 @@ import { OrderStatus, PaymentStatus } from '../../../common/constants/order-stat
 const INTENT_TTL_MINUTES = 60;
 const MERCHANT_OID_PREFIX = 'SP'; // "SP" — Self-Pay (subscription is "SUB")
 
+/**
+ * Truncate a string to N UTF-8 bytes (PayTR basket lines are
+ * base64-encoded and have a byte-length limit, not a char limit).
+ * `.slice(N)` on a JS string counts UTF-16 code units, which
+ * undercounts Turkish letters and emoji.
+ */
+function truncateUtf8(input: string, maxBytes: number): string {
+  if (!input) return '';
+  const buf = Buffer.from(input, 'utf8');
+  if (buf.byteLength <= maxBytes) return input;
+  // Walk back to a UTF-8-safe boundary so we don't split a multi-byte char.
+  let end = maxBytes;
+  while (end > 0 && (buf[end] & 0xc0) === 0x80) end--;
+  return buf.subarray(0, end).toString('utf8');
+}
+
 interface ItemsByOrderShape {
   orderId: string;
   items: Array<{ orderItemId: string; quantity: number }>;
+}
+
+/**
+ * Sum of orderItem units held by other PENDING intents on the same
+ * order. A second customer (or the waiter) cannot pay those units
+ * until the first intent terminates (SUCCEEDED / FAILED / EXPIRED).
+ * Without this, both phones can charge the same item via PayTR and
+ * the second webhook silently drops because payByItems sees "0
+ * remaining" — money taken on PayTR, no Payment row, no auto-refund.
+ *
+ * Exported because PaymentsService.payByItems also consults this
+ * map to block staff cash collection during an in-flight customer
+ * PayTR session.
+ */
+export async function fetchOrderItemReservations(
+  prisma: PrismaService,
+  orderIds: string[],
+  tenantId: string,
+  excludeIntentId?: string,
+): Promise<Map<string, number>> {
+  const reserved = new Map<string, number>();
+  if (orderIds.length === 0) return reserved;
+  const pending = await prisma.pendingSelfPayment.findMany({
+    where: {
+      tenantId,
+      status: 'PENDING',
+      expiresAt: { gt: new Date() },
+      ...(excludeIntentId ? { id: { not: excludeIntentId } } : {}),
+    },
+    select: { itemsByOrder: true },
+  });
+  for (const intent of pending) {
+    const buckets = intent.itemsByOrder as Array<{
+      orderId: string;
+      items?: Array<{ orderItemId: string; quantity: number }>;
+    }>;
+    if (!Array.isArray(buckets)) continue;
+    for (const bucket of buckets) {
+      if (!orderIds.includes(bucket.orderId)) continue;
+      for (const item of bucket.items || []) {
+        reserved.set(
+          item.orderItemId,
+          (reserved.get(item.orderItemId) ?? 0) + item.quantity,
+        );
+      }
+    }
+  }
+  return reserved;
 }
 
 @Injectable()
@@ -45,30 +110,29 @@ export class CustomerSelfPayService {
   async getPayableItemsForSession(sessionId: string) {
     const session = await this.customerSessionService.requireSession(sessionId);
 
-    if (!session.tableId) {
-      // Self-pay only makes sense for dine-in (a table-scoped bill).
-      // Takeaway/QR-counter orders aren't supported in v1.
-      return {
-        sessionId,
-        tableId: null,
-        orders: [],
-        summary: {
-          totalAmount: '0.00',
-          paidAmount: '0.00',
-          remainingAmount: '0.00',
-          remainingQuantity: 0,
-        },
-      };
-    }
+    // Two query modes:
+    //  - Dine-in (session.tableId set): return everyone's open orders
+    //    on that table, so any diner can pay any item (full self-service
+    //    matches the in-restaurant social model — splitting, treating,
+    //    "I'll get this one"). The waiter still owns the table.
+    //  - Takeaway / QR-counter (no tableId): return only the orders
+    //    this session created. A takeaway customer paying from their
+    //    phone shouldn't see (or be able to pay for) some other
+    //    customer's pickup order.
+    const orderWhere = session.tableId
+      ? {
+          tableId: session.tableId,
+          tenantId: session.tenantId,
+          status: { notIn: [OrderStatus.PAID, OrderStatus.CANCELLED] },
+        }
+      : {
+          sessionId,
+          tenantId: session.tenantId,
+          status: { notIn: [OrderStatus.PAID, OrderStatus.CANCELLED] },
+        };
 
     const orders = await this.prisma.order.findMany({
-      where: {
-        tableId: session.tableId,
-        tenantId: session.tenantId,
-        status: {
-          notIn: [OrderStatus.PAID, OrderStatus.CANCELLED],
-        },
-      },
+      where: orderWhere,
       include: {
         orderItems: {
           include: {
@@ -85,6 +149,15 @@ export class CustomerSelfPayService {
       },
       orderBy: { createdAt: 'asc' },
     });
+
+    // Reservations from other customers' PENDING PayTR intents.
+    // We treat reserved-but-not-yet-paid units as unavailable so two
+    // phones can't both check out the same burger.
+    const reservations = await fetchOrderItemReservations(
+      this.prisma,
+      orders.map((o) => o.id),
+      session.tenantId,
+    );
 
     let grandTotal = new Prisma.Decimal(0);
     let grandPaid = new Prisma.Decimal(0);
@@ -104,7 +177,13 @@ export class CustomerSelfPayService {
           (s, a) => s + a.quantity,
           0,
         );
-        const remainingQuantity = item.quantity - paidQuantity;
+        const reservedQuantity = reservations.get(item.id) ?? 0;
+        // Clamp to >= 0 — a stale intent could theoretically reserve
+        // more than what's left if the data got out of sync.
+        const remainingQuantity = Math.max(
+          0,
+          item.quantity - paidQuantity - reservedQuantity,
+        );
         grandRemainingQty += remainingQuantity;
         const perUnit = this.paymentsService.derivePerUnitNet(item, o);
         const itemTotal = perUnit.mul(item.quantity);
@@ -113,6 +192,7 @@ export class CustomerSelfPayService {
           productName: item.product?.name ?? null,
           quantity: item.quantity,
           paidQuantity,
+          reservedQuantity,
           remainingQuantity,
           unitTotal: perUnit.toFixed(2),
           itemTotal: itemTotal.toFixed(2),
@@ -149,7 +229,62 @@ export class CustomerSelfPayService {
   // WRITE: PayTR intent
   // ──────────────────────────────────────────────────────────────────
 
-  async createPayIntent(sessionId: string, dto: CreatePayIntentDto, userIp: string) {
+  /**
+   * Resolve the PayTR return URLs for an incoming intent. Origin is
+   * taken from the caller's HTTP request — that way a customer on
+   * `restaurant.hummytummy.com` comes back to the same host, not the
+   * platform's default. Origin must match the comma-separated regex
+   * whitelist in `PAYTR_ALLOWED_RETURN_ORIGINS` (env), or we fall
+   * back to the global `PAYTR_OK_URL_POS` / `PAYTR_FAIL_URL_POS`.
+   *
+   * Whitelisting is critical: PayTR will redirect to whatever we
+   * hand them, so an attacker who could swap Origin would otherwise
+   * funnel customers to a phishing page after payment.
+   */
+  private resolveReturnUrls(origin?: string): { okUrl: string; failUrl: string } {
+    const fallbackOk =
+      this.config.get<string>('PAYTR_OK_URL_POS') ??
+      this.config.get<string>('PAYTR_OK_URL') ??
+      'http://localhost:5173/payment-result';
+    const fallbackFail =
+      this.config.get<string>('PAYTR_FAIL_URL_POS') ??
+      this.config.get<string>('PAYTR_FAIL_URL') ??
+      'http://localhost:5173/payment-result';
+
+    if (!origin) return { okUrl: fallbackOk, failUrl: fallbackFail };
+
+    // Comma-separated regex patterns; absent → no override allowed.
+    const allowedRaw = this.config.get<string>('PAYTR_ALLOWED_RETURN_ORIGINS') ?? '';
+    const patterns = allowedRaw
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const matches = patterns.some((p) => {
+      try {
+        return new RegExp(`^${p}$`).test(origin);
+      } catch {
+        return false;
+      }
+    });
+
+    if (!matches) return { okUrl: fallbackOk, failUrl: fallbackFail };
+
+    // Origin like https://restaurant.hummytummy.com — same path
+    // suffix the SPA uses for the path-based variant ("/payment-result").
+    const base = origin.replace(/\/+$/, '');
+    return {
+      okUrl: `${base}/payment-result`,
+      failUrl: `${base}/payment-result`,
+    };
+  }
+
+  async createPayIntent(
+    sessionId: string,
+    dto: CreatePayIntentDto,
+    userIp: string,
+    returnOrigin?: string,
+  ) {
     const session = await this.customerSessionService.requireSession(sessionId);
 
     const tenant = await this.prisma.tenant.findUnique({
@@ -161,21 +296,28 @@ export class CustomerSelfPayService {
         'Self-pay is currently available for Turkey-region tenants only.',
       );
     }
-    if (!session.tableId) {
-      throw new BadRequestException('Self-pay requires a dine-in session.');
-    }
 
-    // Validate items: each orderItemId must (a) belong to an order
-    // on the same table + tenant, (b) have enough remaining units.
-    // Group by orderId for the per-order payByItems calls.
-    const requested = await this.prisma.orderItem.findMany({
-      where: {
-        id: { in: dto.items.map((i) => i.orderItemId) },
-        order: {
+    // Scope the orderItem lookup the same way as the read path:
+    //  - Dine-in: any item on any open order at the session's table.
+    //  - Takeaway/counter: only items belonging to orders this
+    //    session itself created (sessionId match).
+    // Either way the tenantId filter keeps the call tenant-scoped.
+    const orderScope = session.tableId
+      ? {
           tableId: session.tableId,
           tenantId: session.tenantId,
           status: { notIn: [OrderStatus.PAID, OrderStatus.CANCELLED] },
-        },
+        }
+      : {
+          sessionId,
+          tenantId: session.tenantId,
+          status: { notIn: [OrderStatus.PAID, OrderStatus.CANCELLED] },
+        };
+
+    const requested = await this.prisma.orderItem.findMany({
+      where: {
+        id: { in: dto.items.map((i) => i.orderItemId) },
+        order: orderScope,
       },
       include: {
         order: true,
@@ -195,6 +337,16 @@ export class CustomerSelfPayService {
       }
     }
 
+    // Reservations held by other in-flight PayTR intents on this
+    // order. A second customer picking the same units 5 seconds
+    // after the first hits a 409 here instead of double-paying.
+    const orderIdsTouched = Array.from(new Set(requested.map((i) => i.orderId)));
+    const reservations = await fetchOrderItemReservations(
+      this.prisma,
+      orderIdsTouched,
+      session.tenantId,
+    );
+
     // Compute total + per-order groupings (server-derived; client can't override).
     let totalAmount = new Prisma.Decimal(0);
     const itemsByOrder = new Map<string, ItemsByOrderShape>();
@@ -204,10 +356,14 @@ export class CustomerSelfPayService {
         (s, a) => s + a.quantity,
         0,
       );
-      const remaining = item.quantity - alreadyPaid;
+      const reserved = reservations.get(item.id) ?? 0;
+      const remaining = item.quantity - alreadyPaid - reserved;
       if (entry.quantity > remaining) {
+        const reasonSuffix = reserved > 0
+          ? ` (${reserved} reserved by another in-flight payment)`
+          : '';
         throw new BadRequestException(
-          `Item ${entry.orderItemId} has ${remaining} units remaining, cannot pay ${entry.quantity}`,
+          `Item ${entry.orderItemId} has ${remaining} units remaining, cannot pay ${entry.quantity}${reasonSuffix}`,
         );
       }
 
@@ -246,38 +402,45 @@ export class CustomerSelfPayService {
       },
     });
 
-    // Build PayTR token request.
-    const okUrl =
-      this.config.get<string>('PAYTR_OK_URL_POS') ??
-      this.config.get<string>('PAYTR_OK_URL') ??
-      'http://localhost:5173/payment-result';
-    const failUrl =
-      this.config.get<string>('PAYTR_FAIL_URL_POS') ??
-      this.config.get<string>('PAYTR_FAIL_URL') ??
-      'http://localhost:5173/payment-result';
+    // Build PayTR token request. Return URLs honour the caller's
+    // Origin (subdomain restaurants need to come back to their own
+    // host) but only if whitelisted; otherwise fall back to env.
+    const { okUrl, failUrl } = this.resolveReturnUrls(returnOrigin);
 
-    // Basket: one line per item entry.
+    // Basket: one line per item entry. Names get UTF-8-byte
+    // truncated (PayTR limits per-line size by *bytes*; .slice() on
+    // a JS string operates in UTF-16 code units, so "Ş" would still
+    // count as 1 even though it's 2 bytes in PayTR's base64'd
+    // basket. Truncate by bytes to be safe.).
     const basket: Array<[string, string, number]> = [];
     for (const entry of dto.items) {
       const item = requested.find((i) => i.id === entry.orderItemId)!;
       const perUnit = this.paymentsService.derivePerUnitNet(item, item.order);
       basket.push([
-        (item.product as any)?.name?.slice(0, 80) || 'Ürün',
+        truncateUtf8((item.product as any)?.name ?? 'Ürün', 80) || 'Ürün',
         perUnit.toFixed(2),
         entry.quantity,
       ]);
     }
 
     try {
+      // PayTR rejects synthetic emails on TLDs it can't deliver to
+      // (e.g. .local is reserved). Use a safely-non-routable but
+      // syntactically valid domain. PayTR also validates phone format
+      // loosely; "0500..." is closer to a valid mobile shape than
+      // "0000000000" which gets bounced by some merchants.
+      const safeEmail = dto.customerPhone
+        ? `${dto.customerPhone.replace(/\D/g, '')}@noreply.invalid`
+        : `${sessionId.slice(0, 8)}@noreply.invalid`;
+      const safePhone = dto.customerPhone || '05000000000';
+
       const result = await this.paytrAdapter.getIframeToken({
         merchantOid,
         amount: totalAmount,
-        email: dto.customerPhone
-          ? `${dto.customerPhone.replace(/\D/g, '')}@self-pay.local`
-          : `${sessionId.slice(0, 8)}@self-pay.local`,
+        email: safeEmail,
         userName: 'Müşteri',
         userAddress: 'Masa',
-        userPhone: dto.customerPhone || '0000000000',
+        userPhone: safePhone,
         userBasket: basket,
         userIp,
         okUrl: `${okUrl}?oid=${merchantOid}`,
@@ -297,12 +460,13 @@ export class CustomerSelfPayService {
       };
     } catch (err: any) {
       // PayTR couldn't issue a token — mark the intent failed so a
-      // stuck-PENDING row doesn't haunt the sweeper.
+      // stuck-PENDING row doesn't haunt the sweeper. failureReason
+      // uses a coded prefix the frontend maps to an i18n string.
       await this.prisma.pendingSelfPayment.update({
         where: { id: intent.id },
         data: {
           status: 'FAILED',
-          failureReason: `paytr_token_error: ${err?.message ?? String(err)}`,
+          failureReason: 'paytr_token_error',
         },
       });
       throw err;
@@ -313,20 +477,59 @@ export class CustomerSelfPayService {
   // READ: poll for status after PayTR redirect
   // ──────────────────────────────────────────────────────────────────
 
+  /**
+   * Poll endpoint after PayTR redirects the customer back. Intentionally
+   * does NOT require an active CustomerSession — that record expires
+   * after 4 hours, and a customer returning from a flaky network or a
+   * long 3DS detour shouldn't be locked out of their own receipt.
+   *
+   * The merchantOid is an unguessable 27+ character token issued by
+   * us inside createPayIntent, so its possession is sufficient
+   * authentication for a read-only status view. We still cross-check
+   * sessionId to keep the route URL-scoped (a customer in tenant A
+   * can't probe tenant B's intent ids).
+   *
+   * Lazy expire: if expiresAt has passed and the row is still
+   * PENDING, flip it to EXPIRED on the fly so the client sees a
+   * terminal status instead of polling forever.
+   */
   async getPayStatus(sessionId: string, merchantOid: string) {
-    const session = await this.customerSessionService.requireSession(sessionId);
     const intent = await this.prisma.pendingSelfPayment.findUnique({
       where: { merchantOid },
     });
-    if (!intent || intent.sessionId !== sessionId || intent.tenantId !== session.tenantId) {
+    if (!intent || intent.sessionId !== sessionId) {
       throw new NotFoundException('Payment intent not found for this session');
     }
-    const remaining = await this.getPayableItemsForSession(sessionId);
+
+    let status = intent.status;
+    let failureReason = intent.failureReason;
+    if (status === 'PENDING' && intent.expiresAt < new Date()) {
+      const updated = await this.prisma.pendingSelfPayment.updateMany({
+        where: { id: intent.id, status: 'PENDING' },
+        data: { status: 'EXPIRED', failureReason: 'expired' },
+      });
+      if (updated.count > 0) {
+        status = 'EXPIRED';
+        failureReason = 'expired';
+      }
+    }
+
+    // remaining summary needs an active session; if the session has
+    // expired by the time the customer returns, we still return the
+    // payment outcome (the important bit) and just leave `remaining`
+    // null. The receipt UI handles a null remaining gracefully.
+    let remaining: Awaited<ReturnType<typeof this.getPayableItemsForSession>> | null = null;
+    try {
+      remaining = await this.getPayableItemsForSession(sessionId);
+    } catch {
+      remaining = null;
+    }
+
     return {
       merchantOid,
-      status: intent.status,
+      status,
       amount: intent.amount.toFixed(2),
-      failureReason: intent.failureReason,
+      failureReason,
       remaining,
     };
   }
@@ -363,7 +566,46 @@ export class CustomerSelfPayService {
 
     const itemsByOrder = intent.itemsByOrder as unknown as ItemsByOrderShape[];
 
+    // Pre-validate every order's remaining quantities BEFORE booking
+    // any Payment row. If, say, the waiter took cash for one of these
+    // items while the customer was in PayTR's iframe, we want to
+    // detect that here and mark the whole intent FAILED — rather
+    // than partially booking order #1 and discovering order #2's
+    // items are gone. payByItems is still idempotent on its own
+    // (selfpay:<oid>:<orderId> key), so a partial book on retry
+    // resolves to the existing row.
     try {
+      for (const bucket of itemsByOrder) {
+        const items = await this.prisma.orderItem.findMany({
+          where: {
+            id: { in: bucket.items.map((i) => i.orderItemId) },
+            order: { id: bucket.orderId, tenantId: intent.tenantId },
+          },
+          include: {
+            orderItemPayments: {
+              where: { payment: { status: PaymentStatus.COMPLETED } },
+            },
+          },
+        });
+        for (const entry of bucket.items) {
+          const dbItem = items.find((it) => it.id === entry.orderItemId);
+          if (!dbItem) {
+            throw new BadRequestException(
+              `Item ${entry.orderItemId} no longer exists or was cancelled`,
+            );
+          }
+          const alreadyPaid = dbItem.orderItemPayments.reduce(
+            (s, a) => s + a.quantity,
+            0,
+          );
+          if (alreadyPaid + entry.quantity > dbItem.quantity) {
+            throw new ConflictException(
+              `Item ${entry.orderItemId} was paid for by someone else after the intent was created`,
+            );
+          }
+        }
+      }
+
       for (const bucket of itemsByOrder) {
         await this.paymentsService.payByItems(
           bucket.orderId,
@@ -394,13 +636,18 @@ export class CustomerSelfPayService {
       );
       Sentry.captureException(err, {
         tags: { event: 'SELF_PAY_SETTLEMENT_FAILED', tenantId: intent.tenantId },
-        extra: { merchantOid, sessionId: intent.sessionId },
+        extra: { merchantOid, sessionId: intent.sessionId, raw: err?.message },
       });
+      // Coded failureReason → frontend maps to localized message.
+      // PayTR charged the card but our settlement didn't book a
+      // Payment row; this is the path that needs ops attention
+      // (manual refund or manual reconciliation). The Sentry alert
+      // carries the raw error; the customer sees a friendly string.
       await this.prisma.pendingSelfPayment.update({
         where: { id: intent.id },
         data: {
           status: 'FAILED',
-          failureReason: `settlement_error: ${err?.message ?? String(err)}`,
+          failureReason: 'settlement_error',
         },
       });
     }

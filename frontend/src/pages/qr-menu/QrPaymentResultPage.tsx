@@ -135,17 +135,53 @@ const QrPaymentResultPage: React.FC<QrPaymentResultPageProps> = ({ subdomain }) 
               {t('payment.result.failed', 'Payment failed')}
             </h2>
             <p className="text-sm text-slate-500">
-              {data?.failureReason ||
-                t(
+              {/* Map server-coded failureReason to a localized message.
+                  Unknown codes fall through to the generic detail. */}
+              {(() => {
+                const code = data?.failureReason;
+                const knownCodes = [
+                  'expired',
+                  'paytr_token_error',
+                  'settlement_error',
+                  'paytr_reported_failure',
+                ];
+                if (code && knownCodes.includes(code)) {
+                  return t(`payment.result.errors.${code}`);
+                }
+                return t(
                   'payment.result.failedDetail',
                   'Your card was not charged. You can try again from your orders page.',
-                )}
+                );
+              })()}
             </p>
             <button
               onClick={() => navigate(ordersUrl)}
               className="mt-6 w-full py-3 rounded-xl bg-indigo-500 text-white font-bold"
             >
               {t('payment.result.tryAgain', 'Try again')}
+            </button>
+          </>
+        )}
+
+        {status === 'EXPIRED' && (
+          <>
+            <div className="inline-flex p-4 rounded-full bg-amber-100 mb-4">
+              <XCircle className="h-12 w-12 text-amber-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-slate-900 mb-2">
+              {t('payment.result.expired', 'Payment session expired')}
+            </h2>
+            <p className="text-sm text-slate-500">
+              {t(
+                'payment.result.expiredDetail',
+                'You took too long at the payment page. Your card was not charged; start a new payment from your orders.',
+              )}
+            </p>
+            <button
+              onClick={() => navigate(ordersUrl)}
+              className="mt-6 w-full py-3 rounded-xl bg-indigo-500 text-white font-bold"
+            >
+              {t('payment.result.backToOrders', 'Back to my orders')}
             </button>
           </>
         )}

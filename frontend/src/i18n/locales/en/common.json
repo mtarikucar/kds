@@ -786,7 +786,15 @@
       "tryAgain": "Try Again",
       "backToOrders": "Back to my orders",
       "payRemaining": "Pay the rest",
-      "enjoy": "Enjoy your meal! 🍽️"
+      "enjoy": "Enjoy your meal! 🍽️",
+      "expired": "Payment session expired",
+      "expiredDetail": "You took too long at the payment page. Your card was not charged; start a new payment from your orders.",
+      "errors": {
+        "expired": "Payment session expired. Your card was not charged.",
+        "paytr_token_error": "Could not reach the payment service. Please try again in a moment.",
+        "settlement_error": "Payment was taken but couldn't be recorded. Please notify the waiter — the restaurant will reconcile it manually.",
+        "paytr_reported_failure": "Your bank declined the payment. Try a different card."
+      }
     }
   },
   "orderStatus": {

@@ -61,7 +61,10 @@ const base = (sessionId: string) =>
  * Table-wide payable items for the customer's session. The server
  * resolves tenantId from sessionId — the client never sends tenantId.
  */
-export const useSessionPayableItems = (sessionId: string | null) => {
+export const useSessionPayableItems = (
+  sessionId: string | null,
+  options: { pollWhileOpen?: boolean } = {},
+) => {
   return useQuery({
     queryKey: ['sessionPayableItems', sessionId],
     queryFn: async (): Promise<CustomerPayableSummary> => {
@@ -73,6 +76,10 @@ export const useSessionPayableItems = (sessionId: string | null) => {
     // existing useCustomerSocket invalidates ['customerOrders']; pair it
     // with refetch on focus so a returning-from-PayTR window sees fresh state.
     refetchOnWindowFocus: true,
+    // When the SelfPayModal is open, poll every 5s so the customer's
+    // unpaid list stays in sync with waiter edits / sibling
+    // customers' payments. Without this the modal goes stale.
+    refetchInterval: options.pollWhileOpen ? 5000 : false,
   });
 };
 

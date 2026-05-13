@@ -101,6 +101,9 @@ describe('PaymentsService — progressive per-item payments', () => {
       stockDeduction,
     );
     wireTransaction();
+    // Default: no pending self-pay intents reserve items in any test.
+    // Specific specs can override to test the reservation block.
+    (prisma.pendingSelfPayment.findMany as unknown as jest.Mock).mockResolvedValue([]);
   });
 
   // ──────────────────────────────────────────────────────────────────

@@ -768,7 +768,15 @@
       "tryAgain": "Qayta urinib ko'r",
       "backToOrders": "Buyurtmalarimga qaytish",
       "payRemaining": "Qoldig'ini to'la",
-      "enjoy": "Yoqimli ishtaha! 🍽️"
+      "enjoy": "Yoqimli ishtaha! 🍽️",
+      "expired": "To'lov sessiyasi tugadi",
+      "expiredDetail": "To'lov sahifasida juda uzoq qoldingiz. Kartangizdan pul yechilmadi; buyurtmalarimdan yangi to'lov boshlang.",
+      "errors": {
+        "expired": "To'lov sessiyasi tugadi. Kartangizdan pul yechilmadi.",
+        "paytr_token_error": "To'lov xizmatiga ulanib bo'lmadi. Bir oz vaqtdan keyin qayta urinib ko'ring.",
+        "settlement_error": "To'lov qabul qilindi, ammo yozib olinmadi. Ofitsiantga xabar bering — restoran qo'lda solishtiradi.",
+        "paytr_reported_failure": "Bank to'lovni rad etdi. Boshqa karta bilan urinib ko'ring."
+      }
     }
   },
   "orderStatus": {
