@@ -110,6 +110,23 @@ export class CustomerSelfPayService {
   async getPayableItemsForSession(sessionId: string) {
     const session = await this.customerSessionService.requireSession(sessionId);
 
+    // Surface the toggle in the read response too so the QR menu
+    // can hide the "Pay Now" button on tenants that haven't opted
+    // in. The createPayIntent path will also enforce it server-side
+    // — this is a UX-layer convenience.
+    const [posSettings, tenant] = await Promise.all([
+      this.prisma.posSettings.findUnique({
+        where: { tenantId: session.tenantId },
+        select: { enableCustomerSelfPay: true },
+      }),
+      this.prisma.tenant.findUnique({
+        where: { id: session.tenantId },
+        select: { paymentRegion: true },
+      }),
+    ]);
+    const selfPayEnabled =
+      !!posSettings?.enableCustomerSelfPay && tenant?.paymentRegion === 'TURKEY';
+
     // Two query modes:
     //  - Dine-in (session.tableId set): return everyone's open orders
     //    on that table, so any diner can pay any item (full self-service
@@ -215,6 +232,7 @@ export class CustomerSelfPayService {
     return {
       sessionId,
       tableId: session.tableId,
+      selfPayEnabled,
       orders: orderViews,
       summary: {
         totalAmount: grandTotal.toFixed(2),
@@ -294,6 +312,20 @@ export class CustomerSelfPayService {
     if (tenant.paymentRegion !== 'TURKEY') {
       throw new BadRequestException(
         'Self-pay is currently available for Turkey-region tenants only.',
+      );
+    }
+
+    // Tenant-owner opt-in: even Turkey-region tenants need to flip
+    // the toggle in POS settings before customers can self-pay. This
+    // is a deliberate guard so a restaurant without a PayTR merchant
+    // account doesn't surface a button that will only ever fail.
+    const posSettings = await this.prisma.posSettings.findUnique({
+      where: { tenantId: session.tenantId },
+      select: { enableCustomerSelfPay: true },
+    });
+    if (!posSettings?.enableCustomerSelfPay) {
+      throw new BadRequestException(
+        'Self-pay is not enabled for this restaurant. Please ask the waiter to take your payment.',
       );
     }
 

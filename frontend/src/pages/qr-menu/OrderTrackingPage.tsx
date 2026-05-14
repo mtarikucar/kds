@@ -20,16 +20,11 @@ const OrderTrackingPage = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isSelfPayOpen, setIsSelfPayOpen] = useState(false);
 
-  const paymentRegion = (menuData?.tenant as any)?.paymentRegion;
-  const isTurkey = paymentRegion === 'TURKEY';
-  // Self-pay shows up whenever there's a session on a Turkey-region
-  // tenant. The backend further restricts items to:
-  //  - dine-in (tableId present): every open order on that table
-  //  - takeaway/counter (no tableId): only this session's own orders
-  // The modal also returns gracefully when there's nothing to pay,
-  // so we don't gate the button on order presence — let the customer
-  // tap and see "nothing to pay" rather than hiding the affordance.
-  const canSelfPay = isTurkey && !!sessionId;
+  // Self-pay availability is resolved server-side (tenant.paymentRegion
+  // = TURKEY AND posSettings.enableCustomerSelfPay) and surfaced on
+  // menuData.enableCustomerSelfPay. Hiding the CTA when disabled
+  // saves the customer from hitting an action that would 400.
+  const canSelfPay = !!menuData?.enableCustomerSelfPay && !!sessionId;
 
   useEffect(() => {
     const fetchOrders = async () => {

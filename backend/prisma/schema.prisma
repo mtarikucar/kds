@@ -1091,6 +1091,12 @@ model PosSettings {
   enableTwoStepCheckout          Boolean @default(false)  // Separate "Create Order" and "Payment" buttons
   showProductImages              Boolean @default(true)   // Show product images in POS menu
   enableCustomerOrdering         Boolean @default(true)   // Allow customers to place orders from QR menu
+  // Allow customers to pay their share via PayTR hosted iFrame from
+  // the QR menu (self-pay flow). Opt-in: default false because it
+  // requires a PayTR merchant account and only makes sense for
+  // tenant.paymentRegion = TURKEY. The backend also checks region;
+  // this toggle is the tenant-owner's explicit consent.
+  enableCustomerSelfPay          Boolean @default(false)
   defaultMapView                 String  @default("2d")   // Default floor plan view: "2d" or "3d"
   requireServedForDineInPayment  Boolean @default(false)  // Require SERVED status for dine-in payment in two-step checkout
 
