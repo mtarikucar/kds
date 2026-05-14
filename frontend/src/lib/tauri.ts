@@ -11,7 +11,9 @@ import type {
   HardwareConfig,
   HardwareEvent,
   ReceiptData as NewReceiptData,
+  ReceiptSnapshot,
   KitchenOrderData,
+  KitchenTicketSnapshot,
   TextAlignment,
   TextStyle,
   BarcodeType,
@@ -58,17 +60,53 @@ export class HardwareService {
   }
 
   /**
-   * Get status of a specific device
+   * Persist a new device row in `~/.kds/hardware.json` (or update an
+   * existing one with the same `id`). Per-machine config — each POS
+   * terminal has its own paired hardware. The frontend
+   * IntegrationsSettingsPage save flow calls this AFTER a successful
+   * backend integration write, so the tenant-level metadata and the
+   * per-terminal pairing stay in sync.
+   *
+   * The `device` shape is the JSON the Rust side deserializes into
+   * `hardware::config::DeviceConfig`. Matching field names + tagged
+   * connection union are documented in `frontend/src/types/hardware.ts`.
    */
-  static async getDeviceStatus(deviceId: string): Promise<DeviceStatus> {
+  static async addDevice(device: {
+    id: string;
+    name: string;
+    device_type: string;
+    enabled: boolean;
+    auto_connect: boolean;
+    connection: { connection_type: string; config: Record<string, any> };
+    settings?: Record<string, any>;
+  }): Promise<unknown> {
+    if (!isTauri()) {
+      console.warn('addDevice only available in desktop mode');
+      return null;
+    }
+
+    try {
+      return await invoke('add_device', { device });
+    } catch (error) {
+      console.error('Failed to add device:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Drop a device row from `~/.kds/hardware.json`. Disconnect first if
+   * still connected; the caller can `disconnectDevice` separately to
+   * be explicit (we do that in IntegrationsSettingsPage's delete flow).
+   */
+  static async removeDevice(deviceId: string): Promise<string> {
     if (!isTauri()) {
       throw new Error('Hardware service only available in desktop mode');
     }
 
     try {
-      return await invoke<DeviceStatus>('get_device_status', { deviceId });
+      return await invoke<string>('remove_device', { deviceId });
     } catch (error) {
-      console.error('Failed to get device status:', error);
+      console.error('Failed to remove device:', error);
       throw error;
     }
   }
@@ -122,11 +160,14 @@ export class HardwareService {
   }
 
   /**
-   * Print receipt to a specific printer device
+   * Print a receipt by passing the backend-persisted snapshot directly.
+   * The Rust side accepts the same versioned shape (ReceiptSnapshot) so
+   * no client-side translation is needed — the JSON from
+   * Payment.receiptSnapshot ships through unchanged.
    */
   static async printReceipt(
     deviceId: string,
-    receipt: NewReceiptData
+    receipt: ReceiptSnapshot
   ): Promise<string> {
     if (!isTauri()) {
       console.warn('Hardware printing only available in desktop mode');
@@ -143,18 +184,20 @@ export class HardwareService {
   }
 
   /**
-   * Print kitchen order to a specific printer device
+   * Print a kitchen ticket from the backend-persisted snapshot.
+   * Same pass-through pattern as printReceipt — Rust accepts
+   * KitchenTicketSnapshot directly from Order.kitchenTicketSnapshot.
    */
   static async printKitchenOrder(
     deviceId: string,
-    order: KitchenOrderData
+    ticket: KitchenTicketSnapshot
   ): Promise<string> {
     if (!isTauri()) {
       throw new Error('Hardware printing only available in desktop mode');
     }
 
     try {
-      return await invoke<string>('print_kitchen_order', { deviceId, order });
+      return await invoke<string>('print_kitchen_order', { deviceId, ticket });
     } catch (error) {
       console.error('Failed to print kitchen order:', error);
       throw error;
@@ -173,30 +216,6 @@ export class HardwareService {
       return await invoke<string>('open_cash_drawer', { deviceId });
     } catch (error) {
       console.error('Failed to open cash drawer:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Call a restaurant pager
-   */
-  static async callPager(
-    deviceId: string,
-    pagerNumber: number,
-    alertType?: string
-  ): Promise<string> {
-    if (!isTauri()) {
-      throw new Error('Hardware control only available in desktop mode');
-    }
-
-    try {
-      return await invoke<string>('call_pager', {
-        deviceId,
-        pagerNumber,
-        alertType,
-      });
-    } catch (error) {
-      console.error('Failed to call pager:', error);
       throw error;
     }
   }
