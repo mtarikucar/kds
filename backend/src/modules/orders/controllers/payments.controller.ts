@@ -42,7 +42,7 @@ export class PaymentsController {
       orderId,
       createPaymentDto,
       req.tenantId,
-      req.user?.id ?? req.user?.sub ?? null,
+      req.user?.id ?? null,
     );
   }
 
@@ -68,7 +68,7 @@ export class PaymentsController {
       orderId,
       dto,
       req.tenantId,
-      req.user?.id ?? req.user?.sub ?? null,
+      req.user?.id ?? null,
     );
   }
 
@@ -94,7 +94,7 @@ export class PaymentsController {
       orderId,
       dto,
       req.tenantId,
-      req.user?.id ?? req.user?.sub ?? null,
+      req.user?.id ?? null,
     );
   }
 
@@ -130,7 +130,7 @@ export class PaymentsController {
       orderId,
       dto,
       req.tenantId,
-      req.user?.id ?? req.user?.sub ?? null,
+      req.user?.id ?? null,
     );
   }
 }

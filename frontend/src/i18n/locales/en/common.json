@@ -760,6 +760,12 @@
     "requestError": "Failed to request bill"
   },
   "payment": {
+    "errors": {
+      "SELF_PAY_NOT_TURKEY": "Self-pay is not active for this restaurant. Please ask the waiter.",
+      "SELF_PAY_DISABLED": "This restaurant hasn't enabled self-pay. Please call the waiter.",
+      "ORDER_ALREADY_PAID": "This order has already been paid. Refresh the menu.",
+      "SELF_PAY_DISABLED_MIXED_PAYMENT": "The waiter has already taken a partial payment for this table — self-pay is disabled here. Please call the waiter."
+    },
     "payNow": "Pay Now",
     "title": "Pay Now",
     "subtitle": "Select what you'll pay for — secure card payment",

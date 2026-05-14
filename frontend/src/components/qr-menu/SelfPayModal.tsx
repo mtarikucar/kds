@@ -120,7 +120,16 @@ const SelfPayModal: React.FC<SelfPayModalProps> = ({
       window.location.href = response.paymentLink;
     } catch (err: any) {
       inflight.current = false;
+      // Prefer the localized message for known error codes; fall back
+      // to the server's English text only when the code is unknown.
+      // Without this a Turkish customer was seeing raw English.
+      const code = err?.response?.data?.code as string | undefined;
+      const codeKey = code ? `payment.errors.${code}` : '';
+      const localized = code
+        ? t(codeKey, { defaultValue: '' })
+        : '';
       const msg =
+        localized ||
         err?.response?.data?.message ||
         t('payment.intentFailed', 'Could not start payment');
       toast.error(msg);

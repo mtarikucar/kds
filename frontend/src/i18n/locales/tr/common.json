@@ -760,6 +760,12 @@
     "requestError": "Hesap isteği gönderilemedi"
   },
   "payment": {
+    "errors": {
+      "SELF_PAY_NOT_TURKEY": "Bu restoran için telefondan ödeme henüz aktif değil. Lütfen garsona haber verin.",
+      "SELF_PAY_DISABLED": "Bu restoran telefondan ödemeyi açmamış. Lütfen garsonu çağırın.",
+      "ORDER_ALREADY_PAID": "Bu sipariş zaten ödenmiş. Sayfayı yenileyin.",
+      "SELF_PAY_DISABLED_MIXED_PAYMENT": "Bu masada garson kısmi ödeme aldı — telefondan ödeme bu masada kullanılamıyor. Lütfen garsona haber verin."
+    },
     "payNow": "Ödemeye Geç",
     "title": "Şimdi Öde",
     "subtitle": "Ödeyeceğin ürünleri seç — kartla güvenli ödeme",

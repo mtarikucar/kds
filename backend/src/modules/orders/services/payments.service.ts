@@ -1019,10 +1019,19 @@ export class PaymentsService {
       this.safeEmitPaymentSuccess(tenantId, p, initiatedByUserId);
     }
 
+    // Strip the internal `__replayed` dedup tag before handing the
+    // payments array to the controller — it's a server-side concern
+    // (suppresses double-emit on a P2002 retry) and must not leak
+    // into the HTTP response shape.
+    const cleanedPayments = result.payments.map((p) => {
+      const { __replayed, ...rest } = p as typeof p & { __replayed?: boolean };
+      return rest;
+    });
+
     return {
       orderId: orderId,
       splitType: dto.splitType,
-      payments: result.payments,
+      payments: cleanedPayments,
       orderFullyPaid: result.isFullyPaid,
     };
   }

@@ -20,9 +20,11 @@ describe('PaymentsService — progressive per-item payments', () => {
   let prisma: MockPrismaClient;
   let ordersService: { findOne: jest.Mock };
   let customersService: any;
+  let receiptSnapshotBuilder: any;
   let salesInvoice: any;
   let accountingSettings: any;
   let stockDeduction: any;
+  let kdsGateway: { emitPaymentSuccess: jest.Mock };
   let svc: PaymentsService;
 
   /**
@@ -87,18 +89,32 @@ describe('PaymentsService — progressive per-item payments', () => {
       findOne: jest.fn().mockResolvedValue(makeOrder()),
     };
     customersService = {};
+    // Receipt snapshot is wired in but exercised only via the
+    // service's own buildReceiptSnapshotForPayment helper which short-
+    // circuits when the (mocked) tenant lookup returns undefined.
+    receiptSnapshotBuilder = {
+      buildReceiptSnapshot: jest.fn().mockReturnValue({}),
+      buildKitchenTicketSnapshot: jest.fn().mockReturnValue({}),
+    };
     salesInvoice = { createFromOrder: jest.fn().mockResolvedValue(undefined) };
     accountingSettings = {
       findByTenant: jest.fn().mockResolvedValue({ autoGenerateInvoice: false }),
     };
     stockDeduction = {};
+    // KdsGateway is optional in the service constructor; injecting a
+    // mock lets us assert that the post-payment emit fires with the
+    // right initiatedByUserId for waiter vs. webhook origins (the
+    // dedup signal the frontend uses to suppress double-prints).
+    kdsGateway = { emitPaymentSuccess: jest.fn() };
     svc = new PaymentsService(
       prisma as any,
       ordersService as any,
       customersService,
+      receiptSnapshotBuilder,
       salesInvoice,
       accountingSettings,
       stockDeduction,
+      kdsGateway as any,
     );
     wireTransaction();
     // Default: no pending self-pay intents reserve items in any test.
@@ -668,6 +684,111 @@ describe('PaymentsService — progressive per-item payments', () => {
 
       // After three single-unit payments, prior sum must equal exactly 10.01.
       expect(priorSum.toFixed(2)).toBe('10.01');
+    });
+    it('payByItems emits payment:success with initiatedByUserId (waiter)', async () => {
+      // The frontend de-dups its own auto-print on the originating
+      // tablet by comparing payment:success.initiatedByUserId to the
+      // logged-in user's id. If the service forgets to forward the
+      // userId, every waiter cash payment double-prints. Locking
+      // this in with a spec so a future refactor can't regress it.
+      const order = makeOrder({
+        finalAmount: new Prisma.Decimal('100.00'),
+        totalAmount: new Prisma.Decimal('100.00'),
+      });
+      const itemA = makeItem('item-A', 1, '50.00');
+      const itemB = makeItem('item-B', 1, '50.00');
+      (order as any).orderItems = [itemA, itemB];
+
+      (prisma.order.findFirst as unknown as jest.Mock).mockResolvedValue(order);
+      (prisma.orderItemPayment.groupBy as unknown as jest.Mock).mockResolvedValue([]);
+      (prisma.orderItemPayment.aggregate as unknown as jest.Mock).mockResolvedValue({
+        _sum: { amount: new Prisma.Decimal('0') },
+      });
+      (prisma.payment.create as unknown as jest.Mock).mockResolvedValue({
+        id: 'payment-1',
+        orderId: ORDER_ID,
+        amount: new Prisma.Decimal('50.00'),
+        method: 'CASH',
+        status: PaymentStatus.COMPLETED,
+        receiptSnapshot: null,
+      });
+      (prisma.payment.aggregate as unknown as jest.Mock).mockResolvedValue({
+        _sum: { amount: new Prisma.Decimal('50.00') },
+      });
+      // getPayableItems read at the end of payByItems.
+      (prisma.order.findFirst as unknown as jest.Mock)
+        .mockResolvedValueOnce(order)
+        .mockResolvedValueOnce({
+          ...order,
+          orderItems: [
+            { ...itemA, product: { name: 'A' }, modifiers: [], orderItemPayments: [{ quantity: 1 }] },
+            { ...itemB, product: { name: 'B' }, modifiers: [], orderItemPayments: [] },
+          ],
+          payments: [],
+        });
+
+      const WAITER_USER_ID = 'waiter-jwt-id';
+      await svc.payByItems(
+        ORDER_ID,
+        { items: [{ orderItemId: 'item-A', quantity: 1 }], method: 'CASH' as any },
+        TENANT_ID,
+        WAITER_USER_ID,
+      );
+
+      expect(kdsGateway.emitPaymentSuccess).toHaveBeenCalledTimes(1);
+      const [emitTenantId, emitPayment, emitUserId] =
+        kdsGateway.emitPaymentSuccess.mock.calls[0];
+      expect(emitTenantId).toBe(TENANT_ID);
+      expect(emitPayment.id).toBe('payment-1');
+      expect(emitUserId).toBe(WAITER_USER_ID);
+    });
+
+    it('payByItems emits with initiatedByUserId=null on webhook origin', async () => {
+      // Customer self-pay path: CustomerSelfPayService.handleWebhookSuccess
+      // calls payByItems without a userId. The emit must echo null so
+      // EVERY tablet (no logged-in user matches) prints the receipt.
+      const order = makeOrder({
+        finalAmount: new Prisma.Decimal('50.00'),
+        totalAmount: new Prisma.Decimal('50.00'),
+      });
+      const itemA = makeItem('item-A', 1, '50.00');
+      (order as any).orderItems = [itemA];
+
+      (prisma.order.findFirst as unknown as jest.Mock).mockResolvedValue(order);
+      (prisma.orderItemPayment.groupBy as unknown as jest.Mock).mockResolvedValue([]);
+      (prisma.orderItemPayment.aggregate as unknown as jest.Mock).mockResolvedValue({
+        _sum: { amount: new Prisma.Decimal('0') },
+      });
+      (prisma.payment.create as unknown as jest.Mock).mockResolvedValue({
+        id: 'payment-webhook-1',
+        orderId: ORDER_ID,
+        amount: new Prisma.Decimal('50.00'),
+        method: 'CARD',
+        status: PaymentStatus.COMPLETED,
+        receiptSnapshot: null,
+      });
+      (prisma.payment.aggregate as unknown as jest.Mock).mockResolvedValue({
+        _sum: { amount: new Prisma.Decimal('50.00') },
+      });
+      (prisma.order.count as unknown as jest.Mock).mockResolvedValue(0);
+      (prisma.order.findFirst as unknown as jest.Mock)
+        .mockResolvedValueOnce(order)
+        .mockResolvedValueOnce({
+          ...order,
+          orderItems: [{ ...itemA, product: { name: 'A' }, modifiers: [], orderItemPayments: [{ quantity: 1 }] }],
+          payments: [],
+        });
+
+      // No userId passed (mimics CustomerSelfPayService.handleWebhookSuccess).
+      await svc.payByItems(
+        ORDER_ID,
+        { items: [{ orderItemId: 'item-A', quantity: 1 }], method: 'CARD' as any },
+        TENANT_ID,
+      );
+
+      expect(kdsGateway.emitPaymentSuccess).toHaveBeenCalledTimes(1);
+      const [, , emitUserId] = kdsGateway.emitPaymentSuccess.mock.calls[0];
+      expect(emitUserId).toBeNull();
     });
   });
 

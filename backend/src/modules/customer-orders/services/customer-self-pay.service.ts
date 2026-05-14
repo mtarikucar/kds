@@ -24,6 +24,22 @@ import { OrderStatus, PaymentStatus } from '../../../common/constants/order-stat
 // (avg table turn ~45 min). Sweeper runs every 30 min, but lazy
 // expire on the polling read makes the practical limit ≈ TTL.
 const INTENT_TTL_MINUTES = 15;
+
+/**
+ * Customer-facing 400 with a stable error code. The QR-menu surfaces
+ * `err.response.data.message` directly to the diner; without a code
+ * a Turkish customer sees raw English. The frontend looks at
+ * `data.code` first, translates via i18n, and falls back to the
+ * English message if the code is unknown.
+ */
+function selfPayError(code: string, message: string): BadRequestException {
+  return new BadRequestException({
+    message,
+    code,
+    error: 'Bad Request',
+    statusCode: 400,
+  });
+}
 const MERCHANT_OID_PREFIX = 'SP'; // "SP" — Self-Pay (subscription is "SUB")
 
 /**
@@ -352,7 +368,8 @@ export class CustomerSelfPayService {
     });
     if (!tenant) throw new NotFoundException('Tenant not found');
     if (tenant.paymentRegion !== 'TURKEY') {
-      throw new BadRequestException(
+      throw selfPayError(
+        'SELF_PAY_NOT_TURKEY',
         'Self-pay is currently available for Turkey-region tenants only.',
       );
     }
@@ -366,7 +383,8 @@ export class CustomerSelfPayService {
       select: { enableCustomerSelfPay: true },
     });
     if (!posSettings?.enableCustomerSelfPay) {
-      throw new BadRequestException(
+      throw selfPayError(
+        'SELF_PAY_DISABLED',
         'Self-pay is not enabled for this restaurant. Please ask the waiter to take your payment.',
       );
     }
@@ -446,7 +464,8 @@ export class CustomerSelfPayService {
         new Prisma.Decimal(0),
       );
       if (paid.gte(new Prisma.Decimal(o.finalAmount))) {
-        throw new BadRequestException(
+        throw selfPayError(
+          'ORDER_ALREADY_PAID',
           `Order ${o.id} is already fully paid — refresh the menu to update your view.`,
         );
       }
@@ -462,7 +481,8 @@ export class CustomerSelfPayService {
       );
       const nonAllocationPaid = paid.sub(allocPaid);
       if (nonAllocationPaid.gt(new Prisma.Decimal('0.01'))) {
-        throw new BadRequestException(
+        throw selfPayError(
+          'SELF_PAY_DISABLED_MIXED_PAYMENT',
           `Order ${o.id} has a payment that wasn't recorded at item level. ` +
             'Self-pay is disabled here — please call the waiter to settle.',
         );

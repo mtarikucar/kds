@@ -710,25 +710,11 @@ export class OrdersService {
       updateData.finalAmount = finalAmount;
       updateData.taxAmount = adjustedTaxAmount;
     } else if (updateOrderDto.discount !== undefined) {
-      // Mid-service discount block: a discount change re-bases the
-      // per-unit math, but already-recorded OrderItemPayment snapshots
-      // wouldn't be retroactively re-priced — the first payer would
-      // silently overpay their share and there's no auto-rebalance.
-      // Block it instead; manager must refund first or apply the
-      // discount before anyone has paid.
-      const allocCount = await this.prisma.orderItemPayment.count({
-        where: { tenantId, orderItem: { orderId: id } },
-      });
-      if (allocCount > 0) {
-        throw new ConflictException(
-          'Cannot change the order discount once any per-item payment has been collected. ' +
-            'Refund the existing payment(s) first, then re-apply the discount.',
-        );
-      }
-      // Cap the discount at totalAmount so a typo / over-discount
-      // can't mint a negative finalAmount (which would pay the
-      // customer). The items-rewrite branch caps too; mirroring
-      // here closes the parity gap.
+      // Discount-only update: cap the value here (cheap), but defer
+      // the allocation + self-pay-intent guards to INSIDE the tx —
+      // outside-tx reads can miss a webhook that lands between the
+      // check and the write. The tx-scoped guards are in the
+      // transaction body below.
       const totalAmountDec = new Prisma.Decimal(order.totalAmount);
       const rawDiscount = new Prisma.Decimal(updateOrderDto.discount);
       const cappedDiscount = rawDiscount.gt(totalAmountDec)
@@ -736,9 +722,6 @@ export class OrdersService {
         : rawDiscount;
       updateData.discount = cappedDiscount;
       updateData.finalAmount = totalAmountDec.sub(cappedDiscount);
-      // Self-pay race window guard runs INSIDE the tx (see line ~775)
-      // so a customer can't slip a new intent between the check here
-      // and the write. The shared helper is the source of truth.
     }
 
     // Atomic replace of the item set: a crash between the deleteMany
@@ -761,16 +744,23 @@ export class OrdersService {
       if (stillEditable === 0) {
         throw new BadRequestException('Cannot update paid or cancelled orders');
       }
-      // Discount-only updates also need the in-flight self-pay
-      // guard (mirrors the items-rewrite check below). A customer
-      // mid-PayTR has a token for the pre-discount amount; changing
-      // the discount under them would charge X at PayTR but settle a
-      // different X' on our side. Running inside the tx closes the
-      // TOCTOU window between an out-of-tx check and the write.
+      // Discount-only updates: both the allocation and self-pay
+      // guards run INSIDE the tx so a webhook landing between the
+      // pre-tx read and the order.update can't slip past. Mirrors
+      // the items-rewrite branch below.
       if (
         updateOrderDto.discount !== undefined &&
         !updateData.orderItems
       ) {
+        const allocCount = await tx.orderItemPayment.count({
+          where: { tenantId, orderItem: { orderId: id } },
+        });
+        if (allocCount > 0) {
+          throw new ConflictException(
+            'Cannot change the order discount once any per-item payment has been collected. ' +
+              'Refund the existing payment(s) first, then re-apply the discount.',
+          );
+        }
         await this.ensureNoInFlightSelfPayIntent(tx, id, tenantId);
       }
       if (updateData.orderItems) {

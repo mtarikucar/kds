@@ -742,6 +742,12 @@
     "requestError": "Hisob so'rab bo'lmadi"
   },
   "payment": {
+    "errors": {
+      "SELF_PAY_NOT_TURKEY": "Bu restoran uchun o'z-o'zidan to'lov mavjud emas. Iltimos, ofitsiantni chaqiring.",
+      "SELF_PAY_DISABLED": "Bu restoran o'z-o'zidan to'lovni yoqmagan. Iltimos, ofitsiantni chaqiring.",
+      "ORDER_ALREADY_PAID": "Bu buyurtma allaqachon to'langan. Menyuni yangilang.",
+      "SELF_PAY_DISABLED_MIXED_PAYMENT": "Ofitsiant bu stol uchun qisman to'lovni qabul qildi — o'z-o'zidan to'lov o'chirilgan. Iltimos, ofitsiantni chaqiring."
+    },
     "payNow": "Hozir to'la",
     "title": "Hozir to'lash",
     "subtitle": "To'lamoqchi bo'lgan mahsulotlarni tanlang — xavfsiz karta orqali",
