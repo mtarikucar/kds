@@ -725,41 +725,20 @@ export class OrdersService {
             'Refund the existing payment(s) first, then re-apply the discount.',
         );
       }
-      // Self-pay race window: a customer might be sitting in PayTR's
-      // iFrame right now with a pre-discount token. Changing the
-      // discount under them would charge X at PayTR but settle a
-      // different X' on our side, leaving the books out of sync.
-      // Block the change until any open intent on this order
-      // resolves (expires, succeeds, or fails). We grab all PENDING
-      // intents for the tenant (always small — TTL is 1h) and
-      // filter the JSON itemsByOrder array client-side; Postgres'
-      // JSON path operators are awkward across Prisma versions.
-      const pendingIntents = await this.prisma.pendingSelfPayment.findMany({
-        where: {
-          tenantId,
-          status: 'PENDING',
-          expiresAt: { gt: new Date() },
-        },
-        select: { itemsByOrder: true },
-      });
-      const intentTouchesThisOrder = pendingIntents.some((intent) => {
-        const buckets = intent.itemsByOrder as Array<{ orderId: string }>;
-        return Array.isArray(buckets) && buckets.some((b) => b?.orderId === id);
-      });
-      if (intentTouchesThisOrder) {
-        throw new ConflictException(
-          'A customer is currently paying for this order via PayTR. ' +
-            'Wait until their payment finalizes (or expires after 1 hour) before changing the discount.',
-        );
-      }
-      // Only discount is being updated. Use Decimal arithmetic so large
-      // bills (over ~70 000 TL) don't lose precision in IEEE-754 — the
-      // `Number(order.totalAmount)` cast in the prior implementation
-      // dropped the second-cent on big-ticket orders.
-      updateData.discount = updateOrderDto.discount;
-      updateData.finalAmount = new Prisma.Decimal(order.totalAmount).sub(
-        new Prisma.Decimal(updateOrderDto.discount),
-      );
+      // Cap the discount at totalAmount so a typo / over-discount
+      // can't mint a negative finalAmount (which would pay the
+      // customer). The items-rewrite branch caps too; mirroring
+      // here closes the parity gap.
+      const totalAmountDec = new Prisma.Decimal(order.totalAmount);
+      const rawDiscount = new Prisma.Decimal(updateOrderDto.discount);
+      const cappedDiscount = rawDiscount.gt(totalAmountDec)
+        ? totalAmountDec
+        : rawDiscount;
+      updateData.discount = cappedDiscount;
+      updateData.finalAmount = totalAmountDec.sub(cappedDiscount);
+      // Self-pay race window guard runs INSIDE the tx (see line ~775)
+      // so a customer can't slip a new intent between the check here
+      // and the write. The shared helper is the source of truth.
     }
 
     // Atomic replace of the item set: a crash between the deleteMany
@@ -781,6 +760,18 @@ export class OrdersService {
       });
       if (stillEditable === 0) {
         throw new BadRequestException('Cannot update paid or cancelled orders');
+      }
+      // Discount-only updates also need the in-flight self-pay
+      // guard (mirrors the items-rewrite check below). A customer
+      // mid-PayTR has a token for the pre-discount amount; changing
+      // the discount under them would charge X at PayTR but settle a
+      // different X' on our side. Running inside the tx closes the
+      // TOCTOU window between an out-of-tx check and the write.
+      if (
+        updateOrderDto.discount !== undefined &&
+        !updateData.orderItems
+      ) {
+        await this.ensureNoInFlightSelfPayIntent(tx, id, tenantId);
       }
       if (updateData.orderItems) {
         // The whole-order rewrite path drops every existing OrderItem

@@ -51,17 +51,30 @@ export class PaymentsService {
    * errors — socket emit failures must NEVER fail a payment write.
    * The auto-print is a convenience; the source of truth is the
    * Payment row.
+   *
+   * `initiatedByUserId` echoes the JWT user that triggered the write
+   * (waiter cash etc.); webhook / customer self-pay paths pass null.
+   * Clients use it to suppress a duplicate auto-print on the
+   * originating tablet (its createPayment.onSuccess already printed).
    */
-  private safeEmitPaymentSuccess(tenantId: string, payment: any): void {
+  private safeEmitPaymentSuccess(
+    tenantId: string,
+    payment: any,
+    initiatedByUserId: string | null = null,
+  ): void {
     if (!this.kdsGateway) return;
     try {
-      this.kdsGateway.emitPaymentSuccess(tenantId, {
-        id: payment.id,
-        orderId: payment.orderId,
-        amount: payment.amount,
-        method: payment.method,
-        receiptSnapshot: payment.receiptSnapshot,
-      });
+      this.kdsGateway.emitPaymentSuccess(
+        tenantId,
+        {
+          id: payment.id,
+          orderId: payment.orderId,
+          amount: payment.amount,
+          method: payment.method,
+          receiptSnapshot: payment.receiptSnapshot,
+        },
+        initiatedByUserId,
+      );
     } catch (err) {
       this.logger.warn(
         `payment:success emit failed for ${payment?.id}: ${(err as Error).message}`,
@@ -395,7 +408,12 @@ export class PaymentsService {
     }
   }
 
-  async create(orderId: string, createPaymentDto: CreatePaymentDto, tenantId: string) {
+  async create(
+    orderId: string,
+    createPaymentDto: CreatePaymentDto,
+    tenantId: string,
+    initiatedByUserId: string | null = null,
+  ) {
     return withTransaction(
       {
         name: 'payment.create',
@@ -599,7 +617,7 @@ export class PaymentsService {
         // inline copy is no longer needed — kept the helper because
         // splitBill and payByItems share it too.
         await this.maybeGenerateAutoInvoice(orderId, tenantId);
-        this.safeEmitPaymentSuccess(tenantId, result);
+        this.safeEmitPaymentSuccess(tenantId, result, initiatedByUserId);
 
         return result;
       }
@@ -828,7 +846,12 @@ export class PaymentsService {
   // SPLIT BILL
   // ========================================
 
-  async splitBill(orderId: string, dto: SplitBillDto, tenantId: string) {
+  async splitBill(
+    orderId: string,
+    dto: SplitBillDto,
+    tenantId: string,
+    initiatedByUserId: string | null = null,
+  ) {
     // Pre-validate order exists and is in valid state
     const preCheck = await this.prisma.order.findFirst({
       where: { id: orderId, tenantId },
@@ -902,7 +925,14 @@ export class PaymentsService {
       // (migration 20260420180000) is the authoritative dedupe — P2002
       // resolves to the existing row on retry.
       const batchKey = dto.idempotencyKey;
-      const payments: Awaited<ReturnType<typeof tx.payment.create>>[] = [];
+      // Track which entries were freshly inserted vs. recovered from
+      // a P2002 idempotent retry. Only fresh inserts emit
+      // payment:success — a recovered row already fired its socket
+      // event on the original call, so re-emitting on retry would
+      // duplicate prints + cash-drawer pops on every Tauri tablet.
+      const payments: Array<
+        Awaited<ReturnType<typeof tx.payment.create>> & { __replayed?: boolean }
+      > = [];
       for (const [idx, entry] of dto.payments.entries()) {
         const key =
           entry.idempotencyKey ??
@@ -941,7 +971,10 @@ export class PaymentsService {
               where: { orderId, tenantId, idempotencyKey: key },
             });
             if (existing) {
-              payments.push(existing);
+              // Tag so the post-tx emit loop skips this entry.
+              // `Object.assign` keeps the type compatible with the
+              // existing `payments` array shape.
+              payments.push(Object.assign(existing, { __replayed: true }));
               continue;
             }
           }
@@ -979,8 +1012,11 @@ export class PaymentsService {
       await this.maybeGenerateAutoInvoice(orderId, tenantId);
     }
     // Emit per-payment so each Tauri terminal prints its own fiş.
+    // Skip replayed entries (P2002 recovery): the original call
+    // already emitted, a duplicate would print the same fiş twice.
     for (const p of result.payments) {
-      this.safeEmitPaymentSuccess(tenantId, p);
+      if ((p as any).__replayed) continue;
+      this.safeEmitPaymentSuccess(tenantId, p, initiatedByUserId);
     }
 
     return {
@@ -1082,7 +1118,12 @@ export class PaymentsService {
    *
    * Idempotency: same partial unique index as `create()` / `splitBill()`.
    */
-  async payByItems(orderId: string, dto: PayItemsDto, tenantId: string) {
+  async payByItems(
+    orderId: string,
+    dto: PayItemsDto,
+    tenantId: string,
+    initiatedByUserId: string | null = null,
+  ) {
     return withTransaction(
       {
         name: 'payment.payByItems',
@@ -1231,7 +1272,7 @@ export class PaymentsService {
               const reserved = reservedByItem.get(entry.orderItemId) ?? 0;
               if (reserved > 0 && entry.quantity > item.quantity - alreadyPaid - reserved) {
                 throw new ConflictException(
-                  `Item ${entry.orderItemId} has ${reserved} unit(s) currently being paid by a customer via PayTR — wait for that intent to finalize (max 1 hour) before collecting at the POS.`,
+                  `Item ${entry.orderItemId} has ${reserved} unit(s) currently being paid by a customer via PayTR — wait for that intent to finalize (up to 15 minutes) before collecting at the POS.`,
                 );
               }
               const remaining = item.quantity - alreadyPaid;
@@ -1453,7 +1494,7 @@ export class PaymentsService {
           // Tell the POS to auto-print + open cash drawer (Tauri).
           // Skip the emit on idempotent replay — the first call
           // already fired and a second print would duplicate.
-          this.safeEmitPaymentSuccess(tenantId, payment);
+          this.safeEmitPaymentSuccess(tenantId, payment, initiatedByUserId);
         }
 
         addBreadcrumb('Per-item payment completed', 'payment', {
@@ -1500,6 +1541,7 @@ export class PaymentsService {
     orderId: string,
     dto: { reason?: string; idempotencyKey?: string },
     tenantId: string,
+    initiatedByUserId: string | null = null,
   ) {
     return withTransaction(
       {
@@ -1605,7 +1647,7 @@ export class PaymentsService {
         // fataralar for diners A/B would also generate an order-level
         // invoice double-counting the same line items.
         await this.maybeGenerateAutoInvoice(orderId, tenantId, result.payment.id);
-        this.safeEmitPaymentSuccess(tenantId, result.payment);
+        this.safeEmitPaymentSuccess(tenantId, result.payment, initiatedByUserId);
 
         addBreadcrumb('Write-off completed', 'payment', { paymentId: result.payment.id });
 

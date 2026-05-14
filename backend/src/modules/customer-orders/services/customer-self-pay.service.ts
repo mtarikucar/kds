@@ -185,21 +185,40 @@ export class CustomerSelfPayService {
     let grandPaid = new Prisma.Decimal(0);
     let grandRemainingQty = 0;
 
-    // Hide orders fully covered by legacy (non-progressive) payments.
-    // The single-payment / split-bill paths book Payment rows WITHOUT
-    // OrderItemPayment allocations; the per-item paidQuantity check
-    // alone would show those items as "still unpaid" and let a
-    // customer self-pay create a PayTR intent for items the waiter
-    // already collected cash for — double charge. So if the order's
-    // total paid amount already covers finalAmount we treat every
-    // item on it as remainingQuantity=0 from this view.
+    // Filter orders so the customer never sees an order where any
+    // non-allocation Payment exists — the legacy single-payment /
+    // split-bill paths book Payment rows without OrderItemPayment
+    // allocations, so a per-item paidQuantity check alone can't tell
+    // which items those rows "covered". Mixing self-pay on top of
+    // such an order would either under- or over-count remaining
+    // (both directions yield double-charges or stranded items).
+    //
+    // The safe semantic: if ANY non-allocation Payment exists on the
+    // order, hide the whole order from the customer's self-pay view.
+    // They can still call the waiter to settle. Once the restaurant
+    // standardizes on payByItems for the table, this branch goes
+    // dormant naturally.
     const filteredOrders = orders.filter((o) => {
       const finalAmount = new Prisma.Decimal(o.finalAmount);
       const paidAmount = o.payments.reduce<Prisma.Decimal>(
         (s, p) => s.add(new Prisma.Decimal(p.amount)),
         new Prisma.Decimal(0),
       );
-      return paidAmount.lt(finalAmount);
+      if (paidAmount.gte(finalAmount)) return false;
+      const allocationPaid = o.orderItems.reduce<Prisma.Decimal>(
+        (sum, item) =>
+          sum.add(
+            item.orderItemPayments.reduce<Prisma.Decimal>(
+              (a, p) => a.add(new Prisma.Decimal(p.amount)),
+              new Prisma.Decimal(0),
+            ),
+          ),
+        new Prisma.Decimal(0),
+      );
+      // Tolerance for sub-kuruş rounding from the residual rule.
+      const nonAllocationPaid = paidAmount.sub(allocationPaid);
+      if (nonAllocationPaid.gt(new Prisma.Decimal('0.01'))) return false;
+      return true;
     });
 
     const orderViews = filteredOrders.map((o) => {
@@ -211,69 +230,18 @@ export class CustomerSelfPayService {
       grandTotal = grandTotal.add(finalAmount);
       grandPaid = grandPaid.add(paidAmount);
 
-      // Defence-in-depth against the legacy-payment blind spot: take
-      // the larger of "sum(OrderItemPayment.quantity)" (progressive
-      // allocations) and a pro-rata share of any non-allocation
-      // Payment amounts. If the waiter took ₺50 cash on a ₺100 order
-      // via the legacy create() path, that's effectively 50% of the
-      // remaining capacity even if no allocations were written.
-      const allocationSum = o.orderItems.reduce(
-        (sum, item) =>
-          sum + item.orderItemPayments.reduce((s, a) => s + a.quantity, 0),
-        0,
-      );
-      const totalUnits = o.orderItems.reduce((s, i) => s + i.quantity, 0);
-      const nonAllocationPaid = paidAmount.sub(
-        // amount already attributed to allocations:
-        o.orderItems.reduce<Prisma.Decimal>(
-          (sum, item) =>
-            sum.add(
-              item.orderItemPayments.reduce<Prisma.Decimal>(
-                (a, p) => a.add(new Prisma.Decimal(p.amount)),
-                new Prisma.Decimal(0),
-              ),
-            ),
-          new Prisma.Decimal(0),
-        ),
-      );
-      // Convert legacy-Payment value to a rough unit count using
-      // finalAmount/total-units; rounded UP so we never under-count
-      // what's been paid. Clamp at totalUnits − allocationSum.
-      const perUnitAvg =
-        totalUnits > 0
-          ? finalAmount.div(totalUnits)
-          : new Prisma.Decimal(1);
-      const legacyUnitsRaw = nonAllocationPaid.lte(0)
-        ? 0
-        : Math.min(
-            totalUnits - allocationSum,
-            Math.ceil(nonAllocationPaid.div(perUnitAvg).toNumber()),
-          );
-
       const items = o.orderItems.map((item) => {
         const paidQuantity = item.orderItemPayments.reduce(
           (s, a) => s + a.quantity,
           0,
         );
         const reservedQuantity = reservations.get(item.id) ?? 0;
-        // Distribute legacy unit count proportionally — we don't
-        // know which items the cash payment "covered" so we treat
-        // it as covering them all equally.
-        const legacyShare =
-          legacyUnitsRaw > 0 && totalUnits - allocationSum > 0
-            ? Math.min(
-                item.quantity - paidQuantity,
-                Math.round(
-                  legacyUnitsRaw *
-                    (item.quantity / (totalUnits - allocationSum)),
-                ),
-              )
-            : 0;
-        // Clamp to >= 0 — a stale intent could theoretically reserve
-        // more than what's left if the data got out of sync.
+        // No legacyShare here — orders with non-allocation Payments
+        // were filtered out above, so the per-item count is fully
+        // backed by OrderItemPayment rows.
         const remainingQuantity = Math.max(
           0,
-          item.quantity - paidQuantity - legacyShare - reservedQuantity,
+          item.quantity - paidQuantity - reservedQuantity,
         );
         grandRemainingQty += remainingQuantity;
         const perUnit = this.paymentsService.derivePerUnitNet(item, o);
@@ -443,14 +411,17 @@ export class CustomerSelfPayService {
       }
     }
 
-    // Defence-in-depth against the legacy-payment blind spot
-    // (sum-of-payments >= finalAmount but no OrderItemPayment rows):
-    // re-fetch each touched order's payment total and reject if
-    // already fully covered. The view-side filter already hides
-    // these orders; this guard catches a stale client that still
-    // posts an intent before its cache refreshes.
+    // Defence-in-depth against the legacy-payment blind spot:
+    // self-pay is disabled on any order that already has a Payment
+    // row WITHOUT a matching OrderItemPayment allocation, because
+    // those Payments came from create() or splitBill() and we can't
+    // attribute them to specific items. Mixing self-pay on top of
+    // them would over- or under-count remaining quantities. The
+    // view-side filter already hides these orders; this guard
+    // catches a stale client that still posts an intent before its
+    // cache refreshes.
     const orderIdsTouched = Array.from(new Set(requested.map((i) => i.orderId)));
-    const fullyPaidOrders = await this.prisma.order.findMany({
+    const guardedOrders = await this.prisma.order.findMany({
       where: { id: { in: orderIdsTouched }, tenantId: session.tenantId },
       select: {
         id: true,
@@ -459,9 +430,17 @@ export class CustomerSelfPayService {
           where: { status: PaymentStatus.COMPLETED },
           select: { amount: true },
         },
+        orderItems: {
+          select: {
+            orderItemPayments: {
+              where: { payment: { status: PaymentStatus.COMPLETED } },
+              select: { amount: true },
+            },
+          },
+        },
       },
     });
-    for (const o of fullyPaidOrders) {
+    for (const o of guardedOrders) {
       const paid = o.payments.reduce<Prisma.Decimal>(
         (s, p) => s.add(new Prisma.Decimal(p.amount)),
         new Prisma.Decimal(0),
@@ -469,6 +448,23 @@ export class CustomerSelfPayService {
       if (paid.gte(new Prisma.Decimal(o.finalAmount))) {
         throw new BadRequestException(
           `Order ${o.id} is already fully paid — refresh the menu to update your view.`,
+        );
+      }
+      const allocPaid = o.orderItems.reduce<Prisma.Decimal>(
+        (sum, item) =>
+          sum.add(
+            item.orderItemPayments.reduce<Prisma.Decimal>(
+              (a, p) => a.add(new Prisma.Decimal(p.amount)),
+              new Prisma.Decimal(0),
+            ),
+          ),
+        new Prisma.Decimal(0),
+      );
+      const nonAllocationPaid = paid.sub(allocPaid);
+      if (nonAllocationPaid.gt(new Prisma.Decimal('0.01'))) {
+        throw new BadRequestException(
+          `Order ${o.id} has a payment that wasn't recorded at item level. ` +
+            'Self-pay is disabled here — please call the waiter to settle.',
         );
       }
     }

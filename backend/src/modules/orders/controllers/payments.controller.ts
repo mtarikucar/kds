@@ -38,7 +38,12 @@ export class PaymentsController {
     @Body() createPaymentDto: CreatePaymentDto,
     @Request() req,
   ) {
-    return this.paymentsService.create(orderId, createPaymentDto, req.tenantId);
+    return this.paymentsService.create(
+      orderId,
+      createPaymentDto,
+      req.tenantId,
+      req.user?.id ?? req.user?.sub ?? null,
+    );
   }
 
   @Get()
@@ -59,7 +64,12 @@ export class PaymentsController {
     @Body() dto: SplitBillDto,
     @Request() req,
   ) {
-    return this.paymentsService.splitBill(orderId, dto, req.tenantId);
+    return this.paymentsService.splitBill(
+      orderId,
+      dto,
+      req.tenantId,
+      req.user?.id ?? req.user?.sub ?? null,
+    );
   }
 
   @Post('items')
@@ -80,7 +90,12 @@ export class PaymentsController {
     @Body() dto: PayItemsDto,
     @Request() req,
   ) {
-    return this.paymentsService.payByItems(orderId, dto, req.tenantId);
+    return this.paymentsService.payByItems(
+      orderId,
+      dto,
+      req.tenantId,
+      req.user?.id ?? req.user?.sub ?? null,
+    );
   }
 
   @Get('payable-items')
@@ -111,6 +126,11 @@ export class PaymentsController {
     @Body() dto: WriteOffOrderDto,
     @Request() req,
   ) {
-    return this.paymentsService.writeOff(orderId, dto, req.tenantId);
+    return this.paymentsService.writeOff(
+      orderId,
+      dto,
+      req.tenantId,
+      req.user?.id ?? req.user?.sub ?? null,
+    );
   }
 }

@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import i18n from '../../i18n/config';
 import { HardwareService, isTauri } from '../../lib/tauri';
 import { useUiStore } from '../../store/uiStore';
+import { useAuthStore } from '../../store/authStore';
 
 export const usePosSocket = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -414,17 +415,29 @@ export const usePosSocket = () => {
 
     // payment:success drives the auto-print + cash-drawer path for
     // payments that originate OUTSIDE the waiter UI — customer
-    // self-pay (PayTR webhook → payByItems), refund flow, write-off.
-    // The waiter's own createPayment mutation handles its own print
-    // locally on onSuccess, so it skips this listener to avoid a
-    // duplicate print on the same terminal.
+    // self-pay (PayTR webhook → payByItems), refund flow, write-off,
+    // and ALSO the waiter UI on a different tablet than the one that
+    // initiated the payment.
+    //
+    // Skip the local print branch when this tablet's user is the one
+    // who initiated the payment — their createPayment mutation's
+    // onSuccess already fired a local print + cash drawer, so a
+    // second print here would duplicate the fiş.
     const handlePaymentSuccess = (event: any) => {
       console.log('[POS Socket] Payment received:', event);
-      // Invalidate caches so the order list reflects the new payment.
+      // Cache invalidation always runs (every tablet wants fresh
+      // order state, regardless of who initiated).
       queryClient.invalidateQueries({ queryKey: ['orders'], refetchType: 'all' });
       queryClient.invalidateQueries({ queryKey: ['payments'] });
       queryClient.invalidateQueries({ queryKey: ['tables'] });
       queryClient.invalidateQueries({ queryKey: ['payableItems'] });
+
+      const myUserId = useAuthStore.getState().user?.id ?? null;
+      const isMyOwnAction =
+        event?.initiatedByUserId &&
+        myUserId &&
+        event.initiatedByUserId === myUserId;
+      if (isMyOwnAction) return; // local mutation onSuccess already printed
 
       // Tauri-only: print the persisted receipt snapshot. Snapshot
       // travels in the event payload so the terminal doesn't need to

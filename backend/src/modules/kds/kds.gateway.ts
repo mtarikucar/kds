@@ -293,6 +293,7 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       method: string;
       receiptSnapshot: any;
     },
+    initiatedByUserId?: string | null,
   ) {
     this.server
       .to(`pos-${tenantId}`)
@@ -302,6 +303,12 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
         method: payment.method,
         amount: payment.amount,
         receiptSnapshot: payment.receiptSnapshot,
+        // The initiator's userId (null for webhook / customer self-pay).
+        // Clients echo their own userId and skip the auto-print branch
+        // when this matches — their createPayment mutation's onSuccess
+        // already fired a local print, so a second print on the same
+        // tablet would duplicate the fiş and pop the cash drawer twice.
+        initiatedByUserId: initiatedByUserId ?? null,
         timestamp: new Date(),
       });
     this.logger.debug(`payment:success ${payment.id} → pos-${tenantId}`);

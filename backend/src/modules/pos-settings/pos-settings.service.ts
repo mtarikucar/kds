@@ -81,7 +81,7 @@ export class PosSettingsService {
 
     // Disabling self-pay must immediately release any in-flight
     // intents — otherwise their PENDING status keeps reserving items
-    // and blocks the waiter from collecting cash for up to 1 hour
+    // and blocks the waiter from collecting cash for up to 15 minutes
     // (until the sweeper expires them). The owner toggling OFF is
     // an explicit "I want to take over this manually" signal.
     if (
