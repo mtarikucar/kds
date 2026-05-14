@@ -47,6 +47,52 @@ export class OrdersService {
     private taxCalculationService?: TaxCalculationService,
   ) {}
 
+  /**
+   * Block a destructive operation (item-set rewrite, item delete,
+   * order cancel) while a customer is mid-PayTR on this order. The
+   * customer's intent.itemsByOrder JSON snapshot is keyed on the
+   * current OrderItem ids; deleting them would orphan the intent
+   * and the webhook would fail post-charge — PayTR took the money,
+   * we couldn't book it, manual refund required.
+   *
+   * If `targetOrderItemId` is given, only blocks when THAT item
+   * appears in any pending intent's itemsByOrder. Otherwise any
+   * pending intent on the order blocks.
+   */
+  private async ensureNoInFlightSelfPayIntent(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    tenantId: string,
+    targetOrderItemId?: string,
+  ): Promise<void> {
+    const pendingIntents = await tx.pendingSelfPayment.findMany({
+      where: {
+        tenantId,
+        status: 'PENDING',
+        expiresAt: { gt: new Date() },
+      },
+      select: { itemsByOrder: true },
+    });
+    const conflicts = pendingIntents.some((intent) => {
+      const buckets = intent.itemsByOrder as Array<{
+        orderId: string;
+        items?: Array<{ orderItemId: string; quantity: number }>;
+      }>;
+      if (!Array.isArray(buckets)) return false;
+      return buckets.some((b) => {
+        if (b?.orderId !== orderId) return false;
+        if (!targetOrderItemId) return true;
+        return (b.items ?? []).some((i) => i.orderItemId === targetOrderItemId);
+      });
+    });
+    if (conflicts) {
+      throw new ConflictException(
+        'A customer is currently paying for this order via PayTR. ' +
+          'Wait until their payment finalizes (or expires) before modifying.',
+      );
+    }
+  }
+
   private generateOrderNumber(): string {
     const timestamp = Date.now();
     const random = randomUUID().substring(0, 8).toUpperCase();
@@ -644,7 +690,12 @@ export class OrdersService {
         };
       });
 
-      const discount = updateOrderDto.discount !== undefined ? updateOrderDto.discount : Number(order.discount);
+      const rawDiscount = updateOrderDto.discount !== undefined ? updateOrderDto.discount : Number(order.discount);
+      // Cap discount at totalAmount — same protection as the
+      // create() path. Shrinking the item set during update could
+      // leave a stored discount > new totalAmount, which would mint
+      // a negative finalAmount (we'd be paying the customer).
+      const discount = Math.min(rawDiscount, totalAmount);
       const finalAmount = totalAmount - discount;
 
       // Recalculate tax after discount (proportional)
@@ -753,6 +804,12 @@ export class OrdersService {
               'or refund the payment(s) first.',
           );
         }
+        // Block when a customer is mid-PayTR on this order — the
+        // intent's itemsByOrder JSON snapshot references the
+        // current OrderItem ids; deleteMany would orphan them and
+        // the webhook would fail with "item no longer exists" AFTER
+        // PayTR already charged the card.
+        await this.ensureNoInFlightSelfPayIntent(tx, id, tenantId);
         await tx.orderItem.deleteMany({ where: { orderId: id } });
       }
       return tx.order.update({
@@ -1024,6 +1081,11 @@ export class OrdersService {
           'This item has been partially paid for. Refund the corresponding payment(s) first.',
         );
       }
+
+      // Also block when this specific item is reserved by a PENDING
+      // self-pay intent — deleting it would orphan the intent's
+      // itemsByOrder snapshot and the webhook would fail post-charge.
+      await this.ensureNoInFlightSelfPayIntent(tx, orderId, tenantId, itemId);
 
       await tx.orderItem.delete({ where: { id: itemId } });
 

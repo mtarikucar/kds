@@ -23,6 +23,7 @@ import * as Sentry from '@sentry/node';
 import { SalesInvoiceService } from '../../accounting/services/sales-invoice.service';
 import { AccountingSettingsService } from '../../accounting/services/accounting-settings.service';
 import { ReceiptSnapshotBuilder } from './receipt-snapshot.builder';
+import { KdsGateway } from '../../kds/kds.gateway';
 
 @Injectable()
 export class PaymentsService {
@@ -40,7 +41,33 @@ export class PaymentsService {
     @Optional()
     @Inject(forwardRef(() => StockDeductionService))
     private stockDeductionService?: StockDeductionService,
+    @Optional()
+    @Inject(forwardRef(() => KdsGateway))
+    private kdsGateway?: KdsGateway,
   ) {}
+
+  /**
+   * Wrapper around KdsGateway.emitPaymentSuccess that swallows
+   * errors — socket emit failures must NEVER fail a payment write.
+   * The auto-print is a convenience; the source of truth is the
+   * Payment row.
+   */
+  private safeEmitPaymentSuccess(tenantId: string, payment: any): void {
+    if (!this.kdsGateway) return;
+    try {
+      this.kdsGateway.emitPaymentSuccess(tenantId, {
+        id: payment.id,
+        orderId: payment.orderId,
+        amount: payment.amount,
+        method: payment.method,
+        receiptSnapshot: payment.receiptSnapshot,
+      });
+    } catch (err) {
+      this.logger.warn(
+        `payment:success emit failed for ${payment?.id}: ${(err as Error).message}`,
+      );
+    }
+  }
 
   /**
    * Acquire a row-level lock on an order. Serializes concurrent payment
@@ -179,6 +206,64 @@ export class PaymentsService {
           },
         });
       }
+    }
+  }
+
+  /**
+   * Build the immutable receipt snapshot for a payment row. Shared by
+   * every payment-creation path (create, splitBill, payByItems,
+   * writeOff) so each one persists the same reprint-safe artifact —
+   * customer self-pay via PayTR, waiter cash, manager write-off all
+   * get a snapshot. Without this, only the legacy single-payment
+   * path wrote a snapshot, and customer self-pay receipts were null.
+   *
+   * Snapshot generation is wrapped in a try/catch and degrades to
+   * Prisma.JsonNull on failure — the convenience reprint feature
+   * must NOT block a payment from being recorded.
+   */
+  private async buildReceiptSnapshotForPayment(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    tenantId: string,
+    paymentInputs: { method: string; transactionId: string | null },
+  ): Promise<Prisma.InputJsonValue | typeof Prisma.JsonNull> {
+    try {
+      // Early-exit on tenant lookup miss so we don't burn a wasted
+      // order.findFirst (also keeps test mock sequences stable —
+      // every extra prisma call inside the helper would shift the
+      // `mockResolvedValueOnce` cursor of every payByItems spec).
+      const tenantRow = await tx.tenant.findUnique({
+        where: { id: tenantId },
+        select: { id: true, name: true, currency: true },
+      });
+      if (!tenantRow) return Prisma.JsonNull;
+      const orderForSnap = await tx.order.findFirst({
+        where: { id: orderId, tenantId },
+        include: {
+          orderItems: {
+            include: {
+              product: true,
+              modifiers: { include: { modifier: true } },
+            },
+          },
+          table: true,
+        },
+      });
+      if (!orderForSnap) return Prisma.JsonNull;
+      return this.receiptSnapshotBuilder.buildReceiptSnapshot({
+        tenant: tenantRow,
+        order: ReceiptSnapshotBuilder.toBuilderOrder(orderForSnap),
+        payment: {
+          method: paymentInputs.method,
+          transactionId: paymentInputs.transactionId,
+          paidAt: new Date(),
+        },
+      }) as unknown as Prisma.InputJsonValue;
+    } catch (snapErr) {
+      this.logger.warn(
+        `Failed to build receipt snapshot for order ${orderId}: ${(snapErr as Error).message}`,
+      );
+      return Prisma.JsonNull;
     }
   }
 
@@ -410,42 +495,15 @@ export class PaymentsService {
           // unexpectedly missing pieces, fall back to JsonNull rather than
           // crashing the payment — this is a reprint convenience, not the
           // source of truth for accounting.
-          let receiptSnapshot: Prisma.InputJsonValue | typeof Prisma.JsonNull =
-            Prisma.JsonNull;
-          try {
-            const tenantRow = await tx.tenant.findUnique({
-              where: { id: tenantId },
-              select: { id: true, name: true, currency: true },
-            });
-            const orderForSnap = await tx.order.findFirst({
-              where: { id: orderId, tenantId },
-              include: {
-                orderItems: {
-                  include: {
-                    product: true,
-                    modifiers: { include: { modifier: true } },
-                  },
-                },
-                table: true,
-              },
-            });
-            if (tenantRow && orderForSnap) {
-              receiptSnapshot = this.receiptSnapshotBuilder.buildReceiptSnapshot({
-                tenant: tenantRow,
-                order: ReceiptSnapshotBuilder.toBuilderOrder(orderForSnap),
-                payment: {
-                  method: createPaymentDto.method,
-                  transactionId: createPaymentDto.transactionId ?? null,
-                  paidAt: new Date(),
-                },
-              }) as unknown as Prisma.InputJsonValue;
-            }
-          } catch (snapErr) {
-            this.logger.warn(
-              `Failed to build receipt snapshot for order ${orderId}: ${(snapErr as Error).message}`,
-            );
-            receiptSnapshot = Prisma.JsonNull;
-          }
+          const receiptSnapshot = await this.buildReceiptSnapshotForPayment(
+            tx,
+            orderId,
+            tenantId,
+            {
+              method: createPaymentDto.method,
+              transactionId: createPaymentDto.transactionId ?? null,
+            },
+          );
 
           // Create payment
           const payment = await tx.payment.create({
@@ -541,6 +599,7 @@ export class PaymentsService {
         // inline copy is no longer needed — kept the helper because
         // splitBill and payByItems share it too.
         await this.maybeGenerateAutoInvoice(orderId, tenantId);
+        this.safeEmitPaymentSuccess(tenantId, result);
 
         return result;
       }
@@ -849,6 +908,15 @@ export class PaymentsService {
           entry.idempotencyKey ??
           (batchKey ? `${batchKey}:${idx}` : undefined);
         try {
+          // Per-split snapshot so each entry in the split has its own
+          // reprintable fiş. Method differs per entry (one diner cash,
+          // next card etc.) so the snapshot is rebuilt per loop.
+          const receiptSnapshot = await this.buildReceiptSnapshotForPayment(
+            tx,
+            orderId,
+            tenantId,
+            { method: entry.method, transactionId: null },
+          );
           const payment = await tx.payment.create({
             data: {
               amount: entry.amount,
@@ -859,6 +927,7 @@ export class PaymentsService {
               tenantId,
               paidAt: new Date(),
               idempotencyKey: key,
+              receiptSnapshot,
             },
           });
           payments.push(payment);
@@ -908,6 +977,10 @@ export class PaymentsService {
     // Auto-generate invoice AFTER transaction commits
     if (result.isFullyPaid) {
       await this.maybeGenerateAutoInvoice(orderId, tenantId);
+    }
+    // Emit per-payment so each Tauri terminal prints its own fiş.
+    for (const p of result.payments) {
+      this.safeEmitPaymentSuccess(tenantId, p);
     }
 
     return {
@@ -1210,6 +1283,19 @@ export class PaymentsService {
               derivedTotal = derivedTotal.add(entryAmount);
             }
 
+            // Build the per-payment receipt snapshot so this Payment
+            // row carries a reprintable fiş — same artifact as the
+            // legacy single-payment path. Customer self-pay (PayTR
+            // webhook → payByItems) and waiter progressive flow both
+            // get a snapshot. Failure inside the helper degrades to
+            // JsonNull rather than blocking the payment.
+            const receiptSnapshot = await this.buildReceiptSnapshotForPayment(
+              tx,
+              orderId,
+              tenantId,
+              { method: dto.method, transactionId: dto.transactionId ?? null },
+            );
+
             // Create the Payment row.
             try {
               payment = await tx.payment.create({
@@ -1223,6 +1309,7 @@ export class PaymentsService {
                   paidAt: new Date(),
                   transactionId: dto.transactionId,
                   idempotencyKey: dto.idempotencyKey,
+                  receiptSnapshot,
                 },
               });
             } catch (err) {
@@ -1363,6 +1450,10 @@ export class PaymentsService {
         // replay returns the existing invoice.
         if (!replayedFromInnerCatch) {
           await this.maybeGenerateAutoInvoice(orderId, tenantId, payment.id);
+          // Tell the POS to auto-print + open cash drawer (Tauri).
+          // Skip the emit on idempotent replay — the first call
+          // already fired and a second print would duplicate.
+          this.safeEmitPaymentSuccess(tenantId, payment);
         }
 
         addBreadcrumb('Per-item payment completed', 'payment', {
@@ -1461,6 +1552,16 @@ export class PaymentsService {
             );
           }
 
+          // House-loss payments need a snapshot too — they're still
+          // a payment row in the audit trail and some jurisdictions
+          // require a fiş line for write-offs.
+          const receiptSnapshot = await this.buildReceiptSnapshotForPayment(
+            tx,
+            orderId,
+            tenantId,
+            { method: 'HOUSE', transactionId: null },
+          );
+
           let payment: Awaited<ReturnType<typeof tx.payment.create>>;
           try {
             payment = await tx.payment.create({
@@ -1473,6 +1574,7 @@ export class PaymentsService {
                 tenantId,
                 paidAt: new Date(),
                 idempotencyKey: idemKey,
+                receiptSnapshot,
               },
             });
           } catch (err) {
@@ -1497,10 +1599,13 @@ export class PaymentsService {
           return { payment, fullyPaid: true };
         });
 
-        // Fire the auto-invoice path so the books reflect the
-        // write-off; the invoice line for HOUSE shows up correctly
-        // in accounting because Payment.method is the source.
-        await this.maybeGenerateAutoInvoice(orderId, tenantId);
+        // Per-payment fatura for the HOUSE line — passing paymentId
+        // so it goes through createFromPayment, not createFromOrder.
+        // Without paymentId, an order that already had per-payment
+        // fataralar for diners A/B would also generate an order-level
+        // invoice double-counting the same line items.
+        await this.maybeGenerateAutoInvoice(orderId, tenantId, result.payment.id);
+        this.safeEmitPaymentSuccess(tenantId, result.payment);
 
         addBreadcrumb('Write-off completed', 'payment', { paymentId: result.payment.id });
 

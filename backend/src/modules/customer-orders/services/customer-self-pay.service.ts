@@ -18,7 +18,12 @@ import { CustomerSessionService } from '../../customers/customer-session.service
 import { CreatePayIntentDto } from '../dto/pay-intent.dto';
 import { OrderStatus, PaymentStatus } from '../../../common/constants/order-status.enum';
 
-const INTENT_TTL_MINUTES = 60;
+// Self-pay intent reservation window. PayTR 3DS step + customer
+// hesitation comfortably fit in 15 min; longer windows leave a
+// table's items locked from the waiter for an entire turn cycle
+// (avg table turn ~45 min). Sweeper runs every 30 min, but lazy
+// expire on the polling read makes the practical limit ≈ TTL.
+const INTENT_TTL_MINUTES = 15;
 const MERCHANT_OID_PREFIX = 'SP'; // "SP" — Self-Pay (subscription is "SUB")
 
 /**
@@ -180,7 +185,24 @@ export class CustomerSelfPayService {
     let grandPaid = new Prisma.Decimal(0);
     let grandRemainingQty = 0;
 
-    const orderViews = orders.map((o) => {
+    // Hide orders fully covered by legacy (non-progressive) payments.
+    // The single-payment / split-bill paths book Payment rows WITHOUT
+    // OrderItemPayment allocations; the per-item paidQuantity check
+    // alone would show those items as "still unpaid" and let a
+    // customer self-pay create a PayTR intent for items the waiter
+    // already collected cash for — double charge. So if the order's
+    // total paid amount already covers finalAmount we treat every
+    // item on it as remainingQuantity=0 from this view.
+    const filteredOrders = orders.filter((o) => {
+      const finalAmount = new Prisma.Decimal(o.finalAmount);
+      const paidAmount = o.payments.reduce<Prisma.Decimal>(
+        (s, p) => s.add(new Prisma.Decimal(p.amount)),
+        new Prisma.Decimal(0),
+      );
+      return paidAmount.lt(finalAmount);
+    });
+
+    const orderViews = filteredOrders.map((o) => {
       const finalAmount = new Prisma.Decimal(o.finalAmount);
       const paidAmount = o.payments.reduce<Prisma.Decimal>(
         (s, p) => s.add(new Prisma.Decimal(p.amount)),
@@ -189,17 +211,69 @@ export class CustomerSelfPayService {
       grandTotal = grandTotal.add(finalAmount);
       grandPaid = grandPaid.add(paidAmount);
 
+      // Defence-in-depth against the legacy-payment blind spot: take
+      // the larger of "sum(OrderItemPayment.quantity)" (progressive
+      // allocations) and a pro-rata share of any non-allocation
+      // Payment amounts. If the waiter took ₺50 cash on a ₺100 order
+      // via the legacy create() path, that's effectively 50% of the
+      // remaining capacity even if no allocations were written.
+      const allocationSum = o.orderItems.reduce(
+        (sum, item) =>
+          sum + item.orderItemPayments.reduce((s, a) => s + a.quantity, 0),
+        0,
+      );
+      const totalUnits = o.orderItems.reduce((s, i) => s + i.quantity, 0);
+      const nonAllocationPaid = paidAmount.sub(
+        // amount already attributed to allocations:
+        o.orderItems.reduce<Prisma.Decimal>(
+          (sum, item) =>
+            sum.add(
+              item.orderItemPayments.reduce<Prisma.Decimal>(
+                (a, p) => a.add(new Prisma.Decimal(p.amount)),
+                new Prisma.Decimal(0),
+              ),
+            ),
+          new Prisma.Decimal(0),
+        ),
+      );
+      // Convert legacy-Payment value to a rough unit count using
+      // finalAmount/total-units; rounded UP so we never under-count
+      // what's been paid. Clamp at totalUnits − allocationSum.
+      const perUnitAvg =
+        totalUnits > 0
+          ? finalAmount.div(totalUnits)
+          : new Prisma.Decimal(1);
+      const legacyUnitsRaw = nonAllocationPaid.lte(0)
+        ? 0
+        : Math.min(
+            totalUnits - allocationSum,
+            Math.ceil(nonAllocationPaid.div(perUnitAvg).toNumber()),
+          );
+
       const items = o.orderItems.map((item) => {
         const paidQuantity = item.orderItemPayments.reduce(
           (s, a) => s + a.quantity,
           0,
         );
         const reservedQuantity = reservations.get(item.id) ?? 0;
+        // Distribute legacy unit count proportionally — we don't
+        // know which items the cash payment "covered" so we treat
+        // it as covering them all equally.
+        const legacyShare =
+          legacyUnitsRaw > 0 && totalUnits - allocationSum > 0
+            ? Math.min(
+                item.quantity - paidQuantity,
+                Math.round(
+                  legacyUnitsRaw *
+                    (item.quantity / (totalUnits - allocationSum)),
+                ),
+              )
+            : 0;
         // Clamp to >= 0 — a stale intent could theoretically reserve
         // more than what's left if the data got out of sync.
         const remainingQuantity = Math.max(
           0,
-          item.quantity - paidQuantity - reservedQuantity,
+          item.quantity - paidQuantity - legacyShare - reservedQuantity,
         );
         grandRemainingQty += remainingQuantity;
         const perUnit = this.paymentsService.derivePerUnitNet(item, o);
@@ -369,10 +443,39 @@ export class CustomerSelfPayService {
       }
     }
 
+    // Defence-in-depth against the legacy-payment blind spot
+    // (sum-of-payments >= finalAmount but no OrderItemPayment rows):
+    // re-fetch each touched order's payment total and reject if
+    // already fully covered. The view-side filter already hides
+    // these orders; this guard catches a stale client that still
+    // posts an intent before its cache refreshes.
+    const orderIdsTouched = Array.from(new Set(requested.map((i) => i.orderId)));
+    const fullyPaidOrders = await this.prisma.order.findMany({
+      where: { id: { in: orderIdsTouched }, tenantId: session.tenantId },
+      select: {
+        id: true,
+        finalAmount: true,
+        payments: {
+          where: { status: PaymentStatus.COMPLETED },
+          select: { amount: true },
+        },
+      },
+    });
+    for (const o of fullyPaidOrders) {
+      const paid = o.payments.reduce<Prisma.Decimal>(
+        (s, p) => s.add(new Prisma.Decimal(p.amount)),
+        new Prisma.Decimal(0),
+      );
+      if (paid.gte(new Prisma.Decimal(o.finalAmount))) {
+        throw new BadRequestException(
+          `Order ${o.id} is already fully paid — refresh the menu to update your view.`,
+        );
+      }
+    }
+
     // Reservations held by other in-flight PayTR intents on this
     // order. A second customer picking the same units 5 seconds
     // after the first hits a 409 here instead of double-paying.
-    const orderIdsTouched = Array.from(new Set(requested.map((i) => i.orderId)));
     const reservations = await fetchOrderItemReservations(
       this.prisma,
       orderIdsTouched,
@@ -456,15 +559,19 @@ export class CustomerSelfPayService {
     }
 
     try {
-      // PayTR rejects synthetic emails on TLDs it can't deliver to
-      // (e.g. .local is reserved). Use a safely-non-routable but
-      // syntactically valid domain. PayTR also validates phone format
-      // loosely; "0500..." is closer to a valid mobile shape than
-      // "0000000000" which gets bounced by some merchants.
-      const safeEmail = dto.customerPhone
-        ? `${dto.customerPhone.replace(/\D/g, '')}@noreply.invalid`
-        : `${sessionId.slice(0, 8)}@noreply.invalid`;
-      const safePhone = dto.customerPhone || '05000000000';
+      // Synthetic email for PayTR. Must be syntactically valid but
+      // we deliberately do NOT include the customer's phone number
+      // in the local-part — phone is PII and PayTR retains basket
+      // metadata in their dashboard. Use the merchantOid (already
+      // ours, already in PayTR's database) so it's stable but not
+      // a personal identifier.
+      // `.invalid` is the RFC 2606 reserved TLD; PayTR accepts it.
+      const safeEmail = `${merchantOid.toLowerCase()}@noreply.invalid`;
+      // Phone format: PayTR loosely validates. "05000000000" is a
+      // valid Turkish mobile shape (starts with 05, 11 digits) but
+      // is not a real number. We don't pass the customer's actual
+      // phone here either — same PII rationale as the email.
+      const safePhone = '05000000000';
 
       const result = await this.paytrAdapter.getIframeToken({
         merchantOid,

@@ -412,6 +412,39 @@ export const usePosSocket = () => {
       queryClient.invalidateQueries({ queryKey: ['tables'] });
     };
 
+    // payment:success drives the auto-print + cash-drawer path for
+    // payments that originate OUTSIDE the waiter UI — customer
+    // self-pay (PayTR webhook → payByItems), refund flow, write-off.
+    // The waiter's own createPayment mutation handles its own print
+    // locally on onSuccess, so it skips this listener to avoid a
+    // duplicate print on the same terminal.
+    const handlePaymentSuccess = (event: any) => {
+      console.log('[POS Socket] Payment received:', event);
+      // Invalidate caches so the order list reflects the new payment.
+      queryClient.invalidateQueries({ queryKey: ['orders'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      queryClient.invalidateQueries({ queryKey: ['payableItems'] });
+
+      // Tauri-only: print the persisted receipt snapshot. Snapshot
+      // travels in the event payload so the terminal doesn't need to
+      // re-fetch anything. Failures are logged but not toasted —
+      // this is a non-waiter event so the operator isn't watching.
+      if (isTauri() && event?.receiptSnapshot) {
+        const printerId = useUiStore.getState().defaultReceiptPrinterId;
+        if (printerId) {
+          HardwareService.printReceipt(printerId, event.receiptSnapshot).catch(
+            (err) => console.error('Auto-print on payment:success failed:', err),
+          );
+          if (event.method === 'CASH') {
+            HardwareService.openCashDrawer(printerId).catch((err) =>
+              console.error('Cash drawer open failed:', err),
+            );
+          }
+        }
+      }
+    };
+
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('order:new', handleNewOrder);
@@ -423,6 +456,7 @@ export const usePosSocket = () => {
     socket.on('bill-request:updated', handleBillRequestUpdated);
     socket.on('waiter-request:new', handleWaiterRequestNew);
     socket.on('waiter-request:updated', handleWaiterRequestUpdated);
+    socket.on('payment:success', handlePaymentSuccess);
 
     // Table merge/unmerge: invalidate tables cache
     const handleTableMergeOrUnmerge = () => {
@@ -442,6 +476,7 @@ export const usePosSocket = () => {
       socket.off('order:updated', handleOrderUpdated);
       socket.off('order:status-changed', handleOrderStatusChanged);
       socket.off('order:item-status-changed', handleOrderItemStatusChanged);
+      socket.off('payment:success', handlePaymentSuccess);
       socket.off('table:orders-transferred', handleTableTransfer);
       socket.off('bill-request:new', handleBillRequestNew);
       socket.off('bill-request:updated', handleBillRequestUpdated);

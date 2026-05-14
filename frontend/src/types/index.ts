@@ -485,10 +485,15 @@ export enum PaymentMethod {
   DIGITAL = 'DIGITAL',
 }
 
+// Mirrors backend Prisma Payment.status. The legacy lowercase
+// 'paid'/'unpaid' values were never written by the backend
+// (PaymentsService writes COMPLETED/FAILED/REFUNDED), so this is a
+// pure fix — no live data uses the old values.
 export enum PaymentStatus {
-  PAID = 'paid',
-  UNPAID = 'unpaid',
-  REFUNDED = 'refunded',
+  PENDING = 'PENDING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+  REFUNDED = 'REFUNDED',
 }
 
 export interface Payment {

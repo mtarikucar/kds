@@ -272,6 +272,41 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.debug(`order:updated ${order.orderNumber} → kitchen/pos-${tenantId}`);
   }
 
+  /**
+   * Notify POS clients that a payment was just booked. Drives the
+   * Tauri auto-print + cash-drawer path for non-waiter-initiated
+   * payments (customer self-pay via PayTR webhook, refund flow,
+   * write-off). The waiter UI's own createPayment mutation already
+   * has an onSuccess that fires print locally — this event covers
+   * the case where the originating actor isn't a logged-in POS user.
+   *
+   * Payload includes the receiptSnapshot so the listening tablet can
+   * print without fetching anything further; method drives the
+   * cash-drawer decision.
+   */
+  emitPaymentSuccess(
+    tenantId: string,
+    payment: {
+      id: string;
+      orderId: string;
+      amount: any;
+      method: string;
+      receiptSnapshot: any;
+    },
+  ) {
+    this.server
+      .to(`pos-${tenantId}`)
+      .emit('payment:success', {
+        paymentId: payment.id,
+        orderId: payment.orderId,
+        method: payment.method,
+        amount: payment.amount,
+        receiptSnapshot: payment.receiptSnapshot,
+        timestamp: new Date(),
+      });
+    this.logger.debug(`payment:success ${payment.id} → pos-${tenantId}`);
+  }
+
   emitOrderStatusChange(tenantId: string, orderId: string, status: string) {
     this.server
       .to(`kitchen-${tenantId}`)
