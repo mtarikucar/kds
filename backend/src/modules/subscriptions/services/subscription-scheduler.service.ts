@@ -11,7 +11,6 @@ import { PaytrAdapter } from '../../payments/adapters/paytr.adapter';
 import {
   BillingCycle,
   PaymentProvider,
-  PaymentRegion,
   PaymentStatus,
   SubscriptionStatus,
 } from '../../../common/constants/subscription.enum';
@@ -85,12 +84,11 @@ export class SubscriptionSchedulerService {
   /**
    * Daily renewal job. For each subscription whose period ends in the
    * next 24h:
-   *   - TURKEY tenant with a stored PayTR recurring token →
-   *     `chargeRecurring`. On success, bump period + create payment +
-   *     invoice. On failure, fall back to `renewSubscription()` (which
-   *     moves the sub to PAST_DUE so the grace-period banner is shown).
-   *   - INTERNATIONAL tenant or no recurring token → same legacy
-   *     behaviour (PAST_DUE; contact-based renewal).
+   *   - Tenant with a stored PayTR recurring token → `chargeRecurring`.
+   *     On success, bump period + create payment + invoice. On failure,
+   *     fall back to `renewSubscription()` (which moves the sub to
+   *     PAST_DUE so the grace-period banner is shown).
+   *   - No recurring token → PAST_DUE; tenant must retry checkout.
    */
   @Cron('0 2 * * *', { name: 'subscription-renewals' })
   async handleSubscriptionRenewals() {
@@ -107,7 +105,7 @@ export class SubscriptionSchedulerService {
         },
         include: {
           plan: true,
-          tenant: { select: { id: true, name: true, paymentRegion: true, paytrRecurringToken: true } },
+          tenant: { select: { id: true, name: true, paytrRecurringToken: true } },
         },
       });
       this.logger.log(`Found ${subscriptionsToRenew.length} subscriptions due for renewal`);
@@ -124,16 +122,15 @@ export class SubscriptionSchedulerService {
 
   /**
    * Renew a single subscription. PayTR-token holders get auto-charged
-   * via PayTR's recurring-payment API; everyone else falls back to
-   * the contact-based PAST_DUE flow. Failures here log but don't throw —
+   * via PayTR's recurring-payment API; everyone else drops to PAST_DUE
+   * so the tenant retries checkout. Failures here log but don't throw —
    * the cron must remain idempotent so a single bad row doesn't stop
    * the rest.
    */
   private async renewOneSubscription(sub: any): Promise<void> {
     const tenant = sub.tenant;
     const canAutoCharge =
-      tenant?.paymentRegion === PaymentRegion.TURKEY &&
-      !!tenant.paytrRecurringToken &&
+      !!tenant?.paytrRecurringToken &&
       sub.paymentProvider === PaymentProvider.PAYTR;
 
     if (!canAutoCharge) {
@@ -152,8 +149,8 @@ export class SubscriptionSchedulerService {
     });
 
     if (result.status !== 'success') {
-      // Auto-charge failed → contact-based path picks up. PayTR error
-      // is recorded on a FAILED payment row for audit.
+      // Auto-charge failed → drop to PAST_DUE so the tenant retries
+      // checkout. PayTR error is recorded on a FAILED payment row for audit.
       await this.prisma.subscriptionPayment.create({
         data: {
           subscriptionId: sub.id,

@@ -10,14 +10,11 @@ export interface CreateIntentRequest {
 }
 
 export interface CreateIntentResponse {
-  provider: 'PAYTR' | 'EMAIL' | 'TRIAL';
+  provider: 'PAYTR' | 'TRIAL';
   paymentLink?: string;
   merchantOid?: string;
   amount: number;
   currency: string;
-  // INTERNATIONAL tenants get this marker — UI navigates to the
-  // contact-based subscription flow instead of attempting PayTR.
-  fallbackToContact?: boolean;
   // Set when the backend short-circuited to a trial activation (no
   // charge). The TRIALING subscription is already provisioned.
   trialActivated?: boolean;
@@ -43,10 +40,9 @@ export const useCreatePaymentIntent = () => {
     // Trial activation flips the subscription to TRIALING server-side
     // *before* this mutation returns; invalidate the relevant caches so
     // any open page (sidebar, settings, plan card) re-renders with the
-    // new state. For the PayTR (paid) and EMAIL (contact-fallback)
-    // branches the cache is also worth invalidating — the activated
-    // sub appears moments later via webhook, and we don't want a stale
-    // free-plan banner showing in the background tab.
+    // new state. Same for the PayTR branch — the activated sub appears
+    // moments later via webhook and we don't want a stale free-plan
+    // banner lingering in the background tab.
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
       queryClient.invalidateQueries({ queryKey: subscriptionKeys.effectiveFeatures() });

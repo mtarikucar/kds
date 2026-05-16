@@ -228,9 +228,9 @@ export class PaytrWebhookController {
         });
 
         // Issue the invoice for this payment, KDV-split inside billing.
-        // Description is Turkish since invoices target Turkish tenants
-        // (PayTR path = paymentRegion === TURKEY). Plan displayName is
-        // already Turkish in the seed/constants (Profesyonel, Başlangıç).
+        // Description is Turkish since the app targets Turkish tenants.
+        // Plan displayName is already Turkish in seed/constants
+        // (Profesyonel, Başlangıç).
         await this.billing.createInvoice(
           tx,
           subscription.id,

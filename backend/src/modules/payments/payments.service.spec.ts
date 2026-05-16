@@ -91,7 +91,6 @@ describe('PaymentsService', () => {
     it('throws BadRequestException when calling user is unverified', async () => {
       prisma.tenant.findUnique.mockResolvedValue({
         id: TENANT_ID,
-        paymentRegion: 'TURKEY',
         trialUsed: false,
         usedTrialPlanIds: [],
         subscriptions: [],
@@ -110,7 +109,6 @@ describe('PaymentsService', () => {
     it('rejects FREE-plan intents', async () => {
       prisma.tenant.findUnique.mockResolvedValue({
         id: TENANT_ID,
-        paymentRegion: 'TURKEY',
         trialUsed: false,
         usedTrialPlanIds: [],
         subscriptions: [],
@@ -123,38 +121,9 @@ describe('PaymentsService', () => {
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
-    it('returns EMAIL fallback for INTERNATIONAL tenants without touching PayTR', async () => {
-      prisma.tenant.findUnique.mockResolvedValue({
-        id: TENANT_ID,
-        paymentRegion: 'INTERNATIONAL',
-        trialUsed: false,
-        usedTrialPlanIds: [],
-        subscriptions: [],
-        name: 'Test',
-      } as any);
-      prisma.user.findUnique.mockResolvedValue({ emailVerified: true, email: 'a@b.com' } as any);
-      prisma.subscriptionPlan.findUnique.mockResolvedValue(proPlan);
-
-      const result = await svc.createIntent(
-        TENANT_ID,
-        USER_ID,
-        { planId: PLAN_ID, billingCycle: 'MONTHLY' },
-        '127.0.0.1',
-      );
-
-      expect(result).toEqual({
-        provider: 'EMAIL',
-        amount: 799,
-        currency: 'TRY',
-        fallbackToContact: true,
-      });
-      expect(paytr.getIframeToken).not.toHaveBeenCalled();
-    });
-
     it('activates trial via SubscriptionService when tenant is trial-eligible on FREE', async () => {
       prisma.tenant.findUnique.mockResolvedValue({
         id: TENANT_ID,
-        paymentRegion: 'TURKEY',
         trialUsed: false,
         usedTrialPlanIds: [],
         subscriptions: [
@@ -190,7 +159,6 @@ describe('PaymentsService', () => {
     it('skips trial when the plan has already been trialed', async () => {
       prisma.tenant.findUnique.mockResolvedValue({
         id: TENANT_ID,
-        paymentRegion: 'TURKEY',
         trialUsed: true,
         usedTrialPlanIds: [PLAN_ID],
         subscriptions: [

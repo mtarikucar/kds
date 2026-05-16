@@ -14,7 +14,6 @@ import {
   SubscriptionStatus,
   BillingCycle,
   PaymentProvider,
-  PaymentRegion,
   SubscriptionPlanType,
 } from '../../../common/constants/subscription.enum';
 import { CreateSubscriptionDto } from '../dto/create-subscription.dto';
@@ -30,18 +29,6 @@ export class SubscriptionService {
     private billingService: BillingService,
     private notificationService: NotificationService,
   ) {}
-
-  /**
-   * Pick the payment provider stamped onto a Subscription / Payment row
-   * from the tenant's billing region. Turkish tenants run through PayTR
-   * (self-serve, recurring); INTERNATIONAL tenants stay on the
-   * contact-based EMAIL flow.
-   */
-  private providerForRegion(paymentRegion: string): PaymentProvider {
-    return paymentRegion === PaymentRegion.TURKEY
-      ? PaymentProvider.PAYTR
-      : PaymentProvider.EMAIL;
-  }
 
   /**
    * Best-effort trial-started email. Always called post-commit so a
@@ -182,7 +169,6 @@ export class SubscriptionService {
     // The DB has a partial unique index on (tenantId) where status IN
     // (ACTIVE, TRIALING), so any concurrent create throws P2002 and the
     // loser's changes are rolled back.
-    const provider = this.providerForRegion(tenant.paymentRegion);
     try {
       const result = await this.prisma.$transaction(async (tx) => {
         const subscription = await tx.subscription.create({
@@ -191,7 +177,7 @@ export class SubscriptionService {
             planId: dto.planId,
             status: isTrialPeriod ? SubscriptionStatus.TRIALING : SubscriptionStatus.ACTIVE,
             billingCycle: dto.billingCycle,
-            paymentProvider: provider,
+            paymentProvider: PaymentProvider.PAYTR,
             startDate: now,
             currentPeriodStart,
             currentPeriodEnd,
@@ -539,107 +525,6 @@ export class SubscriptionService {
     }
   }
 
-  /**
-   * Promote an upgrade after the admin has collected payment off-platform.
-   * Called by SuperAdmin or by a future webhook; idempotent via
-   * externalReference on the recorded SubscriptionPayment.
-   */
-  async applyUpgrade(
-    subscriptionId: string,
-    tenantId: string,
-    newPlanId: string,
-    billingCycleRaw: string,
-    externalReference?: string,
-  ) {
-    if (!Object.values(BillingCycle).includes(billingCycleRaw as BillingCycle)) {
-      throw new BadRequestException('Invalid billing cycle');
-    }
-    const billingCycle = billingCycleRaw as BillingCycle;
-
-    const subscription = await this.getSubscriptionById(subscriptionId, tenantId);
-    const newPlan = await this.prisma.subscriptionPlan.findUnique({
-      where: { id: newPlanId },
-    });
-    if (!newPlan) {
-      throw new NotFoundException('New plan not found');
-    }
-    if (subscription.plan.currency !== newPlan.currency) {
-      throw new BadRequestException('Plan currency change is not supported');
-    }
-
-    const newAmount =
-      billingCycle === BillingCycle.MONTHLY ? newPlan.monthlyPrice : newPlan.yearlyPrice;
-
-    return this.prisma.$transaction(async (tx) => {
-      // Idempotency: if we've already recorded this externalReference, bail.
-      if (externalReference) {
-        const dup = await tx.subscriptionPayment.findUnique({
-          where: { externalReference },
-        });
-        if (dup) {
-          return tx.subscription.findUnique({
-            where: { id: subscriptionId },
-            include: { plan: true },
-          });
-        }
-      }
-
-      // Reset the billing period so the new plan's cadence starts from now.
-      const now = new Date();
-      const newPeriodEnd =
-        billingCycle === BillingCycle.MONTHLY ? addMonths(now, 1) : addYears(now, 1);
-
-      const updated = await tx.subscription.update({
-        where: { id: subscriptionId },
-        data: {
-          planId: newPlanId,
-          billingCycle,
-          amount: newAmount,
-          currency: newPlan.currency,
-          currentPeriodStart: now,
-          currentPeriodEnd: newPeriodEnd,
-        },
-        include: { plan: true },
-      });
-
-      await tx.tenant.update({
-        where: { id: subscription.tenantId },
-        data: { currentPlanId: newPlanId },
-      });
-
-      // Audit row: we took payment (or confirmed) for this upgrade. The
-      // PayTR webhook bypasses this method; if we get here via the
-      // superadmin manual path, EMAIL is correct regardless of region.
-      const payment = await tx.subscriptionPayment.create({
-        data: {
-          subscriptionId,
-          amount: newAmount,
-          currency: newPlan.currency,
-          status: 'SUCCEEDED',
-          paymentProvider: PaymentProvider.EMAIL,
-          externalReference,
-          paidAt: now,
-        },
-      });
-
-      const isTRY = newPlan.currency.toUpperCase() === 'TRY';
-      await this.billingService.createInvoice(
-        tx,
-        subscriptionId,
-        payment.id,
-        newAmount,
-        newPlan.currency,
-        now,
-        newPeriodEnd,
-        isTRY
-          ? `${newPlan.displayName} planına yükseltme`
-          : `Upgrade to ${newPlan.displayName}`,
-      );
-
-      return updated;
-    });
-  }
-
   private async getCurrentUsage(tenantId: string) {
     const [users, tables, products, categories] = await Promise.all([
       this.prisma.user.count({ where: { tenantId, status: 'ACTIVE' } }),
@@ -870,12 +755,11 @@ export class SubscriptionService {
   }
 
   /**
-   * Scheduler entry point. In the current contact-based flow there is
-   * no in-band payment capture, so a renewal attempt cannot magically
-   * charge the tenant — instead we drop the subscription to PAST_DUE
-   * and let the ops team (or the tenant's admin via the contact flow)
-   * resolve it. Previously this silently flipped status back to ACTIVE,
-   * which was an "unlimited free renewals" bug.
+   * Scheduler entry point invoked when the PayTR auto-charge attempt
+   * fails (or no recurring token is on file). We drop the subscription
+   * to PAST_DUE so the in-app banner prompts the tenant to retry
+   * checkout — the past-due cron eventually flips it to EXPIRED if the
+   * user never resolves it.
    */
   async renewSubscription(subscriptionId: string) {
     const subscription = await this.prisma.subscription.findUnique({
@@ -909,87 +793,9 @@ export class SubscriptionService {
     }
 
     this.logger.log(
-      `Subscription ${subscriptionId} marked PAST_DUE (contact-based renewal required)`,
+      `Subscription ${subscriptionId} marked PAST_DUE (auto-charge failed; tenant must retry checkout)`,
     );
     return updated;
-  }
-
-  /**
-   * Mark a subscription as paid for the next period. Called by
-   * SuperAdmin after confirming off-platform payment (WhatsApp/Email).
-   */
-  async confirmContactRenewal(
-    subscriptionId: string,
-    externalReference?: string,
-  ) {
-    const subscription = await this.prisma.subscription.findUnique({
-      where: { id: subscriptionId },
-      include: { plan: true },
-    });
-    if (!subscription) throw new NotFoundException('Subscription not found');
-
-    const now = new Date();
-    const newPeriodStart = now;
-    const newPeriodEnd =
-      subscription.billingCycle === BillingCycle.MONTHLY
-        ? addMonths(now, 1)
-        : addYears(now, 1);
-
-    return this.prisma.$transaction(async (tx) => {
-      if (externalReference) {
-        const dup = await tx.subscriptionPayment.findUnique({
-          where: { externalReference },
-        });
-        if (dup) {
-          return tx.subscription.findUnique({
-            where: { id: subscriptionId },
-            include: { plan: true },
-          });
-        }
-      }
-
-      const payment = await tx.subscriptionPayment.create({
-        data: {
-          subscriptionId,
-          amount: subscription.amount,
-          currency: subscription.currency,
-          status: 'SUCCEEDED',
-          paymentProvider: PaymentProvider.EMAIL,
-          externalReference,
-          paidAt: now,
-        },
-      });
-
-      // Invoice description picks language from currency — TR for TRY
-      // (PayTR / contact-based both target Turkish tenants), EN for
-      // anything else. confirmContactRenewal is called by the manual
-      // EMAIL flow but the description has to be coherent with what
-      // the auto-charge path writes in subscription-scheduler.
-      const isTRY = subscription.currency.toUpperCase() === 'TRY';
-      await this.billingService.createInvoice(
-        tx,
-        subscriptionId,
-        payment.id,
-        subscription.amount,
-        subscription.currency,
-        newPeriodStart,
-        newPeriodEnd,
-        isTRY
-          ? `${subscription.plan.displayName} planı yenileme`
-          : `Renewal — ${subscription.plan.displayName}`,
-      );
-
-      return tx.subscription.update({
-        where: { id: subscriptionId },
-        data: {
-          status: SubscriptionStatus.ACTIVE,
-          isTrialPeriod: false,
-          currentPeriodStart: newPeriodStart,
-          currentPeriodEnd: newPeriodEnd,
-        },
-        include: { plan: true },
-      });
-    });
   }
 
   async isSubscriptionActive(tenantId: string): Promise<boolean> {
@@ -1135,11 +941,10 @@ export class SubscriptionService {
   }
 
   /**
-   * Trial expiry cron. In the current contact-based model trials don't
-   * auto-convert — they simply move to PAST_DUE (so the tenant keeps
-   * read-only access) and the scheduler notifies admins to contact us.
-   * Each row is wrapped in try/catch so one bad tenant does not skip
-   * everyone else's expiry.
+   * Trial expiry cron. Trials don't auto-charge at expiry — we move them
+   * to PAST_DUE (so the tenant keeps read-only access) and notify the
+   * admin to re-checkout. Each row is wrapped in try/catch so one bad
+   * tenant does not skip everyone else's expiry.
    */
   async expireTrials(): Promise<{ processed: number; failed: number }> {
     const now = new Date();

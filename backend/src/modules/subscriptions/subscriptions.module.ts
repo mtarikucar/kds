@@ -5,7 +5,6 @@ import { PaytrAdapterModule } from '../payments/adapters/paytr-adapter.module';
 
 // Services
 import { SubscriptionService } from './services/subscription.service';
-import { ContactService } from './services/contact.service';
 import { BillingService } from './services/billing.service';
 import { SubscriptionSchedulerService } from './services/subscription-scheduler.service';
 import { NotificationService } from './services/notification.service';
@@ -13,7 +12,6 @@ import { InvoicePdfService } from './services/invoice-pdf.service';
 
 // Controllers
 import { SubscriptionController } from './controllers/subscription.controller';
-import { ContactController } from './controllers/contact.controller';
 import { InvoiceController } from './controllers/invoice.controller';
 
 // Guards
@@ -31,13 +29,11 @@ import { PlanFeatureGuard } from './guards/plan-feature.guard';
   ],
   controllers: [
     SubscriptionController,
-    ContactController,
     InvoiceController,
   ],
   providers: [
     // Services
     SubscriptionService,
-    ContactService,
     BillingService,
     NotificationService,
     InvoicePdfService,

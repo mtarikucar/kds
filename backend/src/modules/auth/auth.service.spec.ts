@@ -122,13 +122,12 @@ describe('AuthService', () => {
         firstName: 'John',
         lastName: 'Doe',
         restaurantName: 'New Restaurant',
-        paymentRegion: 'INTERNATIONAL',
       };
 
       const mockFreePlan = {
         id: 'plan-free',
         name: 'FREE',
-        currency: 'USD',
+        currency: 'TRY',
         monthlyPrice: 0,
         yearlyPrice: 0,
         features: {},
@@ -138,7 +137,6 @@ describe('AuthService', () => {
         id: 'tenant-new',
         name: 'New Restaurant',
         subdomain: 'new-restaurant',
-        paymentRegion: 'INTERNATIONAL',
         currentPlanId: 'plan-free',
       };
 

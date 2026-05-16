@@ -66,7 +66,6 @@ export async function createTestTenant(prisma: PrismaService) {
     data: {
       name: 'Test Restaurant',
       subdomain: 'test-restaurant',
-      paymentRegion: 'INTERNATIONAL',
       status: 'ACTIVE',
     },
   });

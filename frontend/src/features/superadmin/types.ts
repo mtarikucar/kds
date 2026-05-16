@@ -94,7 +94,6 @@ export interface TenantDetail extends TenantListItem {
   email?: string;
   phone?: string;
   currency: string;
-  paymentRegion: string;
   featureOverrides?: Record<string, boolean> | null;
   limitOverrides?: Record<string, number> | null;
   subscriptions: any[];

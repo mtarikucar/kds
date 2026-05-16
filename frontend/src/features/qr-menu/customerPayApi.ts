@@ -27,9 +27,9 @@ export interface CustomerPayableSummary {
   tableId: string | null;
   /**
    * Server-side resolution of "can this session actually self-pay?":
-   * tenant.paymentRegion === TURKEY AND posSettings.enableCustomerSelfPay.
-   * The QR menu hides the Pay Now CTA when false to avoid offering an
-   * action that would 400 server-side.
+   * driven by posSettings.enableCustomerSelfPay. The QR menu hides the
+   * Pay Now CTA when false to avoid offering an action that would 400
+   * server-side.
    */
   selfPayEnabled: boolean;
   orders: CustomerPayableOrder[];

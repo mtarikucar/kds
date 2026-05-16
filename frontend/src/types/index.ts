@@ -678,7 +678,6 @@ export enum BillingCycle {
 
 export enum PaymentProvider {
   PAYTR = 'PAYTR',
-  EMAIL = 'EMAIL',
 }
 
 export enum InvoiceStatus {

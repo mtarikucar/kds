@@ -20,10 +20,10 @@ const OrderTrackingPage = () => {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [isSelfPayOpen, setIsSelfPayOpen] = useState(false);
 
-  // Self-pay availability is resolved server-side (tenant.paymentRegion
-  // = TURKEY AND posSettings.enableCustomerSelfPay) and surfaced on
-  // menuData.enableCustomerSelfPay. Hiding the CTA when disabled
-  // saves the customer from hitting an action that would 400.
+  // Self-pay availability is resolved server-side
+  // (posSettings.enableCustomerSelfPay) and surfaced on
+  // menuData.enableCustomerSelfPay. Hiding the CTA when disabled saves
+  // the customer from hitting an action that would 400.
   const canSelfPay = !!menuData?.enableCustomerSelfPay && !!sessionId;
 
   useEffect(() => {

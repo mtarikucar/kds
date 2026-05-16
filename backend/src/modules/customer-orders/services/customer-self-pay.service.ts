@@ -135,18 +135,11 @@ export class CustomerSelfPayService {
     // can hide the "Pay Now" button on tenants that haven't opted
     // in. The createPayIntent path will also enforce it server-side
     // — this is a UX-layer convenience.
-    const [posSettings, tenant] = await Promise.all([
-      this.prisma.posSettings.findUnique({
-        where: { tenantId: session.tenantId },
-        select: { enableCustomerSelfPay: true },
-      }),
-      this.prisma.tenant.findUnique({
-        where: { id: session.tenantId },
-        select: { paymentRegion: true },
-      }),
-    ]);
-    const selfPayEnabled =
-      !!posSettings?.enableCustomerSelfPay && tenant?.paymentRegion === 'TURKEY';
+    const posSettings = await this.prisma.posSettings.findUnique({
+      where: { tenantId: session.tenantId },
+      select: { enableCustomerSelfPay: true },
+    });
+    const selfPayEnabled = !!posSettings?.enableCustomerSelfPay;
 
     // Two query modes:
     //  - Dine-in (session.tableId set): return everyone's open orders
@@ -367,15 +360,9 @@ export class CustomerSelfPayService {
       where: { id: session.tenantId },
     });
     if (!tenant) throw new NotFoundException('Tenant not found');
-    if (tenant.paymentRegion !== 'TURKEY') {
-      throw selfPayError(
-        'SELF_PAY_NOT_TURKEY',
-        'Self-pay is currently available for Turkey-region tenants only.',
-      );
-    }
 
-    // Tenant-owner opt-in: even Turkey-region tenants need to flip
-    // the toggle in POS settings before customers can self-pay. This
+    // Tenant-owner opt-in: needs to flip the toggle in POS settings
+    // before customers can self-pay. This
     // is a deliberate guard so a restaurant without a PayTR merchant
     // account doesn't surface a button that will only ever fail.
     const posSettings = await this.prisma.posSettings.findUnique({

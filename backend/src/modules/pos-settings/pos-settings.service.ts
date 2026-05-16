@@ -62,23 +62,6 @@ export class PosSettingsService {
       }
     }
 
-    // Validation: Self-pay is Turkey-only (PayTR is the sole provider).
-    // The runtime path also rejects non-Turkey tenants, but failing
-    // here gives a clearer error before the QR menu starts showing
-    // a button that won't work.
-    if (updateDto.enableCustomerSelfPay === true) {
-      const tenant = await this.prisma.tenant.findUnique({
-        where: { id: tenantId },
-        select: { paymentRegion: true },
-      });
-      if (tenant?.paymentRegion !== 'TURKEY') {
-        throw new BadRequestException(
-          'Self-pay yalnızca Türkiye bölgesindeki tenantlar için kullanılabilir. ' +
-          'Önce Tenant ayarlarından "Ödeme Bölgesi"ni TURKEY olarak ayarlayın.'
-        );
-      }
-    }
-
     // Disabling self-pay must immediately release any in-flight
     // intents — otherwise their PENDING status keeps reserving items
     // and blocks the waiter from collecting cash for up to 15 minutes

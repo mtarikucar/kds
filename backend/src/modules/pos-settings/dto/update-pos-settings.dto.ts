@@ -24,7 +24,7 @@ export class UpdatePosSettingsDto {
 
   @ApiPropertyOptional({
     description:
-      'Enable customer self-pay via PayTR hosted iFrame from QR menu. Requires tenant.paymentRegion = TURKEY and a configured PayTR merchant account.',
+      'Enable customer self-pay via PayTR hosted iFrame from QR menu. Requires a configured PayTR merchant account.',
   })
   @IsBoolean()
   @IsOptional()

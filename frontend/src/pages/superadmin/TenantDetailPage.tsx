@@ -249,10 +249,6 @@ export default function TenantDetailPage() {
               <dd className="text-sm text-zinc-900">{tenant.currency}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-sm text-zinc-500">Region</dt>
-              <dd className="text-sm text-zinc-900">{tenant.paymentRegion}</dd>
-            </div>
-            <div className="flex justify-between">
               <dt className="text-sm text-zinc-500">Created</dt>
               <dd className="text-sm text-zinc-900">
                 {new Date(tenant.createdAt).toLocaleDateString()}

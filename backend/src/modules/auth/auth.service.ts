@@ -21,7 +21,7 @@ import { GoogleAuthDto, AppleAuthDto } from './dto/social-auth.dto';
 import { AuthResponseDto, UserResponseDto } from './dto/auth-response.dto';
 import { ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto } from './dto/password-reset.dto';
 import { UserRole } from '../../common/constants/roles.enum';
-import { TenantStatus } from '../../common/constants/subscription.enum';
+import { PaymentProvider, TenantStatus } from '../../common/constants/subscription.enum';
 import { EmailService } from '../../common/services/email.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/dto/create-notification.dto';
@@ -163,14 +163,10 @@ export class AuthService {
 
       try {
         const tenant = await this.prisma.$transaction(async (tx) => {
-          const paymentRegion = registerDto.paymentRegion || 'TURKEY';
           const created = await tx.tenant.create({
             data: {
               name: registerDto.restaurantName,
               subdomain: finalSubdomain,
-              // Turkish-market product → default route is PayTR. Caller can
-              // override at registration time by sending `paymentRegion`.
-              paymentRegion,
               currentPlanId: freePlan.id,
             },
           });
@@ -180,10 +176,8 @@ export class AuthService {
               planId: freePlan.id,
               status: 'ACTIVE',
               billingCycle: 'MONTHLY',
-              // FREE plan never charges so this field is informational only,
-              // but stamping it region-aware keeps payment-provider reports
-              // honest (no fake EMAIL rows on Turkish tenants).
-              paymentProvider: paymentRegion === 'TURKEY' ? 'PAYTR' : 'EMAIL',
+              // FREE plan never charges so this is informational only.
+              paymentProvider: PaymentProvider.PAYTR,
               startDate: now,
               currentPeriodStart: now,
               currentPeriodEnd,
@@ -1335,7 +1329,6 @@ export class AuthService {
           data: {
             name: restaurantName,
             subdomain,
-            paymentRegion: 'TURKEY',
             currentPlanId: freePlan.id,
           },
         });
@@ -1345,9 +1338,7 @@ export class AuthService {
             planId: freePlan.id,
             status: 'ACTIVE',
             billingCycle: 'MONTHLY',
-            // Tenant is always TURKEY in this oauth path; stamp PAYTR
-            // so future provider-grouped reports stay coherent.
-            paymentProvider: 'PAYTR',
+            paymentProvider: PaymentProvider.PAYTR,
             startDate: now,
             currentPeriodStart: now,
             currentPeriodEnd,

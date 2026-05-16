@@ -23,14 +23,11 @@ export enum BillingCycle {
   YEARLY = 'YEARLY',
 }
 
+// Active provider list. Add new entries (e.g. STRIPE) when wiring an
+// additional payments-adapter; PaymentsService dispatches by this enum
+// so a single switch entry is enough to plug a new processor in.
 export enum PaymentProvider {
   PAYTR = 'PAYTR',
-  EMAIL = 'EMAIL',
-}
-
-export enum PaymentRegion {
-  TURKEY = 'TURKEY',
-  INTERNATIONAL = 'INTERNATIONAL',
 }
 
 export enum PaymentStatus {

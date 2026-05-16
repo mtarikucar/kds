@@ -18,7 +18,6 @@ describe('SubscriptionSchedulerService.renewOneSubscription', () => {
   const baseTenant = {
     id: 'tenant-1',
     name: 'Test Restoran',
-    paymentRegion: 'TURKEY',
     paytrRecurringToken: 'v1:enc:auth:cipher',
   };
 
@@ -64,15 +63,6 @@ describe('SubscriptionSchedulerService.renewOneSubscription', () => {
     await callRenew({ ...baseSub, tenant: { ...baseTenant, paytrRecurringToken: null } });
     expect(paytr.chargeRecurring).not.toHaveBeenCalled();
     expect(subscriptionService.renewSubscription).toHaveBeenCalledWith('sub-1');
-  });
-
-  it('skips PayTR for INTERNATIONAL tenants even with a token', async () => {
-    await callRenew({
-      ...baseSub,
-      tenant: { ...baseTenant, paymentRegion: 'INTERNATIONAL' },
-    });
-    expect(paytr.chargeRecurring).not.toHaveBeenCalled();
-    expect(subscriptionService.renewSubscription).toHaveBeenCalled();
   });
 
   it('records FAILED payment and falls back when PayTR rejects the charge', async () => {

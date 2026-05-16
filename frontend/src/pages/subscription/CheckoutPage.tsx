@@ -17,7 +17,7 @@ const AUTO_REDIRECT_MS = 3000;
  *      to happen before redirecting (and a manual button if they want
  *      to skip the wait).
  *
- * Trial / INTERNATIONAL short-circuits skip phase 2 entirely.
+ * Trial short-circuit skips phase 2 entirely.
  */
 const CheckoutPage = () => {
   const { t } = useTranslation('subscriptions');
@@ -41,13 +41,6 @@ const CheckoutPage = () => {
         onSuccess: (data) => {
           if (data.provider === 'TRIAL') {
             navigate('/admin/settings/subscription', { replace: true });
-            return;
-          }
-          if (data.fallbackToContact || data.provider === 'EMAIL') {
-            navigate(
-              `/subscription/contact?planId=${planId}&billingCycle=${billingCycle}`,
-              { replace: true },
-            );
             return;
           }
           if (data.paymentLink) {

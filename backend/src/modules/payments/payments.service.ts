@@ -14,7 +14,6 @@ import { SubscriptionService } from '../subscriptions/services/subscription.serv
 import {
   BillingCycle,
   PaymentProvider,
-  PaymentRegion,
   PaymentStatus,
   SubscriptionPlanType,
   SubscriptionStatus,
@@ -22,14 +21,11 @@ import {
 import { CreateIntentDto } from './dto/create-intent.dto';
 
 export interface CreateIntentResult {
-  provider: 'PAYTR' | 'EMAIL' | 'TRIAL';
+  provider: 'PAYTR' | 'TRIAL';
   paymentLink?: string;
   merchantOid?: string;
   amount: number;
   currency: string;
-  // For INTERNATIONAL tenants we return the contact-based fallback marker
-  // so the frontend can navigate to the existing WhatsApp/email flow.
-  fallbackToContact?: boolean;
   // Set when the tenant was trial-eligible and we activated a trial
   // without charging. Frontend skips PayTR and lands on the dashboard.
   trialActivated?: boolean;
@@ -53,10 +49,9 @@ export class PaymentsService {
    * persist a PendingPlanChange (for upgrades) or pre-create a PENDING
    * subscription (for first-time subscribes).
    *
-   * Three short-circuits before we talk to PayTR:
-   *   1. INTERNATIONAL tenants → return contact-based marker.
-   *   2. Trial-eligible tenants → activate trial via SubscriptionService.
-   *   3. (no short-circuit) → reserve rows and call PayTR.
+   * Two short-circuits before we talk to PayTR:
+   *   1. Trial-eligible tenants → activate trial via SubscriptionService.
+   *   2. (no short-circuit) → reserve rows and call PayTR.
    *
    * Idempotency lives on the generated merchantOid — random bytes plus
    * timestamp give us collision-free OIDs even on rapid double-taps.
@@ -126,17 +121,7 @@ export class PaymentsService {
     const amount =
       dto.billingCycle === BillingCycle.MONTHLY ? plan.monthlyPrice : plan.yearlyPrice;
 
-    // (1) INTERNATIONAL → existing contact flow.
-    if (tenant.paymentRegion !== PaymentRegion.TURKEY) {
-      return {
-        provider: 'EMAIL',
-        amount: new Prisma.Decimal(amount).toNumber(),
-        currency: plan.currency,
-        fallbackToContact: true,
-      };
-    }
-
-    // (2) Trial-eligible? Activate trial; no PayTR charge during trial.
+    // (1) Trial-eligible? Activate trial; no PayTR charge during trial.
     //
     // The previous `!existingSub` check was wrong: every tenant gets a
     // permanent FREE subscription at registration, so trial logic never
@@ -174,7 +159,7 @@ export class PaymentsService {
       };
     }
 
-    // (3) Real PayTR flow. merchant_oid must be strictly alphanumeric
+    // (2) Real PayTR flow. merchant_oid must be strictly alphanumeric
     //     per PayTR's documented format; dashes from UUIDs would be
     //     rejected at get-token time.
     const merchantOid = this.generateMerchantOid(tenantId);

@@ -59,7 +59,6 @@ export class QrMenuController {
         socialTiktok: true,
         socialYoutube: true,
         socialWhatsapp: true,
-        paymentRegion: true,
       },
     });
 
@@ -221,11 +220,7 @@ export class QrMenuController {
       },
       enableCustomerOrdering: posSettings.enableCustomerOrdering,
       enableTablelessMode: posSettings.enableTablelessMode,
-      // Customer self-pay (QR-menu PayTR) toggle. Combined with the
-      // Turkey-region check on the tenant so the QR menu has a single
-      // boolean to decide whether to show the "Pay Now" CTA.
-      enableCustomerSelfPay:
-        !!posSettings.enableCustomerSelfPay && tenant.paymentRegion === 'TURKEY',
+      enableCustomerSelfPay: !!posSettings.enableCustomerSelfPay,
       categories: transformedCategories,
     };
   }

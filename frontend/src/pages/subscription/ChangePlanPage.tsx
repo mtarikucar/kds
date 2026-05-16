@@ -100,8 +100,7 @@ const ChangePlanPage = () => {
         const { newPlanId, billingCycle: cycle } = result.paymentInfo;
         // CheckoutPage detects upgrade automatically (backend looks up
         // existingSub on /payments/create-intent and writes a
-        // PendingPlanChange when planIds differ). For INTERNATIONAL
-        // tenants the same page falls back to /subscription/contact.
+        // PendingPlanChange when planIds differ).
         navigate(`/subscription/checkout?planId=${newPlanId}&billingCycle=${cycle}`);
       } else if (result.type === 'downgrade') {
         // Downgrade scheduled - go back to settings

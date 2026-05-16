@@ -70,7 +70,6 @@ const InvoicesPage = lazy(() => import('./pages/admin/invoices/InvoicesPage'));
 // Subscription & Settings Pages (lazy-loaded)
 const SubscriptionPlansPage = lazy(() => import('./pages/subscription/SubscriptionPlansPage'));
 const ChangePlanPage = lazy(() => import('./pages/subscription/ChangePlanPage'));
-const SubscriptionContactPage = lazy(() => import('./pages/subscription/SubscriptionContactPage'));
 const CheckoutPage = lazy(() => import('./pages/subscription/CheckoutPage'));
 const PaymentResultPage = lazy(() => import('./pages/subscription/PaymentResultPage'));
 const SettingsLayout = lazy(() => import('./pages/settings/SettingsLayout'));
@@ -212,7 +211,6 @@ function App() {
         {/* Subscription pages */}
         <Route path="/subscription/plans" element={<SubscriptionPlansPage />} />
         <Route path="/subscription/change-plan" element={<ChangePlanPage />} />
-        <Route path="/subscription/contact" element={<SubscriptionContactPage />} />
         <Route path="/subscription/checkout" element={<CheckoutPage />} />
         <Route path="/subscription/success" element={<PaymentResultPage outcome="success" />} />
         <Route path="/subscription/fail" element={<PaymentResultPage outcome="failed" />} />

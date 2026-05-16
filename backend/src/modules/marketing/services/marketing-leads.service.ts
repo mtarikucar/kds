@@ -435,7 +435,6 @@ export class MarketingLeadsService {
         data: {
           name: dto.tenantName,
           subdomain,
-          paymentRegion: 'TURKEY',
           ...(plan ? { currentPlanId: plan.id } : {}),
           ...(canTrial && plan
             ? {
@@ -470,10 +469,6 @@ export class MarketingLeadsService {
             planId: plan.id,
             status: canTrial ? 'TRIALING' : 'ACTIVE',
             billingCycle,
-            // Marketing-converted tenants are TURKEY by definition (line
-            // above sets paymentRegion: 'TURKEY'); stamp PAYTR so future
-            // renewals route through the self-serve flow instead of the
-            // legacy contact-based path.
             paymentProvider: 'PAYTR',
             startDate: now,
             currentPeriodStart: now,
