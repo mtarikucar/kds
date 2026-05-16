@@ -120,6 +120,22 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.data.tenantId = tenantId;
     client.data.role = role;
     client.data.userType = 'staff';
+    client.data.tokenExp = payload.exp;
+
+    // Auto-disconnect at JWT expiry so a long-running KDS terminal that
+    // hasn't refreshed its token can't keep streaming kitchen events
+    // forever. The frontend retries with the new token on reconnect.
+    if (payload.exp && typeof payload.exp === 'number') {
+      const msToExpiry = payload.exp * 1000 - Date.now();
+      if (msToExpiry > 0 && msToExpiry < 0x7fffffff) {
+        setTimeout(() => {
+          if (client.connected) {
+            this.logger.log(`Staff client ${client.id} token expired; disconnecting.`);
+            client.disconnect(true);
+          }
+        }, msToExpiry).unref?.();
+      }
+    }
 
     // Role-based room membership — sockets receive only the events relevant
     // to their role instead of every kitchen + POS event regardless of job.
@@ -254,6 +270,48 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       .to(`pos-${tenantId}`)
       .emit('order:updated', this.toOrderEvent(order));
     this.logger.debug(`order:updated ${order.orderNumber} → kitchen/pos-${tenantId}`);
+  }
+
+  /**
+   * Notify POS clients that a payment was just booked. Drives the
+   * Tauri auto-print + cash-drawer path for non-waiter-initiated
+   * payments (customer self-pay via PayTR webhook, refund flow,
+   * write-off). The waiter UI's own createPayment mutation already
+   * has an onSuccess that fires print locally — this event covers
+   * the case where the originating actor isn't a logged-in POS user.
+   *
+   * Payload includes the receiptSnapshot so the listening tablet can
+   * print without fetching anything further; method drives the
+   * cash-drawer decision.
+   */
+  emitPaymentSuccess(
+    tenantId: string,
+    payment: {
+      id: string;
+      orderId: string;
+      amount: any;
+      method: string;
+      receiptSnapshot: any;
+    },
+    initiatedByUserId?: string | null,
+  ) {
+    this.server
+      .to(`pos-${tenantId}`)
+      .emit('payment:success', {
+        paymentId: payment.id,
+        orderId: payment.orderId,
+        method: payment.method,
+        amount: payment.amount,
+        receiptSnapshot: payment.receiptSnapshot,
+        // The initiator's userId (null for webhook / customer self-pay).
+        // Clients echo their own userId and skip the auto-print branch
+        // when this matches — their createPayment mutation's onSuccess
+        // already fired a local print, so a second print on the same
+        // tablet would duplicate the fiş and pop the cash drawer twice.
+        initiatedByUserId: initiatedByUserId ?? null,
+        timestamp: new Date(),
+      });
+    this.logger.debug(`payment:success ${payment.id} → pos-${tenantId}`);
   }
 
   emitOrderStatusChange(tenantId: string, orderId: string, status: string) {

@@ -12,6 +12,7 @@ interface PosSettingsState {
   enableTwoStepCheckout: boolean;
   showProductImages: boolean;
   enableCustomerOrdering: boolean;
+  enableCustomerSelfPay: boolean;
   defaultMapView: '2d' | '3d';
   requireServedForDineInPayment: boolean;
 }
@@ -26,6 +27,7 @@ const POSSettingsPage = () => {
     enableTwoStepCheckout: false,
     showProductImages: true,
     enableCustomerOrdering: true,
+    enableCustomerSelfPay: false,
     defaultMapView: '2d',
     requireServedForDineInPayment: false,
   });
@@ -37,6 +39,7 @@ const POSSettingsPage = () => {
         enableTwoStepCheckout: posSettings.enableTwoStepCheckout,
         showProductImages: posSettings.showProductImages,
         enableCustomerOrdering: posSettings.enableCustomerOrdering,
+        enableCustomerSelfPay: (posSettings as any).enableCustomerSelfPay ?? false,
         defaultMapView: posSettings.defaultMapView ?? '2d',
         requireServedForDineInPayment: posSettings.requireServedForDineInPayment ?? false,
       });
@@ -148,6 +151,18 @@ const POSSettingsPage = () => {
                 />
               </>
             )}
+
+            <SettingsDivider />
+
+            <SettingsToggle
+              label={t('customerSelfPay.title', 'Müşteri Self-Pay (PayTR)')}
+              description={t(
+                'customerSelfPay.description',
+                'QR menüden müşterilerin kendi telefonlarından PayTR ile ödeme yapmasına izin ver. Yalnızca Türkiye bölgesindeki tenantlar için ve PayTR hesabı gerektirir.',
+              )}
+              checked={settings.enableCustomerSelfPay}
+              onChange={(checked) => handleToggleChange('enableCustomerSelfPay', checked)}
+            />
 
             <SettingsDivider />
 

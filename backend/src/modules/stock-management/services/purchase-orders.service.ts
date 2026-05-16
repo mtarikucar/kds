@@ -115,9 +115,19 @@ export class PurchaseOrdersService {
       throw new BadRequestException('Only draft purchase orders can be submitted');
     }
 
-    return this.prisma.purchaseOrder.update({
-      where: { id },
+    // Atomic claim with tenant + status predicate — if a parallel call
+    // already submitted this PO (or it slipped to another state), the
+    // updateMany returns 0 and we abort instead of clobbering a more
+    // advanced status. Also serves as the IDOR guard (tenantId filter).
+    const result = await this.prisma.purchaseOrder.updateMany({
+      where: { id, tenantId, status: PurchaseOrderStatus.DRAFT },
       data: { status: PurchaseOrderStatus.SUBMITTED, submittedAt: new Date() },
+    });
+    if (result.count === 0) {
+      throw new BadRequestException('Purchase order is no longer in DRAFT');
+    }
+    return this.prisma.purchaseOrder.findUnique({
+      where: { id },
       include: {
         supplier: { select: { id: true, name: true } },
         items: { include: { stockItem: { select: { id: true, name: true, unit: true } } } },

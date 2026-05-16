@@ -201,7 +201,7 @@ const ProfilePage = () => {
               type="email"
               value={profile?.email}
               disabled
-              helperText={t('profile.contactAdminEmail')}
+              hint={t('profile.contactAdminEmail')}
             />
 
             <Input

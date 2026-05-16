@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsEnum, IsArray, ValidateNested, IsNumber, IsInt, Min, Max, ArrayMinSize, ArrayMaxSize, MaxLength } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsArray, ValidateNested, IsNumber, IsInt, Min, Max, ArrayMinSize, ArrayMaxSize, MaxLength, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { OrderType } from '../../../common/constants/order-status.enum';
@@ -77,4 +77,16 @@ export class CreateOrderDto {
   @ValidateNested({ each: true })
   @Type(() => CreateOrderItemDto)
   items: CreateOrderItemDto[];
+
+  /**
+   * Client-generated UUID for double-tap / retry deduplication.
+   * Backend has a partial unique index on (tenantId, idempotencyKey)
+   * — repeating the same key returns the existing order row instead
+   * of creating a duplicate. Optional: legacy callers without one
+   * still succeed (just without the dedup guarantee).
+   */
+  @ApiPropertyOptional({ description: 'Client UUID for retry deduplication' })
+  @IsUUID()
+  @IsOptional()
+  idempotencyKey?: string;
 }

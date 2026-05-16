@@ -190,7 +190,15 @@
   },
   "brandingSettings": {
     "title": "Marka",
-    "description": "İşletmeniz için para birimi ve özel marka ayarlarını yapılandırın"
+    "description": "İşletmeniz için para birimi ve özel marka ayarlarını yapılandırın",
+    "taxId": {
+      "title": "Fatura Bilgileri",
+      "description": "KDV uyumlu fatura için vergi kimlik numaranızı girin",
+      "label": "Vergi No / TC Kimlik No",
+      "placeholder": "Örn. 1234567890",
+      "help": "10 haneli Vergi No (kurumsal) veya 11 haneli TC Kimlik No (bireysel). Faturanız bu numarayla düzenlenir.",
+      "formatError": "Vergi No 10 hane, TC Kimlik No 11 hane olmalı"
+    }
   },
   "twoStepCheckout": {
     "title": "İki Aşamalı Ödemeyi Etkinleştir",

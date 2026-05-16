@@ -7,6 +7,7 @@ import { useUiStore } from '../../store/uiStore';
 import { SubscriptionProvider } from '../../contexts/SubscriptionContext';
 import { OnboardingProvider } from '../../features/onboarding';
 import { RTL_LANGUAGES } from '../../i18n/config';
+import SubscriptionStatusBanner from '../subscriptions/SubscriptionStatusBanner';
 
 const Layout = () => {
   const { i18n } = useTranslation();
@@ -38,6 +39,9 @@ const Layout = () => {
 
         <div className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${isRTL ? 'md:order-1' : ''}`}>
           <Header onMenuClick={toggleSidebar} />
+          {/* Status banner — sits between header and main content. Renders
+              null when there's nothing to surface, so layout doesn't shift. */}
+          <SubscriptionStatusBanner />
           <main className="flex-1 overflow-y-auto bg-slate-50/50 p-4 md:p-6 lg:p-8 relative">
             <Outlet />
             {import.meta.env.VITE_APP_VERSION && (

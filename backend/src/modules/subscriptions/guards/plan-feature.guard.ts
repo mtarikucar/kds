@@ -68,7 +68,12 @@ export class PlanFeatureGuard implements CanActivate {
 
     const currentPlan = tenant.currentPlan;
 
-    // Check if tenant has an active subscription
+    // Check if tenant has a live subscription. PAST_DUE is intentionally
+    // treated as live — it's the 7-day grace window after a failed
+    // renewal or trial expiry, during which the user can still access
+    // features while they sort out payment. The `past-due-subscriptions`
+    // scheduler promotes PAST_DUE → EXPIRED after 7 days, which is the
+    // actual access cutoff.
     const activeSubscription = await this.prisma.subscription.findFirst({
       where: {
         tenantId: user.tenantId,

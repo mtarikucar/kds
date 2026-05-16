@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 import {
   PhoneIcon,
@@ -46,10 +47,31 @@ type DetailLead = Lead & {
   tasks: MarketingTask[];
 };
 
+// RFC 5321 / 5322 lite: enough to catch typos (missing @, leading dot,
+// trailing whitespace) without falsely rejecting real addresses. Full
+// validation happens on the server when /convert is called.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Mirrors the backend admin-password rule for the /convert endpoint.
+// Anything shorter would be rejected with a 400 anyway — catching it
+// in the form means the user doesn't have to wait for a round-trip.
+const MIN_PASSWORD_LENGTH = 6;
+
 export default function LeadDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { i18n } = useTranslation();
+  // Locale-aware date formatting: `toLocaleDateString()` with no arg
+  // uses the runtime locale, which on a Turkish admin's browser is
+  // usually `en-US` from the OS-level default. Threading i18n.language
+  // through keeps every date in the same locale the rest of the UI
+  // uses, no matter what the browser thinks.
+  const locale = i18n.language || 'tr';
+  const fmtDate = (d: string | Date | null | undefined) =>
+    d ? new Date(d).toLocaleDateString(locale) : '';
+  const fmtDateTime = (d: string | Date | null | undefined) =>
+    d ? new Date(d).toLocaleString(locale) : '';
   const user = useMarketingAuthStore((s) => s.user);
   const isManager = user?.role === 'SALES_MANAGER';
 
@@ -90,6 +112,18 @@ export default function LeadDetailPage() {
 
   // Assign
   const [assignUserId, setAssignUserId] = useState('');
+
+  // Close the convert modal on Escape. The modal otherwise traps the
+  // user with no keyboard-only exit, which is a WCAG 2.1 fail and
+  // surprising for power users who reflexively hit Esc on dialogs.
+  useEffect(() => {
+    if (!showConvertModal) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setShowConvertModal(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [showConvertModal]);
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['marketing', 'lead', id] });
 
@@ -246,7 +280,7 @@ export default function LeadDetailPage() {
 
       {lead.convertedTenantId && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
-          This lead has been converted to a customer on {lead.convertedAt ? new Date(lead.convertedAt).toLocaleDateString() : 'N/A'}.
+          This lead has been converted to a customer on {lead.convertedAt ? fmtDate(lead.convertedAt) : 'N/A'}.
         </div>
       )}
 
@@ -294,7 +328,7 @@ export default function LeadDetailPage() {
               {lead.branchCount != null && <div className="flex justify-between"><dt className="text-gray-500">Branches</dt><dd className="text-gray-900">{lead.branchCount}</dd></div>}
               {lead.currentSystem && <div className="flex justify-between"><dt className="text-gray-500">Current System</dt><dd className="text-gray-900">{lead.currentSystem}</dd></div>}
               {lead.assignedTo && <div className="flex justify-between"><dt className="text-gray-500">Assigned To</dt><dd className="text-gray-900">{lead.assignedTo.firstName} {lead.assignedTo.lastName}</dd></div>}
-              {lead.nextFollowUp && <div className="flex justify-between"><dt className="text-gray-500">Next Follow-up</dt><dd className="text-gray-900">{new Date(lead.nextFollowUp).toLocaleDateString()}</dd></div>}
+              {lead.nextFollowUp && <div className="flex justify-between"><dt className="text-gray-500">Next Follow-up</dt><dd className="text-gray-900">{fmtDate(lead.nextFollowUp)}</dd></div>}
             </dl>
           </div>
 
@@ -328,18 +362,23 @@ export default function LeadDetailPage() {
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">Change Status</h3>
             <div className="flex flex-wrap gap-2">
-              {Object.values(LeadStatus).map((s) => (
-                <button
-                  key={s}
-                  onClick={() => statusMutation.mutate(s)}
-                  disabled={lead.status === s || statusMutation.isPending}
-                  className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-                    lead.status === s ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                  } disabled:opacity-50`}
-                >
-                  {LEAD_STATUS_LABELS[s]}
-                </button>
-              ))}
+              {/* WON is owned by the /convert flow on the backend
+                  (marketing-leads.service.ts:295-299) — exposing a WON
+                  button here just produced a 400 every time. */}
+              {Object.values(LeadStatus)
+                .filter((s) => s !== LeadStatus.WON)
+                .map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => statusMutation.mutate(s)}
+                    disabled={lead.status === s || statusMutation.isPending}
+                    className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+                      lead.status === s ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                    } disabled:opacity-50`}
+                  >
+                    {LEAD_STATUS_LABELS[s]}
+                  </button>
+                ))}
             </div>
           </div>
 
@@ -457,14 +496,14 @@ export default function LeadDetailPage() {
                         <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${offerStatusColors[offer.status] || 'bg-gray-100'}`}>
                           {offer.status}
                         </span>
-                        <span className="text-xs text-gray-400">{new Date(offer.createdAt).toLocaleDateString()}</span>
+                        <span className="text-xs text-gray-400">{fmtDate(offer.createdAt)}</span>
                       </div>
                       <div className="grid grid-cols-3 gap-2 text-sm mb-3">
                         {offer.customPrice && <div><span className="text-gray-500">Price:</span> <span className="font-medium">{offer.customPrice}</span></div>}
                         {offer.discount && <div><span className="text-gray-500">Discount:</span> <span className="font-medium">{offer.discount}%</span></div>}
                         {offer.trialDays && <div><span className="text-gray-500">Trial:</span> <span className="font-medium">{offer.trialDays} days</span></div>}
                       </div>
-                      {offer.validUntil && <p className="text-xs text-gray-400 mb-2">Valid until: {new Date(offer.validUntil).toLocaleDateString()}</p>}
+                      {offer.validUntil && <p className="text-xs text-gray-400 mb-2">Valid until: {fmtDate(offer.validUntil)}</p>}
                       {offer.notes && <p className="text-sm text-gray-600 mb-3">{offer.notes}</p>}
                       <div className="flex gap-2">
                         {offer.status === 'DRAFT' && (
@@ -549,7 +588,7 @@ export default function LeadDetailPage() {
                         <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
                           <span className="bg-gray-100 px-1.5 py-0.5 rounded">{task.type}</span>
                           <span className={taskPriorityColors[task.priority] || ''}>{task.priority}</span>
-                          <span>Due: {new Date(task.dueDate).toLocaleDateString()}</span>
+                          <span>Due: {fmtDate(task.dueDate)}</span>
                         </div>
                       </div>
                       {task.status !== 'COMPLETED' && (
@@ -581,7 +620,20 @@ export default function LeadDetailPage() {
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Admin Email *</label>
-                <input type="email" value={convertEmail} onChange={(e) => setConvertEmail(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" />
+                <input
+                  type="email"
+                  required
+                  value={convertEmail}
+                  onChange={(e) => setConvertEmail(e.target.value)}
+                  className={`w-full px-3 py-2 border rounded-lg text-sm ${
+                    convertEmail && !EMAIL_RE.test(convertEmail)
+                      ? 'border-red-400 focus:ring-red-300'
+                      : ''
+                  }`}
+                />
+                {convertEmail && !EMAIL_RE.test(convertEmail) && (
+                  <p className="text-xs text-red-600 mt-1">Invalid email format.</p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -595,7 +647,24 @@ export default function LeadDetailPage() {
               </div>
               <div>
                 <label className="block text-sm text-gray-600 mb-1">Admin Password *</label>
-                <input type="password" value={convertPassword} onChange={(e) => setConvertPassword(e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" placeholder="Min 6 characters" />
+                <input
+                  type="password"
+                  required
+                  minLength={MIN_PASSWORD_LENGTH}
+                  value={convertPassword}
+                  onChange={(e) => setConvertPassword(e.target.value)}
+                  className={`w-full px-3 py-2 border rounded-lg text-sm ${
+                    convertPassword && convertPassword.length < MIN_PASSWORD_LENGTH
+                      ? 'border-red-400 focus:ring-red-300'
+                      : ''
+                  }`}
+                  placeholder={`Min ${MIN_PASSWORD_LENGTH} characters`}
+                />
+                {convertPassword && convertPassword.length < MIN_PASSWORD_LENGTH && (
+                  <p className="text-xs text-red-600 mt-1">
+                    Password must be at least {MIN_PASSWORD_LENGTH} characters.
+                  </p>
+                )}
               </div>
               {sentOffers.length > 0 && (
                 <div>
@@ -604,7 +673,7 @@ export default function LeadDetailPage() {
                     <option value="">No offer</option>
                     {sentOffers.map((o) => (
                       <option key={o.id} value={o.id}>
-                        {o.customPrice ? `${o.customPrice} TL` : 'Standard'} {o.discount ? `(${o.discount}% off)` : ''} — {new Date(o.createdAt).toLocaleDateString()}
+                        {o.customPrice ? `${o.customPrice} TL` : 'Standard'} {o.discount ? `(${o.discount}% off)` : ''} — {fmtDate(o.createdAt)}
                       </option>
                     ))}
                   </select>
@@ -626,7 +695,16 @@ export default function LeadDetailPage() {
                   ...(convertOfferId ? { offerId: convertOfferId } : {}),
                   ...(convertCommission ? { commissionAmount: Number(convertCommission) } : {}),
                 })}
-                disabled={!convertTenant || !convertEmail || !convertFirstName || !convertLastName || !convertPassword || convertMutation.isPending}
+                disabled={
+                  !convertTenant ||
+                  !convertEmail ||
+                  !EMAIL_RE.test(convertEmail) ||
+                  !convertFirstName ||
+                  !convertLastName ||
+                  !convertPassword ||
+                  convertPassword.length < MIN_PASSWORD_LENGTH ||
+                  convertMutation.isPending
+                }
                 className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50"
               >
                 {convertMutation.isPending ? 'Converting...' : 'Convert'}

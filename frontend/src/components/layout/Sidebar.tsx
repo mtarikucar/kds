@@ -20,11 +20,14 @@ import {
   UserCog,
   Package,
   Receipt,
+  LogOut,
+  User,
 } from 'lucide-react';
 import { UserRole, PlanFeatures } from '../../types';
 import { useAuthStore } from '../../store/authStore';
 import { useUiStore } from '../../store/uiStore';
 import { useSubscription } from '../../contexts/SubscriptionContext';
+import { useLogout } from '../../features/auth/authApi';
 import { RTL_LANGUAGES } from '../../i18n/config';
 
 interface SidebarProps {
@@ -38,7 +41,15 @@ const Sidebar = ({ isOpen, onClose, isRTL: isRTLProp }: SidebarProps) => {
   const user = useAuthStore((state) => state.user);
   const { isSidebarCollapsed, toggleSidebar } = useUiStore();
   const { hasFeature } = useSubscription();
+  const { mutate: logout, isPending: isLoggingOut } = useLogout();
   const isRTL = isRTLProp ?? RTL_LANGUAGES.includes(i18n.language);
+
+  const handleLogout = () => {
+    if (window.innerWidth < 768) {
+      onClose();
+    }
+    logout();
+  };
 
   const handleNavClick = () => {
     if (window.innerWidth < 768) {
@@ -155,7 +166,7 @@ const Sidebar = ({ isOpen, onClose, isRTL: isRTLProp }: SidebarProps) => {
 
   return (
     <aside
-      className={`fixed md:static inset-y-0 z-50 ${isRTL ? 'right-0 md:order-2' : 'left-0'} bg-slate-900 text-white min-h-screen transform transition-all duration-300 ease-in-out ${
+      className={`fixed md:static inset-y-0 z-50 ${isRTL ? 'right-0 md:order-2' : 'left-0'} bg-slate-900 text-white h-screen md:h-auto md:min-h-screen flex flex-col transform transition-all duration-300 ease-in-out ${
         isOpen
           ? 'translate-x-0'
           : isRTL
@@ -164,7 +175,7 @@ const Sidebar = ({ isOpen, onClose, isRTL: isRTLProp }: SidebarProps) => {
       } ${isSidebarCollapsed ? 'md:w-16' : 'md:w-64'} w-64`}
     >
       {/* Header */}
-      <div className="px-5 py-6 flex items-center justify-between border-b border-slate-800/50">
+      <div className="px-5 py-6 flex items-center justify-between border-b border-slate-800/50 flex-shrink-0">
         {!isSidebarCollapsed && (
           <h2 className="text-xl font-heading font-bold bg-gradient-to-r from-primary-400 to-primary-300 bg-clip-text text-transparent">
             HummyTummy
@@ -196,7 +207,7 @@ const Sidebar = ({ isOpen, onClose, isRTL: isRTLProp }: SidebarProps) => {
       </div>
 
       {/* Navigation */}
-      <nav className="px-3 py-4">
+      <nav className="px-3 py-4 flex-1 overflow-y-auto">
         <div className="space-y-1">
           {filteredNavItems.map((item) => (
             <NavLink
@@ -244,6 +255,52 @@ const Sidebar = ({ isOpen, onClose, isRTL: isRTLProp }: SidebarProps) => {
           </div>
         )}
       </nav>
+
+      {/* Footer: user info + logout. Always visible on mobile so users can
+          sign out from the slide-in menu; on desktop it complements the
+          header's logout button. */}
+      <div className="flex-shrink-0 border-t border-slate-800/50 px-3 py-3 space-y-1">
+        <NavLink
+          to="/profile"
+          onClick={handleNavClick}
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 ${
+              isActive
+                ? 'bg-white/10 text-white font-medium'
+                : 'text-slate-300 hover:bg-white/5 hover:text-white'
+            } ${isSidebarCollapsed ? 'md:justify-center' : ''}`
+          }
+          title={isSidebarCollapsed ? `${user?.firstName ?? ''} ${user?.lastName ?? ''}`.trim() : undefined}
+        >
+          <div className="w-8 h-8 rounded-lg bg-white/10 ring-1 ring-white/10 flex items-center justify-center flex-shrink-0">
+            <User className="h-4 w-4" />
+          </div>
+          <div className={`min-w-0 ${isSidebarCollapsed ? 'md:hidden' : ''}`}>
+            <p className="text-sm font-medium truncate">
+              {user?.firstName} {user?.lastName}
+            </p>
+            <p className="text-xs text-slate-400 capitalize truncate">
+              {user?.role?.replace('_', ' ')}
+            </p>
+          </div>
+        </NavLink>
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 text-slate-300 hover:bg-red-500/10 hover:text-red-300 disabled:opacity-60 disabled:cursor-not-allowed ${
+            isSidebarCollapsed ? 'md:justify-center' : ''
+          }`}
+          title={isSidebarCollapsed ? t('app.logout') : undefined}
+          aria-label={t('app.logout')}
+        >
+          <LogOut className="h-5 w-5 flex-shrink-0" />
+          <span className={`text-sm font-medium ${isSidebarCollapsed ? 'md:hidden' : ''}`}>
+            {t('app.logout')}
+          </span>
+        </button>
+      </div>
     </aside>
   );
 };

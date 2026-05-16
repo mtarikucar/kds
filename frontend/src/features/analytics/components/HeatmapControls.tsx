@@ -1,5 +1,4 @@
-import { HeatmapColorScheme } from '../../voxel-world/components/HeatmapOverlay';
-import { HeatmapLegend } from './HeatmapLegend';
+import { HeatmapLegend, HeatmapColorScheme } from './HeatmapLegend';
 
 export type HeatmapType = 'occupancy' | 'traffic' | 'dwell-time' | 'none';
 

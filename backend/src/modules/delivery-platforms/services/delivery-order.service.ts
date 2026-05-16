@@ -120,6 +120,25 @@ export class DeliveryOrderService {
       const discount = normalizedOrder.discount;
       const finalAmount = normalizedOrder.finalAmount;
 
+      // Sanity-check the platform-supplied totals against the sum of items.
+      // The platform sends finalAmount straight from its own ledger, so a
+      // platform-side bug or compromise could silently overcharge customers.
+      // Drift > 5% (or > 1₺ absolute on small orders) gates the order into
+      // approval-required so a human reviews before fulfilling.
+      const itemsSum = normalizedOrder.items.reduce(
+        (sum, it) => sum + Number(it.unitPrice) * Number(it.quantity),
+        0,
+      );
+      const claimedSubtotal = Number(totalAmount) - Number(discount ?? 0);
+      const drift = Math.abs(itemsSum - claimedSubtotal);
+      const tolerance = Math.max(1.0, claimedSubtotal * 0.05);
+      const totalsMismatch = drift > tolerance;
+      if (totalsMismatch) {
+        this.logger.warn(
+          `Totals mismatch for ${platform} order ${externalOrderId}: items Σ=${itemsSum.toFixed(2)} vs claimed subtotal ${claimedSubtotal.toFixed(2)} (drift ${drift.toFixed(2)} > tolerance ${tolerance.toFixed(2)}). Forcing approval.`,
+        );
+      }
+
       // Build notes with platform info and unmapped items
       const unmappedItems = normalizedOrder.items.filter(
         (item) => !mappingByExternalId.has(item.externalItemId),
@@ -137,16 +156,21 @@ export class DeliveryOrderService {
         .join('\n');
 
       // 4. Create order
-      const status = autoAccept
-        ? OrderStatus.PENDING
-        : OrderStatus.PENDING_APPROVAL;
+      // Also force approval when items are unmapped (a zero-line-item
+      // order with autoAccept=true would otherwise pass at the platform
+      // total with no kitchen-visible items) or when totals drift.
+      const requiresApproval =
+        !autoAccept || unmappedItems.length > 0 || totalsMismatch;
+      const status = requiresApproval
+        ? OrderStatus.PENDING_APPROVAL
+        : OrderStatus.PENDING;
 
       return tx.order.create({
         data: {
           orderNumber,
           type: 'DELIVERY',
           status,
-          requiresApproval: !autoAccept,
+          requiresApproval,
           source: platform,
           externalOrderId,
           // Raw payload stored for debugging, but PII (customer
@@ -275,5 +299,92 @@ export class DeliveryOrderService {
     );
 
     return createdOrder;
+  }
+
+  /**
+   * Apply a platform-driven status update (e.g. courier picked up the
+   * order, customer cancelled). Until 2026-05-11 the Yemeksepeti webhook
+   * handler logged these and returned 200 without writing — delivered
+   * orders sat in KDS as READY forever. The mapping here is intentionally
+   * narrow: PICKED_UP / DELIVERED → SERVED (kitchen has handed off);
+   * CANCELLED / REJECTED → CANCELLED (kitchen stop). Anything else logs
+   * and ignores (a no-op is safer than guessing).
+   */
+  async applyPlatformStatusUpdate(args: {
+    platform: string;
+    remoteOrderId: string;
+    tenantId: string;
+    platformStatus: string | undefined | null;
+  }): Promise<{ matched: boolean; mappedTo?: OrderStatus }> {
+    const { platform, remoteOrderId, tenantId, platformStatus } = args;
+    if (!platformStatus) {
+      this.logger.warn(
+        `Platform status update without status field: ${platform} ${remoteOrderId}`,
+      );
+      return { matched: false };
+    }
+
+    const normalized = String(platformStatus).toLowerCase().replace(/[\s_-]/g, '');
+    let target: OrderStatus | null = null;
+    if (
+      ['pickedup', 'delivered', 'completed', 'finished'].includes(normalized)
+    ) {
+      target = OrderStatus.SERVED;
+    } else if (
+      ['cancelled', 'canceled', 'rejected', 'failed'].includes(normalized)
+    ) {
+      target = OrderStatus.CANCELLED;
+    }
+
+    if (!target) {
+      this.logger.debug(
+        `Ignoring unmapped ${platform} status '${platformStatus}' for order ${remoteOrderId}`,
+      );
+      return { matched: false };
+    }
+
+    // Atomic claim. Filter on (tenantId, source, externalOrderId) plus a
+    // status NOT IN [target, terminal-others] so a duplicate webhook
+    // delivery doesn't bounce a CANCELLED order back to SERVED.
+    const result = await this.prisma.order.updateMany({
+      where: {
+        tenantId,
+        source: platform,
+        externalOrderId: remoteOrderId,
+        status: { notIn: [target, OrderStatus.PAID, OrderStatus.CANCELLED] },
+      },
+      data: {
+        status: target,
+        ...(target === OrderStatus.CANCELLED ? { cancelledAt: new Date() } : {}),
+      },
+    });
+
+    if (result.count === 0) {
+      this.logger.debug(
+        `Status update no-op for ${platform} ${remoteOrderId}: order already in terminal state or not found`,
+      );
+      return { matched: false, mappedTo: target };
+    }
+
+    // Notify KDS so the kitchen view reflects the transition immediately.
+    const order = await this.prisma.order.findFirst({
+      where: { tenantId, source: platform, externalOrderId: remoteOrderId },
+    });
+    if (order) {
+      this.kdsGateway.emitNewOrder(tenantId, order);
+    }
+
+    await this.logService.log({
+      tenantId,
+      platform: platform as any,
+      direction: PlatformLogDirection.INBOUND,
+      action: PlatformLogAction.STATUS_UPDATE,
+      orderId: order?.id,
+      externalId: remoteOrderId,
+      request: { platformStatus, mappedTo: target },
+      success: true,
+    });
+
+    return { matched: true, mappedTo: target };
   }
 }

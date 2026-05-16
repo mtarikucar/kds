@@ -174,4 +174,28 @@ export class OrdersController {
   remove(@Param('id') id: string, @Request() req) {
     return this.ordersService.remove(id, req.tenantId);
   }
+
+  @Delete(':orderId/items/:itemId')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
+  @ApiOperation({
+    summary:
+      'Remove a single OrderItem (preserves OrderItemPayment allocations on other items)',
+  })
+  @ApiResponse({ status: 200, description: 'Item removed, order totals recalculated' })
+  @ApiResponse({ status: 404, description: 'Order or item not found' })
+  @ApiResponse({
+    status: 400,
+    description: 'Order is paid/cancelled/awaiting approval, or last item being removed',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Item has partial per-item payments — refund first',
+  })
+  removeItem(
+    @Param('orderId') orderId: string,
+    @Param('itemId') itemId: string,
+    @Request() req,
+  ) {
+    return this.ordersService.removeItem(orderId, itemId, req.tenantId);
+  }
 }

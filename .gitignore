@@ -54,6 +54,10 @@ lerna-debug.log*
 temp/
 tmp/
 
+# Git worktrees (for parallel feature work)
+.worktrees/
+worktrees/
+
 # Rust/Tauri
 frontend/src-tauri/target/
 **/target/

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, ChefHat, CheckCircle2, Utensils, User, Receipt, RefreshCcw, ChevronDown, ChevronUp, ShoppingBag, ArrowLeft } from 'lucide-react';
+import { Clock, ChefHat, CheckCircle2, Utensils, User, Receipt, RefreshCcw, ChevronDown, ChevronUp, ShoppingBag, ArrowLeft, CreditCard } from 'lucide-react';
 import { Order, OrderItem } from '../../types';
 import { formatCurrency, cn } from '../../lib/utils';
 import { MenuSettings } from '../../pages/qr-menu/QRMenuLayout';
@@ -15,6 +15,7 @@ interface OrdersContentProps {
   tableId: string | null;
   onCallWaiter: () => void;
   onRequestBill: () => void;
+  onPayNow?: () => void;
   onBrowseMenu: () => void;
   currency?: string;
 }
@@ -26,6 +27,7 @@ const OrdersContent: React.FC<OrdersContentProps> = ({
   tableId,
   onCallWaiter,
   onRequestBill,
+  onPayNow,
   onBrowseMenu,
   currency = 'TRY',
 }) => {
@@ -152,33 +154,51 @@ const OrdersContent: React.FC<OrdersContentProps> = ({
         </motion.button>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-2 gap-4 mb-6">
+        <div className={cn(
+          "grid gap-3 mb-6",
+          onPayNow ? "grid-cols-3" : "grid-cols-2",
+        )}>
           <motion.button
             onClick={onCallWaiter}
-            className="bg-white rounded-2xl shadow-md p-5 flex flex-col items-center gap-3 hover:shadow-lg transition-all duration-200"
+            className="bg-white rounded-2xl shadow-md p-4 flex flex-col items-center gap-2 hover:shadow-lg transition-all duration-200"
             whileTap={{ scale: 0.95 }}
             whileHover={{ scale: 1.02 }}
           >
             <div className="p-3 rounded-full" style={{ backgroundColor: `${settings.primaryColor}15` }}>
-              <User className="h-6 w-6" style={{ color: settings.primaryColor }} />
+              <User className="h-5 w-5" style={{ color: settings.primaryColor }} />
             </div>
-            <span className="font-semibold text-slate-900 text-center text-sm">
+            <span className="font-semibold text-slate-900 text-center text-xs">
               {t('waiter.call', 'Call Waiter')}
             </span>
           </motion.button>
           <motion.button
             onClick={onRequestBill}
-            className="bg-white rounded-2xl shadow-md p-5 flex flex-col items-center gap-3 hover:shadow-lg transition-all duration-200"
+            className="bg-white rounded-2xl shadow-md p-4 flex flex-col items-center gap-2 hover:shadow-lg transition-all duration-200"
             whileTap={{ scale: 0.95 }}
             whileHover={{ scale: 1.02 }}
           >
             <div className="p-3 rounded-full" style={{ backgroundColor: `${settings.secondaryColor}15` }}>
-              <Receipt className="h-6 w-6" style={{ color: settings.secondaryColor }} />
+              <Receipt className="h-5 w-5" style={{ color: settings.secondaryColor }} />
             </div>
-            <span className="font-semibold text-slate-900 text-center text-sm">
+            <span className="font-semibold text-slate-900 text-center text-xs">
               {t('bill.request', 'Request Bill')}
             </span>
           </motion.button>
+          {onPayNow && (
+            <motion.button
+              onClick={onPayNow}
+              className="bg-white rounded-2xl shadow-md p-4 flex flex-col items-center gap-2 hover:shadow-lg transition-all duration-200 ring-2 ring-indigo-500/20"
+              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.02 }}
+            >
+              <div className="p-3 rounded-full bg-indigo-50">
+                <CreditCard className="h-5 w-5 text-indigo-600" />
+              </div>
+              <span className="font-semibold text-slate-900 text-center text-xs">
+                {t('payment.payNow', 'Pay Now')}
+              </span>
+            </motion.button>
+          )}
         </div>
 
         {/* Orders List */}

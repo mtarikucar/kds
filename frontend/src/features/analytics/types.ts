@@ -241,9 +241,6 @@ export interface Camera {
   streamUrl: string;
   streamType: string;
   status: CameraStatus;
-  voxelX?: number;
-  voxelY?: number;
-  voxelZ?: number;
   rotationY?: number;
   fov?: number;
   calibrationData?: Record<string, unknown>;

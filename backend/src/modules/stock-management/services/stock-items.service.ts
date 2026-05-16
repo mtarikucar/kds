@@ -61,9 +61,19 @@ export class StockItemsService {
     await this.findOne(id, tenantId);
     const data =
       'sku' in dto ? { ...dto, sku: dto.sku ? dto.sku : null } : dto;
-    return this.prisma.stockItem.update({
-      where: { id },
+    // Defence-in-depth: tenant filter in the update's own WHERE so the
+    // pre-check can't be the *only* tenant guard. updateMany + count
+    // check (TOCTOU-safe) — if the row was deleted between the pre-check
+    // and the update, we throw instead of silently failing.
+    const result = await this.prisma.stockItem.updateMany({
+      where: { id, tenantId },
       data,
+    });
+    if (result.count === 0) {
+      throw new NotFoundException('Stock item not found');
+    }
+    return this.prisma.stockItem.findUnique({
+      where: { id },
       include: { category: true },
     });
   }
@@ -73,7 +83,7 @@ export class StockItemsService {
 
     // Prevent deletion of stock items used in active recipes
     const recipeUsage = await this.prisma.recipeIngredient.findFirst({
-      where: { stockItemId: id },
+      where: { stockItemId: id, recipe: { tenantId } },
       include: { recipe: { select: { name: true } } },
     });
     if (recipeUsage) {
@@ -82,7 +92,14 @@ export class StockItemsService {
       );
     }
 
-    return this.prisma.stockItem.delete({ where: { id } });
+    // Compound-filter delete — see comment in update().
+    const result = await this.prisma.stockItem.deleteMany({
+      where: { id, tenantId },
+    });
+    if (result.count === 0) {
+      throw new NotFoundException('Stock item not found');
+    }
+    return { id };
   }
 
   async findLowStockItems(tenantId: string) {

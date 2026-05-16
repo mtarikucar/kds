@@ -5,6 +5,7 @@ import { PlusIcon, FunnelIcon } from '@heroicons/react/24/outline';
 import { toast } from 'sonner';
 import marketingApi from '../../features/marketing/api/marketingApi';
 import type { LeadOffer, Lead, PaginatedResponse } from '../../features/marketing/types';
+import { fmtDate } from '../../features/marketing/utils/format';
 
 const statusColors: Record<string, string> = {
   DRAFT: 'bg-gray-100 text-gray-800',
@@ -464,7 +465,7 @@ export default function OffersPage() {
                       </td>
                       <td className="px-4 py-3 hidden lg:table-cell text-gray-400 text-xs">
                         {offer.validUntil
-                          ? new Date(offer.validUntil).toLocaleDateString()
+                          ? fmtDate(offer.validUntil)
                           : '-'}
                       </td>
                       <td className="px-4 py-3 hidden md:table-cell text-gray-600">
@@ -473,7 +474,7 @@ export default function OffersPage() {
                           : '-'}
                       </td>
                       <td className="px-4 py-3 text-gray-400 text-xs">
-                        {new Date(offer.createdAt).toLocaleDateString()}
+                        {fmtDate(offer.createdAt)}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1 flex-wrap">

@@ -13,6 +13,7 @@ import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { UnauthorizedException } from '@nestjs/common';
+import { getClientIp } from '../../common/helpers/client-ip.helper';
 
 // Per-endpoint throttle budgets for sensitive auth actions
 const LOGIN_THROTTLE = { default: { limit: 5, ttl: 60_000 } };
@@ -86,7 +87,7 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const ip = req.ip || req.headers['x-forwarded-for']?.toString();
+    const ip = getClientIp(req);
     const userAgent = req.headers['user-agent'];
     const result = await this.authService.login(loginDto, ip, userAgent);
     if (result.refreshToken) {
@@ -107,7 +108,7 @@ export class AuthController {
     if (!token) {
       throw new UnauthorizedException('Missing refresh token');
     }
-    const ip = req.ip || req.headers['x-forwarded-for']?.toString();
+    const ip = getClientIp(req);
     const userAgent = req.headers['user-agent'];
     const result = await this.authService.refreshToken(token, ip, userAgent);
     setRefreshCookie(res, result.refreshToken);
@@ -133,7 +134,7 @@ export class AuthController {
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const ip = req.ip || req.headers['x-forwarded-for']?.toString();
+    const ip = getClientIp(req);
     const userAgent = req.headers['user-agent'];
     const result = await this.authService.logout(userId, ip, userAgent);
     clearRefreshCookie(res);

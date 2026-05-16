@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,33 +13,33 @@
 </head>
 <body>
   <div class="header">
-    <h1>Welcome to {{planName}}!</h1>
+    <h1>{{planName}} planına hoş geldiniz!</h1>
   </div>
   <div class="content">
-    <p>Hi {{tenantName}},</p>
+    <p>Merhaba {{tenantName}},</p>
 
-    <p>Great news! Your <strong>{{trialDays}}-day free trial</strong> of the <strong>{{planName}}</strong> plan has started.</p>
+    <p><strong>{{planName}}</strong> planının <strong>{{trialDays}} günlük ücretsiz deneme süresi</strong> başladı.</p>
 
     <div class="highlight">
-      <strong>Your trial expires on: {{expiryDate}}</strong>
+      <strong>Deneme süreniz bitiş tarihi: {{expiryDate}}</strong>
     </div>
 
-    <p>During your trial, you'll have full access to all {{planName}} features including:</p>
+    <p>Deneme süresi boyunca {{planName}} planının tüm özelliklerine sınırsız erişiminiz olacak:</p>
     <ul>
-      <li>Advanced reporting and analytics</li>
-      <li>Multi-location support</li>
-      <li>Inventory tracking</li>
-      <li>Priority support</li>
+      <li>Gelişmiş raporlama ve analitik</li>
+      <li>Çoklu şube desteği</li>
+      <li>Stok takibi</li>
+      <li>Öncelikli destek</li>
     </ul>
 
-    <p>Make the most of your trial and explore everything the platform has to offer!</p>
+    <p>Deneme süreniz dolmadan ödeme yöntemi ekleyerek aboneliğinizi kesintisiz sürdürebilirsiniz.</p>
 
-    <a href="https://your-app-url.com/dashboard" class="button">Go to Dashboard</a>
+    <a href="{{appUrl}}/admin/settings/subscription" class="button">Hesabıma git</a>
 
-    <p>If you have any questions, our support team is here to help.</p>
+    <p>Sorularınız için destek ekibimiz yardımcı olmaktan mutluluk duyar.</p>
 
-    <p>Best regards,<br>
-    The HummyTummy Team</p>
+    <p>Saygılarımızla,<br>
+    HummyTummy Ekibi</p>
   </div>
 </body>
 </html>

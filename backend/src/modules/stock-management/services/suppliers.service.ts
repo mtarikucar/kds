@@ -83,9 +83,23 @@ export class SuppliersService {
   }
 
   async removeStockItem(supplierId: string, stockItemId: string, tenantId: string) {
+    // findOne validates the supplier belongs to the tenant. The composite
+    // key on SupplierStockItem isn't tenant-scoped in the schema, so even
+    // after the pre-check a parallel deleteMany with a tenant predicate
+    // is the canonical IDOR guard — only deletes when *both* the supplier
+    // and the stock item belong to the calling tenant.
     await this.findOne(supplierId, tenantId);
-    return this.prisma.supplierStockItem.delete({
-      where: { supplierId_stockItemId: { supplierId, stockItemId } },
+    const result = await this.prisma.supplierStockItem.deleteMany({
+      where: {
+        supplierId,
+        stockItemId,
+        supplier: { tenantId },
+        stockItem: { tenantId },
+      },
     });
+    if (result.count === 0) {
+      throw new BadRequestException('Supplier-stock association not found');
+    }
+    return { supplierId, stockItemId };
   }
 }

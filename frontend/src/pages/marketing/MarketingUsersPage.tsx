@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { PlusIcon, PencilIcon, KeyIcon } from '@heroicons/react/24/outline';
 import marketingApi from '../../features/marketing/api/marketingApi';
+import { fmtDateTime } from '../../features/marketing/utils/format';
 
 export default function MarketingUsersPage() {
   const queryClient = useQueryClient();
@@ -343,7 +344,7 @@ export default function MarketingUsersPage() {
                         </td>
                         <td className="px-4 py-3 hidden md:table-cell">{u._count?.leads || 0}</td>
                         <td className="px-4 py-3 hidden lg:table-cell text-gray-400 text-xs">
-                          {u.lastLogin ? new Date(u.lastLogin).toLocaleString() : 'Never'}
+                          {u.lastLogin ? fmtDateTime(u.lastLogin) : 'Never'}
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">

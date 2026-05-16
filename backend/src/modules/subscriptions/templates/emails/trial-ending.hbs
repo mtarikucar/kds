@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html lang="tr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -13,25 +13,25 @@
 </head>
 <body>
   <div class="header">
-    <h1>Your trial ends in {{daysRemaining}} days</h1>
+    <h1>Deneme süreniz {{daysRemaining}} gün içinde bitiyor</h1>
   </div>
   <div class="content">
-    <p>Hi {{tenantName}},</p>
+    <p>Merhaba {{tenantName}},</p>
 
     <div class="warning">
-      <strong>Your {{planName}} trial will expire in {{daysRemaining}} days.</strong>
+      <strong>{{planName}} planının deneme süresi {{daysRemaining}} gün içinde sona erecek.</strong>
     </div>
 
-    <p>To continue enjoying all the features of the {{planName}} plan without interruption, please add a payment method before your trial ends.</p>
+    <p>{{planName}} planının tüm özelliklerine kesintisiz erişim sağlamak için deneme süreniz bitmeden ödeme yapmanız gerekmektedir.</p>
 
-    <p>Once your trial expires, you'll be automatically downgraded to the Free plan unless you subscribe.</p>
+    <p>Deneme süresi sona erdiğinde aboneliğiniz 7 günlük ödeme bekleme (PAST_DUE) durumuna alınır; bu süre içinde de ödeme yapmadığınızda hesabınız ücretsiz plana düşürülür.</p>
 
-    <a href="https://your-app-url.com/subscription/upgrade" class="button">Subscribe Now</a>
+    <a href="{{appUrl}}/subscription/checkout?planId={{planId}}&billingCycle={{billingCycle}}" class="button">Şimdi abone ol</a>
 
-    <p>Questions? We're here to help!</p>
+    <p>Sorularınız için her zaman yanınızdayız.</p>
 
-    <p>Best regards,<br>
-    The HummyTummy Team</p>
+    <p>Saygılarımızla,<br>
+    HummyTummy Ekibi</p>
   </div>
 </body>
 </html>

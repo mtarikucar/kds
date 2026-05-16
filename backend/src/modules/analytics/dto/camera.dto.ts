@@ -26,24 +26,6 @@ export class CreateCameraDto {
   @IsOptional()
   streamType?: CameraStreamType;
 
-  @ApiPropertyOptional({ description: 'Voxel X position' })
-  @EmptyStringToNumber()
-  @IsNumber()
-  @IsOptional()
-  voxelX?: number;
-
-  @ApiPropertyOptional({ description: 'Voxel Y position (height)', default: 2.5 })
-  @EmptyStringToNumber()
-  @IsNumber()
-  @IsOptional()
-  voxelY?: number;
-
-  @ApiPropertyOptional({ description: 'Voxel Z position' })
-  @EmptyStringToNumber()
-  @IsNumber()
-  @IsOptional()
-  voxelZ?: number;
-
   @ApiPropertyOptional({ description: 'Horizontal rotation in degrees', default: 0, minimum: 0, maximum: 360 })
   @EmptyStringToNumber()
   @IsNumber()
@@ -100,24 +82,6 @@ export class UpdateCameraDto {
   @ApiPropertyOptional()
   @EmptyStringToNumber()
   @IsNumber()
-  @IsOptional()
-  voxelX?: number;
-
-  @ApiPropertyOptional()
-  @EmptyStringToNumber()
-  @IsNumber()
-  @IsOptional()
-  voxelY?: number;
-
-  @ApiPropertyOptional()
-  @EmptyStringToNumber()
-  @IsNumber()
-  @IsOptional()
-  voxelZ?: number;
-
-  @ApiPropertyOptional()
-  @EmptyStringToNumber()
-  @IsNumber()
   @Min(0)
   @Max(360)
   @IsOptional()
@@ -160,15 +124,6 @@ export class CameraResponseDto {
 
   @ApiProperty({ enum: CameraStatus })
   status: CameraStatus;
-
-  @ApiPropertyOptional()
-  voxelX?: number;
-
-  @ApiPropertyOptional()
-  voxelY?: number;
-
-  @ApiPropertyOptional()
-  voxelZ?: number;
 
   @ApiPropertyOptional()
   rotationY?: number;

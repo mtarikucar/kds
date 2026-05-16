@@ -224,5 +224,62 @@
     "splitFailed": "فشل تقسيم الفاتورة",
     "amountMismatch": "يجب أن تساوي المبالغ المقسمة الإجمالي",
     "collectAll": "تحصيل جميع المدفوعات"
+  },
+  "progressive": {
+    "title": "الدفع لكل زبون",
+    "buttonTitle": "ادفع حسب الزبون",
+    "subtitle": "اختر العناصر التي يدفع ثمنها هذا الزبون — يبقى الباقي مفتوحًا للآخرين",
+    "summary": "الإجمالي {{total}} • المدفوع {{paid}} • المتبقي {{remaining}}",
+    "unpaidItems": "العناصر غير المدفوعة",
+    "paidItems": "العناصر المدفوعة",
+    "unitsRemaining": "{{paid}} / {{total}} وحدة مدفوعة",
+    "selectedTotal": "الإجمالي المحدد",
+    "customerLabel": "اسم الزبون (اختياري)",
+    "customerLabelPlaceholder": "مثلاً: أحمد",
+    "transactionId": "رقم المرجع (للبطاقة/الرقمي)",
+    "payAndContinue": "ادفع واستمر",
+    "done": "تم",
+    "cancel": "إلغاء",
+    "noSelection": "يرجى اختيار عنصر واحد على الأقل",
+    "paymentRecorded": "تم تسجيل الدفع",
+    "paymentFailed": "فشل تسجيل الدفع",
+    "fullyPaid": "تم دفع الطلب بالكامل",
+    "tabOrder": "الطلب {{number}}",
+    "remainingItems": "العناصر المتبقية",
+    "remainingAmount": "المبلغ المتبقي",
+    "cannotCancelPartiallyPaid": "هذا الطلب فيه دفعات جزئية — استرجعها أولاً.",
+    "noUnpaidItems": "كل العناصر مدفوعة.",
+    "method": {
+      "CASH": "نقدًا",
+      "CARD": "بطاقة",
+      "DIGITAL": "رقمي"
+    }
+  },
+  "awaitingPayment": {
+    "title": "بانتظار الدفع",
+    "collectPayment": "تحصيل الدفع",
+    "orderTotal": "إجمالي الطلب"
+  },
+  "dineInPaymentRequiresServed": "لا يمكن دفع طلبات تناول الطعام بالمطعم إلا بعد تقديمها",
+  "dineInPaymentRequiresReadyOrServed": "لا يمكن دفع طلبات تناول الطعام بالمطعم إلا عندما تكون جاهزة أو مقدمة",
+  "noActiveOrder": "أنشئ طلباً أولاً",
+  "transfer": {
+    "title": "نقل طلبات الطاولة",
+    "buttonTitle": "نقل الطلبات إلى طاولة أخرى",
+    "sourceTable": "الطاولة المصدر",
+    "activeOrders": "الطلبات النشطة",
+    "selectTarget": "اختر طاولة هدف لنقل الطلبات إليها:",
+    "noAvailableTables": "لا توجد طاولات متاحة للنقل",
+    "willMerge": "سيتم دمج الطلبات",
+    "from": "من",
+    "to": "إلى",
+    "ordersToTransfer": "الطلبات المراد نقلها",
+    "mergeWarningTitle": "الطاولة الهدف لديها طلبات نشطة",
+    "mergeWarningDescription": "سيتم دمج الطلبات مع الطلبات الموجودة على هذه الطاولة.",
+    "confirmText": "نقل {{count}} طلب من الطاولة {{sourceTable}} إلى الطاولة {{targetTable}}؟",
+    "confirm": "نقل",
+    "success": "تم نقل الطلبات من الطاولة {{sourceTable}} إلى الطاولة {{targetTable}}",
+    "failed": "فشل في نقل الطلبات",
+    "socketNotification": "تم نقل {{count}} طلب من الطاولة {{sourceTable}} إلى الطاولة {{targetTable}}"
   }
 }

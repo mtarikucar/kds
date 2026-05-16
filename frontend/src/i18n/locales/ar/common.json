@@ -102,7 +102,8 @@
   },
   "statuses": {
     "active": "نشط",
-    "inactive": "غير نشط"
+    "inactive": "غير نشط",
+    "pending_approval": "بانتظار الموافقة"
   },
   "messages": {
     "welcome": "مرحباً",
@@ -117,7 +118,9 @@
     "operationSuccessful": "تمت العملية بنجاح",
     "operationFailed": "فشلت العملية",
     "tryAgain": "يرجى المحاولة مرة أخرى",
-    "contactSupport": "يرجى التواصل مع الدعم الفني"
+    "contactSupport": "يرجى التواصل مع الدعم الفني",
+    "confirmDeleteCustomer": "هل أنت متأكد من حذف العميل",
+    "actionCannotBeUndone": "لا يمكن التراجع عن هذا الإجراء."
   },
   "notifications": {
     "loginSuccessful": "تم تسجيل الدخول بنجاح",
@@ -199,7 +202,9 @@
     "modifierUpdatedSuccessfully": "تم تحديث الخيار بنجاح",
     "modifierDeletedSuccessfully": "تم حذف الخيار بنجاح",
     "productModifiersUpdatedSuccessfully": "تم تحديث خيارات المنتج بنجاح",
-    "modifierGroupRemovedFromProduct": "تم إزالة مجموعة الخيارات من المنتج"
+    "modifierGroupRemovedFromProduct": "تم إزالة مجموعة الخيارات من المنتج",
+    "registrationPendingApproval": "تم التسجيل بنجاح. حسابك قيد مراجعة المسؤول.",
+    "scheduledDowngradeCancelled": "تم إلغاء التخفيض المجدول"
   },
   "time": {
     "today": "اليوم",
@@ -367,7 +372,42 @@
     "popupBlocked": "تم حظر النافذة المنبثقة. يرجى السماح بالنوافذ المنبثقة لهذا الموقع لطباعة رموز QR.",
     "noQRCodesForPrinting": "لم يتم العثور على رموز QR للطباعة. يرجى التأكد من تحميل رموز QR.",
     "noTablesFound": "لم يتم العثور على طاولات. يرجى إضافة طاولات أولاً.",
-    "noQRCodesToDownload": "لم يتم العثور على رموز QR للتحميل"
+    "noQRCodesToDownload": "لم يتم العثور على رموز QR للتحميل",
+    "noUsersFoundDescription": "أضف أول عضو في الفريق للبدء في إدارة موظفي مطعمك.",
+    "addFirstUser": "إضافة أول مستخدم",
+    "totalUsers": "إجمالي المستخدمين",
+    "activeUsers": "المستخدمون النشطون",
+    "admins": "المسؤولون",
+    "managers": "المديرون",
+    "invalidEmail": "يرجى إدخال عنوان بريد إلكتروني صالح",
+    "passwordMinLength": "يجب أن تتكون كلمة المرور من 6 أحرف على الأقل",
+    "firstNameRequired": "الاسم الأول مطلوب",
+    "lastNameRequired": "اسم العائلة مطلوب",
+    "emailPlaceholder": "أدخل عنوان البريد الإلكتروني",
+    "passwordPlaceholder": "أدخل كلمة المرور",
+    "firstNamePlaceholder": "أدخل الاسم الأول",
+    "lastNamePlaceholder": "أدخل اسم العائلة",
+    "pendingApproval": "بانتظار الموافقة",
+    "approveUser": "الموافقة على المستخدم",
+    "rejectUser": "رفض المستخدم",
+    "userApproved": "تمت الموافقة على المستخدم بنجاح",
+    "userRejected": "تم رفض المستخدم بنجاح",
+    "userApproveFailed": "فشل في الموافقة على المستخدم",
+    "userRejectFailed": "فشل في رفض المستخدم",
+    "allUsers": "جميع المستخدمين",
+    "noUsersInFilter": "لا يوجد مستخدمون في هذا التصفية",
+    "noUsersInFilterDescription": "لا يوجد مستخدمون يطابقون معايير التصفية هذه.",
+    "showAllUsers": "عرض جميع المستخدمين",
+    "searchUsers": "البحث بالاسم أو البريد الإلكتروني...",
+    "allRoles": "جميع الأدوار",
+    "filterByRole": "تصفية حسب الدور",
+    "noTablesFoundDescription": "أضف الطاولات في قسم إدارة الطاولات لإنشاء رموز QR خاصة بكل طاولة.",
+    "totalQRCodes": "إجمالي رموز QR",
+    "noTables": "لا توجد طاولات بعد",
+    "noTablesDescription": "أضف أول طاولة لبدء إدارة جلوس عملاء مطعمك",
+    "addFirstTable": "إضافة أول طاولة",
+    "gridView": "عرض الشبكة",
+    "floorPlan": "مخطط القاعة"
   },
   "qrDesigner": {
     "quickColorThemes": "سمات الألوان السريعة",
@@ -645,7 +685,14 @@
     "selectUpTo": "اختر حتى {{max}}",
     "selectMultiple": "اختر متعدد",
     "specialInstructions": "تعليمات خاصة",
-    "productImage": "صورة المنتج"
+    "productImage": "صورة المنتج",
+    "wifi": "واي فاي",
+    "wifiNetwork": "شبكة الواي فاي",
+    "wifiPassword": "كلمة المرور",
+    "copyPassword": "نسخ كلمة المرور",
+    "passwordCopied": "تم نسخ كلمة المرور!",
+    "socialMedia": "تابعنا",
+    "connectWithUs": "تواصل معنا"
   },
   "qr": {
     "shareText": "اطلع على قائمتنا",
@@ -688,7 +735,9 @@
     "specialNotes": "ملاحظات خاصة",
     "continueShopping": "مواصلة التسوق",
     "viewCart": "عرض السلة",
-    "cart": "السلة"
+    "cart": "السلة",
+    "item_one": "{{count}} عنصر",
+    "item_other": "{{count}} عناصر"
   },
   "orders": {
     "title": "طلباتي",
@@ -711,6 +760,50 @@
     "request": "طلب الفاتورة",
     "requestSuccess": "تم إرسال طلب الفاتورة!",
     "requestError": "فشل طلب الفاتورة"
+  },
+  "payment": {
+    "errors": {
+      "SELF_PAY_NOT_TURKEY": "الدفع الذاتي غير متاح في هذا المطعم. الرجاء استدعاء النادل.",
+      "SELF_PAY_DISABLED": "هذا المطعم لم يفعّل الدفع الذاتي. الرجاء استدعاء النادل.",
+      "ORDER_ALREADY_PAID": "تم دفع هذا الطلب بالفعل. حدّث القائمة.",
+      "SELF_PAY_DISABLED_MIXED_PAYMENT": "النادل تسلم دفعة جزئية لهذه الطاولة — الدفع الذاتي معطل هنا. الرجاء استدعاء النادل."
+    },
+    "payNow": "ادفع الآن",
+    "title": "الدفع الآن",
+    "subtitle": "اختر العناصر التي ستدفعها — دفع آمن بالبطاقة",
+    "phoneOptional": "الهاتف (اختياري — لنقاط الولاء)",
+    "totalToPay": "المبلغ المستحق",
+    "payWithPaytr": "ادفع عبر PayTR",
+    "payEverything": "اختر كل المتبقي",
+    "remaining": "المتبقي",
+    "tabOrder": "الطلب",
+    "unitsRemaining": "{{paid}} / {{total}} مدفوع",
+    "redirectingToPayTR": "يتم تحويلك إلى صفحة PayTR الآمنة…",
+    "intentFailed": "تعذّر بدء الدفع. حاول مرة أخرى.",
+    "noOpenItems": "لا توجد عناصر للدفع على هذه الطاولة.",
+    "paytrNote": "يتم الدفع على صفحة PayTR الآمنة. لا تُحفظ بيانات بطاقتك هنا.",
+    "result": {
+      "checking": "جارٍ تأكيد دفعك…",
+      "checkingDetail": "بانتظار تأكيد PayTR. قد يستغرق بضع ثوانٍ.",
+      "checkError": "تعذّر الاتصال بالخادم. إعادة المحاولة…",
+      "success": "تم استلام الدفع!",
+      "youPaid": "دفعت",
+      "successWithRemaining": "المتبقي على الطاولة",
+      "failed": "فشل الدفع",
+      "failedDetail": "لم يتم الخصم من بطاقتك. يمكنك المحاولة مرة أخرى من صفحة طلباتي.",
+      "tryAgain": "حاول مرة أخرى",
+      "backToOrders": "العودة إلى طلباتي",
+      "payRemaining": "دفع المتبقي",
+      "enjoy": "بالهناء والشفاء! 🍽️",
+      "expired": "انتهت جلسة الدفع",
+      "expiredDetail": "استغرقت وقتًا طويلًا في صفحة الدفع. لم يتم الخصم من بطاقتك؛ ابدأ دفعًا جديدًا من طلباتي.",
+      "errors": {
+        "expired": "انتهت جلسة الدفع. لم يتم الخصم من بطاقتك.",
+        "paytr_token_error": "تعذّر الوصول إلى خدمة الدفع. حاول مرة أخرى بعد لحظات.",
+        "settlement_error": "تم استلام الدفع لكن تعذّر تسجيله. الرجاء إبلاغ النادل — سيقوم المطعم بالتسوية يدويًا.",
+        "paytr_reported_failure": "رفض البنك الدفع. جرّب بطاقة أخرى."
+      }
+    }
   },
   "orderStatus": {
     "pendingApproval": "في انتظار الموافقة",
@@ -763,5 +856,22 @@
     "referrals": "الإحالات",
     "pointsEarned": "النقاط المكتسبة",
     "noReferralCode": "تواصل مع الدعم للحصول على رمز الإحالة الخاص بك"
+  },
+  "pos": {
+    "floorPlan": {
+      "title": "مخطط القاعة",
+      "available": "متاحة",
+      "occupied": "مشغولة",
+      "reserved": "محجوزة",
+      "fullscreen": "ملء الشاشة",
+      "exitFullscreen": "الخروج من ملء الشاشة",
+      "helpText2d": "انقر على الطاولة للاختيار • مرر للتكبير • Shift+اسحب للتحريك",
+      "helpText3d": "انقر على الطاولة للاختيار • اسحب لتدوير العرض • مرر للتكبير"
+    },
+    "minimap": {
+      "switchTo2D": "التبديل إلى عرض ثنائي الأبعاد",
+      "switchTo3D": "التبديل إلى عرض ثلاثي الأبعاد",
+      "clickToSwitch": "انقر للتبديل"
+    }
   }
 }

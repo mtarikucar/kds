@@ -43,10 +43,4 @@ export class RegisterDto {
   @IsUUID()
   @IsOptional()
   tenantId?: string;
-
-  @ApiProperty({ example: 'INTERNATIONAL', enum: ['TURKEY', 'INTERNATIONAL'], required: false })
-  @EmptyStringToUndefined()
-  @IsString()
-  @IsOptional()
-  paymentRegion?: string;
 }

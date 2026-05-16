@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Users, Search } from 'lucide-react';
 import api from '../../lib/api';
@@ -8,9 +8,15 @@ interface TableSelectionModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectTable: (tableId: string) => void;
-  tenantId: string;
+  // tenantId optional: subdomain-routed pages already have the tenant
+  // baked into the API base URL (axios `api` is subdomain-aware), so
+  // the legacy CartPage path can omit it.
+  tenantId?: string;
   primaryColor: string;
-  secondaryColor: string;
+  // Secondary colour falls back to the primary when omitted — keeps
+  // the visual identity coherent without forcing every caller to pass
+  // both branding values just for one accent stroke.
+  secondaryColor?: string;
 }
 
 export default function TableSelectionModal({
@@ -19,7 +25,7 @@ export default function TableSelectionModal({
   onSelectTable,
   tenantId,
   primaryColor,
-  secondaryColor,
+  secondaryColor = primaryColor,
 }: TableSelectionModalProps) {
   const { t } = useTranslation('common');
   const [tables, setTables] = useState<PublicTable[]>([]);
@@ -136,7 +142,7 @@ export default function TableSelectionModal({
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder={t('tableSelection.searchPlaceholder')}
                     className="w-full pl-10 pr-4 rtl:pl-4 rtl:pr-10 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2"
-                    style={{ focusRingColor: primaryColor }}
+                    style={{ ['--tw-ring-color' as any]: primaryColor }}
                   />
                 </div>
               )}
@@ -159,10 +165,10 @@ export default function TableSelectionModal({
                       `}
                       style={
                         selectedTableId === table.id
-                          ? {
+                          ? ({
                               borderColor: primaryColor,
-                              ringColor: primaryColor + '40',
-                            }
+                              ['--tw-ring-color' as any]: primaryColor + '40',
+                            } as React.CSSProperties)
                           : {}
                       }
                     >
@@ -190,7 +196,7 @@ export default function TableSelectionModal({
                     value={selectedTableId || ''}
                     onChange={(e) => setSelectedTableId(e.target.value)}
                     className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-2"
-                    style={{ focusRingColor: primaryColor }}
+                    style={{ ['--tw-ring-color' as any]: primaryColor }}
                   >
                     <option value="">{t('tableSelection.selectDropdown')}</option>
                     {filteredTables.map((table) => (

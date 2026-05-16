@@ -68,6 +68,12 @@ export interface MenuData {
   settings: MenuSettings;
   enableCustomerOrdering: boolean;
   enableTablelessMode: boolean;
+  /**
+   * Whether customer self-pay (QR-menu PayTR) is available for this
+   * restaurant. Driven by the POS settings toggle; QR menu uses this
+   * single boolean to decide whether to render the "Ödemeye Geç" CTA.
+   */
+  enableCustomerSelfPay?: boolean;
   categories: any[];
 }
 

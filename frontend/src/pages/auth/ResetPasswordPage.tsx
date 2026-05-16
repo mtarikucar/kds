@@ -150,7 +150,7 @@ const ResetPasswordPage = () => {
               to="/login"
               className="text-primary-600 hover:text-primary-700 font-medium transition-colors"
             >
-              Back to Login
+              {t('auth:resetPassword.backToLogin')}
             </Link>
           </div>
         </form>

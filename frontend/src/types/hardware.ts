@@ -178,6 +178,77 @@ export type HardwareEvent =
     };
 
 // Printing Data Types
+
+/**
+ * Versioned receipt snapshot — produced by the backend
+ * ReceiptSnapshotBuilder (see backend/src/modules/orders/services/
+ * receipt-snapshot.builder.ts) and stored on Payment.receiptSnapshot.
+ *
+ * The desktop Tauri app accepts this shape directly via
+ * HardwareService.printReceipt(deviceId, snapshot). Decimal-bearing
+ * fields are STRINGS (e.g. "118.00") so JS Number arithmetic can't
+ * drift them. Bump `version` only when renaming/removing fields;
+ * additive optional fields don't require a bump.
+ */
+export interface ReceiptSnapshot {
+  version: 1;
+  restaurant: {
+    name: string;
+    currency: string;
+  };
+  order: {
+    id: string;
+    orderNumber: string;
+    type: string;
+    tableNumber: string | null;
+    notes: string | null;
+  };
+  items: Array<{
+    name: string;
+    quantity: number;
+    unitPrice: string;
+    totalPrice: string;
+    modifiers: string[];
+    notes: string | null;
+  }>;
+  totals: {
+    subtotal: string;
+    tax: string;
+    discount: string;
+    total: string;
+  };
+  payment: {
+    method: string;
+    transactionId: string | null;
+    paidAt: string;
+  };
+  printedAt: string;
+}
+
+/**
+ * Versioned kitchen-ticket snapshot — produced by the same builder and
+ * stored on Order.kitchenTicketSnapshot.
+ */
+export interface KitchenTicketSnapshot {
+  version: 1;
+  order: {
+    id: string;
+    orderNumber: string;
+    type: string;
+    tableNumber: string | null;
+  };
+  items: Array<{
+    name: string;
+    quantity: number;
+    modifiers: string[];
+    notes: string | null;
+  }>;
+  specialInstructions: string | null;
+  createdAt: string;
+}
+
+// Legacy types — kept for the deprecated PrinterService path until
+// PrinterSettings.tsx is replaced. New callsites use ReceiptSnapshot.
 export interface ReceiptItem {
   name: string;
   quantity: number;

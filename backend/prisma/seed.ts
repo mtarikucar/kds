@@ -7,10 +7,18 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Seeding database...');
 
-  // Create subscription plans
+  // Create subscription plans. The `update` branch mirrors every field
+  // that can drift after the first seed (prices/currency/displayName);
+  // otherwise re-running `prisma:seed` keeps stale USD numbers when the
+  // codebase has migrated to TRY.
   const freePlan = await prisma.subscriptionPlan.upsert({
     where: { name: 'FREE' },
     update: {
+      displayName: 'Ücretsiz',
+      description: 'Yeni başlayan küçük restoranlar için',
+      monthlyPrice: 0,
+      yearlyPrice: 0,
+      currency: 'TRY',
       advancedReports: false,
       multiLocation: false,
       customBranding: false,
@@ -24,8 +32,8 @@ async function main() {
     },
     create: {
       name: 'FREE',
-      displayName: 'Free Plan',
-      description: 'Perfect for small restaurants getting started',
+      displayName: 'Ücretsiz',
+      description: 'Yeni başlayan küçük restoranlar için',
       monthlyPrice: 0,
       yearlyPrice: 0,
       currency: 'TRY',
@@ -43,6 +51,7 @@ async function main() {
       inventoryTracking: false,
       kdsIntegration: true,
       reservationSystem: false,
+      personnelManagement: false,
       deliveryIntegration: false,
       isActive: true,
     },
@@ -51,6 +60,11 @@ async function main() {
   const basicPlan = await prisma.subscriptionPlan.upsert({
     where: { name: 'BASIC' },
     update: {
+      displayName: 'Başlangıç',
+      description: 'Büyüyen restoranlar için ideal',
+      monthlyPrice: 299,
+      yearlyPrice: 2990,
+      currency: 'TRY',
       advancedReports: false,
       multiLocation: false,
       customBranding: false,
@@ -64,10 +78,10 @@ async function main() {
     },
     create: {
       name: 'BASIC',
-      displayName: 'Basic Plan',
-      description: 'Great for growing restaurants',
-      monthlyPrice: 29.99,
-      yearlyPrice: 299.99,
+      displayName: 'Başlangıç',
+      description: 'Büyüyen restoranlar için ideal',
+      monthlyPrice: 299,
+      yearlyPrice: 2990,
       currency: 'TRY',
       trialDays: 14,
       maxUsers: 5,
@@ -83,6 +97,7 @@ async function main() {
       inventoryTracking: true,
       kdsIntegration: true,
       reservationSystem: false,
+      personnelManagement: false,
       deliveryIntegration: false,
       isActive: true,
     },
@@ -91,6 +106,11 @@ async function main() {
   const proPlan = await prisma.subscriptionPlan.upsert({
     where: { name: 'PRO' },
     update: {
+      displayName: 'Profesyonel',
+      description: 'Çok şubeli yerleşik restoranlar için',
+      monthlyPrice: 799,
+      yearlyPrice: 7990,
+      currency: 'TRY',
       advancedReports: true,
       multiLocation: true,
       customBranding: true,
@@ -104,10 +124,10 @@ async function main() {
     },
     create: {
       name: 'PRO',
-      displayName: 'Pro Plan',
-      description: 'For established restaurants with multiple locations',
-      monthlyPrice: 79.99,
-      yearlyPrice: 799.99,
+      displayName: 'Profesyonel',
+      description: 'Çok şubeli yerleşik restoranlar için',
+      monthlyPrice: 799,
+      yearlyPrice: 7990,
       currency: 'TRY',
       trialDays: 14,
       maxUsers: 15,
@@ -132,6 +152,11 @@ async function main() {
   const businessPlan = await prisma.subscriptionPlan.upsert({
     where: { name: 'BUSINESS' },
     update: {
+      displayName: 'Kurumsal',
+      description: 'Büyük restoran zincirleri için kurumsal çözüm',
+      monthlyPrice: 1999,
+      yearlyPrice: 19990,
+      currency: 'TRY',
       advancedReports: true,
       multiLocation: true,
       customBranding: true,
@@ -145,10 +170,10 @@ async function main() {
     },
     create: {
       name: 'BUSINESS',
-      displayName: 'Business Plan',
-      description: 'Enterprise solution for large restaurant chains',
-      monthlyPrice: 199.99,
-      yearlyPrice: 1999.99,
+      displayName: 'Kurumsal',
+      description: 'Büyük restoran zincirleri için kurumsal çözüm',
+      monthlyPrice: 1999,
+      yearlyPrice: 19990,
       currency: 'TRY',
       trialDays: 14,
       maxUsers: -1,
@@ -172,9 +197,14 @@ async function main() {
 
   console.log('✅ Subscription plans created');
 
-  // Create tenant
-  const tenant = await prisma.tenant.create({
-    data: {
+  // Upsert tenant and users so re-running the seed against an existing
+  // DB no longer hits @@unique constraints. The previous `create` calls
+  // worked exactly once per database — every subsequent run blew up on
+  // `subdomain` or `email` collision and required a manual reset.
+  const tenant = await prisma.tenant.upsert({
+    where: { subdomain: 'demo' },
+    update: {},
+    create: {
       name: 'Demo Restaurant',
       subdomain: 'demo',
       status: 'ACTIVE',
@@ -187,8 +217,10 @@ async function main() {
   // Create users
   const hashedPassword = await bcrypt.hash('password123', 10);
 
-  const admin = await prisma.user.create({
-    data: {
+  const admin = await prisma.user.upsert({
+    where: { email: 'admin@restaurant.com' },
+    update: {},
+    create: {
       email: 'admin@restaurant.com',
       password: hashedPassword,
       firstName: 'John',
@@ -199,8 +231,10 @@ async function main() {
     },
   });
 
-  const waiter = await prisma.user.create({
-    data: {
+  const waiter = await prisma.user.upsert({
+    where: { email: 'waiter@restaurant.com' },
+    update: {},
+    create: {
       email: 'waiter@restaurant.com',
       password: hashedPassword,
       firstName: 'Jane',
@@ -211,8 +245,10 @@ async function main() {
     },
   });
 
-  const kitchen = await prisma.user.create({
-    data: {
+  const kitchen = await prisma.user.upsert({
+    where: { email: 'kitchen@restaurant.com' },
+    update: {},
+    create: {
       email: 'kitchen@restaurant.com',
       password: hashedPassword,
       firstName: 'Mike',
@@ -467,25 +503,16 @@ async function main() {
 
   console.log('✅ Tables created');
 
+  // Default credentials are intentionally NOT echoed: this script runs in
+  // CI pipelines whose logs are often retained for weeks, and leaking
+  // working admin/waiter/kitchen passwords there is a real PII surface
+  // even for a "dev" seed (the same DB sometimes gets promoted by accident).
+  // Anyone seeding locally can read the constants in this file directly.
   console.log(`
   ========================================
   🎉 Database seeded successfully!
-  ========================================
-
-  Default Login Credentials:
-
-  Admin:
-    Email: admin@restaurant.com
-    Password: password123
-
-  Waiter:
-    Email: waiter@restaurant.com
-    Password: password123
-
-  Kitchen:
-    Email: kitchen@restaurant.com
-    Password: password123
-
+  Default users created: admin@restaurant.com, waiter@restaurant.com, kitchen@restaurant.com
+  Passwords are NOT logged — see seed.ts source or your secret store.
   ========================================
   `);
 }

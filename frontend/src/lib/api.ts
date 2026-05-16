@@ -37,24 +37,36 @@ api.interceptors.request.use(
 // whatever access token that single refresh produced.
 let refreshInFlight: Promise<string> | null = null;
 
+// Bound the refresh round so a hung /auth/refresh (network stall, server
+// pause) can't permanently block every queued 401 retry. 10s comfortably
+// exceeds the backend's own request timeout while still failing the
+// queue fast enough to bounce to /login.
+const REFRESH_TIMEOUT_MS = 10_000;
+
 function refreshAccessToken(): Promise<string> {
   if (refreshInFlight) return refreshInFlight;
-  refreshInFlight = axios
+  const refresh = axios
     .post(
       `${API_BASE_URL}/auth/refresh`,
       {},
-      { withCredentials: true },
+      { withCredentials: true, timeout: REFRESH_TIMEOUT_MS },
     )
     .then((response) => {
       const { accessToken } = response.data;
       useAuthStore.getState().setAccessToken(accessToken);
       return accessToken as string;
-    })
-    .finally(() => {
-      // Clear the slot only after the promise settles so late-arriving 401s
-      // during the same tick join this round; the next tick starts fresh.
-      refreshInFlight = null;
     });
+  const timeout = new Promise<string>((_, reject) =>
+    setTimeout(
+      () => reject(new Error('refresh timeout')),
+      REFRESH_TIMEOUT_MS,
+    ),
+  );
+  refreshInFlight = Promise.race([refresh, timeout]).finally(() => {
+    // Clear the slot only after the promise settles so late-arriving 401s
+    // during the same tick join this round; the next tick starts fresh.
+    refreshInFlight = null;
+  });
   return refreshInFlight;
 }
 

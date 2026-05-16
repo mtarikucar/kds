@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import QRMenuLayout, { MenuData } from './QRMenuLayout';
 import OrdersContent from '../../components/qr-menu/OrdersContent';
+import SelfPayModal from '../../components/qr-menu/SelfPayModal';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import axios from 'axios';
@@ -21,6 +22,11 @@ const SubdomainOrdersPage: React.FC<SubdomainOrdersPageProps> = ({ subdomain }) 
   const [menuData, setMenuData] = useState<MenuData | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [isSelfPayOpen, setIsSelfPayOpen] = useState(false);
+
+  // See OrderTrackingPage — server-side resolution surfaced via
+  // menuData.enableCustomerSelfPay.
+  const canSelfPay = !!menuData?.enableCustomerSelfPay && !!sessionId;
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -104,7 +110,17 @@ const SubdomainOrdersPage: React.FC<SubdomainOrdersPageProps> = ({ subdomain }) 
           tableId={tableId}
           onCallWaiter={handleCallWaiter}
           onRequestBill={handleRequestBill}
+          onPayNow={canSelfPay ? () => setIsSelfPayOpen(true) : undefined}
           onBrowseMenu={handleBrowseMenu}
+        />
+      )}
+      {menuData && sessionId && (
+        <SelfPayModal
+          isOpen={isSelfPayOpen}
+          onClose={() => setIsSelfPayOpen(false)}
+          sessionId={sessionId}
+          currency={(menuData.tenant as any)?.currency ?? 'TRY'}
+          primaryColor={menuData.settings.primaryColor}
         />
       )}
     </QRMenuLayout>

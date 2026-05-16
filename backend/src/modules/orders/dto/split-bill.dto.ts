@@ -39,6 +39,14 @@ export class SplitPaymentEntry {
   @IsString({ each: true })
   @IsOptional()
   orderItemIds?: string[];
+
+  @ApiPropertyOptional({
+    description:
+      'Optional client-generated idempotency key. Send the same key on retries; the partial unique index payments_orderId_idempotencyKey_notnull_key dedupes server-side.',
+  })
+  @IsString()
+  @IsOptional()
+  idempotencyKey?: string;
 }
 
 export class SplitBillDto {
@@ -63,6 +71,14 @@ export class SplitBillDto {
   @IsString()
   @IsOptional()
   customerPhone?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Batch-level idempotency key for the whole split-bill operation. Combined with per-entry keys, this lets a retry recover the exact prior payment set instead of double-charging.',
+  })
+  @IsString()
+  @IsOptional()
+  idempotencyKey?: string;
 }
 
 export class GroupBillSummaryDto {

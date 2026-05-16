@@ -125,11 +125,17 @@ export class ZReportSchedulerService {
           tenant.timezone || 'UTC',
         );
 
+        // Check `isFinalized` instead of `emailSent` only — if the report
+        // was finalized but the email send failed, the previous filter
+        // re-entered the entire generate-and-send loop every 15 minutes
+        // (and re-finalized would no-op via the atomic claim, but the
+        // wasted DB + email-send work polluted logs and risked duplicate
+        // emails when transient SMTP errors recovered).
         const existingReport = await this.prisma.zReport.findFirst({
           where: {
             tenantId: tenant.id,
             reportDate: tenantTzMidnight,
-            emailSent: true,
+            isFinalized: true,
           },
         });
 

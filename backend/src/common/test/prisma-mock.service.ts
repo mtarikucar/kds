@@ -32,7 +32,6 @@ export const mockTenant = {
   id: 'tenant-1',
   name: 'Test Restaurant',
   subdomain: 'test-restaurant',
-  paymentRegion: 'INTERNATIONAL' as const,
   status: 'ACTIVE' as const,
   currentPlanId: 'plan-1',
   trialUsed: false,

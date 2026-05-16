@@ -11,6 +11,11 @@ export enum SubscriptionStatus {
   EXPIRED = 'EXPIRED',
   PAST_DUE = 'PAST_DUE',
   TRIALING = 'TRIALING',
+  // Pre-activation state used between PayTR intent creation and webhook
+  // confirmation. PENDING subscriptions don't grant feature access and
+  // don't appear in the partial-unique (tenantId) WHERE status IN
+  // (ACTIVE, TRIALING) index, so a tenant may have at most one in flight.
+  PENDING = 'PENDING',
 }
 
 export enum BillingCycle {
@@ -18,14 +23,11 @@ export enum BillingCycle {
   YEARLY = 'YEARLY',
 }
 
+// Active provider list. Add new entries (e.g. STRIPE) when wiring an
+// additional payments-adapter; PaymentsService dispatches by this enum
+// so a single switch entry is enough to plug a new processor in.
 export enum PaymentProvider {
   PAYTR = 'PAYTR',
-  EMAIL = 'EMAIL',
-}
-
-export enum PaymentRegion {
-  TURKEY = 'TURKEY',
-  INTERNATIONAL = 'INTERNATIONAL',
 }
 
 export enum PaymentStatus {

@@ -211,7 +211,12 @@ export class SuperAdminTenantsService {
       });
     }
 
-    // Transaction: status flip + quarantine released subdomain atomically.
+    // Transaction: status flip + quarantine released subdomain + revoke
+    // outstanding tokens atomically. Bumping tokenVersion on every member
+    // makes the per-request jwt.strategy DB check (auth.service.ts) reject
+    // any access token still in flight; refresh tokens are revoked at the
+    // DB layer below. Without this a SUSPENDED tenant's users kept working
+    // sessions until their access token TTL elapsed.
     const updated = await this.prisma.$transaction(async (tx) => {
       const next = await tx.tenant.update({
         where: { id },
@@ -239,6 +244,31 @@ export class SuperAdminTenantsService {
             : 'tenant_suspended',
         );
       }
+
+      // Revoke active sessions on ANY status transition that involves a
+      // privilege change — both ACTIVE→SUSPENDED/DELETED *and* the
+      // reverse (SUSPENDED→ACTIVE). Reactivating a tenant without
+      // bumping tokenVersion would leave any still-living JWTs minted
+      // before suspension valid as soon as the tenant is restored,
+      // bypassing the JwtStrategy tenant-status guard during the
+      // suspension window. Forcing a re-login is the safer default.
+      const wasActive = previousStatus === TenantStatus.ACTIVE;
+      const isActive = updateDto.status === TenantStatus.ACTIVE;
+      if (wasActive !== isActive) {
+        await tx.user.updateMany({
+          where: { tenantId: id },
+          data: { tokenVersion: { increment: 1 } },
+        });
+        // Revoke not-yet-revoked refresh tokens for this tenant's users.
+        await tx.refreshToken.updateMany({
+          where: {
+            user: { tenantId: id },
+            revokedAt: null,
+          },
+          data: { revokedAt: new Date() },
+        });
+      }
+
       return next;
     });
 

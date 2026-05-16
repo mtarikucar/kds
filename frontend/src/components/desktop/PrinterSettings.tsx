@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next';
 import { PrinterService, PrinterInfo, isTauri } from '../../lib/tauri';
 import { Button } from '../ui/Button';
 import { toast } from 'sonner';
-import { Select } from '../ui/Select';
 
 export function PrinterSettings() {
   const { t } = useTranslation(['settings', 'common']);
@@ -112,11 +111,11 @@ export function PrinterSettings() {
             {t('settings.printer.selectPort')}
           </label>
           <div className="flex gap-2">
-            <Select
+            <select
               value={selectedPrinter || ''}
               onChange={(e) => setSelectedPrinter(e.target.value)}
               disabled={loading}
-              className="flex-1"
+              className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="">{t('settings.printer.selectPlaceholder')}</option>
               {printers.map((printer) => (
@@ -124,7 +123,7 @@ export function PrinterSettings() {
                   {printer.name} ({printer.status})
                 </option>
               ))}
-            </Select>
+            </select>
             <Button
               onClick={loadPrinters}
               disabled={loading}

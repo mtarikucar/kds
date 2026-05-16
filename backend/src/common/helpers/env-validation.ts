@@ -44,6 +44,30 @@ const RULES: EnvRule[] = [
   // Production-only
   { key: 'CORS_ORIGIN', required: true, prodOnly: true },
   { key: 'SENTRY_DSN', required: false, prodOnly: true },
+  // PayTR — required in production because the Turkish payment flow is
+  // useless without them. Dev can run without (PaymentsService throws a
+  // clear "credentials not configured" error if the user actually tries
+  // to check out without setting them).
+  { key: 'PAYTR_MERCHANT_ID', required: true, prodOnly: true },
+  { key: 'PAYTR_MERCHANT_KEY', required: true, prodOnly: true, minLength: 8 },
+  { key: 'PAYTR_MERCHANT_SALT', required: true, prodOnly: true, minLength: 8 },
+  { key: 'PAYTR_OK_URL', required: true, prodOnly: true, minLength: 10 },
+  { key: 'PAYTR_FAIL_URL', required: true, prodOnly: true, minLength: 10 },
+  // POS-specific redirect URLs for customer self-pay (QR menu PayTR
+  // flow). Optional — falls back to the subscription PAYTR_OK_URL /
+  // PAYTR_FAIL_URL if unset, but production should set them so
+  // subdomain restaurants don't bounce customers to the wrong host.
+  { key: 'PAYTR_OK_URL_POS', required: false, prodOnly: true, minLength: 10 },
+  { key: 'PAYTR_FAIL_URL_POS', required: false, prodOnly: true, minLength: 10 },
+  // Comma-separated regex patterns for valid return origins (e.g.
+  // `https://.*\.hummytummy\.com,https://hummytummy\.com`). When the
+  // QR menu is opened on a subdomain, the backend honors that origin
+  // for PayTR's redirect IF it matches one of these patterns. Empty
+  // → only the global PAYTR_*_URL_POS is used (subdomain customers
+  // bounce back to the platform host).
+  { key: 'PAYTR_ALLOWED_RETURN_ORIGINS', required: false, prodOnly: false },
+  // PAYTR_TEST_MODE defaults to "1" in adapter; PAYTR_WEBHOOK_ALLOWED_IPS
+  // is optional defence-in-depth. Production-mode guard below.
 ];
 
 export function validateEnv(): void {
@@ -104,6 +128,20 @@ export function validateEnv(): void {
       if (placeholders.includes(process.env[key] ?? '')) {
         errors.push(`${key} is still set to the .env.example placeholder value`);
       }
+    }
+  }
+
+  // PayTR test mode — must NOT stay "1" in production. A customer
+  // whose 3DS "succeeds" against PayTR's sandbox while the merchant
+  // is running prod credentials would book real Payment rows without
+  // money actually moving. Hard-fail boot.
+  if (IS_PROD) {
+    const testMode = process.env.PAYTR_TEST_MODE;
+    if (testMode === undefined || testMode === '' || testMode === '1') {
+      errors.push(
+        'PAYTR_TEST_MODE must be set to "0" in production ' +
+          '(current value: "' + (testMode ?? '<unset>') + '"). Test-mode payments do not move real money.',
+      );
     }
   }
 

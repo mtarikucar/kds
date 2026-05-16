@@ -22,6 +22,7 @@ import {
 import { SuperAdminGuard } from '../guards/superadmin.guard';
 import { SuperAdminPublic, SuperAdminRoute } from '../decorators/superadmin.decorator';
 import { CurrentSuperAdmin } from '../decorators/current-superadmin.decorator';
+import { getClientIp } from '../../../common/helpers/client-ip.helper';
 
 // Aggressive per-endpoint throttle budgets. Superadmin routes are the
 // highest-privilege surface in the product — treating them tighter than
@@ -43,7 +44,7 @@ export class SuperAdminAuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'SuperAdmin login (requires 2FA already enrolled)' })
   async login(@Body() loginDto: SuperAdminLoginDto, @Req() req: Request) {
-    const ip = req.ip || req.headers['x-forwarded-for']?.toString();
+    const ip = getClientIp(req);
     const userAgent = req.headers['user-agent'];
     return this.authService.login(loginDto, ip, userAgent);
   }
@@ -54,7 +55,7 @@ export class SuperAdminAuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify 2FA code or backup code' })
   async verify2FA(@Body() verify2FADto: Verify2FADto, @Req() req: Request) {
-    const ip = req.ip || req.headers['x-forwarded-for']?.toString();
+    const ip = getClientIp(req);
     const userAgent = req.headers['user-agent'];
     return this.authService.verify2FA(verify2FADto, ip, userAgent);
   }
@@ -107,7 +108,7 @@ export class SuperAdminAuthController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'SuperAdmin logout (revokes all tokens)' })
   async logout(@CurrentSuperAdmin('id') superAdminId: string, @Req() req: Request) {
-    const ip = req.ip || req.headers['x-forwarded-for']?.toString();
+    const ip = getClientIp(req);
     const userAgent = req.headers['user-agent'];
     return this.authService.logout(superAdminId, ip, userAgent);
   }

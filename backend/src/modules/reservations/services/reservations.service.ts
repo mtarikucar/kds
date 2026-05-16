@@ -73,11 +73,18 @@ export class ReservationsService {
       throw new BadRequestException('End time must be after start time');
     }
 
-    // Validate date is not in the past
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const reservationDate = new Date(dto.date);
-    reservationDate.setHours(0, 0, 0, 0);
+    // Validate date is not in the past. `new Date("YYYY-MM-DD")` parses
+    // as UTC midnight; calling setHours(0,0,0,0) on it then shifts to
+    // *local* midnight. In Turkey (UTC+3) that crosses the day boundary
+    // and a "tomorrow" reservation can read as "past" between 21:00 and
+    // 23:59 local. Parsing the components as local-time avoids the drift.
+    const parseLocalDate = (s: string) => {
+      const [y, m, d] = s.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    };
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const reservationDate = parseLocalDate(dto.date);
 
     if (reservationDate < today) {
       throw new BadRequestException('Cannot book past dates');

@@ -3,15 +3,37 @@ import { createHash, randomBytes, randomInt } from 'crypto';
 /**
  * Normalize a phone number to a canonical form so duplicate detection under
  * the @@unique([tenantId, phone]) constraint works across whitespace /
- * punctuation variations that end users commonly type. Preserves the leading
- * '+' if present but strips every other non-digit character. Does NOT validate
- * country codes; use class-validator's @Matches for that.
+ * punctuation variations that end users commonly type.
+ *
+ * Turkish numbers come in three equivalent shapes that previously hashed to
+ * three different rows under the unique constraint — splitting one customer
+ * across three loyalty wallets:
+ *   "05551234567"         (national, 11 digits, leading 0)
+ *   "905551234567"        (E.164 without +)
+ *   "+90 555 123 4567"    (E.164 canonical)
+ * All three collapse to "+905551234567" here. International numbers retain
+ * a leading + if the caller already provided one; otherwise fall back to
+ * the digits-only string (preserves prior behaviour for non-TR locales).
  */
 export function normalizePhone(raw: string): string {
   if (!raw) return raw;
   const trimmed = raw.trim();
   const hasPlus = trimmed.startsWith('+');
   const digits = trimmed.replace(/\D+/g, '');
+  if (!digits) return trimmed;
+
+  // Turkish mobile/landline always reduce to 10 digits after the country
+  // code. The three shapes below are the ones we keep seeing in the wild.
+  if (digits.length === 11 && digits.startsWith('0')) {
+    return `+90${digits.slice(1)}`;
+  }
+  if (digits.length === 12 && digits.startsWith('90')) {
+    return `+${digits}`;
+  }
+  if (hasPlus && digits.startsWith('90') && digits.length === 12) {
+    return `+${digits}`;
+  }
+
   return hasPlus ? `+${digits}` : digits;
 }
 

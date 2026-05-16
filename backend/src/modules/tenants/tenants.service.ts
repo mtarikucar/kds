@@ -33,6 +33,9 @@ const SETTINGS_SELECT = {
   socialTiktok: true,
   socialYoutube: true,
   socialWhatsapp: true,
+  // KDV-compliant Turkish invoicing requires the tenant's tax ID
+  // (Vergi No / TC Kimlik). Snapshotted onto invoices at issuance.
+  taxId: true,
 } as const;
 
 @Injectable()
@@ -88,7 +91,11 @@ export class TenantsService {
     return tenant;
   }
 
-  async updateSettings(tenantId: string, updateDto: UpdateTenantSettingsDto) {
+  async updateSettings(
+    tenantId: string,
+    updateDto: UpdateTenantSettingsDto,
+    actorUserId?: string,
+  ) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
     });
@@ -130,11 +137,30 @@ export class TenantsService {
         ) {
           await reserveSubdomain(tx, tenant.subdomain, 'subdomain_changed');
         }
-        return tx.tenant.update({
+        const updated = await tx.tenant.update({
           where: { id: tenantId },
           data: updateDto,
           select: SETTINGS_SELECT,
         });
+
+        // Audit trail for forensic "who changed the subdomain / branding
+        // / billing email" questions. We store the set of changed field
+        // names rather than full values — some fields are sensitive
+        // (taxId, billingEmail) and audit logs are retained for months.
+        if (actorUserId) {
+          await tx.userActivity.create({
+            data: {
+              userId: actorUserId,
+              tenantId,
+              action: 'TENANT_SETTINGS_UPDATED',
+              metadata: {
+                changedFields: Object.keys(updateDto),
+              },
+            },
+          });
+        }
+
+        return updated;
       });
     } catch (err) {
       if (

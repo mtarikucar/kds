@@ -14,6 +14,8 @@ export class IngredientMovementsService {
       type?: string;
       startDate?: string;
       endDate?: string;
+      limit?: number;
+      offset?: number;
     },
   ) {
     const where: any = { tenantId };
@@ -26,10 +28,21 @@ export class IngredientMovementsService {
       if (filters.endDate) where.createdAt.lte = new Date(filters.endDate);
     }
 
+    // Hard cap: ingredient movements grow without bound (every order
+    // closure can write dozens). A no-filter list call on a year-old
+    // tenant streamed 100k+ rows into Node memory before. 500 covers the
+    // UI default page; callers needing more pass `limit` explicitly up
+    // to the safety ceiling.
+    const HARD_MAX = 5000;
+    const take = Math.min(filters?.limit ?? 500, HARD_MAX);
+    const skip = filters?.offset ?? 0;
+
     return this.prisma.ingredientMovement.findMany({
       where,
       include: { stockItem: { select: { id: true, name: true, unit: true } } },
       orderBy: { createdAt: 'desc' },
+      take,
+      skip,
     });
   }
 
@@ -47,17 +60,28 @@ export class IngredientMovementsService {
             ? Math.abs(dto.quantity)
             : dto.quantity; // ADJUSTMENT can be positive or negative
 
-      const newStock = Number(stockItem.currentStock) + quantityChange;
+      const previousStock = Number(stockItem.currentStock);
+      const newStock = previousStock + quantityChange;
       if (newStock < 0) {
         throw new BadRequestException(
           `Insufficient stock for ${stockItem.name}. Current: ${stockItem.currentStock}, Requested: ${Math.abs(quantityChange)}`,
         );
       }
 
-      await tx.stockItem.update({
-        where: { id: stockItem.id },
+      // Conditional write: previously this read currentStock then
+      // wrote it back without checking it hadn't changed in flight,
+      // so two concurrent OUT movements could each subtract the same
+      // amount and oversell. Filter on the observed currentStock so
+      // only one wins; the loser retries via the BadRequest below.
+      const updated = await tx.stockItem.updateMany({
+        where: { id: stockItem.id, currentStock: stockItem.currentStock },
         data: { currentStock: newStock },
       });
+      if (updated.count === 0) {
+        throw new BadRequestException(
+          `Stock for ${stockItem.name} changed mid-flight; please retry.`,
+        );
+      }
 
       return tx.ingredientMovement.create({
         data: {

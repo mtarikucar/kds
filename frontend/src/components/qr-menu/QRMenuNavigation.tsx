@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ShoppingCart, ClipboardList, Home, Award } from 'lucide-react';
 import { useCartStore } from '../../store/cartStore';
-import MobileBottomMenu from './MobileBottomMenu';
 import { buildQRMenuUrl } from '../../utils/subdomain';
 
 interface QRMenuNavigationProps {
@@ -87,17 +86,47 @@ const QRMenuNavigation: React.FC<QRMenuNavigationProps> = ({
 
   return (
     <>
-      {/* Mobile Bottom Menu - md:hidden means hidden on tablet and above */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50">
-        <MobileBottomMenu
-          tenantId={tenantId}
-          tableId={tableId}
-          primaryColor={primaryColor}
-          secondaryColor={secondaryColor}
-          currentPage={currentPage}
-          enableCustomerOrdering={enableCustomerOrdering}
-          subdomain={subdomain}
-        />
+      {/* Mobile Bottom Menu — same nav items as the desktop nav above,
+          but rendered as a fixed bottom bar on phones. Previously this
+          imported a separate MobileBottomMenu component that was deleted
+          in a refactor; inlining keeps both views in sync going forward. */}
+      <div
+        className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-slate-200/80 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80"
+        style={{ borderTopColor: secondaryColor + '20' }}
+      >
+        <div className="flex justify-around items-stretch">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = item.active;
+            const isDisabled = item.disabled;
+            return (
+              <button
+                key={item.id}
+                onClick={() => !isDisabled && handleNavigation(item.id as 'menu' | 'cart' | 'orders' | 'loyalty')}
+                disabled={isDisabled}
+                className={`flex-1 flex flex-col items-center justify-center py-2 text-xs font-medium ${
+                  isDisabled
+                    ? 'text-slate-300 cursor-not-allowed'
+                    : isActive
+                      ? ''
+                      : 'text-slate-600 hover:text-slate-900'
+                }`}
+                style={isActive ? { color: primaryColor } : undefined}
+              >
+                <Icon className="h-5 w-5 mb-1" />
+                <span className="truncate">{item.label}</span>
+                {item.badge ? (
+                  <span
+                    className="absolute mt-[-32px] ml-6 inline-flex items-center justify-center rounded-full text-[10px] text-white px-1.5 py-0.5"
+                    style={{ backgroundColor: primaryColor }}
+                  >
+                    {item.badge}
+                  </span>
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Tablet & Desktop Navigation - Horizontal Tabs */}

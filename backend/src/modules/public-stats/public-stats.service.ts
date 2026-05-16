@@ -18,20 +18,25 @@ export class PublicStatsService {
   private hashIp(ip: string): string {
     // Salt with a server-side secret so a full IPv4 rainbow table (~450GB,
     // already circulating) cannot re-identify visitors from a DB dump of the
-    // ipHash column. Production must provide IP_HASH_SALT explicitly —
-    // falling back to the empty string makes the hash trivially reversible.
-    const salt =
-      process.env.IP_HASH_SALT ??
-      process.env.JWT_SECRET ??
-      process.env.APP_SECRET;
-    if (!salt && process.env.NODE_ENV === 'production') {
+    // ipHash column. Production must provide IP_HASH_SALT explicitly.
+    //
+    // We deliberately do NOT fall back to JWT_SECRET/APP_SECRET in
+    // production — rotating either of those (a routine action) would
+    // silently re-pseudonymize every historical ipHash, breaking visitor
+    // analytics and audit comparability. IP_HASH_SALT must be its own
+    // value with its own rotation cadence.
+    const inProd = process.env.NODE_ENV === 'production';
+    if (inProd && !process.env.IP_HASH_SALT) {
       throw new Error(
-        'IP_HASH_SALT (or JWT_SECRET/APP_SECRET) must be configured in production',
+        'IP_HASH_SALT must be configured in production (do not reuse JWT_SECRET/APP_SECRET)',
       );
     }
+    const salt = inProd
+      ? process.env.IP_HASH_SALT!
+      : process.env.IP_HASH_SALT ?? 'dev-fallback-salt';
     return crypto
       .createHash('sha256')
-      .update(`${salt ?? 'dev-fallback-salt'}:${ip}`)
+      .update(`${salt}:${ip}`)
       .digest('hex')
       .substring(0, 32);
   }

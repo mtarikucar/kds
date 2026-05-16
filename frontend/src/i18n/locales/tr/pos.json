@@ -233,6 +233,36 @@
     "amountMismatch": "Bölünen tutarlar toplama eşit olmalıdır",
     "collectAll": "Tüm Ödemeleri Al"
   },
+  "progressive": {
+    "title": "Adım Adım Ödeme",
+    "buttonTitle": "Müşteriye Göre Öde",
+    "subtitle": "Müşterinin ödeyeceği ürünleri seçin — kalanı diğerleri öder",
+    "summary": "Toplam {{total}} • Ödenen {{paid}} • Kalan {{remaining}}",
+    "unpaidItems": "Ödenmemiş Ürünler",
+    "paidItems": "Ödenmiş Ürünler",
+    "unitsRemaining": "{{paid}} / {{total}} adet ödendi",
+    "selectedTotal": "Seçilen Toplam",
+    "customerLabel": "Müşteri Adı (isteğe bağlı)",
+    "customerLabelPlaceholder": "Örn. Ali",
+    "transactionId": "Referans No (kart/dijital için)",
+    "payAndContinue": "Öde ve Devam Et",
+    "done": "Bitti",
+    "cancel": "İptal",
+    "noSelection": "Lütfen en az bir ürün seçin",
+    "paymentRecorded": "Ödeme kaydedildi",
+    "paymentFailed": "Ödeme kaydedilemedi",
+    "fullyPaid": "Sipariş tamamen ödendi",
+    "tabOrder": "Sipariş {{number}}",
+    "remainingItems": "Kalan Ürünler",
+    "remainingAmount": "Kalan Tutar",
+    "cannotCancelPartiallyPaid": "Bu siparişte kısmi ödeme yapılmış — önce ödemeyi iade edin.",
+    "noUnpaidItems": "Tüm ürünler ödendi.",
+    "method": {
+      "CASH": "Nakit",
+      "CARD": "Kart",
+      "DIGITAL": "Dijital"
+    }
+  },
   "transfer": {
     "title": "Masa Siparişlerini Aktar",
     "buttonTitle": "Siparişleri başka bir masaya aktar",

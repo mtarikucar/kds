@@ -97,10 +97,11 @@ const ChangePlanPage = () => {
       setSelectedPlan(null);
 
       if (result.type === 'upgrade' && result.requiresPayment && result.paymentInfo) {
-        const { subscriptionId, newPlanId, billingCycle: cycle } = result.paymentInfo;
-        navigate(
-          `/subscription/contact?type=upgrade&subscriptionId=${subscriptionId}&newPlanId=${newPlanId}&billingCycle=${cycle}`
-        );
+        const { newPlanId, billingCycle: cycle } = result.paymentInfo;
+        // CheckoutPage detects upgrade automatically (backend looks up
+        // existingSub on /payments/create-intent and writes a
+        // PendingPlanChange when planIds differ).
+        navigate(`/subscription/checkout?planId=${newPlanId}&billingCycle=${cycle}`);
       } else if (result.type === 'downgrade') {
         // Downgrade scheduled - go back to settings
         navigate('/admin/settings/subscription');

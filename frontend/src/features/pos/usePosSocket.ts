@@ -3,6 +3,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { initializeSocket, disconnectSocket } from '../../lib/socket';
 import { toast } from 'sonner';
 import i18n from '../../i18n/config';
+import { HardwareService, isTauri } from '../../lib/tauri';
+import { useUiStore } from '../../store/uiStore';
+import { useAuthStore } from '../../store/authStore';
 
 export const usePosSocket = () => {
   const [isConnected, setIsConnected] = useState(false);
@@ -46,6 +49,26 @@ export const usePosSocket = () => {
 
     const handleNewOrder = (event: any) => {
       console.log('[POS Socket] New order received:', event);
+
+      // Auto-print kitchen ticket on the desktop POS terminal. Gated on
+      // isTauri() and a configured default kitchen printer; web users
+      // see no prints. Failures are logged but never surface to the
+      // operator — the snapshot is persisted on the backend so the
+      // ticket can be reprinted from the order detail view.
+      // Skip pending-approval orders: those go to kitchen only after a
+      // waiter approves, at which point they're emitted as a status
+      // change rather than order:new.
+      if (isTauri() && !event.requiresApproval) {
+        const kitchenPrinterId = useUiStore.getState().defaultKitchenPrinterId;
+        if (kitchenPrinterId && event.kitchenTicketSnapshot) {
+          HardwareService.printKitchenOrder(
+            kitchenPrinterId,
+            event.kitchenTicketSnapshot,
+          ).catch((err) => {
+            console.error('Kitchen ticket print failed:', err);
+          });
+        }
+      }
 
       // Pure Socket.IO Push: Directly inject order into React Query cache
       // No API calls, instant UI updates
@@ -160,6 +183,10 @@ export const usePosSocket = () => {
 
       // 3. Invalidate tables to update status (lightweight operation)
       queryClient.invalidateQueries({ queryKey: ['tables'] });
+
+      // 4. Invalidate payable-items so the progressive payment modal
+      //    reflects another waiter's per-item payment in real time.
+      queryClient.invalidateQueries({ queryKey: ['payableItems'] });
     };
 
     const handleOrderStatusChanged = (event: any) => {
@@ -195,6 +222,9 @@ export const usePosSocket = () => {
 
       // Invalidate tables to update status (lightweight operation)
       queryClient.invalidateQueries({ queryKey: ['tables'] });
+      // Same reason as in handleOrderUpdated — keep progressive-payment
+      // modal in sync across waiters.
+      queryClient.invalidateQueries({ queryKey: ['payableItems'] });
     };
 
     const handleOrderItemStatusChanged = (event: any) => {
@@ -383,6 +413,51 @@ export const usePosSocket = () => {
       queryClient.invalidateQueries({ queryKey: ['tables'] });
     };
 
+    // payment:success drives the auto-print + cash-drawer path for
+    // payments that originate OUTSIDE the waiter UI — customer
+    // self-pay (PayTR webhook → payByItems), refund flow, write-off,
+    // and ALSO the waiter UI on a different tablet than the one that
+    // initiated the payment.
+    //
+    // Skip the local print branch when this tablet's user is the one
+    // who initiated the payment — their createPayment mutation's
+    // onSuccess already fired a local print + cash drawer, so a
+    // second print here would duplicate the fiş.
+    const handlePaymentSuccess = (event: any) => {
+      console.log('[POS Socket] Payment received:', event);
+      // Cache invalidation always runs (every tablet wants fresh
+      // order state, regardless of who initiated).
+      queryClient.invalidateQueries({ queryKey: ['orders'], refetchType: 'all' });
+      queryClient.invalidateQueries({ queryKey: ['payments'] });
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
+      queryClient.invalidateQueries({ queryKey: ['payableItems'] });
+
+      const myUserId = useAuthStore.getState().user?.id ?? null;
+      const isMyOwnAction =
+        event?.initiatedByUserId &&
+        myUserId &&
+        event.initiatedByUserId === myUserId;
+      if (isMyOwnAction) return; // local mutation onSuccess already printed
+
+      // Tauri-only: print the persisted receipt snapshot. Snapshot
+      // travels in the event payload so the terminal doesn't need to
+      // re-fetch anything. Failures are logged but not toasted —
+      // this is a non-waiter event so the operator isn't watching.
+      if (isTauri() && event?.receiptSnapshot) {
+        const printerId = useUiStore.getState().defaultReceiptPrinterId;
+        if (printerId) {
+          HardwareService.printReceipt(printerId, event.receiptSnapshot).catch(
+            (err) => console.error('Auto-print on payment:success failed:', err),
+          );
+          if (event.method === 'CASH') {
+            HardwareService.openCashDrawer(printerId).catch((err) =>
+              console.error('Cash drawer open failed:', err),
+            );
+          }
+        }
+      }
+    };
+
     socket.on('connect', handleConnect);
     socket.on('disconnect', handleDisconnect);
     socket.on('order:new', handleNewOrder);
@@ -394,6 +469,7 @@ export const usePosSocket = () => {
     socket.on('bill-request:updated', handleBillRequestUpdated);
     socket.on('waiter-request:new', handleWaiterRequestNew);
     socket.on('waiter-request:updated', handleWaiterRequestUpdated);
+    socket.on('payment:success', handlePaymentSuccess);
 
     // Table merge/unmerge: invalidate tables cache
     const handleTableMergeOrUnmerge = () => {
@@ -413,6 +489,7 @@ export const usePosSocket = () => {
       socket.off('order:updated', handleOrderUpdated);
       socket.off('order:status-changed', handleOrderStatusChanged);
       socket.off('order:item-status-changed', handleOrderItemStatusChanged);
+      socket.off('payment:success', handlePaymentSuccess);
       socket.off('table:orders-transferred', handleTableTransfer);
       socket.off('bill-request:new', handleBillRequestNew);
       socket.off('bill-request:updated', handleBillRequestUpdated);
