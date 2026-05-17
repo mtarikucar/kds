@@ -292,14 +292,20 @@ jobs:
           DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/restaurant_pos_prod?connection_limit=25&pool_timeout=10
           REDIS_URL=redis://redis:6379/0
 
-          # JWT
+          # JWT realms — every secret here must be UNIQUE in production.
+          # backend env-validation.ts asserts `distinctFrom` across all
+          # seven core secrets and aborts boot if any two collide. Each
+          # value is therefore wired to its own GitHub secret; never
+          # alias one to another.
           JWT_SECRET=${JWT_SECRET}
           JWT_EXPIRES_IN=7d
           JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
           JWT_REFRESH_EXPIRES_IN=30d
           SUPERADMIN_JWT_SECRET=${SUPERADMIN_JWT_SECRET}
-          MARKETING_JWT_SECRET=${JWT_SECRET}
-          SUPERADMIN_JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+          SUPERADMIN_JWT_REFRESH_SECRET=${SUPERADMIN_JWT_REFRESH_SECRET}
+          MARKETING_JWT_SECRET=${MARKETING_JWT_SECRET}
+          MARKETING_JWT_REFRESH_SECRET=${MARKETING_JWT_REFRESH_SECRET}
+          ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY}
 
           # CORS
           CORS_ORIGIN=https://hummytummy.com,http://tauri.localhost,tauri://localhost,https://tauri.localhost
@@ -315,7 +321,16 @@ jobs:
           PAYTR_MERCHANT_KEY=${PAYTR_MERCHANT_KEY}
           PAYTR_MERCHANT_SALT=${PAYTR_MERCHANT_SALT}
           PAYTR_BASE_URL=https://www.paytr.com
-          PAYTR_TEST_MODE=false
+          # backend env-validation aborts boot if PAYTR_TEST_MODE is "1"
+          # (or unset) in production — test-mode payments do not move
+          # real money. Must be the literal "0".
+          PAYTR_TEST_MODE=0
+          # PayTR redirects users to these URLs after success/failure on
+          # its hosted iframe. Both are required (env-validation rules),
+          # so they're written here as literal production URLs rather
+          # than secrets — the value never differs by deployment.
+          PAYTR_OK_URL=https://hummytummy.com/app/subscription/success
+          PAYTR_FAIL_URL=https://hummytummy.com/app/subscription/fail
           BACKEND_URL=https://hummytummy.com
 
           # Email (SMTP)
@@ -344,9 +359,8 @@ jobs:
 
           # Desktop Release
           DESKTOP_RELEASE_API_KEY=${DESKTOP_RELEASE_API_KEY}
-          MARKETING_JWT_REFRESH_SECRET=${MARKETING_JWT_REFRESH_SECRET}
-          SUPERADMIN_JWT_REFRESH_SECRET=${SUPERADMIN_JWT_REFRESH_SECRET}
-          ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY}
+
+          # Infrastructure
           REDIS_PASSWORD=${REDIS_PASSWORD}
           ENVFILE
 
