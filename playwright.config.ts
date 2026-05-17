@@ -1,4 +1,11 @@
 import { defineConfig, devices } from '@playwright/test';
+// Pull backend/.env into the Playwright process so PAYTR_* (and any
+// other secret the backend reads) is available to both `webServer.env`
+// and the test-runner helpers. Without this the test runner only sees
+// what the shell exported, and the PayTR sandbox creds in
+// `backend/.env` wouldn't reach the spec files. backend/.env is
+// gitignored — no secrets land in source control.
+require('./backend/node_modules/dotenv').config({ path: './backend/.env' });
 
 /**
  * Playwright configuration for E2E tests.
@@ -13,12 +20,16 @@ import { defineConfig, devices } from '@playwright/test';
 const isCI = !!process.env.CI;
 const reuseServer = !isCI; // locally, reuse running dev servers if present
 
-// PayTR test credentials. The webhook helper computes the HMAC with the
-// same key/salt so the backend accepts simulated callbacks. Kept here
-// (not in backend/.env) so the test suite is self-contained.
-const PAYTR_TEST_MERCHANT_ID = 'e2e-merchant-id';
-const PAYTR_TEST_MERCHANT_KEY = 'e2e-merchant-key-for-hmac-32-chars-long';
-const PAYTR_TEST_MERCHANT_SALT = 'e2e-merchant-salt-for-hmac-32-chars';
+// PayTR credentials for the test stack. Prefer real PAYTR_* values
+// from the environment (typically backend/.env, sourced by the shell
+// before running playwright). Without them, fall back to deterministic
+// mock values so the suite still runs offline. The webhook helper
+// reads from the same env vars so its HMAC keys match the backend.
+const PAYTR_TEST_MERCHANT_ID = process.env.PAYTR_MERCHANT_ID || 'e2e-merchant-id';
+const PAYTR_TEST_MERCHANT_KEY =
+  process.env.PAYTR_MERCHANT_KEY || 'e2e-merchant-key-for-hmac-32-chars-long';
+const PAYTR_TEST_MERCHANT_SALT =
+  process.env.PAYTR_MERCHANT_SALT || 'e2e-merchant-salt-for-hmac-32-chars';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -71,6 +82,11 @@ export default defineConfig({
         PAYTR_MERCHANT_KEY: PAYTR_TEST_MERCHANT_KEY,
         PAYTR_MERCHANT_SALT: PAYTR_TEST_MERCHANT_SALT,
         PAYTR_TEST_MODE: '1',
+        // Short-circuit the PayTR HTTP call in PaytrAdapter.getIframeToken
+        // so create-intent works without sandbox reachability. The webhook
+        // hash still uses the real MERCHANT_KEY/SALT, so simulatePaytrSuccess
+        // exercises the full webhook → state-change chain.
+        PAYTR_USE_FAKE_ADAPTER: 'true',
       },
     },
     {

@@ -28,6 +28,22 @@ function tomorrowISO(): string {
 }
 
 /**
+ * Pick a random {start, end} slot inside a wide operating window. Used
+ * as the default for createPublicReservation so concurrent test runs
+ * don't pile onto the same slot and trip `maxReservationsPerSlot`. End
+ * time = start + 90 minutes (matches the seed defaultDuration).
+ */
+function randomSlot(): { startTime: string; endTime: string } {
+  // 12:00 .. 21:00 in 30-minute steps → 19 possible starts.
+  const idx = Math.floor(Math.random() * 19);
+  const startMinutes = 12 * 60 + idx * 30;
+  const endMinutes = startMinutes + 90;
+  const fmt = (m: number) =>
+    `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+  return { startTime: fmt(startMinutes), endTime: fmt(endMinutes) };
+}
+
+/**
  * Public reservation endpoint — no auth, but requires tenantId in the
  * path. Returns a confirmation number the cancel-endpoint pairs with
  * the phone for lookup.
@@ -39,10 +55,11 @@ export async function createPublicReservation(
   const ctx = await request.newContext({ baseURL: API_BASE });
   try {
     const ts = Date.now().toString();
+    const slot = randomSlot();
     const payload = {
       date: input.date ?? tomorrowISO(),
-      startTime: input.startTime ?? '19:00',
-      endTime: input.endTime ?? '20:30',
+      startTime: input.startTime ?? slot.startTime,
+      endTime: input.endTime ?? slot.endTime,
       guestCount: input.guestCount ?? 2,
       customerName: input.customerName ?? `E2E Reserve ${ts}`,
       customerPhone: input.customerPhone ?? `+905${ts.slice(-9)}`,

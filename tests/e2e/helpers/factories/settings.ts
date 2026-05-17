@@ -32,3 +32,20 @@ export async function setTenantSettings(
   if (!res.ok()) throw new Error(`setTenantSettings failed: ${res.status()} ${await res.text()}`);
   return res.json();
 }
+
+/**
+ * Patch the current tenant's ReservationSettings row. Endpoint:
+ * `PATCH /reservations/settings/current` — admin/manager scoped,
+ * gated by the RESERVATION_SYSTEM plan feature. The body is a
+ * partial UpdateReservationSettingsDto; the service auto-creates
+ * the row on first call.
+ */
+export async function setReservationSettings(
+  api: APIRequestContext,
+  patch: Record<string, unknown>,
+): Promise<Record<string, unknown>> {
+  const res = await api.patch('reservations/settings/current', { data: patch });
+  if (!res.ok())
+    throw new Error(`setReservationSettings failed: ${res.status()} ${await res.text()}`);
+  return res.json();
+}

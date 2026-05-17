@@ -1,5 +1,10 @@
 import { APIRequestContext } from '@playwright/test';
-import { loginAsSuperAdmin } from './api';
+import { loginAsApi, loginAsSuperAdmin } from './api';
+import {
+  upgradeViaPayTR,
+  forceDowngrade,
+  markEmailVerified,
+} from './paytr-plan-switch';
 
 export type PlanName = 'FREE' | 'BASIC' | 'PRO' | 'BUSINESS';
 
@@ -117,19 +122,35 @@ async function findActiveSubscriptionForTenant(
   );
 }
 
+const PLAN_PRICE_ORDER: Record<PlanName, number> = {
+  FREE: 0,
+  BASIC: 1,
+  PRO: 2,
+  BUSINESS: 3,
+};
+
+async function planNameFromId(superApi: APIRequestContext, planId: string): Promise<PlanName> {
+  const plans = await listPlans(superApi);
+  const row = plans.find((p) => p.id === planId);
+  if (!row) throw new Error(`Plan id ${planId} not found in superadmin/plans`);
+  return row.name;
+}
+
 /**
- * Switch the demo tenant's current plan via the superadmin
- * `PATCH /superadmin/subscriptions/:id` endpoint. That handler
- * atomically moves both Subscription.planId AND Tenant.currentPlanId,
- * so the PlanFeatureGuard sees the new flags immediately on the next
- * request.
+ * Switch the demo tenant's current plan to `newPlan`.
  *
- * The guard also requires a live subscription for non-FREE plans, so
- * we never touch Subscription.status — the existing ACTIVE/TRIALING
- * row keeps the tenant "live" while only its plan reference moves.
+ * Upgrades (price up) go through the production PayTR flow:
+ *   POST /payments/create-intent  →  PendingPlanChange + SubscriptionPayment
+ *   POST /webhooks/paytr (simulated success) →  webhook activates new plan
+ *
+ * Downgrades (price down) use the superadmin PATCH path. Production
+ * schedules downgrades for period end and applies them via a scheduler
+ * tick; tests collapse to immediate. The Subscription.planId /
+ * Tenant.currentPlanId end state is identical either way, which is
+ * all the PlanFeatureGuard observes.
  *
  * Returns a restore() that puts the original plan back. Restore is
- * idempotent; calling it twice is a noop.
+ * direction-aware (upgrade vs downgrade) and idempotent.
  */
 export async function switchTenantPlan(
   superApi: APIRequestContext,
@@ -139,35 +160,62 @@ export async function switchTenantPlan(
   const sub = await findActiveSubscriptionForTenant(superApi, tenantId);
   if (!sub) {
     throw new Error(
-      `No live subscription for tenant ${tenantId}; cannot switch plan via PATCH /superadmin/subscriptions/:id`,
+      `No live subscription for tenant ${tenantId}; switchTenantPlan needs an ACTIVE/TRIALING/PAST_DUE row`,
     );
   }
   const previousPlanId = sub.planId;
   const newPlanId = await getPlanIdByName(superApi, newPlan);
-
   if (previousPlanId === newPlanId) {
     return { restore: async () => {}, subscriptionId: sub.id, previousPlanId };
   }
 
-  const res = await superApi.patch(`superadmin/subscriptions/${sub.id}`, {
-    data: { planId: newPlanId },
-  });
-  if (!res.ok()) {
-    throw new Error(`switchTenantPlan → ${newPlan}: ${res.status()} ${await res.text()}`);
-  }
+  const previousPlanName = await planNameFromId(superApi, previousPlanId);
+  await applyPlanChange(superApi, tenantId, sub.id, previousPlanName, newPlan);
 
   let restored = false;
   const restore = async (): Promise<void> => {
     if (restored) return;
     restored = true;
-    const back = await superApi.patch(`superadmin/subscriptions/${sub.id}`, {
-      data: { planId: previousPlanId },
-    });
-    if (!back.ok()) {
-      throw new Error(`restore previous plan: ${back.status()} ${await back.text()}`);
-    }
+    // Re-read current state because intervening tests / restores may have
+    // already moved the tenant. If we're already on previousPlanName,
+    // there's nothing to do.
+    const live = await findActiveSubscriptionForTenant(superApi, tenantId);
+    if (!live) return;
+    const liveName = await planNameFromId(superApi, live.planId);
+    if (liveName === previousPlanName) return;
+    await applyPlanChange(superApi, tenantId, live.id, liveName, previousPlanName);
   };
   return { restore, subscriptionId: sub.id, previousPlanId };
+}
+
+async function applyPlanChange(
+  superApi: APIRequestContext,
+  tenantId: string,
+  subscriptionId: string,
+  fromPlan: PlanName,
+  toPlan: PlanName,
+): Promise<void> {
+  const isUpgrade = PLAN_PRICE_ORDER[toPlan] > PLAN_PRICE_ORDER[fromPlan];
+  if (isUpgrade) {
+    // Resolve the tenant's admin user so create-intent can be called
+    // and emailVerified can be flipped via superadmin.
+    const { api: adminApi, user: adminUser } = await loginAsApi('admin');
+    try {
+      await markEmailVerified(superApi, adminUser.id);
+      await upgradeViaPayTR(adminApi, superApi, adminUser.id, toPlan);
+    } finally {
+      await adminApi.dispose();
+    }
+    return;
+  }
+  // Downgrade: superadmin PATCH. The end state matches
+  // applyScheduledDowngrade's output (Subscription.planId and
+  // Tenant.currentPlanId both updated atomically).
+  const newPlanId = await getPlanIdByName(superApi, toPlan);
+  await forceDowngrade(superApi, subscriptionId, newPlanId);
+  // Voids unused tenantId in this branch but kept for symmetry / future
+  // extension (e.g., audit-log assertion on currentPlanId).
+  void tenantId;
 }
 
 /** Clear any leftover tenant featureOverrides so plan-only gating

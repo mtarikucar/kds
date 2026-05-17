@@ -4,12 +4,16 @@ import { API_BASE } from './api';
 
 /**
  * Mirror of `backend/src/modules/payments/webhooks/paytr-hash.util.ts`.
- * The keys must match the ones injected via `playwright.config.ts`
- * `webServer.env` so the controller's `verifyCallbackHash` accepts
- * our simulated callbacks.
+ * The keys must match the ones the backend booted with — that is,
+ * whatever `playwright.config.ts` injected via `webServer.env`
+ * (real PayTR sandbox creds when PAYTR_* is set in the shell env,
+ * deterministic mock values otherwise). Reading from the same env
+ * vars keeps the two sides aligned without duplicating the secret.
  */
-const MERCHANT_KEY = 'e2e-merchant-key-for-hmac-32-chars-long';
-const MERCHANT_SALT = 'e2e-merchant-salt-for-hmac-32-chars';
+const MERCHANT_KEY =
+  process.env.PAYTR_MERCHANT_KEY || 'e2e-merchant-key-for-hmac-32-chars-long';
+const MERCHANT_SALT =
+  process.env.PAYTR_MERCHANT_SALT || 'e2e-merchant-salt-for-hmac-32-chars';
 
 function sign(merchantOid: string, status: string, totalAmount: string): string {
   return crypto

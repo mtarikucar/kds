@@ -171,6 +171,26 @@ export class PaytrAdapter {
     const { merchantId, merchantKey, merchantSalt, testMode } = this.credentials;
 
     const paymentAmount = amountToKurus(input.amount);
+
+    // E2E-only short-circuit: when the harness sets PAYTR_USE_FAKE_ADAPTER=true
+    // skip the real paytr.com HTTP call and return a deterministic synthetic
+    // token. The test runner can then drive the webhook (`/webhooks/paytr`)
+    // with a hash signed by the same `MERCHANT_KEY/SALT` the backend booted
+    // with, exercising the full create-intent → webhook → state-change chain
+    // without depending on PayTR sandbox reachability. The flag is gated on
+    // a dedicated env var (not on test_mode or merchant_id format) so a misconfigured
+    // production env can never accidentally mint fake tokens.
+    if (this.config.get<string>('PAYTR_USE_FAKE_ADAPTER') === 'true') {
+      const synthetic = `e2e-token-${input.merchantOid}`;
+      return {
+        token: synthetic,
+        paymentLink: buildPaymentUrl(synthetic),
+        merchantOid: input.merchantOid,
+        amount: paymentAmount,
+        currency: 'TL',
+      };
+    }
+
     const userBasketBase64 = encodeUserBasket(input.userBasket);
     const payload: IframeTokenPayload = {
       merchantId,
