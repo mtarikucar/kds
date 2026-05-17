@@ -68,3 +68,8 @@ Cargo.lock
 
 examples/
 nul
+
+# Playwright artifacts
+playwright-report/
+playwright-results.xml
+test-results/
