@@ -16,7 +16,12 @@
       "Bash(curl -sS -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5179/app/)",
       "Bash(curl -sS -X POST http://localhost:50080/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"admin@sultanahmet.com\",\"password\":\"admin123\"}')",
       "Bash(python3 -c \"import sys,json; t=json.load\\(sys.stdin\\); print\\('access_token=', t.get\\('accessToken','no_token'\\)[:30]\\); print\\('user=', json.dumps\\(t.get\\('user',{}\\),indent=2\\)\\)\")",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "Bash(cp -r templates/emails templates/emails-prebuild-backup)",
+      "Bash(npx webpack *)",
+      "Bash(npm run *)"
     ]
   }
 }

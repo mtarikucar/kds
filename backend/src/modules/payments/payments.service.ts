@@ -216,10 +216,11 @@ export class PaymentsService {
         userName:
           `${callingUser.firstName ?? ''} ${callingUser.lastName ?? ''}`.trim() ||
           callingUser.email,
-        // PayTR labels this "buyer address". We don't currently capture a
-        // postal address per tenant; pass empty so we don't shove the
-        // restaurant brand name into a tax-receipt address field.
-        userAddress: '',
+        // PayTR rejects get-token with "Zorunlu alan degeri gecersiz veya
+        // gonderilmedi: user_address" when this is empty. We don't capture
+        // a tenant-level postal address yet, so fall back to the country
+        // string — accepted by PayTR as a valid buyer address.
+        userAddress: 'Türkiye',
         userPhone: callingUser.phone ?? '',
         userBasket: [[plan.displayName, new Prisma.Decimal(amount).toFixed(2), 1]],
         userIp,

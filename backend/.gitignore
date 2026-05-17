@@ -1,3 +1,23 @@
 
 # Upload files
 uploads/
+
+# Subscription email templates copied by webpack CopyPlugin at build time
+# from src/modules/subscriptions/templates/emails. Source-of-truth lives
+# next to the module; committing the build output here would create
+# dual-truth and silent drift.
+templates/emails/international-request-confirmation.hbs
+templates/emails/international-subscription-request.hbs
+templates/emails/invoice-ready.hbs
+templates/emails/payment-failed.hbs
+templates/emails/payment-successful.hbs
+templates/emails/plan-change-confirmation.hbs
+templates/emails/plan-downgraded.hbs
+templates/emails/plan-upgraded.hbs
+templates/emails/subscription-activated.hbs
+templates/emails/subscription-cancelled.hbs
+templates/emails/subscription-cancelled-immediate.hbs
+templates/emails/subscription-will-cancel.hbs
+templates/emails/trial-ending.hbs
+templates/emails/trial-expired.hbs
+templates/emails/trial-started.hbs
