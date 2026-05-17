@@ -109,7 +109,7 @@
       "faqChangePlans": "Tarifni keyinroq o'zgartira olamanmi?",
       "faqChangePlansAnswer": "Ha, tarifni obuna boshqaruvi sahifasidan istalgan vaqtda oshirishingiz yoki pasaytirishingiz mumkin.",
       "faqPaymentMethods": "Qaysi to'lov usullarini qabul qilasiz?",
-      "faqPaymentMethodsAnswer": "Stripe orqali barcha asosiy kredit kartalarni qabul qilamiz, shuningdek Iyzico orqali mahalliy to'lov usullarini qo'llab-quvvatlaymiz.",
+      "faqPaymentMethodsAnswer": "Biz barcha asosiy kredit va debet kartalarni xavfsiz Turkiya to'lov provayderimiz PayTR orqali qabul qilamiz.",
       "faqCancelAnytime": "Istalgan vaqtda bekor qila olamanmi?",
       "faqCancelAnytimeAnswer": "Ha, obunani istalgan vaqtda bekor qilishingiz mumkin. Hisob-kitob davrining oxirigacha kirishingiz saqlanadi.",
       "faqFreeTrial": "Bepul sinov davri bormi?",

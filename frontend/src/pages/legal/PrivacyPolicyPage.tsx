@@ -94,7 +94,7 @@ const PrivacyPolicyPage: React.FC = () => {
                   We may use third-party service providers to monitor and analyze the use of our Service, process payments, and provide other services:
                 </p>
                 <ul>
-                  <li><strong>Payment Processors:</strong> Stripe, Iyzico</li>
+                  <li><strong>Payment Processors:</strong> PayTR, Stripe</li>
                   <li><strong>Analytics:</strong> Google Analytics</li>
                   <li><strong>Cloud Services:</strong> For hosting and data storage</li>
                 </ul>
@@ -178,7 +178,7 @@ const PrivacyPolicyPage: React.FC = () => {
                   Hizmetimizin kullanımını izlemek ve analiz etmek, ödemeleri işlemek ve diğer hizmetleri sağlamak için üçüncü taraf hizmet sağlayıcıları kullanabiliriz:
                 </p>
                 <ul>
-                  <li><strong>Ödeme İşlemcileri:</strong> Stripe, Iyzico</li>
+                  <li><strong>Ödeme İşlemcileri:</strong> PayTR, Stripe</li>
                   <li><strong>Analitik:</strong> Google Analytics</li>
                   <li><strong>Bulut Hizmetleri:</strong> Barındırma ve veri depolama için</li>
                 </ul>

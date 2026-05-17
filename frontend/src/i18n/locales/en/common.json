@@ -525,7 +525,7 @@
     "faqQ2": "Can I change plans later?",
     "faqA2": "Yes! You can upgrade or downgrade your plan at any time. Changes will be reflected in your next billing cycle.",
     "faqQ3": "What payment methods do you accept?",
-    "faqA3": "We accept all major credit cards, debit cards, and support both international (Stripe) and Turkish (Iyzico) payment methods.",
+    "faqA3": "We accept all major credit and debit cards through PayTR, our secure Turkish payment provider.",
     "faqQ4": "Is my data secure?",
     "faqA4": "Absolutely. We use industry-standard encryption and security practices to keep your data safe. Your information is never shared with third parties.",
     "off": "OFF",

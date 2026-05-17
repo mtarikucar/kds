@@ -139,8 +139,6 @@ jobs:
           PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}
           PAYTR_MERCHANT_KEY: ${{ secrets.PAYTR_MERCHANT_KEY }}
           PAYTR_MERCHANT_SALT: ${{ secrets.PAYTR_MERCHANT_SALT }}
-          IYZICO_API_KEY: ${{ secrets.IYZICO_API_KEY }}
-          IYZICO_SECRET_KEY: ${{ secrets.IYZICO_SECRET_KEY }}
           EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
@@ -201,9 +199,6 @@ jobs:
             FRONTEND_URL=https://staging.hummytummy.com
 
             # Payment
-            IYZICO_API_KEY=${IYZICO_API_KEY}
-            IYZICO_SECRET_KEY=${IYZICO_SECRET_KEY}
-            IYZICO_BASE_URL=https://sandbox-api.iyzipay.com
             PAYTR_MERCHANT_ID=${PAYTR_MERCHANT_ID}
             PAYTR_MERCHANT_KEY=${PAYTR_MERCHANT_KEY}
             PAYTR_MERCHANT_SALT=${PAYTR_MERCHANT_SALT}

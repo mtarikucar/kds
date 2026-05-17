@@ -6,7 +6,6 @@ module.exports = function (options, webpack) {
     ...options,
     externals: {
       sharp: 'commonjs sharp',
-      iyzipay: 'commonjs iyzipay',
       '@sentry/profiling-node': 'commonjs @sentry/profiling-node',
     },
     module: {

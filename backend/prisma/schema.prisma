@@ -1250,7 +1250,7 @@ model IntegrationSettings {
 
   // Integration type
   integrationType String   // PAYMENT_GATEWAY, POS_HARDWARE, THIRD_PARTY_API, DELIVERY_APP, ACCOUNTING, CRM, INVENTORY
-  provider        String   // stripe, iyzico, pos_terminal, quickbooks, etc.
+  provider        String   // stripe, paytr, pos_terminal, quickbooks, etc.
   name            String   // User-friendly name
 
   // Configuration (stored as JSON)

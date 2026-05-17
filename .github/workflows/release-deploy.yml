@@ -182,8 +182,6 @@ jobs:
           PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}
           PAYTR_MERCHANT_KEY: ${{ secrets.PAYTR_MERCHANT_KEY }}
           PAYTR_MERCHANT_SALT: ${{ secrets.PAYTR_MERCHANT_SALT }}
-          IYZICO_API_KEY: ${{ secrets.IYZICO_API_KEY }}
-          IYZICO_SECRET_KEY: ${{ secrets.IYZICO_SECRET_KEY }}
           EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
@@ -198,6 +196,9 @@ jobs:
           ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         run: |
+          # REQUIRED — backend won't boot without these (env-validation
+          # asserts presence + minLength + distinctFrom). Missing →
+          # hard fail.
           required=(
             POSTGRES_PASSWORD
             JWT_SECRET JWT_REFRESH_SECRET
@@ -206,26 +207,42 @@ jobs:
             ENCRYPTION_MASTER_KEY
             REDIS_PASSWORD
             PAYTR_MERCHANT_ID PAYTR_MERCHANT_KEY PAYTR_MERCHANT_SALT
-            IYZICO_API_KEY IYZICO_SECRET_KEY
+          )
+          # RECOMMENDED — feature degrades gracefully when missing
+          # (SMTP silently skips email sends per notification.service.ts,
+          # Google OAuth is one of several login methods, the desktop
+          # release key is consumed by a separate workflow). Missing →
+          # warn but deploy continues.
+          recommended=(
             EMAIL_HOST EMAIL_USER EMAIL_PASSWORD EMAIL_FROM
             GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET
             DESKTOP_RELEASE_API_KEY
           )
+
           missing=()
           for name in "${required[@]}"; do
-            if [ -z "${!name}" ]; then
-              missing+=("$name")
-            fi
+            [ -z "${!name}" ] && missing+=("$name")
           done
           if [ ${#missing[@]} -gt 0 ]; then
-            echo "::error::Refusing to deploy — the following GitHub secrets are unset or empty:"
+            echo "::error::Refusing to deploy — required secrets unset or empty:"
             for name in "${missing[@]}"; do
               echo "::error::  - $name"
             done
             echo "Add each missing secret under repo Settings → Secrets and variables → Actions, then re-run."
             exit 1
           fi
-          echo "All ${#required[@]} required secrets are present."
+
+          degraded=()
+          for name in "${recommended[@]}"; do
+            [ -z "${!name}" ] && degraded+=("$name")
+          done
+          if [ ${#degraded[@]} -gt 0 ]; then
+            echo "::warning::Deploying with degraded functionality — recommended secrets unset:"
+            for name in "${degraded[@]}"; do
+              echo "::warning::  - $name"
+            done
+          fi
+          echo "All ${#required[@]} required secrets present (${#degraded[@]} recommended secret(s) missing)."
 
       - name: Deploy to production
         id: deploy
@@ -236,8 +253,6 @@ jobs:
           PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}
           PAYTR_MERCHANT_KEY: ${{ secrets.PAYTR_MERCHANT_KEY }}
           PAYTR_MERCHANT_SALT: ${{ secrets.PAYTR_MERCHANT_SALT }}
-          IYZICO_API_KEY: ${{ secrets.IYZICO_API_KEY }}
-          IYZICO_SECRET_KEY: ${{ secrets.IYZICO_SECRET_KEY }}
           EMAIL_HOST: ${{ secrets.EMAIL_HOST }}
           EMAIL_USER: ${{ secrets.EMAIL_USER }}
           EMAIL_PASSWORD: ${{ secrets.EMAIL_PASSWORD }}
@@ -310,11 +325,6 @@ jobs:
           # CORS
           CORS_ORIGIN=https://hummytummy.com,http://tauri.localhost,tauri://localhost,https://tauri.localhost
           FRONTEND_URL=https://hummytummy.com
-
-          # Iyzico Payment
-          IYZICO_API_KEY=${IYZICO_API_KEY}
-          IYZICO_SECRET_KEY=${IYZICO_SECRET_KEY}
-          IYZICO_BASE_URL=https://api.iyzipay.com
 
           # PayTR Payment
           PAYTR_MERCHANT_ID=${PAYTR_MERCHANT_ID}

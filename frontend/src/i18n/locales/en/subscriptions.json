@@ -123,7 +123,7 @@
       "faqChangePlans": "Can I change plans later?",
       "faqChangePlansAnswer": "Yes, you can upgrade or downgrade your plan at any time from the subscription management page.",
       "faqPaymentMethods": "What payment methods do you accept?",
-      "faqPaymentMethodsAnswer": "We accept all major credit cards through Stripe and also support local payment methods via Iyzico.",
+      "faqPaymentMethodsAnswer": "We accept all major credit and debit cards through PayTR, our secure Turkish payment provider.",
       "faqCancelAnytime": "Can I cancel anytime?",
       "faqCancelAnytimeAnswer": "Yes, you can cancel your subscription at any time. You'll continue to have access until the end of your billing period.",
       "faqFreeTrial": "Is there a free trial?",

@@ -802,7 +802,6 @@ export interface CreateSubscriptionDto {
   planId: string;
   billingCycle: BillingCycle;
   paymentMethodId?: string; // Optional: For Stripe payment method
-  iyzicoPaymentDetails?: any; // Optional: For Iyzico specific payment details
 }
 
 export interface UpdateSubscriptionDto {

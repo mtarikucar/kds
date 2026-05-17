@@ -525,7 +525,7 @@
     "faqQ2": "Daha sonra planı değiştirebilir miyim?",
     "faqA2": "Evet! Planınızı istediğiniz zaman yükseltebilir veya düşürebilirsiniz. Değişiklikler bir sonraki fatura döneminde yürürlüğe girecektir.",
     "faqQ3": "Hangi ödeme yöntemlerini kabul ediyorsunuz?",
-    "faqA3": "Tüm ana kredi kartlarını, banka kartlarını kabul ediyoruz ve hem uluslararası (Stripe) hem de Türk (Iyzico) ödeme yöntemlerini destekliyoruz.",
+    "faqA3": "Tüm ana kredi ve banka kartlarını güvenli Türk ödeme sağlayıcımız PayTR üzerinden kabul ediyoruz.",
     "faqQ4": "Verilerim güvende mi?",
     "faqA4": "Kesinlikle. Verilerinizi güvende tutmak için endüstri standardı şifreleme ve güvenlik uygulamaları kullanıyoruz. Bilgileriniz asla üçüncü taraflarla paylaşılmaz.",
     "off": "İNDİRİM",

@@ -352,7 +352,7 @@ describe.skip('Subscriptions E2E Tests', () => {
       const pendingChangeId = upgradeResponse.body.id;
       expect(upgradeResponse.body.status).toBe('PENDING');
 
-      // 2. Simulate payment confirmation (in real scenario, this comes from Stripe/Iyzico webhook)
+      // 2. Simulate payment confirmation (in real scenario, this comes from a PayTR webhook)
       await prisma.subscriptionChange.update({
         where: { id: pendingChangeId },
         data: { status: 'COMPLETED' },

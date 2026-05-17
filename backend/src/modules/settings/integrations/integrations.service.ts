@@ -70,7 +70,7 @@ export class IntegrationsService {
 
   /**
    * Transparent decrypt — callers get the plaintext config. Used by
-   * adapter-side code (StripeAdapter, IyzicoAdapter, etc.) that needs
+   * adapter-side code (StripeAdapter, PaytrAdapter, etc.) that needs
    * real credentials. NEVER returned to HTTP responses without first
    * routing through `toPublicView`.
    */
