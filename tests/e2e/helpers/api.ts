@@ -58,40 +58,70 @@ let cachedSuperAdmin: {
   user: { id: string; email: string };
 } | null = null;
 
-export async function loginAsSuperAdmin(): Promise<{
-  api: APIRequestContext;
-  accessToken: string;
-  user: { id: string; email: string };
-}> {
+/**
+ * In-flight promise dedup so parallel `beforeAll` hooks share one
+ * login attempt instead of double-burning the TOTP step.
+ */
+let cachedSuperAdminPromise: Promise<typeof cachedSuperAdmin> | null = null;
+
+export async function loginAsSuperAdmin(): Promise<NonNullable<typeof cachedSuperAdmin>> {
   if (cachedSuperAdmin) return cachedSuperAdmin;
+  if (!cachedSuperAdminPromise) {
+    cachedSuperAdminPromise = doSuperAdminLogin()
+      .then((r) => {
+        cachedSuperAdmin = r;
+        return r;
+      })
+      .catch((e) => {
+        cachedSuperAdminPromise = null; // allow retry on subsequent call
+        throw e;
+      });
+  }
+  const result = await cachedSuperAdminPromise;
+  return result!;
+}
+
+async function doSuperAdminLogin(): Promise<NonNullable<typeof cachedSuperAdmin>> {
   const { email, password, totpSecret } = PLATFORM_USERS.superadmin;
-  const ctx = await request.newContext({ baseURL: API_BASE });
+  const attempt = async (): Promise<NonNullable<typeof cachedSuperAdmin>> => {
+    const ctx = await request.newContext({ baseURL: API_BASE });
+    try {
+      const loginRes = await ctx.post('superadmin/auth/login', { data: { email, password } });
+      if (!loginRes.ok())
+        throw new Error(`superadmin login: ${loginRes.status()} ${await loginRes.text()}`);
+      const { tempToken } = await loginRes.json();
+      if (!tempToken) throw new Error('superadmin login: no tempToken in response');
+
+      const code = speakeasy.totp({ secret: totpSecret, encoding: 'base32' });
+      const verifyRes = await ctx.post('superadmin/auth/verify-2fa', {
+        data: { tempToken, code },
+      });
+      if (!verifyRes.ok())
+        throw new Error(`superadmin verify-2fa: ${verifyRes.status()} ${await verifyRes.text()}`);
+      const body = await verifyRes.json();
+      const accessToken: string = body.accessToken;
+      const user = body.superAdmin ?? body.user ?? { id: '', email };
+      await ctx.dispose();
+
+      const api = await request.newContext({
+        baseURL: API_BASE,
+        extraHTTPHeaders: { Authorization: `Bearer ${accessToken}` },
+      });
+      return { api, accessToken, user };
+    } catch (e) {
+      await ctx.dispose();
+      throw e;
+    }
+  };
   try {
-    const loginRes = await ctx.post('superadmin/auth/login', { data: { email, password } });
-    if (!loginRes.ok())
-      throw new Error(`superadmin login: ${loginRes.status()} ${await loginRes.text()}`);
-    const { tempToken } = await loginRes.json();
-    if (!tempToken) throw new Error('superadmin login: no tempToken in response');
-
-    const code = speakeasy.totp({ secret: totpSecret, encoding: 'base32' });
-    const verifyRes = await ctx.post('superadmin/auth/verify-2fa', {
-      data: { tempToken, code },
-    });
-    if (!verifyRes.ok())
-      throw new Error(`superadmin verify-2fa: ${verifyRes.status()} ${await verifyRes.text()}`);
-    const body = await verifyRes.json();
-    const accessToken: string = body.accessToken;
-    const user = body.superAdmin ?? body.user ?? { id: '', email };
-    await ctx.dispose();
-
-    const api = await request.newContext({
-      baseURL: API_BASE,
-      extraHTTPHeaders: { Authorization: `Bearer ${accessToken}` },
-    });
-    cachedSuperAdmin = { api, accessToken, user };
-    return cachedSuperAdmin;
-  } catch (e) {
-    await ctx.dispose();
+    return await attempt();
+  } catch (e: any) {
+    // TOTP_REPLAY: backend refuses a step we've already burned. Wait
+    // out the current 30s window (+1s slack) then try once more.
+    if (/Invalid 2FA code/i.test(String(e?.message ?? ''))) {
+      await new Promise((r) => setTimeout(r, 31_000));
+      return attempt();
+    }
     throw e;
   }
 }
