@@ -389,22 +389,41 @@ jobs:
 
       - name: Run health checks
         run: |
-          echo "Waiting for services to stabilize..."
-          sleep 15
+          # Poll instead of `sleep 15 && curl-once`. Backend boot does
+          # route mapping, prisma engine spin-up, and the env-validation
+          # pass before serving /api/health, which routinely takes
+          # 30-60s on the prod box. A single early curl reports "deploy
+          # failed" while the app is in fact starting normally — we
+          # have to wait for it.
+          #
+          # Budget: 5 minutes per surface (60 attempts × 5s). If either
+          # surface still isn't answering after that, something is
+          # genuinely broken — bail loud.
+          poll() {
+            local label="$1" url="$2"
+            local max_attempts=60
+            local interval=5
+            local attempt=0
+            echo "Polling $label ($url) — up to $((max_attempts * interval))s..."
+            while [ $attempt -lt $max_attempts ]; do
+              if curl -sf -o /dev/null "$url"; then
+                echo "$label is healthy (after $((attempt * interval))s)"
+                return 0
+              fi
+              attempt=$((attempt + 1))
+              sleep $interval
+            done
+            echo "::error::$label still not responding after $((max_attempts * interval))s — failing"
+            return 1
+          }
 
-          # Check main API
-          if ! curl -sf https://hummytummy.com/api/health > /dev/null; then
-            echo "API health check failed!"
-            exit 1
-          fi
+          # Initial grace so we don't hit a half-restarted container.
+          sleep 10
 
-          # Check homepage
-          if ! curl -sf https://hummytummy.com > /dev/null; then
-            echo "Frontend health check failed!"
-            exit 1
-          fi
+          poll "API"      "https://hummytummy.com/api/health" || exit 1
+          poll "Frontend" "https://hummytummy.com"             || exit 1
 
-          echo "All health checks passed!"
+          echo "All health checks passed."
 
       - name: Create Sentry release
         if: success()
