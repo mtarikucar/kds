@@ -590,11 +590,18 @@ export class AuthService {
 
     const refreshExpiresIn =
       this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '30d';
-    const refreshToken = this.jwtService.sign(payload, {
-      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-      expiresIn: refreshExpiresIn,
-      algorithm: 'HS256',
-    });
+    // jti makes the refresh token unique even when two issuances land in
+    // the same second (same iat → same payload → same JWT bytes → same
+    // tokenHash → P2002 on the unique constraint). The access token
+    // doesn't need it because it isn't persisted server-side.
+    const refreshToken = this.jwtService.sign(
+      { ...payload, jti: randomBytes(8).toString('hex') },
+      {
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        expiresIn: refreshExpiresIn,
+        algorithm: 'HS256',
+      },
+    );
 
     // Persist the hash so we can revoke/rotate server-side.
     const decoded: any = this.jwtService.decode(refreshToken);

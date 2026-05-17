@@ -6,7 +6,17 @@
       "Bash(git pull:*)",
       "Bash(xargs -I {} sh -c 'echo \"\"=== {} ===\"\" && head -30 {}')",
       "Bash(xargs -I {} sh -c 'echo \"\"=== {} ===\"\" && ls -la {} | head -15')",
-      "Bash(xargs -I {} sh -c 'echo \"\"=== {} ===\"\" && head -25 {}')"
+      "Bash(xargs -I {} sh -c 'echo \"\"=== {} ===\"\" && head -25 {}')",
+      "Bash(npx tsc *)",
+      "Bash(backend/node_modules/.bin/tsc --noEmit --project tsconfig.test.json)",
+      "Bash(backend/node_modules/.bin/tsc --noEmit tests/e2e/helpers/paytr-plan-switch.ts tests/e2e/helpers/plans.ts --target es2020 --module commonjs --esModuleInterop --skipLibCheck --strict --moduleResolution node)",
+      "Bash(backend/node_modules/.bin/tsc --noEmit tests/e2e/helpers/paytr-plan-switch.ts --target es2020 --module commonjs --esModuleInterop --skipLibCheck --moduleResolution node)",
+      "Bash(npx playwright *)",
+      "Bash(curl -sS -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:50080/api/health)",
+      "Bash(curl -sS -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:5179/app/)",
+      "Bash(curl -sS -X POST http://localhost:50080/api/auth/login -H \"Content-Type: application/json\" -d '{\"email\":\"admin@sultanahmet.com\",\"password\":\"admin123\"}')",
+      "Bash(python3 -c \"import sys,json; t=json.load\\(sys.stdin\\); print\\('access_token=', t.get\\('accessToken','no_token'\\)[:30]\\); print\\('user=', json.dumps\\(t.get\\('user',{}\\),indent=2\\)\\)\")",
+      "Bash(git add *)"
     ]
   }
 }

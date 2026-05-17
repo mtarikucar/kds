@@ -120,6 +120,16 @@ export class SuperAdminUsersService {
     };
   }
 
+  async setEmailVerified(id: string, emailVerified: boolean) {
+    const user = await this.prisma.user.findUnique({ where: { id }, select: { id: true } });
+    if (!user) throw new NotFoundException('User not found');
+    return this.prisma.user.update({
+      where: { id },
+      data: { emailVerified },
+      select: { id: true, email: true, emailVerified: true },
+    });
+  }
+
   async getActivity(filters: UserActivityFilterDto) {
     const { userId, tenantId, action, page = 1, limit = 50 } = filters;
 

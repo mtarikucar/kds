@@ -35,27 +35,27 @@ export default defineConfig({
 
   // Tauri expects a fixed port, fail if that port is not available
   server: {
-    port: 5173,
+    port: 5179,
     strictPort: true,
     host: host || false,
     hmr: host
       ? {
           protocol: "ws",
           host,
-          port: 5173,
+          port: 5179,
         }
       : undefined,
     proxy: {
       '/api': {
-        target: process.env.VITE_API_URL || 'http://localhost:3000',
+        target: process.env.VITE_API_URL || 'http://localhost:50080',
         changeOrigin: true,
       },
       '/uploads': {
-        target: process.env.VITE_API_URL || 'http://localhost:3000',
+        target: process.env.VITE_API_URL || 'http://localhost:50080',
         changeOrigin: true,
       },
       '/socket.io': {
-        target: process.env.VITE_WS_URL || 'http://localhost:3000',
+        target: process.env.VITE_WS_URL || 'http://localhost:50080',
         changeOrigin: true,
         ws: true,
       },

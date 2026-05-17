@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import { Public } from '../auth/decorators/public.decorator';
 import { CustomersService } from './customers.service';
 import { LoyaltyService } from './loyalty.service';
 import { CustomerSessionService } from './customer-session.service';
@@ -33,6 +34,10 @@ import { normalizePhone } from './customers.helpers';
  * tight because there is no auth wall behind the throttler.
  */
 @ApiTags('customer-public')
+@Public() // All endpoints in this controller are reachable from the QR menu
+          // without staff auth. Per-action throttling keeps abuse in check;
+          // tenant context is resolved server-side from the sessionId on
+          // every mutation (see class docstring above).
 @Controller('customer-public')
 export class CustomerPublicController {
   constructor(

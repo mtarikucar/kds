@@ -17,6 +17,7 @@ import { PaymentStatus, OrderStatus, StockMovementType } from '../../../common/c
 import { TableStatus } from '../../tables/dto/create-table.dto';
 import { OrdersService } from './orders.service';
 import { CustomersService } from '../../customers/customers.service';
+import { LoyaltyService } from '../../customers/loyalty.service';
 import { StockDeductionService } from '../../stock-management/services/stock-deduction.service';
 import { withTransaction, addBreadcrumb } from '../../../common/utils/tracing';
 import * as Sentry from '@sentry/node';
@@ -34,6 +35,7 @@ export class PaymentsService {
     private ordersService: OrdersService,
     private customersService: CustomersService,
     private receiptSnapshotBuilder: ReceiptSnapshotBuilder,
+    private loyaltyService: LoyaltyService,
     @Optional()
     private salesInvoiceService?: SalesInvoiceService,
     @Optional()
@@ -219,6 +221,35 @@ export class PaymentsService {
           },
         });
       }
+    }
+
+  }
+
+  /**
+   * Post-commit loyalty crediting. Called by every payment-create
+   * orchestrator AFTER its outer `$transaction` resolves — running
+   * inside the tx would push the interactive-transaction budget over
+   * the 5s ceiling (loyalty does its own read-update-write). Idempotent
+   * on (customer, order); retries are safe.
+   */
+  private async creditLoyaltyForFinalizedOrder(orderId: string, tenantId: string): Promise<void> {
+    try {
+      const order = await this.prisma.order.findUnique({
+        where: { id: orderId },
+        select: { customerId: true, finalAmount: true, status: true, orderNumber: true },
+      });
+      if (!order?.customerId || order.status !== 'PAID') return;
+      await this.loyaltyService.earnPointsFromOrder(
+        order.customerId,
+        tenantId,
+        orderId,
+        order.orderNumber ?? '',
+        Number(order.finalAmount.toString()),
+      );
+    } catch (err: any) {
+      this.logger.warn(
+        `loyalty.earnPointsFromOrder post-commit failed for order=${orderId}: ${err?.message ?? err}`,
+      );
     }
   }
 
@@ -492,6 +523,23 @@ export class PaymentsService {
             );
           }
 
+          // PosSettings.requireServedForDineInPayment gates dine-in
+          // payments on order.status === SERVED — opt-in for tenants
+          // who want the waiter to confirm the food landed before
+          // taking money. Tenants who leave the toggle off keep the
+          // legacy "pay anytime" behaviour.
+          if (order.type === 'DINE_IN' && order.status !== OrderStatus.SERVED) {
+            const posSettings = await tx.posSettings.findUnique({
+              where: { tenantId },
+              select: { requireServedForDineInPayment: true },
+            });
+            if (posSettings?.requireServedForDineInPayment) {
+              throw new BadRequestException(
+                'Order must be SERVED before payment (tenant policy: requireServedForDineInPayment).',
+              );
+            }
+          }
+
           // Validate payment amount against REMAINING (not total). A partial
           // payment must not be allowed to push the order into overpayment by
           // sending a second full-amount payment.
@@ -617,6 +665,7 @@ export class PaymentsService {
         // inline copy is no longer needed — kept the helper because
         // splitBill and payByItems share it too.
         await this.maybeGenerateAutoInvoice(orderId, tenantId);
+        await this.creditLoyaltyForFinalizedOrder(orderId, tenantId);
         this.safeEmitPaymentSuccess(tenantId, result, initiatedByUserId);
 
         return result;
@@ -1010,6 +1059,7 @@ export class PaymentsService {
     // Auto-generate invoice AFTER transaction commits
     if (result.isFullyPaid) {
       await this.maybeGenerateAutoInvoice(orderId, tenantId);
+      await this.creditLoyaltyForFinalizedOrder(orderId, tenantId);
     }
     // Emit per-payment so each Tauri terminal prints its own fiş.
     // Skip replayed entries (P2002 recovery): the original call
@@ -1500,6 +1550,7 @@ export class PaymentsService {
         // replay returns the existing invoice.
         if (!replayedFromInnerCatch) {
           await this.maybeGenerateAutoInvoice(orderId, tenantId, payment.id);
+          await this.creditLoyaltyForFinalizedOrder(orderId, tenantId);
           // Tell the POS to auto-print + open cash drawer (Tauri).
           // Skip the emit on idempotent replay — the first call
           // already fired and a second print would duplicate.
@@ -1656,6 +1707,7 @@ export class PaymentsService {
         // fataralar for diners A/B would also generate an order-level
         // invoice double-counting the same line items.
         await this.maybeGenerateAutoInvoice(orderId, tenantId, result.payment.id);
+        await this.creditLoyaltyForFinalizedOrder(orderId, tenantId);
         this.safeEmitPaymentSuccess(tenantId, result.payment, initiatedByUserId);
 
         addBreadcrumb('Write-off completed', 'payment', { paymentId: result.payment.id });
