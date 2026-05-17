@@ -102,6 +102,22 @@ export class PaymentsService {
       );
     }
 
+    // PayTR's get-token endpoint rejects empty user_phone with
+    // "Zorunlu alan degeri gecersiz veya gonderilmedi: user_phone".
+    // Fail fast with a structured code so the frontend can route the
+    // user to their profile page to fill it in, then back to checkout
+    // (handled in CheckoutPage.tsx onError + ProfilePage.tsx returnTo).
+    const trimmedPhone = (callingUser.phone ?? '').trim();
+    if (!trimmedPhone) {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'Profile Phone Required',
+        code: 'PROFILE_PHONE_REQUIRED',
+        message:
+          'Telefon numarası gereklidir. Lütfen profilinize bir telefon ekleyin ve ödeme adımına geri dönün.',
+      });
+    }
+
     const plan = await this.prisma.subscriptionPlan.findUnique({
       where: { id: dto.planId },
     });
@@ -221,7 +237,9 @@ export class PaymentsService {
         // a tenant-level postal address yet, so fall back to the country
         // string — accepted by PayTR as a valid buyer address.
         userAddress: 'Türkiye',
-        userPhone: callingUser.phone ?? '',
+        // Empty phone was rejected above with PROFILE_PHONE_REQUIRED, so
+        // by this point trimmedPhone is guaranteed non-empty.
+        userPhone: trimmedPhone,
         userBasket: [[plan.displayName, new Prisma.Decimal(amount).toFixed(2), 1]],
         userIp,
         okUrl: this.config.get<string>('PAYTR_OK_URL') ?? 'http://localhost:5173/subscription/success',

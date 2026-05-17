@@ -52,6 +52,19 @@ const CheckoutPage = () => {
           }
         },
         onError: (err: any) => {
+          // Backend signals "fill in your profile first" with a
+          // structured code on the error body. Bounce the user to
+          // /profile and pass the current checkout URL as returnTo so
+          // ProfilePage can navigate back after a successful save.
+          const code = err?.response?.data?.code;
+          if (code === 'PROFILE_PHONE_REQUIRED') {
+            const returnTo = `/subscription/checkout?planId=${encodeURIComponent(planId!)}&billingCycle=${encodeURIComponent(billingCycle)}`;
+            navigate(
+              `/profile?returnTo=${encodeURIComponent(returnTo)}&reason=phone-required`,
+              { replace: true },
+            );
+            return;
+          }
           setError(err?.response?.data?.message ?? err?.message ?? 'Payment intent failed');
         },
       },

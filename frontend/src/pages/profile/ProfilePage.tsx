@@ -2,6 +2,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMyProfile, useUpdateProfile } from '../../features/users/usersApi';
 import { useChangePassword } from '../../features/auth/authApi';
 import Button from '../../components/ui/Button';
@@ -24,6 +25,17 @@ import {
 
 const ProfilePage = () => {
   const { t } = useTranslation(['auth', 'validation']);
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // When the user arrived here from a flow that requires a complete
+  // profile (e.g. checkout → PROFILE_PHONE_REQUIRED), the source route
+  // passes ?returnTo=<encoded url>&reason=<why>. We show a banner so
+  // the user understands why they were bounced, and after a successful
+  // profile save we navigate back. We restrict returnTo to relative
+  // paths so it can't be turned into an open-redirect.
+  const rawReturnTo = searchParams.get('returnTo');
+  const returnTo = rawReturnTo && rawReturnTo.startsWith('/') ? rawReturnTo : null;
+  const reason = searchParams.get('reason');
 
   const profileSchema = z.object({
     firstName: z.string().min(2, t('validation.firstNameMin')),
@@ -76,7 +88,15 @@ const ProfilePage = () => {
   });
 
   const onProfileSubmit = (data: ProfileFormData) => {
-    updateProfile(data);
+    updateProfile(data, {
+      onSuccess: () => {
+        // Bounce back to the originating flow (e.g. checkout) if the
+        // user came here from a "fill your profile first" redirect and
+        // a returnTo was attached. Otherwise stay on the page so the
+        // user sees the saved state.
+        if (returnTo) navigate(returnTo, { replace: true });
+      },
+    });
   };
 
   const onPasswordSubmit = (data: PasswordFormData) => {
@@ -113,6 +133,25 @@ const ProfilePage = () => {
           <p className="text-slate-500 mt-0.5">{t('profile.manageYourAccount')}</p>
         </div>
       </div>
+
+      {/* Banner shown when checkout (or another flow) bounced the user
+          here to complete a required field. We surface the reason as a
+          plain Turkish string for now — keeping it out of the
+          translation files until the set of reason codes stabilises. */}
+      {reason === 'phone-required' && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-600 mt-0.5 shrink-0" />
+          <div className="text-sm text-amber-900">
+            <p className="font-medium">Telefon numarası gerekli</p>
+            <p className="mt-1">
+              Ödeme sağlayıcısı (PayTR) fatura için geçerli bir telefon
+              numarası talep ediyor. Lütfen aşağıdaki Profile alanına
+              telefon numaranızı ekleyip kaydedin — ödeme adımına
+              otomatik olarak geri yönlendirileceksiniz.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Profile Overview Card */}
       <div className="bg-white rounded-2xl border border-slate-200/60 p-6">
