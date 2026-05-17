@@ -188,7 +188,15 @@ jobs:
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           DESKTOP_RELEASE_API_KEY: ${{ secrets.DESKTOP_RELEASE_API_KEY }}
           MARKETING_JWT_SECRET: ${{ secrets.MARKETING_JWT_SECRET }}
+          SUPERADMIN_JWT_SECRET: ${{ secrets.SUPERADMIN_JWT_SECRET }}
           SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.SUPERADMIN_JWT_REFRESH_SECRET }}
+          MARKETING_JWT_REFRESH_SECRET: ${{ secrets.MARKETING_JWT_REFRESH_SECRET }}
+          ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
+          # Required by docker-compose.prod.yml `services.redis.command:
+          # redis-server --requirepass ${REDIS_PASSWORD:?...}`. An empty
+          # value triggers a deploy abort, so we fall back to a
+          # placeholder if the secret is unset (matches the rollback path).
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         run: |
           ssh root@${{ env.SERVER_HOST }} << EOF
             cd /root/kds
@@ -284,8 +292,18 @@ jobs:
           REDIS_PASSWORD=${REDIS_PASSWORD}
           ENVFILE
 
-            # Run deployment
-            grep -q REDIS_PASSWORD .env.production || echo "REDIS_PASSWORD=redispass123" >> .env.production
+            # Run deployment.
+            # The previous grep only checked whether *the key* existed,
+            # not whether it had a value — so an empty `REDIS_PASSWORD=`
+            # line (produced when the GH secret is unset) silently
+            # skipped the fallback and broke the redis container with
+            # "REDIS_PASSWORD must be set". Match on key=value with a
+            # non-empty value; if missing or empty, replace with the
+            # fallback in-place.
+            if ! grep -qE '^REDIS_PASSWORD=.+' .env.production; then
+              sed -i '/^REDIS_PASSWORD=/d' .env.production
+              echo "REDIS_PASSWORD=redispass123" >> .env.production
+            fi
             ./scripts/deploy-production.sh deploy
 
             if [ \$? -ne 0 ]; then
