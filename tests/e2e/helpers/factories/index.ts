@@ -5,3 +5,4 @@ export * from './orders';
 export * from './reservations';
 export * from './settings';
 export * from './customer-flow';
+export * from './stock';
