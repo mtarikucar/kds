@@ -28,12 +28,28 @@ test.afterAll(async () => {
     .catch(() => {});
 });
 
-async function setOverride(features: Record<string, boolean>): Promise<void> {
+async function setOverride(features: Record<string, boolean | null>): Promise<void> {
   const res = await superApi.patch(`superadmin/tenants/${tenantId}/overrides`, {
     data: { featureOverrides: features },
   });
   if (!res.ok()) throw new Error(`override failed: ${res.status()} ${await res.text()}`);
 }
+
+/** Reset: pass null for every key so the backend deletes them. An
+ *  empty {} works today via the FEATURE_KEYS-iterating loop, but is
+ *  fragile to refactors that short-circuit on payload size. */
+const CLEAR_ALL: Record<string, null> = {
+  advancedReports: null,
+  multiLocation: null,
+  customBranding: null,
+  apiAccess: null,
+  prioritySupport: null,
+  inventoryTracking: null,
+  kdsIntegration: null,
+  reservationSystem: null,
+  personnelManagement: null,
+  deliveryIntegration: null,
+};
 
 test.describe('Plan features → OFF blocks the gated routes', () => {
   test('reservationSystem=false → /reservations returns 403', async () => {
@@ -43,7 +59,7 @@ test.describe('Plan features → OFF blocks the gated routes', () => {
     expect(res.status()).toBe(403);
 
     // Reset for the next test.
-    await setOverride({});
+    await setOverride(CLEAR_ALL);
     const after = await (await loginAsApi('admin')).api.get('reservations');
     expect(after.ok()).toBeTruthy();
   });
@@ -54,7 +70,7 @@ test.describe('Plan features → OFF blocks the gated routes', () => {
     const res = await api.get('personnel/attendance/today');
     expect(res.status()).toBe(403);
 
-    await setOverride({});
+    await setOverride(CLEAR_ALL);
   });
 
   test('inventoryTracking=false → /stock-management/items returns 403', async () => {
@@ -63,6 +79,6 @@ test.describe('Plan features → OFF blocks the gated routes', () => {
     const res = await api.get('stock-management/items');
     expect(res.status()).toBe(403);
 
-    await setOverride({});
+    await setOverride(CLEAR_ALL);
   });
 });
