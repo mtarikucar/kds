@@ -31,7 +31,11 @@ export class KdsService {
   ) {}
 
   async getKitchenOrders(tenantId: string) {
-    // Get orders that are in kitchen workflow (PENDING, PREPARING, READY)
+    // Get orders that are in kitchen workflow (PENDING, PREPARING, READY).
+    // Hard cap at 200 — a kitchen display showing more than that is
+    // unusable anyway, and the limit prevents a runaway tenant whose
+    // orders accumulated due to misuse (e.g. status never moved) from
+    // pulling MB of nested product JSON on every reconnect.
     return this.prisma.order.findMany({
       where: {
         tenantId,
@@ -68,6 +72,7 @@ export class KdsService {
         },
       },
       orderBy: { createdAt: 'asc' },
+      take: 200,
     });
   }
 
@@ -98,11 +103,25 @@ export class KdsService {
     const updateData: any = { status };
     if (status === OrderStatus.PREPARING) updateData.preparingAt = new Date();
     if (status === OrderStatus.READY) updateData.readyAt = new Date();
+    if (status === OrderStatus.CANCELLED) updateData.cancelledAt = new Date();
 
-    // Update order status
-    const updatedOrder = await this.prisma.order.update({
-      where: { id },
+    // Compound WHERE on the original status closes the TOCTOU window
+    // between the read above and the write here. Without it, kitchen and
+    // waiter clicking simultaneously could each pass validateTransition
+    // against PENDING and end up overwriting each other's status — the
+    // last write would win silently while only one of the preparingAt /
+    // readyAt timestamps got set.
+    const claim = await this.prisma.order.updateMany({
+      where: { id, tenantId, status: order.status },
       data: updateData,
+    });
+    if (claim.count === 0) {
+      throw new BadRequestException(
+        'Order status changed concurrently — refresh and retry.',
+      );
+    }
+    const updatedOrder = await this.prisma.order.findUniqueOrThrow({
+      where: { id },
       include: {
         orderItems: {
           include: {
@@ -203,10 +222,21 @@ export class KdsService {
     // This handles PAID and CANCELLED terminal states
     validateTransition(order.status as OrderStatus, OrderStatus.CANCELLED);
 
-    // Update order status to CANCELLED
-    const updatedOrder = await this.prisma.order.update({
+    // Compound WHERE on the original status guards the same TOCTOU window
+    // as updateOrderStatus — a concurrent transition (e.g. status moves to
+    // PAID between the read and the write) must not be silently overwritten
+    // by a stale CANCELLED claim.
+    const cancelClaim = await this.prisma.order.updateMany({
+      where: { id, tenantId, status: order.status },
+      data: { status: OrderStatus.CANCELLED, cancelledAt: new Date() },
+    });
+    if (cancelClaim.count === 0) {
+      throw new BadRequestException(
+        'Order status changed concurrently — refresh and retry.',
+      );
+    }
+    const updatedOrder = await this.prisma.order.findUniqueOrThrow({
       where: { id },
-      data: { status: OrderStatus.CANCELLED },
       include: {
         orderItems: {
           include: {

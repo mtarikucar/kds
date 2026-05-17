@@ -107,7 +107,7 @@ const LoyaltyContent: React.FC<LoyaltyContentProps> = ({
               onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
               placeholder={t('loyalty.enterCode')}
               className="flex-1 px-3 sm:px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-opacity-50 uppercase text-sm sm:text-base"
-              style={{ focusRingColor: settings.primaryColor }}
+              style={{ ['--tw-ring-color' as any]: settings.primaryColor }}
               disabled={isApplyingReferral}
               maxLength={12}
             />

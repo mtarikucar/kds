@@ -14,6 +14,7 @@ const featurePlanMap: Record<keyof PlanFeatures, SubscriptionPlanType> = {
   prioritySupport: SubscriptionPlanType.PRO,
   reservationSystem: SubscriptionPlanType.PRO,
   personnelManagement: SubscriptionPlanType.PRO,
+  deliveryIntegration: SubscriptionPlanType.PRO,
   apiAccess: SubscriptionPlanType.BUSINESS,
 };
 

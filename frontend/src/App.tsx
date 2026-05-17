@@ -41,6 +41,7 @@ import CustomerDetailPage from './pages/customers/CustomerDetailPage';
 const QRMenuPage = lazy(() => import('./pages/qr-menu/QRMenuPage'));
 const CartPage = lazy(() => import('./pages/qr-menu/CartPage'));
 const OrderTrackingPage = lazy(() => import('./pages/qr-menu/OrderTrackingPage'));
+const QrPaymentResultPage = lazy(() => import('./pages/qr-menu/QrPaymentResultPage'));
 const LoyaltyPage = lazy(() => import('./pages/qr-menu/LoyaltyPage'));
 const SubdomainQRMenuPage = lazy(() => import('./pages/qr-menu/SubdomainQRMenuPage'));
 const SubdomainCartPage = lazy(() => import('./pages/qr-menu/SubdomainCartPage'));
@@ -69,7 +70,8 @@ const InvoicesPage = lazy(() => import('./pages/admin/invoices/InvoicesPage'));
 // Subscription & Settings Pages (lazy-loaded)
 const SubscriptionPlansPage = lazy(() => import('./pages/subscription/SubscriptionPlansPage'));
 const ChangePlanPage = lazy(() => import('./pages/subscription/ChangePlanPage'));
-const SubscriptionContactPage = lazy(() => import('./pages/subscription/SubscriptionContactPage'));
+const CheckoutPage = lazy(() => import('./pages/subscription/CheckoutPage'));
+const PaymentResultPage = lazy(() => import('./pages/subscription/PaymentResultPage'));
 const SettingsLayout = lazy(() => import('./pages/settings/SettingsLayout'));
 const POSSettingsPage = lazy(() => import('./pages/settings/POSSettingsPage'));
 const QRMenuSettingsPage = lazy(() => import('./pages/settings/QRMenuSettingsPage'));
@@ -90,11 +92,6 @@ import { useNotificationSocket } from './features/notifications/notificationsApi
 import { useAuthStore } from './store/authStore';
 import { UserRole } from './types';
 import { detectSubdomain } from './utils/subdomain';
-
-// Dev-only pages
-const FloorPlan3DPage = import.meta.env.DEV
-  ? lazy(() => import('./pages/dev/FloorPlan3DPage'))
-  : null;
 
 function App() {
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
@@ -131,6 +128,7 @@ function App() {
           <Route path="/cart" element={<SubdomainCartPage subdomain={subdomainInfo.subdomain} />} />
           <Route path="/orders" element={<SubdomainOrdersPage subdomain={subdomainInfo.subdomain} />} />
           <Route path="/loyalty" element={<SubdomainLoyaltyPage subdomain={subdomainInfo.subdomain} />} />
+          <Route path="/payment-result" element={<QrPaymentResultPage subdomain={subdomainInfo.subdomain} />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
@@ -154,6 +152,7 @@ function App() {
       <Route path="/qr-menu/:tenantId/cart" element={<CartPage />} />
       <Route path="/qr-menu/:tenantId/orders" element={<OrderTrackingPage />} />
       <Route path="/qr-menu/:tenantId/loyalty" element={<LoyaltyPage />} />
+      <Route path="/qr-menu/:tenantId/payment-result" element={<QrPaymentResultPage />} />
       <Route path="/reserve/:tenantId" element={<PublicReservationPage />} />
       <Route path="/reserve/:tenantId/lookup" element={<ReservationLookupPage />} />
 
@@ -205,11 +204,6 @@ function App() {
           <Route path="accounting" element={<AccountingSettingsPage />} />
         </Route>
 
-        {/* Dev-only routes */}
-        {import.meta.env.DEV && FloorPlan3DPage && (
-          <Route path="/dev/floor-plan" element={<Suspense fallback={null}><FloorPlan3DPage /></Suspense>} />
-        )}
-
         {/* Legacy redirects */}
         <Route path="/admin/pos-settings" element={<Navigate to="/admin/settings/pos" replace />} />
         <Route path="/subscription/manage" element={<Navigate to="/admin/settings/subscription" replace />} />
@@ -217,11 +211,13 @@ function App() {
         {/* Subscription pages */}
         <Route path="/subscription/plans" element={<SubscriptionPlansPage />} />
         <Route path="/subscription/change-plan" element={<ChangePlanPage />} />
-        <Route path="/subscription/contact" element={<SubscriptionContactPage />} />
+        <Route path="/subscription/checkout" element={<CheckoutPage />} />
+        <Route path="/subscription/success" element={<PaymentResultPage outcome="success" />} />
+        <Route path="/subscription/fail" element={<PaymentResultPage outcome="failed" />} />
         {/* Legacy redirect for old payment URLs */}
         <Route path="/subscription/payment" element={<Navigate to="/subscription/plans" replace />} />
-        <Route path="/subscription/payment/success" element={<Navigate to="/admin/settings/subscription" replace />} />
-        <Route path="/subscription/payment/failed" element={<Navigate to="/subscription/plans" replace />} />
+        <Route path="/subscription/payment/success" element={<Navigate to="/subscription/success" replace />} />
+        <Route path="/subscription/payment/failed" element={<Navigate to="/subscription/fail" replace />} />
       </Route>
 
       {/* SuperAdmin Routes */}

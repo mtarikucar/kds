@@ -11,7 +11,6 @@ import {
   useGenerateMockData,
   useClearMockData,
   useUpdateInsightStatus,
-  AnalyticsFloorPlan,
 } from '../../features/analytics';
 import { InsightSeverity, InsightStatus } from '../../features/analytics/types';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
@@ -592,19 +591,7 @@ const AnalyticsPage = () => {
                 </Card>
               )}
 
-              {/* 3D Heatmap Visualization */}
-              <Card className="mt-4 md:mt-6">
-                <CardHeader>
-                  <CardTitle>3D Heatmap Visualization</CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  <AnalyticsFloorPlan
-                    startDate={dateRange.startDate}
-                    endDate={dateRange.endDate}
-                    className="p-4"
-                  />
-                </CardContent>
-              </Card>
+              {/* 3D Heatmap visualisation removed with voxel-world */}
             </>
           )}
         </>

@@ -25,6 +25,14 @@ export enum PaymentMethod {
   CASH = 'CASH',
   CARD = 'CARD',
   DIGITAL = 'DIGITAL',
+  /**
+   * House loss / write-off pseudo-method. Created ONLY by the
+   * `POST /orders/:id/write-off` endpoint when a manager absorbs the
+   * remaining balance (no-show, comp, dispute). Never selectable in
+   * the customer-facing payment UIs; surfaces in the Z-report under
+   * its own bucket so the operator can reconcile losses.
+   */
+  HOUSE = 'HOUSE',
 }
 
 export enum PaymentStatus {

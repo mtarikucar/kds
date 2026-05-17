@@ -1,57 +1,56 @@
-import { ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { ExecutionContext } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { TenantGuard } from './tenant.guard';
 
+/**
+ * TenantGuard's job is to project `user.tenantId` onto `request.tenantId`
+ * so services can scope queries without having to dig into the JWT
+ * payload everywhere. It also short-circuits on the public/superadmin/
+ * marketing bypass keys via guard-bypass.helper. These tests cover both
+ * paths.
+ */
 describe('TenantGuard', () => {
   let guard: TenantGuard;
+  let reflector: Reflector;
 
-  const mockExecutionContext = (
-    user: any,
-    params: any = {},
-  ): ExecutionContext => {
-    return {
+  const mockExecutionContext = (user: any): { ctx: ExecutionContext; request: any } => {
+    const request: any = { user };
+    const ctx = {
+      getHandler: jest.fn(),
+      getClass: jest.fn(),
       switchToHttp: jest.fn().mockReturnValue({
-        getRequest: jest.fn().mockReturnValue({
-          user,
-          params,
-        }),
+        getRequest: jest.fn().mockReturnValue(request),
       }),
     } as any;
+    return { ctx, request };
   };
 
   beforeEach(() => {
-    guard = new TenantGuard();
+    reflector = new Reflector();
+    // Default: no bypass keys present.
+    jest.spyOn(reflector, 'getAllAndOverride').mockReturnValue(undefined);
+    guard = new TenantGuard(reflector);
   });
 
   describe('canActivate', () => {
-    it('should return true when no tenantId in params', () => {
-      const user = { tenantId: 'tenant-1' };
-      const context = mockExecutionContext(user, {});
+    it('injects user.tenantId onto the request and allows the call', () => {
+      const { ctx, request } = mockExecutionContext({ tenantId: 'tenant-1' });
 
-      expect(guard.canActivate(context)).toBe(true);
+      expect(guard.canActivate(ctx)).toBe(true);
+      expect(request.tenantId).toBe('tenant-1');
     });
 
-    it('should return true when user tenantId matches param tenantId', () => {
-      const user = { tenantId: 'tenant-1' };
-      const params = { tenantId: 'tenant-1' };
-      const context = mockExecutionContext(user, params);
+    it('rejects when the user has no tenant scope', () => {
+      const { ctx, request } = mockExecutionContext({});
 
-      expect(guard.canActivate(context)).toBe(true);
+      expect(guard.canActivate(ctx)).toBe(false);
+      expect(request.tenantId).toBeUndefined();
     });
 
-    it('should throw ForbiddenException when tenantIds do not match', () => {
-      const user = { tenantId: 'tenant-1' };
-      const params = { tenantId: 'tenant-2' };
-      const context = mockExecutionContext(user, params);
+    it('rejects an unauthenticated request', () => {
+      const { ctx } = mockExecutionContext(null);
 
-      expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
-    });
-
-    it('should throw ForbiddenException when user has no tenantId', () => {
-      const user = {};
-      const params = { tenantId: 'tenant-1' };
-      const context = mockExecutionContext(user, params);
-
-      expect(() => guard.canActivate(context)).toThrow(ForbiddenException);
+      expect(guard.canActivate(ctx)).toBe(false);
     });
   });
 });

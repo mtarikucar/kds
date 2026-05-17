@@ -84,9 +84,16 @@ export class ModifiersService {
   async updateGroup(id: string, dto: UpdateModifierGroupDto, tenantId: string) {
     await this.findOneGroup(id, tenantId);
 
-    return this.prisma.modifierGroup.update({
-      where: { id },
+    // Compound WHERE IDOR guard (B41-B45 pattern).
+    const claim = await this.prisma.modifierGroup.updateMany({
+      where: { id, tenantId },
       data: dto,
+    });
+    if (claim.count === 0) {
+      throw new NotFoundException('Modifier group not found');
+    }
+    return this.prisma.modifierGroup.findUnique({
+      where: { id },
       include: {
         modifiers: {
           orderBy: { displayOrder: 'asc' },
@@ -100,7 +107,7 @@ export class ModifiersService {
 
     // Check if group is assigned to any products
     const productCount = await this.prisma.productModifierGroup.count({
-      where: { groupId: id },
+      where: { groupId: id, group: { tenantId } },
     });
 
     if (productCount > 0) {
@@ -109,8 +116,9 @@ export class ModifiersService {
       );
     }
 
+    // Compound WHERE delete (B41-B45 pattern).
     await this.prisma.modifierGroup.delete({
-      where: { id },
+      where: { id, tenantId },
     });
 
     return { message: 'Modifier group deleted successfully' };
@@ -193,9 +201,16 @@ export class ModifiersService {
   async updateModifier(id: string, dto: UpdateModifierDto, tenantId: string) {
     await this.findOneModifier(id, tenantId);
 
-    return this.prisma.modifier.update({
-      where: { id },
+    // Compound WHERE IDOR guard (B41-B45 pattern).
+    const claim = await this.prisma.modifier.updateMany({
+      where: { id, tenantId },
       data: dto,
+    });
+    if (claim.count === 0) {
+      throw new NotFoundException('Modifier not found');
+    }
+    return this.prisma.modifier.findUnique({
+      where: { id },
       include: {
         group: {
           select: {
@@ -211,9 +226,9 @@ export class ModifiersService {
   async deleteModifier(id: string, tenantId: string) {
     await this.findOneModifier(id, tenantId);
 
-    // Check if modifier is used in any orders
+    // Check if modifier is used in any orders — tenant-scoped count.
     const orderItemCount = await this.prisma.orderItemModifier.count({
-      where: { modifierId: id },
+      where: { modifierId: id, modifier: { tenantId } },
     });
 
     if (orderItemCount > 0) {
@@ -222,8 +237,9 @@ export class ModifiersService {
       );
     }
 
+    // Compound WHERE delete (B41-B45 pattern).
     await this.prisma.modifier.delete({
-      where: { id },
+      where: { id, tenantId },
     });
 
     return { message: 'Modifier deleted successfully' };

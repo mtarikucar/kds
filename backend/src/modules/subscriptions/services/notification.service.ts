@@ -87,50 +87,69 @@ export class NotificationService {
     }
   }
 
+  /** App base URL used in template links. */
+  private get appUrl(): string {
+    return this.configService.get<string>('APP_URL') ?? 'http://localhost:5173';
+  }
+
   /**
-   * Send trial started email
+   * Send trial-started email. Subjects/bodies are Turkish — the product
+   * targets the Turkish market and recipients are virtually always
+   * Turkish-speaking. Locale-aware i18n can be layered on later.
    */
   async sendTrialStarted(email: string, tenantName: string, planName: string, trialDays: number) {
     return this.sendEmail({
       to: email,
-      subject: `Your ${planName} trial has started!`,
+      subject: `${planName} deneme süreniz başladı`,
       template: 'trial-started',
       context: {
         tenantName,
         planName,
         trialDays,
-        expiryDate: new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000).toLocaleDateString(),
+        expiryDate: new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000).toLocaleDateString('tr-TR'),
+        appUrl: this.appUrl,
       },
     });
   }
 
   /**
-   * Send trial ending reminder
+   * Send trial-ending reminder. Cron fires this at 7-day, 3-day, and
+   * 1-day windows before trialEnd with the appropriate daysRemaining.
    */
-  async sendTrialEndingReminder(email: string, tenantName: string, planName: string, daysRemaining: number) {
+  async sendTrialEndingReminder(
+    email: string,
+    tenantName: string,
+    planName: string,
+    daysRemaining: number,
+    extras?: { planId?: string; billingCycle?: string },
+  ) {
     return this.sendEmail({
       to: email,
-      subject: `Your trial ends in ${daysRemaining} days`,
+      subject: `Deneme süreniz ${daysRemaining} gün içinde bitiyor`,
       template: 'trial-ending',
       context: {
         tenantName,
         planName,
         daysRemaining,
+        planId: extras?.planId ?? '',
+        billingCycle: extras?.billingCycle ?? 'MONTHLY',
+        appUrl: this.appUrl,
       },
     });
   }
 
   /**
-   * Send trial expired notification
+   * Send trial-expired notification.
    */
   async sendTrialExpired(email: string, tenantName: string, planName: string) {
     return this.sendEmail({
       to: email,
-      subject: 'Your trial has expired',
+      subject: 'Deneme süreniz sona erdi',
       template: 'trial-expired',
       context: {
         tenantName,
         planName,
+        appUrl: this.appUrl,
       },
     });
   }
@@ -147,16 +166,23 @@ export class NotificationService {
   ) {
     return this.sendEmail({
       to: email,
-      subject: 'Payment received - Thank you!',
+      subject: 'Ödemeniz alındı - Teşekkür ederiz',
       template: 'payment-successful',
       context: {
         tenantName,
         amount,
         currency,
         invoiceNumber,
-        paymentDate: new Date().toLocaleDateString(),
+        paymentDate: new Date().toLocaleDateString('tr-TR'),
+        appUrl: this.appUrl,
       },
     });
+  }
+
+  /** Date formatter pinned to tr-TR; receipts always render Turkish for
+   *  the Turkish-market product. */
+  private formatDate(d: Date): string {
+    return d.toLocaleDateString('tr-TR');
   }
 
   /**
@@ -165,12 +191,13 @@ export class NotificationService {
   async sendPaymentFailed(email: string, tenantName: string, amount: number, reason: string) {
     return this.sendEmail({
       to: email,
-      subject: 'Payment failed - Action required',
+      subject: 'Ödeme başarısız - İşlem gerekiyor',
       template: 'payment-failed',
       context: {
         tenantName,
         amount,
         reason,
+        appUrl: this.appUrl,
       },
     });
   }
@@ -181,12 +208,13 @@ export class NotificationService {
   async sendSubscriptionActivated(email: string, tenantName: string, planName: string, billingCycle: string) {
     return this.sendEmail({
       to: email,
-      subject: `Your ${planName} subscription is now active`,
+      subject: `${planName} aboneliğiniz aktif`,
       template: 'subscription-activated',
       context: {
         tenantName,
         planName,
         billingCycle,
+        appUrl: this.appUrl,
       },
     });
   }
@@ -197,12 +225,13 @@ export class NotificationService {
   async sendSubscriptionCancelled(email: string, tenantName: string, planName: string, endDate: Date) {
     return this.sendEmail({
       to: email,
-      subject: 'Subscription cancelled',
+      subject: 'Aboneliğiniz iptal edildi',
       template: 'subscription-cancelled',
       context: {
         tenantName,
         planName,
-        endDate: endDate.toLocaleDateString(),
+        endDate: this.formatDate(endDate),
+        appUrl: this.appUrl,
       },
     });
   }
@@ -213,13 +242,14 @@ export class NotificationService {
   async sendSubscriptionCancelledImmediate(email: string, tenantName: string, planName: string, reason?: string) {
     return this.sendEmail({
       to: email,
-      subject: 'Subscription cancelled',
+      subject: 'Aboneliğiniz iptal edildi',
       template: 'subscription-cancelled-immediate',
       context: {
         tenantName,
         planName,
-        reason: reason || 'No reason provided',
-        cancelledDate: new Date().toLocaleDateString(),
+        reason: reason || 'Belirtilmedi',
+        cancelledDate: this.formatDate(new Date()),
+        appUrl: this.appUrl,
       },
     });
   }
@@ -230,13 +260,14 @@ export class NotificationService {
   async sendSubscriptionWillCancel(email: string, tenantName: string, planName: string, endDate: Date, reason?: string) {
     return this.sendEmail({
       to: email,
-      subject: 'Subscription cancellation scheduled',
+      subject: 'Abonelik iptali planlandı',
       template: 'subscription-will-cancel',
       context: {
         tenantName,
         planName,
-        reason: reason || 'No reason provided',
-        endDate: endDate.toLocaleDateString(),
+        reason: reason || 'Belirtilmedi',
+        endDate: this.formatDate(endDate),
+        appUrl: this.appUrl,
       },
     });
   }
@@ -247,13 +278,14 @@ export class NotificationService {
   async sendInvoiceReady(email: string, tenantName: string, invoiceNumber: string, amount: number, pdfUrl?: string) {
     return this.sendEmail({
       to: email,
-      subject: `Invoice ${invoiceNumber} is ready`,
+      subject: `${invoiceNumber} numaralı faturanız hazır`,
       template: 'invoice-ready',
       context: {
         tenantName,
         invoiceNumber,
         amount,
         pdfUrl,
+        appUrl: this.appUrl,
       },
     });
   }
@@ -264,12 +296,13 @@ export class NotificationService {
   async sendPlanUpgraded(email: string, tenantName: string, oldPlan: string, newPlan: string) {
     return this.sendEmail({
       to: email,
-      subject: `Plan upgraded to ${newPlan}`,
+      subject: `${newPlan} planına yükseltildi`,
       template: 'plan-upgraded',
       context: {
         tenantName,
         oldPlan,
         newPlan,
+        appUrl: this.appUrl,
       },
     });
   }
@@ -280,13 +313,14 @@ export class NotificationService {
   async sendPlanDowngraded(email: string, tenantName: string, oldPlan: string, newPlan: string, effectiveDate: Date) {
     return this.sendEmail({
       to: email,
-      subject: `Plan change scheduled`,
+      subject: 'Plan değişikliği planlandı',
       template: 'plan-downgraded',
       context: {
         tenantName,
         oldPlan,
         newPlan,
-        effectiveDate: effectiveDate.toLocaleDateString(),
+        effectiveDate: this.formatDate(effectiveDate),
+        appUrl: this.appUrl,
       },
     });
   }
@@ -297,12 +331,13 @@ export class NotificationService {
   async sendPlanChangeConfirmation(email: string, tenantName: string, newPlanName: string) {
     return this.sendEmail({
       to: email,
-      subject: `Plan changed to ${newPlanName}`,
+      subject: `Planınız ${newPlanName} olarak güncellendi`,
       template: 'plan-change-confirmation',
       context: {
         tenantName,
         planName: newPlanName,
-        changeDate: new Date().toLocaleDateString(),
+        changeDate: this.formatDate(new Date()),
+        appUrl: this.appUrl,
       },
     });
   }
@@ -410,35 +445,4 @@ export class NotificationService {
     });
   }
 
-  /**
-   * Send contact inquiry notification to admin
-   * Notifies admin when a customer initiates contact via WhatsApp or Email
-   */
-  async sendContactInquiryNotification(
-    customerEmail: string,
-    customerName: string,
-    tenantName: string,
-    tenantId: string,
-    planName: string,
-    billingCycle: string,
-    contactMethod: string,
-  ) {
-    const adminEmail = this.configService.get('ADMIN_EMAIL', 'admin@hummytummy.com');
-
-    return this.sendEmail({
-      to: adminEmail,
-      subject: `Subscription Inquiry - ${tenantName} (${contactMethod})`,
-      template: 'contact-inquiry',
-      context: {
-        customerEmail,
-        customerName,
-        tenantName,
-        tenantId,
-        planName,
-        billingCycle: billingCycle === 'MONTHLY' ? 'Aylik' : 'Yillik',
-        contactMethod,
-        requestDate: new Date().toLocaleString(),
-      },
-    });
-  }
 }

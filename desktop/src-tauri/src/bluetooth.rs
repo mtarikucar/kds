@@ -50,84 +50,10 @@ pub struct ScannedDevice {
     pub is_connected: bool,
 }
 
-/// Bluetooth printer commands (ESC/POS standard)
-#[derive(Debug, Clone)]
-pub enum PrinterCommand {
-    /// Initialize printer
-    Initialize,
-    /// Print text
-    Text(String),
-    /// Print text with newline
-    TextLine(String),
-    /// Feed paper (n lines)
-    Feed(u8),
-    /// Cut paper
-    Cut,
-    /// Set alignment (0=left, 1=center, 2=right)
-    Align(u8),
-    /// Set text size (1-8)
-    TextSize(u8, u8), // width, height
-    /// Bold text (true/false)
-    Bold(bool),
-    /// Print barcode
-    Barcode(String),
-    /// Print QR code
-    QRCode(String),
-}
-
-impl PrinterCommand {
-    /// Convert command to ESC/POS byte sequence
-    pub fn to_bytes(&self) -> Vec<u8> {
-        match self {
-            PrinterCommand::Initialize => vec![0x1B, 0x40], // ESC @
-            PrinterCommand::Text(text) => text.as_bytes().to_vec(),
-            PrinterCommand::TextLine(text) => {
-                let mut bytes = text.as_bytes().to_vec();
-                bytes.extend_from_slice(&[0x0A]); // LF
-                bytes
-            }
-            PrinterCommand::Feed(lines) => vec![0x1B, 0x64, *lines], // ESC d n
-            PrinterCommand::Cut => vec![0x1D, 0x56, 0x00], // GS V 0
-            PrinterCommand::Align(alignment) => vec![0x1B, 0x61, *alignment], // ESC a n
-            PrinterCommand::TextSize(width, height) => {
-                let size = ((width - 1) << 4) | (height - 1);
-                vec![0x1D, 0x21, size] // GS ! n
-            }
-            PrinterCommand::Bold(enabled) => {
-                vec![0x1B, 0x45, if *enabled { 1 } else { 0 }] // ESC E n
-            }
-            PrinterCommand::Barcode(data) => {
-                let mut bytes = vec![
-                    0x1D, 0x68, 0x64, // GS h 100 (height)
-                    0x1D, 0x77, 0x02, // GS w 2 (width)
-                    0x1D, 0x6B, 0x04, // GS k 4 (CODE39)
-                ];
-                bytes.extend_from_slice(data.as_bytes());
-                bytes.push(0x00); // NULL terminator
-                bytes
-            }
-            PrinterCommand::QRCode(data) => {
-                let mut bytes = vec![
-                    0x1D, 0x28, 0x6B, 0x04, 0x00, 0x31, 0x41, 0x32, 0x00, // Model
-                    0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x43, 0x08, // Size
-                    0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x45, 0x30, // Error correction
-                ];
-                // Store data
-                let len = data.len() + 3;
-                bytes.extend_from_slice(&[
-                    0x1D, 0x28, 0x6B,
-                    (len & 0xFF) as u8,
-                    ((len >> 8) & 0xFF) as u8,
-                    0x31, 0x50, 0x30,
-                ]);
-                bytes.extend_from_slice(data.as_bytes());
-                // Print
-                bytes.extend_from_slice(&[0x1D, 0x28, 0x6B, 0x03, 0x00, 0x31, 0x51, 0x30]);
-                bytes
-            }
-        }
-    }
-}
+// PrinterCommand moved to crate::escpos. Re-exported below so existing
+// `use bluetooth::PrinterCommand;` import sites in main.rs keep compiling
+// without churn during the Phase 1.3 refactor.
+pub use crate::escpos::PrinterCommand;
 
 /// Bluetooth manager for device scanning and connection
 pub struct BluetoothManager {

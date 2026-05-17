@@ -121,13 +121,23 @@ export class InsightsService {
       updateData.dismissedReason = dto.dismissedReason;
     }
 
-    const updated = await this.prisma.analyticsInsight.update({
-      where: { id: insightId },
+    // Compound WHERE IDOR guard (B41-B45 pattern). The findFirst above
+    // already validates tenant ownership, but the mutation itself must
+    // not be tenant-blind — a regression of the pre-check would expose
+    // cross-tenant writes.
+    const claim = await this.prisma.analyticsInsight.updateMany({
+      where: { id: insightId, tenantId },
       data: updateData,
+    });
+    if (claim.count === 0) {
+      throw new NotFoundException('Insight not found');
+    }
+    const updated = await this.prisma.analyticsInsight.findUnique({
+      where: { id: insightId },
     });
 
     this.logger.log(`Insight ${insightId} status updated to ${dto.status}`);
-    return this.mapToResponseDto(updated);
+    return this.mapToResponseDto(updated!);
   }
 
   /**
@@ -272,7 +282,7 @@ export class InsightsService {
 
     const tables = await this.prisma.table.findMany({
       where: { tenantId },
-      select: { id: true, number: true, voxelX: true, voxelZ: true },
+      select: { id: true, number: true },
     });
     const tableMap = new Map(tables.map(t => [t.id, t]));
 
@@ -305,11 +315,9 @@ export class InsightsService {
             description: `Table ${table?.number} has ${Math.round(utilization)}% utilization over the past week, significantly below the restaurant average of ${Math.round(avgUtilization)}%.`,
             recommendation: `Consider repositioning Table ${table?.number} to a more visible location or evaluating its placement for customer comfort.`,
             affectedTableIds: [analytics.tableId],
-            affectedAreaData: table?.voxelX != null && table?.voxelZ != null ? {
-              x: table.voxelX,
-              z: table.voxelZ,
-              radius: 2,
-            } : null,
+            // affectedAreaData was sourced from voxel coordinates; the
+            // voxel feature is gone, so we omit the spatial hint.
+            affectedAreaData: null,
             supportingData: {
               currentUtilization: Math.round(utilization),
               avgUtilization: Math.round(avgUtilization),
@@ -326,7 +334,11 @@ export class InsightsService {
       }
     }
 
-    // Check for traffic bottlenecks
+    // Check for traffic bottlenecks. Hard cap on rows because a busy
+    // restaurant accumulates ~10/hour × 168h × N cameras of TrafficFlow
+    // records per week — easily 100k+ for a large tenant. The
+    // downstream Map aggregation would tip the worker into heap
+    // exhaustion. 10k recent rows is plenty for hotspot detection.
     const trafficData = await this.prisma.trafficFlowRecord.findMany({
       where: {
         tenantId,
@@ -336,6 +348,8 @@ export class InsightsService {
         },
         avgDwellTime: { gte: 60 }, // High dwell time indicates congestion
       },
+      orderBy: { hourBucket: 'desc' },
+      take: 10000,
       select: {
         cellX: true,
         cellZ: true,

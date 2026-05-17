@@ -76,13 +76,21 @@ const BillSplitModal = ({
     });
   }, [numberOfPeople]);
 
-  // Calculate per-person amounts for equal split (last person absorbs remainder)
+  // Calculate per-person amounts for equal split (last person absorbs remainder).
+  // We do the entire computation in *integer kuruş* (TL × 100) so floating-point
+  // drift can't sneak in. The previous implementation did `totalAmount/n` in
+  // floats, multiplied by 100, then floored — for totals like 100.03 / 3
+  // people that produced `Math.floor(33.343333... * 100)/100 = 33.34` and
+  // a last-person value of `Math.round(33.349999... * 100)/100 = 33.35`,
+  // which happens to add up correctly today but is fragile and propagated
+  // worse errors when multi-order allocation chained more `Math.round`s.
   const equalAmounts = useMemo(() => {
     if (splitType !== 'EQUAL' || numberOfPeople < 2) return [];
-    const base = Math.floor((totalAmount / numberOfPeople) * 100) / 100;
-    const amounts = Array(numberOfPeople).fill(base);
-    // Last person absorbs the rounding remainder
-    amounts[numberOfPeople - 1] = Math.round((totalAmount - base * (numberOfPeople - 1)) * 100) / 100;
+    const totalKurus = Math.round(totalAmount * 100);
+    const baseKurus = Math.floor(totalKurus / numberOfPeople);
+    const remainderKurus = totalKurus - baseKurus * (numberOfPeople - 1);
+    const amounts = Array(numberOfPeople).fill(baseKurus / 100);
+    amounts[numberOfPeople - 1] = remainderKurus / 100;
     return amounts;
   }, [totalAmount, numberOfPeople, splitType]);
 
@@ -151,18 +159,22 @@ const BillSplitModal = ({
 
       let remainingPayments = [...payments];
       for (const order of sortedOrders) {
-        const orderAmt = Number(order.finalAmount);
         const orderPayments: SplitPaymentEntry[] = [];
-        let allocated = 0;
 
-        for (let i = 0; i < remainingPayments.length && allocated < orderAmt; i++) {
+        // Allocation normalised in integer kuruş so the running totals
+        // and `remainingPayments[i].amount` updates can't drift across
+        // iterations.
+        const orderKurus = Math.round(Number(order.finalAmount) * 100);
+        let allocatedKurus = 0;
+        for (let i = 0; i < remainingPayments.length && allocatedKurus < orderKurus; i++) {
           const p = remainingPayments[i];
-          if (p.amount <= 0) continue;
+          const paymentKurus = Math.round(p.amount * 100);
+          if (paymentKurus <= 0) continue;
 
-          const canAllocate = Math.min(p.amount, orderAmt - allocated);
-          orderPayments.push({ ...p, amount: Math.round(canAllocate * 100) / 100 });
-          allocated += canAllocate;
-          remainingPayments[i] = { ...p, amount: Math.round((p.amount - canAllocate) * 100) / 100 };
+          const canAllocateKurus = Math.min(paymentKurus, orderKurus - allocatedKurus);
+          orderPayments.push({ ...p, amount: canAllocateKurus / 100 });
+          allocatedKurus += canAllocateKurus;
+          remainingPayments[i] = { ...p, amount: (paymentKurus - canAllocateKurus) / 100 };
         }
 
         if (orderPayments.length > 0) {

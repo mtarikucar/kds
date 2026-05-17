@@ -224,5 +224,62 @@
     "splitFailed": "Не удалось разделить счёт",
     "amountMismatch": "Сумма частей должна равняться итогу",
     "collectAll": "Принять все платежи"
+  },
+  "progressive": {
+    "title": "Оплата по гостям",
+    "buttonTitle": "Оплата по гостю",
+    "subtitle": "Выберите позиции, которые оплачивает этот гость — остальное остаётся для других",
+    "summary": "Итого {{total}} • Оплачено {{paid}} • Остаток {{remaining}}",
+    "unpaidItems": "Неоплаченные позиции",
+    "paidItems": "Оплаченные позиции",
+    "unitsRemaining": "{{paid}} / {{total}} оплачено",
+    "selectedTotal": "Выбранная сумма",
+    "customerLabel": "Имя гостя (необязательно)",
+    "customerLabelPlaceholder": "Напр. Алексей",
+    "transactionId": "Номер ссылки (карта/цифровой)",
+    "payAndContinue": "Принять и продолжить",
+    "done": "Готово",
+    "cancel": "Отмена",
+    "noSelection": "Выберите хотя бы одну позицию",
+    "paymentRecorded": "Оплата зарегистрирована",
+    "paymentFailed": "Не удалось принять оплату",
+    "fullyPaid": "Заказ полностью оплачен",
+    "tabOrder": "Заказ {{number}}",
+    "remainingItems": "Остающиеся позиции",
+    "remainingAmount": "Остающаяся сумма",
+    "cannotCancelPartiallyPaid": "В заказе есть частичные оплаты — сначала верните их.",
+    "noUnpaidItems": "Все позиции оплачены.",
+    "method": {
+      "CASH": "Наличные",
+      "CARD": "Карта",
+      "DIGITAL": "Цифровая"
+    }
+  },
+  "awaitingPayment": {
+    "title": "Ожидание оплаты",
+    "collectPayment": "Принять оплату",
+    "orderTotal": "Сумма заказа"
+  },
+  "dineInPaymentRequiresServed": "Заказы в зале можно оплатить только после подачи блюд",
+  "dineInPaymentRequiresReadyOrServed": "Заказы в зале можно оплатить только когда они готовы или поданы",
+  "noActiveOrder": "Сначала создайте заказ",
+  "transfer": {
+    "title": "Перенос заказов столика",
+    "buttonTitle": "Перенести заказы на другой столик",
+    "sourceTable": "Исходный столик",
+    "activeOrders": "Активные заказы",
+    "selectTarget": "Выберите столик, на который нужно перенести заказы:",
+    "noAvailableTables": "Нет доступных столиков для переноса",
+    "willMerge": "Заказы будут объединены",
+    "from": "Откуда",
+    "to": "Куда",
+    "ordersToTransfer": "Заказы для переноса",
+    "mergeWarningTitle": "На целевом столике есть активные заказы",
+    "mergeWarningDescription": "Заказы будут объединены с уже существующими заказами на этом столике.",
+    "confirmText": "Перенести {{count}} заказ(ов) со столика {{sourceTable}} на столик {{targetTable}}?",
+    "confirm": "Перенести",
+    "success": "Заказы перенесены со столика {{sourceTable}} на столик {{targetTable}}",
+    "failed": "Не удалось перенести заказы",
+    "socketNotification": "{{count}} заказ(ов) перенесено со столика {{sourceTable}} на столик {{targetTable}}"
   }
 }

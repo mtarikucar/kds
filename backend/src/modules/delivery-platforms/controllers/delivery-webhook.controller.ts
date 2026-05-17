@@ -116,10 +116,31 @@ export class DeliveryWebhookController {
     @Param('remoteOrderId') remoteOrderId: string,
     @Body() body: any,
   ) {
-    this.logger.log(
-      `Yemeksepeti status update for order ${remoteOrderId}: ${JSON.stringify(body)}`,
+    // Resolve tenant first — Yemeksepeti's path doesn't carry the tenant
+    // directly; we look it up by the chain-id (`remoteId`).
+    const config = await this.configService.findByRemoteRestaurantId(
+      DeliveryPlatform.YEMEKSEPETI,
+      remoteId,
     );
-    return { status: 'ok' };
+    if (!config) {
+      this.logger.warn(`No config found for Yemeksepeti chain ${remoteId}`);
+      return { status: 'ignored', reason: 'restaurant not configured' };
+    }
+
+    const platformStatus = body?.status ?? body?.event ?? body?.state;
+    const result = await this.orderService.applyPlatformStatusUpdate({
+      platform: DeliveryPlatform.YEMEKSEPETI,
+      remoteOrderId,
+      tenantId: config.tenantId,
+      platformStatus,
+    });
+
+    this.logger.log(
+      `Yemeksepeti status '${platformStatus}' for ${remoteOrderId} -> ${
+        result.mappedTo ?? 'unmapped'
+      }${result.matched ? '' : ' (no-op)'}`,
+    );
+    return { status: 'ok', matched: result.matched, mappedTo: result.mappedTo };
   }
 
   @Post('trendyol/order/:remoteId')

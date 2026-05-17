@@ -390,57 +390,6 @@
     "gridView": "Grid View",
     "floorPlan": "Floor Plan"
   },
-  "voxel": {
-    "layoutSaved": "Floor plan saved successfully",
-    "layoutSaveError": "Failed to save floor plan",
-    "positionUpdateError": "Failed to update table position",
-    "saving": "Saving...",
-    "save": "Save",
-    "tools": {
-      "select": "Select",
-      "move": "Move",
-      "rotate": "Rotate",
-      "delete": "Delete",
-      "undo": "Undo",
-      "redo": "Redo",
-      "floor": "Floor",
-      "table": "Table",
-      "stair": "Stair"
-    },
-    "library": {
-      "title": "Furniture Library"
-    },
-    "procgen": {
-      "tableStyle": "Table Style",
-      "casual": "Casual",
-      "casualDesc": "Light wood, modern style",
-      "formal": "Formal",
-      "formalDesc": "Dark wood, classic legs",
-      "modern": "Modern",
-      "modernDesc": "Metal, round tops",
-      "bistro": "Bistro",
-      "bistroDesc": "Dark wood, pedestal",
-      "autoGenerate": "Auto-Generate",
-      "generateChairs": "Generate Chairs",
-      "generateDecor": "Generate Decor",
-      "snapSettings": "Snap Settings",
-      "enableSnap": "Enable Snap",
-      "showGuides": "Show Guides",
-      "gridSize": "Grid Size",
-      "units": "units"
-    },
-    "map2d": {
-      "zoomIn": "Zoom In",
-      "zoomOut": "Zoom Out",
-      "toggleGrid": "Toggle Grid",
-      "toggleSnap": "Snap to Grid",
-      "resetView": "Reset View",
-      "properties": "Properties",
-      "rotation": "Rotation",
-      "units": "units",
-      "helpText": "Scroll to zoom • Shift+drag to pan • Click to select"
-    }
-  },
   "pos": {
     "floorPlan": {
       "title": "Floor Plan",
@@ -809,6 +758,50 @@
     "request": "Request Bill",
     "requestSuccess": "Bill request sent!",
     "requestError": "Failed to request bill"
+  },
+  "payment": {
+    "errors": {
+      "SELF_PAY_NOT_TURKEY": "Self-pay is not active for this restaurant. Please ask the waiter.",
+      "SELF_PAY_DISABLED": "This restaurant hasn't enabled self-pay. Please call the waiter.",
+      "ORDER_ALREADY_PAID": "This order has already been paid. Refresh the menu.",
+      "SELF_PAY_DISABLED_MIXED_PAYMENT": "The waiter has already taken a partial payment for this table — self-pay is disabled here. Please call the waiter."
+    },
+    "payNow": "Pay Now",
+    "title": "Pay Now",
+    "subtitle": "Select what you'll pay for — secure card payment",
+    "phoneOptional": "Phone (optional — for loyalty)",
+    "totalToPay": "You will pay",
+    "payWithPaytr": "Pay with PayTR",
+    "payEverything": "Select everything remaining",
+    "remaining": "Remaining",
+    "tabOrder": "Order",
+    "unitsRemaining": "{{paid}} / {{total}} paid",
+    "redirectingToPayTR": "Redirecting to PayTR secure payment…",
+    "intentFailed": "Couldn't start payment. Please try again.",
+    "noOpenItems": "Nothing to pay on this table.",
+    "paytrNote": "Your payment is taken on PayTR's secure page. Card details never touch this site.",
+    "result": {
+      "checking": "Confirming your payment…",
+      "checkingDetail": "Waiting for PayTR to confirm. This usually takes a few seconds.",
+      "checkError": "Couldn't reach the server. Retrying…",
+      "success": "Payment received!",
+      "youPaid": "You paid",
+      "successWithRemaining": "Remaining on table",
+      "failed": "Payment failed",
+      "failedDetail": "Your card was not charged. You can try again from your orders page.",
+      "tryAgain": "Try Again",
+      "backToOrders": "Back to my orders",
+      "payRemaining": "Pay the rest",
+      "enjoy": "Enjoy your meal! 🍽️",
+      "expired": "Payment session expired",
+      "expiredDetail": "You took too long at the payment page. Your card was not charged; start a new payment from your orders.",
+      "errors": {
+        "expired": "Payment session expired. Your card was not charged.",
+        "paytr_token_error": "Could not reach the payment service. Please try again in a moment.",
+        "settlement_error": "Payment was taken but couldn't be recorded. Please notify the waiter — the restaurant will reconcile it manually.",
+        "paytr_reported_failure": "Your bank declined the payment. Try a different card."
+      }
+    }
   },
   "orderStatus": {
     "pendingApproval": "Awaiting Approval",

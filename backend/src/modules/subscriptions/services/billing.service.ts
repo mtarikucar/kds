@@ -1,8 +1,13 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { InvoiceStatus } from '../../../common/constants/subscription.enum';
+import {
+  splitGrossAmount,
+  DEFAULT_KDV_RATE,
+} from '../../../common/helpers/kdv.helper';
 
 type PrismaLike = Prisma.TransactionClient | PrismaService;
 
@@ -10,7 +15,22 @@ type PrismaLike = Prisma.TransactionClient | PrismaService;
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
 
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private config: ConfigService,
+  ) {}
+
+  /**
+   * Effective KDV rate. Defaults to the Turkish standard (20%) but allows
+   * an env override (KDV_RATE=0.10 etc.) for jurisdictions that use a
+   * different reduced rate, and for testing.
+   */
+  private get kdvRate(): number {
+    const raw = this.config.get<string>('KDV_RATE');
+    if (!raw) return DEFAULT_KDV_RATE;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : DEFAULT_KDV_RATE;
+  }
 
   /**
    * Atomically obtain a new invoice number using an InvoiceCounter row.
@@ -52,11 +72,21 @@ export class BillingService {
   ) {
     const invoiceNumber = await this.generateInvoiceNumber(tx);
 
-    // Tax is currently 0%; when we wire up per-region tax the math must
-    // happen with Prisma.Decimal, not JS floats.
-    const subtotal = new Prisma.Decimal(amount);
-    const tax = new Prisma.Decimal(0);
-    const total = subtotal.add(tax);
+    // `amount` is the gross (KDV-inclusive) figure the tenant was actually
+    // charged. For TRY invoices we reverse-engineer KDV; for non-TRY
+    // currencies (INTERNATIONAL tenants on the EMAIL flow) we keep
+    // tax at 0 since per-jurisdiction VAT is out of scope.
+    const isTurkish = currency.toUpperCase() === 'TRY';
+    const { subtotal, tax, total } = isTurkish
+      ? splitGrossAmount(amount, this.kdvRate)
+      : (() => {
+          const t = new Prisma.Decimal(amount);
+          return { subtotal: t, tax: new Prisma.Decimal(0), total: t };
+        })();
+
+    // Snapshot the tenant's taxId at issuance — if they later change it,
+    // already-issued invoices remain auditable.
+    const taxIdSnapshot = await this.loadTaxIdSnapshot(tx, subscriptionId);
 
     const invoice = await tx.invoice.create({
       data: {
@@ -75,6 +105,7 @@ export class BillingService {
         description:
           description ||
           `Subscription invoice for ${periodStart.toLocaleDateString()} - ${periodEnd.toLocaleDateString()}`,
+        taxIdSnapshot,
       },
     });
 
@@ -82,6 +113,17 @@ export class BillingService {
       `Invoice created: ${invoice.invoiceNumber} for subscription ${subscriptionId}`,
     );
     return invoice;
+  }
+
+  private async loadTaxIdSnapshot(
+    tx: PrismaLike,
+    subscriptionId: string,
+  ): Promise<string | null> {
+    const sub = await tx.subscription.findUnique({
+      where: { id: subscriptionId },
+      select: { tenant: { select: { taxId: true } } },
+    });
+    return sub?.tenant?.taxId ?? null;
   }
 
   async markInvoiceAsPaid(invoiceId: string, paymentId: string) {

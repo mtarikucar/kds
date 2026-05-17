@@ -62,6 +62,34 @@ export class PosSettingsService {
       }
     }
 
+    // Disabling self-pay must immediately release any in-flight
+    // intents — otherwise their PENDING status keeps reserving items
+    // and blocks the waiter from collecting cash for up to 15 minutes
+    // (until the sweeper expires them). The owner toggling OFF is
+    // an explicit "I want to take over this manually" signal.
+    if (
+      updateDto.enableCustomerSelfPay === false &&
+      settings?.enableCustomerSelfPay === true
+    ) {
+      const cancelled = await this.prisma.pendingSelfPayment.updateMany({
+        where: { tenantId, status: 'PENDING' },
+        data: {
+          status: 'EXPIRED',
+          failureReason: 'tenant_disabled_self_pay',
+        },
+      });
+      if (cancelled.count > 0) {
+        // Visible signal so an admin can see how many customers
+        // were mid-flow when the toggle went off — needed for any
+        // dispute / refund follow-up.
+        // eslint-disable-next-line no-console
+        console.warn(
+          `[pos-settings] Disabled self-pay for tenant ${tenantId}; ` +
+            `cancelled ${cancelled.count} PENDING intent(s).`,
+        );
+      }
+    }
+
     if (!settings) {
       // Create new settings if they don't exist
       settings = await this.prisma.posSettings.create({
@@ -70,6 +98,7 @@ export class PosSettingsService {
           enableTablelessMode: updateDto.enableTablelessMode ?? false,
           enableTwoStepCheckout: updateDto.enableTwoStepCheckout ?? true, // Default to true
           enableCustomerOrdering: updateDto.enableCustomerOrdering ?? true,
+          enableCustomerSelfPay: updateDto.enableCustomerSelfPay ?? false,
         },
       });
     } else {

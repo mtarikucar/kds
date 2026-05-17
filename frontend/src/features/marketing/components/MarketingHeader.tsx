@@ -5,6 +5,7 @@ import { BellIcon } from '@heroicons/react/24/outline';
 import { toast } from 'sonner';
 import marketingApi from '../api/marketingApi';
 import { useMarketingAuthStore } from '../../../store/marketingAuthStore';
+import { fmtDate } from '../utils/format';
 
 interface Notification {
   id: string;
@@ -27,7 +28,7 @@ function formatTimeAgo(dateStr: string): string {
   if (diffMin < 60) return `${diffMin}m ago`;
   if (diffHr < 24) return `${diffHr}h ago`;
   if (diffDay < 7) return `${diffDay}d ago`;
-  return new Date(dateStr).toLocaleDateString();
+  return fmtDate(dateStr);
 }
 
 export default function MarketingHeader() {

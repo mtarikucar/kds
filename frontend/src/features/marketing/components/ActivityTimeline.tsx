@@ -8,6 +8,7 @@ import {
   UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import type { LeadActivity } from '../types';
+import { fmtDate } from '../utils/format';
 
 const activityIcons: Record<string, React.ElementType> = {
   CALL: PhoneIcon,
@@ -63,7 +64,7 @@ export default function ActivityTimeline({ activities }: ActivityTimelineProps) 
                         {activity.title}
                       </p>
                       <time className="text-xs text-gray-400">
-                        {new Date(activity.createdAt).toLocaleDateString()}
+                        {fmtDate(activity.createdAt)}
                       </time>
                     </div>
                     {activity.description && (

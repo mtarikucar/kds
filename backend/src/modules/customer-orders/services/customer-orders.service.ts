@@ -406,11 +406,20 @@ export class CustomerOrdersService {
       if (!table) throw new NotFoundException('Table not found');
     }
 
+    // Coalesce: returning a PENDING/ACKNOWLEDGED row covers the common
+    // "waiter hasn't gotten to me yet" case, but a customer can also
+    // tap the button immediately after one was COMPLETED. Add a 60s
+    // window — mirrors createWaiterRequest — so the POS tray doesn't
+    // get spammed by an impatient table.
+    const oneMinAgo = new Date(Date.now() - 60_000);
     const existing = await this.prisma.billRequest.findFirst({
       where: {
         sessionId: dto.sessionId,
         tenantId,
-        status: { in: ['PENDING', 'ACKNOWLEDGED'] },
+        OR: [
+          { status: { in: ['PENDING', 'ACKNOWLEDGED'] } },
+          { createdAt: { gte: oneMinAgo } },
+        ],
       },
       include: { table: true },
     });

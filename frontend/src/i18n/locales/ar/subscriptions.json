@@ -41,7 +41,8 @@
       "trial": "فترة تجريبية",
       "cancelled": "ملغي",
       "expired": "منتهي",
-      "pastDue": "متأخر"
+      "pastDue": "متأخر",
+      "pending": "قيد الانتظار"
     },
     "invoiceStatus": {
       "paid": "مدفوعة",
@@ -151,6 +152,171 @@
         "thankYou": "شكراً لشرائك",
         "goToDashboard": "الذهاب للوحة التحكم"
       }
+    },
+    "savePercent": "وفّر {{percent}}%",
+    "changePlanTitle": "تغيير خطتك",
+    "currentPlanLabel": "الخطة الحالية",
+    "backToSubscription": "العودة إلى الاشتراك",
+    "upgrade": "ترقية",
+    "confirmUpgradeTitle": "ترقية الخطة",
+    "confirmDowngradeTitle": "تخفيض الخطة",
+    "upgradeMessage": "سيتم تفعيل خطتك الجديدة على الفور. سيتم احتساب الفرق التناسبي للفترة المتبقية.",
+    "downgradeMessage": "سيسري تخفيض الخطة في نهاية فترة الفوترة الحالية.",
+    "downgradeEffectiveDate": "تاريخ السريان: {{date}}",
+    "confirmUpgrade": "تأكيد الترقية",
+    "confirmDowngrade": "تأكيد التخفيض",
+    "scheduledDowngradeWarning": "لديك تغيير خطة مجدول",
+    "scheduledDowngradeInfo": "سيتم نقلك إلى خطة {{plan}} في {{date}}.",
+    "checkout": {
+      "redirecting": "جارٍ إعادة توجيهك إلى صفحة الدفع الآمنة...",
+      "preparing": "جارٍ تجهيز عملية الدفع...",
+      "missingLink": "تعذّر إنشاء رابط الدفع. يرجى المحاولة مرة أخرى.",
+      "errorTitle": "تعذّر بدء عملية الدفع",
+      "backToPlans": "العودة إلى الخطط",
+      "confirmTitle": "جارٍ إعادة التوجيه إلى الدفع الآمن",
+      "confirmBody": "تتم معالجة الدفع عبر بنية PayTR الآمنة. لا تصل تفاصيل بطاقتك إلى تطبيقنا.",
+      "secureNote": "صفحة PayTR مشفّرة بـ SSL ومتوافقة مع PCI-DSS",
+      "proceedNow": "المتابعة إلى PayTR ({{seconds}})",
+      "cancel": "إلغاء"
+    },
+    "invoiceCard": {
+      "paid": "مدفوعة",
+      "open": "مفتوحة",
+      "period": "الفترة",
+      "paidOn": "تاريخ الدفع",
+      "total": "الإجمالي",
+      "view": "عرض",
+      "download": "تنزيل"
+    },
+    "invoiceViewer": {
+      "title": "معاينة الفاتورة",
+      "loading": "جارٍ تحميل الفاتورة...",
+      "loadFailed": "فشل في تحميل الفاتورة",
+      "close": "إغلاق"
+    },
+    "paymentResult": {
+      "confirming": "جارٍ تأكيد عملية الدفع",
+      "confirmingHint": "في انتظار تأكيد PayTR. قد يستغرق ذلك بضع ثوانٍ.",
+      "confirmingStage2": "قد تستغرق المعاملة بضع ثوانٍ إضافية...",
+      "confirmingStage3": "لا يزال الاتصال جارياً. قد يستغرق ذلك أحياناً ما يصل إلى 30 ثانية.",
+      "successTitle": "تمت عملية الدفع بنجاح",
+      "successBody": "اشتراكك مفعّل. يمكنك البدء باستخدامه فوراً.",
+      "failTitle": "لم تكتمل عملية الدفع",
+      "failBody": "فشلت عملية الدفع. ارجع إلى الخطط للمحاولة مرة أخرى.",
+      "goToSubscription": "الذهاب إلى الاشتراك",
+      "tryAgain": "حاول مرة أخرى"
+    },
+    "statusBanner": {
+      "trialCountdown": "تنتهي فترتك التجريبية لخطة {{plan}} خلال {{days}} يوماً",
+      "gracePeriod": "تعذّر استلام دفعتك — قم بالدفع خلال {{days}} يوماً وإلا سيتم تخفيض حسابك إلى الخطة المجانية",
+      "subscribeNow": "بدء الاشتراك",
+      "payNow": "ادفع الآن",
+      "dismiss": "إغلاق"
+    },
+    "usage": {
+      "users": "المستخدمون",
+      "tables": "الطاولات",
+      "products": "المنتجات",
+      "categories": "الفئات",
+      "monthlyOrders": "طلبات هذا الشهر",
+      "nearingLimit": "تم استخدام {{pct}}% — فكّر في الترقية"
+    },
+    "comparison": {
+      "toggle": "مقارنة جميع الميزات",
+      "featureHeader": "الميزة",
+      "limitsGroup": "الحدود",
+      "featuresGroup": "الميزات",
+      "limits": {
+        "maxUsers": "المستخدمون",
+        "maxTables": "الطاولات",
+        "maxProducts": "المنتجات",
+        "maxCategories": "الفئات",
+        "maxMonthlyOrders": "الطلبات الشهرية"
+      },
+      "features": {
+        "kdsIntegration": "تكامل KDS",
+        "inventoryTracking": "تتبع المخزون",
+        "advancedReports": "تقارير متقدمة",
+        "reservationSystem": "نظام الحجز",
+        "personnelManagement": "إدارة الموظفين",
+        "deliveryIntegration": "منصات التوصيل",
+        "multiLocation": "تعدد الفروع",
+        "customBranding": "علامة تجارية مخصصة",
+        "apiAccess": "الوصول إلى API",
+        "prioritySupport": "دعم ذو أولوية"
+      }
+    },
+    "payNow": "ادفع الآن",
+    "taxIdReminder": {
+      "title": "أكمل بيانات الفوترة الخاصة بك",
+      "body": "ستكون فاتورتك أكثر اكتمالاً بإضافة الرقم الضريبي (Vergi No / TC Kimlik No). يمكنك المتابعة بدونه؛ وستخلو الفاتورة من هذا السطر فقط.",
+      "fillNow": "املأ الآن",
+      "skip": "تخطي الآن"
+    },
+    "limitWarning": {
+      "near": "{{resource}}: {{current}}/{{limit}} (متبقي {{remaining}}). أنت تقترب من الحد الأقصى.",
+      "full": "تم بلوغ حد {{resource}} ({{limit}}). قم بترقية خطتك لإضافة المزيد.",
+      "upgrade": "ترقية الآن ←"
+    },
+    "cancelModal": {
+      "title": "إلغاء الاشتراك",
+      "reasonPrompt": "لماذا تغادر؟ ملاحظاتك تساعدنا على التحسّن.",
+      "reasons": {
+        "tooExpensive": "مكلف للغاية",
+        "missingFeature": "تنقصني ميزة أحتاجها",
+        "switchedProvider": "انتقلت إلى خدمة أخرى",
+        "temporary": "لم أعد بحاجة إليها (مؤقتاً)",
+        "other": "أخرى"
+      },
+      "otherPlaceholder": "أخبرنا باختصار عن السبب...",
+      "immediate": "إلغاء فوري (دون انتظار نهاية الفترة)",
+      "warnImmediate": "سيتم إلغاء اشتراكك فوراً وستفقد الوصول إلى الميزات المدفوعة.",
+      "warnPeriodEnd": "سينتهي اشتراكك في {{date}}؛ وستحتفظ بالوصول الكامل حتى ذلك الحين.",
+      "keep": "الاحتفاظ باشتراكي",
+      "confirm": "إلغاء الاشتراك"
+    },
+    "scheduledDowngrade": {
+      "title": "تغيير خطة مجدول",
+      "description": "لديك تخفيض خطة مجدول. ألغه أولاً إذا أردت إجراء تغيير آخر.",
+      "scheduled": "مجدول",
+      "downgradingTo": "التخفيض إلى",
+      "scheduledFor": "تاريخ السريان",
+      "cancelDowngrade": "إلغاء التخفيض",
+      "cancelTitle": "إلغاء التخفيض المجدول؟",
+      "cancelConfirm": "هل أنت متأكد من إلغاء هذا التخفيض المجدول؟ ستحتفظ بخطتك الحالية.",
+      "keepCurrentPlan": "الاحتفاظ بالخطة الحالية"
+    },
+    "upgradeRequired": "الترقية مطلوبة",
+    "featureNotAvailable": "ميزة {{feature}} غير متاحة في خطتك الحالية.",
+    "upgradeToAccess": "قم بالترقية إلى خطة {{plan}} للوصول إلى هذه الميزة.",
+    "featureRequiresPlan": "تتطلب هذه الميزة خطة {{plan}}.",
+    "limitReached": "تم بلوغ الحد الأقصى ({{current}}/{{limit}})",
+    "limitReachedDescription": "لقد بلغت حد {{resource}} في خطتك الحالية ({{current}}/{{limit}}).",
+    "featureAdvancedReports": "تقارير متقدمة",
+    "featureMultiLocation": "دعم تعدد الفروع",
+    "featureCustomBranding": "علامة تجارية مخصصة",
+    "featureApiAccess": "الوصول إلى API",
+    "featurePrioritySupport": "دعم ذو أولوية",
+    "featureInventoryTracking": "تتبع المخزون",
+    "featureKdsIntegration": "تكامل KDS",
+    "contact": {
+      "title": "تواصل معنا",
+      "subtitle": "تواصل معنا بشأن طلب اشتراكك",
+      "whatsapp": "تواصل عبر واتساب",
+      "email": "إرسال بريد إلكتروني",
+      "phone": "الهاتف",
+      "selectedPlan": "الخطة المحددة",
+      "planDetails": "تفاصيل الخطة",
+      "contactUs": "تواصل معنا",
+      "thankYou": "شكراً لك!",
+      "thankYouMessage": "تم استلام طلبك. سنتواصل معك في أقرب وقت ممكن.",
+      "note": "عند التواصل معنا عبر واتساب أو البريد الإلكتروني، سيتواصل فريقنا معك قريباً ويساعدك على إتمام عملية الدفع.",
+      "back": "رجوع",
+      "backToContact": "العودة إلى التواصل",
+      "loading": "جارٍ التحميل...",
+      "error": "حدث خطأ",
+      "missingInfo": "معلومات ناقصة",
+      "upgradeFrom": "ترقية من:"
     }
   }
 }

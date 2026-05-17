@@ -220,6 +220,7 @@ export class QrMenuController {
       },
       enableCustomerOrdering: posSettings.enableCustomerOrdering,
       enableTablelessMode: posSettings.enableTablelessMode,
+      enableCustomerSelfPay: !!posSettings.enableCustomerSelfPay,
       categories: transformedCategories,
     };
   }

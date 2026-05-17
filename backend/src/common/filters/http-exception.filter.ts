@@ -111,9 +111,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
           statusCode,
           requestId,
         });
+        // Intentionally omit email here: Sentry retains breadcrumbs/events
+        // for weeks and user email is unnecessary for triage when we already
+        // have the user id + tenant id. Reduces our GDPR/KVKK surface.
         setContext('user', {
           id: (request as any).user?.id,
-          email: (request as any).user?.email,
           tenantId: (request as any).user?.tenantId,
         });
         captureException(exception, {

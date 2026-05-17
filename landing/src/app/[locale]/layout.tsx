@@ -23,7 +23,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const messages = (await import(`@/i18n/messages/${locale}.json`)).default;
   const meta = messages.metadata;
 
-  const baseUrl = 'https://hummytummy.com';
+  // Honour NEXT_PUBLIC_BASE_URL so staging/preview deploys don't emit
+  // canonical/og:url tags pointing at production. Fallback covers local
+  // `next dev` without env wiring.
+  const baseUrl =
+    process.env.NEXT_PUBLIC_BASE_URL?.replace(/\/+$/, '') ||
+    'https://hummytummy.com';
 
   return {
     title: {

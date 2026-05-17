@@ -190,4 +190,19 @@ export class UpdateTenantSettingsDto {
   @IsOptional()
   @MaxLength(20)
   socialWhatsapp?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Turkish tax identifier: 10-digit Vergi No (corporate) or 11-digit TC Kimlik No (individual). Surfaced on KDV-compliant invoices. Send `null` to clear.',
+    example: '1234567890',
+    maxLength: 11,
+  })
+  @EmptyStringToUndefined()
+  @ValidateIf((o) => o.taxId !== null)
+  @IsString()
+  @IsOptional()
+  @Matches(/^\d{10,11}$/, {
+    message: 'taxId must be 10 digits (Vergi No) or 11 digits (TC Kimlik No)',
+  })
+  taxId?: string | null;
 }

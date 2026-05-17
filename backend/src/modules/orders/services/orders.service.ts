@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  ConflictException,
   Inject,
   forwardRef,
   Optional,
@@ -23,6 +24,7 @@ import { StockDeductionService } from '../../stock-management/services/stock-ded
 import { SmsNotificationService } from '../../sms-settings/sms-notification.service';
 import { TaxCalculationService } from '../../accounting/services/tax-calculation.service';
 import { withTransaction, addBreadcrumb } from '../../../common/utils/tracing';
+import { ReceiptSnapshotBuilder } from './receipt-snapshot.builder';
 
 @Injectable()
 export class OrdersService {
@@ -30,6 +32,7 @@ export class OrdersService {
 
   constructor(
     private prisma: PrismaService,
+    private receiptSnapshotBuilder: ReceiptSnapshotBuilder,
     @Inject(forwardRef(() => KdsGateway))
     private kdsGateway: KdsGateway,
     @Optional()
@@ -43,6 +46,52 @@ export class OrdersService {
     @Optional()
     private taxCalculationService?: TaxCalculationService,
   ) {}
+
+  /**
+   * Block a destructive operation (item-set rewrite, item delete,
+   * order cancel) while a customer is mid-PayTR on this order. The
+   * customer's intent.itemsByOrder JSON snapshot is keyed on the
+   * current OrderItem ids; deleting them would orphan the intent
+   * and the webhook would fail post-charge — PayTR took the money,
+   * we couldn't book it, manual refund required.
+   *
+   * If `targetOrderItemId` is given, only blocks when THAT item
+   * appears in any pending intent's itemsByOrder. Otherwise any
+   * pending intent on the order blocks.
+   */
+  private async ensureNoInFlightSelfPayIntent(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    tenantId: string,
+    targetOrderItemId?: string,
+  ): Promise<void> {
+    const pendingIntents = await tx.pendingSelfPayment.findMany({
+      where: {
+        tenantId,
+        status: 'PENDING',
+        expiresAt: { gt: new Date() },
+      },
+      select: { itemsByOrder: true },
+    });
+    const conflicts = pendingIntents.some((intent) => {
+      const buckets = intent.itemsByOrder as Array<{
+        orderId: string;
+        items?: Array<{ orderItemId: string; quantity: number }>;
+      }>;
+      if (!Array.isArray(buckets)) return false;
+      return buckets.some((b) => {
+        if (b?.orderId !== orderId) return false;
+        if (!targetOrderItemId) return true;
+        return (b.items ?? []).some((i) => i.orderItemId === targetOrderItemId);
+      });
+    });
+    if (conflicts) {
+      throw new ConflictException(
+        'A customer is currently paying for this order via PayTR. ' +
+          'Wait until their payment finalizes (or expires) before modifying.',
+      );
+    }
+  }
 
   private generateOrderNumber(): string {
     const timestamp = Date.now();
@@ -102,6 +151,40 @@ export class OrdersService {
           type: createOrderDto.type,
           itemCount: createOrderDto.items.length,
         });
+
+        // Idempotency fast-path: if the client supplied a key and we've
+        // already recorded an order for this (tenantId, key), return the
+        // existing row instead of creating a duplicate. The DB has a
+        // partial unique index on (tenantId, idempotencyKey) WHERE key
+        // IS NOT NULL — this pre-check is the responsiveness path; the
+        // P2002 catch in createWithOrderNumberRetry handles concurrent
+        // retries authoritatively.
+        if (createOrderDto.idempotencyKey) {
+          const existing = await this.prisma.order.findFirst({
+            where: { tenantId, idempotencyKey: createOrderDto.idempotencyKey },
+            include: {
+              orderItems: {
+                include: {
+                  product: { select: { id: true, name: true, price: true, image: true } },
+                  modifiers: {
+                    include: {
+                      modifier: { select: { id: true, name: true, priceAdjustment: true } },
+                    },
+                  },
+                },
+              },
+              table: { select: { id: true, number: true, section: true } },
+              user: { select: { id: true, firstName: true, lastName: true } },
+            },
+          });
+          if (existing) {
+            addBreadcrumb('Idempotency hit — returning existing order', 'order', {
+              orderId: existing.id,
+              orderNumber: existing.orderNumber,
+            });
+            return existing;
+          }
+        }
 
         // Validate table if provided
         if (createOrderDto.tableId) {
@@ -210,7 +293,17 @@ export class OrdersService {
       };
     });
 
-    const discount = createOrderDto.discount || 0;
+    // Cap the discount at the order total — discount > total would mint a
+    // negative finalAmount and effectively pay the customer. DTO `@Min(0)`
+    // blocks negative discounts but not over-discounts, and a free-form
+    // admin field can hit this even on legit flows (typo, copy/paste).
+    const requestedDiscount = createOrderDto.discount || 0;
+    if (requestedDiscount > totalAmount) {
+      throw new BadRequestException(
+        `Discount (${requestedDiscount}) cannot exceed order total (${totalAmount}).`,
+      );
+    }
+    const discount = requestedDiscount;
     const finalAmount = totalAmount - discount;
 
     // Recalculate tax after discount (proportional)
@@ -233,6 +326,7 @@ export class OrdersService {
         customerName: createOrderDto.customerName,
         userId,
         tenantId,
+        idempotencyKey: createOrderDto.idempotencyKey,
         orderItems: {
           create: orderItems,
         },
@@ -285,6 +379,46 @@ export class OrdersService {
       },
       });
     });
+
+        // Keep table.status in sync with order presence. updateStatus
+        // already flips OCCUPIED on transitions into active states; the
+        // create path used to skip this, leaving freshly-created PENDING
+        // orders on AVAILABLE tables — a violation of the invariant
+        // "table is OCCUPIED iff any active order references it".
+        if (createdOrder.tableId) {
+          await this.prisma.table.update({
+            where: { id: createdOrder.tableId },
+            data: { status: TableStatus.OCCUPIED },
+          });
+        }
+
+        // Build the kitchen ticket snapshot now that the order has its
+        // generated orderNumber. The snapshot is written via a separate
+        // order.update call because the orderNumber is allocated by the
+        // retry helper inside order.create — we can't include the snapshot
+        // in the create payload without a chicken-and-egg problem.
+        //
+        // Note: this is a second query, not atomic with order.create. That
+        // matches the existing pattern in this method (stockDeduction, sms
+        // notifications also run as separate post-create operations).
+        // Fail-soft: a builder error logs and leaves the snapshot null —
+        // reprintability is a convenience, not source of truth.
+        try {
+          const kitchenTicketSnapshot =
+            this.receiptSnapshotBuilder.buildKitchenTicketSnapshot({
+              order: ReceiptSnapshotBuilder.toBuilderOrder(createdOrder),
+            }) as unknown as Prisma.InputJsonValue;
+          await this.prisma.order.update({
+            where: { id: createdOrder.id },
+            data: { kitchenTicketSnapshot },
+          });
+          (createdOrder as any).kitchenTicketSnapshot = kitchenTicketSnapshot;
+        } catch (snapErr) {
+          this.logger.warn(
+            `Failed to build kitchen ticket snapshot for order ${createdOrder.orderNumber}: ${(snapErr as Error).message}`,
+          );
+          (createdOrder as any).kitchenTicketSnapshot = null;
+        }
 
         // Emit new order to kitchen via WebSocket
         this.kdsGateway.emitNewOrder(tenantId, createdOrder);
@@ -568,7 +702,12 @@ export class OrdersService {
         };
       });
 
-      const discount = updateOrderDto.discount !== undefined ? updateOrderDto.discount : Number(order.discount);
+      const rawDiscount = updateOrderDto.discount !== undefined ? updateOrderDto.discount : Number(order.discount);
+      // Cap discount at totalAmount — same protection as the
+      // create() path. Shrinking the item set during update could
+      // leave a stored discount > new totalAmount, which would mint
+      // a negative finalAmount (we'd be paying the customer).
+      const discount = Math.min(rawDiscount, totalAmount);
       const finalAmount = totalAmount - discount;
 
       // Recalculate tax after discount (proportional)
@@ -583,9 +722,18 @@ export class OrdersService {
       updateData.finalAmount = finalAmount;
       updateData.taxAmount = adjustedTaxAmount;
     } else if (updateOrderDto.discount !== undefined) {
-      // Only discount is being updated
-      updateData.discount = updateOrderDto.discount;
-      updateData.finalAmount = Number(order.totalAmount) - updateOrderDto.discount;
+      // Discount-only update: cap the value here (cheap), but defer
+      // the allocation + self-pay-intent guards to INSIDE the tx —
+      // outside-tx reads can miss a webhook that lands between the
+      // check and the write. The tx-scoped guards are in the
+      // transaction body below.
+      const totalAmountDec = new Prisma.Decimal(order.totalAmount);
+      const rawDiscount = new Prisma.Decimal(updateOrderDto.discount);
+      const cappedDiscount = rawDiscount.gt(totalAmountDec)
+        ? totalAmountDec
+        : rawDiscount;
+      updateData.discount = cappedDiscount;
+      updateData.finalAmount = totalAmountDec.sub(cappedDiscount);
     }
 
     // Atomic replace of the item set: a crash between the deleteMany
@@ -593,7 +741,68 @@ export class OrdersService {
     // covers the order.update so a validation failure doesn't leave
     // the order without its items.
     const updatedOrder = await this.prisma.$transaction(async (tx) => {
+      // Re-verify status inside the transaction: a concurrent cancel /
+      // pay between the findOne above and this write could otherwise let
+      // us layer new items onto a PAID/CANCELLED order (corrupting the
+      // audit trail). The terminal statuses are guarded at line 468 but
+      // only against the stale snapshot.
+      const stillEditable = await tx.order.count({
+        where: {
+          id,
+          tenantId,
+          status: { notIn: [OrderStatus.PAID, OrderStatus.CANCELLED] },
+        },
+      });
+      if (stillEditable === 0) {
+        throw new BadRequestException('Cannot update paid or cancelled orders');
+      }
+      // Discount-only updates: both the allocation and self-pay
+      // guards run INSIDE the tx so a webhook landing between the
+      // pre-tx read and the order.update can't slip past. Mirrors
+      // the items-rewrite branch below.
+      if (
+        updateOrderDto.discount !== undefined &&
+        !updateData.orderItems
+      ) {
+        const allocCount = await tx.orderItemPayment.count({
+          where: { tenantId, orderItem: { orderId: id } },
+        });
+        if (allocCount > 0) {
+          throw new ConflictException(
+            'Cannot change the order discount once any per-item payment has been collected. ' +
+              'Refund the existing payment(s) first, then re-apply the discount.',
+          );
+        }
+        await this.ensureNoInFlightSelfPayIntent(tx, id, tenantId);
+      }
       if (updateData.orderItems) {
+        // The whole-order rewrite path drops every existing OrderItem
+        // and recreates the requested set. If any of the items being
+        // dropped has an OrderItemPayment row, the FK Restrict would
+        // fire on the deleteMany — and even if the cascade allowed it,
+        // a customer who already paid for their share would lose the
+        // audit trail of what they bought.
+        //
+        // For surgical changes (waiter wants to remove ONE unpaid item
+        // from a table where other customers already paid) use the
+        // dedicated `DELETE /orders/:orderId/items/:itemId` endpoint
+        // which preserves untouched allocations.
+        const paidItemCount = await tx.orderItemPayment.count({
+          where: { tenantId, orderItem: { orderId: id } },
+        });
+        if (paidItemCount > 0) {
+          throw new ConflictException(
+            'Cannot rewrite the full item set when partial per-item payments exist. ' +
+              'Use DELETE /orders/:orderId/items/:itemId to drop a single unpaid item, ' +
+              'or refund the payment(s) first.',
+          );
+        }
+        // Block when a customer is mid-PayTR on this order — the
+        // intent's itemsByOrder JSON snapshot references the
+        // current OrderItem ids; deleteMany would orphan them and
+        // the webhook would fail with "item no longer exists" AFTER
+        // PayTR already charged the card.
+        await this.ensureNoInFlightSelfPayIntent(tx, id, tenantId);
         await tx.orderItem.deleteMany({ where: { orderId: id } });
       }
       return tx.order.update({
@@ -663,14 +872,42 @@ export class OrdersService {
       // Validate state transition using state machine (STRICT mode)
       validateTransition(order.status as OrderStatus, updateStatusDto.status);
 
+      // Block CANCELLED if there are any per-item payments. A CANCELLED
+      // order with active OrderItemPayment rows leaves the customer who
+      // already paid for their share without a refund trail — refund
+      // the payment(s) explicitly instead, which also frees the items.
+      if (updateStatusDto.status === OrderStatus.CANCELLED) {
+        const paidItemCount = await tx.orderItemPayment.count({
+          where: { tenantId, orderItem: { orderId: id } },
+        });
+        if (paidItemCount > 0) {
+          throw new ConflictException(
+            'Cannot cancel an order with partial per-item payments. Refund the corresponding payment(s) first.',
+          );
+        }
+      }
+
       // Build update data with status timestamps
       const statusUpdateData: any = { status: updateStatusDto.status };
       if (updateStatusDto.status === OrderStatus.PREPARING) statusUpdateData.preparingAt = new Date();
       if (updateStatusDto.status === OrderStatus.READY) statusUpdateData.readyAt = new Date();
+      if (updateStatusDto.status === OrderStatus.CANCELLED) statusUpdateData.cancelledAt = new Date();
 
-      const updated = await tx.order.update({
-        where: { id },
+      // Conditional write: include the observed `order.status` in the
+      // where filter so two concurrent transitions can't both pass the
+      // (stale) validateTransition above and both write. Mirrors the
+      // race-safe pattern in customers/loyalty.service.ts:50-107.
+      const writeResult = await tx.order.updateMany({
+        where: { id, status: order.status },
         data: statusUpdateData,
+      });
+      if (writeResult.count === 0) {
+        throw new BadRequestException(
+          `Order state changed mid-flight; please retry. Expected ${order.status}, found something else.`,
+        );
+      }
+      const updated = await tx.order.findUniqueOrThrow({
+        where: { id },
         include: {
           orderItems: { include: { product: true } },
           table: true,
@@ -785,6 +1022,98 @@ export class OrdersService {
 
     return this.prisma.order.delete({
       where: { id },
+    });
+  }
+
+  /**
+   * Remove a single OrderItem from an open order — used when a waiter
+   * needs to cancel ONE customer's unpaid line without touching the
+   * other customers' already-recorded per-item payments.
+   *
+   * Rules:
+   *  - Order must be open (not PAID / CANCELLED / requiresApproval pending).
+   *  - The target item must have zero COMPLETED OrderItemPayment rows. If
+   *    even one unit has been paid for, refund first.
+   *  - On success, order totals (totalAmount / finalAmount / taxAmount)
+   *    are recomputed from the surviving items so the rest of the bill
+   *    settles cleanly. Discount stays put.
+   */
+  async removeItem(orderId: string, itemId: string, tenantId: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const order = await tx.order.findFirst({
+        where: { id: orderId, tenantId },
+        include: { orderItems: true },
+      });
+      if (!order) {
+        throw new NotFoundException(`Order ${orderId} not found`);
+      }
+      if (order.status === OrderStatus.PAID || order.status === OrderStatus.CANCELLED) {
+        throw new BadRequestException('Cannot modify a paid or cancelled order');
+      }
+      if (order.requiresApproval && order.status === OrderStatus.PENDING_APPROVAL) {
+        throw new BadRequestException(
+          'Order requires approval before items can be modified.',
+        );
+      }
+
+      const item = order.orderItems.find((i) => i.id === itemId);
+      if (!item) {
+        throw new NotFoundException(`Item ${itemId} not found on this order`);
+      }
+      if (order.orderItems.length === 1) {
+        throw new BadRequestException(
+          'Cannot remove the last item from an order; cancel the order instead.',
+        );
+      }
+
+      const allocations = await tx.orderItemPayment.count({
+        where: { orderItemId: itemId },
+      });
+      if (allocations > 0) {
+        throw new ConflictException(
+          'This item has been partially paid for. Refund the corresponding payment(s) first.',
+        );
+      }
+
+      // Also block when this specific item is reserved by a PENDING
+      // self-pay intent — deleting it would orphan the intent's
+      // itemsByOrder snapshot and the webhook would fail post-charge.
+      await this.ensureNoInFlightSelfPayIntent(tx, orderId, tenantId, itemId);
+
+      await tx.orderItem.delete({ where: { id: itemId } });
+
+      // Recompute totals from the surviving items so the order math
+      // stays self-consistent. taxAmount mirrors the order-create
+      // pattern: pro-rata discount applied to the gross tax sum.
+      const remaining = order.orderItems.filter((i) => i.id !== itemId);
+      const newTotal = remaining.reduce<Prisma.Decimal>(
+        (s, i) => s.add(new Prisma.Decimal(i.subtotal)),
+        new Prisma.Decimal(0),
+      );
+      const grossTax = remaining.reduce<Prisma.Decimal>(
+        (s, i) => s.add(new Prisma.Decimal(i.taxAmount)),
+        new Prisma.Decimal(0),
+      );
+      const discount = new Prisma.Decimal(order.discount);
+      const cappedDiscount = discount.gt(newTotal) ? newTotal : discount;
+      const newFinal = newTotal.sub(cappedDiscount);
+      const discountRatio = newTotal.gt(0) ? cappedDiscount.div(newTotal) : new Prisma.Decimal(0);
+      const adjustedTax = grossTax
+        .mul(new Prisma.Decimal(1).sub(discountRatio))
+        .toDecimalPlaces(2);
+
+      const updated = await tx.order.update({
+        where: { id: orderId },
+        data: {
+          totalAmount: newTotal,
+          discount: cappedDiscount,
+          finalAmount: newFinal,
+          taxAmount: adjustedTax,
+        },
+        include: { orderItems: { include: { product: true } } },
+      });
+
+      return updated;
     });
   }
 

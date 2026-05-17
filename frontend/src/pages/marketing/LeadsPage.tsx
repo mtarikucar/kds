@@ -13,6 +13,7 @@ import {
   LEAD_SOURCE_LABELS,
 } from '../../features/marketing/types';
 import type { Lead, PaginatedResponse } from '../../features/marketing/types';
+import { fmtDate } from '../../features/marketing/utils/format';
 
 export default function LeadsPage() {
   const [search, setSearch] = useState('');
@@ -172,7 +173,7 @@ export default function LeadsPage() {
                         : '-'}
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell text-gray-400 text-xs">
-                      {new Date(lead.createdAt).toLocaleDateString()}
+                      {fmtDate(lead.createdAt)}
                     </td>
                   </tr>
                 ))

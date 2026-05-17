@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CommissionFilterDto } from '../dto/commission-filter.dto';
 
@@ -125,9 +126,12 @@ export class MarketingCommissionsService {
     if (commission.status !== 'PENDING') {
       throw new BadRequestException('Only pending commissions can be updated');
     }
+    // Normalise through Prisma.Decimal to avoid passing a JS float at the
+    // edge of IEEE-754 precision into a Decimal(10,2) column. The
+    // canonical create path in marketing-leads already does this.
     return this.prisma.commission.update({
       where: { id },
-      data: { amount },
+      data: { amount: new Prisma.Decimal(amount).toDecimalPlaces(2) },
     });
   }
 

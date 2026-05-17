@@ -151,26 +151,76 @@ const IntegrationsSettingsPage = () => {
 
     try {
       await deleteIntegration.mutateAsync(id);
-  toast.success(t('integrations.deleteSuccess'));
+      toast.success(t('integrations.deleteSuccess'));
+
+      // Remove from local hardware config too. Same fail-soft as save:
+      // a backend deletion that fails to remove the local row leaves
+      // the user with a "ghost" pairing, but it's recoverable by
+      // editing ~/.kds/hardware.json or re-adding/removing.
+      if (isTauri()) {
+        try {
+          await HardwareService.disconnectDevice(id).catch(() => undefined);
+          await HardwareService.removeDevice(id);
+        } catch (localErr) {
+          console.error('Failed to remove device from local hardware config:', localErr);
+        }
+      }
+
       refetch();
       loadHardwareDevices();
     } catch (error) {
-  toast.error(t('integrations.deleteFailed'));
+      toast.error(t('integrations.deleteFailed'));
     }
   };
 
   const handleSaveDevice = async (config: any) => {
     try {
+      // Backend integrations table holds tenant-level abstract metadata
+      // ("we use a Star Micronics printer of model X"). Each terminal's
+      // physical pairing lives in ~/.kds/hardware.json on that machine,
+      // managed via HardwareService.addDevice. We update both: the
+      // tenant row + the local row. The local row is what the auto-
+      // print path reads when firing on payment-success / order:new.
+      let savedRow;
       if (editingDevice) {
-        await updateIntegration.mutateAsync({
+        savedRow = await updateIntegration.mutateAsync({
           id: editingDevice.id,
           data: config,
         });
-  toast.success(t('hardware.deviceUpdated'));
+        toast.success(t('hardware.deviceUpdated'));
       } else {
-        await createIntegration.mutateAsync(config);
-  toast.success(t('hardware.deviceAdded'));
+        savedRow = await createIntegration.mutateAsync(config);
+        toast.success(t('hardware.deviceAdded'));
       }
+
+      // Mirror to ~/.kds/hardware.json on the current terminal so the
+      // POS print path can find this device. Failure here is logged
+      // but doesn't fail the save — the backend row still exists,
+      // and the user can retry by re-saving.
+      if (isTauri() && savedRow) {
+        try {
+          const cfg = config.configuration || {};
+          await HardwareService.addDevice({
+            id: savedRow.id ?? editingDevice?.id,
+            name: config.provider,
+            device_type: config.integrationType,
+            enabled: !!config.isEnabled,
+            auto_connect: !!cfg.auto_connect,
+            connection: {
+              connection_type: cfg.connection_type,
+              config: cfg.connection_config,
+            },
+          });
+        } catch (localErr) {
+          console.error('Failed to mirror device to local hardware config:', localErr);
+          toast.warning(
+            t('hardware.localMirrorFailed', {
+              defaultValue: 'Saved on backend but local pairing failed — check ~/.kds/hardware.json',
+            }),
+          );
+        }
+      }
+
       setDeviceConfigModalOpen(false);
       setEditingDevice(null);
       refetch();
@@ -180,7 +230,7 @@ const IntegrationsSettingsPage = () => {
         loadHardwareDevices();
       }, 1000);
     } catch (error) {
-  toast.error(t('hardware.deviceSaveFailed'));
+      toast.error(t('hardware.deviceSaveFailed'));
     }
   };
 

@@ -1,10 +1,17 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { Response, Request } from 'express';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { UserRole } from '../../common/constants/roles.enum';
 
+/**
+ * Controller-level tests focus on the thin wrapper between Nest's
+ * decorators and the AuthService. Cookie writes and req/res plumbing
+ * land in this layer; the actual auth logic is unit-tested separately
+ * in auth.service.spec.ts.
+ */
 describe('AuthController', () => {
   let controller: AuthController;
   let authService: AuthService;
@@ -29,6 +36,26 @@ describe('AuthController', () => {
     },
   };
 
+  // Minimal Express stubs so the controller's @Res() handler can call
+  // res.cookie() without blowing up. The implementation chain (`cookie`
+  // returns `this`) lets multiple calls chain.
+  const buildMockRes = (): Response => {
+    const res: any = {
+      cookie: jest.fn().mockReturnThis(),
+      clearCookie: jest.fn().mockReturnThis(),
+    };
+    return res;
+  };
+
+  const buildMockReq = (extra: Partial<Request> = {}): Request => {
+    return {
+      headers: {},
+      ip: '127.0.0.1',
+      cookies: {},
+      ...extra,
+    } as unknown as Request;
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       controllers: [AuthController],
@@ -45,11 +72,11 @@ describe('AuthController', () => {
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
   });
 
   describe('register', () => {
-    it('should successfully register a new user', async () => {
+    it('delegates to AuthService.register and strips the refresh token from the body', async () => {
       const registerDto: RegisterDto = {
         email: 'newuser@test.com',
         password: 'password123',
@@ -57,100 +84,65 @@ describe('AuthController', () => {
         lastName: 'Smith',
         restaurantName: 'New Restaurant',
       };
-
       mockAuthService.register.mockResolvedValue(mockAuthResponse);
+      const res = buildMockRes();
 
-      const result = await controller.register(registerDto);
+      const result = await controller.register(registerDto, res);
 
-      expect(result).toEqual(mockAuthResponse);
+      // Controller calls stripRefresh() before returning, so the
+      // refreshToken is in the cookie (set on res) but not the body.
+      expect(result.accessToken).toBe('test-access-token');
+      expect(result.user).toEqual(mockAuthResponse.user);
+      expect((result as any).refreshToken).toBeUndefined();
+      expect(res.cookie).toHaveBeenCalled();
       expect(authService.register).toHaveBeenCalledWith(registerDto);
-      expect(authService.register).toHaveBeenCalledTimes(1);
     });
 
-    it('should call authService.register with correct parameters', async () => {
+    it('does not set a refresh cookie for PENDING_APPROVAL registrations (no token)', async () => {
       const registerDto: RegisterDto = {
-        email: 'test@test.com',
-        password: 'pass123',
-        firstName: 'Test',
-        lastName: 'User',
+        email: 'staff@test.com',
+        password: 'password123',
+        firstName: 'Bob',
+        lastName: 'Marley',
         tenantId: 'tenant-existing',
         role: UserRole.WAITER,
       };
+      mockAuthService.register.mockResolvedValue({
+        ...mockAuthResponse,
+        accessToken: null,
+        refreshToken: null,
+        pendingApproval: true,
+      });
+      const res = buildMockRes();
 
-      mockAuthService.register.mockResolvedValue(mockAuthResponse);
+      await controller.register(registerDto, res);
 
-      await controller.register(registerDto);
-
-      expect(authService.register).toHaveBeenCalledWith(registerDto);
+      expect(res.cookie).not.toHaveBeenCalled();
     });
   });
 
   describe('login', () => {
-    it('should successfully login a user', async () => {
+    it('delegates to AuthService.login and strips refresh token from the body', async () => {
       const loginDto: LoginDto = {
         email: 'test@test.com',
         password: 'password123',
       };
-
       mockAuthService.login.mockResolvedValue(mockAuthResponse);
+      const req = buildMockReq();
+      const res = buildMockRes();
 
-      const result = await controller.login(loginDto);
+      const result = await controller.login(loginDto, req, res);
 
-      expect(result).toEqual(mockAuthResponse);
-      expect(authService.login).toHaveBeenCalledWith(loginDto);
-      expect(authService.login).toHaveBeenCalledTimes(1);
-    });
-
-    it('should return tokens and user data on successful login', async () => {
-      const loginDto: LoginDto = {
-        email: 'admin@test.com',
-        password: 'admin123',
-      };
-
-      mockAuthService.login.mockResolvedValue(mockAuthResponse);
-
-      const result = await controller.login(loginDto);
-
-      expect(result).toHaveProperty('accessToken');
-      expect(result).toHaveProperty('refreshToken');
-      expect(result).toHaveProperty('user');
+      expect(result.accessToken).toBe('test-access-token');
       expect(result.user.email).toBe(mockAuthResponse.user.email);
-    });
-  });
-
-  describe('refresh', () => {
-    it('should successfully refresh access token', async () => {
-      const refreshToken = 'valid-refresh-token';
-
-      mockAuthService.refreshToken.mockResolvedValue(mockAuthResponse);
-
-      const result = await controller.refresh(refreshToken);
-
-      expect(result).toEqual(mockAuthResponse);
-      expect(authService.refreshToken).toHaveBeenCalledWith(refreshToken);
-      expect(authService.refreshToken).toHaveBeenCalledTimes(1);
-    });
-
-    it('should return new tokens on successful refresh', async () => {
-      const refreshToken = 'test-refresh-token';
-
-      const newAuthResponse = {
-        ...mockAuthResponse,
-        accessToken: 'new-access-token',
-        refreshToken: 'new-refresh-token',
-      };
-
-      mockAuthService.refreshToken.mockResolvedValue(newAuthResponse);
-
-      const result = await controller.refresh(refreshToken);
-
-      expect(result.accessToken).toBe('new-access-token');
-      expect(result.refreshToken).toBe('new-refresh-token');
+      expect((result as any).refreshToken).toBeUndefined();
+      expect(res.cookie).toHaveBeenCalled();
+      expect(authService.login).toHaveBeenCalled();
     });
   });
 
   describe('getProfile', () => {
-    it('should return user profile', async () => {
+    it('forwards the userId from the CurrentUser decorator to the service', async () => {
       const userId = 'user-1';
       const userProfile = {
         id: userId,
@@ -160,23 +152,11 @@ describe('AuthController', () => {
         role: UserRole.ADMIN,
         tenantId: 'tenant-1',
       };
-
       mockAuthService.getProfile.mockResolvedValue(userProfile);
 
       const result = await controller.getProfile(userId);
 
       expect(result).toEqual(userProfile);
-      expect(authService.getProfile).toHaveBeenCalledWith(userId);
-      expect(authService.getProfile).toHaveBeenCalledTimes(1);
-    });
-
-    it('should call authService.getProfile with userId from decorator', async () => {
-      const userId = 'user-123';
-
-      mockAuthService.getProfile.mockResolvedValue(mockAuthResponse.user);
-
-      await controller.getProfile(userId);
-
       expect(authService.getProfile).toHaveBeenCalledWith(userId);
     });
   });

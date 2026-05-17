@@ -19,6 +19,10 @@ interface MarketingAuthState {
 
   login: (user: MarketingUser, accessToken: string, refreshToken: string) => void;
   setAccessToken: (accessToken: string) => void;
+  // Backend rotates both halves of the pair on every /auth/refresh — if we
+  // only stored the access half, the next refresh would present a stale
+  // refresh token and bounce to login.
+  setTokens: (accessToken: string, refreshToken: string) => void;
   logout: () => void;
 }
 
@@ -41,6 +45,10 @@ export const useMarketingAuthStore = create<MarketingAuthState>()(
 
       setAccessToken: (accessToken: string) => {
         set({ accessToken });
+      },
+
+      setTokens: (accessToken: string, refreshToken: string) => {
+        set({ accessToken, refreshToken });
       },
 
       logout: () => {

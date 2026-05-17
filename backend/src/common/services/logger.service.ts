@@ -89,8 +89,13 @@ export class LoggerService implements NestLoggerService {
       );
     }
 
+    // Default log level: 'info' in dev so we see what's happening, 'warn'
+    // in prod so we don't fill disks with one line per HTTP request. An
+    // operator can still flip LOG_LEVEL=debug temporarily without code
+    // changes when something needs investigating.
+    const defaultLevel = process.env.NODE_ENV === 'production' ? 'warn' : 'info';
     return winston.createLogger({
-      level: process.env.LOG_LEVEL || 'info',
+      level: process.env.LOG_LEVEL || defaultLevel,
       format: jsonFormat,
       transports,
       exitOnError: false,

@@ -103,31 +103,36 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
               </a>
             </div>
 
-            {/* Error details for debugging */}
-            <div style={{
-              marginTop: '1.5rem',
-              textAlign: 'left',
-              backgroundColor: 'rgba(30,41,59,0.5)',
-              borderRadius: '0.5rem',
-              padding: '1rem',
-              border: '1px solid #334155',
-              maxHeight: '16rem',
-              overflowY: 'auto',
-            }}>
-              <p style={{ fontSize: '0.75rem', color: '#f87171', fontFamily: 'monospace', fontWeight: 700, marginBottom: '0.25rem' }}>
-                {error.name}: {error.message}
-              </p>
-              {error.digest && (
-                <p style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace', marginBottom: '0.5rem' }}>
-                  Digest: {error.digest}
+            {/* Error details — dev only. In prod we still send the
+                digest to Sentry above; rendering the stack/message into
+                the visible page leaks code paths to any visitor who
+                triggers an exception. */}
+            {process.env.NODE_ENV !== 'production' && (
+              <div style={{
+                marginTop: '1.5rem',
+                textAlign: 'left',
+                backgroundColor: 'rgba(30,41,59,0.5)',
+                borderRadius: '0.5rem',
+                padding: '1rem',
+                border: '1px solid #334155',
+                maxHeight: '16rem',
+                overflowY: 'auto',
+              }}>
+                <p style={{ fontSize: '0.75rem', color: '#f87171', fontFamily: 'monospace', fontWeight: 700, marginBottom: '0.25rem' }}>
+                  {error.name}: {error.message}
                 </p>
-              )}
-              {error.stack && (
-                <pre style={{ fontSize: '0.625rem', color: '#64748b', fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.5 }}>
-                  {error.stack}
-                </pre>
-              )}
-            </div>
+                {error.digest && (
+                  <p style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace', marginBottom: '0.5rem' }}>
+                    Digest: {error.digest}
+                  </p>
+                )}
+                {error.stack && (
+                  <pre style={{ fontSize: '0.625rem', color: '#64748b', fontFamily: 'monospace', whiteSpace: 'pre-wrap', wordBreak: 'break-all', lineHeight: 1.5 }}>
+                    {error.stack}
+                  </pre>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </body>

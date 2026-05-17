@@ -435,10 +435,16 @@ export class MarketingLeadsService {
         data: {
           name: dto.tenantName,
           subdomain,
-          paymentRegion: 'TURKEY',
           ...(plan ? { currentPlanId: plan.id } : {}),
-          ...(canTrial
-            ? { trialUsed: true, trialStartedAt: trialStart, trialEndsAt: trialEnd }
+          ...(canTrial && plan
+            ? {
+                trialUsed: true,
+                trialStartedAt: trialStart,
+                trialEndsAt: trialEnd,
+                // Per-plan trial registry stays consistent with the
+                // PaymentsService/SubscriptionService flows.
+                usedTrialPlanIds: [plan.id],
+              }
             : {}),
         },
       });
@@ -463,7 +469,7 @@ export class MarketingLeadsService {
             planId: plan.id,
             status: canTrial ? 'TRIALING' : 'ACTIVE',
             billingCycle,
-            paymentProvider: 'EMAIL',
+            paymentProvider: 'PAYTR',
             startDate: now,
             currentPeriodStart: now,
             currentPeriodEnd,

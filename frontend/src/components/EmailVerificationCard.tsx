@@ -17,7 +17,7 @@ export function EmailVerificationCard({ emailVerified, userEmail }: EmailVerific
 
   const handleVerify = () => {
     if (code.length === 6) {
-      verifyMutation.mutate(code);
+      verifyMutation.mutate({ email: userEmail, code });
     }
   };
 

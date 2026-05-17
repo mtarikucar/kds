@@ -31,6 +31,7 @@ import {
   CameraCalibrationDto,
   PersonState,
 } from '../dto/edge-device';
+import { decryptString } from '../../../common/helpers/encryption.helper';
 
 interface EdgeDeviceConnection {
   socketId: string;
@@ -104,14 +105,35 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
       }
 
       try {
-        const payload = this.jwtService.verify(token);
+        const payload = this.jwtService.verify(token, { algorithms: ['HS256'] });
 
         // Store connection info
         client.data.tenantId = payload.tenantId;
         client.data.authenticated = true;
+        // Persist the JWT exp (seconds since epoch) so subsequent @SubscribeMessage
+        // handlers can reject events from a connection whose token has expired
+        // mid-flight. Without this, a socket opened with a 1-hour token would
+        // happily accept events 12 hours later.
+        client.data.tokenExp = payload.exp;
 
         // Join tenant-specific room
         client.join(`analytics-${payload.tenantId}`);
+
+        // Schedule auto-disconnect at token expiry so an idle socket can't
+        // outlive its JWT. setTimeout is process-local but that's fine —
+        // a disconnected socket can't replay against the new replica it
+        // reconnects to.
+        if (payload.exp && typeof payload.exp === 'number') {
+          const msToExpiry = payload.exp * 1000 - Date.now();
+          if (msToExpiry > 0 && msToExpiry < 0x7fffffff) {
+            setTimeout(() => {
+              if (client.connected) {
+                this.logger.log(`Edge device ${client.id} token expired; disconnecting.`);
+                client.disconnect(true);
+              }
+            }, msToExpiry).unref?.();
+          }
+        }
 
         this.logger.log(`Edge device ${client.id} connected (Tenant: ${payload.tenantId})`);
       } catch (error) {
@@ -122,6 +144,21 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
       this.logger.error(`Edge device ${client.id} connection error: ${error.message}`);
       client.disconnect();
     }
+  }
+
+  /**
+   * Reject a @SubscribeMessage event when the JWT exp has passed. Returns
+   * `false` if the connection should drop; the caller should early-return.
+   */
+  private tokenStillValid(client: Socket): boolean {
+    const exp = client.data?.tokenExp;
+    if (typeof exp !== 'number') return true; // pre-fix tokens — keep working
+    if (exp * 1000 <= Date.now()) {
+      this.logger.warn(`Rejecting event from ${client.id}: token expired`);
+      client.disconnect(true);
+      return false;
+    }
+    return true;
   }
 
   handleDisconnect(client: Socket) {
@@ -147,6 +184,7 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: EdgeDeviceRegisterDto,
   ) {
+    if (!this.tokenStillValid(client)) return { success: false, error: 'Token expired' };
     try {
       const tenantId = client.data.tenantId;
 
@@ -238,6 +276,7 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: EdgeOccupancyDataDto,
   ) {
+    if (!this.tokenStillValid(client)) return { success: false, error: 'Token expired' };
     try {
       const tenantId = client.data.tenantId;
 
@@ -288,6 +327,7 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: EdgeHeartbeatDto,
   ) {
+    if (!this.tokenStillValid(client)) return { success: false, error: 'Token expired' };
     try {
       const deviceId = client.data.deviceId || payload.deviceId;
 
@@ -330,6 +370,7 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: EdgeHealthStatusDto,
   ) {
+    if (!this.tokenStillValid(client)) return { success: false, error: 'Token expired' };
     try {
       const deviceId = client.data.deviceId || payload.deviceId;
 
@@ -475,7 +516,13 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     return {
       cameraId: camera.id,
-      cameraUrl: camera.streamUrl,
+      // The streamUrl is AES-GCM-encrypted at rest (see camera.service.ts:53).
+      // The edge device receives it over a TLS-protected, JWT-authenticated
+      // WebSocket and uses it directly as an RTSP URL, so it must be
+      // decrypted here. The admin-facing API path already does this in
+      // camera.service.ts; forgetting it here previously broke camera
+      // analytics end-to-end.
+      cameraUrl: camera.streamUrl ? decryptString(camera.streamUrl) : '',
       calibration: camera.calibrationData as EdgeDeviceConfigDto['calibration'],
     };
   }

@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { PublicStatsModule } from '../public-stats/public-stats.module';
+import { PaytrAdapterModule } from '../payments/adapters/paytr-adapter.module';
 
 // Services
 import { SubscriptionService } from './services/subscription.service';
-import { ContactService } from './services/contact.service';
 import { BillingService } from './services/billing.service';
 import { SubscriptionSchedulerService } from './services/subscription-scheduler.service';
 import { NotificationService } from './services/notification.service';
@@ -12,7 +12,6 @@ import { InvoicePdfService } from './services/invoice-pdf.service';
 
 // Controllers
 import { SubscriptionController } from './controllers/subscription.controller';
-import { ContactController } from './controllers/contact.controller';
 import { InvoiceController } from './controllers/invoice.controller';
 
 // Guards
@@ -23,16 +22,18 @@ import { PlanFeatureGuard } from './guards/plan-feature.guard';
   imports: [
     PrismaModule,
     PublicStatsModule,
+    // Needed by SchedulerService to attempt PayTR recurring charges
+    // on subscription renewal. Module is intentionally separate from
+    // PaymentsModule to avoid a Payments ↔ Subscriptions cycle.
+    PaytrAdapterModule,
   ],
   controllers: [
     SubscriptionController,
-    ContactController,
     InvoiceController,
   ],
   providers: [
     // Services
     SubscriptionService,
-    ContactService,
     BillingService,
     NotificationService,
     InvoicePdfService,
@@ -47,6 +48,9 @@ import { PlanFeatureGuard } from './guards/plan-feature.guard';
     SubscriptionGuard,
     PlanFeatureGuard,
     BillingService,
+    // Webhook controller (PaymentsModule) sends activation / payment
+    // emails post-commit, so the service must be exported.
+    NotificationService,
   ],
 })
 export class SubscriptionsModule {}

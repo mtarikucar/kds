@@ -20,11 +20,11 @@ import {
   useGetScheduledDowngrade,
 } from '../../features/subscriptions/subscriptionsApi';
 import ScheduledDowngradeAlert from '../../components/subscriptions/ScheduledDowngradeAlert';
+import CancelSubscriptionModal from '../../components/subscriptions/CancelSubscriptionModal';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Spinner from '../../components/ui/Spinner';
 import Badge from '../../components/ui/Badge';
-import Modal from '../../components/ui/Modal';
 import { SubscriptionStatus, BillingCycle, InvoiceStatus } from '../../types';
 import { formatCurrency } from '../../lib/currency';
 
@@ -75,6 +75,7 @@ const SubscriptionSettingsPage = () => {
       [SubscriptionStatus.CANCELLED]: { variant: 'warning' as const, label: t('subscriptions.status.cancelled') },
       [SubscriptionStatus.EXPIRED]: { variant: 'danger' as const, label: t('subscriptions.status.expired') },
       [SubscriptionStatus.PAST_DUE]: { variant: 'danger' as const, label: t('subscriptions.status.pastDue') },
+      [SubscriptionStatus.PENDING]: { variant: 'default' as const, label: t('subscriptions.status.pending') },
     };
 
     const config = statusConfig[status] || { variant: 'default' as const, label: status };
@@ -94,13 +95,13 @@ const SubscriptionSettingsPage = () => {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
-  const handleCancelSubscription = async () => {
+  const handleCancelSubscription = async (params?: { immediate?: boolean; reason?: string }) => {
     if (!currentSubscription) return;
     try {
       await cancelSubscription.mutateAsync({
         id: currentSubscription.id,
-        immediate: false,
-        reason: cancellationReason || undefined,
+        immediate: params?.immediate ?? false,
+        reason: params?.reason ?? cancellationReason ?? undefined,
       });
       setShowCancelModal(false);
       setCancellationReason('');
@@ -240,6 +241,23 @@ const SubscriptionSettingsPage = () => {
                   {t('subscriptions.reactivateSubscription')}
                 </Button>
               )}
+              {/* PAST_DUE → one-click "pay now" routes to checkout with the
+                  tenant's current plan + cycle, which creates a fresh PayTR
+                  intent against the existing PAST_DUE subscription. */}
+              {currentSubscription.status === SubscriptionStatus.PAST_DUE && (
+                <Button
+                  variant="primary"
+                  className="w-full"
+                  onClick={() =>
+                    navigate(
+                      `/subscription/checkout?planId=${currentSubscription.planId}&billingCycle=${currentSubscription.billingCycle}`,
+                    )
+                  }
+                >
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  {t('subscriptions.payNow')}
+                </Button>
+              )}
             </div>
           </div>
 
@@ -357,61 +375,25 @@ const SubscriptionSettingsPage = () => {
         </CardContent>
       </Card>
 
-      {/* Cancel Subscription Modal */}
-      <Modal
-        isOpen={showCancelModal}
+      {/* Cancel Subscription Modal — multi-choice reason + immediate
+          toggle, drives `cancelSubscription` mutation. The shared
+          component lives in components/subscriptions for re-use. */}
+      <CancelSubscriptionModal
+        open={showCancelModal}
         onClose={() => {
           setShowCancelModal(false);
           setCancellationReason('');
         }}
-        title={t('subscriptions.cancelSubscription')}
-      >
-        <div className="space-y-4">
-          <p className="text-slate-600">
-            {t('subscriptions.cancelConfirmWithDate', { date: formatDate(currentSubscription.currentPeriodEnd) })}
-          </p>
-
-          <div>
-            <label htmlFor="cancellation-reason" className="block text-sm font-medium text-slate-700 mb-2">
-              {t('subscriptions.cancelReasonLabel')}
-            </label>
-            <select
-              id="cancellation-reason"
-              value={cancellationReason}
-              onChange={(e) => setCancellationReason(e.target.value)}
-              className="w-full px-3 py-2 border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">{t('subscriptions.cancelReasons.select')}</option>
-              <option value="Too expensive">{t('subscriptions.cancelReasons.tooExpensive')}</option>
-              <option value="Missing features I need">{t('subscriptions.cancelReasons.missingFeatures')}</option>
-              <option value="Switching to competitor">{t('subscriptions.cancelReasons.switching')}</option>
-              <option value="No longer needed">{t('subscriptions.cancelReasons.noLongerNeeded')}</option>
-              <option value="Poor customer support">{t('subscriptions.cancelReasons.poorSupport')}</option>
-              <option value="Technical issues">{t('subscriptions.cancelReasons.technicalIssues')}</option>
-              <option value="Other">{t('subscriptions.cancelReasons.other')}</option>
-            </select>
-          </div>
-
-          <div className="flex justify-end gap-3">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowCancelModal(false);
-                setCancellationReason('');
-              }}
-            >
-              {t('subscriptions.keepSubscription')}
-            </Button>
-            <Button
-              variant="danger"
-              onClick={handleCancelSubscription}
-              isLoading={cancelSubscription.isPending}
-            >
-              {t('subscriptions.cancelSubscription')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        onConfirm={({ immediate, reason }) =>
+          handleCancelSubscription({ immediate, reason })
+        }
+        isSubmitting={cancelSubscription.isPending}
+        periodEnd={
+          currentSubscription.currentPeriodEnd
+            ? new Date(currentSubscription.currentPeriodEnd)
+            : null
+        }
+      />
     </div>
   );
 };

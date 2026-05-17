@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { Trash2, Plus, Minus, ArrowRightLeft, ShoppingCart, Combine, Split } from 'lucide-react';
+import { Trash2, Plus, Minus, ArrowRightLeft, ShoppingCart, Combine, Split, Users } from 'lucide-react';
 import { Product } from '../../types';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui/Card';
 import Button from '../ui/Button';
@@ -27,6 +27,7 @@ interface OrderCartProps {
   onTransferTable?: () => void;
   onMergeTables?: () => void;
   onSplitBill?: () => void;
+  onProgressivePay?: () => void;
   isCheckingOut?: boolean;
   isTwoStepCheckout?: boolean;
   hasActiveOrder?: boolean;
@@ -51,6 +52,7 @@ const OrderCart = ({
   onTransferTable,
   onMergeTables,
   onSplitBill,
+  onProgressivePay,
   isCheckingOut = false,
   isTwoStepCheckout = false,
   hasActiveOrder = false,
@@ -89,9 +91,29 @@ const OrderCart = ({
               size="sm"
               onClick={onSplitBill}
               title={t('billSplit.splitButton')}
-              className="text-slate-500 hover:text-emerald-600"
+              // Label alongside the icon so a waiter on a tablet (where
+              // title tooltips don't trigger on touch) can tell the
+              // split-bill and pay-by-customer buttons apart.
+              className="text-slate-500 hover:text-emerald-600 gap-1.5"
             >
               <Split className="h-4 w-4" />
+              <span className="hidden sm:inline text-xs font-medium">
+                {t('billSplit.splitButton')}
+              </span>
+            </Button>
+          )}
+          {hasActiveOrder && hasSelectedTable && onProgressivePay && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onProgressivePay}
+              title={t('progressive.buttonTitle')}
+              className="text-slate-500 hover:text-indigo-600 gap-1.5"
+            >
+              <Users className="h-4 w-4" />
+              <span className="hidden sm:inline text-xs font-medium">
+                {t('progressive.buttonTitle')}
+              </span>
             </Button>
           )}
           {hasActiveOrder && hasSelectedTable && onTransferTable && (
@@ -202,7 +224,15 @@ const OrderCart = ({
                 max={subtotal}
                 step="0.01"
                 value={discount}
-                onChange={(e) => onUpdateDiscount(parseFloat(e.target.value) || 0)}
+                // `min`/`max` HTML attributes are advisory only and not
+                // enforced by mobile keyboards — a user typing `-50` would
+                // sail through. Clamp on every keystroke so the discount
+                // can never go negative (creating a surcharge / negative
+                // payment downstream) or exceed the subtotal.
+                onChange={(e) => {
+                  const raw = parseFloat(e.target.value) || 0;
+                  onUpdateDiscount(Math.max(0, Math.min(raw, subtotal)));
+                }}
               />
 
               <div className="flex justify-between text-lg font-bold border-t border-slate-200 pt-4">

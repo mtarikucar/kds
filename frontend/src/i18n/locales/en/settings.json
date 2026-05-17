@@ -190,7 +190,15 @@
   },
   "brandingSettings": {
     "title": "Branding",
-    "description": "Configure currency and custom branding for your business"
+    "description": "Configure currency and custom branding for your business",
+    "taxId": {
+      "title": "Billing Information",
+      "description": "Enter your tax ID for compliant invoicing",
+      "label": "Tax ID",
+      "placeholder": "e.g. 1234567890",
+      "help": "10-digit corporate tax ID (Vergi No) or 11-digit personal ID (TC Kimlik No). Used on KDV-compliant invoices.",
+      "formatError": "Tax ID must be 10 (Vergi No) or 11 (TC Kimlik) digits"
+    }
   },
   "twoStepCheckout": {
     "title": "Enable Two-Step Checkout",

@@ -26,7 +26,43 @@ export class AccountingSyncService {
       include: { items: true },
     });
     if (!invoice) return;
-    if (invoice.externalId) return;
+
+    // M4: only skip when the existing externalId is for the SAME provider.
+    // After a provider swap (e.g. Parasut → Logo) the old externalId is
+    // a foreign key to a different system; re-sync must run.
+    if (invoice.externalId && invoice.externalProvider === settings.provider) {
+      return;
+    }
+
+    // F-Acc-7: mark SYNCING before the push. If pushInvoice succeeds but
+    // the local UPDATE that records externalId fails (network blip, DB
+    // hiccup), the remote system has the invoice but the local row
+    // doesn't know it. A retry would push a DUPLICATE invoice to the
+    // remote. The SYNCING marker tells operator tooling "we already
+    // initiated a push — recover the externalId from the remote rather
+    // than pushing again".
+    // Atomic claim — the comment below says "loser sees count===0 and
+    // skips" but the original code didn't actually check `count`, so two
+    // concurrent syncInvoice calls both proceeded to push and produced
+    // duplicate invoices in Foriba. Honour the claim by short-circuiting
+    // when the row wasn't transitioned (because another worker already
+    // owned it or it's already SYNCED).
+    const claim = await this.prisma.salesInvoice.updateMany({
+      where: {
+        id: invoiceId,
+        // Don't re-claim a row already mid-flight: SYNCING is itself a
+        // serializing marker. If two `syncInvoice` calls race, the loser
+        // sees count===0 here and skips. We also re-claim FAILED rows.
+        externalStatus: { in: [null as any, 'FAILED', 'PENDING'] },
+      },
+      data: { externalStatus: 'SYNCING', syncError: null },
+    });
+    if (claim.count === 0) {
+      this.logger.debug(
+        `Invoice ${invoiceId} already SYNCING/SYNCED; skipping duplicate push`,
+      );
+      return;
+    }
 
     try {
       const adapter = this.getAdapter(settings.provider);

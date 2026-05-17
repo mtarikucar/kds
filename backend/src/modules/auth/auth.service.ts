@@ -9,7 +9,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
-import { createHash, randomBytes } from 'crypto';
+import { createHash, randomBytes, timingSafeEqual } from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
 import * as appleSignin from 'apple-signin-auth';
 import * as Sentry from '@sentry/node';
@@ -21,7 +21,7 @@ import { GoogleAuthDto, AppleAuthDto } from './dto/social-auth.dto';
 import { AuthResponseDto, UserResponseDto } from './dto/auth-response.dto';
 import { ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto } from './dto/password-reset.dto';
 import { UserRole } from '../../common/constants/roles.enum';
-import { TenantStatus } from '../../common/constants/subscription.enum';
+import { PaymentProvider, TenantStatus } from '../../common/constants/subscription.enum';
 import { EmailService } from '../../common/services/email.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/dto/create-notification.dto';
@@ -167,7 +167,6 @@ export class AuthService {
             data: {
               name: registerDto.restaurantName,
               subdomain: finalSubdomain,
-              paymentRegion: registerDto.paymentRegion || 'INTERNATIONAL',
               currentPlanId: freePlan.id,
             },
           });
@@ -177,7 +176,8 @@ export class AuthService {
               planId: freePlan.id,
               status: 'ACTIVE',
               billingCycle: 'MONTHLY',
-              paymentProvider: 'EMAIL',
+              // FREE plan never charges so this is informational only.
+              paymentProvider: PaymentProvider.PAYTR,
               startDate: now,
               currentPeriodStart: now,
               currentPeriodEnd,
@@ -470,6 +470,22 @@ export class AuthService {
     }
 
     const tokenHash = this.hashToken(refreshToken);
+
+    // Atomic claim: only one in-flight refresh call wins the rotation.
+    // The previous flow read the row, checked revokedAt, then updated
+    // separately — two parallel refreshes with the same cookie could
+    // both pass that check and both mint a fresh pair (TOCTOU). The
+    // conditional updateMany on `revokedAt: null` serializes them, and
+    // the loser sees count===0 and falls into the replay branch below.
+    const claimed = await this.prisma.refreshToken.updateMany({
+      where: {
+        tokenHash,
+        revokedAt: null,
+        expiresAt: { gt: new Date() },
+      },
+      data: { revokedAt: new Date() },
+    });
+
     const stored = await this.prisma.refreshToken.findUnique({
       where: { tokenHash },
     });
@@ -478,8 +494,10 @@ export class AuthService {
       throw new UnauthorizedException('Invalid refresh token');
     }
 
-    if (stored.revokedAt) {
-      // Possible replay of a rotated-out token — revoke the entire family.
+    if (claimed.count === 0) {
+      // The token was already revoked (legitimate rotation, logout, or
+      // replay of a rotated-out token). Treat as a theft signal and
+      // revoke the whole family so a stolen token can't keep minting.
       await this.prisma.refreshToken.updateMany({
         where: { userId: stored.userId, revokedAt: null },
         data: { revokedAt: new Date() },
@@ -522,12 +540,6 @@ export class AuthService {
       });
       throw new UnauthorizedException('Token has been revoked');
     }
-
-    // Revoke the rotated-out token, issue a new pair.
-    await this.prisma.refreshToken.update({
-      where: { id: stored.id },
-      data: { revokedAt: new Date() },
-    });
 
     const { tenant: _t, tokenVersion: _ver, ...userForToken } = user;
     return this.generateTokens(userForToken, ip, userAgent);
@@ -578,11 +590,18 @@ export class AuthService {
 
     const refreshExpiresIn =
       this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '30d';
-    const refreshToken = this.jwtService.sign(payload, {
-      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-      expiresIn: refreshExpiresIn,
-      algorithm: 'HS256',
-    });
+    // jti makes the refresh token unique even when two issuances land in
+    // the same second (same iat → same payload → same JWT bytes → same
+    // tokenHash → P2002 on the unique constraint). The access token
+    // doesn't need it because it isn't persisted server-side.
+    const refreshToken = this.jwtService.sign(
+      { ...payload, jti: randomBytes(8).toString('hex') },
+      {
+        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        expiresIn: refreshExpiresIn,
+        algorithm: 'HS256',
+      },
+    );
 
     // Persist the hash so we can revoke/rotate server-side.
     const decoded: any = this.jwtService.decode(refreshToken);
@@ -721,6 +740,17 @@ export class AuthService {
       throw new BadRequestException('Invalid or expired reset token');
     }
 
+    // Audit: reset-password successfully consumed a valid token. We had
+    // to refetch tenantId because the initial findFirst only selected id
+    // (to keep the constant-time guarantee tight).
+    const tenantOnly = await this.prisma.user.findUnique({
+      where: { id: user.id },
+      select: { tenantId: true },
+    });
+    if (tenantOnly) {
+      await this.logUserActivity(user.id, tenantOnly.tenantId, 'PASSWORD_RESET');
+    }
+
     return {
       message: 'Password has been reset successfully',
     };
@@ -769,6 +799,11 @@ export class AuthService {
         data: { revokedAt: new Date() },
       }),
     ]);
+
+    // Audit trail for incident response: who changed their password
+    // when. Failure is swallowed because losing an audit entry shouldn't
+    // block a successful password change.
+    await this.logUserActivity(userId, user.tenantId, 'PASSWORD_CHANGED');
 
     return {
       message: 'Password changed successfully',
@@ -862,27 +897,50 @@ export class AuthService {
       where: { email },
     });
 
+    // Constant-time hash comparison + atomic single-use consumption.
+    // The previous implementation read the user, did a plain `!==` on
+    // the hash (timing-attackable; an attacker can probe digit-by-digit
+    // by measuring response time), and then ran a separate UPDATE. Two
+    // concurrent /verify-email calls could both pass the check and
+    // both run the update — letting a stolen code be redeemed twice
+    // (matters less for email-verify than reset-password, but the
+    // pattern should be consistent). `updateMany` with the hash as part
+    // of the WHERE clause makes the consumption atomic; the first
+    // request wins, the second sees `count === 0`.
+    const submitted = this.hashToken(code);
+    const submittedOk =
+      !!user?.emailVerificationCodeHash &&
+      Buffer.byteLength(user.emailVerificationCodeHash) === Buffer.byteLength(submitted) &&
+      timingSafeEqual(
+        Buffer.from(user.emailVerificationCodeHash),
+        Buffer.from(submitted),
+      );
+
     // Return the same error for "no user" and "bad code" so the endpoint cannot
     // be used to enumerate which emails are registered.
     if (
       !user ||
-      !user.emailVerificationCodeHash ||
       !user.emailVerificationCodeExpires ||
       user.emailVerificationCodeExpires <= new Date() ||
-      user.emailVerificationCodeHash !== this.hashToken(code)
+      !submittedOk
     ) {
       throw new BadRequestException('Invalid or expired verification code');
     }
 
-    // Mark email as verified and clear code
-    await this.prisma.user.update({
-      where: { id: user.id },
+    // Atomic claim: filter by the current hash so a concurrent verify
+    // with the same code can't double-consume. `count === 0` means we
+    // lost the race (or the row was mutated mid-flight) → reject.
+    const consumed = await this.prisma.user.updateMany({
+      where: { id: user.id, emailVerificationCodeHash: user.emailVerificationCodeHash },
       data: {
         emailVerified: true,
         emailVerificationCodeHash: null,
         emailVerificationCodeExpires: null,
       },
     });
+    if (consumed.count === 0) {
+      throw new BadRequestException('Invalid or expired verification code');
+    }
 
     // Send success notification
     try {
@@ -902,6 +960,22 @@ export class AuthService {
       message: 'Email verified successfully',
       verified: true,
     };
+  }
+
+  /**
+   * Mirror the tenant-status guard the password path enforces at
+   * `validateUser` (auth.service.ts:437-439). The four social-auth
+   * branches previously checked only `user.status`, letting a member
+   * of a suspended/deleted tenant in via Google or Apple.
+   */
+  private async assertTenantActive(tenantId: string): Promise<void> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { status: true },
+    });
+    if (!tenant || tenant.status !== TenantStatus.ACTIVE) {
+      throw new UnauthorizedException('Your restaurant account is not active');
+    }
   }
 
   /**
@@ -989,6 +1063,7 @@ export class AuthService {
         if (user.status !== 'ACTIVE') {
           throw new UnauthorizedException('User account is inactive');
         }
+        await this.assertTenantActive(user.tenantId);
 
         // Track Google login in Sentry
         Sentry.captureMessage(`User logged in via Google: ${user.email}`, {
@@ -1027,6 +1102,7 @@ export class AuthService {
         if (existingUserByEmail.status !== 'ACTIVE') {
           throw new UnauthorizedException('User account is inactive');
         }
+        await this.assertTenantActive(existingUserByEmail.tenantId);
 
         user = await this.prisma.user.update({
           where: { id: existingUserByEmail.id },
@@ -1119,6 +1195,7 @@ export class AuthService {
         if (user.status !== 'ACTIVE') {
           throw new UnauthorizedException('User account is inactive');
         }
+        await this.assertTenantActive(user.tenantId);
 
         // Track Apple login in Sentry
         Sentry.captureMessage(`User logged in via Apple: ${user.email}`, {
@@ -1157,6 +1234,7 @@ export class AuthService {
         if (existingUserByEmail.status !== 'ACTIVE') {
           throw new UnauthorizedException('User account is inactive');
         }
+        await this.assertTenantActive(existingUserByEmail.tenantId);
 
         user = await this.prisma.user.update({
           where: { id: existingUserByEmail.id },
@@ -1258,7 +1336,6 @@ export class AuthService {
           data: {
             name: restaurantName,
             subdomain,
-            paymentRegion: 'INTERNATIONAL',
             currentPlanId: freePlan.id,
           },
         });
@@ -1268,7 +1345,7 @@ export class AuthService {
             planId: freePlan.id,
             status: 'ACTIVE',
             billingCycle: 'MONTHLY',
-            paymentProvider: 'EMAIL',
+            paymentProvider: PaymentProvider.PAYTR,
             startDate: now,
             currentPeriodStart: now,
             currentPeriodEnd,

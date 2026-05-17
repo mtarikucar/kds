@@ -150,7 +150,7 @@ export class LoyaltyService {
         )?.loyaltyPoints ?? 0,
       };
     }
-    return this.awardPoints(
+    const result = await this.awardPoints(
       customerId,
       tenantId,
       points,
@@ -158,6 +158,11 @@ export class LoyaltyService {
       `Earned ${points} points from order ${orderNumber}`,
       { orderId, orderNumber, orderAmount },
     );
+    // Promote the customer's tier if this earn pushed them across a
+    // threshold. The check reads the lifetime EARNED total so it's
+    // idempotent — repeated calls converge on the same tier.
+    const tierResult = await this.checkAndUpgradeTier(customerId, tenantId).catch(() => null);
+    return { ...result, tierUpgrade: tierResult?.upgraded ? tierResult : null };
   }
 
   async redeemPoints(
@@ -188,34 +193,57 @@ export class LoyaltyService {
   }
 
   async awardWelcomeBonus(customerId: string, tenantId: string) {
-    // Idempotency: at most one welcome BONUS per customer. The public
-    // `identify` endpoint races two concurrent taps → both saw
-    // totalOrders=0/points=0 and both credited — producing duplicate
-    // welcome gifts. A description-qualified findFirst inside the tx is
-    // the cheapest stable check that doesn't require a schema change.
-    const existing = await this.prisma.loyaltyTransaction.findFirst({
-      where: {
-        customerId,
-        type: LoyaltyTransactionType.BONUS,
-        description: { startsWith: 'Welcome bonus:' },
-        customer: { tenantId },
-      },
-    });
-    if (existing) {
-      const customer = await this.prisma.customer.findFirst({
-        where: { id: customerId, tenantId },
-        select: { loyaltyPoints: true },
+    // Idempotency: at most one welcome BONUS per customer. The previous
+    // implementation did the `findFirst` *outside* a transaction and then
+    // called `awardPoints` (which has its own tx) — two concurrent
+    // /identify taps could both see "no bonus yet" and both credit,
+    // producing duplicate welcome gifts. Wrap check + create in one
+    // Serializable tx so the second arrival sees the first's write.
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await tx.loyaltyTransaction.findFirst({
+        where: {
+          customerId,
+          type: LoyaltyTransactionType.BONUS,
+          description: { startsWith: 'Welcome bonus:' },
+          customer: { tenantId },
+        },
       });
-      return { transaction: existing, newBalance: customer?.loyaltyPoints ?? 0 };
-    }
+      if (existing) {
+        const customer = await tx.customer.findFirst({
+          where: { id: customerId, tenantId },
+          select: { loyaltyPoints: true },
+        });
+        return { transaction: existing, newBalance: customer?.loyaltyPoints ?? 0 };
+      }
 
-    return this.awardPoints(
-      customerId,
-      tenantId,
-      LOYALTY_CONFIG.welcomeBonus,
-      LoyaltyTransactionType.BONUS,
-      `Welcome bonus: ${LOYALTY_CONFIG.welcomeBonus} points`,
-    );
+      const customer = await tx.customer.findFirst({
+        where: { id: customerId, tenantId },
+      });
+      if (!customer) throw new BadRequestException('Customer not found');
+
+      const points = LOYALTY_CONFIG.welcomeBonus;
+      const balanceBefore = customer.loyaltyPoints;
+      const balanceAfter = balanceBefore + points;
+
+      await tx.customer.updateMany({
+        where: { id: customerId, tenantId },
+        data: { loyaltyPoints: { increment: points } },
+      });
+
+      const transaction = await tx.loyaltyTransaction.create({
+        data: {
+          tenantId,
+          customerId,
+          type: LoyaltyTransactionType.BONUS,
+          points,
+          description: `Welcome bonus: ${points} points`,
+          balanceBefore,
+          balanceAfter,
+        },
+      });
+
+      return { transaction, newBalance: balanceAfter };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
   async awardBirthdayBonus(customerId: string, tenantId: string) {
@@ -313,10 +341,18 @@ export class LoyaltyService {
 
     const order = [LoyaltyTier.BRONZE, LoyaltyTier.SILVER, LoyaltyTier.GOLD, LoyaltyTier.PLATINUM];
     if (order.indexOf(calculatedTier) > order.indexOf(currentTier)) {
-      await this.prisma.customer.updateMany({
-        where: { id: customerId, tenantId },
+      // Compound WHERE on the observed tier guards two parallel orders
+      // that both cross the threshold from each declaring an upgrade.
+      // The first wins (count=1, caller fires the upgrade email), the
+      // second sees count=0 and returns upgraded=false — so the
+      // customer only gets one "Welcome to GOLD" message, not two.
+      const claim = await this.prisma.customer.updateMany({
+        where: { id: customerId, tenantId, loyaltyTier: currentTier },
         data: { loyaltyTier: calculatedTier },
       });
+      if (claim.count === 0) {
+        return { upgraded: false, newTier: calculatedTier };
+      }
       this.logger.log(`Customer ${customerId} upgraded from ${currentTier} to ${calculatedTier}`);
       return { upgraded: true, oldTier: currentTier, newTier: calculatedTier };
     }

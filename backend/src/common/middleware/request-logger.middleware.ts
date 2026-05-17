@@ -67,9 +67,12 @@ export class DetailedRequestLoggerMiddleware implements NestMiddleware {
     (req as any).requestId = requestId;
     res.setHeader('X-Request-ID', requestId);
 
-    // Extract user info if available
+    // Extract user info if available. Email is intentionally omitted — file
+    // logs are retained for weeks and shipping every authenticated user's
+    // email into them would be a GDPR/KVKK violation. user id + tenant id
+    // are enough to correlate with the auth/audit tables on demand.
     const user = (req as any).user;
-    const userInfo = user ? `User: ${user.email} (ID: ${user.userId})` : 'Anonymous';
+    const userInfo = user ? `User: ${user.userId}` : 'Anonymous';
     const tenantInfo = user ? `Tenant: ${user.tenantId}` : 'N/A';
 
     // Log request with details

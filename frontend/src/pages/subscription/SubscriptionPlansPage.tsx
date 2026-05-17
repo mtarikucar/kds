@@ -4,12 +4,48 @@ import { useTranslation } from 'react-i18next';
 import {
   useGetPlans,
   useGetCurrentSubscription,
-  useCreateSubscription,
+  useGetEffectiveFeatures,
 } from '../../features/subscriptions/subscriptionsApi';
 import PlanCard from '../../components/subscriptions/PlanCard';
+import PlanCardSkeleton from '../../components/subscriptions/PlanCardSkeleton';
+import PlanComparisonMatrix from '../../components/subscriptions/PlanComparisonMatrix';
 import Button from '../../components/ui/Button';
-import Spinner from '../../components/ui/Spinner';
 import { BillingCycle, SubscriptionPlanType, Plan } from '../../types';
+
+/**
+ * Small "yıllık ödersen X TRY tasarruf ediyorsun" callout shown under
+ * the billing toggle. Picks the most expensive paid plan as the
+ * example since absolute savings are most impressive there.
+ */
+function YearlySavingsHint({ plans }: { plans: Plan[] }) {
+  const { t } = useTranslation('subscriptions');
+  const example = useMemo(() => {
+    const paid = plans.filter((p) => Number(p.monthlyPrice) > 0);
+    if (paid.length === 0) return null;
+    // Sort high → low; first match is the headline saving.
+    const sorted = [...paid].sort((a, b) => Number(b.monthlyPrice) - Number(a.monthlyPrice));
+    const p = sorted[0];
+    const monthly = Number(p.monthlyPrice);
+    const yearly = Number(p.yearlyPrice);
+    const monthlyTotal = monthly * 12;
+    const savings = Math.max(0, monthlyTotal - yearly);
+    const effectiveMonthly = yearly / 12;
+    const currency = p.currency || 'TRY';
+    return { planName: p.displayName, savings, effectiveMonthly, monthly, currency };
+  }, [plans]);
+  if (!example) return null;
+  return (
+    <p className="mt-3 text-sm text-emerald-700">
+      💡 {t('subscriptions.plansPage.yearlySavingsHint', {
+        plan: example.planName,
+        savings: example.savings.toFixed(0),
+        effective: example.effectiveMonthly.toFixed(0),
+        currency: example.currency,
+        defaultValue: `${example.planName} planında yıllık ödediğinizde ayda ${example.effectiveMonthly.toFixed(0)} ${example.currency} — toplamda ${example.savings.toFixed(0)} ${example.currency} tasarruf.`,
+      })}
+    </p>
+  );
+}
 
 const SubscriptionPlansPage = () => {
   const { t } = useTranslation('subscriptions');
@@ -19,21 +55,64 @@ const SubscriptionPlansPage = () => {
 
   const { data: plans, isLoading: plansLoading } = useGetPlans();
   const { data: currentSubscription } = useGetCurrentSubscription();
-  const createSubscription = useCreateSubscription();
+  const { data: effective } = useGetEffectiveFeatures();
+  const trialEligibleIds = effective?.trialEligiblePlanIds ?? [];
 
-  // Handle plan selection - navigate to contact page
-  const handleSelectPlan = async (planId: string) => {
-    // Don't process if already processing or user has active subscription
-    if (processingPlanId || currentSubscription) return;
+  // Compute savings before any early-return — useMemo was below the
+  // conditional returns, which violated rules-of-hooks if the component
+  // ever fell through to an early branch on its second render.
+  const maxSavingsPercent = useMemo(() => {
+    if (!plans) return 20;
+    const paidPlans = plans.filter((p: Plan) => Number(p.monthlyPrice) > 0);
+    if (paidPlans.length === 0) return 20;
+    const savings = paidPlans.map((p: Plan) => {
+      const monthlyTotal = Number(p.monthlyPrice) * 12;
+      const yearlyTotal = Number(p.yearlyPrice);
+      return monthlyTotal > 0 ? Math.round(((monthlyTotal - yearlyTotal) / monthlyTotal) * 100) : 0;
+    });
+    return Math.max(...savings);
+  }, [plans]);
 
-    // Redirect to contact page with plan details
-    navigate(`/subscription/contact?planId=${planId}&billingCycle=${billingCycle}`);
+  // Handle plan selection — branch by current-subscription status:
+  //   - ACTIVE/TRIALING on a different plan → change-plan flow
+  //     (proration / scheduled downgrade). Proration math only makes
+  //     sense for live billing periods.
+  //   - ACTIVE/TRIALING on the same plan → no-op.
+  //   - PAST_DUE / EXPIRED / CANCELLED / none → fresh PayTR checkout.
+  //     PAST_DUE is included here because proration over a finished
+  //     billing period produces negative amounts; renewing via the
+  //     checkout flow gets the tenant a fresh full period.
+  // For trial-eligible tenants the backend short-circuits to the
+  // TRIAL response inside /payments/create-intent; CheckoutPage handles it.
+  const handleSelectPlan = (planId: string) => {
+    if (processingPlanId) return;
+    const liveBillingStatuses = ['ACTIVE', 'TRIALING'];
+    const isLiveBilling =
+      currentSubscription &&
+      liveBillingStatuses.includes(currentSubscription.status);
+    if (isLiveBilling) {
+      if (currentSubscription.planId === planId) return;
+      navigate(`/subscription/change-plan?newPlanId=${planId}&billingCycle=${billingCycle}`);
+      return;
+    }
+    setProcessingPlanId(planId);
+    navigate(`/subscription/checkout?planId=${planId}&billingCycle=${billingCycle}`);
   };
 
   if (plansLoading) {
+    // Skeleton placeholders match the eventual 4-column grid so the
+    // layout doesn't jump when plans arrive.
     return (
-      <div className="flex items-center justify-center h-96">
-        <Spinner size="lg" />
+      <div className="max-w-7xl mx-auto">
+        <div className="text-center mb-12">
+          <div className="h-10 w-72 bg-slate-200 rounded mx-auto mb-4 animate-pulse" />
+          <div className="h-5 w-96 bg-slate-100 rounded mx-auto animate-pulse" />
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <PlanCardSkeleton key={i} />
+          ))}
+        </div>
       </div>
     );
   }
@@ -48,19 +127,6 @@ const SubscriptionPlansPage = () => {
 
   // Sort plans by price
   const sortedPlans = [...plans].sort((a, b) => a.monthlyPrice - b.monthlyPrice);
-
-  // Calculate max savings percentage for yearly billing
-  const maxSavingsPercent = useMemo(() => {
-    if (!plans) return 20;
-    const paidPlans = plans.filter((p: Plan) => Number(p.monthlyPrice) > 0);
-    if (paidPlans.length === 0) return 20;
-    const savings = paidPlans.map((p: Plan) => {
-      const monthlyTotal = Number(p.monthlyPrice) * 12;
-      const yearlyTotal = Number(p.yearlyPrice);
-      return monthlyTotal > 0 ? Math.round(((monthlyTotal - yearlyTotal) / monthlyTotal) * 100) : 0;
-    });
-    return Math.max(...savings);
-  }, [plans]);
 
   return (
     <div className="max-w-7xl mx-auto">
@@ -94,6 +160,13 @@ const SubscriptionPlansPage = () => {
             </span>
           </button>
         </div>
+        {/* Yearly savings transparency — show real numbers when yearly
+            is selected; abstract "%17 tasarruf" rarely converts on its
+            own. We pick the PRO plan as the canonical example since
+            it's the highlighted "popular" tier. */}
+        {billingCycle === BillingCycle.YEARLY && (
+          <YearlySavingsHint plans={sortedPlans} />
+        )}
       </div>
 
       {/* Plans Grid */}
@@ -105,8 +178,9 @@ const SubscriptionPlansPage = () => {
             billingCycle={billingCycle}
             isCurrentPlan={currentSubscription?.planId === plan.id}
             isPopular={plan.name === SubscriptionPlanType.PRO}
+            isTrialEligible={trialEligibleIds.includes(plan.id)}
             onSelectPlan={handleSelectPlan}
-            isLoading={createSubscription.isPending && processingPlanId === plan.id}
+            isLoading={processingPlanId === plan.id}
           />
         ))}
       </div>
@@ -127,6 +201,10 @@ const SubscriptionPlansPage = () => {
           </div>
         </div>
       )}
+
+      {/* Plan comparison matrix — collapsed by default to keep the
+          page scannable. Power users expand it for full feature parity. */}
+      <PlanComparisonMatrix plans={sortedPlans} />
 
       {/* FAQ Section */}
       <div className="mt-16 border-t pt-12">

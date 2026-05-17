@@ -128,7 +128,7 @@ export default function MaintenancePage() {
         <div className="mt-8 p-4 bg-blue-50 rounded-lg">
           <p className="text-sm text-blue-800">
             {t('pages.maintenance.needHelp')}{' '}
-            <a href="mailto:support@example.com" className="font-medium underline hover:text-blue-900">
+            <a href="mailto:support@hummytummy.com" className="font-medium underline hover:text-blue-900">
               {t('pages.maintenance.contactSupport')}
             </a>
           </p>

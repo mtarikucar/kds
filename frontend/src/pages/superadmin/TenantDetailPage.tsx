@@ -249,10 +249,6 @@ export default function TenantDetailPage() {
               <dd className="text-sm text-zinc-900">{tenant.currency}</dd>
             </div>
             <div className="flex justify-between">
-              <dt className="text-sm text-zinc-500">Region</dt>
-              <dd className="text-sm text-zinc-900">{tenant.paymentRegion}</dd>
-            </div>
-            <div className="flex justify-between">
               <dt className="text-sm text-zinc-500">Created</dt>
               <dd className="text-sm text-zinc-900">
                 {new Date(tenant.createdAt).toLocaleDateString()}
@@ -580,7 +576,7 @@ export default function TenantDetailPage() {
               </p>
 
               <div className="space-y-2 mb-6">
-                {plans?.map((plan: { id: string; displayName: string; price: number; currency: string; billingCycle: string; isActive: boolean }) => (
+                {plans?.map((plan) => (
                   <label
                     key={plan.id}
                     className={`flex items-center justify-between p-4 border rounded-xl cursor-pointer transition-colors ${

@@ -52,6 +52,6 @@ export class TenantsController {
   @ApiResponse({ status: 200, description: 'Tenant settings updated successfully' })
   @ApiResponse({ status: 403, description: 'Tenant suspended or insufficient permissions' })
   updateSettings(@Request() req, @Body() updateDto: UpdateTenantSettingsDto) {
-    return this.tenantsService.updateSettings(req.tenantId, updateDto);
+    return this.tenantsService.updateSettings(req.tenantId, updateDto, req.user?.userId);
   }
 }

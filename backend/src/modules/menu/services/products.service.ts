@@ -172,11 +172,15 @@ export class ProductsService {
     // Extract imageIds from DTO
     const { imageIds, ...productData } = updateProductDto;
 
-    // Update product
-    await this.prisma.product.update({
-      where: { id },
+    // Defence-in-depth: tenantId in the WHERE so a regression of the
+    // pre-check above can't expose cross-tenant writes (B41-B45 pattern).
+    const claim = await this.prisma.product.updateMany({
+      where: { id, tenantId },
       data: productData,
     });
+    if (claim.count === 0) {
+      throw new BadRequestException('Product not found');
+    }
 
     // Update images if provided
     if (imageIds !== undefined) {
@@ -199,7 +203,8 @@ export class ProductsService {
     await this.findOne(id, tenantId);
 
     try {
-      return await this.prisma.product.delete({ where: { id } });
+      // Compound WHERE — tenantId IDOR guard on delete (B41-B45 pattern).
+      return await this.prisma.product.delete({ where: { id, tenantId } });
     } catch (err) {
       // OrderItem.productId uses onDelete: Restrict, so a product that was
       // ever ordered cannot be hard-deleted. Translate the P2003 into a

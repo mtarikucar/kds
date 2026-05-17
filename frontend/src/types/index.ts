@@ -179,14 +179,9 @@ export interface Table {
   number: string;
   capacity: number;
   section?: string;
-  status: string;
+  status: TableStatus;
   groupId?: string | null;
   tenantId: string;
-  // Voxel position fields (null = not yet placed on floor plan)
-  voxelX?: number | null;
-  voxelY?: number | null;
-  voxelZ?: number | null;
-  voxelRotation?: number | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -210,7 +205,7 @@ export interface UnmergeTableDto {
 
 export interface TableGroupInfo {
   groupId: string;
-  tables: { id: string; number: string; capacity: number; section?: string; status: string }[];
+  tables: { id: string; number: string; capacity: number; section?: string; status: TableStatus }[];
   orders: any[];
   summary: {
     totalOrders: number;
@@ -235,6 +230,8 @@ export interface SplitBillDto {
   numberOfParts?: number;
   payments: SplitPaymentEntry[];
   customerPhone?: string;
+  /** Batch-level idempotency key auto-filled by useSplitBill. */
+  idempotencyKey?: string;
 }
 
 export interface GroupBillSummary {
@@ -254,6 +251,8 @@ export interface GroupBillSummary {
     tableNumber?: string;
     productName?: string;
     quantity: number;
+    paidQuantity?: number;
+    remainingQuantity?: number;
     unitPrice: number;
     subtotal: number;
     modifiers?: { name?: string; price: number }[];
@@ -263,6 +262,64 @@ export interface GroupBillSummary {
     totalPaid: number;
     remainingAmount: number;
   };
+}
+
+// Progressive ("Dutch-style") payment types
+export interface PayItemEntry {
+  orderItemId: string;
+  quantity: number;
+}
+
+export interface PayItemsDto {
+  items: PayItemEntry[];
+  method: string; // 'CASH' | 'CARD' | 'DIGITAL'
+  notes?: string;
+  transactionId?: string;
+  customerPhone?: string;
+  idempotencyKey?: string;
+}
+
+export interface PayableItem {
+  orderItemId: string;
+  productName: string | null;
+  quantity: number;
+  paidQuantity: number;
+  remainingQuantity: number;
+  unitPrice: string;
+  /** Per-unit value after pro-rata discount (server-rounded, 2dp). */
+  unitTotal: string;
+  /**
+   * Authoritative discount-adjusted line total for all units. Use this
+   * (× selectedQty / quantity proportion if needed) for any display
+   * total so the UI never drifts from what the server will actually
+   * charge on the closing payment.
+   */
+  itemTotal: string;
+  modifierLabels: string[];
+}
+
+export interface PayableItemsSummary {
+  orderId: string;
+  finalAmount: string;
+  paidAmount: string;
+  remainingAmount: string;
+  remainingQuantity: number;
+  items: PayableItem[];
+  payments: Array<{
+    id: string;
+    amount: string;
+    method: string;
+    notes: string | null;
+    paidAt: string | null;
+    allocations: Array<{ orderItemId: string; quantity: number; amount: string }>;
+  }>;
+}
+
+export interface PayItemsResponse {
+  payment: Payment;
+  itemAllocations: Array<{ orderItemId: string; quantity: number; amount: string }>;
+  orderFullyPaid: boolean;
+  remaining: PayableItemsSummary;
 }
 
 export interface PublicTable {
@@ -400,6 +457,14 @@ export interface CreateOrderDto {
   items: CreateOrderItemDto[];
   notes?: string;
   discount?: number;
+  /**
+   * Client-generated UUID — same value across retries of the same logical
+   * "Send to Kitchen" click so a double-tap or 401-refresh-retry never
+   * creates duplicate orders. Backend dedupes by (tenantId, idempotencyKey)
+   * via a partial unique index. Optional: legacy callers without one still
+   * succeed (just without the dedup guarantee).
+   */
+  idempotencyKey?: string;
 }
 
 export interface UpdateOrderDto {
@@ -420,10 +485,15 @@ export enum PaymentMethod {
   DIGITAL = 'DIGITAL',
 }
 
+// Mirrors backend Prisma Payment.status. The legacy lowercase
+// 'paid'/'unpaid' values were never written by the backend
+// (PaymentsService writes COMPLETED/FAILED/REFUNDED), so this is a
+// pure fix — no live data uses the old values.
 export enum PaymentStatus {
-  PAID = 'paid',
-  UNPAID = 'unpaid',
-  REFUNDED = 'refunded',
+  PENDING = 'PENDING',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED',
+  REFUNDED = 'REFUNDED',
 }
 
 export interface Payment {
@@ -437,6 +507,13 @@ export interface Payment {
   tenantId: string;
   createdAt: string;
   updatedAt: string;
+  // Versioned receipt content captured at payment-create time. Backend
+  // builds via ReceiptSnapshotBuilder; desktop Tauri app accepts the
+  // shape directly via HardwareService.printReceipt. See
+  // frontend/src/types/hardware.ts for the ReceiptSnapshot interface
+  // and backend/src/modules/orders/services/receipt-snapshot.builder.ts
+  // for the producer.
+  receiptSnapshot?: import('./hardware').ReceiptSnapshot | null;
 }
 
 export interface CreatePaymentDto {
@@ -445,6 +522,17 @@ export interface CreatePaymentDto {
   method: PaymentMethod;
   transactionId?: string;
   customerPhone?: string;
+  /**
+   * Client-generated UUID for the "Confirm Payment" click. Backend has
+   * a partial unique index on (orderId, idempotencyKey) — repeating the
+   * same key returns the existing payment row instead of creating a
+   * second one. See payments.service.ts:62-78 for the fast-path read
+   * and the P2002 catch that handles the concurrent-retry race. The
+   * useCreatePayment hook auto-fills it with a fresh UUID per submit;
+   * declared here so the cast in ordersApi is no longer needed.
+   */
+  idempotencyKey?: string;
+  notes?: string;
 }
 
 export interface UpdatePaymentDto {
@@ -579,6 +667,8 @@ export enum SubscriptionStatus {
   EXPIRED = 'EXPIRED',
   PAST_DUE = 'PAST_DUE',
   TRIALING = 'TRIALING',
+  /** Pre-activation state between PayTR intent and webhook confirmation. */
+  PENDING = 'PENDING',
 }
 
 export enum BillingCycle {
@@ -588,7 +678,6 @@ export enum BillingCycle {
 
 export enum PaymentProvider {
   PAYTR = 'PAYTR',
-  EMAIL = 'EMAIL',
 }
 
 export enum InvoiceStatus {
@@ -617,6 +706,9 @@ export interface PlanFeatures {
   kdsIntegration: boolean;
   reservationSystem: boolean;
   personnelManagement: boolean;
+  /** Delivery-platform (Yemeksepeti, Getir, etc.) integration — added
+   *  to backend SubscriptionPlan schema; the frontend type was lagging. */
+  deliveryIntegration: boolean;
 }
 
 export interface Plan {
@@ -651,6 +743,11 @@ export interface TenantOverrides {
 export interface EffectiveFeatures {
   features: PlanFeatures;
   limits: PlanLimits;
+  /**
+   * Plan IDs the tenant hasn't yet trialed and can still claim a free
+   * 14-day trial on. UI uses this to badge plan cards.
+   */
+  trialEligiblePlanIds?: string[];
 }
 
 export interface Subscription {

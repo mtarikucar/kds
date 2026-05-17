@@ -46,6 +46,13 @@
     "lastVisit": "Последний визит",
     "referralCode": "Реферальный код",
     "tags": "Теги",
-    "tagsPlaceholder": "VIP, Постоянный и т.д."
+    "tagsPlaceholder": "VIP, Постоянный и т.д.",
+    "manageCustomers": "Управляйте базой клиентов и программами лояльности",
+    "noCustomersDescription": "Начните формировать базу клиентов, добавив первого клиента.",
+    "noSearchResults": "Ничего не найдено",
+    "noSearchResultsDescription": "Попробуйте изменить условия поиска, чтобы найти нужное.",
+    "addFirstCustomer": "Добавить первого клиента",
+    "orders": "заказов",
+    "points": "баллов"
   }
 }

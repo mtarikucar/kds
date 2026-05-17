@@ -22,6 +22,14 @@ export class UpdatePosSettingsDto {
   @IsOptional()
   enableCustomerOrdering?: boolean;
 
+  @ApiPropertyOptional({
+    description:
+      'Enable customer self-pay via PayTR hosted iFrame from QR menu. Requires a configured PayTR merchant account.',
+  })
+  @IsBoolean()
+  @IsOptional()
+  enableCustomerSelfPay?: boolean;
+
   @ApiPropertyOptional({ description: 'Default floor plan view mode', enum: ['2d', '3d'] })
   @IsString()
   @IsIn(['2d', '3d'])

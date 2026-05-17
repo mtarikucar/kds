@@ -254,15 +254,59 @@ export class UsersService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      const updated = await tx.user.update({
-        where: { id },
+      // Compound WHERE with tenantId guards against IDOR even if the
+      // pre-check above is regressed in the future. The pattern mirrors
+      // stock-management B41-B45 — `updateMany` + count check is the
+      // canonical defence-in-depth idiom in this codebase.
+      const result = await tx.user.updateMany({
+        where: { id, tenantId },
         data,
+      });
+      if (result.count === 0) {
+        throw new NotFoundException(`User with ID ${id} not found`);
+      }
+      const updated = await tx.user.findUnique({
+        where: { id },
         select: LIST_SELECT,
       });
       if (credentialChanged) {
         await tx.refreshToken.updateMany({
           where: { userId: id, revokedAt: null },
           data: { revokedAt: new Date() },
+        });
+      }
+
+      // Audit trail for privileged user-record changes. Role bumps and
+      // credential rotations are the standard "what changed and who did
+      // it" forensic questions, so they need to land in user_activities.
+      if (dto.role !== undefined && dto.role !== existing.role) {
+        await tx.userActivity.create({
+          data: {
+            userId: id,
+            tenantId,
+            action: 'ROLE_CHANGED',
+            metadata: {
+              by: actor.id,
+              from: existing.role,
+              to: dto.role,
+            },
+          },
+        });
+      }
+      if (credentialChanged) {
+        await tx.userActivity.create({
+          data: {
+            userId: id,
+            tenantId,
+            action: 'CREDENTIAL_CHANGED',
+            metadata: {
+              by: actor.id,
+              fields: [
+                dto.password !== undefined ? 'password' : null,
+                dto.email !== undefined && dto.email !== existing.email ? 'email' : null,
+              ].filter(Boolean),
+            },
+          },
         });
       }
       return updated;
@@ -296,13 +340,20 @@ export class UsersService {
     // ACTIVE users, but a stolen refresh token could still be replayed
     // against the tenant realm unless we invalidate it here.
     return this.prisma.$transaction(async (tx) => {
-      const updated = await tx.user.update({
-        where: { id },
+      // Defence-in-depth tenant filter (see B41 pattern).
+      const claim = await tx.user.updateMany({
+        where: { id, tenantId },
         data: {
           status: 'INACTIVE',
           email: tombstonedEmail,
           tokenVersion: { increment: 1 },
         },
+      });
+      if (claim.count === 0) {
+        throw new NotFoundException(`User with ID ${id} not found`);
+      }
+      const updated = await tx.user.findUnique({
+        where: { id },
         select: {
           id: true,
           email: true,
@@ -499,8 +550,11 @@ export class UsersService {
         throw new NotFoundException('Pasif kullanıcı bulunamadı');
       }
 
+      // PAST_DUE counts as live (grace window) to stay consistent with
+      // PlanFeatureGuard, otherwise CRUD breaks while the feature gate
+      // still says "you can do this".
       const subscription = await tx.subscription.findFirst({
-        where: { tenantId, status: { in: ['ACTIVE', 'TRIALING'] } },
+        where: { tenantId, status: { in: ['ACTIVE', 'TRIALING', 'PAST_DUE'] } },
         include: { plan: true },
       });
       if (!subscription?.plan) {
@@ -556,12 +610,21 @@ export class UsersService {
       ? target.email
       : `${target.email}+rejected-${userId}@tombstone.kds`;
 
-    return this.prisma.user.update({
-      where: { id: userId },
+    // Defence-in-depth: compound WHERE prevents IDOR even if the
+    // pre-check above is later regressed. Status filter also serializes
+    // concurrent reject calls — only the first one transitions the row.
+    const claim = await this.prisma.user.updateMany({
+      where: { id: userId, tenantId, status: 'PENDING_APPROVAL' },
       data: {
         status: 'REJECTED',
         email: tombstonedEmail,
       },
+    });
+    if (claim.count === 0) {
+      throw new NotFoundException('Onay bekleyen kullanıcı bulunamadı');
+    }
+    return this.prisma.user.findUnique({
+      where: { id: userId },
       select: {
         id: true,
         email: true,
