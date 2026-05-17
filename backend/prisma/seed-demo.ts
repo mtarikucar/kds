@@ -143,7 +143,6 @@ async function main() {
       socialFacebook: 'https://facebook.com/sultanahmetsofra',
       socialTwitter: 'sultanahmetsofra',
       socialWhatsapp: '+905551234567',
-      paymentRegion: 'TURKEY',
     },
   });
 
@@ -572,6 +571,7 @@ async function main() {
           amount: totalAmount,
           method: opts.paymentMethod,
           status: 'COMPLETED',
+          tenantId: tenant.id,
           orderId: order.id,
           paidAt: createdAt,
         },
@@ -1003,33 +1003,63 @@ async function main() {
 
   console.log('✅ 5 notifications created');
 
+  // ── Platform users (SuperAdmin + Marketing) ────────────────────────
+  // These live OUTSIDE the tenant — separate JWT realms with their own
+  // auth flows. Seeded here so e2e tests can drive the full superadmin
+  // and marketing surfaces (tenant suspension, lead conversion, etc.).
+  const platformPassword = await bcrypt.hash('demo123', 10);
+
+  // Deterministic TOTP secret so the test harness can mint valid codes
+  // without storing them on disk. Production rotates this via the
+  // setup-2FA flow; we just pre-seed a known one.
+  const E2E_SUPERADMIN_TOTP_SECRET = 'JBSWY3DPEHPK3PXP'; // base32 "Hello!\xDE\xAD\xBE\xEF"
+
+  await prisma.superAdmin.upsert({
+    where: { email: 'superadmin@e2e.local' },
+    update: {},
+    create: {
+      email: 'superadmin@e2e.local',
+      password: platformPassword,
+      firstName: 'Super',
+      lastName: 'Admin',
+      status: 'ACTIVE',
+      twoFactorEnabled: true,
+      twoFactorSecret: E2E_SUPERADMIN_TOTP_SECRET,
+    },
+  });
+  console.log('✅ SuperAdmin (e2e) created');
+
+  await prisma.marketingUser.upsert({
+    where: { email: 'marketing@e2e.local' },
+    update: {},
+    create: {
+      email: 'marketing@e2e.local',
+      password: platformPassword,
+      firstName: 'Marketing',
+      lastName: 'Manager',
+      role: 'SALES_MANAGER',
+      status: 'ACTIVE',
+    },
+  });
+  console.log('✅ MarketingUser (e2e) created');
+
   // ── Done ───────────────────────────────────────────────────────────
   console.log(`
   ========================================
   🎉 Sultanahmet Sofra demo seeded!
   ========================================
 
-  Login Credentials:
+  Tenant staff (password: demo123):
+    admin   — ahmet@sultanahmet-sofra.com
+    manager — elif@sultanahmet-sofra.com
+    waiter  — mehmet@sultanahmet-sofra.com
+    waiter  — zeynep@sultanahmet-sofra.com
+    kitchen — mustafa@sultanahmet-sofra.com
 
-  Admin:
-    Email: ahmet@sultanahmet-sofra.com
-    Password: demo123
-
-  Manager:
-    Email: elif@sultanahmet-sofra.com
-    Password: demo123
-
-  Waiter:
-    Email: mehmet@sultanahmet-sofra.com
-    Password: demo123
-
-  Waiter:
-    Email: zeynep@sultanahmet-sofra.com
-    Password: demo123
-
-  Kitchen:
-    Email: mustafa@sultanahmet-sofra.com
-    Password: demo123
+  Platform users (password: demo123):
+    superadmin — superadmin@e2e.local
+        TOTP secret: ${E2E_SUPERADMIN_TOTP_SECRET}
+    marketing  — marketing@e2e.local  (SALES_MANAGER)
 
   ========================================
   `);
