@@ -8,15 +8,24 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, hint, ...props }, ref) => {
+  ({ className, label, error, hint, id, ...props }, ref) => {
+    // Wire <label htmlFor> ↔ <input id> so screen readers and
+    // role-based locators (getByLabel) actually associate them.
+    // Prefer a caller-supplied id; otherwise mint a stable one.
+    const autoId = React.useId();
+    const inputId = id ?? autoId;
     return (
       <div className="w-full">
         {label && (
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">
+          <label
+            htmlFor={inputId}
+            className="block text-sm font-medium text-slate-700 mb-1.5"
+          >
             {label}
           </label>
         )}
         <input
+          id={inputId}
           ref={ref}
           className={cn(
             'w-full px-3.5 py-2.5 border border-slate-200 rounded-lg bg-white text-slate-900 placeholder:text-slate-400',

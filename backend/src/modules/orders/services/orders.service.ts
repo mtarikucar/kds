@@ -380,6 +380,18 @@ export class OrdersService {
       });
     });
 
+        // Keep table.status in sync with order presence. updateStatus
+        // already flips OCCUPIED on transitions into active states; the
+        // create path used to skip this, leaving freshly-created PENDING
+        // orders on AVAILABLE tables — a violation of the invariant
+        // "table is OCCUPIED iff any active order references it".
+        if (createdOrder.tableId) {
+          await this.prisma.table.update({
+            where: { id: createdOrder.tableId },
+            data: { status: TableStatus.OCCUPIED },
+          });
+        }
+
         // Build the kitchen ticket snapshot now that the order has its
         // generated orderNumber. The snapshot is written via a separate
         // order.update call because the orderNumber is allocated by the
