@@ -11,11 +11,10 @@ import { loginAsApi, loginAsSuperAdmin, API_BASE } from '../../helpers/api';
 let superApi: APIRequestContext;
 
 test.beforeAll(async () => {
+  // `loginAsSuperAdmin` is module-level cached — do not dispose here.
+  // The cache is shared across all spec files in the same Playwright
+  // worker so the backend's TOTP_REPLAY window doesn't bite us.
   ({ api: superApi } = await loginAsSuperAdmin());
-});
-
-test.afterAll(async () => {
-  await superApi?.dispose();
 });
 
 test.describe('SuperAdmin — auth + tenant operations', () => {

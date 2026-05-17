@@ -9,9 +9,9 @@ import { loginAsApi } from '../../helpers/api';
  * covered in `override-precedence.spec.ts` when that lands.
  */
 test.describe('Settings → Plan feature gates allow access on BUSINESS', () => {
-  test('inventoryTracking → /stock-management/stock-items is reachable', async () => {
+  test('inventoryTracking → /stock-management/items is reachable', async () => {
     const { api } = await loginAsApi('admin');
-    const res = await api.get('stock-management/stock-items');
+    const res = await api.get('stock-management/items');
     expect([200, 404]).toContain(res.status());
     // 200 with data array, or 200 with empty list — either is fine.
     // 404 would indicate the route is not registered (regression).

@@ -150,7 +150,7 @@ export class LoyaltyService {
         )?.loyaltyPoints ?? 0,
       };
     }
-    return this.awardPoints(
+    const result = await this.awardPoints(
       customerId,
       tenantId,
       points,
@@ -158,6 +158,11 @@ export class LoyaltyService {
       `Earned ${points} points from order ${orderNumber}`,
       { orderId, orderNumber, orderAmount },
     );
+    // Promote the customer's tier if this earn pushed them across a
+    // threshold. The check reads the lifetime EARNED total so it's
+    // idempotent — repeated calls converge on the same tier.
+    const tierResult = await this.checkAndUpgradeTier(customerId, tenantId).catch(() => null);
+    return { ...result, tierUpgrade: tierResult?.upgraded ? tierResult : null };
   }
 
   async redeemPoints(

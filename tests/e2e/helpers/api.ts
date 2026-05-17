@@ -43,14 +43,27 @@ export async function getJson<T = unknown>(api: APIRequestContext, path: string)
 
 /**
  * SuperAdmin login = 2-step (password → tempToken → TOTP verify).
- * Returns an APIRequestContext pre-armed with the final access token
- * for hitting `/superadmin/*` routes.
+ *
+ * Backend's TOTP_REPLAY guard refuses a step that was already
+ * accepted in the last ~60s, so test files that all call
+ * `loginAsSuperAdmin()` independently would clash on the 2nd login.
+ * We cache one logged-in session per process — `beforeAll` consumers
+ * still work (they each see the same authed context), and per-test
+ * cleanup is unnecessary because `request.newContext()` keeps no
+ * state we care about.
  */
+let cachedSuperAdmin: {
+  api: APIRequestContext;
+  accessToken: string;
+  user: { id: string; email: string };
+} | null = null;
+
 export async function loginAsSuperAdmin(): Promise<{
   api: APIRequestContext;
   accessToken: string;
   user: { id: string; email: string };
 }> {
+  if (cachedSuperAdmin) return cachedSuperAdmin;
   const { email, password, totpSecret } = PLATFORM_USERS.superadmin;
   const ctx = await request.newContext({ baseURL: API_BASE });
   try {
@@ -60,9 +73,6 @@ export async function loginAsSuperAdmin(): Promise<{
     const { tempToken } = await loginRes.json();
     if (!tempToken) throw new Error('superadmin login: no tempToken in response');
 
-    // Step 2: TOTP verify. Generate the current 30-second code from
-    // the seeded secret using the same algorithm the backend's
-    // speakeasy.verifyTotp call expects (SHA1, 6 digits, 30s step).
     const code = speakeasy.totp({ secret: totpSecret, encoding: 'base32' });
     const verifyRes = await ctx.post('superadmin/auth/verify-2fa', {
       data: { tempToken, code },
@@ -78,7 +88,8 @@ export async function loginAsSuperAdmin(): Promise<{
       baseURL: API_BASE,
       extraHTTPHeaders: { Authorization: `Bearer ${accessToken}` },
     });
-    return { api, accessToken, user };
+    cachedSuperAdmin = { api, accessToken, user };
+    return cachedSuperAdmin;
   } catch (e) {
     await ctx.dispose();
     throw e;
