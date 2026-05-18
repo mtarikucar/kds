@@ -1195,6 +1195,16 @@ model SmsSettings {
   smsOnReservationRejected  Boolean @default(true)
   smsOnReservationCancelled Boolean @default(true)
 
+  /// Per-event email toggles. The reservation-notification abstraction
+  /// prefers email when the customer supplied an email AND the matching
+  /// emailOn* flag is on; otherwise it falls back to SMS. Defaults to
+  /// true so the abstraction "just works" out of the box; admins can
+  /// disable channels per event from the SMS/notification settings UI.
+  emailOnReservationCreated   Boolean @default(true)
+  emailOnReservationConfirmed Boolean @default(true)
+  emailOnReservationRejected  Boolean @default(true)
+  emailOnReservationCancelled Boolean @default(true)
+
   smsOnOrderCreated   Boolean @default(true)
   smsOnOrderApproved  Boolean @default(true)
   smsOnOrderPreparing Boolean @default(true)
@@ -1226,7 +1236,11 @@ model Reservation {
   status String @default("PENDING") // PENDING, CONFIRMED, REJECTED, SEATED, COMPLETED, CANCELLED, NO_SHOW
 
   customerName  String
-  customerPhone String
+  /// Either customerPhone or customerEmail must be present at the
+  /// application level (enforced by the @AtLeastOneOf DTO constraint).
+  /// Nullable at the column level so email-only walk-in bookings are
+  /// possible — DB no longer requires a phone for every row.
+  customerPhone String?
   customerEmail String?
 
   adminNotes      String?   @db.Text

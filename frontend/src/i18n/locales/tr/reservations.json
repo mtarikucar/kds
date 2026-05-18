@@ -158,8 +158,12 @@
     "submitting": "Gönderiliyor...",
     "submitError": "Bir şeyler yanlış gitti. Lütfen tekrar deneyin.",
     "validation": {
-      "nameRequired": "İsim gereklidir",
-      "phoneRequired": "Telefon numarası gereklidir"
+      "nameRequired": "Ad zorunlu",
+      "phoneRequired": "Telefon numarası gereklidir",
+      "contactRequired": "E-posta veya telefondan biri zorunlu",
+      "emailInvalid": "Geçerli bir e-posta gir",
+      "phoneInvalid": "Geçerli bir telefon numarası gir",
+      "dateRequired": "Lütfen bir tarih seç"
     },
     "errors": {
       "tenantNotFound": "Bu işletme bulunamadı",
@@ -171,7 +175,30 @@
       "slotFull": "Bu zaman dilimi tamamen dolu",
       "closedDay": "Restoran bu gün kapalı",
       "tooSoon": "Bu saat çok yakın. Lütfen daha ilerisi için rezervasyon yapın."
-    }
+    },
+    "contactHint": "E-posta veya telefon (onay için birinin girilmesi zorunlu)",
+    "customer": "Müşteri",
+    "table": "Masa",
+    "guestsLabel": "kişi",
+    "guestsCount": "{{count}} kişi",
+    "anyTableHint": "Restoran sizin için uygun masayı seçecek",
+    "successDescription": "Rezervasyonunuz onay bekliyor. Onaylandığında size bildirim gönderilecek.",
+    "yourReservationNumber": "Rezervasyon numaranız",
+    "checkYourReservation": "Rezervasyonunu Görüntüle",
+    "review": {
+      "title": "Rezervasyonunu gözden geçir",
+      "edit": "Düzenle",
+      "editing": "Rezervasyon düzenleniyor",
+      "editingHint": "Değiştirmek istediğini yap, ardından otomatik olarak özete döneceksin."
+    },
+    "slots": {
+      "empty": "Bu tarih ve kişi sayısı için uygun saat yok."
+    },
+    "unavailable": {
+      "title": "Rezervasyon şu an aktif değil",
+      "description": "Lütfen doğrudan restoranı arayın."
+    },
+    "successEmailOnlyCancelHint": "Onay e-postanızı gönderdik. İptal etmek isterseniz lütfen restoranı arayın — telefonsuz rezervasyonlar için self-iptal henüz aktif değil."
   },
   "lookup": {
     "title": "Rezervasyonunuzu Kontrol Edin",
@@ -182,7 +209,11 @@
     "notFound": "Rezervasyon bulunamadı",
     "cancelConfirm": "Bu rezervasyonu iptal etmek istediğinizden emin misiniz?",
     "cancelSuccess": "Rezervasyon başarıyla iptal edildi",
-    "deadlinePassed": "İptal son tarihi geçti"
+    "deadlinePassed": "İptal son tarihi geçti",
+    "cancel": "Rezervasyonu iptal et",
+    "cancelTitle": "Rezervasyon iptal edilsin mi?",
+    "keep": "Vazgeç",
+    "confirmCancel": "İptal et"
   },
   "notifications": {
     "confirmed": "Rezervasyon onaylandı",

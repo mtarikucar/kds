@@ -158,8 +158,12 @@
     "submitting": "Submitting...",
     "submitError": "Something went wrong. Please try again.",
     "validation": {
-      "nameRequired": "Name is required",
-      "phoneRequired": "Phone number is required"
+      "nameRequired": "Ism majburiy",
+      "phoneRequired": "Phone number is required",
+      "contactRequired": "Email yoki telefon majburiy",
+      "emailInvalid": "Email noto‘g‘ri",
+      "phoneInvalid": "Telefon noto‘g‘ri",
+      "dateRequired": "Sana tanlang"
     },
     "errors": {
       "tenantNotFound": "This restaurant was not found",
@@ -171,7 +175,30 @@
       "slotFull": "This time slot is fully booked",
       "closedDay": "The restaurant is closed on this day",
       "tooSoon": "This time is too soon. Please book further in advance."
-    }
+    },
+    "contactHint": "Email yoki telefon (biri majburiy)",
+    "customer": "Mijoz",
+    "table": "Stol",
+    "guestsLabel": "mehmon",
+    "guestsCount": "{{count}} mehmon",
+    "anyTableHint": "Restoran siz uchun mos stolni belgilaydi",
+    "successDescription": "Bronyangiz tasdiqlash kutmoqda.",
+    "yourReservationNumber": "Bron raqamingiz",
+    "checkYourReservation": "Bronni ko‘rish",
+    "review": {
+      "title": "Bronni ko‘rib chiqing",
+      "edit": "Tahrirlash",
+      "editing": "Bron tahrirlanmoqda",
+      "editingHint": "O‘zgartirgan zahoti avtomatik xulosaga qaytasiz."
+    },
+    "slots": {
+      "empty": "Bo‘sh vaqt yo‘q."
+    },
+    "unavailable": {
+      "title": "Bron mavjud emas",
+      "description": "Restoranga qo‘ng‘iroq qiling."
+    },
+    "successEmailOnlyCancelHint": "Tasdiq email yuborildi. Bekor qilish uchun restoranga qo‘ng‘iroq qiling."
   },
   "lookup": {
     "title": "Check Your Reservation",
@@ -182,7 +209,11 @@
     "notFound": "Reservation not found",
     "cancelConfirm": "Are you sure you want to cancel this reservation?",
     "cancelSuccess": "Reservation cancelled successfully",
-    "deadlinePassed": "Cancellation deadline has passed"
+    "deadlinePassed": "Cancellation deadline has passed",
+    "cancel": "Bronni bekor qilish",
+    "cancelTitle": "Bron bekor qilinsinmi?",
+    "keep": "Saqlash",
+    "confirmCancel": "Bekor qilish"
   },
   "notifications": {
     "confirmed": "Reservation confirmed",

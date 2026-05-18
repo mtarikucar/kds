@@ -8,7 +8,7 @@ import { UpdateReservationDto } from '../dto/update-reservation.dto';
 import { ReservationQueryDto } from '../dto/reservation-query.dto';
 import { ReservationSettingsService } from './reservation-settings.service';
 import { ReservationStatus } from '../constants/reservation-status.enum';
-import { SmsNotificationService } from '../../sms-settings/sms-notification.service';
+import { ReservationNotificationService } from './reservation-notification.service';
 
 @Injectable()
 export class ReservationsService {
@@ -16,7 +16,9 @@ export class ReservationsService {
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
     private settingsService: ReservationSettingsService,
-    private smsNotificationService: SmsNotificationService,
+    // Email-first / SMS-fallback abstraction. Still calls into the
+    // SMS service under the hood when phone is the live channel.
+    private reservationNotificationService: ReservationNotificationService,
   ) {}
 
   private async validateTenant(tenantId: string) {
@@ -192,19 +194,33 @@ export class ReservationsService {
               }
             }
 
-            // Duplicate reservation check inside transaction: same phone + same day + overlapping time
-            const existingDuplicate = await tx.reservation.findFirst({
-              where: {
-                tenantId,
-                customerPhone: dto.customerPhone,
-                date: new Date(dto.date),
-                startTime: dto.startTime,
-                status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] },
-              },
-            });
-
-            if (existingDuplicate) {
-              throw new BadRequestException('You already have a reservation for this time slot');
+            // Duplicate reservation check inside transaction: same
+            // customer + same day + overlapping time. Bucket by the
+            // contact channel actually supplied — phone is now
+            // optional (email-only bookings allowed), and passing
+            // `customerPhone: undefined` to Prisma would drop the
+            // filter entirely and match every concurrent booking at
+            // that slot (the bug that caused 400s for email-only
+            // walk-ins). Phone wins when both are present so existing
+            // phone-based dedup behavior is preserved.
+            const customerKey = dto.customerPhone
+              ? { customerPhone: dto.customerPhone }
+              : dto.customerEmail
+                ? { customerEmail: dto.customerEmail }
+                : null;
+            if (customerKey) {
+              const existingDuplicate = await tx.reservation.findFirst({
+                where: {
+                  tenantId,
+                  ...customerKey,
+                  date: new Date(dto.date),
+                  startTime: dto.startTime,
+                  status: { in: [ReservationStatus.PENDING, ReservationStatus.CONFIRMED] },
+                },
+              });
+              if (existingDuplicate) {
+                throw new BadRequestException('You already have a reservation for this time slot');
+              }
             }
 
             // Allocate number INSIDE the tx so our "max seen" scan sees
@@ -269,10 +285,13 @@ export class ReservationsService {
       console.error('Failed to send reservation notification:', e.message);
     }
 
-    // Send SMS to customer
-    this.smsNotificationService.notifyReservationCreated(tenantId, {
-      customerPhone: reservation.customerPhone,
+    // Notify customer. Channel chosen at call time: email if the
+    // customer left one and the emailOnReservationCreated toggle is on;
+    // SMS otherwise (or as fallback when email send fails).
+    this.reservationNotificationService.notify(tenantId, 'created', {
       customerName: reservation.customerName,
+      customerEmail: reservation.customerEmail,
+      customerPhone: reservation.customerPhone,
       date: dto.date,
       startTime: dto.startTime,
       reservationNumber: reservation.reservationNumber,
@@ -437,11 +456,12 @@ export class ReservationsService {
       console.error('Failed to send confirmation notification:', e.message);
     }
 
-    // Send SMS to customer
+    // Notify customer (email-first, SMS-fallback).
     const dateStr = reservation.date instanceof Date ? reservation.date.toISOString().split('T')[0] : String(reservation.date);
-    this.smsNotificationService.notifyReservationConfirmed(tenantId, {
-      customerPhone: reservation.customerPhone,
+    this.reservationNotificationService.notify(tenantId, 'confirmed', {
       customerName: reservation.customerName,
+      customerEmail: reservation.customerEmail,
+      customerPhone: reservation.customerPhone,
       date: dateStr,
       startTime: reservation.startTime,
       reservationNumber: reservation.reservationNumber,
@@ -483,13 +503,17 @@ export class ReservationsService {
       console.error('Failed to send rejection notification:', e.message);
     }
 
-    // Send SMS to customer
+    // Notify customer (email-first, SMS-fallback). reservationNumber
+    // is required by the email template even though the legacy SMS
+    // string doesn't use it; passing both keeps both channels happy.
     const rejectDateStr = reservation.date instanceof Date ? reservation.date.toISOString().split('T')[0] : String(reservation.date);
-    this.smsNotificationService.notifyReservationRejected(tenantId, {
-      customerPhone: reservation.customerPhone,
+    this.reservationNotificationService.notify(tenantId, 'rejected', {
       customerName: reservation.customerName,
+      customerEmail: reservation.customerEmail,
+      customerPhone: reservation.customerPhone,
       date: rejectDateStr,
       startTime: reservation.startTime,
+      reservationNumber: reservation.reservationNumber,
       reason: rejectionReason,
     });
 
@@ -628,13 +652,15 @@ export class ReservationsService {
       include: { table: true },
     });
 
-    // Send SMS to customer
+    // Notify customer (email-first, SMS-fallback).
     const cancelDateStr = reservation.date instanceof Date ? reservation.date.toISOString().split('T')[0] : String(reservation.date);
-    this.smsNotificationService.notifyReservationCancelled(tenantId, {
-      customerPhone: reservation.customerPhone,
+    this.reservationNotificationService.notify(tenantId, 'cancelled', {
       customerName: reservation.customerName,
+      customerEmail: reservation.customerEmail,
+      customerPhone: reservation.customerPhone,
       date: cancelDateStr,
       startTime: reservation.startTime,
+      reservationNumber: reservation.reservationNumber,
     });
 
     return cancelled;
@@ -709,13 +735,15 @@ export class ReservationsService {
       console.error('Failed to send cancellation notification:', e.message);
     }
 
-    // Send SMS to customer
+    // Notify customer (email-first, SMS-fallback).
     const publicCancelDateStr = reservation.date instanceof Date ? reservation.date.toISOString().split('T')[0] : String(reservation.date);
-    this.smsNotificationService.notifyReservationCancelled(tenantId, {
-      customerPhone: reservation.customerPhone,
+    this.reservationNotificationService.notify(tenantId, 'cancelled', {
       customerName: reservation.customerName,
+      customerEmail: reservation.customerEmail,
+      customerPhone: reservation.customerPhone,
       date: publicCancelDateStr,
       startTime: reservation.startTime,
+      reservationNumber: reservation.reservationNumber,
     });
 
     return updated;

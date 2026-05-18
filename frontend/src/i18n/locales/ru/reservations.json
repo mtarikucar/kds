@@ -158,8 +158,12 @@
     "submitting": "Submitting...",
     "submitError": "Something went wrong. Please try again.",
     "validation": {
-      "nameRequired": "Name is required",
-      "phoneRequired": "Phone number is required"
+      "nameRequired": "Имя обязательно",
+      "phoneRequired": "Phone number is required",
+      "contactRequired": "Email или телефон обязателен",
+      "emailInvalid": "Неверный email",
+      "phoneInvalid": "Неверный телефон",
+      "dateRequired": "Выберите дату"
     },
     "errors": {
       "tenantNotFound": "This restaurant was not found",
@@ -171,7 +175,30 @@
       "slotFull": "This time slot is fully booked",
       "closedDay": "The restaurant is closed on this day",
       "tooSoon": "This time is too soon. Please book further in advance."
-    }
+    },
+    "contactHint": "Email или телефон (один из них обязателен)",
+    "customer": "Клиент",
+    "table": "Стол",
+    "guestsLabel": "гостей",
+    "guestsCount": "{{count}} гостей",
+    "anyTableHint": "Мы подберём вам подходящий стол",
+    "successDescription": "Бронь ожидает подтверждения.",
+    "yourReservationNumber": "Номер вашей брони",
+    "checkYourReservation": "Посмотреть бронь",
+    "review": {
+      "title": "Проверьте бронь",
+      "edit": "Изменить",
+      "editing": "Редактирование",
+      "editingHint": "Измените нужное и вернитесь к обзору."
+    },
+    "slots": {
+      "empty": "Нет свободных времён."
+    },
+    "unavailable": {
+      "title": "Бронирование недоступно",
+      "description": "Позвоните в ресторан."
+    },
+    "successEmailOnlyCancelHint": "Подтверждение отправлено на email. Для отмены позвоните в ресторан."
   },
   "lookup": {
     "title": "Check Your Reservation",
@@ -182,7 +209,11 @@
     "notFound": "Reservation not found",
     "cancelConfirm": "Are you sure you want to cancel this reservation?",
     "cancelSuccess": "Reservation cancelled successfully",
-    "deadlinePassed": "Cancellation deadline has passed"
+    "deadlinePassed": "Cancellation deadline has passed",
+    "cancel": "Отменить бронь",
+    "cancelTitle": "Отменить бронь?",
+    "keep": "Оставить",
+    "confirmCancel": "Отменить"
   },
   "notifications": {
     "confirmed": "Reservation confirmed",

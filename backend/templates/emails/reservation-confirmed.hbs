@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #10B981; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
+    .detail { background: white; padding: 16px; border-radius: 6px; margin: 16px 0; }
+    .detail-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #eee; }
+    .detail-row:last-child { border-bottom: none; }
+    .label { color: #666; }
+    .value { font-weight: 600; }
+    .number { font-family: 'Courier New', monospace; background: #ecfdf5; padding: 4px 10px; border-radius: 4px; color: #065f46; }
+  </style>
+</head>
+<body>
+  <div class="header"><h1>Rezervasyonunuz Onaylandı</h1></div>
+  <div class="content">
+    <p>Sayın <strong>{{customerName}}</strong>,</p>
+    <p>Rezervasyonunuz onaylandı. Hoş geldiniz!</p>
+    <div class="detail">
+      <div class="detail-row"><span class="label">Rezervasyon No</span> <span class="value number">{{reservationNumber}}</span></div>
+      <div class="detail-row"><span class="label">Tarih</span> <span class="value">{{date}}</span></div>
+      <div class="detail-row"><span class="label">Saat</span> <span class="value">{{startTime}}</span></div>
+    </div>
+    <p>Saygılarımızla,<br>HummyTummy Ekibi</p>
+  </div>
+</body>
+</html>

@@ -1184,7 +1184,10 @@ export interface CreateReservationDto {
   endTime: string;
   guestCount: number;
   customerName: string;
-  customerPhone: string;
+  /** At least one of customerPhone or customerEmail is required —
+   *  enforced by the backend @AtLeastOneOf DTO constraint and by the
+   *  zod schema in features/reservations/public/schema.ts. */
+  customerPhone?: string;
   customerEmail?: string;
   notes?: string;
   tableId?: string;

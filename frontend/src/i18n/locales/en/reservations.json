@@ -159,7 +159,11 @@
     "submitError": "Something went wrong. Please try again.",
     "validation": {
       "nameRequired": "Name is required",
-      "phoneRequired": "Phone number is required"
+      "phoneRequired": "Phone number is required",
+      "contactRequired": "Either email or phone is required",
+      "emailInvalid": "Please enter a valid email",
+      "phoneInvalid": "Please enter a valid phone number",
+      "dateRequired": "Please pick a date"
     },
     "errors": {
       "tenantNotFound": "This restaurant was not found",
@@ -171,7 +175,30 @@
       "slotFull": "This time slot is fully booked",
       "closedDay": "The restaurant is closed on this day",
       "tooSoon": "This time is too soon. Please book further in advance."
-    }
+    },
+    "contactHint": "Email or phone (one is required for confirmation)",
+    "customer": "Customer",
+    "table": "Table",
+    "guestsLabel": "guests",
+    "guestsCount": "{{count}} guests",
+    "anyTableHint": "Server will assign the best fit",
+    "successDescription": "Your reservation is pending approval. You will be notified once confirmed.",
+    "yourReservationNumber": "Your reservation number is",
+    "checkYourReservation": "Check Your Reservation",
+    "review": {
+      "title": "Review your reservation",
+      "edit": "Edit",
+      "editing": "Editing reservation",
+      "editingHint": "Change what you need — you’ll return to review automatically."
+    },
+    "slots": {
+      "empty": "No available times for this date and party size."
+    },
+    "unavailable": {
+      "title": "Reservations are not available",
+      "description": "Please contact the restaurant directly to book."
+    },
+    "successEmailOnlyCancelHint": "We’ve sent confirmation to your email. To cancel this reservation, please call the restaurant — phone-based self-cancel is unavailable for email-only bookings."
   },
   "lookup": {
     "title": "Check Your Reservation",
@@ -182,7 +209,11 @@
     "notFound": "Reservation not found",
     "cancelConfirm": "Are you sure you want to cancel this reservation?",
     "cancelSuccess": "Reservation cancelled successfully",
-    "deadlinePassed": "Cancellation deadline has passed"
+    "deadlinePassed": "Cancellation deadline has passed",
+    "cancel": "Cancel reservation",
+    "cancelTitle": "Cancel reservation?",
+    "keep": "Keep",
+    "confirmCancel": "Cancel reservation"
   },
   "notifications": {
     "confirmed": "Reservation confirmed",
