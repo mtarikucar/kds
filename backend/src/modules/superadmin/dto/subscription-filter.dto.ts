@@ -229,4 +229,20 @@ export class UpdateSubscriptionDto {
   @IsOptional()
   @IsIn(SUBSCRIPTION_STATUSES)
   status?: (typeof SUBSCRIPTION_STATUSES)[number];
+
+  @ApiPropertyOptional({
+    description:
+      'Override trial end timestamp (ISO 8601). Support uses this to extend a trial; ' +
+      'E2E tests use it to fast-forward the trial-expiry sweep.',
+  })
+  @IsOptional()
+  @IsDateString()
+  trialEnd?: string;
+
+  @ApiPropertyOptional({
+    description: 'Override trial start timestamp (ISO 8601). Paired with trialEnd for trial-window edits.',
+  })
+  @IsOptional()
+  @IsDateString()
+  trialStart?: string;
 }

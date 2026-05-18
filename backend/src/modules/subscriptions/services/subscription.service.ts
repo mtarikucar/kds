@@ -140,13 +140,15 @@ export class SubscriptionService {
       throw new BadRequestException('Invalid billing cycle');
     }
 
-    // Per-plan trial: a tenant can trial each paid plan once. The legacy
-    // `trialUsed` boolean is preserved as a coarser "ever-trialed" flag
-    // for reporting, but eligibility uses the per-plan array so a tenant
-    // who trialed BASIC can still trial PRO.
-    const hasTrialedThisPlan = tenant.usedTrialPlanIds?.includes(plan.id) ?? false;
+    // Trial is a LIFETIME-PER-TENANT benefit. `Tenant.trialUsed` is the
+    // canonical gate — once any plan has been trialed (including the
+    // BUSINESS trial auto-started at registration), no further trials
+    // are available regardless of which paid plan the caller targets.
+    // We still write `usedTrialPlanIds` further down for audit, but the
+    // eligibility check is per-tenant, not per-plan.
+    const hasUsedAnyTrial = tenant.trialUsed === true;
     const canUseTrial =
-      !hasTrialedThisPlan &&
+      !hasUsedAnyTrial &&
       plan.trialDays > 0 &&
       plan.name !== SubscriptionPlanType.FREE;
     const isTrialPeriod = canUseTrial;
@@ -282,18 +284,18 @@ export class SubscriptionService {
       throw new BadRequestException('Plan does not offer a trial');
     }
 
-    // Per-plan eligibility check (mirrors PaymentsService) so direct
-    // calls don't bypass the lifetime-per-plan rule.
+    // Lifetime-per-tenant eligibility check (mirrors PaymentsService) so
+    // direct callers don't bypass the once-per-tenant rule.
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { usedTrialPlanIds: true },
+      select: { trialUsed: true },
     });
     if (!tenant) {
       throw new NotFoundException('Tenant not found');
     }
-    if (tenant.usedTrialPlanIds?.includes(plan.id)) {
+    if (tenant.trialUsed === true) {
       throw new BadRequestException(
-        'Tenant has already trialed this plan',
+        'Tenant has already used their trial. Trials are once per account.',
       );
     }
 
@@ -957,21 +959,60 @@ export class SubscriptionService {
       include: { plan: true, tenant: true },
     });
 
+    if (expiredTrials.length === 0) {
+      return { processed: 0, failed: 0 };
+    }
+
+    // Look up FREE once for the whole batch. If the seed is missing
+    // FREE the entire batch fails loudly; no per-row fallback because
+    // there's no sensible alternative target.
+    const freePlan = await this.prisma.subscriptionPlan.findUnique({
+      where: { name: 'FREE' },
+    });
+    if (!freePlan) {
+      this.logger.error('FREE plan missing from catalog — cannot expire trials');
+      return { processed: 0, failed: expiredTrials.length };
+    }
+
+    // FREE has no real period boundary, but currentPeriodEnd is a
+    // non-null column. Project ~10 years out, matching the placeholder
+    // AuthService.register used to write for the FREE subscription it
+    // created at signup. Same intent: the column exists for plan-tier
+    // bookkeeping, not for a real billing cycle.
+    const freePeriodEnd = new Date(now);
+    freePeriodEnd.setFullYear(freePeriodEnd.getFullYear() + 10);
+
     let failed = 0;
     for (const subscription of expiredTrials) {
       try {
-        // Flip `isTrialPeriod` off alongside the status — UI uses the
-        // flag to decide whether to show "trial ends in N days", and
-        // leaving it true on PAST_DUE makes the dashboard claim a
-        // trial is ongoing after it has expired.
-        await this.prisma.subscription.update({
-          where: { id: subscription.id },
-          data: {
-            status: SubscriptionStatus.PAST_DUE,
-            isTrialPeriod: false,
-          },
+        // Atomic transition: move the SAME subscription row from TRIALING
+        // BUSINESS → ACTIVE FREE and update Tenant.currentPlanId in lock
+        // step. Reusing the row avoids tripping the partial-unique
+        // (tenantId) WHERE status IN (ACTIVE, TRIALING) index, which
+        // would fire if we tried to create a fresh FREE row alongside
+        // the TRIALING one.
+        await this.prisma.$transaction(async (tx) => {
+          await tx.subscription.update({
+            where: { id: subscription.id },
+            data: {
+              planId: freePlan.id,
+              status: SubscriptionStatus.ACTIVE,
+              isTrialPeriod: false,
+              amount: 0,
+              currency: freePlan.currency,
+              currentPeriodStart: now,
+              currentPeriodEnd: freePeriodEnd,
+              autoRenew: true,
+            },
+          });
+          await tx.tenant.update({
+            where: { id: subscription.tenantId },
+            data: { currentPlanId: freePlan.id },
+          });
         });
-        this.logger.log(`Trial subscription ${subscription.id} moved to PAST_DUE`);
+        this.logger.log(
+          `Trial subscription ${subscription.id} expired → tenant ${subscription.tenantId} dropped to FREE`,
+        );
 
         // Best-effort trial-expired email; failure here mustn't block the
         // status transition (the cron must remain idempotent).

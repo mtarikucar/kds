@@ -72,6 +72,17 @@ export class SuperAdminSubscriptionsController {
   }
 
   // Subscriptions
+  @Post('subscriptions/expire-trials')
+  @ApiOperation({
+    summary:
+      'Manually run the trial-expiry sweep (same code path as the nightly cron). ' +
+      'Each subscription whose trialEnd has passed is moved to ACTIVE FREE. ' +
+      'Used by support to force a tenant off trial early, and by E2E tests.',
+  })
+  async expireTrials() {
+    return this.subscriptionsService.triggerExpireTrials();
+  }
+
   @Get('subscriptions')
   @ApiOperation({ summary: 'List all subscriptions' })
   async findAllSubscriptions(@Query() filters: SubscriptionFilterDto) {

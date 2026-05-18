@@ -14,6 +14,7 @@ import { OAuth2Client } from 'google-auth-library';
 import * as appleSignin from 'apple-signin-auth';
 import * as Sentry from '@sentry/node';
 import { Prisma } from '@prisma/client';
+import { addDays } from 'date-fns';
 import { PrismaService } from '../../prisma/prisma.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -147,19 +148,32 @@ export class AuthService {
 
       const finalSubdomain = await this.allocateSubdomain(baseSubdomain);
 
-      const freePlan = await this.prisma.subscriptionPlan.findUnique({
-        where: { name: 'FREE' },
+      // Every new tenant gets a 14-day BUSINESS trial — the top-tier
+      // plan with every premium feature open — at zero charge. Trial is
+      // a one-time per-tenant benefit; the SchedulerService.expireTrials
+      // job downgrades the tenant to FREE at trialEnd. We need the
+      // BUSINESS plan here, not FREE, so the new tenant boots into a
+      // fully-featured workspace from the first dashboard load.
+      const businessPlan = await this.prisma.subscriptionPlan.findUnique({
+        where: { name: 'BUSINESS' },
       });
-
-      if (!freePlan) {
-        throw new ResourceNotFoundException('FREE subscription plan');
+      if (!businessPlan) {
+        // Seed misconfigured — refuse to register rather than silently
+        // landing the tenant on FREE without a trial. The user will get
+        // a clear error and ops can re-seed.
+        throw new ResourceNotFoundException('BUSINESS subscription plan');
+      }
+      if (businessPlan.trialDays <= 0) {
+        throw new ResourceNotFoundException(
+          'BUSINESS plan has no trialDays configured — re-seed plans',
+        );
       }
 
-      // Tenant + FREE subscription must be created atomically so other
-      // modules never observe a tenant without a matching subscription.
+      // Tenant + TRIALING BUSINESS subscription must be created
+      // atomically so other modules never observe a tenant without a
+      // matching subscription.
       const now = new Date();
-      const currentPeriodEnd = new Date(now);
-      currentPeriodEnd.setFullYear(currentPeriodEnd.getFullYear() + 10);
+      const trialEnd = addDays(now, businessPlan.trialDays);
 
       try {
         const tenant = await this.prisma.$transaction(async (tx) => {
@@ -167,23 +181,38 @@ export class AuthService {
             data: {
               name: registerDto.restaurantName,
               subdomain: finalSubdomain,
-              currentPlanId: freePlan.id,
+              currentPlanId: businessPlan.id,
+              // Per-tenant trial bookkeeping. `trialUsed=true` is the
+              // canonical lifetime-trial gate read by
+              // PaymentsService.createIntent + SubscriptionService;
+              // once stamped, no further trials regardless of plan.
+              // `usedTrialPlanIds` is kept for audit/reporting.
+              trialUsed: true,
+              trialStartedAt: now,
+              trialEndsAt: trialEnd,
+              usedTrialPlanIds: [businessPlan.id],
             },
           });
           await tx.subscription.create({
             data: {
               tenantId: created.id,
-              planId: freePlan.id,
-              status: 'ACTIVE',
+              planId: businessPlan.id,
+              status: 'TRIALING',
               billingCycle: 'MONTHLY',
-              // FREE plan never charges so this is informational only.
+              // PayTR is the only configured provider; this row is the
+              // trial — no charge moves until the post-trial checkout.
               paymentProvider: PaymentProvider.PAYTR,
               startDate: now,
               currentPeriodStart: now,
-              currentPeriodEnd,
-              isTrialPeriod: false,
-              amount: 0,
-              currency: freePlan.currency,
+              // During trial, currentPeriodEnd == trialEnd. After
+              // expireTrials downgrades to FREE, the FREE write path
+              // resets these fields.
+              currentPeriodEnd: trialEnd,
+              isTrialPeriod: true,
+              trialStart: now,
+              trialEnd,
+              amount: businessPlan.monthlyPrice,
+              currency: businessPlan.currency,
               autoRenew: true,
               cancelAtPeriodEnd: false,
             },

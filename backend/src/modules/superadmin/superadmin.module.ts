@@ -24,10 +24,16 @@ import {
 
 import { SuperAdminGuard } from './guards/superadmin.guard';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 
 @Module({
   imports: [
     NotificationsModule,
+    // SuperAdminSubscriptionsService dispatches into SubscriptionService
+    // for ops-only actions (e.g. forcing the trial-expiry cron from a
+    // test or support session). Keeps the canonical lifecycle logic in
+    // one place instead of duplicating it under superadmin/.
+    SubscriptionsModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

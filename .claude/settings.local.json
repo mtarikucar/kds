@@ -21,7 +21,17 @@
       "Bash(git push *)",
       "Bash(cp -r templates/emails templates/emails-prebuild-backup)",
       "Bash(npx webpack *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(git tag -a v2.8.57 -m 'v2.8.57 — PayTR user_address fix + e2e batches 10-14 *)",
+      "Bash(gh run *)",
+      "Bash(git tag -a v2.8.58 -m 'v2.8.58 — PayTR user_phone + CI redis fix *)",
+      "Bash(python3 -c \"import yaml; yaml.safe_load\\(open\\('/home/tarik/Projects/kds/.github/workflows/release-deploy.yml'\\)\\)\")",
+      "Bash(git tag -a v2.8.59 -m 'v2.8.59 — strict CI secrets gate \\(no fallbacks\\) *)",
+      "Bash(git tag -a v2.8.60 -m 'v2.8.60 — release heredoc completeness fix *)",
+      "Bash(npm install *)",
+      "Bash(git tag -a v2.8.61 -m 'v2.8.61 — Iyzico removed across code, config, workflows, and copy *)",
+      "Bash(python3 -c \"import yaml; yaml.safe_load\\(open\\('.github/workflows/release-deploy.yml'\\)\\)\")",
+      "Bash(git tag -a v2.8.62 -m 'v2.8.62 — polling health check in release deploy *)"
     ]
   }
 }

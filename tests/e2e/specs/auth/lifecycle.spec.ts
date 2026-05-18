@@ -25,7 +25,7 @@ async function newPublicCtx() {
 }
 
 test.describe('Auth — register', () => {
-  test('new-restaurant signup creates a tenant + admin user and returns tokens', async () => {
+  test('new-restaurant signup creates a tenant + admin user + 14-day BUSINESS trial', async () => {
     const pub = await newPublicCtx();
     const email = uniqueEmail('newresto');
     const res = await pub.post('auth/register', {
@@ -42,6 +42,28 @@ test.describe('Auth — register', () => {
     expect(body.accessToken).toBeTruthy();
     expect(body.user?.email).toBe(email);
     expect(body.user?.role).toBe('ADMIN');
+
+    // Subscription state — registration now auto-attaches a 14-day
+    // BUSINESS trial instead of dropping the tenant onto FREE. The
+    // assertion lives here (not in a separate spec) so the
+    // registration contract is a single source of truth for downstream
+    // changes.
+    const authed = await request.newContext({
+      baseURL: API_BASE,
+      extraHTTPHeaders: { Authorization: `Bearer ${body.accessToken}` },
+    });
+    try {
+      const subRes = await authed.get('subscriptions/current');
+      expect(subRes.ok()).toBeTruthy();
+      const sub = await subRes.json();
+      expect(sub.plan?.name).toBe('BUSINESS');
+      expect(sub.status).toBe('TRIALING');
+      expect(sub.isTrialPeriod).toBe(true);
+      expect(sub.trialStart).toBeTruthy();
+      expect(sub.trialEnd).toBeTruthy();
+    } finally {
+      await authed.dispose();
+    }
     await pub.dispose();
   });
 

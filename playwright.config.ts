@@ -57,6 +57,20 @@ export default defineConfig({
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
+      // Mobile-only specs live under specs/mobile/. They run in the
+      // `mobile-chromium` project below so the Pixel-5 viewport drives
+      // their viewport+UA, and they're explicitly excluded here so the
+      // desktop suite isn't billed twice for the same assertions.
+      testIgnore: ['**/specs/mobile/**'],
+    },
+    {
+      // Mobile project — only picks up specs/mobile/**. Pixel 5 is a
+      // representative phone viewport (393×851); when more device
+      // shapes are needed (tablet, iPhone), add more projects here
+      // with their own testMatch filters.
+      name: 'mobile-chromium',
+      use: { ...devices['Pixel 5'] },
+      testMatch: ['**/specs/mobile/**/*.spec.ts'],
     },
   ],
   outputDir: 'test-results/',

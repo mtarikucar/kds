@@ -139,22 +139,22 @@ export class PaymentsService {
 
     // (1) Trial-eligible? Activate trial; no PayTR charge during trial.
     //
-    // The previous `!existingSub` check was wrong: every tenant gets a
-    // permanent FREE subscription at registration, so trial logic never
-    // fired in production. The correct check is "no live sub, OR the live
-    // one is FREE" — promoting from FREE to a paid trial atomically swaps
-    // the subscription rows inside SubscriptionService.startTrialFromIntent.
-    //
-    // Trial eligibility is per-plan (a tenant can trial BASIC, decline,
-    // then later trial PRO). We read `usedTrialPlanIds` instead of the
-    // coarser legacy `trialUsed` flag.
+    // Trial is a LIFETIME-PER-TENANT benefit. Registration auto-starts
+    // a 14-day BUSINESS trial (see AuthService.register), so by the time
+    // a tenant reaches `/payments/create-intent` they've almost always
+    // already burned their trial. The `tenant.trialUsed` boolean is the
+    // canonical gate — once true, no further trials, regardless of which
+    // paid plan they pick. (We still write `usedTrialPlanIds` for audit,
+    // but reading it as the gate would let an old tenant who trialed
+    // BASIC also trial PRO/BUSINESS for free, which is the bug we just
+    // closed.)
     const existingSub = tenant.subscriptions[0];
     const isOnFreeOrNone =
       !existingSub || existingSub.plan.name === SubscriptionPlanType.FREE;
-    const hasTrialedThisPlan = tenant.usedTrialPlanIds?.includes(plan.id) ?? false;
+    const hasUsedAnyTrial = tenant.trialUsed === true;
     const trialEligible =
       isOnFreeOrNone &&
-      !hasTrialedThisPlan &&
+      !hasUsedAnyTrial &&
       plan.trialDays > 0 &&
       plan.name !== SubscriptionPlanType.FREE;
     if (trialEligible) {

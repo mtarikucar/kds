@@ -165,8 +165,12 @@ const TableManagementPage = () => {
 
   return (
     <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-shrink-0 items-center justify-between">
+      {/* Page Header. `flex-wrap` lets the right-side action cluster
+          drop to a second row on narrow viewports — without it the
+          fixed-width icon + title kept the row at desktop width and
+          pushed the "Add Table" button off-screen on mobile. The
+          gap modifier keeps the wrapped layout visually clean. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 md:gap-4">
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center shadow-lg shadow-primary-500/20">
             <LayoutGrid className="w-7 h-7 text-white" />

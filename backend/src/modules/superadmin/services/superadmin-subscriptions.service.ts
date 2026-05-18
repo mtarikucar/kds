@@ -9,13 +9,25 @@ import {
 } from '../dto/subscription-filter.dto';
 import { SuperAdminAuditService } from './superadmin-audit.service';
 import { AuditAction, EntityType } from '../dto/audit-filter.dto';
+import { SubscriptionService } from '../../subscriptions/services/subscription.service';
 
 @Injectable()
 export class SuperAdminSubscriptionsService {
   constructor(
     private prisma: PrismaService,
     private auditService: SuperAdminAuditService,
+    private subscriptionService: SubscriptionService,
   ) {}
+
+  /**
+   * Manually fire the scheduled trial-expiry sweep. Same code path as
+   * the nightly cron, just triggered on-demand from a superadmin
+   * session or an E2E test that needs to verify the post-expiry state
+   * (TRIALING BUSINESS → ACTIVE FREE) without waiting for midnight.
+   */
+  async triggerExpireTrials() {
+    return this.subscriptionService.expireTrials();
+  }
 
   // Plans
   async findAllPlans() {
@@ -248,7 +260,12 @@ export class SuperAdminSubscriptionsService {
       throw new NotFoundException('Subscription not found');
     }
 
-    const updateData: { planId?: string; status?: string } = {};
+    const updateData: {
+      planId?: string;
+      status?: string;
+      trialEnd?: Date;
+      trialStart?: Date;
+    } = {};
 
     if (updateDto.planId) {
       const plan = await this.prisma.subscriptionPlan.findUnique({
@@ -297,6 +314,13 @@ export class SuperAdminSubscriptionsService {
 
     if (updateDto.status) {
       updateData.status = updateDto.status;
+    }
+
+    if (updateDto.trialEnd) {
+      updateData.trialEnd = new Date(updateDto.trialEnd);
+    }
+    if (updateDto.trialStart) {
+      updateData.trialStart = new Date(updateDto.trialStart);
     }
 
     // Subscription plan change + tenant.currentPlanId must move
