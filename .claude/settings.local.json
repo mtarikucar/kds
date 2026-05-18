@@ -31,7 +31,8 @@
       "Bash(npm install *)",
       "Bash(git tag -a v2.8.61 -m 'v2.8.61 — Iyzico removed across code, config, workflows, and copy *)",
       "Bash(python3 -c \"import yaml; yaml.safe_load\\(open\\('.github/workflows/release-deploy.yml'\\)\\)\")",
-      "Bash(git tag -a v2.8.62 -m 'v2.8.62 — polling health check in release deploy *)"
+      "Bash(git tag -a v2.8.62 -m 'v2.8.62 — polling health check in release deploy *)",
+      "Bash(git tag -a v2.8.63 -m 'v2.8.63 — auto-trial at signup, trial-once-per-tenant, mobile table-add fix *)"
     ]
   }
 }

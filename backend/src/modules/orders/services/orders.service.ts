@@ -25,6 +25,15 @@ import { SmsNotificationService } from '../../sms-settings/sms-notification.serv
 import { TaxCalculationService } from '../../accounting/services/tax-calculation.service';
 import { withTransaction, addBreadcrumb } from '../../../common/utils/tracing';
 import { ReceiptSnapshotBuilder } from './receipt-snapshot.builder';
+import { ReservationStatus } from '../../reservations/constants/reservation-status.enum';
+
+/**
+ * Walk-in (POST /orders) guard window: refuse to open a new order on
+ * a table whose next CONFIRMED reservation starts within this many
+ * minutes. Matches the reservation-scheduler's auto-RESERVED window so
+ * the two systems agree on "what counts as imminent".
+ */
+const RESERVATION_HOLD_WINDOW_MINUTES = 30;
 
 @Injectable()
 export class OrdersService {
@@ -198,6 +207,18 @@ export class OrdersService {
           if (!table) {
             throw new BadRequestException('Invalid table or table does not belong to your tenant');
           }
+
+          // Reservation-overlap guard: refuse a walk-in if there's an
+          // active CONFIRMED reservation on this table that either
+          //   (a) is currently in-window (start <= now <= end), or
+          //   (b) starts within the next 30 minutes.
+          // Without this check a waiter could open an order on a table
+          // that a customer reserved weeks ago; later when they arrive,
+          // the reservation seat-flow would overwrite the order's table
+          // and orphan the items. SEATED reservations also block —
+          // those mean the rezervationist already physically seated the
+          // guest, walk-in on the same table is nonsense.
+          await this.assertNoReservationOverlap(tenantId, createOrderDto.tableId);
         }
 
     // Validate all products exist and belong to tenant
@@ -1461,5 +1482,65 @@ export class OrdersService {
       message: `Synced ${updates.length} table(s)`,
       updates,
     };
+  }
+
+  /**
+   * Refuses to open a walk-in order on a table whose next reservation
+   * (CONFIRMED or SEATED) is either active right now or starts within
+   * the next {@link RESERVATION_HOLD_WINDOW_MINUTES} minutes.
+   *
+   * Date math note: reservations store `date` as a Postgres DATE and
+   * `startTime`/`endTime` as HH:mm strings. We can't filter the
+   * combined timestamp at the DB layer without a join+cast, so the
+   * query pulls today's + tomorrow's CONFIRMED/SEATED rows for the
+   * table and the comparison happens in JS. The result set is tiny
+   * (one table × at most a handful of bookings per day) so this stays
+   * O(small) regardless of overall reservation volume.
+   */
+  private async assertNoReservationOverlap(
+    tenantId: string,
+    tableId: string,
+  ): Promise<void> {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const candidates = await this.prisma.reservation.findMany({
+      where: {
+        tenantId,
+        tableId,
+        date: { in: [today, tomorrow] },
+        status: { in: [ReservationStatus.CONFIRMED, ReservationStatus.SEATED] },
+      },
+      select: {
+        id: true,
+        date: true,
+        startTime: true,
+        endTime: true,
+        customerName: true,
+      },
+    });
+
+    const windowEnd = new Date(now.getTime() + RESERVATION_HOLD_WINDOW_MINUTES * 60_000);
+    for (const r of candidates) {
+      const [sh, sm] = r.startTime.split(':').map(Number);
+      const [eh, em] = r.endTime.split(':').map(Number);
+      const start = new Date(r.date);
+      start.setHours(sh, sm, 0, 0);
+      const end = new Date(r.date);
+      end.setHours(eh, em, 0, 0);
+
+      // Currently in-window OR starts soon. The "ends after now" guard
+      // skips reservations whose window has already closed but the
+      // status hasn't been bumped to NO_SHOW yet — a stale CONFIRMED
+      // shouldn't block service for the next sitting.
+      if (end > now && start <= windowEnd) {
+        throw new BadRequestException(
+          `Bu masa için ${r.startTime} saatinde ${r.customerName} adına rezervasyon var. ` +
+            `Sipariş açmadan önce rezervasyonu "seat" edin ya da iptal edin.`,
+        );
+      }
+    }
   }
 }

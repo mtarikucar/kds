@@ -13,6 +13,25 @@ import { MergeTablesDto, UnmergeTableDto } from './dto/merge-tables.dto';
 import { OrderStatus } from '../../common/constants/order-status.enum';
 import { randomUUID } from 'crypto';
 
+/**
+ * How far ahead the floor-plan / POS should surface upcoming
+ * reservations on each table. 120 min covers the typical "next two
+ * sittings" without burying the badge under reservations a week away.
+ * Match this to the reservation-scheduler's hold window for visual
+ * consistency: at 30 min the badge can flip to "table held" too.
+ */
+const UPCOMING_RESERVATION_WINDOW_MIN = 120;
+
+export interface UpcomingReservation {
+  id: string;
+  startTime: string;
+  endTime: string;
+  customerName: string;
+  guestCount: number;
+  status: string;
+  startsAt: string; // ISO datetime — frontend can compute "in N minutes"
+}
+
 @Injectable()
 export class TablesService {
   constructor(
@@ -54,7 +73,7 @@ export class TablesService {
       where.section = section;
     }
 
-    return this.prisma.table.findMany({
+    const tables = await this.prisma.table.findMany({
       where,
       include: {
         _count: {
@@ -71,6 +90,83 @@ export class TablesService {
       },
       orderBy: { number: 'asc' },
     });
+
+    // Annotate each table with the next CONFIRMED reservation in the
+    // next 2 hours, if any. Lets the floor plan render a small "🕐
+    // 19:00 — Ayşe (4)" badge and lets the POS warn before opening a
+    // walk-in. We compute it here rather than per-row in the frontend
+    // so all clients see the same view.
+    const annotated = await this.annotateWithUpcomingReservations(tenantId, tables);
+    return annotated;
+  }
+
+  /**
+   * Attach `upcomingReservation` to each table — the next CONFIRMED
+   * (or PENDING) reservation starting within the next 2 hours, if any.
+   * Pulls all candidates in a single query and joins in memory; the
+   * candidate set is small (one tenant × at most a few dozen
+   * reservations per day) so the join overhead is negligible.
+   */
+  private async annotateWithUpcomingReservations<T extends { id: string }>(
+    tenantId: string,
+    tables: T[],
+  ): Promise<(T & { upcomingReservation: UpcomingReservation | null })[]> {
+    if (tables.length === 0) return [] as any;
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const windowEnd = new Date(now.getTime() + UPCOMING_RESERVATION_WINDOW_MIN * 60_000);
+
+    const tableIds = tables.map((t) => t.id);
+    const candidates = await this.prisma.reservation.findMany({
+      where: {
+        tenantId,
+        tableId: { in: tableIds },
+        date: { in: [today, tomorrow] },
+        status: { in: ['CONFIRMED', 'PENDING'] },
+      },
+      select: {
+        id: true,
+        tableId: true,
+        date: true,
+        startTime: true,
+        endTime: true,
+        customerName: true,
+        guestCount: true,
+        status: true,
+      },
+      orderBy: [{ date: 'asc' }, { startTime: 'asc' }],
+    });
+
+    const byTable = new Map<string, UpcomingReservation>();
+    for (const r of candidates) {
+      if (!r.tableId) continue;
+      const [sh, sm] = r.startTime.split(':').map(Number);
+      const start = new Date(r.date);
+      start.setHours(sh, sm, 0, 0);
+
+      // Only keep upcoming-soon (not in the past, within window). The
+      // sort above guarantees first match is the closest one.
+      if (start < now || start > windowEnd) continue;
+      if (byTable.has(r.tableId)) continue;
+
+      byTable.set(r.tableId, {
+        id: r.id,
+        startTime: r.startTime,
+        endTime: r.endTime,
+        customerName: r.customerName,
+        guestCount: r.guestCount,
+        status: r.status,
+        startsAt: start.toISOString(),
+      });
+    }
+
+    return tables.map((t) => ({
+      ...t,
+      upcomingReservation: byTable.get(t.id) ?? null,
+    }));
   }
 
   async findAvailableForCustomers(tenantId: string) {

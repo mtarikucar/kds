@@ -256,6 +256,17 @@ const POSPage = () => {
 
   const handleSelectTable = (table: Table) => {
     if (table.status === TableStatus.AVAILABLE) {
+      // Informational warning when the table has a reservation coming
+      // up in the next ~2 h. We still let the waiter proceed (a quick
+      // coffee may finish before the booking) but make sure they see
+      // it; the backend's reservation-overlap guard hard-blocks
+      // checkout if the reservation is within 30 minutes of now.
+      if (table.upcomingReservation) {
+        const r = table.upcomingReservation;
+        toast.warning(
+          `${r.startTime} · ${r.customerName} (${r.guestCount} kişi) için rezervasyon var — dikkatli olun`,
+        );
+      }
       setSelectedTable(table);
       setCartItems([]);
       setDiscount(0);

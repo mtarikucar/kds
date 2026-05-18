@@ -457,6 +457,11 @@ export class ReservationsService {
       throw new BadRequestException('This reservation cannot be rejected');
     }
 
+    // If the scheduler already auto-held the table for this reservation
+    // (CONFIRMED rejections within the 30-min window), release it now
+    // so a walk-in can use the table immediately.
+    await this.releaseHoldIfOwned(reservation.id, reservation.tableId);
+
     const updated = await this.prisma.reservation.update({
       where: { id: reservation.id },
       data: {
@@ -503,11 +508,13 @@ export class ReservationsService {
       seatedAt: new Date(),
     };
 
-    // Update table status if assigned
+    // Update table status if assigned: clear any auto-hold this row
+    // owned (scheduler may have set status=RESERVED + reservationHoldId
+    // in the 30-min pre-window) and flip to OCCUPIED in the same write.
     if (reservation.tableId) {
       await this.prisma.table.update({
         where: { id: reservation.tableId },
-        data: { status: 'OCCUPIED' },
+        data: { status: 'OCCUPIED', reservationHoldId: null },
       });
     }
 
@@ -518,6 +525,32 @@ export class ReservationsService {
     });
   }
 
+  /**
+   * Drop the auto-RESERVED hold (if any) that this reservation owns
+   * on its assigned table, returning the table to AVAILABLE. Called
+   * from terminal transitions (reject / no-show / cancel) so the table
+   * is freed for walk-ins or other reservations immediately rather
+   * than waiting for the release-holds cron.
+   *
+   * Filter on `reservationHoldId` ensures we only revert tables we
+   * actually hold — manually-RESERVED tables (admin lock) keep their
+   * status, and tables flipped to OCCUPIED in the meantime aren't
+   * stomped.
+   */
+  private async releaseHoldIfOwned(reservationId: string, tableId: string | null) {
+    if (!tableId) return;
+    await this.prisma.table.updateMany({
+      where: {
+        id: tableId,
+        reservationHoldId: reservationId,
+      },
+      data: {
+        status: 'AVAILABLE',
+        reservationHoldId: null,
+      },
+    });
+  }
+
   async complete(id: string, tenantId: string) {
     const reservation = await this.findOne(id, tenantId);
 
@@ -525,11 +558,13 @@ export class ReservationsService {
       throw new BadRequestException('Only seated reservations can be completed');
     }
 
-    // Free up the table
+    // Free up the table. SEATED reservations already had any hold
+    // cleared in seat(), so the explicit hold revert in releaseHoldIfOwned
+    // would be a no-op here — we just flip the status directly.
     if (reservation.tableId) {
       await this.prisma.table.update({
         where: { id: reservation.tableId },
-        data: { status: 'AVAILABLE' },
+        data: { status: 'AVAILABLE', reservationHoldId: null },
       });
     }
 
@@ -550,6 +585,12 @@ export class ReservationsService {
       throw new BadRequestException('This reservation cannot be marked as no-show');
     }
 
+    // Release any auto-hold so the table is back to AVAILABLE for the
+    // next sitting / walk-in. release-holds cron would catch this too
+    // but doing it inline keeps the staff-visible state in sync with
+    // the action they just took.
+    await this.releaseHoldIfOwned(reservation.id, reservation.tableId);
+
     return this.prisma.reservation.update({
       where: { id: reservation.id },
       data: { status: ReservationStatus.NO_SHOW },
@@ -564,12 +605,17 @@ export class ReservationsService {
       throw new BadRequestException('This reservation cannot be cancelled');
     }
 
-    // Free up the table if seated
+    // Free up the table if currently SEATED (explicit AVAILABLE flip)
+    // OR if the scheduler had auto-held it for this reservation
+    // (PENDING/CONFIRMED inside the 30-min window). The two paths
+    // converge — both end with status=AVAILABLE, reservationHoldId=null.
     if (reservation.status === ReservationStatus.SEATED && reservation.tableId) {
       await this.prisma.table.update({
         where: { id: reservation.tableId },
-        data: { status: 'AVAILABLE' },
+        data: { status: 'AVAILABLE', reservationHoldId: null },
       });
+    } else {
+      await this.releaseHoldIfOwned(reservation.id, reservation.tableId);
     }
 
     const cancelled = await this.prisma.reservation.update({
@@ -635,6 +681,11 @@ export class ReservationsService {
     if (reservationDateTime.getTime() - now.getTime() < deadlineMs) {
       throw new BadRequestException('Cancellation deadline has passed');
     }
+
+    // Release the table-hold if the scheduler already auto-RESERVED
+    // this row's assigned table — staff/customers shouldn't have to
+    // wait for the next cron tick for the table to free up.
+    await this.releaseHoldIfOwned(reservation.id, reservation.tableId);
 
     const updated = await this.prisma.reservation.update({
       where: { id: reservation.id },

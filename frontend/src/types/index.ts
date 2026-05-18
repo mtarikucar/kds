@@ -174,6 +174,20 @@ export enum TableStatus {
   RESERVED = 'RESERVED',
 }
 
+/** Annotation surfaced on every `Table` row by `GET /tables`:
+ *  the next CONFIRMED/PENDING reservation starting within the next
+ *  ~2 hours, if any. Lets the floor plan render a badge and the POS
+ *  warn before opening a walk-in. `null` when no reservation matches. */
+export interface UpcomingReservationOnTable {
+  id: string;
+  startTime: string; // HH:mm
+  endTime: string;
+  customerName: string;
+  guestCount: number;
+  status: string;
+  startsAt: string; // ISO datetime; clients can compute "in N minutes"
+}
+
 export interface Table {
   id: string;
   number: string;
@@ -181,6 +195,11 @@ export interface Table {
   section?: string;
   status: TableStatus;
   groupId?: string | null;
+  /** Auto-set by reservation-scheduler when status=RESERVED was a
+   *  hold for an upcoming reservation. Null for manually-RESERVED. */
+  reservationHoldId?: string | null;
+  /** Closest upcoming reservation (next ~2 h) — surfaced by GET /tables. */
+  upcomingReservation?: UpcomingReservationOnTable | null;
   tenantId: string;
   createdAt?: string;
   updatedAt?: string;

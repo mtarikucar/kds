@@ -299,6 +299,25 @@ const TableManagementPage = () => {
                   </span>
                 </div>
 
+                {/* Upcoming reservation badge — surfaces the next
+                    CONFIRMED/PENDING booking starting within ~2 h so
+                    staff can see at a glance which tables have an
+                    imminent guest. Rendered above the action buttons
+                    so it's always visible (no hover required). */}
+                {table.upcomingReservation && (
+                  <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <Clock className="h-3.5 w-3.5" />
+                      <span>{table.upcomingReservation.startTime}</span>
+                      <span className="text-amber-700">·</span>
+                      <span className="truncate">{table.upcomingReservation.customerName}</span>
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-amber-700">
+                      {table.upcomingReservation.guestCount} {t('admin.people')} · {table.upcomingReservation.status}
+                    </div>
+                  </div>
+                )}
+
                 {/* Actions - visible on hover */}
                 <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                   <Button

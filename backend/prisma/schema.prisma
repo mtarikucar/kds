@@ -16,23 +16,23 @@ datasource db {
 // ========================================
 
 model Tenant {
-  id        String   @id @default(uuid())
+  id        String  @id @default(uuid())
   name      String
-  subdomain String?  @unique
-  status    String   @default("ACTIVE") // ACTIVE, SUSPENDED, DELETED
+  subdomain String? @unique
+  status    String  @default("ACTIVE") // ACTIVE, SUSPENDED, DELETED
 
   // Subscription details
-  currentPlanId   String?
+  currentPlanId    String?
   // Legacy "ever used any trial" flag. Kept for backward-compat with
   // reporting queries and the marketing-leads converter. Per-plan
   // trial eligibility lives in `usedTrialPlanIds` below.
-  trialUsed       Boolean  @default(false)
+  trialUsed        Boolean   @default(false)
   // Plans the tenant has already trialed. Per-plan trial model lets a
   // tenant try BASIC, decline, then later try PRO. Eligibility check:
   //   !usedTrialPlanIds.includes(targetPlanId)
-  usedTrialPlanIds String[] @default([])
-  trialStartedAt  DateTime?
-  trialEndsAt     DateTime?
+  usedTrialPlanIds String[]  @default([])
+  trialStartedAt   DateTime?
+  trialEndsAt      DateTime?
 
   // PayTR recurring-payment token (saved-card reference, encrypted at rest).
   // Issued by PayTR on the first successful payment; used by the renewal
@@ -41,37 +41,37 @@ model Tenant {
 
   // Turkish tax identifier (Vergi No for B2B / TC Kimlik for B2C). Required
   // on KDV-compliant invoices for Turkish tenants.
-  taxId           String?
+  taxId String?
 
   // Currency settings
-  currency        String   @default("TRY") // USD, EUR, GBP, TRY, CAD, AUD
+  currency String @default("TRY") // USD, EUR, GBP, TRY, CAD, AUD
 
   // Restaurant location (for QR menu geolocation validation)
-  latitude        Float?   // Restaurant latitude coordinate
-  longitude       Float?   // Restaurant longitude coordinate
-  locationRadius  Int      @default(100) // Maximum allowed distance in meters (default 100m)
+  latitude       Float? // Restaurant latitude coordinate
+  longitude      Float? // Restaurant longitude coordinate
+  locationRadius Int    @default(100) // Maximum allowed distance in meters (default 100m)
 
   // Report settings
-  closingTime         String?   @default("23:00")  // Store closing time in HH:mm format
-  timezone            String    @default("UTC")    // Timezone for the tenant
-  reportEmailEnabled  Boolean   @default(false)    // Enable automated email reports
-  reportEmails        String[]  @default([])       // Array of email addresses to send reports
+  closingTime        String?  @default("23:00") // Store closing time in HH:mm format
+  timezone           String   @default("UTC") // Timezone for the tenant
+  reportEmailEnabled Boolean  @default(false) // Enable automated email reports
+  reportEmails       String[] @default([]) // Array of email addresses to send reports
 
   // WiFi settings
-  wifiSsid        String?   // WiFi network name
-  wifiPassword    String?   // WiFi password
+  wifiSsid     String? // WiFi network name
+  wifiPassword String? // WiFi password
 
   // Social media links
-  socialInstagram String?   // Instagram username or URL
-  socialFacebook  String?   // Facebook page URL
-  socialTwitter   String?   // Twitter/X username or URL
-  socialTiktok    String?   // TikTok username or URL
-  socialYoutube   String?   // YouTube channel URL
-  socialWhatsapp  String?   // WhatsApp business number
+  socialInstagram String? // Instagram username or URL
+  socialFacebook  String? // Facebook page URL
+  socialTwitter   String? // Twitter/X username or URL
+  socialTiktok    String? // TikTok username or URL
+  socialYoutube   String? // YouTube channel URL
+  socialWhatsapp  String? // WhatsApp business number
 
   // Feature & limit overrides (SuperAdmin can override plan defaults per tenant)
-  featureOverrides  Json?   // { "advancedReports": true, "reservationSystem": false }
-  limitOverrides    Json?   // { "maxUsers": 50, "maxTables": 100 }
+  featureOverrides Json? // { "advancedReports": true, "reservationSystem": false }
+  limitOverrides   Json? // { "maxUsers": 50, "maxTables": 100 }
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -99,16 +99,16 @@ model Tenant {
   customers           Customer[]
   notifications       Notification[]
   zReports            ZReport[]
-  currentPlan         SubscriptionPlan?  @relation("CurrentPlan", fields: [currentPlanId], references: [id], onDelete: SetNull)
+  currentPlan         SubscriptionPlan?     @relation("CurrentPlan", fields: [currentPlanId], references: [id], onDelete: SetNull)
 
   // Analytics relations
-  cameras             Camera[]
-  occupancyRecords    OccupancyRecord[]
-  trafficFlowRecords  TrafficFlowRecord[]
-  tableAnalytics      TableAnalytics[]
-  analyticsInsights   AnalyticsInsight[]
-  heatmapCache        AnalyticsHeatmapCache[]
-  edgeDevices         EdgeDevice[]
+  cameras            Camera[]
+  occupancyRecords   OccupancyRecord[]
+  trafficFlowRecords TrafficFlowRecord[]
+  tableAnalytics     TableAnalytics[]
+  analyticsInsights  AnalyticsInsight[]
+  heatmapCache       AnalyticsHeatmapCache[]
+  edgeDevices        EdgeDevice[]
 
   // Delivery platform relations
   deliveryPlatformConfigs DeliveryPlatformConfig[]
@@ -116,37 +116,37 @@ model Tenant {
   menuItemMappings        MenuItemMapping[]
 
   // Stock management relations
-  stockItemCategories   StockItemCategory[]
-  stockItems            StockItem[]
-  stockBatches          StockBatch[]
-  recipes               Recipe[]
-  suppliers             Supplier[]
-  purchaseOrders        PurchaseOrder[]
-  ingredientMovements   IngredientMovement[]
-  wasteLogs             WasteLog[]
-  stockCounts           StockCount[]
-  stockSettings         StockSettings?
+  stockItemCategories StockItemCategory[]
+  stockItems          StockItem[]
+  stockBatches        StockBatch[]
+  recipes             Recipe[]
+  suppliers           Supplier[]
+  purchaseOrders      PurchaseOrder[]
+  ingredientMovements IngredientMovement[]
+  wasteLogs           WasteLog[]
+  stockCounts         StockCount[]
+  stockSettings       StockSettings?
 
   // Personnel management relations
-  attendances           Attendance[]
-  shiftTemplates        ShiftTemplate[]
-  shiftAssignments      ShiftAssignment[]
-  shiftSwapRequests     ShiftSwapRequest[]
-  marketingCommissions  Commission[]        @relation("MarketingCommissions")
-  convertedLead         Lead?               @relation("ConvertedTenant")
+  attendances          Attendance[]
+  shiftTemplates       ShiftTemplate[]
+  shiftAssignments     ShiftAssignment[]
+  shiftSwapRequests    ShiftSwapRequest[]
+  marketingCommissions Commission[]       @relation("MarketingCommissions")
+  convertedLead        Lead?              @relation("ConvertedTenant")
 
   // Previously-orphaned relations (migration 20260420180000 adds the FKs).
   // Listed here so Prisma keeps the TS-side relation graph in sync.
-  payments              Payment[]
-  orderItemPayments     OrderItemPayment[]
-  pendingSelfPayments   PendingSelfPayment[]
-  customerSessions      CustomerSession[]
-  phoneVerifications    PhoneVerification[]
-  waiterRequests        WaiterRequest[]
-  billRequests          BillRequest[]
-  cashDrawerMovements   CashDrawerMovement[]
-  userActivities        UserActivity[]
-  loyaltyTransactions   LoyaltyTransaction[]
+  payments            Payment[]
+  orderItemPayments   OrderItemPayment[]
+  pendingSelfPayments PendingSelfPayment[]
+  customerSessions    CustomerSession[]
+  phoneVerifications  PhoneVerification[]
+  waiterRequests      WaiterRequest[]
+  billRequests        BillRequest[]
+  cashDrawerMovements CashDrawerMovement[]
+  userActivities      UserActivity[]
+  loyaltyTransactions LoyaltyTransaction[]
 
   @@index([currentPlanId])
   @@index([status])
@@ -160,15 +160,15 @@ model Tenant {
  * sets revokedAt on all of a user's tokens.
  */
 model RefreshToken {
-  id        String   @id @default(uuid())
-  tokenHash String   @unique
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   expiresAt DateTime
   revokedAt DateTime?
   ip        String?
   userAgent String?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId])
   @@index([expiresAt])
@@ -184,7 +184,7 @@ model RefreshToken {
 model ReservedSubdomain {
   id             String   @id @default(uuid())
   subdomain      String   @unique
-  reason         String   // 'tenant_deleted' | 'tenant_suspended' | 'subdomain_changed'
+  reason         String // 'tenant_deleted' | 'tenant_suspended' | 'subdomain_changed'
   reservedAt     DateTime @default(now())
   availableAfter DateTime
 
@@ -193,13 +193,13 @@ model ReservedSubdomain {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  email     String   @unique
+  id        String @id @default(uuid())
+  email     String @unique
   password  String
   firstName String
   lastName  String
-  role      String   // ADMIN, MANAGER, WAITER, KITCHEN, COURIER
-  status    String   @default("ACTIVE") // ACTIVE, INACTIVE, PENDING_APPROVAL
+  role      String // ADMIN, MANAGER, WAITER, KITCHEN, COURIER
+  status    String @default("ACTIVE") // ACTIVE, INACTIVE, PENDING_APPROVAL
 
   // User approval (for non-ADMIN users joining existing restaurants)
   approvedAt    DateTime?
@@ -214,9 +214,9 @@ model User {
   reactivatedUsers User[]    @relation("UserReactivator")
 
   // Email verification (code-based, hashed at rest)
-  emailVerified                 Boolean   @default(false)
-  emailVerificationCodeHash     String?
-  emailVerificationCodeExpires  DateTime?
+  emailVerified                Boolean   @default(false)
+  emailVerificationCodeHash    String?
+  emailVerificationCodeExpires DateTime?
 
   // Password reset (token hashed at rest)
   resetTokenHash   String?   @unique
@@ -225,7 +225,7 @@ model User {
   // Session revocation: JWT payload carries `ver`; incrementing this field
   // invalidates every access token issued before the bump. Used on password
   // reset / suspicious-login / admin lockout.
-  tokenVersion     Int       @default(0)
+  tokenVersion Int @default(0)
 
   // Profile
   avatar    String?
@@ -233,9 +233,9 @@ model User {
   lastLogin DateTime?
 
   // Social Authentication
-  googleId     String?  @unique
-  appleId      String?  @unique
-  authProvider String   @default("local") // local, google, apple
+  googleId     String? @unique
+  appleId      String? @unique
+  authProvider String  @default("local") // local, google, apple
 
   // Onboarding data (persisted for cross-device sync)
   onboardingData Json? // { hasSeenWelcome, tourProgress, skipAllTours }
@@ -247,23 +247,23 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
-  refreshTokens                  RefreshToken[]
-  orders                         Order[]
-  approvedOrders                 Order[] @relation("ApprovedOrders")
-  acknowledgedWaiterRequests     WaiterRequest[] @relation("AcknowledgedWaiterRequests")
-  acknowledgedBillRequests       BillRequest[] @relation("AcknowledgedBillRequests")
-  stockMovements                 StockMovement[]
-  notifications                  Notification[]
-  readNotifications              UserNotificationRead[]
-  zReports                       ZReport[]
-  cashDrawerMovements            CashDrawerMovement[]
+  refreshTokens              RefreshToken[]
+  orders                     Order[]
+  approvedOrders             Order[]                @relation("ApprovedOrders")
+  acknowledgedWaiterRequests WaiterRequest[]        @relation("AcknowledgedWaiterRequests")
+  acknowledgedBillRequests   BillRequest[]          @relation("AcknowledgedBillRequests")
+  stockMovements             StockMovement[]
+  notifications              Notification[]
+  readNotifications          UserNotificationRead[]
+  zReports                   ZReport[]
+  cashDrawerMovements        CashDrawerMovement[]
 
   // Personnel management relations
-  attendances                    Attendance[]
-  shiftAssignments               ShiftAssignment[]
-  swapRequestsMade               ShiftSwapRequest[] @relation("SwapRequester")
-  swapRequestsReceived           ShiftSwapRequest[] @relation("SwapTarget")
-  swapRequestsApproved           ShiftSwapRequest[] @relation("SwapApprover")
+  attendances          Attendance[]
+  shiftAssignments     ShiftAssignment[]
+  swapRequestsMade     ShiftSwapRequest[] @relation("SwapRequester")
+  swapRequestsReceived ShiftSwapRequest[] @relation("SwapTarget")
+  swapRequestsApproved ShiftSwapRequest[] @relation("SwapApprover")
 
   @@index([tenantId])
   @@index([email])
@@ -318,12 +318,12 @@ model Product {
   updatedAt DateTime @updatedAt
 
   // Relations
-  productImages      ProductToImage[]      // Many-to-many through junction table
-  orderItems         OrderItem[]
-  stockMovements     StockMovement[]
-  modifierGroups     ProductModifierGroup[] // Many-to-many for modifiers
-  menuItemMappings   MenuItemMapping[]
-  recipe             Recipe?               // Ingredient-level recipe for stock deduction
+  productImages    ProductToImage[] // Many-to-many through junction table
+  orderItems       OrderItem[]
+  stockMovements   StockMovement[]
+  modifierGroups   ProductModifierGroup[] // Many-to-many for modifiers
+  menuItemMappings MenuItemMapping[]
+  recipe           Recipe? // Ingredient-level recipe for stock deduction
 
   @@index([tenantId])
   @@index([categoryId])
@@ -334,7 +334,7 @@ model ProductImage {
   id       String @id @default(uuid())
   url      String // File path or URL
   filename String // Original filename
-  size     Int    // File size in bytes
+  size     Int // File size in bytes
   mimeType String // image/jpeg, image/png, image/webp
 
   tenantId String
@@ -373,16 +373,16 @@ model ProductToImage {
 // ========================================
 
 model ModifierGroup {
-  id             String  @id @default(uuid())
-  name           String  // Internal name (e.g., "sauces")
-  displayName    String  // Display name (e.g., "Soslar", "Sauces")
-  description    String?
-  selectionType  String  @default("SINGLE") // SINGLE or MULTIPLE
-  minSelections  Int     @default(0) // Minimum number of selections required
-  maxSelections  Int? // Maximum number of selections allowed (null = unlimited)
-  isRequired     Boolean @default(false)
-  displayOrder   Int     @default(0)
-  isActive       Boolean @default(true)
+  id            String  @id @default(uuid())
+  name          String // Internal name (e.g., "sauces")
+  displayName   String // Display name (e.g., "Soslar", "Sauces")
+  description   String?
+  selectionType String  @default("SINGLE") // SINGLE or MULTIPLE
+  minSelections Int     @default(0) // Minimum number of selections required
+  maxSelections Int? // Maximum number of selections allowed (null = unlimited)
+  isRequired    Boolean @default(false)
+  displayOrder  Int     @default(0)
+  isActive      Boolean @default(true)
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -391,8 +391,8 @@ model ModifierGroup {
   updatedAt DateTime @updatedAt
 
   // Relations
-  modifiers        Modifier[]
-  productMappings  ProductModifierGroup[]
+  modifiers       Modifier[]
+  productMappings ProductModifierGroup[]
 
   @@index([tenantId])
   @@index([isActive])
@@ -401,8 +401,8 @@ model ModifierGroup {
 
 model Modifier {
   id              String  @id @default(uuid())
-  name            String  // Internal name (e.g., "ranch_sauce")
-  displayName     String  // Display name (e.g., "Ranch Sos", "Ranch Sauce")
+  name            String // Internal name (e.g., "ranch_sauce")
+  displayName     String // Display name (e.g., "Ranch Sos", "Ranch Sauce")
   description     String?
   priceAdjustment Decimal @default(0) @db.Decimal(10, 2) // Price change (can be positive or negative)
   isAvailable     Boolean @default(true)
@@ -456,6 +456,15 @@ model Table {
   section  String?
   status   String  @default("AVAILABLE") // AVAILABLE, OCCUPIED, RESERVED
 
+  // When status=RESERVED was set by the reservation-scheduler (auto-hold
+  // ~30 min before a CONFIRMED reservation begins), this points at the
+  // reservation that owns the hold. The release tick uses this to
+  // distinguish auto-holds from manually-RESERVED tables (which have
+  // reservationHoldId=null and must never be auto-cleared).
+  // SetNull on delete so deleting a reservation doesn't blow up the table row.
+  reservationHoldId String?
+  reservationHold   Reservation? @relation("TableReservationHold", fields: [reservationHoldId], references: [id], onDelete: SetNull)
+
   // Table grouping (merge/split)
   groupId String? // Shared UUID for merged tables; null = standalone
 
@@ -466,14 +475,17 @@ model Table {
   updatedAt DateTime @updatedAt
 
   // Relations
-  orders             Order[]
-  waiterRequests     WaiterRequest[]
-  billRequests       BillRequest[]
+  orders         Order[]
+  waiterRequests WaiterRequest[]
+  billRequests   BillRequest[]
 
   // Analytics relations
-  occupancyRecords   OccupancyRecord[]
-  tableAnalytics     TableAnalytics[]
-  reservations       Reservation[]
+  occupancyRecords OccupancyRecord[]
+  tableAnalytics   TableAnalytics[]
+  // Reservations assigned to this table (covers the lifetime of every
+  // booking; the reservationHold field above is the *currently active*
+  // auto-hold pointer, while this list is the full backlog/history).
+  reservations     Reservation[]     @relation("ReservationAssignedTable")
 
   @@unique([tenantId, number])
   @@index([tenantId])
@@ -486,23 +498,23 @@ model Table {
 // ========================================
 
 model Order {
-  id          String   @id @default(uuid())
+  id          String @id @default(uuid())
   orderNumber String
-  type        String   // DINE_IN, TAKEAWAY, DELIVERY, COUNTER
-  status      String   @default("PENDING") // PENDING_APPROVAL, PENDING, PREPARING, READY, SERVED, PAID, CANCELLED
+  type        String // DINE_IN, TAKEAWAY, DELIVERY, COUNTER
+  status      String @default("PENDING") // PENDING_APPROVAL, PENDING, PREPARING, READY, SERVED, PAID, CANCELLED
 
-  totalAmount  Decimal @db.Decimal(10, 2)
-  discount     Decimal @default(0) @db.Decimal(10, 2)
-  finalAmount  Decimal @db.Decimal(10, 2)
-  taxAmount    Decimal @default(0) @db.Decimal(10, 2)
+  totalAmount Decimal @db.Decimal(10, 2)
+  discount    Decimal @default(0) @db.Decimal(10, 2)
+  finalAmount Decimal @db.Decimal(10, 2)
+  taxAmount   Decimal @default(0) @db.Decimal(10, 2)
 
   notes        String?
   customerName String?
 
   // Delivery platform fields
-  source          String?   // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS (NULL = internal/POS order)
-  externalOrderId String?   // Platform's order ID/token for status sync
-  externalData    Json?     // Raw platform payload for audit trail
+  source          String? // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS (NULL = internal/POS order)
+  externalOrderId String? // Platform's order ID/token for status sync
+  externalData    Json? // Raw platform payload for audit trail
 
   // Captured at order-create time so the kitchen ticket is reprintable
   // and survives later edits to items/modifiers. Owned by ReceiptSnapshotBuilder.
@@ -518,7 +530,7 @@ model Order {
   // Customer ordering fields
   sessionId        String? // UUID for customer session tracking
   customerPhone    String? // Optional customer phone
-  requiresApproval Boolean @default(false) // If true, waiter must approve before going to kitchen
+  requiresApproval Boolean   @default(false) // If true, waiter must approve before going to kitchen
   approvedAt       DateTime? // When the order was approved
 
   // Idempotency flag for recipe/stock deduction. Prevents duplicate
@@ -541,20 +553,20 @@ model Order {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  paidAt       DateTime?
-  preparingAt  DateTime?
-  readyAt      DateTime?
-  cancelledAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  paidAt      DateTime?
+  preparingAt DateTime?
+  readyAt     DateTime?
+  cancelledAt DateTime?
 
   // Relations
-  orderItems OrderItem[]
-  payments   Payment[]
+  orderItems    OrderItem[]
+  payments      Payment[]
   // Pluralized: progressive flow generates one SalesInvoice per
   // Payment; the legacy single-payment flow still produces one
   // invoice per order. Both shapes are valid in this list.
-  salesInvoices  SalesInvoice[]
+  salesInvoices SalesInvoice[]
 
   @@unique([tenantId, orderNumber])
   @@index([tenantId])
@@ -633,7 +645,7 @@ model OrderItemModifier {
 model Payment {
   id     String  @id @default(uuid())
   amount Decimal @db.Decimal(10, 2)
-  method String  // CASH, CARD, DIGITAL
+  method String // CASH, CARD, DIGITAL
   status String  @default("PENDING") // PENDING, COMPLETED, FAILED, REFUNDED
 
   transactionId  String?
@@ -676,7 +688,7 @@ model Payment {
   // because Prisma's 1-to-1 defining-side validator wants @unique on
   // a nullable column, which would inflate the index footprint.
   // Consumers should expect at most one row.
-  salesInvoices     SalesInvoice[]
+  salesInvoices SalesInvoice[]
 
   // NOTE: @@unique([orderId, idempotencyKey]) does NOT dedupe null keys in
   // Postgres (multiple NULLs are considered distinct). Migration
@@ -706,28 +718,28 @@ model Payment {
 // `deleteMany`'d in the same tx so the units become payable again.
 // (Payment is not deleted; the audit row stays.)
 model OrderItemPayment {
-  id           String   @id @default(uuid())
+  id String @id @default(uuid())
 
-  paymentId    String
+  paymentId String
   // RESTRICT: Payment is never hard-deleted (refund flips to REFUNDED).
   // The authorized free-the-units path is the explicit deleteMany in
   // PaymentsService.updateStatus REFUNDED branch; cascade would silently
   // nuke audit if a future hard-delete were ever added.
-  payment      Payment  @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+  payment   Payment @relation(fields: [paymentId], references: [id], onDelete: Restrict)
 
-  orderItemId  String
-  orderItem    OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
+  orderItemId String
+  orderItem   OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Restrict)
 
-  quantity     Int
+  quantity Int
 
   // Snapshot of this allocation's contribution to Payment.amount. Stored,
   // not derived, so refund accounting and audits stay stable.
-  amount       Decimal  @db.Decimal(10, 2)
+  amount Decimal @db.Decimal(10, 2)
 
-  tenantId     String
-  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  createdAt    DateTime @default(now())
+  createdAt DateTime @default(now())
 
   @@index([paymentId])
   @@index([orderItemId])
@@ -745,24 +757,24 @@ model OrderItemPayment {
 // distinguishes self-pay from subscription "SUB" in the shared
 // PaytrWebhookController dispatcher.
 model PendingSelfPayment {
-  id              String    @id @default(uuid())
-  merchantOid     String    @unique
-  sessionId       String
-  tenantId        String
-  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id          String @id @default(uuid())
+  merchantOid String @unique
+  sessionId   String
+  tenantId    String
+  tenant      Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // [{ orderId, items: [{ orderItemId, quantity }] }, ...]
-  itemsByOrder    Json
+  itemsByOrder Json
 
-  amount          Decimal   @db.Decimal(10, 2)
-  status          String    @default("PENDING") // PENDING, SUCCEEDED, FAILED, EXPIRED
-  failureReason   String?
-  paytrToken      String?
-  customerPhone   String?
+  amount        Decimal @db.Decimal(10, 2)
+  status        String  @default("PENDING") // PENDING, SUCCEEDED, FAILED, EXPIRED
+  failureReason String?
+  paytrToken    String?
+  customerPhone String?
 
-  expiresAt       DateTime
-  createdAt       DateTime  @default(now())
-  succeededAt     DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  succeededAt DateTime?
 
   @@index([sessionId])
   @@index([tenantId])
@@ -775,7 +787,7 @@ model PendingSelfPayment {
 // ========================================
 
 model StockMovement {
-  id       String @id @default(uuid())
+  id       String  @id @default(uuid())
   type     String // IN, OUT, ADJUSTMENT
   quantity Int
   reason   String?
@@ -822,30 +834,30 @@ model SubscriptionPlan {
   trialDays Int @default(0)
 
   // Feature limits
-  maxUsers           Int     @default(1)
-  maxTables          Int     @default(5)
-  maxProducts        Int     @default(50)
-  maxCategories      Int     @default(10)
-  maxMonthlyOrders   Int     @default(100)
+  maxUsers         Int @default(1)
+  maxTables        Int @default(5)
+  maxProducts      Int @default(50)
+  maxCategories    Int @default(10)
+  maxMonthlyOrders Int @default(100)
 
   // Feature flags
-  advancedReports    Boolean @default(false)
-  multiLocation      Boolean @default(false)
-  customBranding     Boolean @default(false)
-  apiAccess          Boolean @default(false)
-  prioritySupport    Boolean @default(false)
-  inventoryTracking  Boolean @default(false)
-  kdsIntegration     Boolean @default(true)
-  reservationSystem      Boolean @default(false)
-  personnelManagement    Boolean @default(false)
-  deliveryIntegration    Boolean @default(false)
+  advancedReports     Boolean @default(false)
+  multiLocation       Boolean @default(false)
+  customBranding      Boolean @default(false)
+  apiAccess           Boolean @default(false)
+  prioritySupport     Boolean @default(false)
+  inventoryTracking   Boolean @default(false)
+  kdsIntegration      Boolean @default(true)
+  reservationSystem   Boolean @default(false)
+  personnelManagement Boolean @default(false)
+  deliveryIntegration Boolean @default(false)
 
   // Discount settings
-  discountPercentage   Int?       // Discount percentage (e.g., 25 for 25%)
-  discountLabel        String?    // "New Year Special", "Holiday Offer"
-  discountStartDate    DateTime?  // When discount becomes active
-  discountEndDate      DateTime?  // When discount expires
-  isDiscountActive     Boolean    @default(false)
+  discountPercentage Int? // Discount percentage (e.g., 25 for 25%)
+  discountLabel      String? // "New Year Special", "Holiday Offer"
+  discountStartDate  DateTime? // When discount becomes active
+  discountEndDate    DateTime? // When discount expires
+  isDiscountActive   Boolean   @default(false)
 
   isActive Boolean @default(true)
 
@@ -853,11 +865,11 @@ model SubscriptionPlan {
   updatedAt DateTime @updatedAt
 
   // Relations
-  subscriptions           Subscription[]
-  currentPlanTenants      Tenant[]             @relation("CurrentPlan")
-  scheduledDowngrades     Subscription[]       @relation("ScheduledDowngrade")
-  pendingPlanChanges      PendingPlanChange[]  @relation("PendingPlanChange")
-  leadOffers              LeadOffer[]
+  subscriptions       Subscription[]
+  currentPlanTenants  Tenant[]            @relation("CurrentPlan")
+  scheduledDowngrades Subscription[]      @relation("ScheduledDowngrade")
+  pendingPlanChanges  PendingPlanChange[] @relation("PendingPlanChange")
+  leadOffers          LeadOffer[]
 
   @@map("subscription_plans")
 }
@@ -882,21 +894,21 @@ model Subscription {
   // `past-due-subscriptions` cron then promotes PAST_DUE → EXPIRED
   // which cuts access. PlanFeatureGuard treats ACTIVE/TRIALING/PAST_DUE
   // identically as "live"; only EXPIRED/CANCELLED block access.
-  status          String   @default("ACTIVE") // ACTIVE, CANCELLED, EXPIRED, PAST_DUE, TRIALING, PENDING
-  billingCycle    String   // MONTHLY, YEARLY
+  status          String @default("ACTIVE") // ACTIVE, CANCELLED, EXPIRED, PAST_DUE, TRIALING, PENDING
+  billingCycle    String // MONTHLY, YEARLY
   // PAYTR for Turkish tenants (self-serve via hosted iFrame + webhook);
   // EMAIL for INTERNATIONAL tenants (contact-based, superadmin-driven).
-  paymentProvider String   // PAYTR, EMAIL
+  paymentProvider String // PAYTR, EMAIL
 
   // Dates
-  startDate       DateTime @default(now())
+  startDate          DateTime  @default(now())
   currentPeriodStart DateTime
   currentPeriodEnd   DateTime
-  cancelledAt     DateTime?
-  endedAt         DateTime?
+  cancelledAt        DateTime?
+  endedAt            DateTime?
 
   // Trial tracking
-  isTrialPeriod Boolean  @default(false)
+  isTrialPeriod Boolean   @default(false)
   trialStart    DateTime?
   trialEnd      DateTime?
 
@@ -905,15 +917,15 @@ model Subscription {
   currency String  @default("TRY")
 
   // Auto-renewal
-  autoRenew       Boolean @default(true)
+  autoRenew         Boolean @default(true)
   cancelAtPeriodEnd Boolean @default(false)
 
   // Cancellation tracking
   cancellationReason String?
 
   // Scheduled downgrade (for period end)
-  scheduledDowngradePlanId      String?
-  scheduledDowngradePlan        SubscriptionPlan? @relation("ScheduledDowngrade", fields: [scheduledDowngradePlanId], references: [id], onDelete: SetNull)
+  scheduledDowngradePlanId       String?
+  scheduledDowngradePlan         SubscriptionPlan? @relation("ScheduledDowngrade", fields: [scheduledDowngradePlanId], references: [id], onDelete: SetNull)
   scheduledDowngradeBillingCycle String?
 
   createdAt DateTime @default(now())
@@ -942,7 +954,7 @@ model SubscriptionPayment {
   amount          Decimal @db.Decimal(10, 2)
   currency        String  @default("TRY")
   status          String  @default("PENDING") // PENDING, SUCCEEDED, FAILED, REFUNDED
-  paymentProvider String  // PAYTR, EMAIL
+  paymentProvider String // PAYTR, EMAIL
 
   // Free-form external reference (receipt id, bank transfer id) for audit.
   externalReference String? @unique
@@ -966,10 +978,10 @@ model SubscriptionPayment {
   retryCount     Int     @default(0)
 
   // Dates
-  paidAt    DateTime?
+  paidAt     DateTime?
   refundedAt DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   // Relations
   invoice Invoice?
@@ -989,15 +1001,15 @@ model SubscriptionPayment {
  * what plan was being purchased.
  */
 model PendingPlanChange {
-  id              String   @id @default(uuid())
-  subscriptionId  String
-  subscription    Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  targetPlanId    String
-  targetPlan      SubscriptionPlan @relation("PendingPlanChange", fields: [targetPlanId], references: [id], onDelete: Restrict)
-  billingCycle    String   // MONTHLY, YEARLY
-  merchantOid     String   @unique
-  expiresAt       DateTime
-  createdAt       DateTime @default(now())
+  id             String           @id @default(uuid())
+  subscriptionId String
+  subscription   Subscription     @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  targetPlanId   String
+  targetPlan     SubscriptionPlan @relation("PendingPlanChange", fields: [targetPlanId], references: [id], onDelete: Restrict)
+  billingCycle   String // MONTHLY, YEARLY
+  merchantOid    String           @unique
+  expiresAt      DateTime
+  createdAt      DateTime         @default(now())
 
   @@index([subscriptionId])
   @@map("pending_plan_changes")
@@ -1009,12 +1021,12 @@ model Invoice {
   subscriptionId String
   subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
 
-  paymentId String? @unique
+  paymentId String?              @unique
   payment   SubscriptionPayment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
 
   // Invoice details
-  invoiceNumber String  @unique
-  status        String  @default("DRAFT") // DRAFT, OPEN, PAID, VOID, UNCOLLECTIBLE
+  invoiceNumber String @unique
+  status        String @default("DRAFT") // DRAFT, OPEN, PAID, VOID, UNCOLLECTIBLE
 
   // Amounts
   subtotal Decimal @db.Decimal(10, 2)
@@ -1062,34 +1074,33 @@ model InvoiceCounter {
   @@map("invoice_counters")
 }
 
-
 // ========================================
 // QR MENU CUSTOMIZATION
 // ========================================
 
 model QrMenuSettings {
-  id        String   @id @default(uuid())
-  tenantId  String   @unique
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // Design customization
-  primaryColor      String  @default("#3B82F6")  // Blue
-  secondaryColor    String  @default("#1F2937")  // Gray
-  backgroundColor   String  @default("#F9FAFB")  // Light gray
-  fontFamily        String  @default("Inter")
-  logoUrl           String?
+  primaryColor       String  @default("#3B82F6") // Blue
+  secondaryColor     String  @default("#1F2937") // Gray
+  backgroundColor    String  @default("#F9FAFB") // Light gray
+  fontFamily         String  @default("Inter")
+  logoUrl            String?
   showRestaurantInfo Boolean @default(true)
-  showPrices        Boolean @default(true)
-  showDescription   Boolean @default(true)
-  showImages        Boolean @default(true)
+  showPrices         Boolean @default(true)
+  showDescription    Boolean @default(true)
+  showImages         Boolean @default(true)
 
   // Layout options
-  layoutStyle       String  @default("GRID") // GRID, LIST, COMPACT
-  itemsPerRow       Int     @default(2)
+  layoutStyle String @default("GRID") // GRID, LIST, COMPACT
+  itemsPerRow Int    @default(2)
 
   // Table-specific settings
-  enableTableQR     Boolean @default(true)
-  tableQRMessage    String  @default("Scan to view our menu")
+  enableTableQR  Boolean @default(true)
+  tableQRMessage String  @default("Scan to view our menu")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1103,21 +1114,21 @@ model QrMenuSettings {
 // ========================================
 
 model PosSettings {
-  id        String   @id @default(uuid())
-  tenantId  String   @unique
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // POS operation modes
-  enableTablelessMode            Boolean @default(false)  // Allow orders without table selection
-  enableTwoStepCheckout          Boolean @default(false)  // Separate "Create Order" and "Payment" buttons
-  showProductImages              Boolean @default(true)   // Show product images in POS menu
-  enableCustomerOrdering         Boolean @default(true)   // Allow customers to place orders from QR menu
+  enableTablelessMode           Boolean @default(false) // Allow orders without table selection
+  enableTwoStepCheckout         Boolean @default(false) // Separate "Create Order" and "Payment" buttons
+  showProductImages             Boolean @default(true) // Show product images in POS menu
+  enableCustomerOrdering        Boolean @default(true) // Allow customers to place orders from QR menu
   // Allow customers to pay their share via PayTR hosted iFrame from
   // the QR menu (self-pay flow). Opt-in: default false because it
   // requires a PayTR merchant account.
-  enableCustomerSelfPay          Boolean @default(false)
-  defaultMapView                 String  @default("2d")   // Default floor plan view: "2d" or "3d"
-  requireServedForDineInPayment  Boolean @default(false)  // Require SERVED status for dine-in payment in two-step checkout
+  enableCustomerSelfPay         Boolean @default(false)
+  defaultMapView                String  @default("2d") // Default floor plan view: "2d" or "3d"
+  requireServedForDineInPayment Boolean @default(false) // Require SERVED status for dine-in payment in two-step checkout
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1131,19 +1142,19 @@ model PosSettings {
 // ========================================
 
 model ReservationSettings {
-  id        String   @id @default(uuid())
-  tenantId  String   @unique
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  isEnabled                Boolean @default(true)
-  requireApproval          Boolean @default(true)
-  timeSlotInterval         Int     @default(30)
-  minAdvanceBooking        Int     @default(60)
-  maxAdvanceDays           Int     @default(30)
-  defaultDuration          Int     @default(90)
-  operatingHours           Json?
-  maxGuestsPerReservation  Int     @default(20)
-  maxReservationsPerSlot   Int?
+  isEnabled               Boolean @default(true)
+  requireApproval         Boolean @default(true)
+  timeSlotInterval        Int     @default(30)
+  minAdvanceBooking       Int     @default(60)
+  maxAdvanceDays          Int     @default(30)
+  defaultDuration         Int     @default(90)
+  operatingHours          Json?
+  maxGuestsPerReservation Int     @default(20)
+  maxReservationsPerSlot  Int?
 
   bannerImageUrl    String?
   bannerTitle       String?
@@ -1165,22 +1176,22 @@ model ReservationSettings {
 // ========================================
 
 model SmsSettings {
-  id        String   @id @default(uuid())
-  tenantId  String   @unique
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  isEnabled                  Boolean @default(false)
+  isEnabled Boolean @default(false)
 
-  smsOnReservationCreated    Boolean @default(true)
-  smsOnReservationConfirmed  Boolean @default(true)
-  smsOnReservationRejected   Boolean @default(true)
-  smsOnReservationCancelled  Boolean @default(true)
+  smsOnReservationCreated   Boolean @default(true)
+  smsOnReservationConfirmed Boolean @default(true)
+  smsOnReservationRejected  Boolean @default(true)
+  smsOnReservationCancelled Boolean @default(true)
 
-  smsOnOrderCreated          Boolean @default(true)
-  smsOnOrderApproved         Boolean @default(true)
-  smsOnOrderPreparing        Boolean @default(true)
-  smsOnOrderReady            Boolean @default(true)
-  smsOnOrderCancelled        Boolean @default(true)
+  smsOnOrderCreated   Boolean @default(true)
+  smsOnOrderApproved  Boolean @default(true)
+  smsOnOrderPreparing Boolean @default(true)
+  smsOnOrderReady     Boolean @default(true)
+  smsOnOrderCancelled Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1194,7 +1205,7 @@ model SmsSettings {
 // ========================================
 
 model Reservation {
-  id                String   @id @default(uuid())
+  id                String @id @default(uuid())
   reservationNumber String
 
   date      DateTime @db.Date
@@ -1210,7 +1221,7 @@ model Reservation {
   customerPhone String
   customerEmail String?
 
-  adminNotes      String? @db.Text
+  adminNotes      String?   @db.Text
   confirmedAt     DateTime?
   confirmedById   String?
   rejectionReason String?
@@ -1219,8 +1230,14 @@ model Reservation {
   seatedAt        DateTime?
   completedAt     DateTime?
 
-  tableId  String?
-  table    Table?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  tableId String?
+  table   Table?  @relation("ReservationAssignedTable", fields: [tableId], references: [id], onDelete: SetNull)
+
+  // Back-relation for Table.reservationHold (auto-RESERVED hold set by
+  // the reservation-scheduler 30 min before this reservation starts).
+  // Empty array unless the scheduler has currently holding a table for
+  // this row — in practice 0 or 1 entries.
+  heldTables Table[] @relation("TableReservationHold")
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1244,25 +1261,25 @@ model Reservation {
 // ========================================
 
 model IntegrationSettings {
-  id        String   @id @default(uuid())
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // Integration type
-  integrationType String   // PAYMENT_GATEWAY, POS_HARDWARE, THIRD_PARTY_API, DELIVERY_APP, ACCOUNTING, CRM, INVENTORY
-  provider        String   // stripe, paytr, pos_terminal, quickbooks, etc.
-  name            String   // User-friendly name
+  integrationType String // PAYMENT_GATEWAY, POS_HARDWARE, THIRD_PARTY_API, DELIVERY_APP, ACCOUNTING, CRM, INVENTORY
+  provider        String // stripe, paytr, pos_terminal, quickbooks, etc.
+  name            String // User-friendly name
 
   // Configuration (stored as JSON)
-  config          Json     // Flexible config object based on integration type
+  config Json // Flexible config object based on integration type
 
   // Status
-  isEnabled       Boolean  @default(false)
-  isConfigured    Boolean  @default(false)
+  isEnabled    Boolean @default(false)
+  isConfigured Boolean @default(false)
 
   // Metadata
-  lastSyncedAt    DateTime?
-  notes           String?
+  lastSyncedAt DateTime?
+  notes        String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1274,31 +1291,31 @@ model IntegrationSettings {
 }
 
 model ApiKey {
-  id        String   @id @default(uuid())
-  tenantId  String
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // API Key details
-  name        String   // User-friendly name (e.g., "Production API", "Mobile App")
+  name      String // User-friendly name (e.g., "Production API", "Mobile App")
   // SHA-256 hash of the issued key. The plaintext is shown to the user once
   // at creation and never stored; lookup uses keyHash only.
-  keyHash     String   @unique
-  keyPrefix   String   // First few characters for identification (e.g., "pk_live_...")
+  keyHash   String @unique
+  keyPrefix String // First few characters for identification (e.g., "pk_live_...")
 
   // Permissions & Scopes
-  scopes      String[] // Array of permissions (e.g., ["orders:read", "orders:write", "menu:read"])
+  scopes String[] // Array of permissions (e.g., ["orders:read", "orders:write", "menu:read"])
 
   // Webhook configuration
-  webhookUrl  String?
+  webhookUrl    String?
   webhookEvents String[] @default([]) // Events to send to webhook (e.g., ["order.created", "order.updated"])
 
   // Status
-  isActive    Boolean  @default(true)
-  expiresAt   DateTime?
+  isActive  Boolean   @default(true)
+  expiresAt DateTime?
 
   // Usage tracking
-  lastUsedAt  DateTime?
-  usageCount  Int      @default(0)
+  lastUsedAt DateTime?
+  usageCount Int       @default(0)
 
   // Security
   ipWhitelist String[] @default([]) // Allowed IP addresses (empty = allow all)
@@ -1316,14 +1333,14 @@ model ApiKey {
 // ========================================
 
 model ContactMessage {
-  id      String @id @default(uuid())
+  id      String  @id @default(uuid())
   name    String
   email   String
   phone   String?
-  message String @db.Text
+  message String  @db.Text
 
   // Status tracking
-  status  String @default("NEW") // NEW, READ, REPLIED, ARCHIVED
+  status String @default("NEW") // NEW, READ, REPLIED, ARCHIVED
 
   // Admin notes
   adminNotes String? @db.Text
@@ -1341,10 +1358,10 @@ model ContactMessage {
 // ========================================
 
 model Customer {
-  id    String  @id @default(uuid())
-  name  String
-  email String?
-  phone String?
+  id            String  @id @default(uuid())
+  name          String
+  email         String?
+  phone         String?
   phoneVerified Boolean @default(false)
 
   // Loyalty & Engagement
@@ -1354,8 +1371,8 @@ model Customer {
   notes         String?  @db.Text
 
   // Referral System
-  referralCode  String?   @unique // Unique code for this customer to share (optional)
-  referredBy    String? // Referral code that was used to sign up
+  referralCode String? @unique // Unique code for this customer to share (optional)
+  referredBy   String? // Referral code that was used to sign up
 
   // Statistics
   totalOrders  Int     @default(0)
@@ -1364,7 +1381,7 @@ model Customer {
 
   // Birthday & Marketing
   birthday    DateTime?
-  preferences Json?     // Dietary preferences, favorite items, etc.
+  preferences Json? // Dietary preferences, favorite items, etc.
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1374,12 +1391,12 @@ model Customer {
   lastVisit DateTime?
 
   // Relations
-  orders Order[] @relation("CustomerOrders")
-  payments Payment[] @relation("CustomerPayments")
-  sessions CustomerSession[]
+  orders              Order[]              @relation("CustomerOrders")
+  payments            Payment[]            @relation("CustomerPayments")
+  sessions            CustomerSession[]
   loyaltyTransactions LoyaltyTransaction[]
-  referralsMade CustomerReferral[] @relation("ReferralsMade")
-  referralsReceived CustomerReferral? @relation("ReferralsReceived")
+  referralsMade       CustomerReferral[]   @relation("ReferralsMade")
+  referralsReceived   CustomerReferral?    @relation("ReferralsReceived")
 
   @@unique([tenantId, email])
   @@unique([tenantId, phone])
@@ -1396,17 +1413,17 @@ model Customer {
 // ========================================
 
 model CustomerSession {
-  id        String   @id @default(uuid())
-  sessionId String   @unique // Public session identifier
+  id        String @id @default(uuid())
+  sessionId String @unique // Public session identifier
 
   // Customer identification
   customerId String?
   customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   // Session details
-  tableId   String?
-  phone     String? // Optional phone for identification
-  isActive  Boolean  @default(true)
+  tableId  String?
+  phone    String? // Optional phone for identification
+  isActive Boolean @default(true)
 
   // Session metadata
   userAgent String?
@@ -1417,7 +1434,7 @@ model CustomerSession {
   longitude Float?
 
   // Expiration
-  expiresAt DateTime
+  expiresAt    DateTime
   lastActivity DateTime @default(now())
 
   tenantId String
@@ -1434,25 +1451,25 @@ model CustomerSession {
 }
 
 model LoyaltyTransaction {
-  id          String   @id @default(uuid())
+  id String @id @default(uuid())
 
   // Tenant isolation is now explicit. onDelete: Restrict on the customer
   // relation means a customer with loyalty history can't be hard-deleted;
   // callers must soft-delete / anonymize + keep the audit trail. Matches
   // the typical fiscal/regulatory stance on loyalty liabilities.
-  tenantId   String
-  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
 
   // Transaction details
-  type        String  // EARNED, REDEEMED, EXPIRED, ADJUSTMENT, BONUS, REFERRAL
-  points      Int     // Positive for earned, negative for redeemed
+  type        String // EARNED, REDEEMED, EXPIRED, ADJUSTMENT, BONUS, REFERRAL
+  points      Int // Positive for earned, negative for redeemed
   description String
 
   // Order reference (if applicable)
-  orderId String?
+  orderId     String?
   orderNumber String?
   orderAmount Decimal? @db.Decimal(10, 2)
 
@@ -1479,20 +1496,20 @@ model LoyaltyTransaction {
 model PhoneVerification {
   id        String   @id @default(uuid())
   phone     String
-  code      String   // 6-digit OTP code
+  code      String // 6-digit OTP code
   verified  Boolean  @default(false)
   expiresAt DateTime // OTP expires after 10 minutes
 
   // Session tracking
   sessionId String?
   tenantId  String
-  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // Rate limiting
-  attempts  Int      @default(0)
-  maxAttempts Int    @default(3)
+  attempts    Int @default(0)
+  maxAttempts Int @default(3)
 
-  createdAt DateTime @default(now())
+  createdAt  DateTime  @default(now())
   verifiedAt DateTime?
 
   @@index([phone, tenantId])
@@ -1502,26 +1519,26 @@ model PhoneVerification {
 }
 
 model CustomerReferral {
-  id              String   @id @default(uuid())
+  id String @id @default(uuid())
 
   // Referrer (person who shared the referral code)
-  referrerId      String
-  referrer        Customer @relation("ReferralsMade", fields: [referrerId], references: [id], onDelete: Cascade)
+  referrerId String
+  referrer   Customer @relation("ReferralsMade", fields: [referrerId], references: [id], onDelete: Cascade)
 
   // Referred (person who used the referral code)
-  referredId      String   @unique
-  referred        Customer @relation("ReferralsReceived", fields: [referredId], references: [id], onDelete: Cascade)
+  referredId String   @unique
+  referred   Customer @relation("ReferralsReceived", fields: [referredId], references: [id], onDelete: Cascade)
 
   // Referral details
-  referralCode    String   // Unique code used
-  status          String   @default("PENDING") // PENDING, COMPLETED, EXPIRED
+  referralCode String // Unique code used
+  status       String @default("PENDING") // PENDING, COMPLETED, EXPIRED
 
   // Rewards
-  referrerReward  Int      @default(0) // Points given to referrer
-  referredReward  Int      @default(0) // Points given to referred customer
-  rewardedAt      DateTime?
+  referrerReward Int       @default(0) // Points given to referrer
+  referredReward Int       @default(0) // Points given to referred customer
+  rewardedAt     DateTime?
 
-  createdAt DateTime @default(now())
+  createdAt   DateTime  @default(now())
   completedAt DateTime? // When referred customer completed qualifying action
 
   @@index([referrerId])
@@ -1536,17 +1553,17 @@ model CustomerReferral {
 // ========================================
 
 model Notification {
-  id    String @id @default(uuid())
-  title String
+  id      String @id @default(uuid())
+  title   String
   message String @db.Text
-  type  String // INFO, WARNING, ERROR, SUCCESS, ORDER, STOCK, SYSTEM
+  type    String // INFO, WARNING, ERROR, SUCCESS, ORDER, STOCK, SYSTEM
 
   // Notification data (for deep links, actions, etc.)
   data Json?
 
   // Target
-  userId   String?
-  user     User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1555,7 +1572,7 @@ model Notification {
   isGlobal Boolean @default(false) // If true, sent to all users in tenant
   priority String  @default("NORMAL") // LOW, NORMAL, HIGH, URGENT
 
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   expiresAt DateTime?
 
   // Relations
@@ -1598,18 +1615,18 @@ model WaiterRequest {
   status    String  @default("PENDING") // PENDING, ACKNOWLEDGED, COMPLETED
   sessionId String
   tenantId  String
-  tenant    Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant    Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   tableId String?
   table   Table?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
 
   acknowledgedAt   DateTime?
   acknowledgedById String?
-  acknowledgedBy   User? @relation("AcknowledgedWaiterRequests", fields: [acknowledgedById], references: [id], onDelete: SetNull)
+  acknowledgedBy   User?     @relation("AcknowledgedWaiterRequests", fields: [acknowledgedById], references: [id], onDelete: SetNull)
 
   completedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([tableId])
   @@index([status])
@@ -1631,11 +1648,11 @@ model BillRequest {
 
   acknowledgedAt   DateTime?
   acknowledgedById String?
-  acknowledgedBy   User? @relation("AcknowledgedBillRequests", fields: [acknowledgedById], references: [id], onDelete: SetNull)
+  acknowledgedBy   User?     @relation("AcknowledgedBillRequests", fields: [acknowledgedById], references: [id], onDelete: SetNull)
 
   completedAt DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   @@index([tableId])
   @@index([status])
@@ -1650,27 +1667,27 @@ model BillRequest {
 // ========================================
 
 model DesktopRelease {
-  id          String   @id @default(uuid())
-  version     String   @unique  // e.g., "0.2.6" (synced with web app)
-  releaseTag  String   @unique  // e.g., "v0.2.6"
+  id         String @id @default(uuid())
+  version    String @unique // e.g., "0.2.6" (synced with web app)
+  releaseTag String @unique // e.g., "v0.2.6"
 
-  published   Boolean  @default(false)
-  pubDate     DateTime @default(now())
+  published Boolean  @default(false)
+  pubDate   DateTime @default(now())
 
   // GitHub Release URLs for each platform
-  windowsUrl       String?
-  windowsSignature String?
-  macArmUrl        String?
-  macArmSignature  String?
-  macIntelUrl      String?
+  windowsUrl        String?
+  windowsSignature  String?
+  macArmUrl         String?
+  macArmSignature   String?
+  macIntelUrl       String?
   macIntelSignature String?
-  linuxUrl         String?
-  linuxSignature   String?
+  linuxUrl          String?
+  linuxSignature    String?
 
   // Release metadata
-  releaseNotes String  @db.Text // Markdown formatted release notes
-  changelog    String? @db.Text // Detailed changelog
-  downloadCount Int    @default(0) // Total downloads across all platforms
+  releaseNotes  String  @db.Text // Markdown formatted release notes
+  changelog     String? @db.Text // Detailed changelog
+  downloadCount Int     @default(0) // Total downloads across all platforms
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1685,86 +1702,86 @@ model DesktopRelease {
 // ========================================
 
 model ZReport {
-  id            String   @id @default(uuid())
-  reportNumber  String   // Auto-generated report number (e.g., "Z-20250117-001")
-  reportDate    DateTime // End of day date
-  closingTime   DateTime @default(now())
+  id           String   @id @default(uuid())
+  reportNumber String // Auto-generated report number (e.g., "Z-20250117-001")
+  reportDate   DateTime // End of day date
+  closingTime  DateTime @default(now())
 
   // Closing details
-  closingType   String   @default("MANUAL") // MANUAL, AUTOMATIC
+  closingType String @default("MANUAL") // MANUAL, AUTOMATIC
 
   // Staff who performed the closing
-  closedById    String
-  closedBy      User     @relation(fields: [closedById], references: [id], onDelete: Restrict)
+  closedById String
+  closedBy   User   @relation(fields: [closedById], references: [id], onDelete: Restrict)
 
   // Branch/Terminal information (optional for multi-location)
-  branchName    String?
-  terminalId    String?
+  branchName String?
+  terminalId String?
 
   // Sales Summary
-  totalSales              Decimal @db.Decimal(10, 2)
-  totalOrders             Int
-  totalDiscount           Decimal @default(0) @db.Decimal(10, 2)
-  totalRefunds            Decimal @default(0) @db.Decimal(10, 2)
-  netSales                Decimal @db.Decimal(10, 2) // totalSales - totalRefunds
-  totalTax                Decimal @default(0) @db.Decimal(10, 2)
-  taxBreakdown            Json?
+  totalSales    Decimal @db.Decimal(10, 2)
+  totalOrders   Int
+  totalDiscount Decimal @default(0) @db.Decimal(10, 2)
+  totalRefunds  Decimal @default(0) @db.Decimal(10, 2)
+  netSales      Decimal @db.Decimal(10, 2) // totalSales - totalRefunds
+  totalTax      Decimal @default(0) @db.Decimal(10, 2)
+  taxBreakdown  Json?
 
   // Order Type Breakdown
-  dineInSales             Decimal @default(0) @db.Decimal(10, 2)
-  dineInOrders            Int     @default(0)
-  takeawaySales           Decimal @default(0) @db.Decimal(10, 2)
-  takeawayOrders          Int     @default(0)
-  deliverySales           Decimal @default(0) @db.Decimal(10, 2)
-  deliveryOrders          Int     @default(0)
+  dineInSales    Decimal @default(0) @db.Decimal(10, 2)
+  dineInOrders   Int     @default(0)
+  takeawaySales  Decimal @default(0) @db.Decimal(10, 2)
+  takeawayOrders Int     @default(0)
+  deliverySales  Decimal @default(0) @db.Decimal(10, 2)
+  deliveryOrders Int     @default(0)
 
   // Payment Method Summary
-  cashPayments            Decimal @default(0) @db.Decimal(10, 2)
-  cashPaymentCount        Int     @default(0)
-  cardPayments            Decimal @default(0) @db.Decimal(10, 2)
-  cardPaymentCount        Int     @default(0)
-  digitalPayments         Decimal @default(0) @db.Decimal(10, 2)
-  digitalPaymentCount     Int     @default(0)
+  cashPayments        Decimal @default(0) @db.Decimal(10, 2)
+  cashPaymentCount    Int     @default(0)
+  cardPayments        Decimal @default(0) @db.Decimal(10, 2)
+  cardPaymentCount    Int     @default(0)
+  digitalPayments     Decimal @default(0) @db.Decimal(10, 2)
+  digitalPaymentCount Int     @default(0)
 
   // Cash Drawer Summary
-  openingCash             Decimal @db.Decimal(10, 2)
-  expectedCash            Decimal @db.Decimal(10, 2)
-  countedCash             Decimal @db.Decimal(10, 2)
-  cashDifference          Decimal @db.Decimal(10, 2) // countedCash - expectedCash
-  cashInOut               Decimal @default(0) @db.Decimal(10, 2) // Non-sales movements
+  openingCash    Decimal @db.Decimal(10, 2)
+  expectedCash   Decimal @db.Decimal(10, 2)
+  countedCash    Decimal @db.Decimal(10, 2)
+  cashDifference Decimal @db.Decimal(10, 2) // countedCash - expectedCash
+  cashInOut      Decimal @default(0) @db.Decimal(10, 2) // Non-sales movements
 
   // Refunds & Cancellations
-  cancelledOrders         Int     @default(0)
-  cancelledOrdersAmount   Decimal @default(0) @db.Decimal(10, 2)
-  refundedPayments        Int     @default(0)
-  refundedAmount          Decimal @default(0) @db.Decimal(10, 2)
+  cancelledOrders       Int     @default(0)
+  cancelledOrdersAmount Decimal @default(0) @db.Decimal(10, 2)
+  refundedPayments      Int     @default(0)
+  refundedAmount        Decimal @default(0) @db.Decimal(10, 2)
 
   // Staff Performance (stored as JSON for flexibility)
-  staffPerformance        Json?   // Array of {staffId, staffName, sales, orders, refunds}
+  staffPerformance Json? // Array of {staffId, staffName, sales, orders, refunds}
 
   // Product Group Sales (stored as JSON)
-  categoryBreakdown       Json?   // Array of {categoryId, categoryName, sales, quantity}
+  categoryBreakdown Json? // Array of {categoryId, categoryName, sales, quantity}
 
   // Top Products (stored as JSON)
-  topProducts             Json?   // Array of {productId, productName, quantity, revenue}
+  topProducts Json? // Array of {productId, productName, quantity, revenue}
 
   // System Status
-  openChecks              Int     @default(0) // Should be 0 for successful closing
-  openChecksAmount        Decimal @default(0) @db.Decimal(10, 2)
+  openChecks       Int     @default(0) // Should be 0 for successful closing
+  openChecksAmount Decimal @default(0) @db.Decimal(10, 2)
 
   // Metadata
-  notes                   String? @db.Text
-  systemGenerated         Boolean @default(false)
+  notes           String? @db.Text
+  systemGenerated Boolean @default(false)
 
   // Report export tracking
-  pdfExported             Boolean  @default(false)
-  pdfUrl                  String?
-  excelExported           Boolean  @default(false)
-  excelUrl                String?
-  emailSent               Boolean  @default(false)
-  emailSentAt             DateTime?
-  emailRecipients         String[] @default([])    // Who received the email
-  emailError              String?                  // Last email error if any
+  pdfExported     Boolean   @default(false)
+  pdfUrl          String?
+  excelExported   Boolean   @default(false)
+  excelUrl        String?
+  emailSent       Boolean   @default(false)
+  emailSentAt     DateTime?
+  emailRecipients String[]  @default([]) // Who received the email
+  emailError      String? // Last email error if any
 
   // Fiscal finalization — once set, totals are locked and every write path
   // asserts isFinalized=false. payloadHash is sha256 of the canonical
@@ -1791,11 +1808,11 @@ model ZReport {
 }
 
 model CashDrawerMovement {
-  id          String   @id @default(uuid())
-  type        String   // OPENING, CLOSING, CASH_IN, CASH_OUT, ADJUSTMENT
-  amount      Decimal  @db.Decimal(10, 2)
-  reason      String?
-  notes       String?  @db.Text
+  id     String  @id @default(uuid())
+  type   String // OPENING, CLOSING, CASH_IN, CASH_OUT, ADJUSTMENT
+  amount Decimal @db.Decimal(10, 2)
+  reason String?
+  notes  String? @db.Text
 
   // Cash counting details (for CLOSING type)
   denominationBreakdown Json? // {100: 5, 50: 10, 20: 15, etc.}
@@ -1805,8 +1822,8 @@ model CashDrawerMovement {
   zReport   ZReport? @relation(fields: [zReportId], references: [id], onDelete: Cascade)
 
   // Staff who performed the movement
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Restrict)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -1826,27 +1843,27 @@ model CashDrawerMovement {
 // ========================================
 
 model PageView {
-  id        String   @id @default(uuid())
+  id String @id @default(uuid())
 
   // Page tracking
-  page      String   // "landing", "pricing", "features", etc.
-  path      String   // Full URL path
-  referrer  String?  // Where visitor came from
+  page     String // "landing", "pricing", "features", etc.
+  path     String // Full URL path
+  referrer String? // Where visitor came from
 
   // Geographic data (from IP geolocation)
-  country      String?
-  countryCode  String?
-  city         String?
-  region       String?
+  country     String?
+  countryCode String?
+  city        String?
+  region      String?
 
   // Session info
-  sessionId    String?   // Anonymous session tracking
-  userAgent    String?
-  ipHash       String?   // Hashed IP for privacy (don't store raw IP)
+  sessionId String? // Anonymous session tracking
+  userAgent String?
+  ipHash    String? // Hashed IP for privacy (don't store raw IP)
 
   // Device info
-  deviceType   String?   // "desktop", "mobile", "tablet"
-  browser      String?
+  deviceType String? // "desktop", "mobile", "tablet"
+  browser    String?
 
   createdAt DateTime @default(now())
 
@@ -1858,28 +1875,28 @@ model PageView {
 }
 
 model PublicReview {
-  id        String   @id @default(uuid())
+  id String @id @default(uuid())
 
   // Reviewer info
-  name         String
-  email        String
-  restaurant   String?    // Restaurant name (optional)
-  avatar       String?    // Initials or image URL
+  name       String
+  email      String
+  restaurant String? // Restaurant name (optional)
+  avatar     String? // Initials or image URL
 
   // Review content
-  rating       Int        // 1-5 stars
-  comment      String     @db.Text
+  rating  Int // 1-5 stars
+  comment String @db.Text
 
   // Moderation
-  status       String     @default("PENDING") // PENDING, APPROVED, REJECTED
-  approvedAt   DateTime?
+  status     String    @default("PENDING") // PENDING, APPROVED, REJECTED
+  approvedAt DateTime?
 
   // Geographic context
-  country      String?
-  city         String?
+  country String?
+  city    String?
 
   // Verification
-  isVerified   Boolean    @default(false)  // Verified customer
+  isVerified Boolean @default(false) // Verified customer
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1890,27 +1907,27 @@ model PublicReview {
 }
 
 model PublicStatsCache {
-  id          String   @id @default("main")
+  id String @id @default("main")
 
   // Cached statistics (updated periodically)
-  totalViews         Int      @default(0)
-  uniqueVisitors     Int      @default(0)
-  totalReviews       Int      @default(0)
-  averageRating      Float    @default(0)
-  totalTenants       Int      @default(0)    // Active restaurants
+  totalViews     Int   @default(0)
+  uniqueVisitors Int   @default(0)
+  totalReviews   Int   @default(0)
+  averageRating  Float @default(0)
+  totalTenants   Int   @default(0) // Active restaurants
 
   // Business metrics for landing page
-  totalOrders        Int      @default(0)    // Total completed orders
-  totalRevenue       Float    @default(0)    // Total revenue in TRY
+  totalOrders  Int   @default(0) // Total completed orders
+  totalRevenue Float @default(0) // Total revenue in TRY
 
   // Geographic breakdown (JSON)
-  countryDistribution Json?   // {country: count}
-  cityDistribution    Json?   // {city: count}
+  countryDistribution Json? // {country: count}
+  cityDistribution    Json? // {city: count}
 
   // Time-based stats
-  viewsToday         Int      @default(0)
-  viewsThisWeek      Int      @default(0)
-  viewsThisMonth     Int      @default(0)
+  viewsToday     Int @default(0)
+  viewsThisWeek  Int @default(0)
+  viewsThisMonth Int @default(0)
 
   lastUpdated DateTime @default(now())
 
@@ -1922,38 +1939,38 @@ model PublicStatsCache {
 // ========================================
 
 model SuperAdmin {
-  id                String    @id @default(uuid())
-  email             String    @unique
-  password          String
-  firstName         String
-  lastName          String
-  status            String    @default("ACTIVE") // ACTIVE, INACTIVE
+  id        String @id @default(uuid())
+  email     String @unique
+  password  String
+  firstName String
+  lastName  String
+  status    String @default("ACTIVE") // ACTIVE, INACTIVE
 
   // 2FA (TOTP)
-  twoFactorSecret          String?
-  twoFactorEnabled         Boolean  @default(false)
+  twoFactorSecret        String?
+  twoFactorEnabled       Boolean   @default(false)
   // Secret that has been generated but not yet confirmed by a successful
   // TOTP; promoted to twoFactorSecret only after enable2FA verifies it.
-  pendingTwoFactorSecret   String?
+  pendingTwoFactorSecret String?
   // One-time recovery codes (sha256-hashed) for when the authenticator
   // is lost. Each entry gets removed as it is used.
-  backupCodes              String[] @default([])
+  backupCodes            String[]  @default([])
   // Replay-protection: records the TOTP time step of the last accepted
   // code, plus when it expires. A code can only be used once.
-  lastTotpStep             BigInt?
-  lastTotpStepExpiresAt    DateTime?
+  lastTotpStep           BigInt?
+  lastTotpStepExpiresAt  DateTime?
 
   // Session revocation: bumped on logout, password change, 2FA change,
   // account suspension. Access tokens carry this version and are
   // rejected once they don't match.
-  tokenVersion             Int      @default(0)
+  tokenVersion Int @default(0)
 
-  lastLogin         DateTime?
-  lastLoginIp       String?
-  failedLogins      Int       @default(0)
-  lockedUntil       DateTime?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  lastLogin    DateTime?
+  lastLoginIp  String?
+  failedLogins Int       @default(0)
+  lockedUntil  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@map("super_admins")
 }
@@ -1964,14 +1981,14 @@ model SuperAdmin {
 
 model AuditLog {
   id               String   @id @default(uuid())
-  action           String   // LOGIN, LOGOUT, VIEW, CREATE, UPDATE, DELETE, SUSPEND
-  entityType       String   // TENANT, USER, SUBSCRIPTION, PLAN
+  action           String // LOGIN, LOGOUT, VIEW, CREATE, UPDATE, DELETE, SUSPEND
+  entityType       String // TENANT, USER, SUBSCRIPTION, PLAN
   entityId         String?
   actorId          String
   actorEmail       String
   previousData     Json?
   newData          Json?
-  metadata         Json?    // {ip, userAgent, requestId}
+  metadata         Json? // {ip, userAgent, requestId}
   targetTenantId   String?
   targetTenantName String?
   createdAt        DateTime @default(now())
@@ -1992,7 +2009,7 @@ model UserActivity {
   userId    String
   tenantId  String
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  action    String   // LOGIN, LOGOUT, LOGIN_FAILED
+  action    String // LOGIN, LOGOUT, LOGIN_FAILED
   ip        String?
   userAgent String?
   metadata  Json?
@@ -2010,32 +2027,32 @@ model UserActivity {
 // ========================================
 
 model Camera {
-  id              String   @id @default(uuid())
-  name            String
-  description     String?
-  streamUrl       String   // Encrypted RTSP/ONVIF URL
-  streamType      String   @default("RTSP") // RTSP, ONVIF, HLS, WEBRTC
+  id          String  @id @default(uuid())
+  name        String
+  description String?
+  streamUrl   String // Encrypted RTSP/ONVIF URL
+  streamType  String  @default("RTSP") // RTSP, ONVIF, HLS, WEBRTC
 
   // Floor plan calibration
-  calibrationData Json?    // {corners: [{imageX, imageY, floorX, floorZ}], homographyMatrix: [...]}
+  calibrationData Json? // {corners: [{imageX, imageY, floorX, floorZ}], homographyMatrix: [...]}
 
-  rotationY       Float?   @default(0)    // Horizontal rotation (degrees)
-  fov             Float?   @default(90)   // Field of view (degrees)
+  rotationY Float? @default(0) // Horizontal rotation (degrees)
+  fov       Float? @default(90) // Field of view (degrees)
 
   // Status and health
-  status          String   @default("OFFLINE") // ONLINE, OFFLINE, ERROR, CALIBRATING
-  lastSeenAt      DateTime?
-  errorMessage    String?
+  status       String    @default("OFFLINE") // ONLINE, OFFLINE, ERROR, CALIBRATING
+  lastSeenAt   DateTime?
+  errorMessage String?
 
   // Edge device assignment
-  edgeDeviceId    String?
-  edgeDevice      EdgeDevice? @relation(fields: [edgeDeviceId], references: [id], onDelete: SetNull)
+  edgeDeviceId String?
+  edgeDevice   EdgeDevice? @relation(fields: [edgeDeviceId], references: [id], onDelete: SetNull)
 
-  tenantId        String
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([tenantId, name])
   @@index([tenantId])
@@ -2045,32 +2062,32 @@ model Camera {
 }
 
 model OccupancyRecord {
-  id              String   @id @default(uuid())
-  timestamp       DateTime @default(now())
+  id        String   @id @default(uuid())
+  timestamp DateTime @default(now())
 
   // Anonymous tracking ID (per session, not personally identifiable)
-  trackingId      String   // e.g., "track_abc123" - assigned by edge device
+  trackingId String // e.g., "track_abc123" - assigned by edge device
 
   // Position in floor plan coordinates (meters from origin)
-  positionX       Float
-  positionZ       Float
-  positionY       Float    @default(0) // Height estimation (0 = floor level)
+  positionX Float
+  positionZ Float
+  positionY Float @default(0) // Height estimation (0 = floor level)
 
   // Person state classification
-  state           String   // STANDING, SITTING, MOVING, WAITING
+  state String // STANDING, SITTING, MOVING, WAITING
 
   // Confidence score from ML model (0-1)
-  confidence      Float    @default(0.9)
+  confidence Float @default(0.9)
 
   // Optional table association
-  tableId         String?
-  table           Table?   @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  tableId String?
+  table   Table?  @relation(fields: [tableId], references: [id], onDelete: SetNull)
 
   // Source camera
-  cameraId        String?
+  cameraId String?
 
-  tenantId        String
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, timestamp])
   @@index([tableId])
@@ -2080,25 +2097,25 @@ model OccupancyRecord {
 }
 
 model TrafficFlowRecord {
-  id              String   @id @default(uuid())
-  hourBucket      DateTime // Rounded to hour for aggregation
+  id         String   @id @default(uuid())
+  hourBucket DateTime // Rounded to hour for aggregation
 
   // Grid cell coordinates (floor plan divided into cells)
-  cellX           Int      // Grid X coordinate
-  cellZ           Int      // Grid Z coordinate
-  cellSize        Float    @default(1.0) // Cell size in meters
+  cellX    Int // Grid X coordinate
+  cellZ    Int // Grid Z coordinate
+  cellSize Float @default(1.0) // Cell size in meters
 
   // Traffic metrics
-  personCount     Int      // Number of unique persons passing through
-  avgDwellTime    Float?   // Average time spent in cell (seconds)
-  entrances       Int      @default(0) // People entering cell
-  exits           Int      @default(0) // People exiting cell
+  personCount  Int // Number of unique persons passing through
+  avgDwellTime Float? // Average time spent in cell (seconds)
+  entrances    Int    @default(0) // People entering cell
+  exits        Int    @default(0) // People exiting cell
 
   // Direction flow (JSON for flexibility)
-  flowDirections  Json?    // {north: 10, south: 5, east: 3, west: 8}
+  flowDirections Json? // {north: 10, south: 5, east: 3, west: 8}
 
-  tenantId        String
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, hourBucket, cellX, cellZ])
   @@index([tenantId, hourBucket])
@@ -2107,41 +2124,41 @@ model TrafficFlowRecord {
 }
 
 model TableAnalytics {
-  id                      String   @id @default(uuid())
-  date                    DateTime @db.Date
+  id   String   @id @default(uuid())
+  date DateTime @db.Date
 
-  tableId                 String
-  table                   Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  tableId String
+  table   Table  @relation(fields: [tableId], references: [id], onDelete: Cascade)
 
   // Occupancy metrics (in minutes)
-  totalOccupiedMinutes    Int      @default(0)
-  totalDiningMinutes      Int      @default(0)  // When orders are active
-  totalIdleMinutes        Int      @default(0)  // Occupied but no orders
-  totalEmptyMinutes       Int      @default(0)  // Table unoccupied
+  totalOccupiedMinutes Int @default(0)
+  totalDiningMinutes   Int @default(0) // When orders are active
+  totalIdleMinutes     Int @default(0) // Occupied but no orders
+  totalEmptyMinutes    Int @default(0) // Table unoccupied
 
   // Session metrics
-  totalSessions           Int      @default(0)  // Number of table turns
-  avgSessionDuration      Float?   // Average session length (minutes)
-  avgDiningDuration       Float?   // Average dining time (minutes)
-  avgIdleDuration         Float?   // Average idle time after dining (minutes)
+  totalSessions      Int    @default(0) // Number of table turns
+  avgSessionDuration Float? // Average session length (minutes)
+  avgDiningDuration  Float? // Average dining time (minutes)
+  avgIdleDuration    Float? // Average idle time after dining (minutes)
 
   // Revenue metrics
-  revenueGenerated        Decimal  @default(0) @db.Decimal(10, 2)
-  ordersCount             Int      @default(0)
-  avgOrderValue           Decimal? @db.Decimal(10, 2)
-  revenuePerMinute        Decimal? @db.Decimal(10, 4) // Revenue efficiency
+  revenueGenerated Decimal  @default(0) @db.Decimal(10, 2)
+  ordersCount      Int      @default(0)
+  avgOrderValue    Decimal? @db.Decimal(10, 2)
+  revenuePerMinute Decimal? @db.Decimal(10, 4) // Revenue efficiency
 
   // Utilization score (0-100)
-  utilizationScore        Float?   // Calculated: (occupiedMinutes / operatingMinutes) * 100
+  utilizationScore Float? // Calculated: (occupiedMinutes / operatingMinutes) * 100
 
   // Peak hours (JSON for flexibility)
-  peakHours               Json?    // {hour: occupancyPercentage}
+  peakHours Json? // {hour: occupancyPercentage}
 
-  tenantId                String
-  tenant                  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([tableId, date])
   @@index([tenantId, date])
@@ -2150,46 +2167,46 @@ model TableAnalytics {
 }
 
 model AnalyticsInsight {
-  id              String   @id @default(uuid())
+  id String @id @default(uuid())
 
   // Insight classification
-  type            String   // SPACE_OPTIMIZATION, TRAFFIC_BOTTLENECK, TABLE_UNDERUTILIZATION,
-                           // CUSTOMER_BEHAVIOR, REVENUE_OPPORTUNITY, STAFFING_SUGGESTION
-  category        String   @default("OPERATIONAL") // OPERATIONAL, REVENUE, CUSTOMER, LAYOUT
-  severity        String   @default("INFO") // INFO, WARNING, CRITICAL
+  type     String // SPACE_OPTIMIZATION, TRAFFIC_BOTTLENECK, TABLE_UNDERUTILIZATION,
+  // CUSTOMER_BEHAVIOR, REVENUE_OPPORTUNITY, STAFFING_SUGGESTION
+  category String @default("OPERATIONAL") // OPERATIONAL, REVENUE, CUSTOMER, LAYOUT
+  severity String @default("INFO") // INFO, WARNING, CRITICAL
 
   // Content
-  title           String   // e.g., "Table 7 is underutilized"
-  description     String   @db.Text // Detailed explanation
-  recommendation  String   @db.Text // Actionable suggestion
+  title          String // e.g., "Table 7 is underutilized"
+  description    String @db.Text // Detailed explanation
+  recommendation String @db.Text // Actionable suggestion
 
   // Affected entities
   affectedTableIds String[] @default([])
-  affectedAreaData Json?    // {x: number, z: number, width: number, depth: number}
+  affectedAreaData Json? // {x: number, z: number, width: number, depth: number}
 
   // Supporting data
-  supportingData  Json?    // Charts, metrics, evidence
+  supportingData Json? // Charts, metrics, evidence
 
   // Impact estimation
-  potentialImpact String?  // "Could increase revenue by 15%"
-  confidenceScore Float    @default(0.8) // ML confidence (0-1)
+  potentialImpact String? // "Could increase revenue by 15%"
+  confidenceScore Float   @default(0.8) // ML confidence (0-1)
 
   // Status tracking
-  status          String   @default("NEW") // NEW, REVIEWED, IN_PROGRESS, IMPLEMENTED, DISMISSED
+  status          String    @default("NEW") // NEW, REVIEWED, IN_PROGRESS, IMPLEMENTED, DISMISSED
   reviewedAt      DateTime?
   reviewedBy      String?
   implementedAt   DateTime?
   dismissedReason String?
 
   // Validity period
-  validFrom       DateTime @default(now())
-  validUntil      DateTime? // Insight may expire
+  validFrom  DateTime  @default(now())
+  validUntil DateTime? // Insight may expire
 
-  tenantId        String
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([tenantId, status])
   @@index([tenantId, type])
@@ -2199,31 +2216,31 @@ model AnalyticsInsight {
 }
 
 model AnalyticsHeatmapCache {
-  id              String   @id @default(uuid())
+  id String @id @default(uuid())
 
   // Time range
-  startTime       DateTime
-  endTime         DateTime
-  granularity     String   // HOURLY, DAILY, WEEKLY
+  startTime   DateTime
+  endTime     DateTime
+  granularity String // HOURLY, DAILY, WEEKLY
 
   // Grid configuration
-  gridWidth       Int      // Number of cells in X direction
-  gridDepth       Int      // Number of cells in Z direction
-  cellSize        Float    // Cell size in meters
+  gridWidth Int // Number of cells in X direction
+  gridDepth Int // Number of cells in Z direction
+  cellSize  Float // Cell size in meters
 
   // Heatmap data (2D array as JSON)
-  heatmapData     Json     // [[value, value, ...], [...], ...]
-  maxValue        Float    // For normalization
-  minValue        Float
+  heatmapData Json // [[value, value, ...], [...], ...]
+  maxValue    Float // For normalization
+  minValue    Float
 
   // Metadata
-  metric          String   // OCCUPANCY, DWELL_TIME, TRAFFIC, REVENUE
+  metric String // OCCUPANCY, DWELL_TIME, TRAFFIC, REVENUE
 
-  tenantId        String
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  createdAt       DateTime @default(now())
-  expiresAt       DateTime // Cache expiration
+  createdAt DateTime @default(now())
+  expiresAt DateTime // Cache expiration
 
   @@unique([tenantId, startTime, endTime, granularity, metric])
   @@index([tenantId, metric])
@@ -2232,48 +2249,48 @@ model AnalyticsHeatmapCache {
 }
 
 model EdgeDevice {
-  id              String   @id @default(uuid())
-  deviceId        String   // Unique device identifier (e.g., "edge-001")
-  name            String   // Human-readable name
-  description     String?
+  id          String  @id @default(uuid())
+  deviceId    String // Unique device identifier (e.g., "edge-001")
+  name        String // Human-readable name
+  description String?
 
   // Hardware info
-  hardwareType    String?  // "JETSON_ORIN", "RASPBERRY_PI_5", "CUSTOM"
+  hardwareType    String? // "JETSON_ORIN", "RASPBERRY_PI_5", "CUSTOM"
   firmwareVersion String?
   ipAddress       String?
   macAddress      String?
 
   // Connection status
-  status          String   @default("OFFLINE") // ONLINE, OFFLINE, ERROR, UPDATING
-  lastHeartbeat   DateTime?
-  lastSeenAt      DateTime?
-  errorMessage    String?
+  status        String    @default("OFFLINE") // ONLINE, OFFLINE, ERROR, UPDATING
+  lastHeartbeat DateTime?
+  lastSeenAt    DateTime?
+  errorMessage  String?
 
   // Capabilities
-  capabilities    Json?    // {yolov8: true, pose: true, tracking: true, gpuAccel: true}
+  capabilities Json? // {yolov8: true, pose: true, tracking: true, gpuAccel: true}
 
   // Configuration
-  config          Json?    // Device-specific configuration
+  config Json? // Device-specific configuration
 
   // Assigned cameras
-  cameras         Camera[]
+  cameras Camera[]
 
   // Health metrics
-  cpuUsage        Float?   // Last reported CPU usage (0-100)
-  memoryUsage     Float?   // Last reported memory usage (0-100)
-  gpuUsage        Float?   // Last reported GPU usage (0-100)
-  temperature     Float?   // Last reported temperature (Celsius)
-  uptime          Int?     // Uptime in seconds
+  cpuUsage    Float? // Last reported CPU usage (0-100)
+  memoryUsage Float? // Last reported memory usage (0-100)
+  gpuUsage    Float? // Last reported GPU usage (0-100)
+  temperature Float? // Last reported temperature (Celsius)
+  uptime      Int? // Uptime in seconds
 
   // Statistics
-  framesProcessed BigInt   @default(0)
-  detectionsTotal BigInt   @default(0)
+  framesProcessed BigInt @default(0)
+  detectionsTotal BigInt @default(0)
 
-  tenantId        String
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([tenantId, deviceId])
   @@index([tenantId])
@@ -2286,36 +2303,36 @@ model EdgeDevice {
 // ========================================
 
 model DeliveryPlatformConfig {
-  id        String   @id @default(uuid())
+  id String @id @default(uuid())
 
-  platform  String   // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS
-  isEnabled Boolean  @default(false)
+  platform  String // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS
+  isEnabled Boolean @default(false)
 
   // Authentication (all three fields hold AES-256-GCM-encrypted JSON;
   // see common/helpers/encryption.helper.ts). Never log these or return
   // them from tenant-facing endpoints.
-  credentials    Json?      // { ciphertext, iv, authTag } or null
-  accessToken    String?    // AES-GCM-encrypted bearer token
-  tokenExpiresAt DateTime?  // Token expiration time
+  credentials    Json? // { ciphertext, iv, authTag } or null
+  accessToken    String? // AES-GCM-encrypted bearer token
+  tokenExpiresAt DateTime? // Token expiration time
 
   // Platform identifiers
-  remoteRestaurantId String?  // Platform's restaurant/vendor ID
+  remoteRestaurantId String? // Platform's restaurant/vendor ID
 
   // Restaurant status on platform
   restaurantOpen Boolean @default(false)
 
   // Sync tracking
-  lastOrderPollAt  DateTime?
-  lastMenuSyncAt   DateTime?
+  lastOrderPollAt DateTime?
+  lastMenuSyncAt  DateTime?
 
   // Circuit breaker / error tracking
-  lastError    String?
-  lastErrorAt  DateTime?
-  errorCount   Int       @default(0)
+  lastError   String?
+  lastErrorAt DateTime?
+  errorCount  Int       @default(0)
 
   // Configuration options
-  autoAccept   Boolean @default(true)  // Auto-accept incoming orders
-  notifySound  String? // Custom notification sound identifier
+  autoAccept  Boolean @default(true) // Auto-accept incoming orders
+  notifySound String? // Custom notification sound identifier
 
   // Soft delete marker so we don't orphan in-flight orders / mappings
   // when an admin hits Delete while orders are still syncing.
@@ -2339,15 +2356,15 @@ model DeliveryPlatformConfig {
 }
 
 model DeliveryPlatformLog {
-  id        String   @id @default(uuid())
+  id String @id @default(uuid())
 
-  platform  String   // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS
-  direction String   // INBOUND, OUTBOUND
-  action    String   // e.g., ORDER_RECEIVED, ORDER_ACCEPTED, STATUS_UPDATE, AUTH_REFRESH
+  platform  String // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS
+  direction String // INBOUND, OUTBOUND
+  action    String // e.g., ORDER_RECEIVED, ORDER_ACCEPTED, STATUS_UPDATE, AUTH_REFRESH
 
   // Related entities
-  orderId    String?  // Internal order ID (if applicable)
-  externalId String?  // Platform's order/entity ID
+  orderId    String? // Internal order ID (if applicable)
+  externalId String? // Platform's order/entity ID
 
   // Request/response data
   request    Json?
@@ -2355,8 +2372,8 @@ model DeliveryPlatformLog {
   statusCode Int?
 
   // Result
-  success    Boolean
-  error      String?
+  success Boolean
+  error   String?
 
   // Retry mechanism (dead letter queue)
   retryCount  Int       @default(0)
@@ -2377,15 +2394,15 @@ model DeliveryPlatformLog {
 }
 
 model MenuItemMapping {
-  id        String   @id @default(uuid())
+  id String @id @default(uuid())
 
-  platform       String   // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS
-  externalItemId String   // Platform's product/item ID
+  platform       String // YEMEKSEPETI, GETIR, TRENDYOL, MIGROS
+  externalItemId String // Platform's product/item ID
 
   // Sync data
-  externalData   Json?    // Platform-specific item metadata
-  isActive       Boolean  @default(true)
-  lastSyncedAt   DateTime?
+  externalData Json? // Platform-specific item metadata
+  isActive     Boolean   @default(true)
+  lastSyncedAt DateTime?
 
   productId String
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -2431,7 +2448,7 @@ model StockItem {
   id          String  @id @default(uuid())
   name        String
   sku         String?
-  unit        String  // KG, G, L, ML, PCS, BOX, BAG, CAN, BOTTLE, BUNCH, SLICE, PORTION
+  unit        String // KG, G, L, ML, PCS, BOX, BAG, CAN, BOTTLE, BUNCH, SLICE, PORTION
   description String?
 
   currentStock Decimal @default(0) @db.Decimal(10, 3)
@@ -2451,13 +2468,13 @@ model StockItem {
   updatedAt DateTime @updatedAt
 
   // Relations
-  batches              StockBatch[]
-  recipeIngredients    RecipeIngredient[]
-  supplierStockItems   SupplierStockItem[]
-  purchaseOrderItems   PurchaseOrderItem[]
-  ingredientMovements  IngredientMovement[]
-  wasteLogs            WasteLog[]
-  stockCountItems      StockCountItem[]
+  batches             StockBatch[]
+  recipeIngredients   RecipeIngredient[]
+  supplierStockItems  SupplierStockItem[]
+  purchaseOrderItems  PurchaseOrderItem[]
+  ingredientMovements IngredientMovement[]
+  wasteLogs           WasteLog[]
+  stockCountItems     StockCountItem[]
 
   @@unique([tenantId, sku])
   @@index([tenantId])
@@ -2467,12 +2484,12 @@ model StockItem {
 }
 
 model StockBatch {
-  id         String  @id @default(uuid())
+  id          String  @id @default(uuid())
   batchNumber String?
   quantity    Decimal @db.Decimal(10, 3) // Remaining quantity in this batch
   costPerUnit Decimal @db.Decimal(10, 4)
 
-  receivedAt DateTime @default(now())
+  receivedAt DateTime  @default(now())
   expiryDate DateTime?
 
   stockItemId String
@@ -2493,10 +2510,10 @@ model StockBatch {
 }
 
 model Recipe {
-  id    String @id @default(uuid())
+  id    String  @id @default(uuid())
   name  String?
   notes String?
-  yield Int    @default(1) // How many portions this recipe makes
+  yield Int     @default(1) // How many portions this recipe makes
 
   productId String  @unique
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -2578,12 +2595,12 @@ model SupplierStockItem {
 }
 
 model PurchaseOrder {
-  id            String  @id @default(uuid())
-  orderNumber   String
-  status        String  @default("DRAFT") // DRAFT, SUBMITTED, PARTIALLY_RECEIVED, RECEIVED, CANCELLED
-  notes         String?
-  expectedDate  DateTime?
-  createdById   String?
+  id           String    @id @default(uuid())
+  orderNumber  String
+  status       String    @default("DRAFT") // DRAFT, SUBMITTED, PARTIALLY_RECEIVED, RECEIVED, CANCELLED
+  notes        String?
+  expectedDate DateTime?
+  createdById  String?
 
   supplierId String
   supplier   Supplier @relation(fields: [supplierId], references: [id], onDelete: Restrict)
@@ -2627,9 +2644,9 @@ model PurchaseOrderItem {
 }
 
 model IngredientMovement {
-  id            String  @id @default(uuid())
-  type          String  // IN, OUT, ADJUSTMENT, WASTE, ORDER_DEDUCTION, ORDER_REVERSAL, PO_RECEIVE, PO_CANCEL_REVERSAL, COUNT_ADJUSTMENT
-  quantity      Decimal @db.Decimal(10, 3) // Positive for additions, negative for deductions
+  id            String   @id @default(uuid())
+  type          String // IN, OUT, ADJUSTMENT, WASTE, ORDER_DEDUCTION, ORDER_REVERSAL, PO_RECEIVE, PO_CANCEL_REVERSAL, COUNT_ADJUSTMENT
+  quantity      Decimal  @db.Decimal(10, 3) // Positive for additions, negative for deductions
   costPerUnit   Decimal? @db.Decimal(10, 4)
   notes         String?
   referenceType String? // ORDER, PURCHASE_ORDER, WASTE_LOG, STOCK_COUNT
@@ -2659,11 +2676,11 @@ model IngredientMovement {
 }
 
 model WasteLog {
-  id       String  @id @default(uuid())
-  quantity Decimal @db.Decimal(10, 3)
-  reason   String  // EXPIRED, SPOILED, DAMAGED, OVERPRODUCTION, PREPARATION_WASTE, CUSTOMER_RETURN, OTHER
-  notes    String?
-  cost     Decimal? @db.Decimal(10, 4) // Calculated cost of waste
+  id          String   @id @default(uuid())
+  quantity    Decimal  @db.Decimal(10, 3)
+  reason      String // EXPIRED, SPOILED, DAMAGED, OVERPRODUCTION, PREPARATION_WASTE, CUSTOMER_RETURN, OTHER
+  notes       String?
+  cost        Decimal? @db.Decimal(10, 4) // Calculated cost of waste
   createdById String?
 
   stockItemId String
@@ -2682,10 +2699,10 @@ model WasteLog {
 }
 
 model StockCount {
-  id     String @id @default(uuid())
-  name   String?
-  status String @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, CANCELLED
-  notes  String?
+  id          String  @id @default(uuid())
+  name        String?
+  status      String  @default("IN_PROGRESS") // IN_PROGRESS, COMPLETED, CANCELLED
+  notes       String?
   createdById String?
 
   tenantId String
@@ -2704,8 +2721,8 @@ model StockCount {
 }
 
 model StockCountItem {
-  id          String  @id @default(uuid())
-  expectedQty Decimal @db.Decimal(10, 3) // Snapshot of currentStock at count start
+  id          String   @id @default(uuid())
+  expectedQty Decimal  @db.Decimal(10, 3) // Snapshot of currentStock at count start
   countedQty  Decimal? @db.Decimal(10, 3) // What was actually counted
   variance    Decimal? @db.Decimal(10, 3) // countedQty - expectedQty
 
@@ -2750,11 +2767,11 @@ model StockSettings {
 // ========================================
 
 model Attendance {
-  id        String   @id @default(uuid())
+  id String @id @default(uuid())
 
-  date      DateTime @db.Date
-  clockIn   DateTime
-  clockOut  DateTime?
+  date     DateTime  @db.Date
+  clockIn  DateTime
+  clockOut DateTime?
 
   breakStart DateTime?
   breakEnd   DateTime?
@@ -2763,16 +2780,16 @@ model Attendance {
   totalBreakMinutes  Int @default(0)
   overtimeMinutes    Int @default(0)
 
-  status    String   @default("CLOCKED_IN") // CLOCKED_IN, ON_BREAK, CLOCKED_OUT
-  isLate    Boolean  @default(false)
-  lateMinutes Int    @default(0)
-  notes     String?
+  status      String  @default("CLOCKED_IN") // CLOCKED_IN, ON_BREAK, CLOCKED_OUT
+  isLate      Boolean @default(false)
+  lateMinutes Int     @default(0)
+  notes       String?
 
   shiftAssignmentId String?
   shiftAssignment   ShiftAssignment? @relation(fields: [shiftAssignmentId], references: [id], onDelete: SetNull)
 
-  userId   String
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -2789,13 +2806,13 @@ model Attendance {
 }
 
 model ShiftTemplate {
-  id        String  @id @default(uuid())
-  name      String
-  startTime String  // HH:mm format
-  endTime   String  // HH:mm format
-  color     String  @default("#3B82F6") // Hex color
-  gracePeriodMinutes Int @default(15)
-  isActive  Boolean @default(true)
+  id                 String  @id @default(uuid())
+  name               String
+  startTime          String // HH:mm format
+  endTime            String // HH:mm format
+  color              String  @default("#3B82F6") // Hex color
+  gracePeriodMinutes Int     @default(15)
+  isActive           Boolean @default(true)
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -2811,13 +2828,13 @@ model ShiftTemplate {
 }
 
 model ShiftAssignment {
-  id        String   @id @default(uuid())
-  date      DateTime @db.Date
-  status    String   @default("SCHEDULED") // SCHEDULED, COMPLETED, MISSED, SWAPPED
-  notes     String?
+  id     String   @id @default(uuid())
+  date   DateTime @db.Date
+  status String   @default("SCHEDULED") // SCHEDULED, COMPLETED, MISSED, SWAPPED
+  notes  String?
 
-  userId          String
-  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   shiftTemplateId String
   shiftTemplate   ShiftTemplate @relation(fields: [shiftTemplateId], references: [id], onDelete: Cascade)
@@ -2842,9 +2859,9 @@ model ShiftAssignment {
 }
 
 model ShiftSwapRequest {
-  id        String @id @default(uuid())
-  status    String @default("PENDING") // PENDING, TARGET_ACCEPTED, TARGET_REJECTED, APPROVED, REJECTED
-  reason    String?
+  id     String  @id @default(uuid())
+  status String  @default("PENDING") // PENDING, TARGET_ACCEPTED, TARGET_REJECTED, APPROVED, REJECTED
+  reason String?
 
   // Two-stage approval: the target employee must consent before a
   // manager can apply the swap. Prior flow let a manager force a swap
@@ -2852,20 +2869,20 @@ model ShiftSwapRequest {
   targetRespondedAt DateTime?
   targetApproved    Boolean?
 
-  requesterId            String
-  requester              User            @relation("SwapRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  requesterId String
+  requester   User   @relation("SwapRequester", fields: [requesterId], references: [id], onDelete: Cascade)
 
-  targetId               String
-  target                 User            @relation("SwapTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  targetId String
+  target   User   @relation("SwapTarget", fields: [targetId], references: [id], onDelete: Cascade)
 
-  requesterAssignmentId  String
-  requesterAssignment    ShiftAssignment @relation("SwapRequester", fields: [requesterAssignmentId], references: [id], onDelete: Cascade)
+  requesterAssignmentId String
+  requesterAssignment   ShiftAssignment @relation("SwapRequester", fields: [requesterAssignmentId], references: [id], onDelete: Cascade)
 
-  targetAssignmentId     String
-  targetAssignment       ShiftAssignment @relation("SwapTarget", fields: [targetAssignmentId], references: [id], onDelete: Cascade)
+  targetAssignmentId String
+  targetAssignment   ShiftAssignment @relation("SwapTarget", fields: [targetAssignmentId], references: [id], onDelete: Cascade)
 
-  approvedById           String?
-  approvedBy             User?           @relation("SwapApprover", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedById String?
+  approvedBy   User?   @relation("SwapApprover", fields: [approvedById], references: [id], onDelete: SetNull)
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -2885,34 +2902,34 @@ model ShiftSwapRequest {
 // ========================================
 
 model MarketingUser {
-  id              String    @id @default(uuid())
-  email           String    @unique
-  password        String
-  firstName       String
-  lastName        String
-  phone           String?
-  avatar          String?
-  role            String    // SALES_MANAGER, SALES_REP
-  status          String    @default("ACTIVE") // ACTIVE, INACTIVE
-  lastLogin       DateTime?
-  lastLoginIp     String?
-  failedLogins    Int       @default(0)
-  lockedUntil     DateTime?
+  id           String    @id @default(uuid())
+  email        String    @unique
+  password     String
+  firstName    String
+  lastName     String
+  phone        String?
+  avatar       String?
+  role         String // SALES_MANAGER, SALES_REP
+  status       String    @default("ACTIVE") // ACTIVE, INACTIVE
+  lastLogin    DateTime?
+  lastLoginIp  String?
+  failedLogins Int       @default(0)
+  lockedUntil  DateTime?
 
   // Session revocation token: carried in access/refresh JWTs; bumped on
   // logout and on password change so outstanding tokens are invalidated.
-  tokenVersion    Int       @default(0)
+  tokenVersion Int @default(0)
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  leads           Lead[]            @relation("AssignedRep")
-  activities      LeadActivity[]
-  tasks           MarketingTask[]
-  offers          LeadOffer[]
-  commissions     Commission[]
-  notifications   MarketingNotification[]
+  leads         Lead[]                  @relation("AssignedRep")
+  activities    LeadActivity[]
+  tasks         MarketingTask[]
+  offers        LeadOffer[]
+  commissions   Commission[]
+  notifications MarketingNotification[]
 
   @@index([email])
   @@index([role])
@@ -2921,43 +2938,43 @@ model MarketingUser {
 }
 
 model Lead {
-  id                String    @id @default(uuid())
-  businessName      String
-  contactPerson     String
-  phone             String?
-  whatsapp          String?
-  email             String?
-  address           String?
-  city              String?
-  region            String?
-  businessType      String    // CAFE, RESTAURANT, BAR, PATISSERIE, FAST_FOOD, OTHER
-  tableCount        Int?
-  branchCount       Int?
-  currentSystem     String?
-  source            String    // INSTAGRAM, REFERRAL, FIELD_VISIT, ADS, WEBSITE, PHONE, OTHER
-  status            String    @default("NEW") // NEW, CONTACTED, NOT_REACHABLE, MEETING_DONE, DEMO_SCHEDULED, OFFER_SENT, WAITING, WON, LOST
-  lostReason        String?
-  notes             String?   @db.Text
-  nextFollowUp      DateTime?
-  priority          String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  id            String    @id @default(uuid())
+  businessName  String
+  contactPerson String
+  phone         String?
+  whatsapp      String?
+  email         String?
+  address       String?
+  city          String?
+  region        String?
+  businessType  String // CAFE, RESTAURANT, BAR, PATISSERIE, FAST_FOOD, OTHER
+  tableCount    Int?
+  branchCount   Int?
+  currentSystem String?
+  source        String // INSTAGRAM, REFERRAL, FIELD_VISIT, ADS, WEBSITE, PHONE, OTHER
+  status        String    @default("NEW") // NEW, CONTACTED, NOT_REACHABLE, MEETING_DONE, DEMO_SCHEDULED, OFFER_SENT, WAITING, WON, LOST
+  lostReason    String?
+  notes         String?   @db.Text
+  nextFollowUp  DateTime?
+  priority      String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
 
   // Assigned sales rep
-  assignedToId      String?
-  assignedTo        MarketingUser? @relation("AssignedRep", fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedToId String?
+  assignedTo   MarketingUser? @relation("AssignedRep", fields: [assignedToId], references: [id], onDelete: SetNull)
 
   // Conversion tracking
   convertedTenantId String?   @unique
   convertedTenant   Tenant?   @relation("ConvertedTenant", fields: [convertedTenantId], references: [id], onDelete: SetNull)
   convertedAt       DateTime?
 
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   // Relations
-  activities        LeadActivity[]
-  tasks             MarketingTask[]
-  offers            LeadOffer[]
-  commissions       Commission[]      @relation("CommissionLead")
+  activities  LeadActivity[]
+  tasks       MarketingTask[]
+  offers      LeadOffer[]
+  commissions Commission[]    @relation("CommissionLead")
 
   @@index([assignedToId])
   @@index([status])
@@ -2973,20 +2990,20 @@ model Lead {
 }
 
 model LeadActivity {
-  id          String    @id @default(uuid())
-  type        String    // CALL, VISIT, NOTE, EMAIL, WHATSAPP, STATUS_CHANGE, DEMO, MEETING
+  id          String  @id @default(uuid())
+  type        String // CALL, VISIT, NOTE, EMAIL, WHATSAPP, STATUS_CHANGE, DEMO, MEETING
   title       String
-  description String?   @db.Text
-  outcome     String?   // POSITIVE, NEGATIVE, NEUTRAL, NO_ANSWER
-  duration    Int?      // Duration in minutes (for calls/visits)
+  description String? @db.Text
+  outcome     String? // POSITIVE, NEGATIVE, NEUTRAL, NO_ANSWER
+  duration    Int? // Duration in minutes (for calls/visits)
 
-  leadId      String
-  lead        Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   createdById String
   createdBy   MarketingUser @relation(fields: [createdById], references: [id], onDelete: Restrict)
 
-  createdAt   DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([leadId])
   @@index([createdById])
@@ -2996,23 +3013,23 @@ model LeadActivity {
 }
 
 model MarketingTask {
-  id            String    @id @default(uuid())
-  title         String
-  description   String?
-  type          String    // CALL, VISIT, DEMO, FOLLOW_UP, MEETING, OTHER
-  status        String    @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, CANCELLED
-  priority      String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
-  dueDate       DateTime
-  completedAt   DateTime?
+  id          String    @id @default(uuid())
+  title       String
+  description String?
+  type        String // CALL, VISIT, DEMO, FOLLOW_UP, MEETING, OTHER
+  status      String    @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, CANCELLED
+  priority    String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  dueDate     DateTime
+  completedAt DateTime?
 
-  leadId        String?
-  lead          Lead?     @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  leadId String?
+  lead   Lead?   @relation(fields: [leadId], references: [id], onDelete: SetNull)
 
-  assignedToId  String
-  assignedTo    MarketingUser @relation(fields: [assignedToId], references: [id], onDelete: Cascade)
+  assignedToId String
+  assignedTo   MarketingUser @relation(fields: [assignedToId], references: [id], onDelete: Cascade)
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([assignedToId])
   @@index([leadId])
@@ -3024,26 +3041,26 @@ model MarketingTask {
 }
 
 model LeadOffer {
-  id              String    @id @default(uuid())
-  planId          String?
-  plan            SubscriptionPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
-  customPrice     Decimal?  @db.Decimal(10, 2)
-  discount        Decimal?  @db.Decimal(5, 2)
-  trialDays       Int?
-  notes           String?   @db.Text
-  status          String    @default("DRAFT") // DRAFT, SENT, ACCEPTED, REJECTED, EXPIRED
-  validUntil      DateTime?
-  sentAt          DateTime?
-  respondedAt     DateTime?
+  id          String            @id @default(uuid())
+  planId      String?
+  plan        SubscriptionPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+  customPrice Decimal?          @db.Decimal(10, 2)
+  discount    Decimal?          @db.Decimal(5, 2)
+  trialDays   Int?
+  notes       String?           @db.Text
+  status      String            @default("DRAFT") // DRAFT, SENT, ACCEPTED, REJECTED, EXPIRED
+  validUntil  DateTime?
+  sentAt      DateTime?
+  respondedAt DateTime?
 
-  leadId          String
-  lead            Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  leadId String
+  lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
-  createdById     String
-  createdBy       MarketingUser @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdById String
+  createdBy   MarketingUser @relation(fields: [createdById], references: [id], onDelete: Restrict)
 
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([leadId])
   @@index([createdById])
@@ -3053,24 +3070,24 @@ model LeadOffer {
 }
 
 model Commission {
-  id              String    @id @default(uuid())
-  amount          Decimal   @db.Decimal(10, 2)
-  type            String    // SIGNUP, RENEWAL, UPSELL
-  status          String    @default("PENDING") // PENDING, APPROVED, PAID
-  period          String    // "2026-04" (YYYY-MM format)
-  tenantId        String?
-  tenant          Tenant?   @relation("MarketingCommissions", fields: [tenantId], references: [id], onDelete: SetNull)
-  leadId          String?
-  lead            Lead?     @relation("CommissionLead", fields: [leadId], references: [id], onDelete: SetNull)
-  notes           String?   @db.Text
+  id       String  @id @default(uuid())
+  amount   Decimal @db.Decimal(10, 2)
+  type     String // SIGNUP, RENEWAL, UPSELL
+  status   String  @default("PENDING") // PENDING, APPROVED, PAID
+  period   String // "2026-04" (YYYY-MM format)
+  tenantId String?
+  tenant   Tenant? @relation("MarketingCommissions", fields: [tenantId], references: [id], onDelete: SetNull)
+  leadId   String?
+  lead     Lead?   @relation("CommissionLead", fields: [leadId], references: [id], onDelete: SetNull)
+  notes    String? @db.Text
 
   marketingUserId String
   marketingUser   MarketingUser @relation(fields: [marketingUserId], references: [id], onDelete: Restrict)
 
-  approvedAt      DateTime?
-  paidAt          DateTime?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  approvedAt DateTime?
+  paidAt     DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([marketingUserId])
   @@index([tenantId])
@@ -3082,17 +3099,17 @@ model Commission {
 }
 
 model MarketingNotification {
-  id          String    @id @default(uuid())
-  type        String    // FOLLOW_UP_REMINDER, DEMO_REMINDER, INACTIVE_LEAD, OFFER_EXPIRING, TASK_DUE
-  title       String
-  message     String
-  isRead      Boolean   @default(false)
-  metadata    Json?
+  id       String  @id @default(uuid())
+  type     String // FOLLOW_UP_REMINDER, DEMO_REMINDER, INACTIVE_LEAD, OFFER_EXPIRING, TASK_DUE
+  title    String
+  message  String
+  isRead   Boolean @default(false)
+  metadata Json?
 
-  userId      String
-  user        MarketingUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   MarketingUser @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  createdAt   DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@index([userId, isRead])
   @@index([createdAt])
@@ -3104,41 +3121,41 @@ model MarketingNotification {
 // ========================================
 
 model AccountingSettings {
-  id        String   @id @default(uuid())
-  tenantId  String   @unique
-  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  tenantId String @unique
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  autoGenerateInvoice  Boolean @default(false)
+  autoGenerateInvoice Boolean @default(false)
 
-  companyName          String?
-  companyTaxId         String?
-  companyTaxOffice     String?
-  companyAddress       String?
-  companyPhone         String?
-  companyEmail         String?
+  companyName      String?
+  companyTaxId     String?
+  companyTaxOffice String?
+  companyAddress   String?
+  companyPhone     String?
+  companyEmail     String?
 
-  provider             String  @default("NONE")
-  autoSync             Boolean @default(false)
+  provider String  @default("NONE")
+  autoSync Boolean @default(false)
 
-  parasutCompanyId     String?
-  parasutClientId      String?
-  parasutClientSecret  String?
-  parasutUsername       String?
-  parasutPassword      String?
+  parasutCompanyId    String?
+  parasutClientId     String?
+  parasutClientSecret String?
+  parasutUsername     String?
+  parasutPassword     String?
 
-  logoApiUrl           String?
-  logoUsername          String?
-  logoPassword         String?
-  logoFirmNumber       String?
+  logoApiUrl     String?
+  logoUsername   String?
+  logoPassword   String?
+  logoFirmNumber String?
 
-  foribaApiUrl         String?
-  foribaUsername        String?
-  foribaPassword       String?
-  foribaServiceType    String?
+  foribaApiUrl      String?
+  foribaUsername    String?
+  foribaPassword    String?
+  foribaServiceType String?
 
-  invoicePrefix        String  @default("FTR")
-  nextInvoiceNumber    Int     @default(1)
-  defaultPaymentTermDays Int   @default(0)
+  invoicePrefix          String @default("FTR")
+  nextInvoiceNumber      Int    @default(1)
+  defaultPaymentTermDays Int    @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3152,27 +3169,27 @@ model AccountingSettings {
 // ========================================
 
 model SalesInvoice {
-  id             String   @id @default(uuid())
-  invoiceNumber  String
-  type           String   @default("SALES")
-  status         String   @default("DRAFT")
+  id            String @id @default(uuid())
+  invoiceNumber String
+  type          String @default("SALES")
+  status        String @default("DRAFT")
 
-  customerName   String?
-  customerPhone  String?
-  customerEmail  String?
-  customerTaxId  String?
+  customerName      String?
+  customerPhone     String?
+  customerEmail     String?
+  customerTaxId     String?
   customerTaxOffice String?
 
-  subtotal       Decimal  @db.Decimal(10, 2)
-  taxAmount      Decimal  @db.Decimal(10, 2)
-  totalAmount    Decimal  @db.Decimal(10, 2)
-  discount       Decimal  @default(0) @db.Decimal(10, 2)
-  currency       String   @default("TRY")
+  subtotal    Decimal @db.Decimal(10, 2)
+  taxAmount   Decimal @db.Decimal(10, 2)
+  totalAmount Decimal @db.Decimal(10, 2)
+  discount    Decimal @default(0) @db.Decimal(10, 2)
+  currency    String  @default("TRY")
 
-  taxBreakdown   Json?
+  taxBreakdown Json?
 
-  orderId        String?
-  order          Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  orderId       String?
+  order         Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
   // When the invoice corresponds to a single Payment row (progressive
   // / per-customer flow), paymentId links to it so each customer can
   // get their own KDV breakdown. Order-level invoices (single payment
@@ -3180,28 +3197,28 @@ model SalesInvoice {
   // partial unique constraint (one invoice per payment) is enforced
   // by a unique index defined in the migration; Prisma's @unique on
   // a nullable column would block multiple NULLs in Postgres.
-  paymentId      String?
-  payment        Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
-  paymentMethod  String?
+  paymentId     String?
+  payment       Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  paymentMethod String?
 
-  externalId     String?
+  externalId       String?
   externalProvider String?
-  externalStatus String?
-  syncedAt       DateTime?
-  syncError      String?
+  externalStatus   String?
+  syncedAt         DateTime?
+  syncError        String?
 
-  pdfUrl         String?
+  pdfUrl String?
 
-  issueDate      DateTime @default(now())
-  dueDate        DateTime?
+  issueDate DateTime  @default(now())
+  dueDate   DateTime?
 
-  tenantId       String
-  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  items          SalesInvoiceItem[]
+  items SalesInvoiceItem[]
 
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId])
@@ -3213,17 +3230,17 @@ model SalesInvoice {
 }
 
 model SalesInvoiceItem {
-  id             String   @id @default(uuid())
-  description    String
-  quantity       Int
-  unitPrice      Decimal  @db.Decimal(10, 2)
-  taxRate        Int      @default(10)
-  taxAmount      Decimal  @db.Decimal(10, 2)
-  subtotal       Decimal  @db.Decimal(10, 2)
-  total          Decimal  @db.Decimal(10, 2)
+  id          String  @id @default(uuid())
+  description String
+  quantity    Int
+  unitPrice   Decimal @db.Decimal(10, 2)
+  taxRate     Int     @default(10)
+  taxAmount   Decimal @db.Decimal(10, 2)
+  subtotal    Decimal @db.Decimal(10, 2)
+  total       Decimal @db.Decimal(10, 2)
 
-  invoiceId      String
-  invoice        SalesInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoiceId String
+  invoice   SalesInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
   @@map("sales_invoice_items")
