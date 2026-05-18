@@ -58,6 +58,17 @@
   "tableOccupiedNoOrders": "Table is occupied but no active orders found",
   "loadingExistingOrder": "Loading existing order...",
   "tableReserved": "Table is reserved",
+  "tableManuallyReserved": "This table was manually marked reserved by an admin",
+  "reservationDialog": {
+    "title": "This table has a reservation",
+    "banner": "Table {{tableNumber}} has an upcoming reservation. If the guest just arrived, tap \"Guest arrived — Seat\" to seat the reservation and switch the table to order mode.",
+    "timeLabel": "Time",
+    "customerLabel": "Customer",
+    "guestsLabel": "Guests",
+    "statusLabel": "Status",
+    "seatButton": "Guest arrived — Seat",
+    "cancelButton": "Cancel"
+  },
   "selectTableFirst": "Please select a table first",
   "orderCreatedSuccess": "Order #{{orderNumber}} created successfully",
   "orderCompletedSuccess": "Order completed successfully!",
@@ -281,5 +292,6 @@
     "success": "Orders transferred from Table {{sourceTable}} to Table {{targetTable}}",
     "failed": "Failed to transfer orders",
     "socketNotification": "{{count}} order(s) transferred from Table {{sourceTable}} to Table {{targetTable}}"
-  }
+  },
+  "availableTableHasUpcomingReservation": "Table reserved for {{startTime}} · {{customerName}} ({{guestCount}} guests) — proceed with care"
 }

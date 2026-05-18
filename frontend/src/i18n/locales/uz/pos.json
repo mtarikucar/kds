@@ -58,6 +58,17 @@
   "tableOccupiedNoOrders": "Stol band, lekin faol buyurtmalar topilmadi",
   "loadingExistingOrder": "Mavjud buyurtma yuklanmoqda...",
   "tableReserved": "Stol band qilingan",
+  "tableManuallyReserved": "Bu stol administrator tomonidan qo'lda band qilingan",
+  "reservationDialog": {
+    "title": "Bu stolda bron mavjud",
+    "banner": "Stol {{tableNumber}} uchun yaqinlashayotgan bron bor. Mehmon kelgan bo'lsa \"Mehmon keldi — O'tirtirish\" tugmasini bosib bronni o'tirtirib, stolni buyurtma rejimiga o'tkazishingiz mumkin.",
+    "timeLabel": "Vaqt",
+    "customerLabel": "Mijoz",
+    "guestsLabel": "Mehmonlar soni",
+    "statusLabel": "Holat",
+    "seatButton": "Mehmon keldi — O'tirtirish",
+    "cancelButton": "Bekor qilish"
+  },
   "selectTableFirst": "Avval stolni tanlang",
   "orderCreatedSuccess": "№{{orderNumber}} buyurtma muvaffaqiyatli yaratildi",
   "orderCompletedSuccess": "Buyurtma muvaffaqiyatli yakunlandi!",
@@ -281,5 +292,6 @@
     "success": "Buyurtmalar {{sourceTable}} stolidan {{targetTable}} stoliga ko'chirildi",
     "failed": "Buyurtmalarni ko'chirish amalga oshmadi",
     "socketNotification": "{{sourceTable}} stolidan {{targetTable}} stoliga {{count}} ta buyurtma ko'chirildi"
-  }
+  },
+  "availableTableHasUpcomingReservation": "Stol {{startTime}} · {{customerName}} ({{guestCount}} mehmon) uchun band qilingan — ehtiyot bo‘ling"
 }

@@ -58,6 +58,17 @@
   "tableOccupiedNoOrders": "Masa dolu ancak aktif sipariş bulunamadı",
   "loadingExistingOrder": "Mevcut sipariş yükleniyor...",
   "tableReserved": "Masa rezerve edilmiş",
+  "tableManuallyReserved": "Bu masa yönetici tarafından manuel olarak rezerve edildi",
+  "reservationDialog": {
+    "title": "Bu masada rezervasyon var",
+    "banner": "Masa {{tableNumber}} için yaklaşan bir rezervasyon mevcut. Misafir geldiyse \"Misafir geldi — Yerleştir\" ile rezervasyonu oturtarak masayı sipariş alma moduna geçirebilirsiniz.",
+    "timeLabel": "Saat",
+    "customerLabel": "Müşteri",
+    "guestsLabel": "Kişi sayısı",
+    "statusLabel": "Durum",
+    "seatButton": "Misafir geldi — Yerleştir",
+    "cancelButton": "Vazgeç"
+  },
   "selectTableFirst": "Lütfen önce bir masa seçin",
   "orderCreatedSuccess": "Sipariş #{{orderNumber}} başarıyla oluşturuldu",
   "orderCompletedSuccess": "Sipariş başarıyla tamamlandı!",
@@ -71,7 +82,7 @@
   "createOrder": "Sipariş Oluştur",
   "proceedToPayment": "Ödemeye Devam Et",
   "cart": {
-    "yourOrder": "Sipari\u015finiz",
+    "yourOrder": "Siparişiniz",
     "closeCart": "Sepeti kapat"
   },
   "menu": {
@@ -100,7 +111,7 @@
     "customerPhone": "Müşteri Telefonu (İsteğe Bağlı)",
     "customerPhonePlaceholder": "+90 555 123 4567"
   },
-  "checkout": "\u00d6deme",
+  "checkout": "Ödeme",
   "notifications": {
     "pending": "Bekleyen",
     "notification": "Bildirim",
@@ -281,5 +292,6 @@
     "success": "Siparişler Masa {{sourceTable}}'den Masa {{targetTable}}'e aktarıldı",
     "failed": "Siparişler aktarılamadı",
     "socketNotification": "{{count}} sipariş Masa {{sourceTable}}'den Masa {{targetTable}}'e aktarıldı"
-  }
+  },
+  "availableTableHasUpcomingReservation": "Masa {{startTime}} · {{customerName}} ({{guestCount}} kişi) için rezervasyon var — dikkatli olun"
 }

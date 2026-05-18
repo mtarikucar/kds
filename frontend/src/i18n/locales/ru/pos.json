@@ -58,6 +58,17 @@
   "tableOccupiedNoOrders": "Стол занят, но активных заказов не найдено",
   "loadingExistingOrder": "Загрузка существующего заказа...",
   "tableReserved": "Стол забронирован",
+  "tableManuallyReserved": "Этот стол вручную помечен как зарезервированный администратором",
+  "reservationDialog": {
+    "title": "Этот стол забронирован",
+    "banner": "Для стола {{tableNumber}} есть ближайшая бронь. Если гость уже прибыл, нажмите \"Гость пришёл — Усадить\", чтобы усадить бронь и перевести стол в режим приёма заказов.",
+    "timeLabel": "Время",
+    "customerLabel": "Клиент",
+    "guestsLabel": "Кол-во гостей",
+    "statusLabel": "Статус",
+    "seatButton": "Гость пришёл — Усадить",
+    "cancelButton": "Отмена"
+  },
   "selectTableFirst": "Сначала выберите стол",
   "orderCreatedSuccess": "Заказ №{{orderNumber}} успешно создан",
   "orderCompletedSuccess": "Заказ успешно завершен!",
@@ -281,5 +292,6 @@
     "success": "Заказы перенесены со столика {{sourceTable}} на столик {{targetTable}}",
     "failed": "Не удалось перенести заказы",
     "socketNotification": "{{count}} заказ(ов) перенесено со столика {{sourceTable}} на столик {{targetTable}}"
-  }
+  },
+  "availableTableHasUpcomingReservation": "Стол забронирован на {{startTime}} · {{customerName}} ({{guestCount}} гостей) — будьте внимательны"
 }

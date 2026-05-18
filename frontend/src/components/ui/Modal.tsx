@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useId } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
@@ -35,6 +35,10 @@ const Modal: React.FC<ModalProps> = ({
   children,
   size = 'md',
 }) => {
+  // useId per-instance so stacked modals don't both stamp the same
+  // `id="modal-title"` (duplicate IDs would break aria-labelledby).
+  const titleId = useId();
+
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -74,6 +78,9 @@ const Modal: React.FC<ModalProps> = ({
 
         {/* Modal */}
         <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={title ? titleId : undefined}
           className={cn(
             'relative w-full bg-white rounded-xl shadow-2xl',
             'max-h-[90vh] flex flex-col',
@@ -84,7 +91,7 @@ const Modal: React.FC<ModalProps> = ({
           {/* Header */}
           {title && (
             <div className="flex items-center justify-between px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-100 flex-shrink-0">
-              <h2 className="text-base sm:text-lg md:text-xl font-heading font-semibold text-slate-900">{title}</h2>
+              <h2 id={titleId} className="text-base sm:text-lg md:text-xl font-heading font-semibold text-slate-900">{title}</h2>
               <button
                 onClick={onClose}
                 className="text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg p-1.5 sm:p-2 transition-all duration-150"

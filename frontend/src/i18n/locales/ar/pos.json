@@ -58,6 +58,17 @@
   "tableOccupiedNoOrders": "الطاولة مشغولة ولكن لم يتم العثور على طلبات نشطة",
   "loadingExistingOrder": "جاري تحميل الطلب الحالي...",
   "tableReserved": "الطاولة محجوزة",
+  "tableManuallyReserved": "تم حجز هذه الطاولة يدويًا بواسطة المسؤول",
+  "reservationDialog": {
+    "title": "هذه الطاولة لديها حجز",
+    "banner": "هناك حجز قادم للطاولة {{tableNumber}}. إذا وصل الضيف، اضغط \"وصل الضيف — إجلاس\" لإجلاس الحجز وتحويل الطاولة إلى وضع الطلب.",
+    "timeLabel": "الوقت",
+    "customerLabel": "العميل",
+    "guestsLabel": "عدد الضيوف",
+    "statusLabel": "الحالة",
+    "seatButton": "وصل الضيف — إجلاس",
+    "cancelButton": "إلغاء"
+  },
   "selectTableFirst": "يرجى اختيار طاولة أولاً",
   "orderCreatedSuccess": "تم إنشاء الطلب #{{orderNumber}} بنجاح",
   "orderCompletedSuccess": "تم إكمال الطلب بنجاح!",
@@ -281,5 +292,6 @@
     "success": "تم نقل الطلبات من الطاولة {{sourceTable}} إلى الطاولة {{targetTable}}",
     "failed": "فشل في نقل الطلبات",
     "socketNotification": "تم نقل {{count}} طلب من الطاولة {{sourceTable}} إلى الطاولة {{targetTable}}"
-  }
+  },
+  "availableTableHasUpcomingReservation": "الطاولة محجوزة في {{startTime}} · {{customerName}} ({{guestCount}} ضيوف) — يرجى الانتباه"
 }

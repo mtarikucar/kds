@@ -81,9 +81,19 @@ export const useConfirmReservation = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reservations'] });
       queryClient.invalidateQueries({ queryKey: ['reservationStats'] });
+      // confirm flips the reservation to CONFIRMED — table status
+      // doesn't move yet, but GET /tables annotates each row with
+      // `upcomingReservation` based on the reservation list, so the
+      // floor plan badge needs a fresh read.
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
       toast.success(i18n.t('reservations:notifications.confirmed'));
     },
     onError: (error: any) => {
+      // 4xx on a lifecycle transition usually means the row already
+      // moved (another terminal confirmed/cancelled it) — refetch so
+      // the floor plan and reservation list reflect reality.
+      queryClient.invalidateQueries({ queryKey: ['reservations'] });
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
       toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
   });
@@ -99,9 +109,17 @@ export const useRejectReservation = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reservations'] });
       queryClient.invalidateQueries({ queryKey: ['reservationStats'] });
+      // reject releases any auto-hold on the table (lifecycle hook in
+      // ReservationsService.reject), so the floor plan / POS need
+      // fresh table state.
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
       toast.success(i18n.t('reservations:notifications.rejected'));
     },
     onError: (error: any) => {
+      // Same conflict-class refetch as confirm; covers "already
+      // rejected by another terminal" 409s.
+      queryClient.invalidateQueries({ queryKey: ['reservations'] });
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
       toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
   });
@@ -117,9 +135,22 @@ export const useSeatReservation = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reservations'] });
       queryClient.invalidateQueries({ queryKey: ['reservationStats'] });
+      // seat flips the table → OCCUPIED in lock step with the
+      // reservation row; the POS reservation modal expects this
+      // invalidation so the just-seated table appears OCCUPIED on the
+      // next render (otherwise the stale cache still shows RESERVED
+      // and the modal would re-open on a re-click).
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
       toast.success(i18n.t('reservations:notifications.seated'));
     },
     onError: (error: any) => {
+      // 404 (reservation gone) and 409 (already SEATED/COMPLETED, or
+      // table state mismatch) almost always mean our local cache is
+      // stale — refetch so the caller sees the real state instead of
+      // looping on the same error. Cheap: ['tables'] is a single
+      // tenant-scoped list.
+      queryClient.invalidateQueries({ queryKey: ['reservations'] });
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
       toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
   });
@@ -135,9 +166,15 @@ export const useCompleteReservation = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reservations'] });
       queryClient.invalidateQueries({ queryKey: ['reservationStats'] });
+      // complete frees the table → AVAILABLE.
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
       toast.success(i18n.t('reservations:notifications.completed'));
     },
     onError: (error: any) => {
+      // 409 if the reservation moved off SEATED before complete
+      // landed — refetch so the user sees current state.
+      queryClient.invalidateQueries({ queryKey: ['reservations'] });
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
       toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
   });
@@ -153,9 +190,16 @@ export const useNoShowReservation = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reservations'] });
       queryClient.invalidateQueries({ queryKey: ['reservationStats'] });
+      // no-show releases the auto-hold and clears the upcoming-reservation
+      // annotation — tables list needs the fresh state.
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
       toast.success(i18n.t('reservations:notifications.noShow'));
     },
     onError: (error: any) => {
+      // Same conflict-class refetch; another terminal may have
+      // already marked the row or the guest may have arrived.
+      queryClient.invalidateQueries({ queryKey: ['reservations'] });
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
       toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
   });
@@ -171,9 +215,17 @@ export const useCancelReservation = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['reservations'] });
       queryClient.invalidateQueries({ queryKey: ['reservationStats'] });
+      // cancel releases the auto-hold (lifecycle hook in
+      // ReservationsService.cancel) — refresh tables so the formerly
+      // RESERVED row drops back to AVAILABLE on the floor plan.
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
       toast.success(i18n.t('reservations:notifications.cancelled'));
     },
     onError: (error: any) => {
+      // 409 if the reservation can no longer be cancelled (already
+      // SEATED/COMPLETED). Refetch so the user sees the final state.
+      queryClient.invalidateQueries({ queryKey: ['reservations'] });
+      queryClient.invalidateQueries({ queryKey: ['tables'] });
       toast.error(error.response?.data?.message || i18n.t('common:notifications.operationFailed'));
     },
   });
