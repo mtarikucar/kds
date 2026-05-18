@@ -5,12 +5,20 @@ import { ReservationStatus } from '../constants/reservation-status.enum';
 import { TableStatus } from '../../tables/dto/create-table.dto';
 
 /**
- * Auto-RESERVED hold window: how many minutes before a CONFIRMED
- * reservation's startTime should the table be flipped to RESERVED so
- * a walk-in can't grab it. Matches the orders-service walk-in guard
- * so the two systems agree on "imminent".
+ * Default pre-start hold window when a tenant has no ReservationSettings
+ * row yet (cold seed / brand-new tenant). Once the row exists the per-
+ * tenant `holdOffsetMinutes` overrides this. Matches the original
+ * hard-coded value so behavior is unchanged for stock tenants.
  */
-const HOLD_WINDOW_MINUTES = 30;
+const DEFAULT_HOLD_OFFSET_MINUTES = 30;
+
+/**
+ * After a confirmed reservation's startTime, how long we wait before
+ * auto-flipping it to NO_SHOW and releasing the table. Hardcoded — the
+ * user-facing setting controls the pre-start hold only; the post-start
+ * grace is fixed at 30 minutes by product decision.
+ */
+const GRACE_AFTER_START_MINUTES = 30;
 
 /**
  * Manages table-level holds for upcoming reservations.
@@ -44,10 +52,9 @@ export class ReservationSchedulerService {
   @Cron(CronExpression.EVERY_5_MINUTES, { name: 'reservation-auto-hold' })
   async autoHoldUpcoming(): Promise<{ held: number }> {
     const now = new Date();
-    const windowEnd = new Date(now.getTime() + HOLD_WINDOW_MINUTES * 60_000);
 
     // Reservations whose date is today (or tomorrow at the boundary)
-    // and whose startTime falls inside [now, now+window]. SQL can't
+    // and whose startTime falls inside [now, now+offset]. SQL can't
     // compare the composed timestamp directly without a join+cast, so
     // we pull a small candidate set per day and filter in memory.
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -69,8 +76,18 @@ export class ReservationSchedulerService {
       },
     });
 
+    // Batch-fetch per-tenant offset so we don't issue one query per
+    // reservation. Tenants without a settings row fall back to the
+    // default — matches the legacy hardcoded behavior.
+    const offsetByTenant = await this.fetchOffsets(
+      Array.from(new Set(candidates.map((r) => r.tenantId))),
+    );
+
     let held = 0;
     for (const r of candidates) {
+      const offsetMin = offsetByTenant.get(r.tenantId) ?? DEFAULT_HOLD_OFFSET_MINUTES;
+      const windowEnd = new Date(now.getTime() + offsetMin * 60_000);
+
       const [sh, sm] = r.startTime.split(':').map(Number);
       const startDt = new Date(r.date);
       startDt.setHours(sh, sm, 0, 0);
@@ -137,12 +154,37 @@ export class ReservationSchedulerService {
         // something raced — drop the hold to converge.
         shouldRelease = true;
       } else {
-        // Still PENDING/CONFIRMED. Released only if the end of the
-        // window has passed (no-show without anyone flipping the row).
+        // Still PENDING/CONFIRMED. Two release triggers:
+        //   (a) end of the reservation window has passed (legacy no-show).
+        //   (b) start + GRACE_AFTER_START_MINUTES has passed without
+        //       seating — auto-mark NO_SHOW and release the table so the
+        //       waiter can use it for a walk-in. The dialog UX only
+        //       exposes "seat" within this grace, after which the row
+        //       has no actionable path anyway.
         const [eh, em] = r.endTime.split(':').map(Number);
         const endDt = new Date(r.date);
         endDt.setHours(eh, em, 0, 0);
-        if (endDt < now) shouldRelease = true;
+
+        const [sh, sm] = r.startTime.split(':').map(Number);
+        const startDt = new Date(r.date);
+        startDt.setHours(sh, sm, 0, 0);
+        const graceEnd = new Date(startDt.getTime() + GRACE_AFTER_START_MINUTES * 60_000);
+
+        if (endDt < now) {
+          shouldRelease = true;
+        } else if (graceEnd < now) {
+          // Mark the reservation as NO_SHOW so the customer report and
+          // history reflect what happened. Guarded by status filter so
+          // a concurrent SEAT/CANCEL can't be overwritten.
+          await this.prisma.reservation.updateMany({
+            where: {
+              id: r.id,
+              status: { in: [ReservationStatus.CONFIRMED, ReservationStatus.PENDING] },
+            },
+            data: { status: ReservationStatus.NO_SHOW },
+          });
+          shouldRelease = true;
+        }
       }
 
       if (!shouldRelease) continue;
@@ -168,5 +210,19 @@ export class ReservationSchedulerService {
       this.logger.log(`release-holds: cleared ${released} stale RESERVED hold(s)`);
     }
     return { released };
+  }
+
+  /**
+   * Fetches per-tenant holdOffsetMinutes settings in one query. Tenants
+   * without a settings row are absent from the map; callers fall back
+   * to {@link DEFAULT_HOLD_OFFSET_MINUTES}.
+   */
+  private async fetchOffsets(tenantIds: string[]): Promise<Map<string, number>> {
+    if (tenantIds.length === 0) return new Map();
+    const rows = await this.prisma.reservationSettings.findMany({
+      where: { tenantId: { in: tenantIds } },
+      select: { tenantId: true, holdOffsetMinutes: true },
+    });
+    return new Map(rows.map((r) => [r.tenantId, r.holdOffsetMinutes]));
   }
 }

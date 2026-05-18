@@ -57,7 +57,9 @@
     "reservationLink": "Reservation Link",
     "reservationLinkDesc": "Share this link with your customers so they can make reservations",
     "copyLink": "Copy",
-    "linkCopied": "Link copied!"
+    "linkCopied": "Link copied!",
+    "holdOffsetMinutes": "Reservation hold offset (minutes)",
+    "holdOffsetMinutesDesc": "Minutes before a confirmed reservation that the assigned table flips to Reserved. Default 30 — set to 0 to disable pre-hold."
   },
   "status": {
     "PENDING": "Pending",

@@ -1175,6 +1175,7 @@ export interface ReservationSettings {
   customMessage?: string;
   allowCancellation: boolean;
   cancellationDeadline: number;
+  holdOffsetMinutes: number;
 }
 
 export interface CreateReservationDto {
@@ -1218,6 +1219,7 @@ export interface UpdateReservationSettingsDto {
   customMessage?: string;
   allowCancellation?: boolean;
   cancellationDeadline?: number;
+  holdOffsetMinutes?: number;
 }
 
 export interface AvailableSlot {

@@ -20,6 +20,7 @@ import TableMergeModal from '../../components/pos/TableMergeModal';
 import BillSplitModal from '../../components/pos/BillSplitModal';
 import ProgressiveSplitModal from '../../components/pos/ProgressiveSplitModal';
 import ReservationActionDialog from '../../components/pos/ReservationActionDialog';
+import ManualLockDialog from '../../components/pos/ManualLockDialog';
 import type { UpcomingReservationOnTable } from '../../types';
 import { useTables, useUpdateTableStatus, useMergeTables, useUnmergeTable, useUnmergeAll } from '../../features/tables/tablesApi';
 import { useGetPosSettings } from '../../features/pos/posApi';
@@ -114,6 +115,12 @@ const POSPage = () => {
     table: Table;
     reservation: UpcomingReservationOnTable;
   } | null>(null);
+
+  // Manual-lock dialog: opened when waiter taps a RESERVED table that
+  // has no upcomingReservation annotation (admin lock with no booking
+  // backing). Waiter can choose to override the lock and start an
+  // order — the table is flipped to AVAILABLE before the order screen.
+  const [manualLockDialog, setManualLockDialog] = useState<Table | null>(null);
 
   // Set right before flipping selectedTable → OCCUPIED via the seat
   // path. The OCCUPIED useEffect uses it to suppress the "table is
@@ -321,15 +328,17 @@ const POSPage = () => {
       //      waiter can see the booking details and seat the guest in
       //      one tap when they arrive.
       //   2. Manually RESERVED by admin (no reservation backing) —
-      //      `upcomingReservation` is null. Fall back to the plain
-      //      "manually reserved" toast; we don't have a row to seat.
+      //      `upcomingReservation` is null. Open the manual-lock
+      //      dialog so the waiter can override and start an order;
+      //      we don't have a row to "seat" but they shouldn't be
+      //      stuck either.
       if (table.upcomingReservation) {
         setReservationDialog({
           table,
           reservation: table.upcomingReservation,
         });
       } else {
-        toast.warning(t('tableManuallyReserved'));
+        setManualLockDialog(table);
       }
     }
   };
@@ -357,6 +366,28 @@ const POSPage = () => {
     setCurrentOrderAmount(null);
     setCurrentView('order');
   }, [reservationDialog]);
+
+  /**
+   * Callback fired by ManualLockDialog after a successful
+   * PATCH /tables/:id/status=AVAILABLE. The hook invalidated
+   * ['tables']; we optimistically use the AVAILABLE-table flow so
+   * the waiter lands on the order screen as a fresh start (no
+   * customer prefill, empty cart) — they'll be filling in the order
+   * from scratch.
+   */
+  const handleManualLockOverride = useCallback(() => {
+    const justUnlocked = manualLockDialog;
+    setManualLockDialog(null);
+    if (!justUnlocked) return;
+    setSelectedTable({ ...justUnlocked, status: TableStatus.AVAILABLE });
+    setCartItems([]);
+    setDiscount(0);
+    setCustomerName('');
+    setOrderNotes('');
+    setCurrentOrderId(null);
+    setCurrentOrderAmount(null);
+    setCurrentView('order');
+  }, [manualLockDialog]);
 
   // Handle back to table selection (preserves cart)
   const handleBackToTables = () => {
@@ -1270,6 +1301,21 @@ const POSPage = () => {
           reservation={reservationDialog.reservation}
           tableNumber={reservationDialog.table.number}
           onSeated={handleReservationSeated}
+        />
+      )}
+
+      {/* Manual-lock dialog — opens when the waiter taps a RESERVED
+          table that is NOT auto-held for an upcoming reservation
+          (admin marked it RESERVED with no booking row). Offers a
+          one-tap override that flips the table to AVAILABLE and
+          drops the waiter on the order screen. */}
+      {manualLockDialog && (
+        <ManualLockDialog
+          isOpen
+          onClose={() => setManualLockDialog(null)}
+          tableId={manualLockDialog.id}
+          tableNumber={manualLockDialog.number}
+          onUnlocked={handleManualLockOverride}
         />
       )}
     </div>

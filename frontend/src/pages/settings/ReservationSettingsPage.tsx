@@ -41,6 +41,7 @@ interface ReservationSettingsState {
   maxReservationsPerSlot: number | null;
   allowCancellation: boolean;
   cancellationDeadline: number;
+  holdOffsetMinutes: number;
   operatingHours: Record<string, { open: string; close: string; closed: boolean }>;
   bannerTitle: string;
   bannerDescription: string;
@@ -90,6 +91,7 @@ const ReservationSettingsPage = () => {
     maxReservationsPerSlot: null,
     allowCancellation: true,
     cancellationDeadline: 120,
+    holdOffsetMinutes: 30,
     operatingHours: DEFAULT_OPERATING_HOURS,
     bannerTitle: '',
     bannerDescription: '',
@@ -109,6 +111,7 @@ const ReservationSettingsPage = () => {
         maxReservationsPerSlot: reservationSettings.maxReservationsPerSlot ?? null,
         allowCancellation: reservationSettings.allowCancellation,
         cancellationDeadline: reservationSettings.cancellationDeadline,
+        holdOffsetMinutes: reservationSettings.holdOffsetMinutes ?? 30,
         operatingHours: reservationSettings.operatingHours ?? DEFAULT_OPERATING_HOURS,
         bannerTitle: reservationSettings.bannerTitle ?? '',
         bannerDescription: reservationSettings.bannerDescription ?? '',
@@ -333,6 +336,16 @@ const ReservationSettingsPage = () => {
               type="number"
               value={String(settings.defaultDuration)}
               onChange={(value) => handleNumberChange('defaultDuration', value)}
+            />
+
+            <SettingsDivider />
+
+            <SettingsInput
+              label={t('reservations:settings.holdOffsetMinutes')}
+              description={t('reservations:settings.holdOffsetMinutesDesc')}
+              type="number"
+              value={String(settings.holdOffsetMinutes)}
+              onChange={(value) => handleNumberChange('holdOffsetMinutes', value)}
             />
           </SettingsGroup>
         </SettingsSection>

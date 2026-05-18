@@ -1164,6 +1164,14 @@ model ReservationSettings {
   allowCancellation    Boolean @default(true)
   cancellationDeadline Int     @default(120)
 
+  /// How many minutes before a confirmed reservation's start time the
+  /// scheduler should auto-flip an AVAILABLE table to RESERVED. Also
+  /// drives the upcomingReservation annotation window on GET /tables
+  /// and the POS reservation-action dialog visibility. Default 30 —
+  /// the seat-on-tap UX is built for last-30-minute prep, not 2h-ahead
+  /// blockade. Tenants can widen for banquets or large parties.
+  holdOffsetMinutes Int @default(30)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

@@ -98,3 +98,20 @@ export async function markNoShow(api: APIRequestContext, reservationId: string):
   const res = await api.patch(`reservations/${reservationId}/no-show`);
   if (!res.ok()) throw new Error(`markNoShow failed: ${res.status()} ${await res.text()}`);
 }
+
+/**
+ * PATCH /reservations/settings/current — partial update of the
+ * tenant's reservation settings. Only the fields supplied are touched
+ * (DTO is fully optional). Tests use this to widen
+ * `holdOffsetMinutes` so a reservation 100 min ahead still falls in
+ * the upcomingReservation annotation window without colliding with
+ * the demo's `minAdvanceBooking: 60` floor.
+ */
+export async function updateReservationSettings(
+  api: APIRequestContext,
+  patch: { holdOffsetMinutes?: number; minAdvanceBooking?: number },
+): Promise<void> {
+  const res = await api.patch('reservations/settings/current', { data: patch });
+  if (!res.ok())
+    throw new Error(`updateReservationSettings failed: ${res.status()} ${await res.text()}`);
+}

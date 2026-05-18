@@ -293,5 +293,12 @@
     "failed": "فشل في نقل الطلبات",
     "socketNotification": "تم نقل {{count}} طلب من الطاولة {{sourceTable}} إلى الطاولة {{targetTable}}"
   },
-  "availableTableHasUpcomingReservation": "الطاولة محجوزة في {{startTime}} · {{customerName}} ({{guestCount}} ضيوف) — يرجى الانتباه"
+  "availableTableHasUpcomingReservation": "الطاولة محجوزة في {{startTime}} · {{customerName}} ({{guestCount}} ضيوف) — يرجى الانتباه",
+  "manualLockDialog": {
+    "title": "هذه الطاولة محجوزة بواسطة المسؤول",
+    "banner": "تم تعليم الطاولة {{tableNumber}} كمحجوزة يدويًا",
+    "body": "لا يوجد سجل حجز لإجلاسه — ولكن يمكنك تجاوز القفل والبدء بأخذ الطلب. سيتم تحويل الطاولة إلى متاحة أولاً.",
+    "proceedButton": "افتح وخذ الطلب",
+    "cancelButton": "إلغاء"
+  }
 }

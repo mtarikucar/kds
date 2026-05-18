@@ -293,5 +293,12 @@
     "failed": "Не удалось перенести заказы",
     "socketNotification": "{{count}} заказ(ов) перенесено со столика {{sourceTable}} на столик {{targetTable}}"
   },
-  "availableTableHasUpcomingReservation": "Стол забронирован на {{startTime}} · {{customerName}} ({{guestCount}} гостей) — будьте внимательны"
+  "availableTableHasUpcomingReservation": "Стол забронирован на {{startTime}} · {{customerName}} ({{guestCount}} гостей) — будьте внимательны",
+  "manualLockDialog": {
+    "title": "Этот стол зарезервирован администратором",
+    "banner": "Стол {{tableNumber}} помечен зарезервированным вручную",
+    "body": "Записи брони для усаживания нет — но вы можете обойти блокировку и начать принимать заказ. Стол сначала перейдёт в Доступно.",
+    "proceedButton": "Открыть и принять заказ",
+    "cancelButton": "Отмена"
+  }
 }

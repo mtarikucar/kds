@@ -293,5 +293,12 @@
     "failed": "Buyurtmalarni ko'chirish amalga oshmadi",
     "socketNotification": "{{sourceTable}} stolidan {{targetTable}} stoliga {{count}} ta buyurtma ko'chirildi"
   },
-  "availableTableHasUpcomingReservation": "Stol {{startTime}} · {{customerName}} ({{guestCount}} mehmon) uchun band qilingan — ehtiyot bo‘ling"
+  "availableTableHasUpcomingReservation": "Stol {{startTime}} · {{customerName}} ({{guestCount}} mehmon) uchun band qilingan — ehtiyot bo‘ling",
+  "manualLockDialog": {
+    "title": "Bu stol administrator tomonidan band qilingan",
+    "banner": "Stol {{tableNumber}} qo‘lda band qilingan deb belgilangan",
+    "body": "O‘tirtirish uchun bron yozuvi yo‘q — lekin qulfni chetlab o‘tib buyurtma qabul qilishni boshlashingiz mumkin. Stol avval Mavjud holatiga o‘tkaziladi.",
+    "proceedButton": "Ochish va buyurtma olish",
+    "cancelButton": "Bekor qilish"
+  }
 }

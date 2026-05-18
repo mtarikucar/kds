@@ -293,5 +293,12 @@
     "failed": "Failed to transfer orders",
     "socketNotification": "{{count}} order(s) transferred from Table {{sourceTable}} to Table {{targetTable}}"
   },
-  "availableTableHasUpcomingReservation": "Table reserved for {{startTime}} · {{customerName}} ({{guestCount}} guests) — proceed with care"
+  "availableTableHasUpcomingReservation": "Table reserved for {{startTime}} · {{customerName}} ({{guestCount}} guests) — proceed with care",
+  "manualLockDialog": {
+    "title": "This table is reserved by an admin",
+    "banner": "Table {{tableNumber}} was manually marked reserved",
+    "body": "There is no booking record to seat — but you can override the lock and start taking an order. The table will be flipped to Available first.",
+    "proceedButton": "Open and take order anyway",
+    "cancelButton": "Cancel"
+  }
 }

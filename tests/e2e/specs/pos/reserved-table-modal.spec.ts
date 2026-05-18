@@ -1,7 +1,11 @@
 import { test, expect } from '../../fixtures/test';
 import { loginAsApi } from '../../helpers/api';
 import { createTable, setTableStatus } from '../../helpers/factories/tables';
-import { createPublicReservation, confirmReservation } from '../../helpers/factories/reservations';
+import {
+  createPublicReservation,
+  confirmReservation,
+  updateReservationSettings,
+} from '../../helpers/factories/reservations';
 
 function todayISO(): string {
   const d = new Date();
@@ -17,13 +21,25 @@ function inMinutes(min: number): Date {
 }
 
 test.describe('POS — reserved-table modal', () => {
+  test.beforeAll(async () => {
+    // Widen `holdOffsetMinutes` so reservations 100 min ahead still
+    // fall inside the `upcomingReservation` annotation window. The
+    // demo's `minAdvanceBooking: 60` blocks anything closer than 60
+    // min, so we can't shrink the test reservation's lead time
+    // instead. Production default is 30 — covered separately in the
+    // `offset window` spec below.
+    const { api } = await loginAsApi('admin');
+    await updateReservationSettings(api, { holdOffsetMinutes: 120 });
+    await api.dispose();
+  });
+
   test('upcoming reservation → modal → seat → order screen', async ({ waiterPage }) => {
     const { api: adminApi, user: adminUser } = await loginAsApi('admin');
 
     const table = await createTable(adminApi);
 
     // 100 min from now: past demo's minAdvanceBooking=60, inside the
-    // 2-hour `upcomingReservation` window the tables service annotates.
+    // beforeAll-bumped 120-min hold-offset annotation window.
     const startTime = fmt(inMinutes(100));
     const endTime = fmt(inMinutes(190));
     const customerName = `E2E Reserve ${Date.now()}`;
@@ -79,12 +95,10 @@ test.describe('POS — reserved-table modal', () => {
     await expect(dialog.getByText(/^Confirmed$|^Onaylandı$/)).toBeVisible();
     await expect(dialog.getByText('CONFIRMED', { exact: true })).toBeHidden();
 
-    // Manual-lock toast must NOT also fire on the auto-hold path —
+    // Manual-lock dialog must NOT also open on the auto-hold path —
     // regression guard for the if/else in handleSelectTable.
     await expect(
-      waiterPage.getByText(
-        /This table was manually marked reserved by an admin|Bu masa yönetici tarafından manuel olarak rezerve edildi/i,
-      ),
+      waiterPage.getByText(/This table is reserved by an admin|Bu masa admin tarafından rezerve/i),
     ).toBeHidden();
 
     const seatBtn = dialog.getByRole('button', {
@@ -111,7 +125,9 @@ test.describe('POS — reserved-table modal', () => {
     await adminApi.dispose();
   });
 
-  test('manually-RESERVED table (no booking) shows toast, no modal', async ({ waiterPage }) => {
+  test('manually-RESERVED table (no booking) → override dialog → order screen', async ({
+    waiterPage,
+  }) => {
     const { api: adminApi } = await loginAsApi('admin');
 
     const table = await createTable(adminApi);
@@ -124,17 +140,30 @@ test.describe('POS — reserved-table modal', () => {
     const tableCard = grid.locator('button', { hasText: table.number }).first();
     await tableCard.click();
 
-    // Toast (sonner) appears with the manual-lock copy.
+    // Manual-lock dialog opens (replacing the legacy plain toast). The
+    // dialog explains the lock and offers an override that flips the
+    // table to AVAILABLE before dropping the waiter on the order screen.
+    const dialog = waiterPage.getByRole('dialog');
     await expect(
-      waiterPage.getByText(
-        /This table was manually marked reserved by an admin|Bu masa yönetici tarafından manuel olarak rezerve edildi/i,
-      ),
+      dialog.getByText(/This table is reserved by an admin|Bu masa admin tarafından rezerve/i),
     ).toBeVisible({ timeout: 5_000 });
 
-    // Modal must NOT open — there's no reservation to seat.
+    // Auto-hold dialog must NOT open — no booking row here.
     await expect(
       waiterPage.getByText(/This table has a reservation|Bu masada rezervasyon var/i),
     ).toBeHidden();
+
+    const proceedBtn = dialog.getByRole('button', {
+      name: /Open and take order anyway|Aç ve sipariş al/i,
+    });
+    await proceedBtn.click();
+
+    // After override: dialog closes, order screen visible, table is
+    // now AVAILABLE locally (will flip to OCCUPIED once the first
+    // order lands — server-side state machine handles that).
+    await expect(dialog).toBeHidden({ timeout: 10_000 });
+    await expect(waiterPage.locator('[data-tour="menu-panel"]')).toBeVisible({ timeout: 10_000 });
+    await expect(waiterPage.locator('[data-tour="order-cart"]')).toBeVisible();
 
     await adminApi.dispose();
   });

@@ -93,4 +93,15 @@ export class UpdateReservationSettingsDto {
   @IsInt()
   @Min(0)
   cancellationDeadline?: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Minutes before a confirmed reservation starts that the table auto-flips to RESERVED. Also bounds the upcomingReservation annotation and the POS reservation dialog. 0 disables pre-hold (table only flips on/after start).',
+  })
+  @EmptyStringToNumber()
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(240)
+  holdOffsetMinutes?: number;
 }

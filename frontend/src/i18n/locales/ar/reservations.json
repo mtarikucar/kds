@@ -57,7 +57,9 @@
     "reservationLink": "رابط الحجز",
     "reservationLinkDesc": "شارك هذا الرابط مع عملائك ليتمكنوا من إجراء الحجوزات",
     "copyLink": "نسخ",
-    "linkCopied": "تم نسخ الرابط!"
+    "linkCopied": "تم نسخ الرابط!",
+    "holdOffsetMinutes": "فترة حجز الطاولة قبل البدء (بالدقائق)",
+    "holdOffsetMinutesDesc": "كم دقيقة قبل بدء حجز مؤكد يتم تعليم الطاولة المخصصة كمحجوزة تلقائيًا. الافتراضي 30 — أدخل 0 لتعطيل الحجز المسبق."
   },
   "status": {
     "PENDING": "Pending",

@@ -14,13 +14,21 @@ import { OrderStatus } from '../../common/constants/order-status.enum';
 import { randomUUID } from 'crypto';
 
 /**
- * How far ahead the floor-plan / POS should surface upcoming
- * reservations on each table. 120 min covers the typical "next two
- * sittings" without burying the badge under reservations a week away.
- * Match this to the reservation-scheduler's hold window for visual
- * consistency: at 30 min the badge can flip to "table held" too.
+ * Fallback pre-start window when a tenant has no ReservationSettings
+ * row. Once the row exists, the per-tenant `holdOffsetMinutes`
+ * overrides this and the annotation lines up with the scheduler's
+ * auto-hold and the POS reservation-action dialog.
  */
-const UPCOMING_RESERVATION_WINDOW_MIN = 120;
+const DEFAULT_HOLD_OFFSET_MINUTES = 30;
+
+/**
+ * After a reservation's startTime, how long the annotation continues
+ * to surface the booking so the dialog can still offer "seat" while
+ * the waiter chases down the no-show. Matches the scheduler's
+ * GRACE_AFTER_START_MINUTES; once past this point the scheduler flips
+ * the row to NO_SHOW and clears the table hold.
+ */
+const GRACE_AFTER_START_MINUTES = 30;
 
 export interface UpcomingReservation {
   id: string;
@@ -102,10 +110,11 @@ export class TablesService {
 
   /**
    * Attach `upcomingReservation` to each table — the next CONFIRMED
-   * (or PENDING) reservation starting within the next 2 hours, if any.
-   * Pulls all candidates in a single query and joins in memory; the
-   * candidate set is small (one tenant × at most a few dozen
-   * reservations per day) so the join overhead is negligible.
+   * (or PENDING) reservation inside the per-tenant hold window:
+   * `[startTime - holdOffsetMinutes, startTime + 30 min grace]`.
+   * Matches the scheduler so the dialog surfaces exactly when the
+   * table is (or will momentarily be) auto-RESERVED. Outside this
+   * window the table is free for walk-ins.
    */
   private async annotateWithUpcomingReservations<T extends { id: string }>(
     tenantId: string,
@@ -117,7 +126,14 @@ export class TablesService {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const windowEnd = new Date(now.getTime() + UPCOMING_RESERVATION_WINDOW_MIN * 60_000);
+
+    // Per-tenant pre-start hold window. Single row lookup — keep it
+    // unwrapped here rather than passing through every call site.
+    const settings = await this.prisma.reservationSettings.findUnique({
+      where: { tenantId },
+      select: { holdOffsetMinutes: true },
+    });
+    const holdOffsetMin = settings?.holdOffsetMinutes ?? DEFAULT_HOLD_OFFSET_MINUTES;
 
     const tableIds = tables.map((t) => t.id);
     const candidates = await this.prisma.reservation.findMany({
@@ -147,9 +163,13 @@ export class TablesService {
       const start = new Date(r.date);
       start.setHours(sh, sm, 0, 0);
 
-      // Only keep upcoming-soon (not in the past, within window). The
-      // sort above guarantees first match is the closest one.
-      if (start < now || start > windowEnd) continue;
+      // Annotation window: open `holdOffsetMin` minutes before start,
+      // closes `GRACE_AFTER_START_MINUTES` after start (the same grace
+      // the scheduler honors before auto-NO_SHOW). The sort above
+      // guarantees first match is the closest one.
+      const windowOpen = new Date(start.getTime() - holdOffsetMin * 60_000);
+      const windowClose = new Date(start.getTime() + GRACE_AFTER_START_MINUTES * 60_000);
+      if (now < windowOpen || now > windowClose) continue;
       if (byTable.has(r.tableId)) continue;
 
       byTable.set(r.tableId, {

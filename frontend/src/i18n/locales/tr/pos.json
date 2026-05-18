@@ -293,5 +293,12 @@
     "failed": "Siparişler aktarılamadı",
     "socketNotification": "{{count}} sipariş Masa {{sourceTable}}'den Masa {{targetTable}}'e aktarıldı"
   },
-  "availableTableHasUpcomingReservation": "Masa {{startTime}} · {{customerName}} ({{guestCount}} kişi) için rezervasyon var — dikkatli olun"
+  "availableTableHasUpcomingReservation": "Masa {{startTime}} · {{customerName}} ({{guestCount}} kişi) için rezervasyon var — dikkatli olun",
+  "manualLockDialog": {
+    "title": "Bu masa admin tarafından rezerve",
+    "banner": "Masa {{tableNumber}} elle rezerve olarak işaretlenmiş",
+    "body": "Oturtulacak bir rezervasyon kaydı yok — ama kilidi geçip yine de sipariş alabilirsin. Masa önce Müsait duruma alınacak.",
+    "proceedButton": "Aç ve sipariş al",
+    "cancelButton": "Vazgeç"
+  }
 }

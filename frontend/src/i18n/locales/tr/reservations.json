@@ -57,7 +57,9 @@
     "reservationLink": "Rezervasyon Linki",
     "reservationLinkDesc": "Müşterilerinizin rezervasyon yapabilmesi için bu linki paylaşın",
     "copyLink": "Kopyala",
-    "linkCopied": "Link kopyalandı!"
+    "linkCopied": "Link kopyalandı!",
+    "holdOffsetMinutes": "Rezervasyon hold süresi (dakika)",
+    "holdOffsetMinutesDesc": "Onaylı bir rezervasyonun başlamasından kaç dakika önce masanın otomatik olarak Rezerve durumuna geçeceği. Varsayılan 30 — pre-hold iptali için 0 girin."
   },
   "status": {
     "PENDING": "Beklemede",

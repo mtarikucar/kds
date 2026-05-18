@@ -57,7 +57,9 @@
     "reservationLink": "Bron havolasi",
     "reservationLinkDesc": "Mijozlaringiz bron qilishi uchun ushbu havolani ulashing",
     "copyLink": "Nusxalash",
-    "linkCopied": "Havola nusxalandi!"
+    "linkCopied": "Havola nusxalandi!",
+    "holdOffsetMinutes": "Bron ushlash oralig‘i (daqiqa)",
+    "holdOffsetMinutesDesc": "Tasdiqlangan bron boshlanishidan necha daqiqa oldin stol avtomatik Band holatiga o‘tadi. Standart 30 — old-ushlashni o‘chirish uchun 0 kiriting."
   },
   "status": {
     "PENDING": "Pending",
