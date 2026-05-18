@@ -158,23 +158,10 @@
     "mostPopular": "Most Popular",
     "perMonth": "/month",
     "plans": {
-      "free": {
-        "name": "Free",
-        "description": "Perfect for trying out HummyTummy",
-        "price": "$0",
-        "cta": "Start free",
-        "features": [
-          "2 users",
-          "5 tables",
-          "25 products",
-          "5 categories",
-          "KDS integration"
-        ]
-      },
       "basic": {
-        "name": "Basic",
-        "description": "For small restaurants",
-        "price": "$29.99",
+        "name": "Starter",
+        "description": "For cafés and small restaurants",
+        "price": "₺499",
         "cta": "Start free trial",
         "features": [
           "5 users",
@@ -187,8 +174,8 @@
       },
       "pro": {
         "name": "Pro",
-        "description": "For growing restaurants",
-        "price": "$79.99",
+        "description": "For city-centre restaurants",
+        "price": "₺1,299",
         "cta": "Start free trial",
         "features": [
           "15 users",
@@ -196,27 +183,28 @@
           "500 products",
           "50 categories",
           "Advanced reports",
-          "Multi-location",
-          "Custom branding",
+          "Reservation system",
+          "Staff management",
+          "Delivery integrations (Yemeksepeti, Trendyol, Getir, Migros)",
+          "Custom branding colours",
           "Priority support"
         ]
       },
       "business": {
         "name": "Business",
-        "description": "For multi-location operations",
-        "price": "$199.99",
+        "description": "For multi-location chains",
+        "price": "₺2,999",
         "cta": "Contact sales",
         "features": [
-          "Unlimited users",
-          "Unlimited tables",
-          "Unlimited products",
-          "Unlimited categories",
+          "Unlimited users, tables, products",
+          "Multi-location",
           "API access",
-          "All features included"
+          "All features included",
+          "Enterprise support"
         ]
       }
     },
-    "trialNote": "All plans include 14-day free trial. No credit card required."
+    "trialNote": "Every plan starts with a 14-day free Business trial. No credit card required."
   },
   "business": {
     "badge": "Results That Matter",

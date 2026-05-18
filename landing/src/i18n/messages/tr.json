@@ -158,23 +158,10 @@
     "mostPopular": "En Popüler",
     "perMonth": "/ay",
     "plans": {
-      "free": {
-        "name": "Ücretsiz",
-        "description": "HummyTummy'yi denemek için mükemmel",
-        "price": "$0",
-        "cta": "Ücretsiz başla",
-        "features": [
-          "2 kullanıcı",
-          "5 masa",
-          "25 ürün",
-          "5 kategori",
-          "KDS entegrasyonu"
-        ]
-      },
       "basic": {
-        "name": "Basic",
-        "description": "Küçük restoranlar için",
-        "price": "$29.99",
+        "name": "Başlangıç",
+        "description": "Kafe ve küçük restoranlar için",
+        "price": "499₺",
         "cta": "Ücretsiz denemeye başla",
         "features": [
           "5 kullanıcı",
@@ -186,9 +173,9 @@
         ]
       },
       "pro": {
-        "name": "Pro",
-        "description": "Büyüyen restoranlar için",
-        "price": "$79.99",
+        "name": "Profesyonel",
+        "description": "Şehir merkezi restoranlar için",
+        "price": "1.299₺",
         "cta": "Ücretsiz denemeye başla",
         "features": [
           "15 kullanıcı",
@@ -196,27 +183,28 @@
           "500 ürün",
           "50 kategori",
           "Gelişmiş raporlar",
-          "Çoklu şube",
-          "Özel marka",
+          "Rezervasyon sistemi",
+          "Personel takibi",
+          "Delivery entegrasyonları (Yemeksepeti, Trendyol, Getir, Migros)",
+          "Özel marka renkleri",
           "Öncelikli destek"
         ]
       },
       "business": {
-        "name": "Business",
-        "description": "Çoklu lokasyon operasyonları için",
-        "price": "$199.99",
+        "name": "Kurumsal",
+        "description": "Çok şubeli zincirler için",
+        "price": "2.999₺",
         "cta": "Satışla iletişime geç",
         "features": [
-          "Sınırsız kullanıcı",
-          "Sınırsız masa",
-          "Sınırsız ürün",
-          "Sınırsız kategori",
+          "Sınırsız kullanıcı, masa, ürün",
+          "Çoklu şube",
           "API erişimi",
-          "Tüm özellikler dahil"
+          "Tüm özellikler dahil",
+          "Kurumsal destek"
         ]
       }
     },
-    "trialNote": "Tüm planlar 14 günlük ücretsiz deneme içerir. Kredi kartı gerekmez."
+    "trialNote": "Tüm planlar 14 günlük ücretsiz Kurumsal deneme ile başlar. Kredi kartı gerekmez."
   },
   "business": {
     "badge": "Önemli Sonuçlar",

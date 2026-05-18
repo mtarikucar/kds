@@ -158,23 +158,10 @@
     "mostPopular": "Eng mashhur",
     "perMonth": "/oy",
     "plans": {
-      "free": {
-        "name": "Bepul",
-        "description": "HummyTummy'ni sinab ko'rish uchun mukammal",
-        "price": "$0",
-        "cta": "Bepul boshlash",
-        "features": [
-          "2 ta foydalanuvchi",
-          "5 ta stol",
-          "25 ta mahsulot",
-          "5 ta kategoriya",
-          "KDS integratsiyasi"
-        ]
-      },
       "basic": {
-        "name": "Asosiy",
-        "description": "Kichik restoranlar uchun",
-        "price": "$29.99",
+        "name": "Boshlang'ich",
+        "description": "Kafe va kichik restoranlar uchun",
+        "price": "₺499",
         "cta": "Bepul sinovni boshlash",
         "features": [
           "5 ta foydalanuvchi",
@@ -187,8 +174,8 @@
       },
       "pro": {
         "name": "Pro",
-        "description": "O'sib borayotgan restoranlar uchun",
-        "price": "$79.99",
+        "description": "Shahar markazidagi restoranlar uchun",
+        "price": "₺1.299",
         "cta": "Bepul sinovni boshlash",
         "features": [
           "15 ta foydalanuvchi",
@@ -196,27 +183,28 @@
           "500 ta mahsulot",
           "50 ta kategoriya",
           "Kengaytirilgan hisobotlar",
-          "Ko'p joylashuv",
-          "Maxsus brend",
+          "Bron qilish tizimi",
+          "Xodimlarni boshqarish",
+          "Yetkazib berish integratsiyalari (Yemeksepeti, Trendyol, Getir, Migros)",
+          "Maxsus brend ranglari",
           "Ustuvor yordam"
         ]
       },
       "business": {
         "name": "Biznes",
-        "description": "Ko'p joyli operatsiyalar uchun",
-        "price": "$199.99",
+        "description": "Ko'p filialli restoran tarmoqlari uchun",
+        "price": "₺2.999",
         "cta": "Sotuvlar bilan bog'lanish",
         "features": [
-          "Cheksiz foydalanuvchilar",
-          "Cheksiz stollar",
-          "Cheksiz mahsulotlar",
-          "Cheksiz kategoriyalar",
+          "Cheksiz foydalanuvchi, stol va mahsulot",
+          "Ko'p joylashuv",
           "API kirish",
-          "Barcha xususiyatlar kiritilgan"
+          "Barcha xususiyatlar kiritilgan",
+          "Korporativ yordam"
         ]
       }
     },
-    "trialNote": "Barcha rejalar 14 kunlik bepul sinov davrini o'z ichiga oladi. Kredit karta talab qilinmaydi."
+    "trialNote": "Barcha rejalar 14 kunlik bepul Biznes sinov davri bilan boshlanadi. Kredit karta talab qilinmaydi."
   },
   "business": {
     "badge": "Muhim natijalar",

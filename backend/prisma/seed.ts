@@ -11,11 +11,22 @@ async function main() {
   // that can drift after the first seed (prices/currency/displayName);
   // otherwise re-running `prisma:seed` keeps stale USD numbers when the
   // codebase has migrated to TRY.
+  // FREE plan is the post-trial fallback, not a self-serve choice.
+  // Registration grants an automatic 14-day BUSINESS trial; when that
+  // trial expires without a paid subscription the tenant falls through
+  // to FREE (PlanFeatureGuard treats FREE as live without requiring an
+  // active Subscription row).
+  //
+  // The plan stays `isActive: true` so /subscriptions/plans and
+  // /superadmin/plans still surface it for internal consumers (the
+  // PlanFeatureGuard, the post-trial scheduler, e2e tests). The
+  // landing page deliberately omits it from the public pricing grid
+  // — see landing/src/components/sections/Pricing.tsx.
   const freePlan = await prisma.subscriptionPlan.upsert({
     where: { name: 'FREE' },
     update: {
       displayName: 'Ücretsiz',
-      description: 'Yeni başlayan küçük restoranlar için',
+      description: 'Deneme sürümü sona erdiğinde kullanılan kısıtlı plan',
       monthlyPrice: 0,
       yearlyPrice: 0,
       currency: 'TRY',
@@ -33,7 +44,7 @@ async function main() {
     create: {
       name: 'FREE',
       displayName: 'Ücretsiz',
-      description: 'Yeni başlayan küçük restoranlar için',
+      description: 'Deneme sürümü sona erdiğinde kullanılan kısıtlı plan',
       monthlyPrice: 0,
       yearlyPrice: 0,
       currency: 'TRY',
@@ -61,9 +72,9 @@ async function main() {
     where: { name: 'BASIC' },
     update: {
       displayName: 'Başlangıç',
-      description: 'Büyüyen restoranlar için ideal',
-      monthlyPrice: 299,
-      yearlyPrice: 2990,
+      description: 'Kafe ve küçük restoranlar için temel POS + stok takibi',
+      monthlyPrice: 499,
+      yearlyPrice: 4490, // 2 ay bedava (10 ay × 499 = 4990 → 4490 promosyon)
       currency: 'TRY',
       advancedReports: false,
       multiLocation: false,
@@ -79,9 +90,9 @@ async function main() {
     create: {
       name: 'BASIC',
       displayName: 'Başlangıç',
-      description: 'Büyüyen restoranlar için ideal',
-      monthlyPrice: 299,
-      yearlyPrice: 2990,
+      description: 'Kafe ve küçük restoranlar için temel POS + stok takibi',
+      monthlyPrice: 499,
+      yearlyPrice: 4490,
       currency: 'TRY',
       trialDays: 14,
       maxUsers: 5,
@@ -107,9 +118,9 @@ async function main() {
     where: { name: 'PRO' },
     update: {
       displayName: 'Profesyonel',
-      description: 'Çok şubeli yerleşik restoranlar için',
-      monthlyPrice: 799,
-      yearlyPrice: 7990,
+      description: 'Şehir merkezi restoranlar için rezervasyon + delivery + personel takibi',
+      monthlyPrice: 1299,
+      yearlyPrice: 12990, // 2 ay bedava (10 ay × 1299 = 12990 düz)
       currency: 'TRY',
       advancedReports: true,
       multiLocation: true,
@@ -125,9 +136,9 @@ async function main() {
     create: {
       name: 'PRO',
       displayName: 'Profesyonel',
-      description: 'Çok şubeli yerleşik restoranlar için',
-      monthlyPrice: 799,
-      yearlyPrice: 7990,
+      description: 'Şehir merkezi restoranlar için rezervasyon + delivery + personel takibi',
+      monthlyPrice: 1299,
+      yearlyPrice: 12990,
       currency: 'TRY',
       trialDays: 14,
       maxUsers: 15,
@@ -153,9 +164,9 @@ async function main() {
     where: { name: 'BUSINESS' },
     update: {
       displayName: 'Kurumsal',
-      description: 'Büyük restoran zincirleri için kurumsal çözüm',
-      monthlyPrice: 1999,
-      yearlyPrice: 19990,
+      description: 'Çok şubeli zincirler için sınırsız + API erişimi + öncelikli destek',
+      monthlyPrice: 2999,
+      yearlyPrice: 29990, // 2 ay bedava (10 ay × 2999 = 29990 düz)
       currency: 'TRY',
       advancedReports: true,
       multiLocation: true,
@@ -171,9 +182,9 @@ async function main() {
     create: {
       name: 'BUSINESS',
       displayName: 'Kurumsal',
-      description: 'Büyük restoran zincirleri için kurumsal çözüm',
-      monthlyPrice: 1999,
-      yearlyPrice: 19990,
+      description: 'Çok şubeli zincirler için sınırsız + API erişimi + öncelikli destek',
+      monthlyPrice: 2999,
+      yearlyPrice: 29990,
       currency: 'TRY',
       trialDays: 14,
       maxUsers: -1,

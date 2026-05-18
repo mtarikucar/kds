@@ -33,7 +33,7 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
   [SubscriptionPlanType.FREE]: {
     name: SubscriptionPlanType.FREE,
     displayName: 'Ücretsiz',
-    description: 'Yeni başlayan küçük restoranlar için',
+    description: 'Deneme sürümü sona erdiğinde kullanılan kısıtlı plan',
     monthlyPrice: 0,
     yearlyPrice: 0,
     currency: 'TRY',
@@ -61,11 +61,11 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
   [SubscriptionPlanType.BASIC]: {
     name: SubscriptionPlanType.BASIC,
     displayName: 'Başlangıç',
-    description: 'Büyüyen restoranlar için ideal',
+    description: 'Kafe ve küçük restoranlar için temel POS + stok takibi',
     // TRY prices are KDV-inclusive (advertised gross). BillingService
     // reverse-engineers the KDV split when issuing invoices.
-    monthlyPrice: 299,
-    yearlyPrice: 2990,
+    monthlyPrice: 499,
+    yearlyPrice: 4490,
     currency: 'TRY',
     trialDays: 14,
     limits: {
@@ -91,9 +91,9 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
   [SubscriptionPlanType.PRO]: {
     name: SubscriptionPlanType.PRO,
     displayName: 'Profesyonel',
-    description: 'Çok şubeli yerleşik restoranlar için',
-    monthlyPrice: 799,
-    yearlyPrice: 7990,
+    description: 'Şehir merkezi restoranlar için rezervasyon + delivery + personel takibi',
+    monthlyPrice: 1299,
+    yearlyPrice: 12990,
     currency: 'TRY',
     trialDays: 14,
     limits: {
@@ -119,9 +119,9 @@ export const SUBSCRIPTION_PLANS: Record<SubscriptionPlanType, PlanConfig> = {
   [SubscriptionPlanType.BUSINESS]: {
     name: SubscriptionPlanType.BUSINESS,
     displayName: 'Kurumsal',
-    description: 'Büyük restoran zincirleri için kurumsal çözüm',
-    monthlyPrice: 1999,
-    yearlyPrice: 19990,
+    description: 'Çok şubeli zincirler için sınırsız + API erişimi + öncelikli destek',
+    monthlyPrice: 2999,
+    yearlyPrice: 29990,
     currency: 'TRY',
     trialDays: 14,
     limits: {

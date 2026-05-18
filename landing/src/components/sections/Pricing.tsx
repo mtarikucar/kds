@@ -20,20 +20,10 @@ export default function Pricing({ apiPlans }: PricingProps) {
     setMounted(true);
   }, []);
 
-  // Build plans from translations (static) with optional API discount overlay
+  // Build plans from translations (static) with optional API discount overlay.
+  // FREE is intentionally absent — registration grants a 14-day BUSINESS
+  // trial; FREE is only the post-trial fallback and never a self-serve choice.
   const staticPlans = [
-    {
-      key: 'free',
-      name: t('plans.free.name'),
-      description: t('plans.free.description'),
-      price: t('plans.free.price'),
-      period: t('perMonth'),
-      features: t.raw('plans.free.features') as string[],
-      cta: t('plans.free.cta'),
-      href: '/app/register?plan=FREE',
-      popular: false,
-      monthlyPrice: 0,
-    },
     {
       key: 'basic',
       name: t('plans.basic.name'),
@@ -44,7 +34,7 @@ export default function Pricing({ apiPlans }: PricingProps) {
       cta: t('plans.basic.cta'),
       href: '/app/register?plan=BASIC',
       popular: false,
-      monthlyPrice: 29.99,
+      monthlyPrice: 499,
     },
     {
       key: 'pro',
@@ -56,7 +46,7 @@ export default function Pricing({ apiPlans }: PricingProps) {
       cta: t('plans.pro.cta'),
       href: '/app/register?plan=PRO',
       popular: true,
-      monthlyPrice: 79.99,
+      monthlyPrice: 1299,
     },
     {
       key: 'business',
@@ -68,7 +58,7 @@ export default function Pricing({ apiPlans }: PricingProps) {
       cta: t('plans.business.cta'),
       href: '/app/register?plan=BUSINESS',
       popular: false,
-      monthlyPrice: 199.99,
+      monthlyPrice: 2999,
     },
   ];
 
@@ -85,8 +75,10 @@ export default function Pricing({ apiPlans }: PricingProps) {
       discountPercentage: hasDiscount ? apiPlan!.discountPercentage : undefined,
       discountLabel: hasDiscount ? apiPlan!.discountLabel : undefined,
       discountEndDate: hasDiscount ? apiPlan!.discountEndDate : undefined,
+      // Discounted price is rendered alongside the strikethrough original.
+      // Format matches the TRY base price in the locale files ("499₺").
       discountedPrice: hasDiscount && sp.monthlyPrice > 0
-        ? `$${(sp.monthlyPrice * (1 - apiPlan!.discountPercentage! / 100)).toFixed(2)}`
+        ? `${Math.round(sp.monthlyPrice * (1 - apiPlan!.discountPercentage! / 100))}₺`
         : undefined,
     };
   });

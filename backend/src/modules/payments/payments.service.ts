@@ -166,7 +166,7 @@ export class PaymentsService {
       });
       // Return the *plan* price (what they'll be charged after trial
       // ends), not 0 — the frontend uses this to render
-      // "Free for 14 days, then 799 TRY/month".
+      // "Free for 14 days, then 1299 TRY/month" for PRO etc.
       return {
         provider: 'TRIAL',
         amount: new Prisma.Decimal(amount).toNumber(),

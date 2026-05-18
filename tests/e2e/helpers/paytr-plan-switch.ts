@@ -136,8 +136,8 @@ export async function upgradeViaPayTR(
     throw new Error(`create-intent returned PAYTR provider but no merchantOid: ${JSON.stringify(intent)}`);
   }
 
-  // PayTR amounts are in kuruş. createIntent returns whole units (e.g. 799 TRY);
-  // the webhook hash is computed over the kuruş string (e.g. "79900").
+  // PayTR amounts are in kuruş. createIntent returns whole units (e.g. 1299 TRY);
+  // the webhook hash is computed over the kuruş string (e.g. "129900").
   const amountKurus = Math.round(intent.amount * 100).toString();
   await simulatePaytrSuccess({ merchantOid: intent.merchantOid, totalAmountKurus: amountKurus });
 
