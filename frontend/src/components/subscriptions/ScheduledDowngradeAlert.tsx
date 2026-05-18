@@ -39,7 +39,7 @@ const ScheduledDowngradeAlert = ({
     });
   };
 
-  const newPlanName = scheduledDowngrade.scheduledPlan?.displayName || t('unknownPlan');
+  const newPlanName = scheduledDowngrade.scheduledPlan?.displayName || t('subscriptions.unknownPlan');
 
   return (
     <div className={cn('rounded-lg border-2 p-4 mb-6 bg-orange-50 border-orange-200')}>
@@ -48,9 +48,9 @@ const ScheduledDowngradeAlert = ({
           <Clock className="w-6 h-6 flex-shrink-0 mt-0.5 text-orange-600" />
           <div>
             <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-              {t('scheduledDowngrade.title')}
+              {t('subscriptions.scheduledDowngrade.title')}
               <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-800">
-                {t('scheduledDowngrade.scheduled')}
+                {t('subscriptions.scheduledDowngrade.scheduled')}
               </span>
             </h3>
 
@@ -58,16 +58,16 @@ const ScheduledDowngradeAlert = ({
               <div className="flex items-center gap-2">
                 <ArrowDownCircle className="w-4 h-4 text-orange-600" />
                 <span>
-                  {t('scheduledDowngrade.downgradingTo')}: <strong>{newPlanName}</strong>
+                  {t('subscriptions.scheduledDowngrade.downgradingTo')}: <strong>{newPlanName}</strong>
                 </span>
               </div>
 
               <div>
-                {t('scheduledDowngrade.scheduledFor')}: <strong>{formatDate(scheduledDowngrade.scheduledFor)}</strong>
+                {t('subscriptions.scheduledDowngrade.scheduledFor')}: <strong>{formatDate(scheduledDowngrade.scheduledFor)}</strong>
               </div>
 
               <p className="text-slate-500 text-xs mt-2">
-                {t('scheduledDowngrade.description')}
+                {t('subscriptions.scheduledDowngrade.description')}
               </p>
             </div>
           </div>
@@ -77,7 +77,7 @@ const ScheduledDowngradeAlert = ({
         <button
           onClick={() => setShowCancelConfirm(true)}
           className="text-slate-400 hover:text-slate-600 p-1"
-          title={t('scheduledDowngrade.cancel')}
+          title={t('subscriptions.scheduledDowngrade.cancel')}
         >
           <X className="w-5 h-5" />
         </button>
@@ -90,7 +90,7 @@ const ScheduledDowngradeAlert = ({
           onClick={() => setShowCancelConfirm(true)}
           size="sm"
         >
-          {t('scheduledDowngrade.cancelDowngrade')}
+          {t('subscriptions.scheduledDowngrade.cancelDowngrade')}
         </Button>
       </div>
 
@@ -99,10 +99,10 @@ const ScheduledDowngradeAlert = ({
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl">
             <h3 className="text-lg font-semibold text-slate-900 mb-2">
-              {t('scheduledDowngrade.cancelTitle')}
+              {t('subscriptions.scheduledDowngrade.cancelTitle')}
             </h3>
             <p className="text-slate-600 mb-4">
-              {t('scheduledDowngrade.cancelConfirm')}
+              {t('subscriptions.scheduledDowngrade.cancelConfirm')}
             </p>
             <div className="flex justify-end gap-2">
               <Button
@@ -117,7 +117,7 @@ const ScheduledDowngradeAlert = ({
                 onClick={handleCancel}
                 isLoading={cancelMutation.isPending}
               >
-                {t('scheduledDowngrade.keepCurrentPlan')}
+                {t('subscriptions.scheduledDowngrade.keepCurrentPlan')}
               </Button>
             </div>
           </div>

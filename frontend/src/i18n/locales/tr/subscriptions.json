@@ -243,6 +243,7 @@
       "scheduled": "Planlandı",
       "downgradingTo": "Düşürülecek plan",
       "scheduledFor": "Geçerlilik tarihi",
+      "cancel": "İptal et",
       "cancelDowngrade": "Plan Düşürmeyi İptal Et",
       "cancelTitle": "Planlanmış Düşürmeyi İptal Et?",
       "cancelConfirm": "Bu planlanmış düşürmeyi iptal etmek istediğinizden emin misiniz? Mevcut planınızı koruyacaksınız.",

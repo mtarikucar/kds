@@ -281,6 +281,7 @@
       "scheduled": "مجدول",
       "downgradingTo": "التخفيض إلى",
       "scheduledFor": "تاريخ السريان",
+      "cancel": "إلغاء",
       "cancelDowngrade": "إلغاء التخفيض",
       "cancelTitle": "إلغاء التخفيض المجدول؟",
       "cancelConfirm": "هل أنت متأكد من إلغاء هذا التخفيض المجدول؟ ستحتفظ بخطتك الحالية.",

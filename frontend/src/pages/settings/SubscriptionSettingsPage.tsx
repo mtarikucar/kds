@@ -213,7 +213,7 @@ const SubscriptionSettingsPage = () => {
                     className="w-full"
                     onClick={() => navigate('/subscription/change-plan')}
                     disabled={!!scheduledDowngrade}
-                    title={scheduledDowngrade ? t('scheduledDowngrade.description') : undefined}
+                    title={scheduledDowngrade ? t('subscriptions.scheduledDowngrade.description') : undefined}
                   >
                     <RefreshCw className="h-4 w-4 mr-2" />
                     {t('subscriptions.changePlan')}

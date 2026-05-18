@@ -243,6 +243,7 @@
       "scheduled": "Scheduled",
       "downgradingTo": "Downgrading to",
       "scheduledFor": "Effective date",
+      "cancel": "Cancel",
       "cancelDowngrade": "Cancel Downgrade",
       "cancelTitle": "Cancel Scheduled Downgrade?",
       "cancelConfirm": "Are you sure you want to cancel this scheduled downgrade? You will keep your current plan.",

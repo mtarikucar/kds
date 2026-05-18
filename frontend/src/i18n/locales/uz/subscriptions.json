@@ -281,6 +281,7 @@
       "scheduled": "Rejalashtirilgan",
       "downgradingTo": "Pasaytiriladigan tarif",
       "scheduledFor": "Kuchga kirish sanasi",
+      "cancel": "Bekor qilish",
       "cancelDowngrade": "Pasaytirishni bekor qilish",
       "cancelTitle": "Rejalashtirilgan pasaytirish bekor qilinsinmi?",
       "cancelConfirm": "Ushbu rejalashtirilgan pasaytirishni bekor qilishga ishonchingiz komilmi? Joriy tarifingiz saqlanadi.",
