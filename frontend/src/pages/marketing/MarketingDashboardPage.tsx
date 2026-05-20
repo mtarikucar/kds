@@ -7,6 +7,7 @@ import {
   ClipboardDocumentListIcon,
   DocumentTextIcon,
   ArrowTrendingUpIcon,
+  ArrowDownTrayIcon,
 } from '@heroicons/react/24/outline';
 import marketingApi from '../../features/marketing/api/marketingApi';
 import { StatsCard } from '../../features/marketing/components';
@@ -45,11 +46,32 @@ export default function MarketingDashboardPage() {
     enabled: isManager,
   });
 
+  // The guide PDF is shipped from frontend/public, so its URL is just
+  // the Vite base path + filename. Resolving at runtime keeps the
+  // link correct under any deploy prefix (BASE_URL env / Vite `base`).
+  const guideUrl = `${import.meta.env.BASE_URL.replace(/\/?$/, '/')}pazarlamaci-rehberi.pdf`;
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">{t('dashboard.title')}</h1>
-        <p className="text-sm text-slate-500">{t('dashboard.subtitle')}</p>
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">{t('dashboard.title')}</h1>
+          <p className="text-sm text-slate-500">{t('dashboard.subtitle')}</p>
+        </div>
+        {/* Pazarlamacı rehberi — sahaya çıkış, komisyon yapısı, sıkça
+            sorulan sorular. Yeni sekmede açar, tarayıcı isterse de
+            indirir (download attribute set). */}
+        <a
+          href={guideUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          download="KDS-Pazarlamaci-Rehberi.pdf"
+          className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+          data-testid="dashboard-guide-download"
+        >
+          <ArrowDownTrayIcon className="w-4 h-4" />
+          {t('dashboard.downloadGuide', 'Pazarlamacı Rehberini İndir (PDF)')}
+        </a>
       </div>
 
       {/* Stats Grid */}

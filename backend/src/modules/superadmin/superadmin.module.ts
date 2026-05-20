@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { Module } from "@nestjs/common";
+import { JwtModule } from "@nestjs/jwt";
+import { ConfigModule, ConfigService } from "@nestjs/config";
 
 // Controllers
 import {
@@ -10,7 +10,8 @@ import {
   SuperAdminUsersController,
   SuperAdminSubscriptionsController,
   SuperAdminAuditController,
-} from './controllers';
+  SuperAdminMarketingController,
+} from "./controllers";
 
 // Services
 import {
@@ -20,11 +21,13 @@ import {
   SuperAdminTenantsService,
   SuperAdminUsersService,
   SuperAdminSubscriptionsService,
-} from './services';
+  SuperAdminMarketingService,
+} from "./services";
 
-import { SuperAdminGuard } from './guards/superadmin.guard';
-import { NotificationsModule } from '../notifications/notifications.module';
-import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
+import { SuperAdminGuard } from "./guards/superadmin.guard";
+import { NotificationsModule } from "../notifications/notifications.module";
+import { SubscriptionsModule } from "../subscriptions/subscriptions.module";
+import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
 
 @Module({
   imports: [
@@ -34,32 +37,38 @@ import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
     // test or support session). Keeps the canonical lifecycle logic in
     // one place instead of duplicating it under superadmin/.
     SubscriptionsModule,
+    // SuperAdmin refund endpoint and cancel-subscription token revoke
+    // both call PaytrAdapter directly. PaytrAdapterModule is the same
+    // standalone module SubscriptionsModule already uses.
+    PaytrAdapterModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        const secret = configService.get<string>('SUPERADMIN_JWT_SECRET');
-        const refresh = configService.get<string>('SUPERADMIN_JWT_REFRESH_SECRET');
-        const tenant = configService.get<string>('JWT_SECRET');
+        const secret = configService.get<string>("SUPERADMIN_JWT_SECRET");
+        const refresh = configService.get<string>(
+          "SUPERADMIN_JWT_REFRESH_SECRET",
+        );
+        const tenant = configService.get<string>("JWT_SECRET");
         if (!secret || !refresh) {
           throw new Error(
-            'SUPERADMIN_JWT_SECRET and SUPERADMIN_JWT_REFRESH_SECRET must be configured',
+            "SUPERADMIN_JWT_SECRET and SUPERADMIN_JWT_REFRESH_SECRET must be configured",
           );
         }
         if (secret.length < 32 || refresh.length < 32) {
           throw new Error(
-            'SUPERADMIN_JWT_SECRET / SUPERADMIN_JWT_REFRESH_SECRET must be at least 32 chars',
+            "SUPERADMIN_JWT_SECRET / SUPERADMIN_JWT_REFRESH_SECRET must be at least 32 chars",
           );
         }
         if (secret === tenant || refresh === tenant) {
           throw new Error(
-            'SUPERADMIN_JWT_SECRET must differ from the tenant JWT_SECRET',
+            "SUPERADMIN_JWT_SECRET must differ from the tenant JWT_SECRET",
           );
         }
         return {
           secret,
-          signOptions: { expiresIn: '1h', algorithm: 'HS256' },
-          verifyOptions: { algorithms: ['HS256'] },
+          signOptions: { expiresIn: "1h", algorithm: "HS256" },
+          verifyOptions: { algorithms: ["HS256"] },
         };
       },
     }),
@@ -71,6 +80,7 @@ import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
     SuperAdminUsersController,
     SuperAdminSubscriptionsController,
     SuperAdminAuditController,
+    SuperAdminMarketingController,
   ],
   providers: [
     SuperAdminAuthService,
@@ -79,6 +89,7 @@ import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
     SuperAdminTenantsService,
     SuperAdminUsersService,
     SuperAdminSubscriptionsService,
+    SuperAdminMarketingService,
     SuperAdminGuard,
   ],
   exports: [

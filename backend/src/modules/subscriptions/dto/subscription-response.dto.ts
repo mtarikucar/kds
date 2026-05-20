@@ -1,4 +1,8 @@
-import { SubscriptionStatus, BillingCycle, PaymentProvider } from '../../../common/constants/subscription.enum';
+import {
+  SubscriptionStatus,
+  BillingCycle,
+  PaymentProvider,
+} from "../../../common/constants/subscription.enum";
 
 export class SubscriptionResponseDto {
   id: string;
@@ -21,7 +25,6 @@ export class SubscriptionResponseDto {
   amount: number;
   currency: string;
 
-  autoRenew: boolean;
   cancelAtPeriodEnd: boolean;
 
   plan?: {

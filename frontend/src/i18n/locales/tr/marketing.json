@@ -150,6 +150,7 @@
   "dashboard": {
     "title": "Gösterge Paneli",
     "subtitle": "Performansa bir bakış",
+    "downloadGuide": "Pazarlamacı Rehberini İndir (PDF)",
     "totalLeads": "Toplam lead",
     "convertedLeads": "Dönüştürülen",
     "conversionRate": "Dönüşüm oranı",

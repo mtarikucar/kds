@@ -1,10 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
-import { Transporter } from 'nodemailer';
-import * as handlebars from 'handlebars';
-import * as fs from 'fs';
-import * as path from 'path';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import * as nodemailer from "nodemailer";
+import { Transporter } from "nodemailer";
+import * as handlebars from "handlebars";
+import * as fs from "fs";
+import * as path from "path";
 
 export interface EmailOptions {
   to: string;
@@ -20,23 +20,25 @@ export class NotificationService {
   private templatesPath: string;
 
   constructor(private configService: ConfigService) {
-    this.templatesPath = path.join(__dirname, '../templates/emails');
+    this.templatesPath = path.join(__dirname, "../templates/emails");
     this.initializeTransporter();
   }
 
   private initializeTransporter() {
     const emailConfig = {
-      host: this.configService.get('EMAIL_HOST', 'smtpout.secureserver.net'),
-      port: this.configService.get('EMAIL_PORT', 587),
-      secure: this.configService.get('EMAIL_SECURE', false),
+      host: this.configService.get("EMAIL_HOST", "smtpout.secureserver.net"),
+      port: this.configService.get("EMAIL_PORT", 587),
+      secure: this.configService.get("EMAIL_SECURE", false),
       auth: {
-        user: this.configService.get('EMAIL_USER'),
-        pass: this.configService.get('EMAIL_PASSWORD'),
+        user: this.configService.get("EMAIL_USER"),
+        pass: this.configService.get("EMAIL_PASSWORD"),
       },
     };
 
     if (!emailConfig.auth.user || !emailConfig.auth.pass) {
-      this.logger.warn('Email credentials not configured. Email notifications will be disabled.');
+      this.logger.warn(
+        "Email credentials not configured. Email notifications will be disabled.",
+      );
       return;
     }
 
@@ -56,7 +58,10 @@ export class NotificationService {
       const html = await this.renderTemplate(options.template, options.context);
 
       await this.transporter.sendMail({
-        from: this.configService.get('EMAIL_FROM', 'noreply@restaurant-pos.com'),
+        from: this.configService.get(
+          "EMAIL_FROM",
+          "noreply@restaurant-pos.com",
+        ),
         to: options.to,
         subject: options.subject,
         html,
@@ -73,23 +78,28 @@ export class NotificationService {
   /**
    * Render email template
    */
-  private async renderTemplate(templateName: string, context: Record<string, any>): Promise<string> {
+  private async renderTemplate(
+    templateName: string,
+    context: Record<string, any>,
+  ): Promise<string> {
     const templatePath = path.join(this.templatesPath, `${templateName}.hbs`);
 
     try {
-      const templateContent = fs.readFileSync(templatePath, 'utf-8');
+      const templateContent = fs.readFileSync(templatePath, "utf-8");
       const template = handlebars.compile(templateContent);
       return template(context);
     } catch (error) {
-      this.logger.error(`Failed to render template ${templateName}: ${error.message}`);
+      this.logger.error(
+        `Failed to render template ${templateName}: ${error.message}`,
+      );
       // Return a simple fallback template
-      return `<p>${context.message || 'Notification from HummyTummy'}</p>`;
+      return `<p>${context.message || "Notification from HummyTummy"}</p>`;
     }
   }
 
   /** App base URL used in template links. */
   private get appUrl(): string {
-    return this.configService.get<string>('APP_URL') ?? 'http://localhost:5173';
+    return this.configService.get<string>("APP_URL") ?? "http://localhost:5173";
   }
 
   /**
@@ -97,16 +107,23 @@ export class NotificationService {
    * targets the Turkish market and recipients are virtually always
    * Turkish-speaking. Locale-aware i18n can be layered on later.
    */
-  async sendTrialStarted(email: string, tenantName: string, planName: string, trialDays: number) {
+  async sendTrialStarted(
+    email: string,
+    tenantName: string,
+    planName: string,
+    trialDays: number,
+  ) {
     return this.sendEmail({
       to: email,
       subject: `${planName} deneme süreniz başladı`,
-      template: 'trial-started',
+      template: "trial-started",
       context: {
         tenantName,
         planName,
         trialDays,
-        expiryDate: new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000).toLocaleDateString('tr-TR'),
+        expiryDate: new Date(
+          Date.now() + trialDays * 24 * 60 * 60 * 1000,
+        ).toLocaleDateString("tr-TR"),
         appUrl: this.appUrl,
       },
     });
@@ -126,13 +143,46 @@ export class NotificationService {
     return this.sendEmail({
       to: email,
       subject: `Deneme süreniz ${daysRemaining} gün içinde bitiyor`,
-      template: 'trial-ending',
+      template: "trial-ending",
       context: {
         tenantName,
         planName,
         daysRemaining,
-        planId: extras?.planId ?? '',
-        billingCycle: extras?.billingCycle ?? 'MONTHLY',
+        planId: extras?.planId ?? "",
+        billingCycle: extras?.billingCycle ?? "MONTHLY",
+        appUrl: this.appUrl,
+      },
+    });
+  }
+
+  /**
+   * Send subscription-expiry reminder. Manual-renewal model: cron
+   * fires this at 7-day, 3-day, and 1-day windows before
+   * `currentPeriodEnd` so the tenant has time to re-purchase. The CTA
+   * link drops them on `/subscription/plans?renew=1` which pre-fills
+   * the current plan for a one-click re-checkout.
+   */
+  async sendSubscriptionExpiryReminder(
+    email: string,
+    tenantName: string,
+    planName: string,
+    expiresAt: Date,
+    daysRemaining: 7 | 3 | 1,
+  ) {
+    const subject =
+      daysRemaining === 1
+        ? `${tenantName} aboneliğiniz YARIN sona eriyor`
+        : `${tenantName} aboneliğiniz ${daysRemaining} gün içinde sona eriyor`;
+    return this.sendEmail({
+      to: email,
+      subject,
+      template: "subscription-expiry-reminder",
+      context: {
+        tenantName,
+        planName,
+        daysRemaining,
+        expiresAt: expiresAt.toISOString().slice(0, 10),
+        renewUrl: `${this.appUrl}/subscription/plans?renew=1`,
         appUrl: this.appUrl,
       },
     });
@@ -144,8 +194,8 @@ export class NotificationService {
   async sendTrialExpired(email: string, tenantName: string, planName: string) {
     return this.sendEmail({
       to: email,
-      subject: 'Deneme süreniz sona erdi',
-      template: 'trial-expired',
+      subject: "Deneme süreniz sona erdi",
+      template: "trial-expired",
       context: {
         tenantName,
         planName,
@@ -166,14 +216,14 @@ export class NotificationService {
   ) {
     return this.sendEmail({
       to: email,
-      subject: 'Ödemeniz alındı - Teşekkür ederiz',
-      template: 'payment-successful',
+      subject: "Ödemeniz alındı - Teşekkür ederiz",
+      template: "payment-successful",
       context: {
         tenantName,
         amount,
         currency,
         invoiceNumber,
-        paymentDate: new Date().toLocaleDateString('tr-TR'),
+        paymentDate: new Date().toLocaleDateString("tr-TR"),
         appUrl: this.appUrl,
       },
     });
@@ -182,17 +232,22 @@ export class NotificationService {
   /** Date formatter pinned to tr-TR; receipts always render Turkish for
    *  the Turkish-market product. */
   private formatDate(d: Date): string {
-    return d.toLocaleDateString('tr-TR');
+    return d.toLocaleDateString("tr-TR");
   }
 
   /**
    * Send payment failed email
    */
-  async sendPaymentFailed(email: string, tenantName: string, amount: number, reason: string) {
+  async sendPaymentFailed(
+    email: string,
+    tenantName: string,
+    amount: number,
+    reason: string,
+  ) {
     return this.sendEmail({
       to: email,
-      subject: 'Ödeme başarısız - İşlem gerekiyor',
-      template: 'payment-failed',
+      subject: "Ödeme başarısız - İşlem gerekiyor",
+      template: "payment-failed",
       context: {
         tenantName,
         amount,
@@ -205,11 +260,16 @@ export class NotificationService {
   /**
    * Send subscription activated email
    */
-  async sendSubscriptionActivated(email: string, tenantName: string, planName: string, billingCycle: string) {
+  async sendSubscriptionActivated(
+    email: string,
+    tenantName: string,
+    planName: string,
+    billingCycle: string,
+  ) {
     return this.sendEmail({
       to: email,
       subject: `${planName} aboneliğiniz aktif`,
-      template: 'subscription-activated',
+      template: "subscription-activated",
       context: {
         tenantName,
         planName,
@@ -222,11 +282,16 @@ export class NotificationService {
   /**
    * Send subscription cancelled email
    */
-  async sendSubscriptionCancelled(email: string, tenantName: string, planName: string, endDate: Date) {
+  async sendSubscriptionCancelled(
+    email: string,
+    tenantName: string,
+    planName: string,
+    endDate: Date,
+  ) {
     return this.sendEmail({
       to: email,
-      subject: 'Aboneliğiniz iptal edildi',
-      template: 'subscription-cancelled',
+      subject: "Aboneliğiniz iptal edildi",
+      template: "subscription-cancelled",
       context: {
         tenantName,
         planName,
@@ -239,15 +304,20 @@ export class NotificationService {
   /**
    * Send subscription cancelled immediately email
    */
-  async sendSubscriptionCancelledImmediate(email: string, tenantName: string, planName: string, reason?: string) {
+  async sendSubscriptionCancelledImmediate(
+    email: string,
+    tenantName: string,
+    planName: string,
+    reason?: string,
+  ) {
     return this.sendEmail({
       to: email,
-      subject: 'Aboneliğiniz iptal edildi',
-      template: 'subscription-cancelled-immediate',
+      subject: "Aboneliğiniz iptal edildi",
+      template: "subscription-cancelled-immediate",
       context: {
         tenantName,
         planName,
-        reason: reason || 'Belirtilmedi',
+        reason: reason || "Belirtilmedi",
         cancelledDate: this.formatDate(new Date()),
         appUrl: this.appUrl,
       },
@@ -257,15 +327,21 @@ export class NotificationService {
   /**
    * Send subscription will cancel at period end email
    */
-  async sendSubscriptionWillCancel(email: string, tenantName: string, planName: string, endDate: Date, reason?: string) {
+  async sendSubscriptionWillCancel(
+    email: string,
+    tenantName: string,
+    planName: string,
+    endDate: Date,
+    reason?: string,
+  ) {
     return this.sendEmail({
       to: email,
-      subject: 'Abonelik iptali planlandı',
-      template: 'subscription-will-cancel',
+      subject: "Abonelik iptali planlandı",
+      template: "subscription-will-cancel",
       context: {
         tenantName,
         planName,
-        reason: reason || 'Belirtilmedi',
+        reason: reason || "Belirtilmedi",
         endDate: this.formatDate(endDate),
         appUrl: this.appUrl,
       },
@@ -275,11 +351,17 @@ export class NotificationService {
   /**
    * Send invoice ready notification
    */
-  async sendInvoiceReady(email: string, tenantName: string, invoiceNumber: string, amount: number, pdfUrl?: string) {
+  async sendInvoiceReady(
+    email: string,
+    tenantName: string,
+    invoiceNumber: string,
+    amount: number,
+    pdfUrl?: string,
+  ) {
     return this.sendEmail({
       to: email,
       subject: `${invoiceNumber} numaralı faturanız hazır`,
-      template: 'invoice-ready',
+      template: "invoice-ready",
       context: {
         tenantName,
         invoiceNumber,
@@ -293,11 +375,16 @@ export class NotificationService {
   /**
    * Send plan upgraded email
    */
-  async sendPlanUpgraded(email: string, tenantName: string, oldPlan: string, newPlan: string) {
+  async sendPlanUpgraded(
+    email: string,
+    tenantName: string,
+    oldPlan: string,
+    newPlan: string,
+  ) {
     return this.sendEmail({
       to: email,
       subject: `${newPlan} planına yükseltildi`,
-      template: 'plan-upgraded',
+      template: "plan-upgraded",
       context: {
         tenantName,
         oldPlan,
@@ -310,11 +397,17 @@ export class NotificationService {
   /**
    * Send plan downgraded email
    */
-  async sendPlanDowngraded(email: string, tenantName: string, oldPlan: string, newPlan: string, effectiveDate: Date) {
+  async sendPlanDowngraded(
+    email: string,
+    tenantName: string,
+    oldPlan: string,
+    newPlan: string,
+    effectiveDate: Date,
+  ) {
     return this.sendEmail({
       to: email,
-      subject: 'Plan değişikliği planlandı',
-      template: 'plan-downgraded',
+      subject: "Plan değişikliği planlandı",
+      template: "plan-downgraded",
       context: {
         tenantName,
         oldPlan,
@@ -328,11 +421,15 @@ export class NotificationService {
   /**
    * Send plan change confirmation email
    */
-  async sendPlanChangeConfirmation(email: string, tenantName: string, newPlanName: string) {
+  async sendPlanChangeConfirmation(
+    email: string,
+    tenantName: string,
+    newPlanName: string,
+  ) {
     return this.sendEmail({
       to: email,
       subject: `Planınız ${newPlanName} olarak güncellendi`,
-      template: 'plan-change-confirmation',
+      template: "plan-change-confirmation",
       context: {
         tenantName,
         planName: newPlanName,
@@ -345,11 +442,17 @@ export class NotificationService {
   /**
    * Send payment retry notification
    */
-  async sendPaymentRetryNotification(email: string, tenantName: string, amount: number, currency: string, nextRetryDate: Date) {
+  async sendPaymentRetryNotification(
+    email: string,
+    tenantName: string,
+    amount: number,
+    currency: string,
+    nextRetryDate: Date,
+  ) {
     return this.sendEmail({
       to: email,
-      subject: 'Payment retry scheduled',
-      template: 'payment-retry',
+      subject: "Payment retry scheduled",
+      template: "payment-retry",
       context: {
         tenantName,
         amount,
@@ -362,11 +465,17 @@ export class NotificationService {
   /**
    * Send subscription past due warning
    */
-  async sendSubscriptionPastDue(email: string, tenantName: string, planName: string, amount: number, currency: string) {
+  async sendSubscriptionPastDue(
+    email: string,
+    tenantName: string,
+    planName: string,
+    amount: number,
+    currency: string,
+  ) {
     return this.sendEmail({
       to: email,
-      subject: 'Subscription payment past due - Action required',
-      template: 'subscription-past-due',
+      subject: "Subscription payment past due - Action required",
+      template: "subscription-past-due",
       context: {
         tenantName,
         planName,
@@ -383,7 +492,7 @@ export class NotificationService {
     return this.sendEmail({
       to: email,
       subject: `Welcome to ${planName}!`,
-      template: 'welcome',
+      template: "welcome",
       context: {
         tenantName,
         planName,
@@ -405,12 +514,15 @@ export class NotificationService {
     billingCycle: string,
     currency: string,
   ) {
-    const adminEmail = this.configService.get('ADMIN_EMAIL', 'admin@hummytummy.com');
+    const adminEmail = this.configService.get(
+      "ADMIN_EMAIL",
+      "admin@hummytummy.com",
+    );
 
     return this.sendEmail({
       to: adminEmail,
       subject: `International Subscription Request - ${tenantName}`,
-      template: 'international-subscription-request',
+      template: "international-subscription-request",
       context: {
         customerEmail,
         customerName,
@@ -435,8 +547,8 @@ export class NotificationService {
   ) {
     return this.sendEmail({
       to: email,
-      subject: 'Subscription Request Received',
-      template: 'international-request-confirmation',
+      subject: "Subscription Request Received",
+      template: "international-request-confirmation",
       context: {
         tenantName,
         planName,
@@ -444,5 +556,4 @@ export class NotificationService {
       },
     });
   }
-
 }

@@ -550,7 +550,6 @@ export class MarketingLeadsService {
             trialEnd,
             amount: subscriptionAmount,
             currency: plan.currency,
-            autoRenew: true,
             cancelAtPeriodEnd: false,
           },
         });

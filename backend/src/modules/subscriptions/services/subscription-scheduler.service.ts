@@ -1,19 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { addDays, addMonths, addYears } from 'date-fns';
-import { Prisma } from '@prisma/client';
-import { randomBytes } from 'crypto';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { SubscriptionService } from './subscription.service';
-import { NotificationService } from './notification.service';
-import { BillingService } from './billing.service';
-import { PaytrAdapter } from '../../payments/adapters/paytr.adapter';
+import { Injectable, Logger, Inject, forwardRef } from "@nestjs/common";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { addDays, addHours } from "date-fns";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { SubscriptionService } from "./subscription.service";
+import { NotificationService } from "./notification.service";
+import { BillingService } from "./billing.service";
+import { PaytrAdapter } from "../../payments/adapters/paytr.adapter";
+import { PaytrSettlementService } from "../../payments/services/paytr-settlement.service";
 import {
-  BillingCycle,
-  PaymentProvider,
   PaymentStatus,
   SubscriptionStatus,
-} from '../../../common/constants/subscription.enum';
+} from "../../../common/constants/subscription.enum";
 
 /**
  * All jobs acquire a Postgres advisory lock per job name before running,
@@ -31,6 +28,11 @@ export class SubscriptionSchedulerService {
     private readonly notifications: NotificationService,
     private readonly billing: BillingService,
     private readonly paytr: PaytrAdapter,
+    // forwardRef because PaytrSettlementModule imports SubscriptionsModule
+    // for Billing+Notification — without this, Nest sees the cycle at
+    // bootstrap and throws.
+    @Inject(forwardRef(() => PaytrSettlementService))
+    private readonly settlement: PaytrSettlementService,
   ) {}
 
   /**
@@ -39,13 +41,18 @@ export class SubscriptionSchedulerService {
    * releases automatically at the end of the current DB session, so we
    * explicitly release it when the job body is done.
    */
-  private async withJobLock(jobName: string, run: () => Promise<void>): Promise<void> {
+  private async withJobLock(
+    jobName: string,
+    run: () => Promise<void>,
+  ): Promise<void> {
     const lockId = this.jobLockId(jobName);
     const rows = await this.prisma.$queryRawUnsafe<{ locked: boolean }[]>(
       `SELECT pg_try_advisory_lock(${lockId}) AS locked`,
     );
     if (!rows[0]?.locked) {
-      this.logger.warn(`Skipping ${jobName}: advisory lock held by another process`);
+      this.logger.warn(
+        `Skipping ${jobName}: advisory lock held by another process`,
+      );
       return;
     }
     try {
@@ -66,262 +73,141 @@ export class SubscriptionSchedulerService {
     return hash;
   }
 
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT, { name: 'trial-expirations' })
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT, { name: "trial-expirations" })
   async handleTrialExpirations() {
-    await this.withJobLock('trial-expirations', async () => {
-      this.logger.log('Running trial expiration check...');
+    await this.withJobLock("trial-expirations", async () => {
+      this.logger.log("Running trial expiration check...");
       try {
         const result = await this.subscriptionService.expireTrials();
         this.logger.log(
           `Trial expiry: processed ${result.processed}, failed ${result.failed}`,
         );
       } catch (error: any) {
-        this.logger.error(`Error processing trial expirations: ${error?.message}`);
-      }
-    });
-  }
-
-  /**
-   * Daily renewal job. For each subscription whose period ends in the
-   * next 24h:
-   *   - Tenant with a stored PayTR recurring token → `chargeRecurring`.
-   *     On success, bump period + create payment + invoice. On failure,
-   *     fall back to `renewSubscription()` (which moves the sub to
-   *     PAST_DUE so the grace-period banner is shown).
-   *   - No recurring token → PAST_DUE; tenant must retry checkout.
-   */
-  @Cron('0 2 * * *', { name: 'subscription-renewals' })
-  async handleSubscriptionRenewals() {
-    await this.withJobLock('subscription-renewals', async () => {
-      this.logger.log('Running subscription renewal check...');
-      const now = new Date();
-      const tomorrow = addDays(now, 1);
-
-      const subscriptionsToRenew = await this.prisma.subscription.findMany({
-        where: {
-          status: SubscriptionStatus.ACTIVE,
-          autoRenew: true,
-          currentPeriodEnd: { gte: now, lte: tomorrow },
-        },
-        include: {
-          plan: true,
-          tenant: { select: { id: true, name: true, paytrRecurringToken: true } },
-        },
-      });
-      this.logger.log(`Found ${subscriptionsToRenew.length} subscriptions due for renewal`);
-
-      for (const sub of subscriptionsToRenew) {
-        try {
-          await this.renewOneSubscription(sub);
-        } catch (error: any) {
-          this.logger.error(`Failed to renew ${sub.id}: ${error?.message}`);
-        }
-      }
-    });
-  }
-
-  /**
-   * Renew a single subscription. PayTR-token holders get auto-charged
-   * via PayTR's recurring-payment API; everyone else drops to PAST_DUE
-   * so the tenant retries checkout. Failures here log but don't throw —
-   * the cron must remain idempotent so a single bad row doesn't stop
-   * the rest.
-   */
-  private async renewOneSubscription(sub: any): Promise<void> {
-    const tenant = sub.tenant;
-    const canAutoCharge =
-      !!tenant?.paytrRecurringToken &&
-      sub.paymentProvider === PaymentProvider.PAYTR;
-
-    if (!canAutoCharge) {
-      await this.subscriptionService.renewSubscription(sub.id);
-      return;
-    }
-
-    const merchantOid = `RNW${tenant.id.replace(/-/g, '').slice(0, 12)}${Date.now().toString(36)}${randomBytes(3).toString('hex')}`;
-    const amount = sub.amount as Prisma.Decimal;
-
-    const result = await this.paytr.chargeRecurring({
-      merchantOid,
-      amount,
-      utoken: tenant.paytrRecurringToken,
-      productName: `${sub.plan.displayName} yenileme`,
-    });
-
-    if (result.status !== 'success') {
-      // Auto-charge failed → drop to PAST_DUE so the tenant retries
-      // checkout. PayTR error is recorded on a FAILED payment row for audit.
-      await this.prisma.subscriptionPayment.create({
-        data: {
-          subscriptionId: sub.id,
-          amount,
-          currency: sub.currency,
-          status: PaymentStatus.FAILED,
-          paymentProvider: PaymentProvider.PAYTR,
-          paytrMerchantOid: merchantOid,
-          failureCode: 'RECURRING_FAILED',
-          failureMessage: typeof result.reason === 'string' ? result.reason : 'unknown',
-        },
-      });
-      await this.subscriptionService.renewSubscription(sub.id);
-      this.logger.warn(
-        `Recurring charge failed for sub=${sub.id}, fell back to PAST_DUE: ${result.reason ?? 'unknown'}`,
-      );
-      return;
-    }
-
-    // Success path — write payment, bump period, issue invoice, all atomic.
-    // Period continuity: the cron fires ~24h before currentPeriodEnd so
-    // we anchor the *new* period on the old end (not on `now`). Otherwise
-    // a tenant whose period ends at 23:59 would lose those 24 hours on
-    // every renewal. If the period has already passed (cron caught a
-    // PAST_DUE-then-recovered edge case), fall back to `now`.
-    const now = new Date();
-    const newPeriodStart =
-      sub.currentPeriodEnd > now ? new Date(sub.currentPeriodEnd) : now;
-    const newPeriodEnd =
-      sub.billingCycle === BillingCycle.MONTHLY
-        ? addMonths(newPeriodStart, 1)
-        : addYears(newPeriodStart, 1);
-
-    let invoiceNumber: string | undefined;
-    await this.prisma.$transaction(async (tx) => {
-      const payment = await tx.subscriptionPayment.create({
-        data: {
-          subscriptionId: sub.id,
-          amount,
-          currency: sub.currency,
-          status: PaymentStatus.SUCCEEDED,
-          paymentProvider: PaymentProvider.PAYTR,
-          paytrMerchantOid: merchantOid,
-          paidAt: now,
-        },
-      });
-      await tx.subscription.update({
-        where: { id: sub.id },
-        data: {
-          currentPeriodStart: newPeriodStart,
-          currentPeriodEnd: newPeriodEnd,
-        },
-      });
-      const invoice = await this.billing.createInvoice(
-        tx,
-        sub.id,
-        payment.id,
-        amount,
-        sub.currency,
-        newPeriodStart,
-        newPeriodEnd,
-        `${sub.plan.displayName} planı otomatik yenileme`,
-      );
-      invoiceNumber = invoice.invoiceNumber;
-    });
-
-    // Best-effort payment-success email (post-commit).
-    void this.sendRenewalSuccessEmail(
-      tenant.id,
-      tenant.name,
-      Number(amount),
-      sub.currency,
-      invoiceNumber ?? '',
-    );
-
-    // Marketing rep RENEWAL commission. Best-effort — failure here
-    // shouldn't reverse the renewal. Skip when no marketing lead
-    // backed the original signup (manual self-serve onboarding) or
-    // when the amount is zero (no plan -> nothing to pay out on).
-    void this.creditRenewalCommission(tenant.id, sub, amount, now);
-
-    this.logger.log(
-      `Recurring charge succeeded for sub=${sub.id} tenant=${tenant.id} oid=${merchantOid}`,
-    );
-  }
-
-  /**
-   * Look up the marketing lead that converted into this tenant and
-   * stamp a PENDING RENEWAL commission for its assigned rep. The
-   * lookup leans on Lead.convertedTenantId — the @@unique constraint
-   * there guarantees at most one match. The commission rate is
-   * sourced from the plan's `commissionRate` column (P3 of the
-   * marketing rebuild) with a 0.10 floor for plans cold-seeded before
-   * the column existed.
-   */
-  private async creditRenewalCommission(
-    tenantId: string,
-    sub: { plan: { commissionRate?: Prisma.Decimal | null } },
-    amount: Prisma.Decimal,
-    now: Date,
-  ): Promise<void> {
-    try {
-      const numericAmount = Number(amount);
-      if (!Number.isFinite(numericAmount) || numericAmount <= 0) return;
-
-      const lead = await this.prisma.lead.findFirst({
-        where: { convertedTenantId: tenantId },
-        select: { id: true, assignedToId: true },
-      });
-      if (!lead?.assignedToId) return;
-
-      const rate =
-        sub.plan.commissionRate !== null && sub.plan.commissionRate !== undefined
-          ? new Prisma.Decimal(sub.plan.commissionRate)
-          : new Prisma.Decimal(0.1);
-      const commissionAmount = new Prisma.Decimal(amount)
-        .mul(rate)
-        .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
-      const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-      await this.prisma.commission.create({
-        data: {
-          amount: commissionAmount,
-          type: 'RENEWAL',
-          status: 'PENDING',
-          period,
-          tenantId,
-          leadId: lead.id,
-          marketingUserId: lead.assignedToId,
-        },
-      });
-      this.logger.log(
-        `Renewal commission created for tenant=${tenantId} rep=${lead.assignedToId} amount=${commissionAmount}`,
-      );
-    } catch (err: any) {
-      this.logger.error(
-        `Renewal commission credit failed for tenant=${tenantId}: ${err?.message ?? err}`,
-      );
-    }
-  }
-
-  private async sendRenewalSuccessEmail(
-    tenantId: string,
-    tenantName: string,
-    amount: number,
-    currency: string,
-    invoiceNumber: string,
-  ): Promise<void> {
-    try {
-      const admin = await this.prisma.user.findFirst({
-        where: { tenantId, role: 'ADMIN' },
-        select: { email: true },
-      });
-      if (admin?.email) {
-        await this.notifications.sendPaymentSuccessful(
-          admin.email,
-          tenantName,
-          amount,
-          currency,
-          invoiceNumber,
+        this.logger.error(
+          `Error processing trial expirations: ${error?.message}`,
         );
       }
-    } catch (err: any) {
-      this.logger.error(`payment-success notification failed: ${err?.message}`);
+    });
+  }
+
+  /**
+   * Subscription period-end watcher. Manual-renewal model: PayTR's
+   * Kart Saklama / Recurring yetkisi is closed for this merchant, so
+   * we don't auto-charge. Instead, when a subscription's period ends,
+   * the subscription drops to PAST_DUE — features keep working for
+   * the 7-day grace window (handled by `handlePastDueSubscriptions`
+   * below), and the tenant is nudged via email + dashboard CTA to
+   * manually re-purchase.
+   *
+   * Runs at 02:00 TR. The split with `past-due-subscriptions` at 03:00
+   * is deliberate: ACTIVE → PAST_DUE here, then 7 days later the next
+   * cron flips PAST_DUE → EXPIRED.
+   */
+  @Cron("0 2 * * *", { name: "subscription-period-end" })
+  async handleSubscriptionPeriodEnd() {
+    await this.withJobLock("subscription-period-end", async () => {
+      const now = new Date();
+      const expired = await this.prisma.subscription.findMany({
+        where: {
+          status: SubscriptionStatus.ACTIVE,
+          currentPeriodEnd: { lt: now },
+        },
+        include: { plan: true, tenant: { select: { id: true, name: true } } },
+        orderBy: { currentPeriodEnd: "asc" },
+        take: 200,
+      });
+
+      for (const sub of expired) {
+        try {
+          await this.prisma.subscription.update({
+            where: { id: sub.id },
+            data: { status: SubscriptionStatus.PAST_DUE },
+          });
+
+          const admin = await this.prisma.user.findFirst({
+            where: { tenantId: sub.tenant.id, role: "ADMIN" },
+            select: { email: true },
+          });
+          if (admin?.email) {
+            void this.notifications
+              .sendSubscriptionPastDue(
+                admin.email,
+                sub.tenant.name,
+                sub.plan.displayName,
+                Number(sub.amount),
+                sub.currency,
+              )
+              .catch((err: any) =>
+                this.logger.error(
+                  `past-due email failed for tenant=${sub.tenant.id}: ${err?.message}`,
+                ),
+              );
+          }
+        } catch (err: any) {
+          this.logger.error(
+            `Period-end transition failed for sub=${sub.id}: ${err?.message}`,
+          );
+        }
+      }
+
+      this.logger.log(
+        `Period-end sweep: ACTIVE → PAST_DUE count=${expired.length}`,
+      );
+    });
+  }
+
+  /**
+   * Pre-expiry reminder cadence: 7 days, 3 days, and 1 day before
+   * `currentPeriodEnd`. Each window is one calendar day wide so an
+   * ACTIVE subscription that falls in the window gets exactly one
+   * email per stage. Mirrors the trial-reminder pattern below.
+   */
+  @Cron("0 10 * * *", { name: "subscription-expiry-reminders" })
+  async handleSubscriptionExpiryReminders() {
+    await this.withJobLock("subscription-expiry-reminders", async () => {
+      for (const daysOut of [7, 3, 1] as const) {
+        await this.fireExpiryReminderWindow(daysOut);
+      }
+    });
+  }
+
+  private async fireExpiryReminderWindow(daysOut: 7 | 3 | 1): Promise<void> {
+    const now = new Date();
+    const windowStart = addDays(now, daysOut);
+    const windowEnd = addDays(now, daysOut + 1);
+    const due = await this.prisma.subscription.findMany({
+      where: {
+        status: SubscriptionStatus.ACTIVE,
+        currentPeriodEnd: { gte: windowStart, lt: windowEnd },
+      },
+      include: { plan: true, tenant: { select: { id: true, name: true } } },
+    });
+    for (const sub of due) {
+      try {
+        const admin = await this.prisma.user.findFirst({
+          where: { tenantId: sub.tenant.id, role: "ADMIN" },
+          select: { email: true },
+        });
+        if (!admin?.email) continue;
+        await this.notifications.sendSubscriptionExpiryReminder(
+          admin.email,
+          sub.tenant.name,
+          sub.plan.displayName,
+          sub.currentPeriodEnd,
+          daysOut,
+        );
+      } catch (err: any) {
+        this.logger.error(
+          `expiry reminder ${daysOut}d failed for sub=${sub.id}: ${err?.message}`,
+        );
+      }
     }
   }
 
-  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT, { name: 'pending-cancellations' })
+  @Cron(CronExpression.EVERY_DAY_AT_MIDNIGHT, { name: "pending-cancellations" })
   async handlePendingCancellations() {
-    await this.withJobLock('pending-cancellations', async () => {
-      this.logger.log('Running pending cancellation check...');
+    await this.withJobLock("pending-cancellations", async () => {
+      this.logger.log("Running pending cancellation check...");
       const now = new Date();
       const result = await this.prisma.subscription.updateMany({
         where: {
@@ -338,10 +224,10 @@ export class SubscriptionSchedulerService {
     });
   }
 
-  @Cron('0 3 * * *', { name: 'past-due-subscriptions' })
+  @Cron("0 3 * * *", { name: "past-due-subscriptions" })
   async handlePastDueSubscriptions() {
-    await this.withJobLock('past-due-subscriptions', async () => {
-      this.logger.log('Running past-due subscription check...');
+    await this.withJobLock("past-due-subscriptions", async () => {
+      this.logger.log("Running past-due subscription check...");
       const sevenDaysAgo = addDays(new Date(), -7);
       const result = await this.prisma.subscription.updateMany({
         where: {
@@ -363,10 +249,10 @@ export class SubscriptionSchedulerService {
    * land within that window get exactly one email per stage. Single
    * 10:00 daily cron drives all three.
    */
-  @Cron('0 10 * * *', { name: 'trial-reminders' })
+  @Cron("0 10 * * *", { name: "trial-reminders" })
   async sendTrialReminders() {
-    await this.withJobLock('trial-reminders', async () => {
-      this.logger.log('Running trial reminder check...');
+    await this.withJobLock("trial-reminders", async () => {
+      this.logger.log("Running trial reminder check...");
       for (const daysOut of [7, 3, 1]) {
         await this.fireTrialReminderWindow(daysOut);
       }
@@ -390,7 +276,7 @@ export class SubscriptionSchedulerService {
     for (const subscription of trials) {
       try {
         const admin = await this.prisma.user.findFirst({
-          where: { tenantId: subscription.tenantId, role: 'ADMIN' },
+          where: { tenantId: subscription.tenantId, role: "ADMIN" },
           select: { email: true },
         });
         if (admin?.email) {
@@ -413,19 +299,20 @@ export class SubscriptionSchedulerService {
     }
   }
 
-  @Cron('0 1 * * *', { name: 'scheduled-downgrades' })
+  @Cron("0 1 * * *", { name: "scheduled-downgrades" })
   async handleScheduledDowngrades() {
-    await this.withJobLock('scheduled-downgrades', async () => {
-      this.logger.log('Running scheduled downgrade check...');
+    await this.withJobLock("scheduled-downgrades", async () => {
+      this.logger.log("Running scheduled downgrade check...");
       const now = new Date();
-      const subscriptionsWithDowngrades = await this.prisma.subscription.findMany({
-        where: {
-          scheduledDowngradePlanId: { not: null },
-          currentPeriodEnd: { lte: now },
-          status: SubscriptionStatus.ACTIVE,
-        },
-        select: { id: true },
-      });
+      const subscriptionsWithDowngrades =
+        await this.prisma.subscription.findMany({
+          where: {
+            scheduledDowngradePlanId: { not: null },
+            currentPeriodEnd: { lte: now },
+            status: SubscriptionStatus.ACTIVE,
+          },
+          select: { id: true },
+        });
       this.logger.log(
         `Found ${subscriptionsWithDowngrades.length} scheduled downgrades to apply`,
       );
@@ -451,9 +338,9 @@ export class SubscriptionSchedulerService {
    * deliver a successful callback hours after the user closed the tab,
    * and we want to honour it.
    */
-  @Cron(CronExpression.EVERY_HOUR, { name: 'paytr-orphan-cleanup' })
+  @Cron(CronExpression.EVERY_HOUR, { name: "paytr-orphan-cleanup" })
   async handlePaytrOrphanCleanup() {
-    await this.withJobLock('paytr-orphan-cleanup', async () => {
+    await this.withJobLock("paytr-orphan-cleanup", async () => {
       const now = new Date();
       const subscriptionGrace = addDays(now, -1);
 
@@ -500,23 +387,92 @@ export class SubscriptionSchedulerService {
    * customer can't pay the same units. Sweeping to EXPIRED releases
    * those units back to the payable pool.
    */
-  @Cron('*/30 * * * *', { name: 'self-pay-orphan-cleanup' })
+  @Cron("*/30 * * * *", { name: "self-pay-orphan-cleanup" })
   async handleSelfPayOrphanCleanup() {
-    await this.withJobLock('self-pay-orphan-cleanup', async () => {
+    await this.withJobLock("self-pay-orphan-cleanup", async () => {
       const now = new Date();
       const expired = await this.prisma.pendingSelfPayment.updateMany({
         where: {
-          status: 'PENDING',
+          status: "PENDING",
           expiresAt: { lte: now },
         },
         data: {
-          status: 'EXPIRED',
-          failureReason: 'expired',
+          status: "EXPIRED",
+          failureReason: "expired",
         },
       });
       if (expired.count > 0) {
         this.logger.log(`Self-pay orphan cleanup: expired=${expired.count}`);
       }
+    });
+  }
+
+  /**
+   * Webhook recovery sweeper. PayTR's callback is normally the only
+   * signal we get for whether a checkout succeeded — but callbacks
+   * occasionally fail to land (network blip, our 5xx during deploy,
+   * PayTR retry exhaustion). Without this sweeper, the payment row
+   * hangs in PENDING forever and the tenant's subscription never
+   * activates even though their card may already have been charged.
+   *
+   * Every hour, find SubscriptionPayment rows that have been PENDING
+   * for ≥ 2 hours (still expecting a callback) and ask PayTR's
+   * `durum-sorgu` endpoint what really happened. Replay the same
+   * settlement logic the webhook would have run.
+   *
+   * Caveats:
+   *   - We never receive `utoken` via inquiry, so recovered
+   *     activations leave the tenant without a stored card — they'll
+   *     need a fresh checkout when the next renewal cycle starts.
+   *     This is acceptable for the rare loss case.
+   *   - Hard cap at 50 rows per run to bound PayTR API spend.
+   *   - SP-prefix self-pay PENDING rows live in PendingSelfPayment,
+   *     not SubscriptionPayment — they're swept by a different cron.
+   */
+  @Cron(CronExpression.EVERY_HOUR, { name: "paytr-pending-recovery" })
+  async handlePaytrPendingRecovery() {
+    await this.withJobLock("paytr-pending-recovery", async () => {
+      const cutoff = addHours(new Date(), -2);
+      const stuck = await this.prisma.subscriptionPayment.findMany({
+        where: {
+          status: PaymentStatus.PENDING,
+          createdAt: { lt: cutoff },
+          paytrMerchantOid: { not: null },
+        },
+        select: { id: true, paytrMerchantOid: true },
+        orderBy: { createdAt: "asc" },
+        take: 50,
+      });
+      if (stuck.length === 0) return;
+
+      let recovered = 0;
+      let failed = 0;
+      let stillPending = 0;
+      for (const row of stuck) {
+        const oid = row.paytrMerchantOid!;
+        const inquiry = await this.paytr.inquiryStatus(oid);
+        if (inquiry.status === "success") {
+          await this.settlement.settlePayment(oid, {
+            kind: "success",
+            paymentType: inquiry.paymentType,
+            totalAmount: inquiry.paymentAmount,
+            // utoken intentionally omitted — inquiry doesn't return it.
+          });
+          recovered += 1;
+        } else if (inquiry.status === "failed") {
+          await this.settlement.settlePayment(oid, {
+            kind: "failure",
+            failureCode: inquiry.failedReasonCode,
+            failureMessage: inquiry.failedReasonMsg,
+          });
+          failed += 1;
+        } else {
+          stillPending += 1;
+        }
+      }
+      this.logger.log(
+        `PayTR pending recovery: scanned=${stuck.length} recovered=${recovered} failed=${failed} stillPending=${stillPending}`,
+      );
     });
   }
 }

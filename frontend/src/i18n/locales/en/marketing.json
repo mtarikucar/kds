@@ -150,6 +150,7 @@
   "dashboard": {
     "title": "Dashboard",
     "subtitle": "Performance at a glance",
+    "downloadGuide": "Download Marketer Guide (PDF)",
     "totalLeads": "Total leads",
     "convertedLeads": "Converted",
     "conversionRate": "Conversion rate",

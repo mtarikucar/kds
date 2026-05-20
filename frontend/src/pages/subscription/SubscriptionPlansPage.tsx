@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   useGetPlans,
@@ -50,6 +50,8 @@ function YearlySavingsHint({ plans }: { plans: Plan[] }) {
 const SubscriptionPlansPage = () => {
   const { t } = useTranslation('subscriptions');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isRenewFlow = searchParams.get('renew') === '1';
   const [billingCycle, setBillingCycle] = useState<BillingCycle>(BillingCycle.MONTHLY);
   const [processingPlanId, setProcessingPlanId] = useState<string | null>(null);
 
@@ -128,8 +130,31 @@ const SubscriptionPlansPage = () => {
   // Sort plans by price
   const sortedPlans = [...plans].sort((a, b) => a.monthlyPrice - b.monthlyPrice);
 
+  const previousPlanName = currentSubscription?.plan?.displayName;
+
   return (
     <div className="max-w-7xl mx-auto">
+      {/* Renewal banner: surfaces when the user arrives from a PAST_DUE
+          or EXPIRED CTA. Reminds them what plan they were on and gives
+          permission to pick a different one. */}
+      {isRenewFlow && (
+        <div className="mb-8 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
+          <h3 className="font-semibold mb-1">
+            {t('subscriptions.plansPage.renewBannerTitle', 'Aboneliğinizi yenileyin')}
+          </h3>
+          <p className="text-sm">
+            {previousPlanName
+              ? t('subscriptions.plansPage.renewBannerWithPlan', {
+                  plan: previousPlanName,
+                  defaultValue: `Önceki paketiniz: ${previousPlanName}. Aynı planı seçerek yenileyebilir veya başka bir plana geçebilirsiniz.`,
+                })
+              : t(
+                  'subscriptions.plansPage.renewBanner',
+                  'Aboneliğinizi yenilemek için aşağıdan bir plan seçin.',
+                )}
+          </p>
+        </div>
+      )}
       <div className="text-center mb-12">
         <h1 className="text-4xl font-bold text-slate-900 mb-4">{t('subscriptions.plansPage.title')}</h1>
         <p className="text-lg text-slate-600 mb-8">

@@ -4,3 +4,4 @@ export * from './superadmin-dashboard.service';
 export * from './superadmin-tenants.service';
 export * from './superadmin-users.service';
 export * from './superadmin-subscriptions.service';
+export * from './superadmin-marketing.service';

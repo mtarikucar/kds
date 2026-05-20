@@ -266,3 +266,92 @@ describe('SubscriptionService.startTrialFromIntent', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
+
+/**
+ * Manual-renewal cancellation:
+ *   - immediate=true → status CANCELLED + cancelledAt + endedAt = now
+ *   - immediate=false → cancelAtPeriodEnd=true (deferred)
+ *
+ * No PayTR token to revoke (column dropped); cancellation is now a
+ * single subscription update + best-effort notification email.
+ */
+describe('SubscriptionService.cancelSubscription', () => {
+  let prisma: MockPrismaClient;
+  let billing: jest.Mocked<BillingService>;
+  let notifications: jest.Mocked<NotificationService>;
+  let svc: SubscriptionService;
+
+  const TENANT_ID = 'tenant-1';
+  const SUB_ID = 'sub-1';
+
+  const activeSub: any = {
+    id: SUB_ID,
+    tenantId: TENANT_ID,
+    status: 'ACTIVE',
+    currentPeriodEnd: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    plan: { displayName: 'Profesyonel' },
+    tenant: { name: 'Test Restoran' },
+  };
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    billing = {} as any;
+    notifications = {
+      sendSubscriptionCancelledImmediate: jest.fn().mockResolvedValue(undefined),
+      sendSubscriptionWillCancel: jest.fn().mockResolvedValue(undefined),
+    } as any;
+    svc = new SubscriptionService(prisma as any, billing, notifications);
+
+    // getSubscriptionById uses findUnique({ id })
+    prisma.subscription.findUnique.mockResolvedValue(activeSub);
+    prisma.subscription.update.mockResolvedValue(activeSub);
+    prisma.user.findFirst.mockResolvedValue({ email: 'admin@example.com' } as any);
+  });
+
+  it('immediate=true → writes CANCELLED + cancelledAt + endedAt', async () => {
+    await svc.cancelSubscription(SUB_ID, TENANT_ID, true, 'no longer needed');
+
+    expect(prisma.subscription.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: SUB_ID },
+        data: expect.objectContaining({
+          status: 'CANCELLED',
+          cancelledAt: expect.any(Date),
+          endedAt: expect.any(Date),
+          cancellationReason: 'no longer needed',
+        }),
+      }),
+    );
+  });
+
+  it('immediate=false → writes cancelAtPeriodEnd=true (deferred)', async () => {
+    await svc.cancelSubscription(SUB_ID, TENANT_ID, false, 'will let it expire');
+
+    expect(prisma.subscription.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          cancelAtPeriodEnd: true,
+          cancellationReason: 'will let it expire',
+        }),
+      }),
+    );
+    // No endedAt set on deferred cancellation
+    const call = (prisma.subscription.update as any).mock.calls[0][0];
+    expect(call.data.endedAt).toBeUndefined();
+  });
+
+  it('sends the immediate-cancellation email when immediate=true', async () => {
+    await svc.cancelSubscription(SUB_ID, TENANT_ID, true, 'ops cancel');
+    expect(notifications.sendSubscriptionCancelledImmediate).toHaveBeenCalledWith(
+      'admin@example.com',
+      'Test Restoran',
+      'Profesyonel',
+      'ops cancel',
+    );
+  });
+
+  it('sends the at-period-end warning email when immediate=false', async () => {
+    await svc.cancelSubscription(SUB_ID, TENANT_ID, false);
+    expect(notifications.sendSubscriptionWillCancel).toHaveBeenCalled();
+  });
+});

@@ -79,6 +79,10 @@ async function main() {
     await prisma.orderItemModifier.deleteMany({
       where: { orderItem: { order: { tenantId: existing.id } } },
     });
+    // OrderItemPayment FKs OrderItem; clear before deleting items.
+    await prisma.orderItemPayment.deleteMany({
+      where: { orderItem: { order: { tenantId: existing.id } } },
+    });
     await prisma.orderItem.deleteMany({
       where: { order: { tenantId: existing.id } },
     });
@@ -151,12 +155,16 @@ async function main() {
   // ── Staff Users ────────────────────────────────────────────────────
   const hashedPassword = await bcrypt.hash('demo123', 10);
 
+  // Phone numbers are mandatory for /payments/create-intent (the PayTR
+  // adapter rejects empty user_phone). Without phones here, all
+  // checkout-driving e2e specs against the demo admin/manager users
+  // get 400 PROFILE_PHONE_REQUIRED before they can even mint an intent.
   const staffData = [
-    { email: 'ahmet@sultanahmet-sofra.com', firstName: 'Ahmet', lastName: 'Yilmaz', role: UserRole.ADMIN },
-    { email: 'elif@sultanahmet-sofra.com', firstName: 'Elif', lastName: 'Kaya', role: UserRole.MANAGER },
-    { email: 'mehmet@sultanahmet-sofra.com', firstName: 'Mehmet', lastName: 'Demir', role: UserRole.WAITER },
-    { email: 'zeynep@sultanahmet-sofra.com', firstName: 'Zeynep', lastName: 'Celik', role: UserRole.WAITER },
-    { email: 'mustafa@sultanahmet-sofra.com', firstName: 'Mustafa', lastName: 'Ozturk', role: UserRole.KITCHEN },
+    { email: 'ahmet@sultanahmet-sofra.com', firstName: 'Ahmet', lastName: 'Yilmaz', role: UserRole.ADMIN, phone: '+905551112201' },
+    { email: 'elif@sultanahmet-sofra.com', firstName: 'Elif', lastName: 'Kaya', role: UserRole.MANAGER, phone: '+905551112202' },
+    { email: 'mehmet@sultanahmet-sofra.com', firstName: 'Mehmet', lastName: 'Demir', role: UserRole.WAITER, phone: '+905551112203' },
+    { email: 'zeynep@sultanahmet-sofra.com', firstName: 'Zeynep', lastName: 'Celik', role: UserRole.WAITER, phone: '+905551112204' },
+    { email: 'mustafa@sultanahmet-sofra.com', firstName: 'Mustafa', lastName: 'Ozturk', role: UserRole.KITCHEN, phone: '+905551112205' },
   ];
 
   const users: Record<string, any> = {};
@@ -975,7 +983,6 @@ async function main() {
       currentPeriodEnd: periodEnd,
       amount: 29990,
       currency: 'TRY',
-      autoRenew: true,
       cancelAtPeriodEnd: false,
     },
   });
@@ -1029,9 +1036,12 @@ async function main() {
   });
   console.log('✅ SuperAdmin (e2e) created');
 
-  await prisma.marketingUser.upsert({
+  const marketingUser = await prisma.marketingUser.upsert({
     where: { email: 'marketing@e2e.local' },
-    update: {},
+    update: {
+      referralCode: 'E2EMKT99',
+      referralCodeUpdatedAt: new Date(),
+    },
     create: {
       email: 'marketing@e2e.local',
       password: platformPassword,
@@ -1039,9 +1049,171 @@ async function main() {
       lastName: 'Manager',
       role: 'SALES_MANAGER',
       status: 'ACTIVE',
+      referralCode: 'E2EMKT99',
+      referralCodeUpdatedAt: new Date(),
     },
   });
-  console.log('✅ MarketingUser (e2e) created');
+  console.log('✅ MarketingUser (e2e) created — ref code: E2EMKT99');
+
+  // ── Demo marketing pipeline ────────────────────────────────────────
+  // One WON lead converted into the Sultanahmet tenant (so RENEWAL/UPSELL
+  // hooks have a Lead.convertedTenantId to resolve back to the rep), one
+  // pre-conversion OFFER_SENT lead with a draft offer + open task +
+  // recent activity. Three commissions span every type and status so
+  // the marketer panel and SuperAdmin pages show non-trivial data on
+  // first boot.
+  const DEMO_LEAD_WON_ID = 'demo-lead-won-001';
+  const DEMO_LEAD_OPEN_ID = 'demo-lead-open-001';
+  const demoPeriod = (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  })();
+
+  await prisma.lead.upsert({
+    where: { id: DEMO_LEAD_WON_ID },
+    update: {
+      status: 'WON',
+      assignedToId: marketingUser.id,
+      convertedTenantId: tenant.id,
+      convertedAt: new Date(),
+    },
+    create: {
+      id: DEMO_LEAD_WON_ID,
+      businessName: tenant.name,
+      contactPerson: 'Ahmet Yılmaz',
+      phone: '+905551112233',
+      email: 'ahmet@sultanahmet-sofra.com',
+      city: 'İstanbul',
+      region: 'Marmara',
+      businessType: 'RESTAURANT',
+      source: 'REFERRAL',
+      status: 'WON',
+      priority: 'HIGH',
+      assignedToId: marketingUser.id,
+      convertedTenantId: tenant.id,
+      convertedAt: new Date(),
+      notes: 'Demo: pazarlamacı referansıyla kazanılmış lead',
+    },
+  });
+
+  await prisma.lead.upsert({
+    where: { id: DEMO_LEAD_OPEN_ID },
+    update: {},
+    create: {
+      id: DEMO_LEAD_OPEN_ID,
+      businessName: 'Boğaziçi Cafe',
+      contactPerson: 'Selin Demir',
+      phone: '+905552223344',
+      email: 'selin@bogazici-cafe.example.com',
+      city: 'İstanbul',
+      region: 'Marmara',
+      businessType: 'CAFE',
+      source: 'INSTAGRAM',
+      status: 'OFFER_SENT',
+      priority: 'MEDIUM',
+      assignedToId: marketingUser.id,
+      notes: 'Demo: teklif gönderilmiş, yanıt bekleniyor',
+    },
+  });
+
+  await prisma.commission.upsert({
+    where: { id: 'demo-commission-signup-001' },
+    update: {},
+    create: {
+      id: 'demo-commission-signup-001',
+      amount: '199.90',
+      type: 'SIGNUP',
+      status: 'PENDING',
+      period: demoPeriod,
+      tenantId: tenant.id,
+      leadId: DEMO_LEAD_WON_ID,
+      marketingUserId: marketingUser.id,
+      notes: 'Demo SIGNUP komisyonu (PENDING)',
+    },
+  });
+
+  await prisma.commission.upsert({
+    where: { id: 'demo-commission-renewal-001' },
+    update: {},
+    create: {
+      id: 'demo-commission-renewal-001',
+      amount: '189.90',
+      type: 'RENEWAL',
+      status: 'APPROVED',
+      period: demoPeriod,
+      tenantId: tenant.id,
+      leadId: DEMO_LEAD_WON_ID,
+      marketingUserId: marketingUser.id,
+      approvedAt: new Date(),
+      notes: 'Demo RENEWAL komisyonu (APPROVED)',
+    },
+  });
+
+  await prisma.commission.upsert({
+    where: { id: 'demo-commission-upsell-001' },
+    update: {},
+    create: {
+      id: 'demo-commission-upsell-001',
+      amount: '349.50',
+      type: 'UPSELL',
+      status: 'PAID',
+      period: demoPeriod,
+      tenantId: tenant.id,
+      leadId: DEMO_LEAD_WON_ID,
+      marketingUserId: marketingUser.id,
+      approvedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+      paidAt: new Date(),
+      notes: 'Demo UPSELL komisyonu (PAID)',
+    },
+  });
+
+  await prisma.leadOffer.upsert({
+    where: { id: 'demo-offer-001' },
+    update: {},
+    create: {
+      id: 'demo-offer-001',
+      leadId: DEMO_LEAD_OPEN_ID,
+      createdById: marketingUser.id,
+      customPrice: '299.00',
+      trialDays: 14,
+      status: 'SENT',
+      validUntil: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+      sentAt: new Date(),
+      notes: 'Demo teklif — 14 gün geçerli',
+    },
+  });
+
+  await prisma.leadActivity.upsert({
+    where: { id: 'demo-activity-001' },
+    update: {},
+    create: {
+      id: 'demo-activity-001',
+      leadId: DEMO_LEAD_OPEN_ID,
+      createdById: marketingUser.id,
+      type: 'CALL',
+      title: 'İlk tanışma araması',
+      description: 'Müşteri ilgileniyor, teklif gönderdik.',
+      outcome: 'POSITIVE',
+      duration: 12,
+    },
+  });
+
+  await prisma.marketingTask.upsert({
+    where: { id: 'demo-task-001' },
+    update: {},
+    create: {
+      id: 'demo-task-001',
+      leadId: DEMO_LEAD_OPEN_ID,
+      assignedToId: marketingUser.id,
+      title: 'Teklif takip araması',
+      description: 'Gönderilen teklifin durumunu öğren.',
+      type: 'CALL',
+      priority: 'MEDIUM',
+      status: 'PENDING',
+      dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
+    },
+  });
+  console.log('✅ Demo marketing pipeline seeded (2 leads, 3 commissions, 1 offer/activity/task)');
 
   // ── Done ───────────────────────────────────────────────────────────
   console.log(`

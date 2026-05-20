@@ -4,21 +4,21 @@ import {
   BadRequestException,
   ForbiddenException,
   NotFoundException,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { addDays, addMonths, addYears } from 'date-fns';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { BillingService } from './billing.service';
-import { NotificationService } from './notification.service';
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { addDays, addMonths, addYears } from "date-fns";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { BillingService } from "./billing.service";
+import { NotificationService } from "./notification.service";
 import {
   SubscriptionStatus,
   BillingCycle,
   PaymentProvider,
   SubscriptionPlanType,
-} from '../../../common/constants/subscription.enum';
-import { CreateSubscriptionDto } from '../dto/create-subscription.dto';
-import { ChangePlanDto } from '../dto/change-plan.dto';
-import { UpdateSubscriptionDto } from '../dto/update-subscription.dto';
+} from "../../../common/constants/subscription.enum";
+import { CreateSubscriptionDto } from "../dto/create-subscription.dto";
+import { ChangePlanDto } from "../dto/change-plan.dto";
+import { UpdateSubscriptionDto } from "../dto/update-subscription.dto";
 
 @Injectable()
 export class SubscriptionService {
@@ -43,7 +43,7 @@ export class SubscriptionService {
   ): Promise<void> {
     try {
       const admin = await this.prisma.user.findFirst({
-        where: { tenantId, role: 'ADMIN' },
+        where: { tenantId, role: "ADMIN" },
         select: { email: true, tenant: { select: { name: true } } },
       });
       if (!admin?.email || !admin.tenant) return;
@@ -80,9 +80,9 @@ export class SubscriptionService {
       },
       include: {
         plan: true,
-        payments: { orderBy: { createdAt: 'desc' }, take: 5 },
+        payments: { orderBy: { createdAt: "desc" }, take: 5 },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -97,16 +97,16 @@ export class SubscriptionService {
       include: {
         plan: true,
         tenant: true,
-        payments: { orderBy: { createdAt: 'desc' } },
-        invoices: { orderBy: { createdAt: 'desc' }, take: 50 },
+        payments: { orderBy: { createdAt: "desc" } },
+        invoices: { orderBy: { createdAt: "desc" }, take: 50 },
       },
     });
 
     if (!subscription) {
-      throw new NotFoundException('Subscription not found');
+      throw new NotFoundException("Subscription not found");
     }
     if (tenantId && subscription.tenantId !== tenantId) {
-      throw new NotFoundException('Subscription not found');
+      throw new NotFoundException("Subscription not found");
     }
     return subscription;
   }
@@ -115,18 +115,18 @@ export class SubscriptionService {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
     });
-    if (!tenant) throw new NotFoundException('Tenant not found');
+    if (!tenant) throw new NotFoundException("Tenant not found");
 
     const adminUser = await this.prisma.user.findFirst({
-      where: { tenantId, role: 'ADMIN' },
+      where: { tenantId, role: "ADMIN" },
     });
     if (!adminUser) {
-      throw new NotFoundException('Admin user not found for this tenant');
+      throw new NotFoundException("Admin user not found for this tenant");
     }
     if (!adminUser.emailVerified) {
       throw new BadRequestException(
-        'Email must be verified before creating a subscription. ' +
-          'Please check your email for the 6-digit verification code.',
+        "Email must be verified before creating a subscription. " +
+          "Please check your email for the 6-digit verification code.",
       );
     }
 
@@ -134,10 +134,12 @@ export class SubscriptionService {
       where: { id: dto.planId },
     });
     if (!plan || !plan.isActive) {
-      throw new NotFoundException('Plan not found or inactive');
+      throw new NotFoundException("Plan not found or inactive");
     }
-    if (!Object.values(BillingCycle).includes(dto.billingCycle as BillingCycle)) {
-      throw new BadRequestException('Invalid billing cycle');
+    if (
+      !Object.values(BillingCycle).includes(dto.billingCycle as BillingCycle)
+    ) {
+      throw new BadRequestException("Invalid billing cycle");
     }
 
     // Trial is a LIFETIME-PER-TENANT benefit. `Tenant.trialUsed` is the
@@ -165,7 +167,9 @@ export class SubscriptionService {
         : addYears(now, 1);
 
     const amount =
-      dto.billingCycle === BillingCycle.MONTHLY ? plan.monthlyPrice : plan.yearlyPrice;
+      dto.billingCycle === BillingCycle.MONTHLY
+        ? plan.monthlyPrice
+        : plan.yearlyPrice;
 
     // Transaction: subscription + tenant + (optional) pricing snapshot.
     // The DB has a partial unique index on (tenantId) where status IN
@@ -177,7 +181,9 @@ export class SubscriptionService {
           data: {
             tenantId,
             planId: dto.planId,
-            status: isTrialPeriod ? SubscriptionStatus.TRIALING : SubscriptionStatus.ACTIVE,
+            status: isTrialPeriod
+              ? SubscriptionStatus.TRIALING
+              : SubscriptionStatus.ACTIVE,
             billingCycle: dto.billingCycle,
             paymentProvider: PaymentProvider.PAYTR,
             startDate: now,
@@ -188,7 +194,6 @@ export class SubscriptionService {
             trialEnd,
             amount,
             currency: plan.currency,
-            autoRenew: true,
             cancelAtPeriodEnd: false,
           },
           include: { plan: true },
@@ -211,16 +216,22 @@ export class SubscriptionService {
 
       // Fire-and-forget welcome email (only when we actually started a trial).
       if (isTrialPeriod) {
-        void this.notifyTrialStarted(tenantId, plan.displayName, plan.trialDays);
+        void this.notifyTrialStarted(
+          tenantId,
+          plan.displayName,
+          plan.trialDays,
+        );
       }
 
       return result;
     } catch (err) {
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2002'
+        err.code === "P2002"
       ) {
-        throw new BadRequestException('Tenant already has an active subscription');
+        throw new BadRequestException(
+          "Tenant already has an active subscription",
+        );
       }
       throw err;
     }
@@ -258,11 +269,11 @@ export class SubscriptionService {
       select: { emailVerified: true },
     });
     if (!callingUser) {
-      throw new NotFoundException('Calling user not found');
+      throw new NotFoundException("Calling user not found");
     }
     if (!callingUser.emailVerified) {
       throw new BadRequestException(
-        'Email must be verified before starting a trial. Please check your inbox for the verification code.',
+        "Email must be verified before starting a trial. Please check your inbox for the verification code.",
       );
     }
 
@@ -270,7 +281,7 @@ export class SubscriptionService {
       where: { id: planId },
     });
     if (!plan || !plan.isActive) {
-      throw new NotFoundException('Plan not found or inactive');
+      throw new NotFoundException("Plan not found or inactive");
     }
     // Defence-in-depth: PaymentsService is the only known caller and it
     // already gates trialDays/plan-name/usedTrialPlanIds, but a future
@@ -278,10 +289,10 @@ export class SubscriptionService {
     // explicitly instead of silently creating a zero-day "trial" that
     // would burn the tenant's per-plan trial slot.
     if (plan.name === SubscriptionPlanType.FREE) {
-      throw new BadRequestException('Cannot start trial on FREE plan');
+      throw new BadRequestException("Cannot start trial on FREE plan");
     }
     if (plan.trialDays <= 0) {
-      throw new BadRequestException('Plan does not offer a trial');
+      throw new BadRequestException("Plan does not offer a trial");
     }
 
     // Lifetime-per-tenant eligibility check (mirrors PaymentsService) so
@@ -291,18 +302,20 @@ export class SubscriptionService {
       select: { trialUsed: true },
     });
     if (!tenant) {
-      throw new NotFoundException('Tenant not found');
+      throw new NotFoundException("Tenant not found");
     }
     if (tenant.trialUsed === true) {
       throw new BadRequestException(
-        'Tenant has already used their trial. Trials are once per account.',
+        "Tenant has already used their trial. Trials are once per account.",
       );
     }
 
     const now = new Date();
     const trialEnd = addDays(now, plan.trialDays);
     const amount =
-      billingCycle === BillingCycle.MONTHLY ? plan.monthlyPrice : plan.yearlyPrice;
+      billingCycle === BillingCycle.MONTHLY
+        ? plan.monthlyPrice
+        : plan.yearlyPrice;
 
     try {
       const subscription = await this.prisma.$transaction(async (tx) => {
@@ -312,14 +325,14 @@ export class SubscriptionService {
         const live = await tx.subscription.findFirst({
           where: {
             tenantId,
-            status: { in: ['ACTIVE', 'TRIALING', 'PAST_DUE'] },
+            status: { in: ["ACTIVE", "TRIALING", "PAST_DUE"] },
           },
           include: { plan: true },
         });
 
         if (live && live.plan.name !== SubscriptionPlanType.FREE) {
           throw new BadRequestException(
-            'Cannot start trial: tenant already has a paid subscription',
+            "Cannot start trial: tenant already has a paid subscription",
           );
         }
 
@@ -332,7 +345,7 @@ export class SubscriptionService {
             data: {
               status: SubscriptionStatus.CANCELLED,
               endedAt: now,
-              cancellationReason: 'Replaced by paid-plan trial',
+              cancellationReason: "Replaced by paid-plan trial",
             },
           });
         }
@@ -352,7 +365,6 @@ export class SubscriptionService {
             trialEnd,
             amount,
             currency: plan.currency,
-            autoRenew: true,
             cancelAtPeriodEnd: false,
           },
           include: { plan: true },
@@ -383,10 +395,10 @@ export class SubscriptionService {
     } catch (err) {
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2002'
+        err.code === "P2002"
       ) {
         throw new BadRequestException(
-          'Tenant already has an active subscription',
+          "Tenant already has an active subscription",
         );
       }
       throw err;
@@ -404,16 +416,23 @@ export class SubscriptionService {
    * passed), and CANCELLED has no meaningful current plan to switch
    * from. UI routes those statuses to a fresh checkout instead.
    */
-  async changePlan(subscriptionId: string, tenantId: string, dto: ChangePlanDto) {
-    const subscription = await this.getSubscriptionById(subscriptionId, tenantId);
+  async changePlan(
+    subscriptionId: string,
+    tenantId: string,
+    dto: ChangePlanDto,
+  ) {
+    const subscription = await this.getSubscriptionById(
+      subscriptionId,
+      tenantId,
+    );
 
     if (
       subscription.status !== SubscriptionStatus.ACTIVE &&
       subscription.status !== SubscriptionStatus.TRIALING
     ) {
       throw new BadRequestException(
-        'Plan change is only available on active or trialing subscriptions. ' +
-          'Please start a new subscription instead.',
+        "Plan change is only available on active or trialing subscriptions. " +
+          "Please start a new subscription instead.",
       );
     }
 
@@ -422,31 +441,34 @@ export class SubscriptionService {
       where: { id: dto.newPlanId },
     });
     if (!newPlan || !newPlan.isActive) {
-      throw new NotFoundException('New plan not found or inactive');
+      throw new NotFoundException("New plan not found or inactive");
     }
     if (subscription.planId === dto.newPlanId) {
-      throw new BadRequestException('Already subscribed to this plan');
+      throw new BadRequestException("Already subscribed to this plan");
     }
     if (subscription.scheduledDowngradePlanId) {
       throw new BadRequestException(
-        'There is already a scheduled plan change. Please cancel it first.',
+        "There is already a scheduled plan change. Please cancel it first.",
       );
     }
     // Cross-currency plan changes don't have meaningful proration math;
     // refuse them instead of silently producing a garbage diff.
     if (currentPlan.currency !== newPlan.currency) {
       throw new BadRequestException(
-        'Plan currency change is not supported. Contact support to switch currencies.',
+        "Plan currency change is not supported. Contact support to switch currencies.",
       );
     }
 
-    const billingCycle = (dto.billingCycle || subscription.billingCycle) as BillingCycle;
+    const billingCycle = (dto.billingCycle ||
+      subscription.billingCycle) as BillingCycle;
     if (!Object.values(BillingCycle).includes(billingCycle)) {
-      throw new BadRequestException('Invalid billing cycle');
+      throw new BadRequestException("Invalid billing cycle");
     }
 
     const newAmount =
-      billingCycle === BillingCycle.MONTHLY ? newPlan.monthlyPrice : newPlan.yearlyPrice;
+      billingCycle === BillingCycle.MONTHLY
+        ? newPlan.monthlyPrice
+        : newPlan.yearlyPrice;
     const currentAmount = subscription.amount;
     const isUpgrade = new Prisma.Decimal(newAmount).gt(currentAmount);
 
@@ -467,7 +489,7 @@ export class SubscriptionService {
 
       return {
         subscription,
-        type: 'upgrade' as const,
+        type: "upgrade" as const,
         requiresPayment: prorationAmount.gt(0),
         paymentInfo: {
           subscriptionId: subscription.id,
@@ -495,7 +517,7 @@ export class SubscriptionService {
 
     return {
       subscription: updatedSubscription,
-      type: 'downgrade' as const,
+      type: "downgrade" as const,
       requiresPayment: false,
       scheduledFor: subscription.currentPeriodEnd,
       newPlan,
@@ -504,7 +526,12 @@ export class SubscriptionService {
 
   private async assertDowngradeAllowed(
     tenantId: string,
-    newPlan: { maxUsers: number; maxTables: number; maxProducts: number; maxCategories: number },
+    newPlan: {
+      maxUsers: number;
+      maxTables: number;
+      maxProducts: number;
+      maxCategories: number;
+    },
   ) {
     const usage = await this.getCurrentUsage(tenantId);
     const violations: string[] = [];
@@ -517,19 +544,24 @@ export class SubscriptionService {
     if (newPlan.maxProducts !== -1 && usage.products > newPlan.maxProducts) {
       violations.push(`Products: ${usage.products}/${newPlan.maxProducts}`);
     }
-    if (newPlan.maxCategories !== -1 && usage.categories > newPlan.maxCategories) {
-      violations.push(`Categories: ${usage.categories}/${newPlan.maxCategories}`);
+    if (
+      newPlan.maxCategories !== -1 &&
+      usage.categories > newPlan.maxCategories
+    ) {
+      violations.push(
+        `Categories: ${usage.categories}/${newPlan.maxCategories}`,
+      );
     }
     if (violations.length > 0) {
       throw new BadRequestException(
-        `Cannot downgrade: current usage exceeds new plan limits. Please reduce: ${violations.join(', ')}`,
+        `Cannot downgrade: current usage exceeds new plan limits. Please reduce: ${violations.join(", ")}`,
       );
     }
   }
 
   private async getCurrentUsage(tenantId: string) {
     const [users, tables, products, categories] = await Promise.all([
-      this.prisma.user.count({ where: { tenantId, status: 'ACTIVE' } }),
+      this.prisma.user.count({ where: { tenantId, status: "ACTIVE" } }),
       this.prisma.table.count({ where: { tenantId } }),
       this.prisma.product.count({ where: { tenantId } }),
       this.prisma.category.count({ where: { tenantId } }),
@@ -547,9 +579,12 @@ export class SubscriptionService {
       where: { id: subscriptionId },
       include: { plan: true, tenant: true, scheduledDowngradePlan: true },
     });
-    if (!subscription) throw new NotFoundException('Subscription not found');
-    if (!subscription.scheduledDowngradePlanId || !subscription.scheduledDowngradePlan) {
-      throw new BadRequestException('No scheduled downgrade found');
+    if (!subscription) throw new NotFoundException("Subscription not found");
+    if (
+      !subscription.scheduledDowngradePlanId ||
+      !subscription.scheduledDowngradePlan
+    ) {
+      throw new BadRequestException("No scheduled downgrade found");
     }
 
     const newPlan = subscription.scheduledDowngradePlan;
@@ -558,7 +593,9 @@ export class SubscriptionService {
     const billingCycle =
       subscription.scheduledDowngradeBillingCycle || subscription.billingCycle;
     const newAmount =
-      billingCycle === BillingCycle.MONTHLY ? newPlan.monthlyPrice : newPlan.yearlyPrice;
+      billingCycle === BillingCycle.MONTHLY
+        ? newPlan.monthlyPrice
+        : newPlan.yearlyPrice;
 
     const updated = await this.prisma.subscription.update({
       where: { id: subscriptionId },
@@ -579,7 +616,7 @@ export class SubscriptionService {
     });
 
     const adminUser = await this.prisma.user.findFirst({
-      where: { tenantId: subscription.tenantId, role: 'ADMIN' },
+      where: { tenantId: subscription.tenantId, role: "ADMIN" },
       select: { email: true },
     });
     if (adminUser?.email) {
@@ -617,9 +654,12 @@ export class SubscriptionService {
   }
 
   async cancelScheduledDowngrade(subscriptionId: string, tenantId: string) {
-    const subscription = await this.getSubscriptionById(subscriptionId, tenantId);
+    const subscription = await this.getSubscriptionById(
+      subscriptionId,
+      tenantId,
+    );
     if (!subscription.scheduledDowngradePlanId) {
-      throw new BadRequestException('No scheduled downgrade found');
+      throw new BadRequestException("No scheduled downgrade found");
     }
     await this.prisma.subscription.update({
       where: { id: subscriptionId },
@@ -628,7 +668,7 @@ export class SubscriptionService {
         scheduledDowngradeBillingCycle: null,
       },
     });
-    return { success: true, message: 'Scheduled downgrade cancelled' };
+    return { success: true, message: "Scheduled downgrade cancelled" };
   }
 
   /**
@@ -645,9 +685,12 @@ export class SubscriptionService {
     immediate: boolean = false,
     reason?: string,
   ) {
-    const subscription = await this.getSubscriptionById(subscriptionId, tenantId);
+    const subscription = await this.getSubscriptionById(
+      subscriptionId,
+      tenantId,
+    );
     if (subscription.status === SubscriptionStatus.CANCELLED) {
-      throw new BadRequestException('Subscription already cancelled');
+      throw new BadRequestException("Subscription already cancelled");
     }
 
     const now = new Date();
@@ -656,35 +699,25 @@ export class SubscriptionService {
           status: SubscriptionStatus.CANCELLED,
           cancelledAt: now,
           endedAt: now,
-          autoRenew: false,
           cancellationReason: reason,
         }
       : {
           cancelAtPeriodEnd: true,
-          autoRenew: false,
           cancelledAt: now,
           cancellationReason: reason,
         };
 
-    // Wipe the stored PayTR recurring token on cancellation so a future
-    // resubscribe doesn't pick up a stale card binding — and so the
-    // renewal cron can't even theoretically charge a cancelled tenant
-    // if `autoRenew=false` is ever bypassed.
-    const updated = await this.prisma.$transaction(async (tx) => {
-      const sub = await tx.subscription.update({
-        where: { id: subscriptionId },
-        data,
-        include: { plan: true, tenant: true },
-      });
-      await tx.tenant.update({
-        where: { id: subscription.tenantId },
-        data: { paytrRecurringToken: null },
-      });
-      return sub;
+    // Manual-renewal model: no PayTR-side token to revoke (we never
+    // store one), no auto-renew flag to flip off. Cancellation is now
+    // a single subscription update.
+    const updated = await this.prisma.subscription.update({
+      where: { id: subscriptionId },
+      data,
+      include: { plan: true, tenant: true },
     });
 
     const adminUser = await this.prisma.user.findFirst({
-      where: { tenantId: subscription.tenantId, role: 'ADMIN' },
+      where: { tenantId: subscription.tenantId, role: "ADMIN" },
       select: { email: true },
     });
     if (adminUser?.email) {
@@ -716,17 +749,19 @@ export class SubscriptionService {
    * `cancelledAt` is preserved as "last cancellation decision" audit.
    */
   async reactivateSubscription(subscriptionId: string, tenantId: string) {
-    const subscription = await this.getSubscriptionById(subscriptionId, tenantId);
+    const subscription = await this.getSubscriptionById(
+      subscriptionId,
+      tenantId,
+    );
     if (!subscription.cancelAtPeriodEnd) {
       throw new BadRequestException(
-        'Can only reactivate subscriptions that are set to cancel at period end',
+        "Can only reactivate subscriptions that are set to cancel at period end",
       );
     }
     const updated = await this.prisma.subscription.update({
       where: { id: subscriptionId },
       data: {
         cancelAtPeriodEnd: false,
-        autoRenew: true,
       },
       include: { plan: true },
     });
@@ -734,9 +769,9 @@ export class SubscriptionService {
   }
 
   /**
-   * Restricted update surface for admin tweaks (autoRenew, etc). Field
-   * whitelisting prevents mass-assignment of financial state like plan,
-   * status, amount, currency, trial flags.
+   * Restricted update surface for admin tweaks (cancelAtPeriodEnd, etc).
+   * Field whitelisting prevents mass-assignment of financial state like
+   * plan, status, amount, currency, trial flags.
    */
   async updateSubscription(
     subscriptionId: string,
@@ -745,8 +780,7 @@ export class SubscriptionService {
   ) {
     await this.getSubscriptionById(subscriptionId, tenantId);
     const data: Prisma.SubscriptionUpdateInput = {};
-    if (typeof dto.autoRenew === 'boolean') data.autoRenew = dto.autoRenew;
-    if (typeof dto.cancelAtPeriodEnd === 'boolean') {
+    if (typeof dto.cancelAtPeriodEnd === "boolean") {
       data.cancelAtPeriodEnd = dto.cancelAtPeriodEnd;
     }
     return this.prisma.subscription.update({
@@ -756,57 +790,15 @@ export class SubscriptionService {
     });
   }
 
-  /**
-   * Scheduler entry point invoked when the PayTR auto-charge attempt
-   * fails (or no recurring token is on file). We drop the subscription
-   * to PAST_DUE so the in-app banner prompts the tenant to retry
-   * checkout — the past-due cron eventually flips it to EXPIRED if the
-   * user never resolves it.
-   */
-  async renewSubscription(subscriptionId: string) {
-    const subscription = await this.prisma.subscription.findUnique({
-      where: { id: subscriptionId },
-      include: { plan: true, tenant: true },
-    });
-    if (!subscription) throw new NotFoundException('Subscription not found');
-    if (!subscription.autoRenew) return null;
-
-    const updated = await this.prisma.subscription.update({
-      where: { id: subscriptionId },
-      data: { status: SubscriptionStatus.PAST_DUE },
-      include: { plan: true },
-    });
-
-    const adminUser = await this.prisma.user.findFirst({
-      where: { tenantId: subscription.tenantId, role: 'ADMIN' },
-      select: { email: true },
-    });
-    if (adminUser?.email) {
-      await this.notificationService
-        .sendPaymentFailed(
-          adminUser.email,
-          subscription.tenant.name,
-          Number(subscription.amount),
-          'Subscription renewal requires manual payment confirmation',
-        )
-        .catch((err: any) =>
-          this.logger.error(`payment-failed notification failed: ${err?.message}`),
-        );
-    }
-
-    this.logger.log(
-      `Subscription ${subscriptionId} marked PAST_DUE (auto-charge failed; tenant must retry checkout)`,
-    );
-    return updated;
-  }
-
   async isSubscriptionActive(tenantId: string): Promise<boolean> {
     const subscription = await this.prisma.subscription.findFirst({
       where: {
         tenantId,
-        status: { in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING] },
+        status: {
+          in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.TRIALING],
+        },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
     if (!subscription) return false;
     return subscription.currentPeriodEnd > new Date();
@@ -815,7 +807,7 @@ export class SubscriptionService {
   async getAvailablePlans() {
     const plans = await this.prisma.subscriptionPlan.findMany({
       where: { isActive: true },
-      orderBy: { monthlyPrice: 'asc' },
+      orderBy: { monthlyPrice: "asc" },
     });
 
     const now = new Date();
@@ -833,7 +825,9 @@ export class SubscriptionService {
       let discountedMonthly: Prisma.Decimal | null = null;
       let discountedYearly: Prisma.Decimal | null = null;
       if (isDiscountActive) {
-        const multiplier = new Prisma.Decimal(100 - plan.discountPercentage!).div(100);
+        const multiplier = new Prisma.Decimal(
+          100 - plan.discountPercentage!,
+        ).div(100);
         discountedMonthly = new Prisma.Decimal(plan.monthlyPrice)
           .mul(multiplier)
           .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
@@ -892,7 +886,7 @@ export class SubscriptionService {
       include: { currentPlan: true },
     });
     if (!tenant || !tenant.currentPlan) {
-      throw new NotFoundException('Tenant or plan not found');
+      throw new NotFoundException("Tenant or plan not found");
     }
     const plan = tenant.currentPlan;
     const featureOverrides =
@@ -913,11 +907,13 @@ export class SubscriptionService {
       .map((p) => p.id);
 
     const features = {
-      advancedReports: featureOverrides?.advancedReports ?? plan.advancedReports,
+      advancedReports:
+        featureOverrides?.advancedReports ?? plan.advancedReports,
       multiLocation: featureOverrides?.multiLocation ?? plan.multiLocation,
       customBranding: featureOverrides?.customBranding ?? plan.customBranding,
       apiAccess: featureOverrides?.apiAccess ?? plan.apiAccess,
-      prioritySupport: featureOverrides?.prioritySupport ?? plan.prioritySupport,
+      prioritySupport:
+        featureOverrides?.prioritySupport ?? plan.prioritySupport,
       inventoryTracking:
         featureOverrides?.inventoryTracking ?? plan.inventoryTracking,
       kdsIntegration: featureOverrides?.kdsIntegration ?? plan.kdsIntegration,
@@ -933,7 +929,8 @@ export class SubscriptionService {
       maxTables: limitOverrides?.maxTables ?? plan.maxTables,
       maxProducts: limitOverrides?.maxProducts ?? plan.maxProducts,
       maxCategories: limitOverrides?.maxCategories ?? plan.maxCategories,
-      maxMonthlyOrders: limitOverrides?.maxMonthlyOrders ?? plan.maxMonthlyOrders,
+      maxMonthlyOrders:
+        limitOverrides?.maxMonthlyOrders ?? plan.maxMonthlyOrders,
     };
     return { features, limits, trialEligiblePlanIds };
   }
@@ -967,10 +964,12 @@ export class SubscriptionService {
     // FREE the entire batch fails loudly; no per-row fallback because
     // there's no sensible alternative target.
     const freePlan = await this.prisma.subscriptionPlan.findUnique({
-      where: { name: 'FREE' },
+      where: { name: "FREE" },
     });
     if (!freePlan) {
-      this.logger.error('FREE plan missing from catalog — cannot expire trials');
+      this.logger.error(
+        "FREE plan missing from catalog — cannot expire trials",
+      );
       return { processed: 0, failed: expiredTrials.length };
     }
 
@@ -1002,7 +1001,6 @@ export class SubscriptionService {
               currency: freePlan.currency,
               currentPeriodStart: now,
               currentPeriodEnd: freePeriodEnd,
-              autoRenew: true,
             },
           });
           await tx.tenant.update({
@@ -1017,12 +1015,16 @@ export class SubscriptionService {
         // Best-effort trial-expired email; failure here mustn't block the
         // status transition (the cron must remain idempotent).
         const admin = await this.prisma.user.findFirst({
-          where: { tenantId: subscription.tenantId, role: 'ADMIN' },
+          where: { tenantId: subscription.tenantId, role: "ADMIN" },
           select: { email: true },
         });
         if (admin?.email) {
           await this.notificationService
-            .sendTrialExpired(admin.email, subscription.tenant.name, subscription.plan.displayName)
+            .sendTrialExpired(
+              admin.email,
+              subscription.tenant.name,
+              subscription.plan.displayName,
+            )
             .catch((err: any) =>
               this.logger.error(
                 `trial-expired notification failed for sub ${subscription.id}: ${err?.message}`,

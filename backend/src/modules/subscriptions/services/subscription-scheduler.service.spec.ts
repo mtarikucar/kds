@@ -1,141 +1,314 @@
 import { SubscriptionSchedulerService } from './subscription-scheduler.service';
 import { mockPrismaClient, MockPrismaClient } from '../../../common/test/prisma-mock.service';
+import { addDays } from 'date-fns';
 
 /**
- * Focused unit tests for the recurring-charge branch of the renewal cron.
- * The legacy fallback (renewSubscription → PAST_DUE) is already exercised
- * by the e2e suite; here we isolate the PayTR token path so we can assert
- * the success / failure side-effects in isolation.
+ * Tests for the manual-renewal cron jobs:
+ *   - handleSubscriptionPeriodEnd: ACTIVE → PAST_DUE when period ends
+ *   - handleSubscriptionExpiryReminders: 7d/3d/1d emails before period ends
+ *   - handlePaytrPendingRecovery: webhook-loss recovery via PayTR inquiry
+ *
+ * Auto-renewal has been removed (PayTR Kart Saklama yetkisi closed) so
+ * the legacy `renewOneSubscription` charge path is gone too — tests for
+ * it were deleted with the implementation.
  */
-describe('SubscriptionSchedulerService.renewOneSubscription', () => {
+
+function buildSvc(
+  prisma: MockPrismaClient,
+  paytr: any,
+  notifications: any,
+  settlement: any = { settlePayment: jest.fn().mockResolvedValue('OK') },
+): SubscriptionSchedulerService {
+  const svc = new SubscriptionSchedulerService(
+    prisma as any,
+    {} as any, // subscriptionService — not used by the manual-renewal crons
+    notifications,
+    {} as any, // billing — not used by these crons
+    paytr,
+    settlement,
+  );
+  // Bypass the advisory-lock SQL probe — assume we acquired the lock.
+  prisma.$queryRawUnsafe.mockResolvedValue([{ locked: true }]);
+  return svc;
+}
+
+describe('SubscriptionSchedulerService.handleSubscriptionPeriodEnd', () => {
   let prisma: MockPrismaClient;
-  let subscriptionService: any;
   let notifications: any;
-  let billing: any;
-  let paytr: any;
   let svc: SubscriptionSchedulerService;
-
-  const baseTenant = {
-    id: 'tenant-1',
-    name: 'Test Restoran',
-    paytrRecurringToken: 'v1:enc:auth:cipher',
-  };
-
-  const baseSub: any = {
-    id: 'sub-1',
-    amount: { toString: () => '799' } as any,
-    currency: 'TRY',
-    billingCycle: 'MONTHLY',
-    paymentProvider: 'PAYTR',
-    currentPeriodEnd: new Date(Date.now() + 24 * 60 * 60 * 1000),
-    plan: { displayName: 'Profesyonel' },
-    tenant: baseTenant,
-  };
-
-  function callRenew(sub: any): Promise<void> {
-    return (svc as any).renewOneSubscription(sub);
-  }
 
   beforeEach(() => {
     prisma = mockPrismaClient();
-    subscriptionService = {
-      renewSubscription: jest.fn().mockResolvedValue({}),
+    notifications = {
+      sendSubscriptionPastDue: jest.fn().mockResolvedValue(undefined),
     };
-    notifications = { sendPaymentSuccessful: jest.fn().mockResolvedValue(undefined) };
-    billing = {
-      createInvoice: jest.fn().mockResolvedValue({ invoiceNumber: 'INV-202604-0001-aaaaaa' }),
+    svc = buildSvc(prisma, {}, notifications);
+  });
+
+  it('moves ACTIVE subs with past currentPeriodEnd to PAST_DUE', async () => {
+    const expiredSub = {
+      id: 'sub-1',
+      amount: 799,
+      currency: 'TRY',
+      currentPeriodEnd: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      plan: { displayName: 'Profesyonel' },
+      tenant: { id: 'tenant-1', name: 'Test Restoran' },
     };
-    paytr = { chargeRecurring: jest.fn() };
-    svc = new SubscriptionSchedulerService(
-      prisma as any,
-      subscriptionService,
-      notifications,
-      billing,
-      paytr,
+    prisma.subscription.findMany.mockResolvedValue([expiredSub] as any);
+    prisma.user.findFirst.mockResolvedValue({ email: 'admin@example.com' } as any);
+
+    await svc.handleSubscriptionPeriodEnd();
+
+    expect(prisma.subscription.update).toHaveBeenCalledWith({
+      where: { id: 'sub-1' },
+      data: { status: 'PAST_DUE' },
+    });
+  });
+
+  it('sends past-due email to tenant admin', async () => {
+    prisma.subscription.findMany.mockResolvedValue([
+      {
+        id: 'sub-1',
+        amount: 799,
+        currency: 'TRY',
+        currentPeriodEnd: new Date(Date.now() - 24 * 60 * 60 * 1000),
+        plan: { displayName: 'Profesyonel' },
+        tenant: { id: 'tenant-1', name: 'Test Restoran' },
+      },
+    ] as any);
+    prisma.user.findFirst.mockResolvedValue({ email: 'admin@example.com' } as any);
+
+    await svc.handleSubscriptionPeriodEnd();
+    // Wait for the fire-and-forget catch chain to settle.
+    await new Promise((r) => setImmediate(r));
+
+    expect(notifications.sendSubscriptionPastDue).toHaveBeenCalledWith(
+      'admin@example.com',
+      'Test Restoran',
+      'Profesyonel',
+      799,
+      'TRY',
     );
-    prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
-    prisma.subscriptionPayment.create.mockResolvedValue({ id: 'pay-1' } as any);
-    prisma.subscription.update.mockResolvedValue({} as any);
+  });
+
+  it('caps the batch at 200 rows per run', async () => {
+    prisma.subscription.findMany.mockResolvedValue([] as any);
+
+    await svc.handleSubscriptionPeriodEnd();
+
+    expect(prisma.subscription.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 200 }),
+    );
+  });
+
+  it('skips email send when tenant admin has no email', async () => {
+    prisma.subscription.findMany.mockResolvedValue([
+      {
+        id: 'sub-1',
+        amount: 799,
+        currency: 'TRY',
+        currentPeriodEnd: new Date(Date.now() - 1000),
+        plan: { displayName: 'Profesyonel' },
+        tenant: { id: 'tenant-1', name: 'X' },
+      },
+    ] as any);
+    prisma.user.findFirst.mockResolvedValue(null);
+
+    await svc.handleSubscriptionPeriodEnd();
+
+    expect(notifications.sendSubscriptionPastDue).not.toHaveBeenCalled();
+  });
+});
+
+describe('SubscriptionSchedulerService.handleSubscriptionExpiryReminders', () => {
+  let prisma: MockPrismaClient;
+  let notifications: any;
+  let svc: SubscriptionSchedulerService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    notifications = {
+      sendSubscriptionExpiryReminder: jest.fn().mockResolvedValue(undefined),
+    };
+    svc = buildSvc(prisma, {}, notifications);
     prisma.user.findFirst.mockResolvedValue({ email: 'admin@example.com' } as any);
   });
 
-  it('skips PayTR and falls back to legacy renew when tenant has no recurring token', async () => {
-    await callRenew({ ...baseSub, tenant: { ...baseTenant, paytrRecurringToken: null } });
-    expect(paytr.chargeRecurring).not.toHaveBeenCalled();
-    expect(subscriptionService.renewSubscription).toHaveBeenCalledWith('sub-1');
+  it('queries 7d, 3d, and 1d windows', async () => {
+    prisma.subscription.findMany.mockResolvedValue([] as any);
+
+    await svc.handleSubscriptionExpiryReminders();
+
+    // Three calls — one per window.
+    expect(prisma.subscription.findMany).toHaveBeenCalledTimes(3);
   });
 
-  it('records FAILED payment and falls back when PayTR rejects the charge', async () => {
-    paytr.chargeRecurring.mockResolvedValue({
-      status: 'failed',
-      reason: 'insufficient_funds',
+  it('sends reminder when a sub falls in the 7-day window', async () => {
+    const subInWindow = {
+      id: 'sub-7d',
+      currentPeriodEnd: addDays(new Date(), 7),
+      plan: { displayName: 'Profesyonel' },
+      tenant: { id: 'tenant-1', name: 'Test Restoran' },
+    };
+    // findMany called for each window — return the sub only for the 7-day call.
+    prisma.subscription.findMany.mockResolvedValueOnce([subInWindow] as any);
+    prisma.subscription.findMany.mockResolvedValueOnce([] as any);
+    prisma.subscription.findMany.mockResolvedValueOnce([] as any);
+
+    await svc.handleSubscriptionExpiryReminders();
+
+    expect(notifications.sendSubscriptionExpiryReminder).toHaveBeenCalledWith(
+      'admin@example.com',
+      'Test Restoran',
+      'Profesyonel',
+      expect.any(Date),
+      7,
+    );
+  });
+
+  it('sends reminder when a sub falls in the 3-day window', async () => {
+    prisma.subscription.findMany.mockResolvedValueOnce([] as any);
+    prisma.subscription.findMany.mockResolvedValueOnce([
+      {
+        id: 'sub-3d',
+        currentPeriodEnd: addDays(new Date(), 3),
+        plan: { displayName: 'Başlangıç' },
+        tenant: { id: 'tenant-2', name: 'X' },
+      },
+    ] as any);
+    prisma.subscription.findMany.mockResolvedValueOnce([] as any);
+
+    await svc.handleSubscriptionExpiryReminders();
+
+    expect(notifications.sendSubscriptionExpiryReminder).toHaveBeenCalledWith(
+      'admin@example.com',
+      'X',
+      'Başlangıç',
+      expect.any(Date),
+      3,
+    );
+  });
+
+  it('sends reminder when a sub falls in the 1-day window', async () => {
+    prisma.subscription.findMany.mockResolvedValueOnce([] as any);
+    prisma.subscription.findMany.mockResolvedValueOnce([] as any);
+    prisma.subscription.findMany.mockResolvedValueOnce([
+      {
+        id: 'sub-1d',
+        currentPeriodEnd: addDays(new Date(), 1),
+        plan: { displayName: 'Pro' },
+        tenant: { id: 'tenant-3', name: 'Y' },
+      },
+    ] as any);
+
+    await svc.handleSubscriptionExpiryReminders();
+
+    expect(notifications.sendSubscriptionExpiryReminder).toHaveBeenCalledWith(
+      'admin@example.com',
+      'Y',
+      'Pro',
+      expect.any(Date),
+      1,
+    );
+  });
+
+  it('does not send when no subs fall in any window', async () => {
+    prisma.subscription.findMany.mockResolvedValue([] as any);
+
+    await svc.handleSubscriptionExpiryReminders();
+
+    expect(notifications.sendSubscriptionExpiryReminder).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Hourly webhook-recovery sweeper. The cron asks PayTR for the real
+ * status of any SubscriptionPayment stuck in PENDING for ≥ 2 hours,
+ * then delegates the state transition to PaytrSettlementService. These
+ * tests fence off the dispatch logic so the settlement service itself
+ * stays out of scope (it's mocked).
+ */
+describe('SubscriptionSchedulerService.handlePaytrPendingRecovery', () => {
+  let prisma: MockPrismaClient;
+  let paytr: any;
+  let settlement: any;
+  let svc: SubscriptionSchedulerService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    paytr = { chargeRecurring: jest.fn(), inquiryStatus: jest.fn() };
+    settlement = { settlePayment: jest.fn().mockResolvedValue('OK') };
+    svc = buildSvc(prisma, paytr, {}, settlement);
+  });
+
+  it('dispatches inquiry-success rows to settlement.settlePayment with kind=success', async () => {
+    prisma.subscriptionPayment.findMany.mockResolvedValue([
+      { id: 'pay-1', paytrMerchantOid: 'OID1' },
+    ] as any);
+    paytr.inquiryStatus.mockResolvedValue({
+      status: 'success',
+      paymentType: 'card',
+      paymentAmount: '79900',
       raw: {},
     });
 
-    await callRenew(baseSub);
+    await svc.handlePaytrPendingRecovery();
 
-    expect(prisma.subscriptionPayment.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          status: 'FAILED',
-          paymentProvider: 'PAYTR',
-          failureCode: 'RECURRING_FAILED',
-          failureMessage: 'insufficient_funds',
-        }),
-      }),
+    expect(paytr.inquiryStatus).toHaveBeenCalledWith('OID1');
+    expect(settlement.settlePayment).toHaveBeenCalledWith('OID1', {
+      kind: 'success',
+      paymentType: 'card',
+      totalAmount: '79900',
+    });
+  });
+
+  it('dispatches inquiry-failed rows with the failure reason fields', async () => {
+    prisma.subscriptionPayment.findMany.mockResolvedValue([
+      { id: 'pay-2', paytrMerchantOid: 'OID2' },
+    ] as any);
+    paytr.inquiryStatus.mockResolvedValue({
+      status: 'failed',
+      failedReasonCode: '99',
+      failedReasonMsg: 'do_not_honor',
+      raw: {},
+    });
+
+    await svc.handlePaytrPendingRecovery();
+
+    expect(settlement.settlePayment).toHaveBeenCalledWith('OID2', {
+      kind: 'failure',
+      failureCode: '99',
+      failureMessage: 'do_not_honor',
+    });
+  });
+
+  it('leaves still-pending rows alone (no settlement call)', async () => {
+    prisma.subscriptionPayment.findMany.mockResolvedValue([
+      { id: 'pay-3', paytrMerchantOid: 'OID3' },
+    ] as any);
+    paytr.inquiryStatus.mockResolvedValue({ status: 'pending', raw: {} });
+
+    await svc.handlePaytrPendingRecovery();
+
+    expect(settlement.settlePayment).not.toHaveBeenCalled();
+  });
+
+  it('returns early without querying PayTR when no rows are stuck', async () => {
+    prisma.subscriptionPayment.findMany.mockResolvedValue([] as any);
+
+    await svc.handlePaytrPendingRecovery();
+
+    expect(paytr.inquiryStatus).not.toHaveBeenCalled();
+    expect(settlement.settlePayment).not.toHaveBeenCalled();
+  });
+
+  it('caps the batch at 50 rows per run to bound PayTR API spend', async () => {
+    prisma.subscriptionPayment.findMany.mockResolvedValue([] as any);
+
+    await svc.handlePaytrPendingRecovery();
+
+    expect(prisma.subscriptionPayment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ take: 50 }),
     );
-    expect(subscriptionService.renewSubscription).toHaveBeenCalledWith('sub-1');
-  });
-
-  it('on success writes SUCCEEDED payment, bumps period, creates invoice, sends email', async () => {
-    paytr.chargeRecurring.mockResolvedValue({ status: 'success', raw: {} });
-
-    await callRenew(baseSub);
-    await new Promise((r) => setImmediate(r)); // flush microtasks for the void email
-
-    // Payment row written as SUCCEEDED with the new merchantOid
-    const createCalls = prisma.subscriptionPayment.create.mock.calls.map((c) => c[0]);
-    expect(createCalls[0].data.status).toBe('SUCCEEDED');
-    expect(createCalls[0].data.paymentProvider).toBe('PAYTR');
-    expect(createCalls[0].data.paytrMerchantOid).toMatch(/^RNW[A-Za-z0-9]+$/);
-
-    // Subscription period bumped
-    expect(prisma.subscription.update).toHaveBeenCalled();
-    const subUpdate = prisma.subscription.update.mock.calls[0][0];
-    expect(subUpdate.data.currentPeriodEnd).toBeInstanceOf(Date);
-
-    // Invoice issued
-    expect(billing.createInvoice).toHaveBeenCalled();
-
-    // Best-effort success email
-    expect(notifications.sendPaymentSuccessful).toHaveBeenCalledWith(
-      'admin@example.com',
-      'Test Restoran',
-      expect.any(Number),
-      'TRY',
-      'INV-202604-0001-aaaaaa',
-    );
-  });
-
-  it('anchors the new period on currentPeriodEnd (not now) when the period is still live', async () => {
-    paytr.chargeRecurring.mockResolvedValue({ status: 'success', raw: {} });
-    const liveEnd = new Date(Date.now() + 24 * 60 * 60 * 1000);
-    await callRenew({ ...baseSub, currentPeriodEnd: liveEnd });
-
-    const subUpdate = prisma.subscription.update.mock.calls[0][0];
-    // Period should start exactly at the old end, not now-ish.
-    expect((subUpdate.data.currentPeriodStart as Date).getTime()).toBe(liveEnd.getTime());
-  });
-
-  it('falls back to now when the period has already passed', async () => {
-    paytr.chargeRecurring.mockResolvedValue({ status: 'success', raw: {} });
-    const before = Date.now();
-    const expiredEnd = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    await callRenew({ ...baseSub, currentPeriodEnd: expiredEnd });
-
-    const subUpdate = prisma.subscription.update.mock.calls[0][0];
-    const start = (subUpdate.data.currentPeriodStart as Date).getTime();
-    // start is ~now (within the test execution window), not in the past
-    expect(start).toBeGreaterThanOrEqual(before);
   });
 });

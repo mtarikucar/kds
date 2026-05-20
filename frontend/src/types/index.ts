@@ -786,7 +786,6 @@ export interface Subscription {
   trialEnd?: string;
   amount: number;
   currency: string;
-  autoRenew: boolean;
   cancelAtPeriodEnd: boolean;
   plan?: {
     id: string;
@@ -824,7 +823,7 @@ export interface CreateSubscriptionDto {
 }
 
 export interface UpdateSubscriptionDto {
-  autoRenew?: boolean;
+  cancelAtPeriodEnd?: boolean;
 }
 
 export interface ChangePlanDto {

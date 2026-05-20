@@ -34,11 +34,6 @@ model Tenant {
   trialStartedAt   DateTime?
   trialEndsAt      DateTime?
 
-  // PayTR recurring-payment token (saved-card reference, encrypted at rest).
-  // Issued by PayTR on the first successful payment; used by the renewal
-  // scheduler to auto-charge without re-collecting card details.
-  paytrRecurringToken String?
-
   // Turkish tax identifier (Vergi No for B2B / TC Kimlik for B2C). Required
   // on KDV-compliant invoices for Turkish tenants.
   taxId String?
@@ -264,6 +259,11 @@ model User {
   swapRequestsMade     ShiftSwapRequest[] @relation("SwapRequester")
   swapRequestsReceived ShiftSwapRequest[] @relation("SwapTarget")
   swapRequestsApproved ShiftSwapRequest[] @relation("SwapApprover")
+
+  // Legal consents — every accepted version of KVKK / Mesafeli Satış
+  // / İade / Terms is recorded for audit. Cascade-delete with the user
+  // because a removed user can't be asked to re-accept anything.
+  consents Consent[]
 
   @@index([tenantId])
   @@index([email])
@@ -923,8 +923,9 @@ model Subscription {
   amount   Decimal @db.Decimal(10, 2)
   currency String  @default("TRY")
 
-  // Auto-renewal
-  autoRenew         Boolean @default(true)
+  // Manual-renewal model: tenant explicitly checkouts each cycle.
+  // No autoRenew flag because there's no auto-charge path. `cancelAtPeriodEnd`
+  // still drives the deferred-cancellation UI.
   cancelAtPeriodEnd Boolean @default(false)
 
   // Cancellation tracking
@@ -990,6 +991,16 @@ model SubscriptionPayment {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
+  // Marketing referral snapshot: the code the customer typed (or that
+  // was pre-filled from a `?ref=CODE` cookie) at checkout, plus the
+  // marketer it resolved to at that moment. Both nullable — most
+  // payments have no referrer. Kept on the payment row (not on
+  // subscription) so re-resolves are stable even if the marketer
+  // later rotates their code.
+  referralCode              String?
+  referredByMarketingUserId String?
+  referredBy                MarketingUser? @relation("ReferredByMarketer", fields: [referredByMarketingUserId], references: [id], onDelete: SetNull)
+
   // Relations
   invoice Invoice?
 
@@ -997,6 +1008,7 @@ model SubscriptionPayment {
   @@index([status])
   @@index([createdAt])
   @@index([paytrMerchantOid])
+  @@index([referredByMarketingUserId])
   @@map("subscription_payments")
 }
 
@@ -2945,6 +2957,15 @@ model MarketingUser {
   failedLogins Int       @default(0)
   lockedUntil  DateTime?
 
+  // Public-facing referral code (e.g. "AHMET42"). Marketers share it
+  // via /?ref=CODE links or word-of-mouth; the checkout flow resolves
+  // it back to this row, auto-creates a WON Lead on payment success,
+  // and lifetime SIGNUP/RENEWAL/UPSELL commissions accrue to this user.
+  // Nullable so legacy rows backfill cleanly; @unique to keep the
+  // resolver O(1).
+  referralCode          String?   @unique
+  referralCodeUpdatedAt DateTime?
+
   // Session revocation token: carried in access/refresh JWTs; bumped on
   // logout and on password change so outstanding tokens are invalidated.
   tokenVersion Int @default(0)
@@ -2953,12 +2974,13 @@ model MarketingUser {
   updatedAt DateTime @updatedAt
 
   // Relations
-  leads         Lead[]                  @relation("AssignedRep")
-  activities    LeadActivity[]
-  tasks         MarketingTask[]
-  offers        LeadOffer[]
-  commissions   Commission[]
-  notifications MarketingNotification[]
+  leads            Lead[]                  @relation("AssignedRep")
+  activities       LeadActivity[]
+  tasks            MarketingTask[]
+  offers           LeadOffer[]
+  commissions      Commission[]
+  notifications    MarketingNotification[]
+  referredPayments SubscriptionPayment[]   @relation("ReferredByMarketer")
 
   @@index([email])
   @@index([role])
@@ -3121,7 +3143,7 @@ model Commission {
   /// pushes one entry `{ at, actorId, action, prev?, next? }`. JSON
   /// rather than a separate table because the volume is low (a few
   /// rows per commission lifetime) and we never need to join on it.
-  auditLog Json?
+  auditLog     Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3281,4 +3303,70 @@ model SalesInvoiceItem {
 
   @@index([invoiceId])
   @@map("sales_invoice_items")
+}
+
+// ========================================
+// LEGAL DOCUMENTS & CONSENTS
+// ========================================
+//
+// Versioned legal documents (KVKK, Mesafeli Satış, İade Politikası, etc.)
+// and per-user consent records. Two-table design:
+//
+//   LegalDocument — content + version. New version = new row, old row
+//     keeps `isCurrent: false` so existing Consent FKs stay valid.
+//   Consent — immutable acceptance record. One row per (user, version).
+//     Required at checkout for create-intent to succeed.
+//
+// `kind` is a string (not a Prisma enum) following the project-wide
+// convention of String + comment listing allowed values.
+//   KVKK              — 6698 sayılı KVKK aydınlatma metni
+//   DISTANCE_SALES    — 6502 sayılı Tüketici Kanunu mesafeli satış
+//   REFUND_POLICY     — 14 günlük cayma hakkı + iade politikası
+//   TERMS_OF_SERVICE  — genel kullanım koşulları (mevcut /terms sayfası)
+//   PRIVACY_POLICY    — gizlilik politikası (mevcut /privacy sayfası)
+
+model LegalDocument {
+  id           String   @id @default(uuid())
+  kind         String // KVKK, DISTANCE_SALES, REFUND_POLICY, TERMS_OF_SERVICE, PRIVACY_POLICY
+  version      String // "1.0", "1.1", "2.0" — semver-ish, set when publishing
+  locale       String // "tr" canonical for TR launch; future-proofed for "en", "ar", ...
+  title        String
+  bodyMarkdown String   @db.Text
+  effectiveAt  DateTime
+  // One row per kind has isCurrent=true. When publishing a new version,
+  // LegalDocumentsService flips the prior row's isCurrent to false in
+  // the same transaction. Old rows are NEVER deleted because existing
+  // Consent rows reference them by id (audit-proof).
+  isCurrent    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  consents Consent[]
+
+  @@unique([kind, version, locale])
+  @@index([kind, isCurrent])
+  @@map("legal_documents")
+}
+
+model Consent {
+  id              String        @id @default(uuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documentId      String
+  document        LegalDocument @relation(fields: [documentId], references: [id])
+  // Denormalised snapshot — lets reports filter "users who accepted KVKK"
+  // without joining LegalDocument every time.
+  documentKind    String
+  documentVersion String
+  ipAddress       String?
+  userAgent       String?
+  // Which checkout (if any) triggered the consent. Null when the user
+  // accepts an updated version outside a checkout flow (re-acceptance).
+  subscriptionId  String?
+  acceptedAt      DateTime      @default(now())
+
+  @@index([userId, documentKind])
+  @@index([subscriptionId])
+  @@index([documentId])
+  @@map("consents")
 }

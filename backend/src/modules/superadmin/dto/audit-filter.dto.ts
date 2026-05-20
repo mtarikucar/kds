@@ -1,26 +1,35 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, IsInt, Min, Max, IsDateString } from 'class-validator';
-import { Type } from 'class-transformer';
+import { ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  IsEnum,
+  IsOptional,
+  IsString,
+  IsInt,
+  Min,
+  Max,
+  IsDateString,
+} from "class-validator";
+import { Type } from "class-transformer";
 
 export enum AuditAction {
-  LOGIN = 'LOGIN',
-  LOGOUT = 'LOGOUT',
-  VIEW = 'VIEW',
-  CREATE = 'CREATE',
-  UPDATE = 'UPDATE',
-  DELETE = 'DELETE',
-  SUSPEND = 'SUSPEND',
-  ACTIVATE = 'ACTIVATE',
-  EXTEND = 'EXTEND',
-  CANCEL = 'CANCEL',
+  LOGIN = "LOGIN",
+  LOGOUT = "LOGOUT",
+  VIEW = "VIEW",
+  CREATE = "CREATE",
+  UPDATE = "UPDATE",
+  DELETE = "DELETE",
+  SUSPEND = "SUSPEND",
+  ACTIVATE = "ACTIVATE",
+  EXTEND = "EXTEND",
+  CANCEL = "CANCEL",
+  REFUND = "REFUND",
 }
 
 export enum EntityType {
-  TENANT = 'TENANT',
-  USER = 'USER',
-  SUBSCRIPTION = 'SUBSCRIPTION',
-  PLAN = 'PLAN',
-  SUPER_ADMIN = 'SUPER_ADMIN',
+  TENANT = "TENANT",
+  USER = "USER",
+  SUBSCRIPTION = "SUBSCRIPTION",
+  PLAN = "PLAN",
+  SUPER_ADMIN = "SUPER_ADMIN",
 }
 
 export class AuditFilterDto {
@@ -34,22 +43,22 @@ export class AuditFilterDto {
   @IsEnum(EntityType)
   entityType?: EntityType;
 
-  @ApiPropertyOptional({ description: 'Filter by actor ID' })
+  @ApiPropertyOptional({ description: "Filter by actor ID" })
   @IsOptional()
   @IsString()
   actorId?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by target tenant ID' })
+  @ApiPropertyOptional({ description: "Filter by target tenant ID" })
   @IsOptional()
   @IsString()
   targetTenantId?: string;
 
-  @ApiPropertyOptional({ description: 'Start date filter' })
+  @ApiPropertyOptional({ description: "Start date filter" })
   @IsOptional()
   @IsDateString()
   startDate?: string;
 
-  @ApiPropertyOptional({ description: 'End date filter' })
+  @ApiPropertyOptional({ description: "End date filter" })
   @IsOptional()
   @IsDateString()
   endDate?: string;
@@ -71,8 +80,8 @@ export class AuditFilterDto {
 }
 
 export enum ExportFormat {
-  CSV = 'csv',
-  JSON = 'json',
+  CSV = "csv",
+  JSON = "json",
 }
 
 export class AuditExportDto extends AuditFilterDto {

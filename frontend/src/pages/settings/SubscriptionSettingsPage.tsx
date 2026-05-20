@@ -241,9 +241,11 @@ const SubscriptionSettingsPage = () => {
                   {t('subscriptions.reactivateSubscription')}
                 </Button>
               )}
-              {/* PAST_DUE → one-click "pay now" routes to checkout with the
-                  tenant's current plan + cycle, which creates a fresh PayTR
-                  intent against the existing PAST_DUE subscription. */}
+              {/* PAST_DUE (within 7-day grace) → one-click "renew now"
+                  routes to checkout with the tenant's current plan + cycle,
+                  which creates a fresh PayTR intent against the existing
+                  PAST_DUE subscription. Manual-renewal model: no
+                  auto-charge, the user explicitly clicks here. */}
               {currentSubscription.status === SubscriptionStatus.PAST_DUE && (
                 <Button
                   variant="primary"
@@ -255,7 +257,20 @@ const SubscriptionSettingsPage = () => {
                   }
                 >
                   <CreditCard className="h-4 w-4 mr-2" />
-                  {t('subscriptions.payNow')}
+                  {t('subscriptions.renewNow', 'Şimdi yenile')}
+                </Button>
+              )}
+              {/* EXPIRED → grace period elapsed; route to plans page with
+                  ?renew=1 so the user can confirm the same plan or pick
+                  a different one. */}
+              {currentSubscription.status === SubscriptionStatus.EXPIRED && (
+                <Button
+                  variant="primary"
+                  className="w-full"
+                  onClick={() => navigate('/subscription/plans?renew=1')}
+                >
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  {t('subscriptions.resubscribe', 'Yeniden abone ol')}
                 </Button>
               )}
             </div>

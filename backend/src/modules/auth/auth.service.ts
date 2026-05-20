@@ -213,7 +213,6 @@ export class AuthService {
               trialEnd,
               amount: businessPlan.monthlyPrice,
               currency: businessPlan.currency,
-              autoRenew: true,
               cancelAtPeriodEnd: false,
             },
           });
@@ -1381,7 +1380,6 @@ export class AuthService {
             isTrialPeriod: false,
             amount: 0,
             currency: freePlan.currency,
-            autoRenew: true,
             cancelAtPeriodEnd: false,
           },
         });

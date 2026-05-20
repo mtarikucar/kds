@@ -1,22 +1,37 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { differenceInDays } from "date-fns";
+import { PrismaService } from "../../../prisma/prisma.service";
 import {
   SubscriptionFilterDto,
   CreatePlanDto,
   UpdatePlanDto,
   ExtendSubscriptionDto,
   UpdateSubscriptionDto,
-} from '../dto/subscription-filter.dto';
-import { SuperAdminAuditService } from './superadmin-audit.service';
-import { AuditAction, EntityType } from '../dto/audit-filter.dto';
-import { SubscriptionService } from '../../subscriptions/services/subscription.service';
+} from "../dto/subscription-filter.dto";
+import { RefundSubscriptionPaymentDto } from "../dto/refund-subscription-payment.dto";
+import { SuperAdminAuditService } from "./superadmin-audit.service";
+import { AuditAction, EntityType } from "../dto/audit-filter.dto";
+import { SubscriptionService } from "../../subscriptions/services/subscription.service";
+import { SubscriptionSchedulerService } from "../../subscriptions/services/subscription-scheduler.service";
+import { PaytrAdapter } from "../../payments/adapters/paytr.adapter";
+import { PaymentStatus } from "../../../common/constants/subscription.enum";
 
 @Injectable()
 export class SuperAdminSubscriptionsService {
+  private readonly logger = new Logger(SuperAdminSubscriptionsService.name);
+
   constructor(
     private prisma: PrismaService,
     private auditService: SuperAdminAuditService,
     private subscriptionService: SubscriptionService,
+    private scheduler: SubscriptionSchedulerService,
+    private paytr: PaytrAdapter,
   ) {}
 
   /**
@@ -29,10 +44,30 @@ export class SuperAdminSubscriptionsService {
     return this.subscriptionService.expireTrials();
   }
 
+  /**
+   * Manually fire the period-end → PAST_DUE sweep. Same code path as
+   * the 02:00 daily cron — used by ops to confirm a tenant whose period
+   * ended a few minutes ago is correctly demoted, and by E2E tests that
+   * can't wait until 02:00.
+   */
+  async triggerPeriodEndSweep() {
+    await this.scheduler.handleSubscriptionPeriodEnd();
+    return { success: true };
+  }
+
+  /**
+   * Manually fire the 7d/3d/1d pre-expiry reminder cron. Same code path
+   * as the 10:00 daily cron.
+   */
+  async triggerExpiryReminders() {
+    await this.scheduler.handleSubscriptionExpiryReminders();
+    return { success: true };
+  }
+
   // Plans
   async findAllPlans() {
     return this.prisma.subscriptionPlan.findMany({
-      orderBy: { monthlyPrice: 'asc' },
+      orderBy: { monthlyPrice: "asc" },
       include: {
         _count: {
           select: { subscriptions: true },
@@ -41,7 +76,11 @@ export class SuperAdminSubscriptionsService {
     });
   }
 
-  async createPlan(createDto: CreatePlanDto, actorId: string, actorEmail: string) {
+  async createPlan(
+    createDto: CreatePlanDto,
+    actorId: string,
+    actorEmail: string,
+  ) {
     const plan = await this.prisma.subscriptionPlan.create({
       data: {
         name: createDto.name,
@@ -51,7 +90,7 @@ export class SuperAdminSubscriptionsService {
         yearlyPrice: createDto.yearlyPrice,
         // Use nullish coalescing so an explicit `false` from the caller
         // isn't silently flipped to a default `true`/number.
-        currency: createDto.currency ?? 'TRY',
+        currency: createDto.currency ?? "TRY",
         trialDays: createDto.trialDays ?? 0,
         maxUsers: createDto.maxUsers ?? 1,
         maxTables: createDto.maxTables ?? 5,
@@ -95,7 +134,7 @@ export class SuperAdminSubscriptionsService {
     });
 
     if (!existingPlan) {
-      throw new NotFoundException('Plan not found');
+      throw new NotFoundException("Plan not found");
     }
 
     const plan = await this.prisma.subscriptionPlan.update({
@@ -149,12 +188,12 @@ export class SuperAdminSubscriptionsService {
     });
 
     if (!plan) {
-      throw new NotFoundException('Plan not found');
+      throw new NotFoundException("Plan not found");
     }
 
     if (plan._count.subscriptions > 0) {
       throw new BadRequestException(
-        'Cannot delete plan with active subscriptions',
+        "Cannot delete plan with active subscriptions",
       );
     }
 
@@ -169,7 +208,7 @@ export class SuperAdminSubscriptionsService {
       previousData: plan,
     });
 
-    return { message: 'Plan deleted successfully' };
+    return { message: "Plan deleted successfully" };
   }
 
   // Subscriptions
@@ -193,7 +232,7 @@ export class SuperAdminSubscriptionsService {
     const [subscriptions, total] = await Promise.all([
       this.prisma.subscription.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
         include: {
@@ -228,18 +267,18 @@ export class SuperAdminSubscriptionsService {
         },
         plan: true,
         payments: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           take: 10,
         },
         invoices: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           take: 10,
         },
       },
     });
 
     if (!subscription) {
-      throw new NotFoundException('Subscription not found');
+      throw new NotFoundException("Subscription not found");
     }
 
     return subscription;
@@ -257,7 +296,7 @@ export class SuperAdminSubscriptionsService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Subscription not found');
+      throw new NotFoundException("Subscription not found");
     }
 
     const updateData: {
@@ -272,7 +311,7 @@ export class SuperAdminSubscriptionsService {
         where: { id: updateDto.planId },
       });
       if (!plan) {
-        throw new NotFoundException('Plan not found');
+        throw new NotFoundException("Plan not found");
       }
       // Downgrade guard: refuse a plan change that would push the tenant
       // above the new plan's limits. The regular tenant flow already has
@@ -283,7 +322,7 @@ export class SuperAdminSubscriptionsService {
       const [userCount, tableCount, productCount, categoryCount] =
         await Promise.all([
           this.prisma.user.count({
-            where: { tenantId: existing.tenantId, status: 'ACTIVE' },
+            where: { tenantId: existing.tenantId, status: "ACTIVE" },
           }),
           this.prisma.table.count({ where: { tenantId: existing.tenantId } }),
           this.prisma.product.count({ where: { tenantId: existing.tenantId } }),
@@ -306,7 +345,7 @@ export class SuperAdminSubscriptionsService {
       }
       if (violations.length > 0) {
         throw new BadRequestException(
-          `Cannot change plan — current usage exceeds new plan limits: ${violations.join(', ')}`,
+          `Cannot change plan — current usage exceeds new plan limits: ${violations.join(", ")}`,
         );
       }
       updateData.planId = updateDto.planId;
@@ -374,14 +413,18 @@ export class SuperAdminSubscriptionsService {
     });
 
     if (!subscription) {
-      throw new NotFoundException('Subscription not found');
+      throw new NotFoundException("Subscription not found");
     }
 
     // Defend against a negative or 10-year gift that bypasses DTO
     // validation drift — the DTO SHOULD cap this but the service
     // re-checks because this endpoint moves real billing dates.
-    if (!Number.isFinite(extendDto.days) || extendDto.days < 1 || extendDto.days > 3650) {
-      throw new BadRequestException('days must be between 1 and 3650');
+    if (
+      !Number.isFinite(extendDto.days) ||
+      extendDto.days < 1 ||
+      extendDto.days > 3650
+    ) {
+      throw new BadRequestException("days must be between 1 and 3650");
     }
 
     const newEndDate = new Date(subscription.currentPeriodEnd);
@@ -427,16 +470,18 @@ export class SuperAdminSubscriptionsService {
     id: string,
     actorId: string,
     actorEmail: string,
-    mode: 'IMMEDIATE' | 'AT_PERIOD_END' = 'AT_PERIOD_END',
+    mode: "IMMEDIATE" | "AT_PERIOD_END" = "AT_PERIOD_END",
     reason?: string,
   ) {
     const subscription = await this.prisma.subscription.findUnique({
       where: { id },
-      include: { tenant: { select: { id: true, name: true } } },
+      include: {
+        tenant: { select: { id: true, name: true } },
+      },
     });
 
     if (!subscription) {
-      throw new NotFoundException('Subscription not found');
+      throw new NotFoundException("Subscription not found");
     }
 
     const now = new Date();
@@ -445,32 +490,28 @@ export class SuperAdminSubscriptionsService {
     // downstream billing/feature-gating code unable to tell the admin's
     // intent.
     const data =
-      mode === 'IMMEDIATE'
+      mode === "IMMEDIATE"
         ? {
-            status: 'CANCELLED',
+            status: "CANCELLED",
             cancelledAt: now,
             endedAt: now,
             cancelAtPeriodEnd: false,
-            autoRenew: false,
             cancellationReason: reason,
           }
         : {
             cancelAtPeriodEnd: true,
-            autoRenew: false,
             cancelledAt: now,
             cancellationReason: reason,
           };
 
+    // Manual-renewal model: no PayTR token to revoke, no autoRenew flag
+    // to flip. Single subscription update.
     const updated = await this.prisma.subscription.update({
       where: { id },
       data,
       include: {
-        tenant: {
-          select: { id: true, name: true },
-        },
-        plan: {
-          select: { id: true, name: true, displayName: true },
-        },
+        tenant: { select: { id: true, name: true } },
+        plan: { select: { id: true, name: true, displayName: true } },
       },
     });
 
@@ -481,9 +522,124 @@ export class SuperAdminSubscriptionsService {
       actorId,
       actorEmail,
       previousData: { status: subscription.status },
-      newData: { status: 'CANCELLED', reason },
+      newData: { status: "CANCELLED", reason },
       targetTenantId: subscription.tenant.id,
       targetTenantName: subscription.tenant.name,
+    });
+
+    return updated;
+  }
+
+  /**
+   * Issue a refund through PayTR's `/odeme/api/iade` endpoint for a
+   * specific SubscriptionPayment, then terminalise the local payment
+   * row to `REFUNDED` and append an audit entry.
+   *
+   * Partial refunds are accepted (`amount < payment.amount`) and still
+   * mark the row as REFUNDED — the schema doesn't currently model a
+   * partial-refund state separately, so the exact refunded amount is
+   * preserved in the audit log only.
+   *
+   * 14-day cayma penceresi (TR consumer law) is a soft check: support
+   * can still issue a refund past day 14 (e.g. goodwill, dispute),
+   * but a warning gets logged so the action is visible later.
+   */
+  async refundPayment(
+    subscriptionId: string,
+    dto: RefundSubscriptionPaymentDto,
+    actorId: string,
+    actorEmail: string,
+  ) {
+    const payment = await this.prisma.subscriptionPayment.findUnique({
+      where: { id: dto.paymentId },
+      include: {
+        subscription: {
+          select: {
+            id: true,
+            tenantId: true,
+            tenant: { select: { name: true } },
+          },
+        },
+      },
+    });
+
+    if (!payment) {
+      throw new NotFoundException("Payment not found");
+    }
+    if (payment.subscriptionId !== subscriptionId) {
+      throw new BadRequestException(
+        "Payment does not belong to this subscription",
+      );
+    }
+    if (payment.status !== PaymentStatus.SUCCEEDED) {
+      throw new BadRequestException(
+        `Only SUCCEEDED payments can be refunded (current: ${payment.status})`,
+      );
+    }
+    if (!payment.paytrMerchantOid) {
+      throw new BadRequestException(
+        "Payment has no PayTR merchantOid — refund via PayTR not possible",
+      );
+    }
+
+    const paymentAmount = new Prisma.Decimal(payment.amount as any);
+    const refundAmount =
+      dto.amount !== undefined ? new Prisma.Decimal(dto.amount) : paymentAmount;
+    if (refundAmount.gt(paymentAmount)) {
+      throw new BadRequestException(
+        `Refund amount (${refundAmount}) cannot exceed payment amount (${paymentAmount})`,
+      );
+    }
+
+    // Soft 14-day cooling-off check — log but don't block. Support
+    // sometimes refunds past day 14 (goodwill, dispute). The audit log
+    // captures the decision either way.
+    if (payment.paidAt) {
+      const daysSincePaid = differenceInDays(new Date(), payment.paidAt);
+      if (daysSincePaid > 14) {
+        this.logger.warn(
+          `Refund past 14-day window for payment=${payment.id} (paidAt=${payment.paidAt.toISOString()}, ${daysSincePaid}d ago)`,
+        );
+      }
+    }
+
+    const result = await this.paytr.refund({
+      merchantOid: payment.paytrMerchantOid,
+      amount: refundAmount,
+      referenceNo: payment.id,
+    });
+
+    if (result.status !== "success") {
+      throw new BadRequestException(
+        `PayTR refund rejected: ${result.reason ?? "unknown"}`,
+      );
+    }
+
+    const now = new Date();
+    const updated = await this.prisma.subscriptionPayment.update({
+      where: { id: payment.id },
+      data: {
+        status: PaymentStatus.REFUNDED,
+        refundedAt: now,
+      },
+    });
+
+    await this.auditService.log({
+      action: AuditAction.REFUND,
+      entityType: EntityType.SUBSCRIPTION,
+      entityId: subscriptionId,
+      actorId,
+      actorEmail,
+      previousData: { status: "SUCCEEDED", amount: paymentAmount.toString() },
+      newData: {
+        status: "REFUNDED",
+        refundedAmount: refundAmount.toString(),
+        paymentId: payment.id,
+        merchantOid: payment.paytrMerchantOid,
+        reason: dto.reason,
+      },
+      targetTenantId: payment.subscription.tenantId,
+      targetTenantName: payment.subscription.tenant.name,
     });
 
     return updated;

@@ -314,7 +314,6 @@ export class PaymentsService {
         currentPeriodEnd: addHours(now, INTENT_TTL_HOURS),
         amount,
         currency,
-        autoRenew: true,
       },
     });
     return created.id;
