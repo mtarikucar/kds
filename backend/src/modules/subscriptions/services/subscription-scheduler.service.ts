@@ -226,9 +226,70 @@ export class SubscriptionSchedulerService {
       invoiceNumber ?? '',
     );
 
+    // Marketing rep RENEWAL commission. Best-effort — failure here
+    // shouldn't reverse the renewal. Skip when no marketing lead
+    // backed the original signup (manual self-serve onboarding) or
+    // when the amount is zero (no plan -> nothing to pay out on).
+    void this.creditRenewalCommission(tenant.id, sub, amount, now);
+
     this.logger.log(
       `Recurring charge succeeded for sub=${sub.id} tenant=${tenant.id} oid=${merchantOid}`,
     );
+  }
+
+  /**
+   * Look up the marketing lead that converted into this tenant and
+   * stamp a PENDING RENEWAL commission for its assigned rep. The
+   * lookup leans on Lead.convertedTenantId — the @@unique constraint
+   * there guarantees at most one match. The commission rate is
+   * sourced from the plan's `commissionRate` column (P3 of the
+   * marketing rebuild) with a 0.10 floor for plans cold-seeded before
+   * the column existed.
+   */
+  private async creditRenewalCommission(
+    tenantId: string,
+    sub: { plan: { commissionRate?: Prisma.Decimal | null } },
+    amount: Prisma.Decimal,
+    now: Date,
+  ): Promise<void> {
+    try {
+      const numericAmount = Number(amount);
+      if (!Number.isFinite(numericAmount) || numericAmount <= 0) return;
+
+      const lead = await this.prisma.lead.findFirst({
+        where: { convertedTenantId: tenantId },
+        select: { id: true, assignedToId: true },
+      });
+      if (!lead?.assignedToId) return;
+
+      const rate =
+        sub.plan.commissionRate !== null && sub.plan.commissionRate !== undefined
+          ? new Prisma.Decimal(sub.plan.commissionRate)
+          : new Prisma.Decimal(0.1);
+      const commissionAmount = new Prisma.Decimal(amount)
+        .mul(rate)
+        .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+      const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+      await this.prisma.commission.create({
+        data: {
+          amount: commissionAmount,
+          type: 'RENEWAL',
+          status: 'PENDING',
+          period,
+          tenantId,
+          leadId: lead.id,
+          marketingUserId: lead.assignedToId,
+        },
+      });
+      this.logger.log(
+        `Renewal commission created for tenant=${tenantId} rep=${lead.assignedToId} amount=${commissionAmount}`,
+      );
+    } catch (err: any) {
+      this.logger.error(
+        `Renewal commission credit failed for tenant=${tenantId}: ${err?.message ?? err}`,
+      );
+    }
   }
 
   private async sendRenewalSuccessEmail(

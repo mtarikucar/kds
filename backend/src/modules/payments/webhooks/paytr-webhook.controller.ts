@@ -155,6 +155,15 @@ export class PaytrWebhookController {
     const subscription = payment.subscription;
     const now = new Date();
 
+    // Captured inside the transaction, used after commit to fire the
+    // UPSELL commission. `null` when this charge was a fresh activation
+    // rather than an upgrade.
+    let upgradeContext: {
+      planId: string;
+      amount: Prisma.Decimal;
+      commissionRate: Prisma.Decimal;
+    } | null = null;
+
     try {
       await this.prisma.$transaction(async (tx) => {
         // Look up any upgrade-target keyed off the merchantOid.
@@ -178,6 +187,13 @@ export class PaytrWebhookController {
               : (upgrade.targetPlan.yearlyPrice as Prisma.Decimal);
           finalCurrency = upgrade.targetPlan.currency;
           displayName = upgrade.targetPlan.displayName;
+          upgradeContext = {
+            planId: upgrade.targetPlanId,
+            amount: finalAmount,
+            commissionRate:
+              (upgrade.targetPlan.commissionRate as Prisma.Decimal) ??
+              new Prisma.Decimal(0.1),
+          };
         }
 
         const periodEnd =
@@ -257,6 +273,18 @@ export class PaytrWebhookController {
       // Best-effort post-commit notifications. Failures are logged but
       // never unwind the activation transaction.
       void this.notifyActivation(subscription.tenantId, subscription.tenant.name);
+
+      // Marketing rep UPSELL commission on plan upgrades. We don't
+      // credit a SIGNUP here — that one was already created at lead
+      // conversion. Skipped when the charge was a fresh activation
+      // (no PendingPlanChange) or when no lead converted into this
+      // tenant.
+      if (upgradeContext) {
+        void this.creditUpsellCommission(
+          subscription.tenantId,
+          upgradeContext as { planId: string; amount: Prisma.Decimal; commissionRate: Prisma.Decimal },
+        );
+      }
     } catch (err) {
       // The DB has a partial unique on (tenantId) WHERE status IN
       // (ACTIVE,TRIALING). If two payments for the same tenant race to
@@ -327,6 +355,54 @@ export class PaytrWebhookController {
     } catch (err: any) {
       this.logger.error(
         `subscription-activated notification failed for tenant=${tenantId}: ${err?.message}`,
+      );
+    }
+  }
+
+  /**
+   * Stamp a PENDING UPSELL commission for the marketing rep who
+   * originally converted this tenant, when a plan upgrade has just
+   * been activated. Best-effort: failure here doesn't unwind the
+   * payment-success transaction. Skipped when the tenant has no
+   * marketing lead (self-serve conversion) or the rate works out
+   * to zero.
+   */
+  private async creditUpsellCommission(
+    tenantId: string,
+    upgrade: { planId: string; amount: Prisma.Decimal; commissionRate: Prisma.Decimal },
+  ): Promise<void> {
+    try {
+      const lead = await this.prisma.lead.findFirst({
+        where: { convertedTenantId: tenantId },
+        select: { id: true, assignedToId: true },
+      });
+      if (!lead?.assignedToId) return;
+
+      const commissionAmount = new Prisma.Decimal(upgrade.amount)
+        .mul(upgrade.commissionRate)
+        .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+      if (commissionAmount.lte(0)) return;
+
+      const now = new Date();
+      const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+      await this.prisma.commission.create({
+        data: {
+          amount: commissionAmount,
+          type: 'UPSELL',
+          status: 'PENDING',
+          period,
+          tenantId,
+          leadId: lead.id,
+          marketingUserId: lead.assignedToId,
+        },
+      });
+      this.logger.log(
+        `Upsell commission created for tenant=${tenantId} rep=${lead.assignedToId} amount=${commissionAmount}`,
+      );
+    } catch (err: any) {
+      this.logger.error(
+        `Upsell commission credit failed for tenant=${tenantId}: ${err?.message ?? err}`,
       );
     }
   }

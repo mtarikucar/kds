@@ -859,6 +859,13 @@ model SubscriptionPlan {
   discountEndDate    DateTime? // When discount expires
   isDiscountActive   Boolean   @default(false)
 
+  /// Marketing rep commission rate for SIGNUP/RENEWAL/UPSELL when this
+  /// plan is involved. Decimal fraction (0.10 = 10%). Default lines up
+  /// with the historical hard-coded constant so the rollout is
+  /// transparent. Per-plan overrides let high-margin plans pay reps
+  /// more (e.g. BUSINESS 15%) without affecting BASIC.
+  commissionRate Decimal @default(0.10) @db.Decimal(5, 4)
+
   isActive Boolean @default(true)
 
   createdAt DateTime @default(now())

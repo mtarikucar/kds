@@ -39,8 +39,13 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   LOST: [],
 };
 
-/** Signup commission as a fraction of the plan's monthly price. */
-const SIGNUP_COMMISSION_RATE = 0.1;
+/**
+ * Fallback signup-commission rate used when a tenant converts on a
+ * plan whose `commissionRate` couldn't be read (cold seed without
+ * the new column, or a no-plan conversion). Per-plan overrides on
+ * SubscriptionPlan.commissionRate take precedence.
+ */
+const DEFAULT_SIGNUP_COMMISSION_RATE = 0.1;
 
 @Injectable()
 export class MarketingLeadsService {
@@ -584,7 +589,11 @@ export class MarketingLeadsService {
         // commissions service.
         const commissionAmount = plan
           ? new Prisma.Decimal(plan.monthlyPrice)
-              .mul(SIGNUP_COMMISSION_RATE)
+              .mul(
+                // Per-plan override; defaults to the historical 10%
+                // when the column is absent (transitional rollout).
+                plan.commissionRate ?? DEFAULT_SIGNUP_COMMISSION_RATE,
+              )
               .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP)
           : new Prisma.Decimal(0);
         const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
