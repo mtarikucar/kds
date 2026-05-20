@@ -14,6 +14,10 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-restaurant_pos_prod}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Pin container TZ so timestamps in pg_dump / pg_stat align with
+      # the wall-clock business day. Application logic always normalises
+      # via tenant.timezone, so this is purely for ops legibility.
+      TZ: ${TZ:-Europe/Istanbul}
     ports:
       - '127.0.0.1:5432:5432'
     volumes:
@@ -62,6 +66,13 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
+      # The renewal cron is declared as `0 2 * * *` and must fire at
+      # 02:00 Europe/Istanbul (low-traffic window before breakfast
+      # service). Without TZ, NestJS @Cron uses the Node process TZ
+      # which defaults to UTC on Alpine — pushing the job to 05:00
+      # local. Pin TZ here so the cron's wall-clock matches its intent
+      # and our SLA "we charge at 02:00 TR time" stays honest.
+      TZ: ${TZ:-Europe/Istanbul}
       PORT: 3000
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-restaurant_pos_prod}
       REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/2
