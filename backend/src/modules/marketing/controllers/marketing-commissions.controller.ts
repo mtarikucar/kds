@@ -52,19 +52,20 @@ export class MarketingCommissionsController {
   updateAmount(
     @Param('id') id: string,
     @Body() dto: UpdateCommissionAmountDto,
+    @CurrentMarketingUser() user: MarketingUserPayload,
   ) {
-    return this.commissionsService.updateAmount(id, dto.amount);
+    return this.commissionsService.updateAmount(id, dto.amount, user.id);
   }
 
   @Patch(':id/approve')
   @MarketingRoles('SALES_MANAGER')
-  approve(@Param('id') id: string) {
-    return this.commissionsService.approve(id);
+  approve(@Param('id') id: string, @CurrentMarketingUser() user: MarketingUserPayload) {
+    return this.commissionsService.approve(id, user.id);
   }
 
   @Patch(':id/pay')
   @MarketingRoles('SALES_MANAGER')
-  markPaid(@Param('id') id: string) {
-    return this.commissionsService.markPaid(id);
+  markPaid(@Param('id') id: string, @CurrentMarketingUser() user: MarketingUserPayload) {
+    return this.commissionsService.markPaid(id, user.id);
   }
 }

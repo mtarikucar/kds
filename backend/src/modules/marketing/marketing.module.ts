@@ -28,6 +28,7 @@ import {
   MarketingUsersService,
   MarketingCommissionsService,
   MarketingNotificationsService,
+  MarketingSchedulerService,
 } from './services';
 
 // Guards
@@ -93,6 +94,8 @@ import { MarketingRolesGuard } from './guards/marketing-roles.guard';
     MarketingUsersService,
     MarketingCommissionsService,
     MarketingNotificationsService,
+    // Cron jobs (offer expiry, notification TTL, follow-up reminders).
+    MarketingSchedulerService,
     // Guards
     MarketingGuard,
     MarketingRolesGuard,

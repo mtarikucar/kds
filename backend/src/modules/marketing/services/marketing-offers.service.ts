@@ -132,6 +132,15 @@ export class MarketingOffersService {
     if (offer.lead.convertedTenantId || ['WON', 'LOST'].includes(offer.lead.status)) {
       throw new BadRequestException('Lead is already closed');
     }
+    // Refuse to send an already-expired offer. The scheduler flips
+    // SENT offers to EXPIRED past validUntil; if someone tries to
+    // send a DRAFT whose validUntil is in the past, bail here instead
+    // of producing a born-expired SENT row.
+    if (offer.validUntil && offer.validUntil.getTime() < Date.now()) {
+      throw new BadRequestException(
+        'Offer validUntil is in the past — extend it before sending',
+      );
+    }
 
     const [updatedOffer] = await this.prisma.$transaction([
       this.prisma.leadOffer.update({

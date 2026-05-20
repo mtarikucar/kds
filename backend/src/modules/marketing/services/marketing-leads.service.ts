@@ -80,6 +80,30 @@ export class MarketingLeadsService {
   }
 
   async create(dto: CreateLeadDto, userId: string) {
+    // Idempotency: refuse to create a second OPEN lead for the same
+    // email. Two reps logging the same prospect was the actual
+    // user-pain (no unique constraint at the DB level because the
+    // schema needs to allow a customer to come back later as a
+    // separate opportunity, but blocking duplicates while the first
+    // is still in pipeline is the right tradeoff).
+    if (dto.email) {
+      const existing = await this.prisma.lead.findFirst({
+        where: {
+          email: dto.email,
+          status: { notIn: ['WON', 'LOST'] },
+        },
+        select: { id: true, businessName: true, assignedTo: { select: { firstName: true, lastName: true } } },
+      });
+      if (existing) {
+        const owner = existing.assignedTo
+          ? `${existing.assignedTo.firstName} ${existing.assignedTo.lastName}`
+          : 'unassigned';
+        throw new ConflictException(
+          `A lead with this email already exists (${existing.businessName}, owned by ${owner})`,
+        );
+      }
+    }
+
     return this.prisma.lead.create({
       data: {
         ...dto,
@@ -321,6 +345,35 @@ export class MarketingLeadsService {
       },
     });
 
+    // LOST terminates the pipeline. WON goes through convert() which
+    // has its own task-cleanup hook. Cancel any open tasks attached to
+    // the lead so they don't clutter the calendar — the rep would
+    // never act on them.
+    if (status === 'LOST') {
+      await this.prisma.marketingTask.updateMany({
+        where: {
+          leadId: id,
+          status: { in: ['PENDING', 'IN_PROGRESS'] },
+        },
+        data: { status: 'CANCELLED' },
+      });
+    }
+
+    // Notify the lead's assignee of the change — but only when the
+    // change came from someone else (the assignee fired it themselves,
+    // they already know).
+    if (updatedLead.assignedToId && updatedLead.assignedToId !== userId) {
+      await this.prisma.marketingNotification.create({
+        data: {
+          userId: updatedLead.assignedToId,
+          type: 'INACTIVE_LEAD',
+          title: 'Lead status updated',
+          message: `${updatedLead.businessName}: ${lead.status} → ${status}`,
+          metadata: { leadId: id, from: lead.status, to: status },
+        },
+      });
+    }
+
     return updatedLead;
   }
 
@@ -357,6 +410,20 @@ export class MarketingLeadsService {
         createdById: actorId,
       },
     });
+
+    // Notify the new owner — they need to know a lead just landed in
+    // their queue. Skip if they happened to assign it to themselves.
+    if (assignedToId !== actorId) {
+      await this.prisma.marketingNotification.create({
+        data: {
+          userId: assignedToId,
+          type: 'FOLLOW_UP_REMINDER',
+          title: 'New lead assigned to you',
+          message: `${updated.businessName} — ${updated.contactPerson}`,
+          metadata: { leadId: id, assignedBy: actorId },
+        },
+      });
+    }
 
     return updated;
   }
@@ -500,6 +567,16 @@ export class MarketingLeadsService {
         },
       });
 
+      // Cancel any open tasks attached to this lead — the rep no
+      // longer needs reminders for a closed deal.
+      await tx.marketingTask.updateMany({
+        where: {
+          leadId: id,
+          status: { in: ['PENDING', 'IN_PROGRESS'] },
+        },
+        data: { status: 'CANCELLED' },
+      });
+
       if (lead.assignedToId) {
         // Signup commission: percentage of the plan's monthly price when
         // a plan was attached to the conversion; 0 when no plan was
@@ -554,22 +631,24 @@ export class MarketingLeadsService {
 
     // Send the welcome email outside the transaction. Failure here
     // shouldn't roll back the conversion — the owner can still recover
-    // via /auth/forgot-password.
+    // via /auth/forgot-password. Template-driven so the Turkish copy
+    // sits in a .hbs file rather than inline service code (was a
+    // blocker for i18n + translator review).
     try {
-      await this.emailService.sendPlainEmail(
-        dto.adminEmail,
-        'Welcome to your HummyTummy account',
-        [
-          `Hi ${dto.adminFirstName},`,
-          '',
-          `Your account for "${dto.tenantName}" has been created.`,
-          '',
-          `Temporary password: ${rawPassword}`,
-          '',
-          'Please log in and change your password immediately.',
-          'You can also request a password reset at /forgot-password.',
-        ].join('\n'),
-      );
+      const appUrl = process.env.APP_URL ?? 'https://hummytummy.com';
+      await this.emailService.sendEmail({
+        to: dto.adminEmail,
+        subject: 'HummyTummy hesabınız hazır',
+        template: 'marketing-tenant-welcome',
+        context: {
+          adminFirstName: dto.adminFirstName,
+          adminEmail: dto.adminEmail,
+          tenantName: dto.tenantName,
+          rawPassword,
+          appUrl,
+          loginUrl: `${appUrl}/login`,
+        },
+      });
     } catch (err) {
       // Log only; do not fail the response.
       // eslint-disable-next-line no-console

@@ -3106,10 +3106,18 @@ model Commission {
   marketingUserId String
   marketingUser   MarketingUser @relation(fields: [marketingUserId], references: [id], onDelete: Restrict)
 
-  approvedAt DateTime?
-  paidAt     DateTime?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  approvedAt   DateTime?
+  approvedById String? // MarketingUser.id of the manager who approved
+  paidAt       DateTime?
+  paidById     String? // MarketingUser.id of the manager who marked paid
+  /// Append-only state-transition log: every approve/pay/amount edit
+  /// pushes one entry `{ at, actorId, action, prev?, next? }`. JSON
+  /// rather than a separate table because the volume is low (a few
+  /// rows per commission lifetime) and we never need to join on it.
+  auditLog Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([marketingUserId])
   @@index([tenantId])

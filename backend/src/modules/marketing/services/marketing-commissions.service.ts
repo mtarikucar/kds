@@ -90,7 +90,7 @@ export class MarketingCommissionsService {
     };
   }
 
-  async approve(id: string) {
+  async approve(id: string, actorId: string) {
     const commission = await this.prisma.commission.findUnique({ where: { id } });
     if (!commission) throw new NotFoundException('Commission not found');
     if (commission.status !== 'PENDING') {
@@ -107,17 +107,31 @@ export class MarketingCommissionsService {
       );
     }
 
+    const auditLog = appendAuditEntry(commission.auditLog, {
+      action: 'approve',
+      actorId,
+      prevStatus: commission.status,
+      nextStatus: 'APPROVED',
+    });
+
     return this.prisma.commission.update({
       where: { id },
-      data: { status: 'APPROVED', approvedAt: new Date() },
+      data: {
+        status: 'APPROVED',
+        approvedAt: new Date(),
+        approvedById: actorId,
+        auditLog,
+      },
     });
   }
 
   /**
    * Set the commission amount. Only valid while still PENDING so
-   * approved/paid rows remain immutable for audit.
+   * approved/paid rows remain immutable for audit. Each call appends
+   * an `amount` entry to the audit log with the old + new value so
+   * the manager who flips the number is on the record.
    */
-  async updateAmount(id: string, amount: number) {
+  async updateAmount(id: string, amount: number, actorId: string) {
     if (!Number.isFinite(amount) || amount < 0) {
       throw new BadRequestException('Amount must be a non-negative number');
     }
@@ -126,25 +140,58 @@ export class MarketingCommissionsService {
     if (commission.status !== 'PENDING') {
       throw new BadRequestException('Only pending commissions can be updated');
     }
+    const auditLog = appendAuditEntry(commission.auditLog, {
+      action: 'amount',
+      actorId,
+      prevAmount: commission.amount.toString(),
+      nextAmount: amount.toString(),
+    });
     // Normalise through Prisma.Decimal to avoid passing a JS float at the
     // edge of IEEE-754 precision into a Decimal(10,2) column. The
     // canonical create path in marketing-leads already does this.
     return this.prisma.commission.update({
       where: { id },
-      data: { amount: new Prisma.Decimal(amount).toDecimalPlaces(2) },
+      data: { amount: new Prisma.Decimal(amount).toDecimalPlaces(2), auditLog },
     });
   }
 
-  async markPaid(id: string) {
+  async markPaid(id: string, actorId: string) {
     const commission = await this.prisma.commission.findUnique({ where: { id } });
     if (!commission) throw new NotFoundException('Commission not found');
     if (commission.status !== 'APPROVED') {
       throw new BadRequestException('Only approved commissions can be marked as paid');
     }
 
+    const auditLog = appendAuditEntry(commission.auditLog, {
+      action: 'pay',
+      actorId,
+      prevStatus: commission.status,
+      nextStatus: 'PAID',
+    });
+
     return this.prisma.commission.update({
       where: { id },
-      data: { status: 'PAID', paidAt: new Date() },
+      data: { status: 'PAID', paidAt: new Date(), paidById: actorId, auditLog },
     });
   }
+}
+
+/**
+ * Audit-log helper: append an entry to the JSON array on a
+ * commission, returning a value safe to pass directly to a Prisma
+ * `data: { auditLog: ... }`. Treats null/undefined existing logs as
+ * empty arrays so the first transition still creates valid JSON.
+ */
+type AuditEntry = {
+  action: 'approve' | 'pay' | 'amount';
+  actorId: string;
+  prevStatus?: string;
+  nextStatus?: string;
+  prevAmount?: string;
+  nextAmount?: string;
+};
+
+function appendAuditEntry(existing: unknown, entry: AuditEntry): Prisma.InputJsonValue {
+  const arr = Array.isArray(existing) ? existing : [];
+  return [...arr, { at: new Date().toISOString(), ...entry }] as unknown as Prisma.InputJsonValue;
 }

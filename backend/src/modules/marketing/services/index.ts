@@ -8,3 +8,4 @@ export * from './marketing-reports.service';
 export * from './marketing-users.service';
 export * from './marketing-commissions.service';
 export * from './marketing-notifications.service';
+export * from './marketing-scheduler.service';
