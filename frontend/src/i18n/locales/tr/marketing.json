@@ -25,7 +25,8 @@
     "ADS": "Reklam",
     "WEBSITE": "Web sitesi",
     "PHONE": "Telefon",
-    "OTHER": "Diğer"
+    "OTHER": "Diğer",
+    "AI_RESEARCH": "AI Araştırma"
   },
   "activityType": {
     "CALL": "Telefon",

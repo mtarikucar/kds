@@ -25,7 +25,8 @@
     "ADS": "Ads",
     "WEBSITE": "Website",
     "PHONE": "Phone",
-    "OTHER": "Other"
+    "OTHER": "Other",
+    "AI_RESEARCH": "AI tadqiqot"
   },
   "activityType": {
     "CALL": "Call",

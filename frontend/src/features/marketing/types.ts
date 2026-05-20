@@ -32,6 +32,7 @@ export enum LeadSource {
   WEBSITE = 'WEBSITE',
   PHONE = 'PHONE',
   OTHER = 'OTHER',
+  AI_RESEARCH = 'AI_RESEARCH',
 }
 
 export enum ActivityType {
@@ -220,4 +221,5 @@ export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
   [LeadSource.WEBSITE]: 'Website',
   [LeadSource.PHONE]: 'Phone',
   [LeadSource.OTHER]: 'Other',
+  [LeadSource.AI_RESEARCH]: 'AI Research',
 };
