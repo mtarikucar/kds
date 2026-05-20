@@ -104,9 +104,20 @@ interface Step2Props extends StepCommonProps {
   isLoading: boolean;
   /** Default reservation duration (min) used to compute endTime. */
   defaultDuration: number;
+  /** The chosen reservation date (YYYY-MM-DD). Drives the client-side
+   *  past-time filter — when the user picked today, we still drop any
+   *  slot whose HH:mm is before "now" even if the backend returned it
+   *  as available (defense-in-depth against a stale or misconfigured
+   *  `minAdvanceBooking` setting). */
+  date: string;
 }
 
-export const Step2TimeSlots: React.FC<Step2Props> = ({ slots, isLoading, defaultDuration }) => {
+export const Step2TimeSlots: React.FC<Step2Props> = ({
+  slots,
+  isLoading,
+  defaultDuration,
+  date,
+}) => {
   const { t } = useTranslation('reservations');
   const { watch, setValue } = useFormContext<ReservationFormValues>();
   const selectedTime = watch('startTime') || '';
@@ -114,7 +125,20 @@ export const Step2TimeSlots: React.FC<Step2Props> = ({ slots, isLoading, default
   // Filter out all unavailable slots — past + full + closed. The
   // backend marks them `available: false`; the user explicitly wanted
   // them gone from the UI rather than greyed.
-  const visible = (slots ?? []).filter((s) => s.available);
+  //
+  // Plus an extra past-time guard for today's slots: if the tenant's
+  // `minAdvanceBooking` is 0 or the backend forgot to flip a slot to
+  // unavailable, we still won't show 09:00 at 13:00. The reservation
+  // service applies the same check at create time so a determined POST
+  // can't sneak past either.
+  const visible = (slots ?? []).filter((s) => {
+    if (!s.available) return false;
+    if (!date) return true;
+    const slotDateTime = new Date(date);
+    const [h, m] = s.time.split(':').map(Number);
+    slotDateTime.setHours(h, m, 0, 0);
+    return slotDateTime.getTime() >= Date.now();
+  });
 
   const handleSelect = (time: string) => {
     setValue('startTime', time, { shouldValidate: true });

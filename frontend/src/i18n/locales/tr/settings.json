@@ -547,5 +547,17 @@
     "noInvoices": "Henüz fatura bulunmuyor.",
     "prev": "Önceki",
     "next": "Sonraki"
+  },
+  "emailChannel": {
+    "reservationSection": "E-posta — Rezervasyon olayları",
+    "reservationSectionDesc": "Müşteri e-posta verdiyse onay e-postası gönderilir. E-posta kapalı veya başarısızsa SMS'e geçer.",
+    "reservationCreated": "Oluşturulduğunda",
+    "reservationCreatedDesc": "Rezervasyon alındığında müşteriye e-posta gönder.",
+    "reservationConfirmed": "Onaylandığında",
+    "reservationConfirmedDesc": "Yönetici onayladığında müşteriye e-posta gönder.",
+    "reservationRejected": "Reddedildiğinde",
+    "reservationRejectedDesc": "Yönetici reddettiğinde müşteriye e-posta gönder.",
+    "reservationCancelled": "İptal edildiğinde",
+    "reservationCancelledDesc": "Rezervasyon iptal edildiğinde müşteriye e-posta gönder."
   }
 }

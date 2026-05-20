@@ -547,5 +547,17 @@
     "noInvoices": "Счета не найдены.",
     "prev": "Назад",
     "next": "Далее"
+  },
+  "emailChannel": {
+    "reservationSection": "Email — события брони",
+    "reservationSectionDesc": "Email при наличии адреса, SMS резерв.",
+    "reservationCreated": "При создании",
+    "reservationCreatedDesc": "Email при подаче брони.",
+    "reservationConfirmed": "При подтверждении",
+    "reservationConfirmedDesc": "Email при подтверждении.",
+    "reservationRejected": "При отклонении",
+    "reservationRejectedDesc": "Email при отклонении.",
+    "reservationCancelled": "При отмене",
+    "reservationCancelledDesc": "Email при отмене."
   }
 }

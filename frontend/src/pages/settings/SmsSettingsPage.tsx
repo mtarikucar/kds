@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
-import { MessageSquare, CalendarCheck, ShoppingCart } from 'lucide-react';
+import { MessageSquare, CalendarCheck, ShoppingCart, Mail } from 'lucide-react';
 import { useGetSmsSettings, useUpdateSmsSettings, SmsSettings } from '../../features/sms/smsSettingsApi';
 import { useAutoSave } from '../../hooks/useAutoSave';
 import { SettingsSection, SettingsDivider, SettingsGroup } from '../../components/settings/SettingsSection';
@@ -13,6 +13,10 @@ interface SmsSettingsState {
   smsOnReservationConfirmed: boolean;
   smsOnReservationRejected: boolean;
   smsOnReservationCancelled: boolean;
+  emailOnReservationCreated: boolean;
+  emailOnReservationConfirmed: boolean;
+  emailOnReservationRejected: boolean;
+  emailOnReservationCancelled: boolean;
   smsOnOrderCreated: boolean;
   smsOnOrderApproved: boolean;
   smsOnOrderPreparing: boolean;
@@ -26,6 +30,10 @@ const defaultSettings: SmsSettingsState = {
   smsOnReservationConfirmed: true,
   smsOnReservationRejected: true,
   smsOnReservationCancelled: true,
+  emailOnReservationCreated: true,
+  emailOnReservationConfirmed: true,
+  emailOnReservationRejected: true,
+  emailOnReservationCancelled: true,
   smsOnOrderCreated: true,
   smsOnOrderApproved: true,
   smsOnOrderPreparing: true,
@@ -48,6 +56,10 @@ const SmsSettingsPage = () => {
         smsOnReservationConfirmed: smsSettings.smsOnReservationConfirmed,
         smsOnReservationRejected: smsSettings.smsOnReservationRejected,
         smsOnReservationCancelled: smsSettings.smsOnReservationCancelled,
+        emailOnReservationCreated: smsSettings.emailOnReservationCreated ?? true,
+        emailOnReservationConfirmed: smsSettings.emailOnReservationConfirmed ?? true,
+        emailOnReservationRejected: smsSettings.emailOnReservationRejected ?? true,
+        emailOnReservationCancelled: smsSettings.emailOnReservationCancelled ?? true,
         smsOnOrderCreated: smsSettings.smsOnOrderCreated,
         smsOnOrderApproved: smsSettings.smsOnOrderApproved,
         smsOnOrderPreparing: smsSettings.smsOnOrderPreparing,
@@ -167,6 +179,54 @@ const SmsSettingsPage = () => {
               checked={settings.smsOnReservationCancelled}
               onChange={(checked) => handleToggleChange('smsOnReservationCancelled', checked)}
               disabled={!settings.isEnabled}
+            />
+          </SettingsGroup>
+        </SettingsSection>
+
+        {/* Reservation Email — channel-aware notification service
+            prefers email when the customer supplied one and the
+            matching toggle here is on. SMS section above still
+            governs the phone-only fallback path. */}
+        <SettingsSection
+          title={t('emailChannel.reservationSection')}
+          description={t('emailChannel.reservationSectionDesc')}
+          icon={<Mail className="w-4 h-4" />}
+          saveStatus={saveStatus}
+          onRetry={retrySave}
+        >
+          <SettingsGroup>
+            <SettingsToggle
+              label={t('emailChannel.reservationCreated')}
+              description={t('emailChannel.reservationCreatedDesc')}
+              checked={settings.emailOnReservationCreated}
+              onChange={(checked) => handleToggleChange('emailOnReservationCreated', checked)}
+            />
+
+            <SettingsDivider />
+
+            <SettingsToggle
+              label={t('emailChannel.reservationConfirmed')}
+              description={t('emailChannel.reservationConfirmedDesc')}
+              checked={settings.emailOnReservationConfirmed}
+              onChange={(checked) => handleToggleChange('emailOnReservationConfirmed', checked)}
+            />
+
+            <SettingsDivider />
+
+            <SettingsToggle
+              label={t('emailChannel.reservationRejected')}
+              description={t('emailChannel.reservationRejectedDesc')}
+              checked={settings.emailOnReservationRejected}
+              onChange={(checked) => handleToggleChange('emailOnReservationRejected', checked)}
+            />
+
+            <SettingsDivider />
+
+            <SettingsToggle
+              label={t('emailChannel.reservationCancelled')}
+              description={t('emailChannel.reservationCancelledDesc')}
+              checked={settings.emailOnReservationCancelled}
+              onChange={(checked) => handleToggleChange('emailOnReservationCancelled', checked)}
             />
           </SettingsGroup>
         </SettingsSection>

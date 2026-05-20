@@ -547,5 +547,17 @@
     "noInvoices": "لا توجد فواتير.",
     "prev": "السابق",
     "next": "التالي"
+  },
+  "emailChannel": {
+    "reservationSection": "البريد الإلكتروني — أحداث الحجز",
+    "reservationSectionDesc": "بريد إلكتروني إذا توفر، وإلا SMS.",
+    "reservationCreated": "عند الإنشاء",
+    "reservationCreatedDesc": "بريد عند تقديم الحجز.",
+    "reservationConfirmed": "عند التأكيد",
+    "reservationConfirmedDesc": "بريد عند التأكيد.",
+    "reservationRejected": "عند الرفض",
+    "reservationRejectedDesc": "بريد عند الرفض.",
+    "reservationCancelled": "عند الإلغاء",
+    "reservationCancelledDesc": "بريد عند الإلغاء."
   }
 }

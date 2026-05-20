@@ -9,6 +9,16 @@ export interface SmsSettings {
   smsOnReservationConfirmed: boolean;
   smsOnReservationRejected: boolean;
   smsOnReservationCancelled: boolean;
+  // Per-event email channel toggles. The channel-aware reservation
+  // notification service prefers email when the customer left one
+  // AND the matching emailOn* toggle is on; falls back to SMS
+  // otherwise. Lives on SmsSettings (rather than a new table)
+  // because the surface is small and admin sees both channels
+  // in one place.
+  emailOnReservationCreated: boolean;
+  emailOnReservationConfirmed: boolean;
+  emailOnReservationRejected: boolean;
+  emailOnReservationCancelled: boolean;
   smsOnOrderCreated: boolean;
   smsOnOrderApproved: boolean;
   smsOnOrderPreparing: boolean;
@@ -22,6 +32,10 @@ export interface UpdateSmsSettingsDto {
   smsOnReservationConfirmed?: boolean;
   smsOnReservationRejected?: boolean;
   smsOnReservationCancelled?: boolean;
+  emailOnReservationCreated?: boolean;
+  emailOnReservationConfirmed?: boolean;
+  emailOnReservationRejected?: boolean;
+  emailOnReservationCancelled?: boolean;
   smsOnOrderCreated?: boolean;
   smsOnOrderApproved?: boolean;
   smsOnOrderPreparing?: boolean;

@@ -250,6 +250,7 @@ const PublicReservationContainer: React.FC = () => {
                 slots={slots}
                 isLoading={slotsLoading}
                 defaultDuration={settings.defaultDuration ?? 60}
+                date={date}
               />
             )}
             {step === 3 && <Step3Table tables={tables} isLoading={tablesLoading} />}
@@ -275,6 +276,7 @@ const PublicReservationContainer: React.FC = () => {
               </button>
               {step < 5 ? (
                 <button
+                  key="wizard-next"
                   type="button"
                   onClick={handleNext}
                   className="inline-flex items-center gap-1.5 h-12 px-6 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition"
@@ -283,7 +285,13 @@ const PublicReservationContainer: React.FC = () => {
                   <ChevronRight className="h-4 w-4" />
                 </button>
               ) : (
+                // Distinct key so React doesn't reuse the Next button's
+                // DOM node. If the same <button> element is recycled,
+                // an in-flight click event can bubble to the form
+                // AFTER the type attribute has been mutated to
+                // "submit", triggering an unintended form submission.
                 <button
+                  key="wizard-submit"
                   type="submit"
                   disabled={createReservation.isPending}
                   className="inline-flex items-center gap-1.5 h-12 px-6 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition disabled:opacity-60"

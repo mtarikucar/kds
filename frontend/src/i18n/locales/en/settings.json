@@ -547,5 +547,17 @@
     "noInvoices": "No invoices found.",
     "prev": "Previous",
     "next": "Next"
+  },
+  "emailChannel": {
+    "reservationSection": "Email — Reservation events",
+    "reservationSectionDesc": "Send confirmation by email when the customer leaves an email address. SMS fallback applies when email is off or fails.",
+    "reservationCreated": "On created",
+    "reservationCreatedDesc": "Email customer when a reservation is submitted.",
+    "reservationConfirmed": "On confirmed",
+    "reservationConfirmedDesc": "Email customer when admin confirms.",
+    "reservationRejected": "On rejected",
+    "reservationRejectedDesc": "Email customer when admin rejects.",
+    "reservationCancelled": "On cancelled",
+    "reservationCancelledDesc": "Email customer when the reservation is cancelled."
   }
 }

@@ -547,5 +547,17 @@
     "noInvoices": "Hisob-fakturalar topilmadi.",
     "prev": "Oldingi",
     "next": "Keyingi"
+  },
+  "emailChannel": {
+    "reservationSection": "Email — Bron hodisalari",
+    "reservationSectionDesc": "Email mavjud bo‘lsa email, aks holda SMS.",
+    "reservationCreated": "Yaratilganda",
+    "reservationCreatedDesc": "Bron qabul qilinganda email yuborish.",
+    "reservationConfirmed": "Tasdiqlanganda",
+    "reservationConfirmedDesc": "Tasdiqlanganda email yuborish.",
+    "reservationRejected": "Rad etilganda",
+    "reservationRejectedDesc": "Rad etilganda email yuborish.",
+    "reservationCancelled": "Bekor qilinganda",
+    "reservationCancelledDesc": "Bekor qilinganda email yuborish."
   }
 }

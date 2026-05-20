@@ -102,12 +102,22 @@ export class ReservationsService {
       }
     }
 
-    // Validate minAdvanceBooking (same day check)
+    // Validate slot time against now. The earlier `reservationDate <
+    // today` check rejects past *dates* but a today-with-past-time
+    // slot (e.g. 09:00 booked at 13:00) slips past it — so this is a
+    // separate, always-on check. The minAdvanceBooking buffer below
+    // is layered on top.
+    const [startHour, startMinute] = dto.startTime.split(':').map(Number);
+    const slotDateTime = new Date(dto.date);
+    slotDateTime.setHours(startHour, startMinute, 0, 0);
+    if (slotDateTime.getTime() < now.getTime()) {
+      throw new BadRequestException('Reservation time is in the past');
+    }
+
+    // Validate minAdvanceBooking (additional buffer beyond "not past").
+    // Guarded by truthy because 0 means "no buffer required" — the
+    // past-time check above already covers the floor.
     if (settings.minAdvanceBooking) {
-      const now = new Date();
-      const [h, m] = dto.startTime.split(':').map(Number);
-      const slotDateTime = new Date(dto.date);
-      slotDateTime.setHours(h, m, 0, 0);
       if (slotDateTime.getTime() - now.getTime() < settings.minAdvanceBooking * 60 * 1000) {
         throw new BadRequestException('Reservation time is too soon. Please book further in advance.');
       }
