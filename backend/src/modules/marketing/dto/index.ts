@@ -17,3 +17,4 @@ export * from './change-password.dto';
 export * from './update-profile.dto';
 export * from './update-lead-status.dto';
 export * from './assign-lead.dto';
+export * from './ingest-leads.dto';

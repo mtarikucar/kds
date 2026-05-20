@@ -62,9 +62,34 @@ async function main() {
     },
   });
 
+  // Sentinel user for the AI research ingest routine. Never logs in;
+  // password is randomised every seed run so a leaked seed file can't
+  // be used to authenticate.
+  const aiResearchPassword = await bcrypt.hash(
+    require('crypto').randomBytes(48).toString('hex'),
+    12,
+  );
+  await prisma.marketingUser.upsert({
+    where: { email: 'ai-research@system.local' },
+    update: {
+      status: 'ACTIVE',
+      failedLogins: 0,
+      lockedUntil: null,
+    },
+    create: {
+      email: 'ai-research@system.local',
+      password: aiResearchPassword,
+      firstName: 'AI',
+      lastName: 'Research',
+      role: 'SALES_MANAGER',
+      status: 'ACTIVE',
+    },
+  });
+
   console.log('✅ platform users upserted');
   console.log(`  superadmin@e2e.local  /  ${E2E_PLATFORM_PASSWORD}  /  TOTP secret: ${E2E_SUPERADMIN_TOTP_SECRET}`);
   console.log(`  marketing@e2e.local   /  ${E2E_PLATFORM_PASSWORD}`);
+  console.log(`  ai-research@system.local  /  (random — sentinel for ingest routine; no login)`);
 }
 
 main()

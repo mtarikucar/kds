@@ -27,6 +27,7 @@ export enum LeadSource {
   WEBSITE = 'WEBSITE',
   PHONE = 'PHONE',
   OTHER = 'OTHER',
+  AI_RESEARCH = 'AI_RESEARCH',
 }
 
 export enum LeadPriority {
