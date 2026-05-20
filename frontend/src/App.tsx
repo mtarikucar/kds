@@ -32,6 +32,7 @@ const MarketingReportsPage = lazy(() => import('./pages/marketing/ReportsPage'))
 const CommissionsPage = lazy(() => import('./pages/marketing/CommissionsPage'));
 const MarketingUsersPage = lazy(() => import('./pages/marketing/MarketingUsersPage'));
 import { MarketingLayout, MarketingProtectedRoute } from './features/marketing/components';
+import { MarketingRole } from './features/marketing/types';
 import ProfilePage from './pages/profile/ProfilePage';
 import FAQPage from './pages/help/FAQPage';
 import CustomersPage from './pages/customers/CustomersPage';
@@ -251,7 +252,14 @@ function App() {
           <Route path="/marketing/offers" element={<OffersPage />} />
           <Route path="/marketing/reports" element={<MarketingReportsPage />} />
           <Route path="/marketing/commissions" element={<CommissionsPage />} />
-          <Route path="/marketing/users" element={<MarketingUsersPage />} />
+        </Route>
+        {/* Manager-only sub-tree. Bare-URL navigation by a SALES_REP
+            redirects to the dashboard rather than rendering the page
+            and waiting for the backend 403. */}
+        <Route element={<MarketingProtectedRoute requiredRole={MarketingRole.SALES_MANAGER} />}>
+          <Route element={<MarketingLayout />}>
+            <Route path="/marketing/users" element={<MarketingUsersPage />} />
+          </Route>
         </Route>
       </Route>
     </Routes>

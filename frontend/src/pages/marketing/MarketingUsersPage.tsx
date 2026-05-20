@@ -134,7 +134,7 @@ export default function MarketingUsersPage() {
         <h1 className="text-2xl font-bold text-gray-900">Sales Team</h1>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700"
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90"
         >
           <PlusIcon className="w-4 h-4" />
           Add Member
@@ -199,7 +199,7 @@ export default function MarketingUsersPage() {
             <button
               onClick={() => createMutation.mutate(form)}
               disabled={!form.email || !form.password || !form.firstName || !form.lastName || createMutation.isPending}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+              className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
             >
               {createMutation.isPending ? 'Creating...' : 'Create'}
             </button>
@@ -277,7 +277,7 @@ export default function MarketingUsersPage() {
                               <button
                                 onClick={() => editMutation.mutate({ id: u.id, data: editForm })}
                                 disabled={!editForm.firstName || !editForm.lastName || editMutation.isPending}
-                                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                                className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
                               >
                                 {editMutation.isPending ? 'Saving...' : 'Save'}
                               </button>
@@ -308,7 +308,7 @@ export default function MarketingUsersPage() {
                             <button
                               onClick={() => resetPasswordMutation.mutate({ id: u.id, password: newPassword })}
                               disabled={!newPassword || resetPasswordMutation.isPending}
-                              className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-medium hover:bg-indigo-700 disabled:opacity-50"
+                              className="px-3 py-1.5 bg-primary text-white rounded-lg text-xs font-medium hover:bg-primary/90 disabled:opacity-50"
                             >
                               {resetPasswordMutation.isPending ? 'Resetting...' : 'Confirm'}
                             </button>
@@ -350,14 +350,14 @@ export default function MarketingUsersPage() {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => startEditing(u)}
-                              className="text-gray-400 hover:text-indigo-600"
+                              className="text-gray-400 hover:text-primary"
                               title="Edit user"
                             >
                               <PencilIcon className="w-4 h-4" />
                             </button>
                             <button
                               onClick={() => startResetPassword(u.id)}
-                              className="text-gray-400 hover:text-indigo-600"
+                              className="text-gray-400 hover:text-primary"
                               title="Reset password"
                             >
                               <KeyIcon className="w-4 h-4" />

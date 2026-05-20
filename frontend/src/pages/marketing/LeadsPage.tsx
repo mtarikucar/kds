@@ -47,7 +47,7 @@ export default function LeadsPage() {
         <h1 className="text-2xl font-bold text-gray-900">Leads</h1>
         <Link
           to="/marketing/leads/new"
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
         >
           <PlusIcon className="w-4 h-4" />
           New Lead
@@ -64,13 +64,13 @@ export default function LeadsPage() {
               placeholder="Search leads..."
               value={search}
               onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none"
             />
           </div>
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm ${
-              showFilters ? 'border-indigo-300 bg-indigo-50 text-indigo-700' : 'border-gray-300 text-gray-600'
+              showFilters ? 'border-primary/40 bg-primary/10 text-primary' : 'border-gray-300 text-gray-600'
             }`}
           >
             <FunnelIcon className="w-4 h-4" />
@@ -148,7 +148,7 @@ export default function LeadsPage() {
                     <td className="px-4 py-3">
                       <Link
                         to={`/marketing/leads/${lead.id}`}
-                        className="font-medium text-indigo-600 hover:text-indigo-800"
+                        className="font-medium text-primary hover:text-primary/80"
                       >
                         {lead.businessName}
                       </Link>

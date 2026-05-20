@@ -43,7 +43,7 @@ export default function ReportsPage() {
             key={t}
             onClick={() => setTab(t as any)}
             className={`px-4 py-2 rounded-lg text-sm font-medium capitalize ${
-              tab === t ? 'bg-indigo-100 text-indigo-700' : 'text-gray-600 hover:bg-gray-100'
+              tab === t ? 'bg-primary/15 text-primary' : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
             {t === 'sources' ? 'Lead Sources' : t}
@@ -74,7 +74,7 @@ export default function ReportsPage() {
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
                       <div className="w-16 h-2 bg-gray-200 rounded-full">
-                        <div className="h-2 bg-indigo-500 rounded-full" style={{ width: `${Math.min(s.conversionRate, 100)}%` }} />
+                        <div className="h-2 bg-primary/100 rounded-full" style={{ width: `${Math.min(s.conversionRate, 100)}%` }} />
                       </div>
                       <span className="text-xs">{s.conversionRate}%</span>
                     </div>
@@ -129,7 +129,7 @@ export default function ReportsPage() {
                   <div className="flex-1">
                     <div className="h-8 bg-gray-100 rounded-lg overflow-hidden">
                       <div
-                        className="h-full bg-indigo-500 rounded-lg flex items-center px-3"
+                        className="h-full bg-primary/100 rounded-lg flex items-center px-3"
                         style={{ width: `${Math.max(widthPercent, 2)}%` }}
                       >
                         <span className="text-xs text-white font-medium">{item.count}</span>

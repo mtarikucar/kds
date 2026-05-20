@@ -7,7 +7,7 @@ interface StatsCardProps {
 }
 
 const colorMap = {
-  indigo: 'bg-indigo-50 text-indigo-600',
+  indigo: 'bg-primary/10 text-primary',
   green: 'bg-green-50 text-green-600',
   red: 'bg-red-50 text-red-600',
   yellow: 'bg-yellow-50 text-yellow-600',

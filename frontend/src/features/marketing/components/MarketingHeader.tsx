@@ -209,7 +209,7 @@ export default function MarketingHeader() {
               }}
               className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-gray-100 transition-colors"
             >
-              <div className="h-8 w-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-semibold">
+              <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-semibold">
                 {userInitials}
               </div>
               <span className="text-sm font-medium text-gray-700 hidden sm:block">
@@ -277,7 +277,7 @@ export default function MarketingHeader() {
                   type="password"
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                   placeholder="Enter current password"
                 />
               </div>
@@ -289,7 +289,7 @@ export default function MarketingHeader() {
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                   placeholder="Enter new password"
                 />
               </div>
@@ -308,7 +308,7 @@ export default function MarketingHeader() {
                 <button
                   type="submit"
                   disabled={changePasswordMutation.isPending}
-                  className="px-4 py-2 text-sm text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                  className="px-4 py-2 text-sm text-white bg-primary rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
                 >
                   {changePasswordMutation.isPending ? 'Saving...' : 'Change Password'}
                 </button>

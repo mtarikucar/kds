@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useMarketingAuthStore } from '../../store/marketingAuthStore';
 import marketingApi from '../../features/marketing/api/marketingApi';
 
 export default function MarketingLoginPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation('marketing');
   const { login, isAuthenticated } = useMarketingAuthStore();
 
   if (isAuthenticated) {
@@ -25,23 +27,23 @@ export default function MarketingLoginPage() {
       login(data.user, data.accessToken, data.refreshToken);
       navigate('/marketing/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.message || err.message || 'Login failed. Please check your connection.');
+      setError(err.response?.data?.message || err.message || t('login.wrongCreds'));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-blue-100 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gradient-to-br from-primary/5 to-primary/10 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl shadow-xl p-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="w-14 h-14 bg-indigo-600 rounded-xl flex items-center justify-center mx-auto mb-4">
-              <span className="text-white font-bold text-xl">M</span>
+            <div className="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mx-auto mb-4">
+              <span className="text-primary-foreground font-bold text-xl">M</span>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900">Marketing Panel</h1>
-            <p className="text-sm text-gray-500 mt-1">Sign in to manage your leads</p>
+            <h1 className="text-2xl font-bold text-slate-900">{t('login.title')}</h1>
+            <p className="text-sm text-slate-500 mt-1">{t('login.subtitle')}</p>
           </div>
 
           {/* Error */}
@@ -54,39 +56,39 @@ export default function MarketingLoginPage() {
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                {t('login.emailLabel')}
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
                 placeholder="you@company.com"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                {t('login.passwordLabel')}
               </label>
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                placeholder="Enter your password"
+                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none"
+                placeholder="••••••••"
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="w-full py-2.5 bg-primary text-primary-foreground rounded-lg font-medium hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading ? t('login.loading') : t('login.submit')}
             </button>
           </form>
         </div>

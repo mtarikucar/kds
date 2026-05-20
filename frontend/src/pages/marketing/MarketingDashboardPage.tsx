@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import {
   UserGroupIcon,
   StarIcon,
@@ -9,11 +10,13 @@ import {
 } from '@heroicons/react/24/outline';
 import marketingApi from '../../features/marketing/api/marketingApi';
 import { StatsCard } from '../../features/marketing/components';
-import { LeadStatus, LEAD_STATUS_LABELS, LEAD_STATUS_COLORS } from '../../features/marketing/types';
+import { LeadStatus } from '../../features/marketing/types';
+import { LEAD_STATUS_BADGE } from '../../features/marketing/constants';
 import { useMarketingAuthStore } from '../../store/marketingAuthStore';
 
 export default function MarketingDashboardPage() {
   const { user } = useMarketingAuthStore();
+  const { t } = useTranslation('marketing');
   const isManager = user?.role === 'SALES_MANAGER';
 
   const { data: stats } = useQuery({
@@ -44,30 +47,33 @@ export default function MarketingDashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+      <div>
+        <h1 className="text-2xl font-bold text-slate-900">{t('dashboard.title')}</h1>
+        <p className="text-sm text-slate-500">{t('dashboard.subtitle')}</p>
+      </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard
-          title="Total Leads"
+          title={t('dashboard.totalLeads')}
           value={stats?.totalLeads ?? 0}
           icon={<UserGroupIcon className="w-6 h-6" />}
           color="blue"
         />
         <StatsCard
-          title="Won Deals"
+          title={t('leadStatus.WON')}
           value={stats?.wonLeads ?? 0}
           icon={<StarIcon className="w-6 h-6" />}
           color="green"
         />
         <StatsCard
-          title="Lost Deals"
+          title={t('leadStatus.LOST')}
           value={stats?.lostLeads ?? 0}
           icon={<XCircleIcon className="w-6 h-6" />}
           color="red"
         />
         <StatsCard
-          title="Conversion Rate"
+          title={t('dashboard.conversionRate')}
           value={`${stats?.conversionRate ?? 0}%`}
           icon={<ArrowTrendingUpIcon className="w-6 h-6" />}
           color="indigo"
@@ -76,19 +82,15 @@ export default function MarketingDashboardPage() {
 
       {/* Second row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <StatsCard title={t('leadStatus.NEW')} value={stats?.newLeads ?? 0} color="blue" />
         <StatsCard
-          title="New Leads"
-          value={stats?.newLeads ?? 0}
-          color="blue"
-        />
-        <StatsCard
-          title="Active Offers"
+          title={t('dashboard.openOffers')}
           value={stats?.activeOffers ?? 0}
           icon={<DocumentTextIcon className="w-6 h-6" />}
           color="yellow"
         />
         <StatsCard
-          title="Pending Tasks"
+          title={t('dashboard.pendingTasks')}
           value={stats?.pendingTasks ?? 0}
           icon={<ClipboardDocumentListIcon className="w-6 h-6" />}
           color="purple"
@@ -97,44 +99,44 @@ export default function MarketingDashboardPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Today's Summary */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Today's Summary</h2>
+        <div className="bg-white rounded-xl border border-slate-200 p-6">
+          <h2 className="text-lg font-semibold text-slate-900 mb-4">{t('dashboard.today')}</h2>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Tasks Today</span>
+              <span className="text-sm text-slate-600">{t('tasks.tabs.today')}</span>
               <span className="font-medium">{today?.todayTasks ?? 0}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Completed</span>
-              <span className="font-medium text-green-600">{today?.completedTasks ?? 0}</span>
+              <span className="text-sm text-slate-600">{t('taskStatus.COMPLETED')}</span>
+              <span className="font-medium text-emerald-600">{today?.completedTasks ?? 0}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Activities</span>
+              <span className="text-sm text-slate-600">{t('leadDetail.tabs.activities')}</span>
               <span className="font-medium">{today?.todayActivities ?? 0}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Overdue Tasks</span>
+              <span className="text-sm text-slate-600">{t('tasks.tabs.overdue')}</span>
               <span className="font-medium text-red-600">{today?.overdueTasks ?? 0}</span>
             </div>
           </div>
         </div>
 
         {/* Monthly Metrics */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">
-            Monthly Metrics ({monthly?.month})
+        <div className="bg-white rounded-xl border border-slate-200 p-6">
+          <h2 className="text-lg font-semibold text-slate-900 mb-4">
+            {t('dashboard.thisMonth')} ({monthly?.month})
           </h2>
           <div className="space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">New Leads</span>
+              <span className="text-sm text-slate-600">{t('leadStatus.NEW')}</span>
               <span className="font-medium">{monthly?.newLeads ?? 0}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Won Deals</span>
-              <span className="font-medium text-green-600">{monthly?.wonLeads ?? 0}</span>
+              <span className="text-sm text-slate-600">{t('leadStatus.WON')}</span>
+              <span className="font-medium text-emerald-600">{monthly?.wonLeads ?? 0}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Total Activities</span>
+              <span className="text-sm text-slate-600">{t('leadDetail.tabs.activities')}</span>
               <span className="font-medium">{monthly?.activitiesCount ?? 0}</span>
             </div>
           </div>
@@ -142,22 +144,19 @@ export default function MarketingDashboardPage() {
       </div>
 
       {/* Leads by Status */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Leads by Status</h2>
+      <div className="bg-white rounded-xl border border-slate-200 p-6">
+        <h2 className="text-lg font-semibold text-slate-900 mb-4">{t('dashboard.byStatus')}</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {leadsByStatus?.map((item: { status: string; count: number }) => (
-            <div
-              key={item.status}
-              className="text-center p-3 rounded-lg bg-gray-50"
-            >
+            <div key={item.status} className="text-center p-3 rounded-lg bg-slate-50">
               <span
                 className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium mb-2 ${
-                  LEAD_STATUS_COLORS[item.status as LeadStatus] || 'bg-gray-100 text-gray-800'
+                  LEAD_STATUS_BADGE[item.status as LeadStatus] || 'bg-slate-100 text-slate-800'
                 }`}
               >
-                {LEAD_STATUS_LABELS[item.status as LeadStatus] || item.status}
+                {t(`leadStatus.${item.status}`, { defaultValue: item.status })}
               </span>
-              <p className="text-xl font-bold text-gray-900">{item.count}</p>
+              <p className="text-xl font-bold text-slate-900">{item.count}</p>
             </div>
           ))}
         </div>
@@ -165,25 +164,25 @@ export default function MarketingDashboardPage() {
 
       {/* Top Performers (Manager only) */}
       {isManager && topPerformers && topPerformers.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Top Performers (This Month)</h2>
+        <div className="bg-white rounded-xl border border-slate-200 p-6">
+          <h2 className="text-lg font-semibold text-slate-900 mb-4">{t('dashboard.topPerformers')}</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="text-left text-gray-500 border-b">
-                  <th className="pb-2 font-medium">Name</th>
-                  <th className="pb-2 font-medium">Total Leads</th>
-                  <th className="pb-2 font-medium">Activities</th>
-                  <th className="pb-2 font-medium">Won This Month</th>
+                <tr className="text-left text-slate-500 border-b border-slate-200">
+                  <th className="pb-2 font-medium">{t('users.table.name')}</th>
+                  <th className="pb-2 font-medium">{t('dashboard.totalLeads')}</th>
+                  <th className="pb-2 font-medium">{t('leadDetail.tabs.activities')}</th>
+                  <th className="pb-2 font-medium">{t('leadStatus.WON')}</th>
                 </tr>
               </thead>
               <tbody>
-                {topPerformers.map((rep: any) => (
-                  <tr key={rep.id} className="border-b last:border-0">
-                    <td className="py-2 font-medium text-gray-900">{rep.name}</td>
+                {topPerformers.map((rep: { id: string; name: string; totalLeads: number; totalActivities: number; wonThisMonth: number }) => (
+                  <tr key={rep.id} className="border-b border-slate-100 last:border-0">
+                    <td className="py-2 font-medium text-slate-900">{rep.name}</td>
                     <td className="py-2">{rep.totalLeads}</td>
                     <td className="py-2">{rep.totalActivities}</td>
-                    <td className="py-2 font-medium text-green-600">{rep.wonThisMonth}</td>
+                    <td className="py-2 font-medium text-emerald-600">{rep.wonThisMonth}</td>
                   </tr>
                 ))}
               </tbody>

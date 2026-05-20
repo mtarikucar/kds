@@ -261,7 +261,7 @@ export default function OffersPage() {
         <h1 className="text-2xl font-bold text-gray-900">Offers</h1>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
         >
           <PlusIcon className="w-4 h-4" />
           New Offer
@@ -277,7 +277,7 @@ export default function OffersPage() {
             <button
               onClick={handleCreate}
               disabled={!form.leadId || createMutation.isPending}
-              className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+              className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
             >
               {createMutation.isPending ? 'Creating...' : 'Create'}
             </button>
@@ -316,7 +316,7 @@ export default function OffersPage() {
             onClick={() => setShowFilters(!showFilters)}
             className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm ${
               showFilters
-                ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
+                ? 'border-primary/40 bg-primary/10 text-primary'
                 : 'border-gray-300 text-gray-600'
             }`}
           >
@@ -331,7 +331,7 @@ export default function OffersPage() {
                 setDateTo('');
                 setPage(1);
               }}
-              className="text-xs text-indigo-600 hover:underline"
+              className="text-xs text-primary hover:underline"
             >
               Clear filters
             </button>
@@ -402,12 +402,12 @@ export default function OffersPage() {
                 offers.map((offer) =>
                   editingId === offer.id ? (
                     // Inline edit row
-                    <tr key={offer.id} className="bg-indigo-50/40">
+                    <tr key={offer.id} className="bg-primary/10/40">
                       <td colSpan={9} className="px-4 py-4">
                         <div className="space-y-3">
                           <p className="text-xs font-medium text-gray-500">
                             Editing offer for{' '}
-                            <span className="text-indigo-600">
+                            <span className="text-primary">
                               {offer.lead?.businessName || 'Unknown'}
                             </span>
                           </p>
@@ -416,7 +416,7 @@ export default function OffersPage() {
                             <button
                               onClick={handleUpdate}
                               disabled={updateMutation.isPending}
-                              className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                              className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
                             >
                               {updateMutation.isPending ? 'Saving...' : 'Save'}
                             </button>
@@ -437,7 +437,7 @@ export default function OffersPage() {
                         {offer.lead ? (
                           <Link
                             to={`/marketing/leads/${offer.lead.id}`}
-                            className="font-medium text-indigo-600 hover:text-indigo-800"
+                            className="font-medium text-primary hover:text-primary/80"
                           >
                             {offer.lead.businessName}
                           </Link>

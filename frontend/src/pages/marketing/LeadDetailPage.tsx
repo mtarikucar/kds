@@ -294,7 +294,7 @@ export default function LeadDetailPage() {
               {lead.phone && (
                 <div className="flex items-center gap-2">
                   <PhoneIcon className="w-4 h-4 text-gray-400" />
-                  <a href={`tel:${lead.phone}`} className="text-indigo-600 hover:underline">{lead.phone}</a>
+                  <a href={`tel:${lead.phone}`} className="text-primary hover:underline">{lead.phone}</a>
                 </div>
               )}
               {lead.whatsapp && (
@@ -306,7 +306,7 @@ export default function LeadDetailPage() {
               {lead.email && (
                 <div className="flex items-center gap-2">
                   <EnvelopeIcon className="w-4 h-4 text-gray-400" />
-                  <a href={`mailto:${lead.email}`} className="text-indigo-600 hover:underline">{lead.email}</a>
+                  <a href={`mailto:${lead.email}`} className="text-primary hover:underline">{lead.email}</a>
                 </div>
               )}
               {(lead.city || lead.address) && (
@@ -350,7 +350,7 @@ export default function LeadDetailPage() {
                 <button
                   onClick={() => assignUserId && assignMutation.mutate(assignUserId)}
                   disabled={!assignUserId || assignMutation.isPending}
-                  className="px-3 py-2 bg-indigo-600 text-white rounded-lg text-sm disabled:opacity-50"
+                  className="px-3 py-2 bg-primary text-white rounded-lg text-sm disabled:opacity-50"
                 >
                   Assign
                 </button>
@@ -373,7 +373,7 @@ export default function LeadDetailPage() {
                     onClick={() => statusMutation.mutate(s)}
                     disabled={lead.status === s || statusMutation.isPending}
                     className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-                      lead.status === s ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                      lead.status === s ? 'bg-primary/15 border-primary/40 text-primary' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                     } disabled:opacity-50`}
                   >
                     {LEAD_STATUS_LABELS[s]}
@@ -412,7 +412,7 @@ export default function LeadDetailPage() {
             <div className="bg-white rounded-xl border border-gray-200 p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">Activity Timeline</h3>
-                <button onClick={() => setShowActivityForm(!showActivityForm)} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ Add Activity</button>
+                <button onClick={() => setShowActivityForm(!showActivityForm)} className="text-sm text-primary hover:text-primary/80 font-medium">+ Add Activity</button>
               </div>
               {showActivityForm && (
                 <div className="mb-6 p-4 bg-gray-50 rounded-lg space-y-3">
@@ -424,7 +424,7 @@ export default function LeadDetailPage() {
                   </div>
                   <textarea placeholder="Description (optional)" value={activityDesc} onChange={(e) => setActivityDesc(e.target.value)} rows={2} className="w-full px-3 py-2 border rounded-lg text-sm" />
                   <div className="flex gap-2">
-                    <button onClick={() => activityMutation.mutate({ type: activityType, title: activityTitle, description: activityDesc || undefined })} disabled={!activityTitle || activityMutation.isPending} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50">
+                    <button onClick={() => activityMutation.mutate({ type: activityType, title: activityTitle, description: activityDesc || undefined })} disabled={!activityTitle || activityMutation.isPending} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50">
                       {activityMutation.isPending ? 'Saving...' : 'Save'}
                     </button>
                     <button onClick={() => setShowActivityForm(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-sm">Cancel</button>
@@ -441,7 +441,7 @@ export default function LeadDetailPage() {
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">Offers</h3>
                 {!lead.convertedTenantId && (
-                  <button onClick={() => setShowOfferForm(!showOfferForm)} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ New Offer</button>
+                  <button onClick={() => setShowOfferForm(!showOfferForm)} className="text-sm text-primary hover:text-primary/80 font-medium">+ New Offer</button>
                 )}
               </div>
 
@@ -477,7 +477,7 @@ export default function LeadDetailPage() {
                         ...(offerNotes ? { notes: offerNotes } : {}),
                       })}
                       disabled={createOfferMutation.isPending}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                      className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
                     >
                       {createOfferMutation.isPending ? 'Creating...' : 'Create Offer'}
                     </button>
@@ -525,7 +525,7 @@ export default function LeadDetailPage() {
             <div className="bg-white rounded-xl border border-gray-200 p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">Tasks</h3>
-                <button onClick={() => setShowTaskForm(!showTaskForm)} className="text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ New Task</button>
+                <button onClick={() => setShowTaskForm(!showTaskForm)} className="text-sm text-primary hover:text-primary/80 font-medium">+ New Task</button>
               </div>
 
               {showTaskForm && (
@@ -557,7 +557,7 @@ export default function LeadDetailPage() {
                         ...(taskDesc ? { description: taskDesc } : {}),
                       })}
                       disabled={!taskTitle || !taskDueDate || createTaskMutation.isPending}
-                      className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50"
+                      className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
                     >
                       {createTaskMutation.isPending ? 'Creating...' : 'Create Task'}
                     </button>

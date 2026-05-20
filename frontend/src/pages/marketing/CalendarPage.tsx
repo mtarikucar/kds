@@ -182,20 +182,20 @@ export default function CalendarPage() {
               <div
                 key={idx}
                 onClick={() => openDayModal(dateKey)}
-                className={`min-h-[80px] p-1 border-b border-r cursor-pointer transition-colors hover:bg-indigo-50/50 ${
+                className={`min-h-[80px] p-1 border-b border-r cursor-pointer transition-colors hover:bg-primary/10/50 ${
                   !isCurrentMonth ? 'bg-gray-50' : ''
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
                   <p
                     className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full ${
-                      isToday(date) ? 'bg-indigo-600 text-white' : isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
+                      isToday(date) ? 'bg-primary text-white' : isCurrentMonth ? 'text-gray-900' : 'text-gray-400'
                     }`}
                   >
                     {date.getDate()}
                   </p>
                   {taskCount > 0 && (
-                    <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-indigo-600 text-white text-[10px] font-semibold px-1">
+                    <span className="min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-primary text-white text-[10px] font-semibold px-1">
                       {taskCount}
                     </span>
                   )}
@@ -207,7 +207,7 @@ export default function CalendarPage() {
                       className={`text-xs px-1 py-0.5 rounded truncate ${
                         task.status === 'COMPLETED'
                           ? 'bg-green-100 text-green-700 line-through'
-                          : 'bg-indigo-100 text-indigo-700'
+                          : 'bg-primary/15 text-primary'
                       }`}
                       title={task.title}
                     >
@@ -281,7 +281,7 @@ export default function CalendarPage() {
             {/* Create task form */}
             <form onSubmit={handleSubmit} className="p-4 space-y-3">
               <div className="flex items-center gap-2">
-                <PlusIcon className="w-4 h-4 text-indigo-600" />
+                <PlusIcon className="w-4 h-4 text-primary" />
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Create Task</p>
               </div>
 
@@ -290,7 +290,7 @@ export default function CalendarPage() {
                 placeholder="Task title"
                 value={form.title}
                 onChange={(e) => setForm({ ...form, title: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none"
                 autoFocus
               />
 
@@ -300,7 +300,7 @@ export default function CalendarPage() {
                   <select
                     value={form.type}
                     onChange={(e) => setForm({ ...form, type: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none"
                   >
                     <option value="CALL">Call</option>
                     <option value="VISIT">Visit</option>
@@ -315,7 +315,7 @@ export default function CalendarPage() {
                   <select
                     value={form.priority}
                     onChange={(e) => setForm({ ...form, priority: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none"
                   >
                     <option value="LOW">Low</option>
                     <option value="MEDIUM">Medium</option>
@@ -331,7 +331,7 @@ export default function CalendarPage() {
                   type="date"
                   value={form.dueDate}
                   onChange={(e) => setForm({ ...form, dueDate: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none"
                 />
               </div>
 
@@ -342,7 +342,7 @@ export default function CalendarPage() {
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none resize-none"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-primary focus:border-primary outline-none resize-none"
                 />
               </div>
 
@@ -350,7 +350,7 @@ export default function CalendarPage() {
                 <button
                   type="submit"
                   disabled={!form.title.trim() || createMutation.isPending}
-                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+                  className="flex-1 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
                 >
                   {createMutation.isPending ? 'Creating...' : 'Create Task'}
                 </button>

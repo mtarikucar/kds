@@ -1,332 +1,324 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
+import { useForm, type SubmitHandler } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
+import { Loader2 } from 'lucide-react';
 import marketingApi from '../../features/marketing/api/marketingApi';
-import {
-  BusinessType,
-  LeadSource,
-  BUSINESS_TYPE_LABELS,
-  LEAD_SOURCE_LABELS,
-} from '../../features/marketing/types';
+import { BusinessType, LeadSource } from '../../features/marketing/types';
+import { leadSchema, type LeadFormValues } from '../../features/marketing/schemas';
 
+/**
+ * Lead create/edit form. Route param `id` switches into edit mode
+ * and the form preloads from `/leads/:id`. Validation is zod-driven;
+ * the schema mirrors the backend DTO so payloads that pass here are
+ * always shape-correct on the server too (the server stays the
+ * source of truth — these checks just shorten the feedback loop).
+ */
 export default function CreateLeadPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation('marketing');
   const isEdit = !!id;
 
-  const [form, setForm] = useState({
-    businessName: '',
-    contactPerson: '',
-    phone: '',
-    whatsapp: '',
-    email: '',
-    address: '',
-    city: '',
-    region: '',
-    businessType: 'RESTAURANT',
-    tableCount: '',
-    branchCount: '',
-    currentSystem: '',
-    source: 'PHONE',
-    notes: '',
-    nextFollowUp: '',
-    priority: 'MEDIUM',
+  const form = useForm<LeadFormValues>({
+    resolver: zodResolver(leadSchema),
+    mode: 'onBlur',
+    defaultValues: {
+      businessName: '',
+      contactPerson: '',
+      businessType: 'RESTAURANT',
+      source: 'PHONE',
+      priority: 'MEDIUM',
+      phone: '',
+      whatsapp: '',
+      email: '',
+      address: '',
+      city: '',
+      region: '',
+      tableCount: '',
+      branchCount: '',
+      currentSystem: '',
+      notes: '',
+      nextFollowUp: '',
+    },
   });
 
-  const [error, setError] = useState('');
-
-  // Load existing lead data for edit mode
   const { data: existingLead } = useQuery({
     queryKey: ['marketing', 'lead', id],
     queryFn: () => marketingApi.get(`/leads/${id}`).then((r) => r.data),
     enabled: isEdit,
   });
 
-  // Populate form when lead data loads
   useEffect(() => {
     if (existingLead) {
-      setForm({
+      form.reset({
         businessName: existingLead.businessName || '',
         contactPerson: existingLead.contactPerson || '',
+        businessType: existingLead.businessType || 'RESTAURANT',
+        source: existingLead.source || 'PHONE',
+        priority: existingLead.priority || 'MEDIUM',
         phone: existingLead.phone || '',
         whatsapp: existingLead.whatsapp || '',
         email: existingLead.email || '',
         address: existingLead.address || '',
         city: existingLead.city || '',
         region: existingLead.region || '',
-        businessType: existingLead.businessType || 'RESTAURANT',
         tableCount: existingLead.tableCount?.toString() || '',
         branchCount: existingLead.branchCount?.toString() || '',
         currentSystem: existingLead.currentSystem || '',
-        source: existingLead.source || 'PHONE',
         notes: existingLead.notes || '',
         nextFollowUp: existingLead.nextFollowUp ? existingLead.nextFollowUp.split('T')[0] : '',
-        priority: existingLead.priority || 'MEDIUM',
       });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [existingLead]);
 
   const mutation = useMutation({
-    mutationFn: (data: any) =>
+    mutationFn: (data: unknown) =>
       isEdit
         ? marketingApi.patch(`/leads/${id}`, data)
         : marketingApi.post('/leads', data),
     onSuccess: (res) => {
       const leadId = isEdit ? id : res.data.id;
-      toast.success(isEdit ? 'Lead updated' : 'Lead created');
+      toast.success(isEdit ? t('createLead.updateSuccess') : t('createLead.createSuccess'));
       navigate(`/marketing/leads/${leadId}`);
     },
     onError: (err: any) => {
-      setError(err.response?.data?.message || 'Failed to save lead');
-      toast.error('Failed to save lead');
+      const message = err.response?.data?.message;
+      // Backend 409 on duplicate email — surface as a field-level
+      // error rather than a generic toast.
+      if (err.response?.status === 409 && /email/i.test(message ?? '')) {
+        form.setError('email', { message: t('createLead.duplicateEmailError') });
+        return;
+      }
+      toast.error(message || t('common.noData'));
     },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const data: any = {
-      businessName: form.businessName,
-      contactPerson: form.contactPerson,
-      businessType: form.businessType,
-      source: form.source,
-      priority: form.priority,
+  const onSubmit: SubmitHandler<LeadFormValues> = (values) => {
+    // Strip empty optional strings so the backend doesn't store "".
+    const payload: Record<string, unknown> = {
+      businessName: values.businessName.trim(),
+      contactPerson: values.contactPerson.trim(),
+      businessType: values.businessType,
+      source: values.source,
+      priority: values.priority,
     };
-
-    if (form.phone) data.phone = form.phone;
-    if (form.whatsapp) data.whatsapp = form.whatsapp;
-    if (form.email) data.email = form.email;
-    if (form.address) data.address = form.address;
-    if (form.city) data.city = form.city;
-    if (form.region) data.region = form.region;
-    if (form.tableCount) data.tableCount = parseInt(form.tableCount);
-    if (form.branchCount) data.branchCount = parseInt(form.branchCount);
-    if (form.currentSystem) data.currentSystem = form.currentSystem;
-    if (form.notes) data.notes = form.notes;
-    if (form.nextFollowUp) data.nextFollowUp = form.nextFollowUp;
-
-    mutation.mutate(data);
+    if (values.phone) payload.phone = values.phone.trim();
+    if (values.whatsapp) payload.whatsapp = values.whatsapp.trim();
+    if (values.email) payload.email = values.email.trim();
+    if (values.address) payload.address = values.address.trim();
+    if (values.city) payload.city = values.city.trim();
+    if (values.region) payload.region = values.region.trim();
+    if (values.tableCount) payload.tableCount = parseInt(values.tableCount, 10);
+    if (values.branchCount) payload.branchCount = parseInt(values.branchCount, 10);
+    if (values.currentSystem) payload.currentSystem = values.currentSystem.trim();
+    if (values.notes) payload.notes = values.notes.trim();
+    if (values.nextFollowUp) payload.nextFollowUp = values.nextFollowUp;
+    mutation.mutate(payload);
   };
 
-  const updateField = (field: string, value: string) => {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  };
+  const inputCls =
+    'w-full px-3 py-2 border border-slate-300 rounded-lg text-sm bg-white text-slate-900 focus:ring-2 focus:ring-primary focus:border-primary outline-none disabled:bg-slate-50';
+  const errCls = 'mt-1 text-xs text-red-600';
+  const labelCls = 'block text-sm text-slate-600 mb-1';
+  const sectionTitleCls = 'text-sm font-semibold text-slate-900 mb-3';
+
+  const fieldErr = (msg?: string) =>
+    msg
+      ? // Translation lookup; falls back to the raw message for any
+        // backend-supplied string (e.g. duplicate-email error).
+        t([`validation.${msg}`, msg], { defaultValue: msg })
+      : null;
 
   return (
-    <div className="max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">
-        {isEdit ? 'Edit Lead' : 'New Lead'}
-      </h1>
+    <div className="max-w-3xl mx-auto px-4 sm:px-0 pb-12">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-slate-900">
+          {isEdit ? t('createLead.titleEdit') : t('createLead.titleNew')}
+        </h1>
+        <p className="text-sm text-slate-500 mt-1">{t('createLead.subtitle')}</p>
+      </div>
 
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-          {error}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="bg-white rounded-xl border border-gray-200 p-6 space-y-6">
-        {/* Business Info */}
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Business Information</h3>
+      <form
+        onSubmit={form.handleSubmit(onSubmit)}
+        noValidate
+        className="bg-white rounded-xl border border-slate-200 p-6 space-y-6"
+      >
+        {/* Business */}
+        <section>
+          <h3 className={sectionTitleCls}>{t('createLead.sections.business')}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Business Name *</label>
-              <input
-                type="text"
-                required
-                value={form.businessName}
-                onChange={(e) => updateField('businessName', e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
-              />
+              <label className={labelCls}>{t('createLead.fields.businessName')} *</label>
+              <input type="text" {...form.register('businessName')} className={inputCls} />
+              {form.formState.errors.businessName && (
+                <p className={errCls}>{fieldErr(form.formState.errors.businessName.message)}</p>
+              )}
             </div>
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Business Type *</label>
-              <select
-                value={form.businessType}
-                onChange={(e) => updateField('businessType', e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
-              >
-                {Object.values(BusinessType).map((t) => (
-                  <option key={t} value={t}>{BUSINESS_TYPE_LABELS[t]}</option>
+              <label className={labelCls}>{t('createLead.fields.businessType')} *</label>
+              <select {...form.register('businessType')} className={inputCls}>
+                {Object.values(BusinessType).map((b) => (
+                  <option key={b} value={b}>
+                    {t(`businessType.${b}`)}
+                  </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Table Count</label>
+              <label className={labelCls}>{t('createLead.fields.tableCount')}</label>
               <input
                 type="number"
-                min="0"
-                value={form.tableCount}
-                onChange={(e) => updateField('tableCount', e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
+                min={0}
+                {...form.register('tableCount')}
+                className={inputCls}
               />
+              {form.formState.errors.tableCount && (
+                <p className={errCls}>{fieldErr(form.formState.errors.tableCount.message)}</p>
+              )}
             </div>
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Branch Count</label>
+              <label className={labelCls}>{t('createLead.fields.branchCount')}</label>
               <input
                 type="number"
-                min="0"
-                value={form.branchCount}
-                onChange={(e) => updateField('branchCount', e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
+                min={0}
+                {...form.register('branchCount')}
+                className={inputCls}
               />
+              {form.formState.errors.branchCount && (
+                <p className={errCls}>{fieldErr(form.formState.errors.branchCount.message)}</p>
+              )}
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-sm text-gray-600 mb-1">Current System</label>
-              <input
-                type="text"
-                value={form.currentSystem}
-                onChange={(e) => updateField('currentSystem', e.target.value)}
-                placeholder="e.g., Paper-based, Competitor POS"
-                className="w-full px-3 py-2 border rounded-lg text-sm"
-              />
+              <label className={labelCls}>{t('createLead.fields.currentSystem')}</label>
+              <input type="text" {...form.register('currentSystem')} className={inputCls} />
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Contact Info */}
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Contact Information</h3>
+        {/* Contact */}
+        <section>
+          <h3 className={sectionTitleCls}>{t('createLead.sections.contact')}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Contact Person *</label>
-              <input
-                type="text"
-                required
-                value={form.contactPerson}
-                onChange={(e) => updateField('contactPerson', e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
-              />
+              <label className={labelCls}>{t('createLead.fields.contactPerson')} *</label>
+              <input type="text" {...form.register('contactPerson')} className={inputCls} />
+              {form.formState.errors.contactPerson && (
+                <p className={errCls}>{fieldErr(form.formState.errors.contactPerson.message)}</p>
+              )}
             </div>
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Phone</label>
+              <label className={labelCls}>{t('createLead.fields.phone')}</label>
               <input
                 type="tel"
-                value={form.phone}
-                onChange={(e) => updateField('phone', e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
+                {...form.register('phone')}
+                placeholder="+90555..."
+                className={inputCls}
               />
+              {form.formState.errors.phone && (
+                <p className={errCls}>{fieldErr(form.formState.errors.phone.message)}</p>
+              )}
             </div>
             <div>
-              <label className="block text-sm text-gray-600 mb-1">WhatsApp</label>
+              <label className={labelCls}>{t('createLead.fields.whatsapp')}</label>
               <input
                 type="tel"
-                value={form.whatsapp}
-                onChange={(e) => updateField('whatsapp', e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
+                {...form.register('whatsapp')}
+                placeholder="+90555..."
+                className={inputCls}
               />
+              {form.formState.errors.whatsapp && (
+                <p className={errCls}>{fieldErr(form.formState.errors.whatsapp.message)}</p>
+              )}
             </div>
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Email</label>
-              <input
-                type="email"
-                value={form.email}
-                onChange={(e) => updateField('email', e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
-              />
+              <label className={labelCls}>{t('createLead.fields.email')}</label>
+              <input type="email" {...form.register('email')} className={inputCls} />
+              {form.formState.errors.email && (
+                <p className={errCls}>{fieldErr(form.formState.errors.email.message)}</p>
+              )}
             </div>
           </div>
-        </div>
+        </section>
 
         {/* Location */}
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Location</h3>
+        <section>
+          <h3 className={sectionTitleCls}>{t('createLead.sections.location')}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm text-gray-600 mb-1">City</label>
-              <input
-                type="text"
-                value={form.city}
-                onChange={(e) => updateField('city', e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
-              />
+              <label className={labelCls}>{t('createLead.fields.city')}</label>
+              <input type="text" {...form.register('city')} className={inputCls} />
             </div>
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Region</label>
-              <input
-                type="text"
-                value={form.region}
-                onChange={(e) => updateField('region', e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
-              />
+              <label className={labelCls}>{t('createLead.fields.region')}</label>
+              <input type="text" {...form.register('region')} className={inputCls} />
             </div>
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Address</label>
-              <input
-                type="text"
-                value={form.address}
-                onChange={(e) => updateField('address', e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
-              />
+              <label className={labelCls}>{t('createLead.fields.address')}</label>
+              <input type="text" {...form.register('address')} className={inputCls} />
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Lead Info */}
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900 mb-3">Lead Information</h3>
+        {/* Lead info */}
+        <section>
+          <h3 className={sectionTitleCls}>{t('createLead.sections.lead')}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Source *</label>
-              <select
-                value={form.source}
-                onChange={(e) => updateField('source', e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
-              >
+              <label className={labelCls}>{t('createLead.fields.source')} *</label>
+              <select {...form.register('source')} className={inputCls}>
                 {Object.values(LeadSource).map((s) => (
-                  <option key={s} value={s}>{LEAD_SOURCE_LABELS[s]}</option>
+                  <option key={s} value={s}>
+                    {t(`source.${s}`)}
+                  </option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Priority</label>
-              <select
-                value={form.priority}
-                onChange={(e) => updateField('priority', e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
-              >
-                <option value="LOW">Low</option>
-                <option value="MEDIUM">Medium</option>
-                <option value="HIGH">High</option>
-                <option value="URGENT">Urgent</option>
+              <label className={labelCls}>{t('createLead.fields.priority')}</label>
+              <select {...form.register('priority')} className={inputCls}>
+                {['LOW', 'MEDIUM', 'HIGH', 'URGENT'].map((p) => (
+                  <option key={p} value={p}>
+                    {t(`priority.${p}`)}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm text-gray-600 mb-1">Next Follow-up</label>
-              <input
-                type="date"
-                value={form.nextFollowUp}
-                onChange={(e) => updateField('nextFollowUp', e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg text-sm"
-              />
+              <label className={labelCls}>{t('createLead.fields.nextFollowUp')}</label>
+              <input type="date" {...form.register('nextFollowUp')} className={inputCls} />
             </div>
           </div>
           <div className="mt-4">
-            <label className="block text-sm text-gray-600 mb-1">Notes</label>
+            <label className={labelCls}>{t('createLead.fields.notes')}</label>
             <textarea
               rows={3}
-              value={form.notes}
-              onChange={(e) => updateField('notes', e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm"
+              {...form.register('notes')}
+              className={`${inputCls} resize-none`}
             />
           </div>
-        </div>
+        </section>
 
         {/* Actions */}
-        <div className="flex gap-3 pt-4 border-t">
+        <div className="flex gap-3 pt-4 border-t border-slate-200">
           <button
             type="submit"
             disabled={mutation.isPending}
-            className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg font-medium text-sm hover:bg-indigo-700 disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground rounded-lg font-medium text-sm hover:bg-primary/90 disabled:opacity-60 transition"
           >
-            {mutation.isPending ? 'Saving...' : isEdit ? 'Update Lead' : 'Create Lead'}
+            {mutation.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
+            {isEdit ? t('createLead.submitUpdate') : t('createLead.submitCreate')}
           </button>
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="px-6 py-2.5 border border-gray-300 rounded-lg text-sm hover:bg-gray-50"
+            className="px-6 py-2.5 border border-slate-300 rounded-lg text-sm hover:bg-slate-50 transition"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
         </div>
       </form>
