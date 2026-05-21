@@ -175,9 +175,17 @@ export class DeliveryConfigService {
     }
 
     try {
-      return await this.prisma.deliveryPlatformConfig.update({
-        where: { id: config.id },
+      // Defence-in-depth: tenantId in the WHERE so a regression of the
+      // pre-check above can't expose cross-tenant writes (B41-B45).
+      const claim = await this.prisma.deliveryPlatformConfig.updateMany({
+        where: { id: config.id, tenantId, deletedAt: null },
         data,
+      });
+      if (claim.count === 0) {
+        throw new NotFoundException(`Configuration for ${platform} not found`);
+      }
+      return this.prisma.deliveryPlatformConfig.findUniqueOrThrow({
+        where: { id: config.id },
       });
     } catch (err) {
       if (
@@ -208,9 +216,16 @@ export class DeliveryConfigService {
       await adapter.closeRestaurant(config);
     }
 
-    return this.prisma.deliveryPlatformConfig.update({
-      where: { id: config.id },
+    // Defence-in-depth: tenantId in the WHERE (B41-B45).
+    const claim = await this.prisma.deliveryPlatformConfig.updateMany({
+      where: { id: config.id, tenantId, deletedAt: null },
       data: { restaurantOpen: open },
+    });
+    if (claim.count === 0) {
+      throw new NotFoundException(`Configuration for ${platform} not found`);
+    }
+    return this.prisma.deliveryPlatformConfig.findUniqueOrThrow({
+      where: { id: config.id },
     });
   }
 
@@ -279,9 +294,16 @@ export class DeliveryConfigService {
     if (!config) {
       throw new NotFoundException(`Configuration for ${platform} not found`);
     }
-    return this.prisma.deliveryPlatformConfig.update({
-      where: { id: config.id },
+    // Defence-in-depth: tenantId in the WHERE (B41-B45).
+    const claim = await this.prisma.deliveryPlatformConfig.updateMany({
+      where: { id: config.id, tenantId, deletedAt: null },
       data: { deletedAt: new Date(), isEnabled: false },
+    });
+    if (claim.count === 0) {
+      throw new NotFoundException(`Configuration for ${platform} not found`);
+    }
+    return this.prisma.deliveryPlatformConfig.findUniqueOrThrow({
+      where: { id: config.id },
     });
   }
 }
