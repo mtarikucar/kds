@@ -123,9 +123,15 @@ export class ReservationsService {
       }
     }
 
-    // Validate operating hours (closed day check)
+    // Validate operating hours (closed day check). Use parseLocalDate
+    // — `new Date(dto.date)` is UTC-midnight, and on UTC+3 a Monday
+    // booking could read as Sunday's day-of-week and trigger a false
+    // "restaurant is closed" reject. parseLocalDate keeps the day in
+    // tenant-local time.
     if (settings.operatingHours) {
-      const dayOfWeek = new Date(dto.date).toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+      const dayOfWeek = parseLocalDate(dto.date)
+        .toLocaleDateString('en-US', { weekday: 'long' })
+        .toLowerCase();
       const hours = settings.operatingHours as any;
       if (hours[dayOfWeek]?.closed) {
         throw new BadRequestException('Restaurant is closed on this day');
@@ -545,9 +551,10 @@ export class ReservationsService {
     // Update table status if assigned: clear any auto-hold this row
     // owned (scheduler may have set status=RESERVED + reservationHoldId
     // in the 30-min pre-window) and flip to OCCUPIED in the same write.
+    // Compound WHERE — IDOR guard (B41-B45 pattern).
     if (reservation.tableId) {
-      await this.prisma.table.update({
-        where: { id: reservation.tableId },
+      await this.prisma.table.updateMany({
+        where: { id: reservation.tableId, tenantId },
         data: { status: 'OCCUPIED', reservationHoldId: null },
       });
     }
@@ -595,9 +602,10 @@ export class ReservationsService {
     // Free up the table. SEATED reservations already had any hold
     // cleared in seat(), so the explicit hold revert in releaseHoldIfOwned
     // would be a no-op here — we just flip the status directly.
+    // Compound WHERE — IDOR guard (B41-B45 pattern).
     if (reservation.tableId) {
-      await this.prisma.table.update({
-        where: { id: reservation.tableId },
+      await this.prisma.table.updateMany({
+        where: { id: reservation.tableId, tenantId },
         data: { status: 'AVAILABLE', reservationHoldId: null },
       });
     }
@@ -643,9 +651,12 @@ export class ReservationsService {
     // OR if the scheduler had auto-held it for this reservation
     // (PENDING/CONFIRMED inside the 30-min window). The two paths
     // converge — both end with status=AVAILABLE, reservationHoldId=null.
+    // Compound WHERE on the SEATED branch — IDOR guard (B41-B45);
+    // releaseHoldIfOwned already runs an updateMany filtered by
+    // reservationHoldId so it's tenant-safe by construction.
     if (reservation.status === ReservationStatus.SEATED && reservation.tableId) {
-      await this.prisma.table.update({
-        where: { id: reservation.tableId },
+      await this.prisma.table.updateMany({
+        where: { id: reservation.tableId, tenantId },
         data: { status: 'AVAILABLE', reservationHoldId: null },
       });
     } else {
