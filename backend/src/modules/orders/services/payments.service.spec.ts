@@ -24,6 +24,7 @@ describe('PaymentsService — progressive per-item payments', () => {
   let salesInvoice: any;
   let accountingSettings: any;
   let stockDeduction: any;
+  let loyalty: any;
   let kdsGateway: { emitPaymentSuccess: jest.Mock };
   let svc: PaymentsService;
 
@@ -96,11 +97,18 @@ describe('PaymentsService — progressive per-item payments', () => {
       buildReceiptSnapshot: jest.fn().mockReturnValue({}),
       buildKitchenTicketSnapshot: jest.fn().mockReturnValue({}),
     };
-    salesInvoice = { createFromOrder: jest.fn().mockResolvedValue(undefined) };
+    salesInvoice = { createFromOrder: jest.fn().mockResolvedValue(undefined), createFromPayment: jest.fn().mockResolvedValue(undefined) };
     accountingSettings = {
       findByTenant: jest.fn().mockResolvedValue({ autoGenerateInvoice: false }),
     };
     stockDeduction = {};
+    // LoyaltyService is the 5th constructor parameter (between
+    // receiptSnapshotBuilder and salesInvoiceService). payByItems +
+    // splitBill + create all call earnPointsFromOrder post-commit;
+    // omit this mock and the service throws on the post-commit step.
+    loyalty = {
+      earnPointsFromOrder: jest.fn().mockResolvedValue(undefined),
+    };
     // KdsGateway is optional in the service constructor; injecting a
     // mock lets us assert that the post-payment emit fires with the
     // right initiatedByUserId for waiter vs. webhook origins (the
@@ -111,6 +119,7 @@ describe('PaymentsService — progressive per-item payments', () => {
       ordersService as any,
       customersService,
       receiptSnapshotBuilder,
+      loyalty,
       salesInvoice,
       accountingSettings,
       stockDeduction,

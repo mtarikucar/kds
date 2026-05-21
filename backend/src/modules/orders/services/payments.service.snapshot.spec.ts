@@ -5,6 +5,7 @@ import { OrdersService } from './orders.service';
 import { CustomersService } from '../../customers/customers.service';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ReceiptSnapshotBuilder } from './receipt-snapshot.builder';
+import { LoyaltyService } from '../../customers/loyalty.service';
 import {
   mockPrismaClient,
   MockPrismaClient,
@@ -134,6 +135,14 @@ describe('PaymentsService — receipt snapshot persistence', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: OrdersService, useValue: ordersServiceMock },
         { provide: CustomersService, useValue: customersServiceMock },
+        // LoyaltyService is a required (non-Optional) dependency of
+        // PaymentsService. Snapshot tests don't exercise the loyalty
+        // path, but Nest's DI still needs to resolve it — provide a
+        // stub that no-ops earnPointsFromOrder.
+        {
+          provide: LoyaltyService,
+          useValue: { earnPointsFromOrder: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile();
 

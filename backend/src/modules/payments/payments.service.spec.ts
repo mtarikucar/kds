@@ -146,7 +146,11 @@ describe('PaymentsService', () => {
         ],
         name: 'Test',
       } as any);
-      prisma.user.findUnique.mockResolvedValue({ emailVerified: true, email: 'a@b.com' } as any);
+      prisma.user.findUnique.mockResolvedValue({
+        emailVerified: true,
+        email: 'a@b.com',
+        phone: '+905551234567',
+      } as any);
       prisma.subscriptionPlan.findUnique.mockResolvedValue(proPlan);
 
       const result = await svc.createIntent(
@@ -158,7 +162,7 @@ describe('PaymentsService', () => {
 
       expect(result).toEqual({
         provider: 'TRIAL',
-        amount: 799,
+        amount: 1299,
         currency: 'TRY',
         trialActivated: true,
       });

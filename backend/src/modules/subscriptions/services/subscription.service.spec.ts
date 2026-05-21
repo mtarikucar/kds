@@ -116,8 +116,12 @@ describe('SubscriptionService.startTrialFromIntent', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('rejects re-trialing the same plan (per-plan lifetime)', async () => {
+  it('rejects re-trialing once the tenant has already used any trial (lifetime gate)', async () => {
+    // Trial eligibility moved from per-plan (`usedTrialPlanIds`) to a
+    // lifetime per-tenant flag (`trialUsed`). The historical row is
+    // still kept for audit but `trialUsed=true` is the canonical gate.
     prisma.tenant.findUnique.mockResolvedValue({
+      trialUsed: true,
       usedTrialPlanIds: [PLAN_ID],
     } as any);
     await expect(
