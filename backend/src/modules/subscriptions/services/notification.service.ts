@@ -474,13 +474,15 @@ export class NotificationService {
   ) {
     return this.sendEmail({
       to: email,
-      subject: "Subscription payment past due - Action required",
+      subject: `${planName} aboneliğiniz ödemesi gecikti — yenileyin`,
       template: "subscription-past-due",
       context: {
         tenantName,
         planName,
         amount,
         currency,
+        renewUrl: `${this.appUrl}/subscription/plans?renew=1`,
+        appUrl: this.appUrl,
       },
     });
   }

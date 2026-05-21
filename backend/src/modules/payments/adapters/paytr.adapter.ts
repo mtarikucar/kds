@@ -687,14 +687,19 @@ export class PaytrAdapter {
       paytr_token: paytrToken,
     });
 
-    const response = await axios.post(
-      PAYTR_BIN_DETAIL_ENDPOINT,
-      form.toString(),
-      {
+    let response;
+    try {
+      response = await axios.post(PAYTR_BIN_DETAIL_ENDPOINT, form.toString(), {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         timeout: 15_000,
-      },
-    );
+      });
+    } catch (err: any) {
+      this.logger.error(`PayTR bin-detail HTTP failure: ${err?.message}`);
+      // Read-only lookup — return empty result instead of throwing so the
+      // caller (UX nicety, not a billing path) can render a card without
+      // the brand badge.
+      return { raw: err?.message };
+    }
     const body = response.data ?? {};
     return {
       cardBrand: body.brand ?? body.card_brand,
@@ -737,14 +742,22 @@ export class PaytrAdapter {
       paytr_token: paytrToken,
     });
 
-    const response = await axios.post(
-      PAYTR_INSTALLMENT_TABLE_ENDPOINT,
-      form.toString(),
-      {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        timeout: 15_000,
-      },
-    );
+    let response;
+    try {
+      response = await axios.post(
+        PAYTR_INSTALLMENT_TABLE_ENDPOINT,
+        form.toString(),
+        {
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          timeout: 15_000,
+        },
+      );
+    } catch (err: any) {
+      this.logger.error(`PayTR taksit-orani HTTP failure: ${err?.message}`);
+      // UX-only endpoint — failing back to "no installment options" is
+      // safer than throwing and breaking the checkout page render.
+      return { rates: [], raw: err?.message };
+    }
     const body = response.data ?? {};
     // PayTR returns the table under varying keys depending on the
     // product configuration. Look for the common ones, fall back to

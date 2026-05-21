@@ -69,8 +69,15 @@ export class PaytrWebhookController {
     const merchantKey = this.config.get<string>("PAYTR_MERCHANT_KEY");
     const merchantSalt = this.config.get<string>("PAYTR_MERCHANT_SALT");
     if (!merchantKey || !merchantSalt) {
-      this.logger.error("PayTR credentials missing — rejecting callback");
-      return "FAIL";
+      // Misconfigured deploy — we can't verify the hash. Return "OK" so
+      // PayTR stops retrying (which would otherwise cascade into a
+      // 30-minute retry storm), and surface a critical error so ops
+      // notices and fixes env. Recovery sweeper will reconcile the
+      // stuck PENDING rows once creds are restored.
+      this.logger.error(
+        "PayTR credentials missing — acknowledging callback to stop retries; ops alert raised",
+      );
+      return "OK";
     }
 
     if (

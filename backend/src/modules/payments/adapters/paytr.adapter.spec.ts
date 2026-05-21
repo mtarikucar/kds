@@ -1,6 +1,11 @@
 import {
   buildIframeTokenSignature,
   buildRecurringPaymentSignature,
+  buildRefundSignature,
+  buildInquirySignature,
+  buildRecurringCancelSignature,
+  buildBinDetailSignature,
+  buildInstallmentTableSignature,
   buildPaymentUrl,
   encodeUserBasket,
   amountToKurus,
@@ -87,6 +92,56 @@ describe('PayTR adapter primitives', () => {
   describe('buildPaymentUrl', () => {
     it('builds the secure-payment URL from a token', () => {
       expect(buildPaymentUrl('tk_xyz')).toBe('https://www.paytr.com/odeme/guvenli/tk_xyz');
+    });
+  });
+
+  describe('buildRefundSignature', () => {
+    it('matches HMAC over merchant_id + merchant_oid + return_amount + salt', () => {
+      const sig = buildRefundSignature(
+        { merchantId: '123456', merchantOid: 'ABC123', returnAmount: '5000' },
+        { merchantKey: 'key_x', merchantSalt: 'salt_x' },
+      );
+      expect(sig).toBe('JFR7mfpwbNJFbZpWfCPVn10o6Pqul9GTBABZ3ti25ic=');
+    });
+  });
+
+  describe('buildInquirySignature', () => {
+    it('matches HMAC over merchant_id + merchant_oid + salt', () => {
+      const sig = buildInquirySignature(
+        { merchantId: '123456', merchantOid: 'ABC123' },
+        { merchantKey: 'key_x', merchantSalt: 'salt_x' },
+      );
+      expect(sig).toBe('QOGXQcEsbYZC+guX+/u1e+q+7FPQYeOV7Yf6hotRsog=');
+    });
+  });
+
+  describe('buildRecurringCancelSignature', () => {
+    it('matches HMAC over merchant_id + utoken + salt', () => {
+      const sig = buildRecurringCancelSignature(
+        { merchantId: '123456', utoken: 'tk_abc' },
+        { merchantKey: 'key_x', merchantSalt: 'salt_x' },
+      );
+      expect(sig).toBe('R0DJ5Hb9PmkSLOlDq19bk1WFRZ8/eBXjtxoEcf2eBEI=');
+    });
+  });
+
+  describe('buildBinDetailSignature', () => {
+    it('matches HMAC over merchant_id + bin_number + salt', () => {
+      const sig = buildBinDetailSignature(
+        { merchantId: '123456', binNumber: '454671' },
+        { merchantKey: 'key_x', merchantSalt: 'salt_x' },
+      );
+      expect(sig).toBe('cQ1W5CcvbGrClhxLgrwv8rg9FwNiPhkShDYE58WWolg=');
+    });
+  });
+
+  describe('buildInstallmentTableSignature', () => {
+    it('matches HMAC over merchant_id + amount + salt', () => {
+      const sig = buildInstallmentTableSignature(
+        { merchantId: '123456', amount: '29999' },
+        { merchantKey: 'key_x', merchantSalt: 'salt_x' },
+      );
+      expect(sig).toBe('ufVvquJUQevOP9N7Y9yujDEG/tc2mPXqEeRKaa5A3yw=');
     });
   });
 });
