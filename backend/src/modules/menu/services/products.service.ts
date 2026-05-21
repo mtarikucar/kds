@@ -236,24 +236,21 @@ export class ProductsService {
       throw new BadRequestException('Insufficient stock');
     }
 
-    const updatedProduct = await this.prisma.product.update({
-      where: { id },
+    // Compound WHERE — IDOR guard (B41-B45 pattern). Every other write
+    // path in this service goes through updateMany with tenantId; the
+    // bare `update where: { id }` here was the only outlier.
+    const claim = await this.prisma.product.updateMany({
+      where: { id, tenantId },
       data: {
         currentStock: newStock,
         isAvailable: newStock > 0,
       },
-      include: {
-        category: true,
-        productImages: {
-          include: {
-            image: true,
-          },
-          orderBy: { order: 'asc' },
-        },
-      },
     });
+    if (claim.count === 0) {
+      throw new NotFoundException(`Product with ID ${id} not found`);
+    }
 
-    return this.transformProductResponse(updatedProduct);
+    return this.findOne(id, tenantId);
   }
 
   // Image management methods
@@ -262,40 +259,41 @@ export class ProductsService {
     imageIds: string[],
     tenantId: string,
   ): Promise<void> {
-    // Verify all images exist and belong to tenant
-    for (const imageId of imageIds) {
-      const image = await this.prisma.productImage.findFirst({
-        where: {
-          id: imageId,
-          tenantId,
-        },
-      });
+    if (imageIds.length === 0) return;
 
-      if (!image) {
-        throw new BadRequestException(`Image ${imageId} not found or does not belong to your tenant`);
-      }
+    // Bulk-verify ownership in one round-trip. Bare `findMany` + count
+    // comparison catches both "wrong tenant" and "id doesn't exist"
+    // with a single query, replacing the per-image findFirst loop that
+    // burned an extra round-trip per item.
+    const owned = await this.prisma.productImage.findMany({
+      where: { id: { in: imageIds }, tenantId },
+      select: { id: true },
+    });
+    if (owned.length !== imageIds.length) {
+      const foundSet = new Set(owned.map((o) => o.id));
+      const missing = imageIds.filter((id) => !foundSet.has(id));
+      throw new BadRequestException(
+        `Image(s) not found or do not belong to your tenant: ${missing.join(', ')}`,
+      );
     }
 
-    // Attach images with proper ordering using junction table
-    for (let i = 0; i < imageIds.length; i++) {
-      // Use upsert to handle duplicates gracefully
-      await this.prisma.productToImage.upsert({
-        where: {
-          productId_imageId: {
-            productId,
-            imageId: imageIds[i],
-          },
-        },
-        update: {
-          order: i,
-        },
-        create: {
-          productId,
-          imageId: imageIds[i],
-          order: i,
-        },
-      });
-    }
+    // Two-pass write: createMany for fresh links (skipDuplicates so
+    // re-attach is idempotent), then a transaction of per-image
+    // updates to set the final order. Prisma doesn't expose a "bulk
+    // upsert with different values per row" so the loop remains, but
+    // it's now inside a single transaction batch.
+    await this.prisma.productToImage.createMany({
+      data: imageIds.map((imageId, i) => ({ productId, imageId, order: i })),
+      skipDuplicates: true,
+    });
+    await this.prisma.$transaction(
+      imageIds.map((imageId, i) =>
+        this.prisma.productToImage.update({
+          where: { productId_imageId: { productId, imageId } },
+          data: { order: i },
+        }),
+      ),
+    );
   }
 
   async getProductImages(productId: string, tenantId: string) {
