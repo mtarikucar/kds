@@ -97,7 +97,14 @@ export class ScheduleService {
       throw new NotFoundException('Shift assignment not found');
     }
 
-    return this.prisma.shiftAssignment.delete({ where: { id } });
+    // Defence-in-depth: tenantId in the WHERE (B41-B45 pattern).
+    const result = await this.prisma.shiftAssignment.deleteMany({
+      where: { id, tenantId },
+    });
+    if (result.count === 0) {
+      throw new NotFoundException('Shift assignment not found');
+    }
+    return { id };
   }
 
   private getMonday(date: Date): Date {

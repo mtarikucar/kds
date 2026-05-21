@@ -123,14 +123,26 @@ export class AttendanceService {
       overtimeMinutes = Math.max(0, totalWorkedMinutes - shiftDuration);
     }
 
-    const result = await this.prisma.attendance.update({
-      where: { id: attendance.id },
+    // Compound WHERE on the original status closes the TOCTOU window:
+    // a concurrent break-start (status → ON_BREAK) between our read
+    // above and the write here must not be silently overwritten as
+    // CLOCKED_OUT. tenantId in the WHERE is defence-in-depth IDOR.
+    const claim = await this.prisma.attendance.updateMany({
+      where: { id: attendance.id, tenantId, status: attendance.status },
       data: {
         clockOut: now,
         status: AttendanceStatus.CLOCKED_OUT,
         totalWorkedMinutes,
         overtimeMinutes,
       },
+    });
+    if (claim.count === 0) {
+      throw new BadRequestException(
+        'Attendance status changed concurrently — refresh and retry.',
+      );
+    }
+    const result = await this.prisma.attendance.findUniqueOrThrow({
+      where: { id: attendance.id },
       include: { user: { select: { id: true, firstName: true, lastName: true, role: true } } },
     });
 
@@ -154,12 +166,21 @@ export class AttendanceService {
       throw new BadRequestException('Must be clocked in to start a break');
     }
 
-    const result = await this.prisma.attendance.update({
-      where: { id: attendance.id },
+    // Compound WHERE on status — race-safe; tenant guard defence-in-depth.
+    const claim = await this.prisma.attendance.updateMany({
+      where: { id: attendance.id, tenantId, status: AttendanceStatus.CLOCKED_IN },
       data: {
         breakStart: new Date(),
         status: AttendanceStatus.ON_BREAK,
       },
+    });
+    if (claim.count === 0) {
+      throw new BadRequestException(
+        'Attendance status changed concurrently — refresh and retry.',
+      );
+    }
+    const result = await this.prisma.attendance.findUniqueOrThrow({
+      where: { id: attendance.id },
       include: { user: { select: { id: true, firstName: true, lastName: true, role: true } } },
     });
 
@@ -192,13 +213,22 @@ export class AttendanceService {
       (now.getTime() - attendance.breakStart.getTime()) / 60000,
     );
 
-    const result = await this.prisma.attendance.update({
-      where: { id: attendance.id },
+    // Compound WHERE on status — race-safe; tenant guard defence-in-depth.
+    const claim = await this.prisma.attendance.updateMany({
+      where: { id: attendance.id, tenantId, status: AttendanceStatus.ON_BREAK },
       data: {
         breakEnd: now,
         status: AttendanceStatus.CLOCKED_IN,
         totalBreakMinutes: attendance.totalBreakMinutes + breakDuration,
       },
+    });
+    if (claim.count === 0) {
+      throw new BadRequestException(
+        'Attendance status changed concurrently — refresh and retry.',
+      );
+    }
+    const result = await this.prisma.attendance.findUniqueOrThrow({
+      where: { id: attendance.id },
       include: { user: { select: { id: true, firstName: true, lastName: true, role: true } } },
     });
 

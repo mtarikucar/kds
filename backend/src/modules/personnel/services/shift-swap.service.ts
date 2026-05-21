@@ -258,12 +258,28 @@ export class ShiftSwapService {
       throw new NotFoundException('Swap request not found or already processed');
     }
 
-    const result = await this.prisma.shiftSwapRequest.update({
-      where: { id },
+    // Compound WHERE: a concurrent approve/reject from another manager
+    // must not be silently overwritten. Plus tenantId IDOR guard.
+    const claim = await this.prisma.shiftSwapRequest.updateMany({
+      where: {
+        id,
+        tenantId,
+        status: {
+          in: [SwapRequestStatus.PENDING, SwapRequestStatus.TARGET_ACCEPTED],
+        },
+      },
       data: {
         status: SwapRequestStatus.REJECTED,
         approvedById,
       },
+    });
+    if (claim.count === 0) {
+      throw new NotFoundException(
+        'Swap request not found or already processed',
+      );
+    }
+    const result = await this.prisma.shiftSwapRequest.findFirstOrThrow({
+      where: { id, tenantId },
       include: {
         requester: { select: { id: true, firstName: true, lastName: true } },
         target: { select: { id: true, firstName: true, lastName: true } },
