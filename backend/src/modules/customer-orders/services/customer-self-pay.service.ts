@@ -767,8 +767,13 @@ export class CustomerSelfPayService {
           intent.tenantId,
         );
       }
-      await this.prisma.pendingSelfPayment.update({
-        where: { id: intent.id },
+      // Compound WHERE on the original PENDING status closes the
+      // TOCTOU between line 704's intent.status check and this write.
+      // A concurrent retry from PayTR that already finished settlement
+      // won't be overwritten; a concurrent failure path won't be
+      // downgraded to SUCCEEDED.
+      await this.prisma.pendingSelfPayment.updateMany({
+        where: { id: intent.id, status: 'PENDING' },
         data: { status: 'SUCCEEDED', succeededAt: new Date() },
       });
     } catch (err: any) {
@@ -785,8 +790,11 @@ export class CustomerSelfPayService {
       // Payment row; this is the path that needs ops attention
       // (manual refund or manual reconciliation). The Sentry alert
       // carries the raw error; the customer sees a friendly string.
-      await this.prisma.pendingSelfPayment.update({
-        where: { id: intent.id },
+      // Compound WHERE on PENDING: a concurrent retry that already
+      // succeeded must not be downgraded to FAILED. The Sentry alert
+      // above is still emitted regardless — ops gets the signal.
+      await this.prisma.pendingSelfPayment.updateMany({
+        where: { id: intent.id, status: 'PENDING' },
         data: {
           status: 'FAILED',
           failureReason: 'settlement_error',
