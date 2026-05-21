@@ -3008,6 +3008,7 @@ model Lead {
   notes         String?   @db.Text
   nextFollowUp  DateTime?
   priority      String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  externalRef   String?   @unique
 
   // Assigned sales rep
   assignedToId String?

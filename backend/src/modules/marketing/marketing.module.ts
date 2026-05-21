@@ -14,6 +14,7 @@ import {
   MarketingUsersController,
   MarketingCommissionsController,
   MarketingNotificationsController,
+  MarketingLeadsIngestController,
 } from './controllers';
 
 // Services
@@ -29,11 +30,13 @@ import {
   MarketingCommissionsService,
   MarketingNotificationsService,
   MarketingSchedulerService,
+  MarketingLeadsIngestService,
 } from './services';
 
 // Guards
 import { MarketingGuard } from './guards/marketing.guard';
 import { MarketingRolesGuard } from './guards/marketing-roles.guard';
+import { IngestTokenGuard } from './guards/ingest-token.guard';
 
 @Module({
   imports: [
@@ -71,6 +74,11 @@ import { MarketingRolesGuard } from './guards/marketing-roles.guard';
     }),
   ],
   controllers: [
+    // Listed first so /marketing/leads/ingest resolves to this controller's
+    // literal route before Nest considers /:id on MarketingLeadsController.
+    // (Nest matches literals before params regardless, but explicit
+    // ordering avoids ambiguity for anyone reading the wiring.)
+    MarketingLeadsIngestController,
     MarketingAuthController,
     MarketingLeadsController,
     MarketingActivitiesController,
@@ -94,11 +102,13 @@ import { MarketingRolesGuard } from './guards/marketing-roles.guard';
     MarketingUsersService,
     MarketingCommissionsService,
     MarketingNotificationsService,
+    MarketingLeadsIngestService,
     // Cron jobs (offer expiry, notification TTL, follow-up reminders).
     MarketingSchedulerService,
     // Guards
     MarketingGuard,
     MarketingRolesGuard,
+    IngestTokenGuard,
   ],
   exports: [
     MarketingAuthService,
