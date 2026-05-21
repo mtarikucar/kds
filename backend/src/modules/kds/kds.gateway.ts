@@ -29,8 +29,12 @@ import { UserRole } from '../../common/constants/roles.enum';
 @Injectable()
 @WebSocketGateway({
   cors: {
+    // `.split(',').map(trim)` so an env value like
+    // `https://a.com, https://b.com` (with a leading space on the
+    // second entry) still matches — bare split keeps the space and
+    // silently fails the origin check.
     origin: process.env.CORS_ORIGIN
-      ? process.env.CORS_ORIGIN.split(',')
+      ? process.env.CORS_ORIGIN.split(',').map((s) => s.trim()).filter(Boolean)
       : ['http://localhost:5173'],
     credentials: true,
   },

@@ -175,9 +175,26 @@ export class KdsService {
       throw new NotFoundException(`Order item with ID ${updateDto.orderItemId} not found`);
     }
 
-    const updatedOrderItem = await this.prisma.orderItem.update({
-      where: { id: updateDto.orderItemId },
+    // Compound WHERE on the original status + tenantId — mirrors the
+    // TOCTOU guard `updateOrderStatus` / `cancelOrder` use. Without it,
+    // two KDS terminals clicking the same item at once would both pass
+    // the implicit findFirst check and both succeed; whichever wrote
+    // last wins silently. Defence-in-depth IDOR on tenantId too.
+    const claim = await this.prisma.orderItem.updateMany({
+      where: {
+        id: updateDto.orderItemId,
+        order: { tenantId },
+        status: orderItem.status,
+      },
       data: { status: updateDto.status },
+    });
+    if (claim.count === 0) {
+      throw new BadRequestException(
+        'Item status changed concurrently — refresh and retry.',
+      );
+    }
+    const updatedOrderItem = await this.prisma.orderItem.findUniqueOrThrow({
+      where: { id: updateDto.orderItemId },
       include: {
         product: true,
         order: true,
