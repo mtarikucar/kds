@@ -218,8 +218,15 @@ export class PublicStatsService {
   private async calculateAndCacheStats() {
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    // ISO/TR week starts Monday. getDay() returns Sunday=0..Saturday=6,
+    // so Sunday must roll back 6 days, everything else (dayOfWeek - 1).
+    // The previous calculation rolled back to Sunday, which made the
+    // "this week" counter reset a day early and mis-aligned the WoW
+    // comparisons used by the marketing dashboard.
+    const dayOfWeek = startOfToday.getDay();
+    const daysSinceMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
     const startOfWeek = new Date(startOfToday);
-    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+    startOfWeek.setDate(startOfToday.getDate() - daysSinceMonday);
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const [
@@ -236,11 +243,14 @@ export class PublicStatsService {
     ] = await Promise.all([
       // Total views
       this.prisma.pageView.count(),
-      // Unique visitors (by ipHash)
-      this.prisma.pageView.groupBy({
-        by: ['ipHash'],
-        _count: true,
-      }).then(result => result.length),
+      // Unique visitors — `COUNT(DISTINCT ipHash)` is computed in the DB
+      // and returns a single integer. The previous `groupBy(['ipHash'])`
+      // path materialised every distinct hash into a JS array just to
+      // call .length on it, which doesn't scale past a few hundred
+      // thousand rows.
+      this.prisma.$queryRaw<{ count: bigint }[]>`
+        SELECT COUNT(DISTINCT "ipHash")::bigint AS count FROM "page_views"
+      `.then((rows) => Number(rows[0]?.count ?? 0)),
       // Views today
       this.prisma.pageView.count({
         where: { createdAt: { gte: startOfToday } },
