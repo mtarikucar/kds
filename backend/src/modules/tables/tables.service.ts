@@ -4,6 +4,7 @@ import {
   ConflictException,
   BadRequestException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { KdsGateway } from '../kds/kds.gateway';
 import { CreateTableDto, TableStatus } from './dto/create-table.dto';
@@ -254,10 +255,17 @@ export class TablesService {
       }
     }
 
-    return this.prisma.table.update({
-      where: { id },
+    // Compound WHERE — IDOR guard (B41-B45 pattern). findOne above is
+    // a TOCTOU check; the write also has to be tenant-scoped so a
+    // regression there can't leak into a cross-tenant rename.
+    const claim = await this.prisma.table.updateMany({
+      where: { id, tenantId },
       data: updateTableDto,
     });
+    if (claim.count === 0) {
+      throw new NotFoundException('Table not found');
+    }
+    return this.prisma.table.findFirst({ where: { id, tenantId } });
   }
 
   async updateStatus(id: string, updateStatusDto: UpdateTableStatusDto, tenantId: string) {
@@ -332,22 +340,27 @@ export class TablesService {
         throw new NotFoundException('One or more tables not found');
       }
 
-      // Check if any table is already in a different group
+      // Cross-group merge protection. Previously a user picking one
+      // table out of group A and one out of group B would silently
+      // pull every member of both groups into a single new group.
+      // That violates least-surprise — the user only selected 2
+      // tables but ended up with a 10-table merge. Refuse instead;
+      // operator must unmerge the existing groups first if that's
+      // really what they want.
       const existingGroupIds = tables
-        .map(t => t.groupId)
+        .map((t) => t.groupId)
         .filter(Boolean) as string[];
       const uniqueGroups = [...new Set(existingGroupIds)];
 
+      if (uniqueGroups.length > 1) {
+        throw new ConflictException(
+          'One or more selected tables already belong to different merged groups. ' +
+            'Unmerge them first before creating a new merge.',
+        );
+      }
+
       // Use existing groupId if one of the tables is already in a group, otherwise create new
       const groupId = uniqueGroups.length > 0 ? uniqueGroups[0] : randomUUID();
-
-      // If multiple groups exist, merge them all into one
-      if (uniqueGroups.length > 1) {
-        await tx.table.updateMany({
-          where: { groupId: { in: uniqueGroups }, tenantId },
-          data: { groupId },
-        });
-      }
 
       // Assign groupId to all requested tables
       await tx.table.updateMany({
@@ -454,12 +467,25 @@ export class TablesService {
     }
 
     const allOrders = tables.flatMap(t => t.orders);
-    const totalAmount = allOrders.reduce((sum, o) => sum + Number(o.finalAmount), 0);
-    const totalPaid = allOrders.reduce((sum, o) =>
-      sum + o.payments
-        .filter(p => p.status === 'COMPLETED')
-        .reduce((ps, p) => ps + Number(p.amount), 0),
-      0
+    // Sum in Decimal so the bill summary doesn't drift on groups with
+    // 10+ orders. The rest of the payments stack uses Prisma.Decimal
+    // end-to-end; coercing to Number here would re-introduce the
+    // float-precision drift the orders service spent effort avoiding.
+    const totalAmount = allOrders.reduce(
+      (sum, o) => sum.add(new Prisma.Decimal(o.finalAmount as any)),
+      new Prisma.Decimal(0),
+    );
+    const totalPaid = allOrders.reduce(
+      (sum, o) =>
+        sum.add(
+          o.payments
+            .filter((p) => p.status === 'COMPLETED')
+            .reduce(
+              (ps, p) => ps.add(new Prisma.Decimal(p.amount as any)),
+              new Prisma.Decimal(0),
+            ),
+        ),
+      new Prisma.Decimal(0),
     );
 
     return {
@@ -474,9 +500,9 @@ export class TablesService {
       orders: allOrders,
       summary: {
         totalOrders: allOrders.length,
-        totalAmount,
-        totalPaid,
-        remainingAmount: totalAmount - totalPaid,
+        totalAmount: totalAmount.toNumber(),
+        totalPaid: totalPaid.toNumber(),
+        remainingAmount: totalAmount.sub(totalPaid).toNumber(),
       },
     };
   }
