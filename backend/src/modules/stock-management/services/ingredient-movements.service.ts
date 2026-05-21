@@ -74,7 +74,11 @@ export class IngredientMovementsService {
       // amount and oversell. Filter on the observed currentStock so
       // only one wins; the loser retries via the BadRequest below.
       const updated = await tx.stockItem.updateMany({
-        where: { id: stockItem.id, currentStock: stockItem.currentStock },
+        where: {
+          id: stockItem.id,
+          tenantId,
+          currentStock: stockItem.currentStock,
+        },
         data: { currentStock: newStock },
       });
       if (updated.count === 0) {

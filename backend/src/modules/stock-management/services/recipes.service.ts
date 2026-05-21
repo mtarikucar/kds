@@ -156,7 +156,14 @@ export class RecipesService {
     logger.warn(
       `Recipe ${recipe.name ?? recipe.id} removed for product ${recipe.productId}; ingredient auto-deduction for this product has stopped.`,
     );
-    return this.prisma.recipe.delete({ where: { id } });
+    // Compound WHERE — defence-in-depth IDOR (B41-B45 pattern).
+    const result = await this.prisma.recipe.deleteMany({
+      where: { id, tenantId },
+    });
+    if (result.count === 0) {
+      throw new BadRequestException('Recipe not found');
+    }
+    return { id };
   }
 
   async checkStock(id: string, tenantId: string, quantity: number = 1) {

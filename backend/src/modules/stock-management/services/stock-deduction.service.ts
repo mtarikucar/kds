@@ -254,47 +254,56 @@ export class StockDeductionService {
     });
     const reversedItems = new Set(existingReversals.map((m) => m.stockItemId));
 
-    return this.prisma.$transaction(async (tx) => {
-      for (const movement of movements) {
-        if (reversedItems.has(movement.stockItemId)) continue;
+    return this.prisma.$transaction(
+      async (tx) => {
+        for (const movement of movements) {
+          if (reversedItems.has(movement.stockItemId)) continue;
 
-        const reverseQty = new Prisma.Decimal(movement.quantity).abs();
+          const reverseQty = new Prisma.Decimal(movement.quantity).abs();
 
-        const stockItem = await tx.stockItem.findFirst({
-          where: { id: movement.stockItemId, tenantId },
+          const stockItem = await tx.stockItem.findFirst({
+            where: { id: movement.stockItemId, tenantId },
+          });
+          if (!stockItem) continue;
+
+          // Defence-in-depth: tenantId in the WHERE so a regression of
+          // the pre-check can't expose cross-tenant stock writes.
+          await tx.stockItem.updateMany({
+            where: { id: movement.stockItemId, tenantId },
+            data: { currentStock: { increment: reverseQty as any } },
+          });
+
+          await tx.ingredientMovement.create({
+            data: {
+              type: IngredientMovementType.ORDER_REVERSAL,
+              quantity: reverseQty as any,
+              costPerUnit: movement.costPerUnit ?? undefined,
+              notes: `Reversal: order cancellation (${movement.notes ?? ''})`.trim(),
+              referenceType: 'ORDER_REVERSAL',
+              referenceId: orderId,
+              stockItemId: movement.stockItemId,
+              tenantId,
+              createdById: userId,
+            },
+          });
+        }
+
+        // Flip the deduction flag back so a future re-deduction is
+        // allowed (rare: re-opening a cancelled order).
+        await tx.order.updateMany({
+          where: { id: orderId, tenantId },
+          data: { stockDeducted: false },
         });
-        if (!stockItem) continue;
 
-        await tx.stockItem.update({
-          where: { id: movement.stockItemId },
-          data: { currentStock: { increment: reverseQty as any } },
-        });
-
-        await tx.ingredientMovement.create({
-          data: {
-            type: IngredientMovementType.ORDER_REVERSAL,
-            quantity: reverseQty as any,
-            costPerUnit: movement.costPerUnit ?? undefined,
-            notes: `Reversal: order cancellation (${movement.notes ?? ''})`.trim(),
-            referenceType: 'ORDER_REVERSAL',
-            referenceId: orderId,
-            stockItemId: movement.stockItemId,
-            tenantId,
-            createdById: userId,
-          },
-        });
-      }
-
-      // Flip the deduction flag back so a future re-deduction is allowed
-      // (rare: re-opening a cancelled order).
-      await tx.order.updateMany({
-        where: { id: orderId, tenantId },
-        data: { stockDeducted: false },
-      });
-
-      this.logger.log(
-        `Reversed ingredient deductions for order ${orderId}: ${movements.length - reversedItems.size} items`,
-      );
-    });
+        this.logger.log(
+          `Reversed ingredient deductions for order ${orderId}: ${movements.length - reversedItems.size} items`,
+        );
+      },
+      // Serializable isolation mirrors `deductForOrder` — concurrent
+      // reversals (rare but possible if cancel + refund fire together)
+      // must not both see the same "not yet reversed" snapshot and
+      // double-credit the stock back.
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 }

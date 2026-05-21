@@ -101,9 +101,19 @@ export class StockCountsService {
 
     const variance = dto.countedQty - Number(countItem.expectedQty);
 
-    return this.prisma.stockCountItem.update({
-      where: { id: itemId },
+    // Defence-in-depth: stockCountItem doesn't carry tenantId directly,
+    // but the parent `count` row does — scope by both the row id and
+    // its parent count's tenantId so a regression of the pre-check
+    // above can't be exploited cross-tenant.
+    const result = await this.prisma.stockCountItem.updateMany({
+      where: { id: itemId, stockCount: { tenantId } },
       data: { countedQty: dto.countedQty, variance },
+    });
+    if (result.count === 0) {
+      throw new NotFoundException('Stock count item not found');
+    }
+    return this.prisma.stockCountItem.findUnique({
+      where: { id: itemId },
       include: { stockItem: { select: { id: true, name: true, unit: true } } },
     });
   }
@@ -159,9 +169,13 @@ export class StockCountsService {
         });
       }
 
-      return tx.stockCount.update({
-        where: { id },
+      // Defence-in-depth IDOR — tenantId in the WHERE.
+      await tx.stockCount.updateMany({
+        where: { id, tenantId },
         data: { status: StockCountStatus.COMPLETED, completedAt: new Date() },
+      });
+      return tx.stockCount.findUnique({
+        where: { id },
         include: {
           items: {
             include: { stockItem: { select: { id: true, name: true, unit: true, currentStock: true } } },
@@ -177,9 +191,11 @@ export class StockCountsService {
       throw new BadRequestException('Can only cancel an in-progress count');
     }
 
-    return this.prisma.stockCount.update({
-      where: { id },
+    // Defence-in-depth IDOR — tenantId in the WHERE.
+    await this.prisma.stockCount.updateMany({
+      where: { id, tenantId },
       data: { status: StockCountStatus.CANCELLED },
     });
+    return this.prisma.stockCount.findUnique({ where: { id } });
   }
 }
