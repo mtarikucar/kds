@@ -111,6 +111,12 @@ export class SubscriptionSchedulerService {
         where: {
           status: SubscriptionStatus.ACTIVE,
           currentPeriodEnd: { lt: now },
+          // Tenants who already opted to cancel-at-period-end are
+          // handled by `pending-cancellations` (00:00 cron) — they
+          // belong in CANCELLED, not PAST_DUE. Filtering them out
+          // here also prevents the "renew now" past-due email from
+          // contradicting the cancellation they just confirmed.
+          cancelAtPeriodEnd: false,
         },
         include: { plan: true, tenant: { select: { id: true, name: true } } },
         orderBy: { currentPeriodEnd: "asc" },

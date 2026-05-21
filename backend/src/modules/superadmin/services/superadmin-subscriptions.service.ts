@@ -21,6 +21,7 @@ import { SubscriptionService } from "../../subscriptions/services/subscription.s
 import { SubscriptionSchedulerService } from "../../subscriptions/services/subscription-scheduler.service";
 import { PaytrAdapter } from "../../payments/adapters/paytr.adapter";
 import { PaymentStatus } from "../../../common/constants/subscription.enum";
+import { captureException } from "../../../sentry.config";
 
 @Injectable()
 export class SuperAdminSubscriptionsService {
@@ -615,33 +616,63 @@ export class SuperAdminSubscriptionsService {
       );
     }
 
+    // PayTR has now moved real money. Any failure in the DB update or
+    // audit log below means we owe an ops alert — PayTR's panel will
+    // show REFUNDED, our SubscriptionPayment will still show SUCCEEDED,
+    // and the next refund attempt would double-refund (PayTR will
+    // reject with "already refunded", we won't know).
     const now = new Date();
-    const updated = await this.prisma.subscriptionPayment.update({
-      where: { id: payment.id },
-      data: {
-        status: PaymentStatus.REFUNDED,
-        refundedAt: now,
-      },
-    });
+    try {
+      const updated = await this.prisma.subscriptionPayment.update({
+        where: { id: payment.id },
+        data: {
+          status: PaymentStatus.REFUNDED,
+          refundedAt: now,
+        },
+      });
 
-    await this.auditService.log({
-      action: AuditAction.REFUND,
-      entityType: EntityType.SUBSCRIPTION,
-      entityId: subscriptionId,
-      actorId,
-      actorEmail,
-      previousData: { status: "SUCCEEDED", amount: paymentAmount.toString() },
-      newData: {
-        status: "REFUNDED",
-        refundedAmount: refundAmount.toString(),
+      await this.auditService.log({
+        action: AuditAction.REFUND,
+        entityType: EntityType.SUBSCRIPTION,
+        entityId: subscriptionId,
+        actorId,
+        actorEmail,
+        previousData: { status: "SUCCEEDED", amount: paymentAmount.toString() },
+        newData: {
+          status: "REFUNDED",
+          refundedAmount: refundAmount.toString(),
+          paymentId: payment.id,
+          merchantOid: payment.paytrMerchantOid,
+          reason: dto.reason,
+        },
+        targetTenantId: payment.subscription.tenantId,
+        targetTenantName: payment.subscription.tenant.name,
+      });
+
+      return updated;
+    } catch (err: any) {
+      this.logger.error(
+        `Refund succeeded on PayTR but DB update failed for payment=${payment.id} merchantOid=${payment.paytrMerchantOid}: ${err?.message ?? err}`,
+      );
+      captureException(err, {
+        severity: "critical",
+        context: "refund-success-db-update-failed",
         paymentId: payment.id,
-        merchantOid: payment.paytrMerchantOid,
-        reason: dto.reason,
-      },
-      targetTenantId: payment.subscription.tenantId,
-      targetTenantName: payment.subscription.tenant.name,
-    });
-
-    return updated;
+        paytrMerchantOid: payment.paytrMerchantOid,
+        refundAmount: refundAmount.toString(),
+        actorId,
+        actorEmail,
+      });
+      // Surface a coded error to ops so they know the difference between
+      // "PayTR rejected" and "PayTR succeeded but we're inconsistent".
+      throw new BadRequestException({
+        statusCode: 400,
+        error: "Refund Partially Applied",
+        code: "REFUND_APPLIED_DB_INCONSISTENT",
+        message:
+          "PayTR refund succeeded but local payment state could not be updated. " +
+          "Ops has been alerted — do NOT retry the refund (PayTR will reject as duplicate).",
+      });
+    }
   }
 }
