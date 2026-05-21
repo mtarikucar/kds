@@ -190,6 +190,12 @@ export class CustomersService {
   }
 
   async updateStatistics(customerId: string, tenantId: string, orderAmount: number | Prisma.Decimal) {
+    // Serializable isolation: the read-modify-write below is a classic
+    // lost-update target — two concurrent orders for the same customer
+    // would each read totalOrders=N, both write N+1, and the database
+    // would land at N+1 instead of N+2. Postgres' default READ
+    // COMMITTED doesn't catch this; Serializable does (the second tx
+    // gets a 40001 and Prisma retries it).
     return this.prisma.$transaction(async (tx) => {
       const customer = await tx.customer.findFirst({
         where: { id: customerId, tenantId },
@@ -212,7 +218,7 @@ export class CustomersService {
       });
       if (result.count !== 1) throw new BadRequestException('Customer update race');
       return tx.customer.findFirstOrThrow({ where: { id: customerId, tenantId } });
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
   async getAnalytics(tenantId: string, options?: { startDate?: Date; endDate?: Date }) {
