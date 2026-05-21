@@ -11,6 +11,7 @@ import { randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PaytrAdapter } from './adapters/paytr.adapter';
 import { SubscriptionService } from '../subscriptions/services/subscription.service';
+import { ConsentService } from '../legal/services/consent.service';
 import {
   BillingCycle,
   PaymentProvider,
@@ -42,6 +43,7 @@ export class PaymentsService {
     private readonly paytr: PaytrAdapter,
     private readonly config: ConfigService,
     private readonly subscriptions: SubscriptionService,
+    private readonly consents: ConsentService,
   ) {}
 
   /**
@@ -61,6 +63,7 @@ export class PaymentsService {
     userId: string,
     dto: CreateIntentDto,
     userIp: string,
+    userAgent?: string,
   ): Promise<CreateIntentResult> {
     const [tenant, callingUser] = await Promise.all([
       this.prisma.tenant.findUnique({
@@ -133,6 +136,29 @@ export class PaymentsService {
         'Cannot create a payment intent for the FREE plan',
       );
     }
+
+    // Legal consent gate — three required documents (KVKK + Mesafeli
+    // Satış + İade) must be checked at the checkout step. ConsentService
+    // verifies the ids point to the current `isCurrent=true` rows of
+    // those three kinds, then writes three Consent rows in one
+    // transaction with ip + userAgent for KVKK audit. Trial activation
+    // counts as "agreeing to the contract" too — gate fires before the
+    // trial-eligible short-circuit below so even free trials require
+    // explicit acceptance.
+    if (!dto.acceptedDocumentIds || dto.acceptedDocumentIds.length === 0) {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'Legal Consent Required',
+        code: 'LEGAL_CONSENT_REQUIRED',
+        message:
+          'Devam etmek için KVKK, Mesafeli Satış ve İade politikalarını onaylamanız gerekiyor.',
+      });
+    }
+    await this.consents.verifyAndRecord(dto.acceptedDocumentIds, {
+      userId,
+      ipAddress: userIp,
+      userAgent,
+    });
 
     const amount =
       dto.billingCycle === BillingCycle.MONTHLY ? plan.monthlyPrice : plan.yearlyPrice;

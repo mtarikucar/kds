@@ -39,6 +39,18 @@ export class PaymentsController {
       req.ip ||
       req.socket?.remoteAddress ||
       '0.0.0.0';
-    return this.payments.createIntent(req.user.tenantId, req.user.id, dto, userIp);
+    // userAgent feeds into the Consent audit row alongside ip. KVKK
+    // expects "kim onayladı, hangi cihazdan" answerable later.
+    const userAgent =
+      typeof req.headers['user-agent'] === 'string'
+        ? (req.headers['user-agent'] as string).slice(0, 500)
+        : undefined;
+    return this.payments.createIntent(
+      req.user.tenantId,
+      req.user.id,
+      dto,
+      userIp,
+      userAgent,
+    );
   }
 }

@@ -4,7 +4,13 @@ import { mockPrismaClient, MockPrismaClient } from '../../common/test/prisma-moc
 
 describe('PaymentsService', () => {
   describe('merchantOid generator', () => {
-    const svc = new PaymentsService(null as any, null as any, null as any, null as any);
+    const svc = new PaymentsService(
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+      null as any,
+    );
 
     function oid(tenantId: string): string {
       return (svc as any).generateMerchantOid(tenantId);
@@ -77,14 +83,23 @@ describe('PaymentsService', () => {
         },
       };
       subscriptions = { startTrialFromIntent: jest.fn().mockResolvedValue({}) };
-      svc = new PaymentsService(prisma as any, paytr, config, subscriptions);
+      const consents = {
+        verifyAndRecord: jest.fn().mockResolvedValue(undefined),
+      };
+      svc = new PaymentsService(
+        prisma as any,
+        paytr,
+        config,
+        subscriptions,
+        consents as any,
+      );
     });
 
     it('throws NotFoundException when tenant is missing', async () => {
       prisma.tenant.findUnique.mockResolvedValue(null);
       prisma.user.findUnique.mockResolvedValue({ emailVerified: true } as any);
       await expect(
-        svc.createIntent(TENANT_ID, USER_ID, { planId: PLAN_ID, billingCycle: 'MONTHLY' }, '127.0.0.1'),
+        svc.createIntent(TENANT_ID, USER_ID, { planId: PLAN_ID, billingCycle: 'MONTHLY', acceptedDocumentIds: ['11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333'] }, '127.0.0.1'),
       ).rejects.toBeInstanceOf(NotFoundException);
     });
 
@@ -102,7 +117,7 @@ describe('PaymentsService', () => {
       } as any);
       prisma.subscriptionPlan.findUnique.mockResolvedValue(proPlan);
       await expect(
-        svc.createIntent(TENANT_ID, USER_ID, { planId: PLAN_ID, billingCycle: 'MONTHLY' }, '127.0.0.1'),
+        svc.createIntent(TENANT_ID, USER_ID, { planId: PLAN_ID, billingCycle: 'MONTHLY', acceptedDocumentIds: ['11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333'] }, '127.0.0.1'),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
@@ -117,7 +132,7 @@ describe('PaymentsService', () => {
       prisma.user.findUnique.mockResolvedValue({ emailVerified: true, email: 'a@b.com' } as any);
       prisma.subscriptionPlan.findUnique.mockResolvedValue({ ...proPlan, name: 'FREE' } as any);
       await expect(
-        svc.createIntent(TENANT_ID, USER_ID, { planId: PLAN_ID, billingCycle: 'MONTHLY' }, '127.0.0.1'),
+        svc.createIntent(TENANT_ID, USER_ID, { planId: PLAN_ID, billingCycle: 'MONTHLY', acceptedDocumentIds: ['11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333'] }, '127.0.0.1'),
       ).rejects.toBeInstanceOf(BadRequestException);
     });
 
@@ -137,7 +152,7 @@ describe('PaymentsService', () => {
       const result = await svc.createIntent(
         TENANT_ID,
         USER_ID,
-        { planId: PLAN_ID, billingCycle: 'MONTHLY' },
+        { planId: PLAN_ID, billingCycle: 'MONTHLY', acceptedDocumentIds: ['11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333'] },
         '127.0.0.1',
       );
 
@@ -188,7 +203,7 @@ describe('PaymentsService', () => {
       const result = await svc.createIntent(
         TENANT_ID,
         USER_ID,
-        { planId: PLAN_ID, billingCycle: 'MONTHLY' },
+        { planId: PLAN_ID, billingCycle: 'MONTHLY', acceptedDocumentIds: ['11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222', '33333333-3333-3333-3333-333333333333'] },
         '127.0.0.1',
       );
 

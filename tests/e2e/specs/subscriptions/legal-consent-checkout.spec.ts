@@ -51,12 +51,21 @@ test.describe('Checkout — legal consent gate', () => {
     const res = await api.post('payments/create-intent', {
       data: { planId: paid.id, billingCycle: 'MONTHLY' },
     });
-    // Backend short-circuits at the consent gate before any other
-    // upstream check (plan, PayTR, trial). Either the consent error
-    // or the email-verified gate may fire first depending on demo
-    // user state — both are 400 and demonstrate "no consent → no
-    // intent".
     expect(res.status()).toBe(400);
+    // Assert the specific error code, not just the status. Without
+    // this assertion the test was previously passing for the wrong
+    // reason (PROFILE_PHONE_REQUIRED was also 400) and let a regression
+    // ship that effectively disabled the consent gate.
+    const body = await res.json();
+    // DTO validation fires first (acceptedDocumentIds missing). The
+    // service-level LEGAL_CONSENT_REQUIRED code only surfaces if the
+    // DTO is bypassed; in the normal path we get a class-validator
+    // error array. Either is acceptable proof the gate is engaged.
+    const isDtoRejection =
+      Array.isArray(body.message) &&
+      body.message.some((m: string) => /acceptedDocumentIds/i.test(m));
+    const isServiceRejection = body.code === 'LEGAL_CONSENT_REQUIRED';
+    expect(isDtoRejection || isServiceRejection).toBe(true);
   });
 
   test('create-intent with two-of-three accepted ids is refused (missing one kind)', async () => {

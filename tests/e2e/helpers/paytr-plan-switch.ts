@@ -1,7 +1,33 @@
-import { APIRequestContext } from '@playwright/test';
+import { APIRequestContext, request } from '@playwright/test';
 import { simulatePaytrSuccess, simulatePaytrFailure } from './paytr-webhook';
-import { loginAsApi, loginAsSuperAdmin } from './api';
+import { loginAsApi, loginAsSuperAdmin, API_BASE } from './api';
 import { getPlanIdByName, PlanName } from './plans';
+
+/**
+ * Resolve the three current legal-document ids that create-intent
+ * expects. Public endpoint — no auth required. Cached per process so
+ * each spec doesn't re-fetch 3 times.
+ */
+let cachedLegalIds: string[] | null = null;
+async function fetchAcceptedDocumentIds(): Promise<string[]> {
+  if (cachedLegalIds) return cachedLegalIds;
+  const ctx = await request.newContext({ baseURL: API_BASE });
+  try {
+    const kinds = ['KVKK', 'DISTANCE_SALES', 'REFUND_POLICY'] as const;
+    const ids = await Promise.all(
+      kinds.map(async (kind) => {
+        const r = await ctx.get(`legal/documents/${kind}/current`);
+        if (!r.ok()) throw new Error(`legal ${kind}: ${r.status()}`);
+        const body = await r.json();
+        return body.id as string;
+      }),
+    );
+    cachedLegalIds = ids;
+    return ids;
+  } finally {
+    await ctx.dispose();
+  }
+}
 
 /**
  * PayTR-driven plan switch helper.
@@ -117,8 +143,9 @@ export async function upgradeViaPayTR(
     );
   }
 
+  const acceptedDocumentIds = await fetchAcceptedDocumentIds();
   const res = await adminApi.post('payments/create-intent', {
-    data: { planId: target.id, billingCycle },
+    data: { planId: target.id, billingCycle, acceptedDocumentIds },
   });
   if (!res.ok()) {
     throw new Error(`create-intent ${targetPlan}: ${res.status()} ${await res.text()}`);
@@ -219,8 +246,9 @@ export async function attemptUpgradeWithFailure(
     throw new Error(`attemptUpgradeWithFailure: ${targetPlan} is not an upgrade from ${current.plan.name}`);
   }
 
+  const acceptedDocumentIds = await fetchAcceptedDocumentIds();
   const res = await adminApi.post('payments/create-intent', {
-    data: { planId: target.id, billingCycle },
+    data: { planId: target.id, billingCycle, acceptedDocumentIds },
   });
   if (!res.ok()) {
     throw new Error(`create-intent: ${res.status()} ${await res.text()}`);

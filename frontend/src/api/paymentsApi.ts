@@ -7,6 +7,14 @@ export type BillingCycle = 'MONTHLY' | 'YEARLY';
 export interface CreateIntentRequest {
   planId: string;
   billingCycle: BillingCycle;
+  /**
+   * IDs of the three current legal documents (KVKK + Mesafeli Satış +
+   * İade Politikası) the user just checked at checkout. Backend
+   * verifies these match the current `isCurrent=true` rows and writes
+   * three audit Consent rows before minting a PayTR token. Required —
+   * backend 400s with code `LEGAL_CONSENT_REQUIRED` if omitted.
+   */
+  acceptedDocumentIds: string[];
 }
 
 export interface CreateIntentResponse {
