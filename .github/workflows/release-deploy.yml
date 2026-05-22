@@ -43,6 +43,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # composite action under .github/actions/ requires the repo to be
+      # checked out before `uses: ./...` can resolve.
+      - name: Checkout (for composite action)
+        uses: actions/checkout@v4
+
       - name: Production API liveness (HARD)
         run: |
           set -euo pipefail
