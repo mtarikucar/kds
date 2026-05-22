@@ -710,9 +710,31 @@ export class SubscriptionService {
     // Manual-renewal model: no PayTR-side token to revoke (we never
     // store one), no auto-renew flag to flip off. Cancellation is now
     // a single subscription update.
-    const updated = await this.prisma.subscription.update({
-      where: { id: subscriptionId },
+    //
+    // Compound WHERE: tenantId IDOR defence-in-depth + status not
+    // already CANCELLED. Without the status guard, two admins clicking
+    // "Cancel immediate" and "Cancel at period end" within the same
+    // millisecond both pass the status check above, then one writes
+    // status=CANCELLED + endedAt and the other writes
+    // cancelAtPeriodEnd=true on the now-CANCELLED row — landing the
+    // subscription with cancelAtPeriodEnd=true AND status=CANCELLED,
+    // which the period-end cron then re-cancels at period boundary,
+    // sending a confusing follow-up email.
+    const claim = await this.prisma.subscription.updateMany({
+      where: {
+        id: subscriptionId,
+        tenantId,
+        status: { not: SubscriptionStatus.CANCELLED },
+      },
       data,
+    });
+    if (claim.count === 0) {
+      throw new BadRequestException(
+        'Subscription state changed concurrently — refresh and retry.',
+      );
+    }
+    const updated = await this.prisma.subscription.findUniqueOrThrow({
+      where: { id: subscriptionId },
       include: { plan: true, tenant: true },
     });
 
@@ -758,11 +780,27 @@ export class SubscriptionService {
         "Can only reactivate subscriptions that are set to cancel at period end",
       );
     }
-    const updated = await this.prisma.subscription.update({
-      where: { id: subscriptionId },
-      data: {
-        cancelAtPeriodEnd: false,
+    // Compound WHERE: tenantId IDOR + cancelAtPeriodEnd=true guard.
+    // A concurrent "Cancel immediate" from another admin would already
+    // have set status=CANCELLED; reactivating that row would silently
+    // flip cancelAtPeriodEnd=false while leaving the subscription
+    // CANCELLED — invariant break.
+    const claim = await this.prisma.subscription.updateMany({
+      where: {
+        id: subscriptionId,
+        tenantId,
+        cancelAtPeriodEnd: true,
+        status: { not: SubscriptionStatus.CANCELLED },
       },
+      data: { cancelAtPeriodEnd: false },
+    });
+    if (claim.count === 0) {
+      throw new BadRequestException(
+        'Subscription state changed concurrently — refresh and retry.',
+      );
+    }
+    const updated = await this.prisma.subscription.findUniqueOrThrow({
+      where: { id: subscriptionId },
       include: { plan: true },
     });
     return updated;

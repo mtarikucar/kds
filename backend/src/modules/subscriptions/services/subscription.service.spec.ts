@@ -308,16 +308,22 @@ describe('SubscriptionService.cancelSubscription', () => {
 
     // getSubscriptionById uses findUnique({ id })
     prisma.subscription.findUnique.mockResolvedValue(activeSub);
-    prisma.subscription.update.mockResolvedValue(activeSub);
+    // Race-safe cancel path: updateMany + count check, then re-read
+    // via findUniqueOrThrow. Mirror both in the mocks.
+    prisma.subscription.updateMany.mockResolvedValue({ count: 1 } as any);
+    prisma.subscription.findUniqueOrThrow.mockResolvedValue(activeSub);
     prisma.user.findFirst.mockResolvedValue({ email: 'admin@example.com' } as any);
   });
 
   it('immediate=true → writes CANCELLED + cancelledAt + endedAt', async () => {
     await svc.cancelSubscription(SUB_ID, TENANT_ID, true, 'no longer needed');
 
-    expect(prisma.subscription.update).toHaveBeenCalledWith(
+    expect(prisma.subscription.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: SUB_ID },
+        where: expect.objectContaining({
+          id: SUB_ID,
+          tenantId: TENANT_ID,
+        }),
         data: expect.objectContaining({
           status: 'CANCELLED',
           cancelledAt: expect.any(Date),
@@ -331,7 +337,7 @@ describe('SubscriptionService.cancelSubscription', () => {
   it('immediate=false → writes cancelAtPeriodEnd=true (deferred)', async () => {
     await svc.cancelSubscription(SUB_ID, TENANT_ID, false, 'will let it expire');
 
-    expect(prisma.subscription.update).toHaveBeenCalledWith(
+    expect(prisma.subscription.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           cancelAtPeriodEnd: true,
@@ -340,7 +346,7 @@ describe('SubscriptionService.cancelSubscription', () => {
       }),
     );
     // No endedAt set on deferred cancellation
-    const call = (prisma.subscription.update as any).mock.calls[0][0];
+    const call = (prisma.subscription.updateMany as any).mock.calls[0][0];
     expect(call.data.endedAt).toBeUndefined();
   });
 
