@@ -1,0 +1,199 @@
+name: DB Baseline (manual)
+
+# One-shot remedial workflow for the "hidden P3005" case the doctor
+# reports: the database already has every migration's schema, but
+# `_prisma_migrations` is empty so prisma refuses to deploy. This
+# workflow loops over `prisma/migrations/*` and marks each one as
+# `--applied`, which is what the operator would do over SSH.
+#
+# Guard rails:
+#   - manual trigger only (workflow_dispatch). It never runs on push.
+#   - operator must type the exact confirmation phrase, per environment,
+#     before any state change is attempted.
+#   - dry-run mode prints the resolve plan without touching the DB.
+#   - prod-rollback IS available via deploy.sh — this workflow is the
+#     dual-purpose remediation for a DB that was never baselined, NOT
+#     a routine maintenance lever.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Which environment to baseline'
+        required: true
+        type: choice
+        options:
+          - staging
+          - prod
+      mode:
+        description: 'dry-run = list only, apply = actually mark each migration --applied'
+        required: true
+        default: 'dry-run'
+        type: choice
+        options:
+          - dry-run
+          - apply
+      confirm:
+        description: 'Type the environment name back (e.g. "staging" or "prod") to confirm.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Don't let a baseline race with a deploy.
+concurrency:
+  group: ${{ inputs.environment }}-deploy
+  cancel-in-progress: false
+
+env:
+  SERVER_HOST: '38.242.233.166'
+
+jobs:
+  baseline:
+    name: ${{ inputs.environment }} baseline (${{ inputs.mode }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Validate confirmation
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.confirm }}" != "${{ inputs.environment }}" ]; then
+            echo "::error::Confirmation '${{ inputs.confirm }}' does not match environment '${{ inputs.environment }}'."
+            echo "::error::Refusing to proceed."
+            exit 1
+          fi
+          echo "Confirmation OK — environment=${{ inputs.environment }}, mode=${{ inputs.mode }}."
+
+      - name: Checkout (for composite SSH action)
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: ./.github/actions/setup-ssh
+        with:
+          ssh-private-key-base64: ${{ secrets.SSH_PRIVATE_KEY_BASE64 }}
+          ssh-known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          server-host: ${{ env.SERVER_HOST }}
+
+      - name: Resolve container + DB names from environment
+        id: cfg
+        run: |
+          set -euo pipefail
+          if [ "${{ inputs.environment }}" = "prod" ]; then
+            echo "backend_container=kds_backend_prod"       >> "$GITHUB_OUTPUT"
+            echo "postgres_container=kds_postgres_prod"     >> "$GITHUB_OUTPUT"
+            echo "db_name=restaurant_pos_prod"              >> "$GITHUB_OUTPUT"
+          else
+            echo "backend_container=kds_backend_staging"    >> "$GITHUB_OUTPUT"
+            echo "postgres_container=kds_postgres_staging"  >> "$GITHUB_OUTPUT"
+            echo "db_name=restaurant_pos_staging"           >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Pre-baseline DB sanity
+        env:
+          PG: ${{ steps.cfg.outputs.postgres_container }}
+          DB: ${{ steps.cfg.outputs.db_name }}
+        run: |
+          set -euo pipefail
+          ssh root@${{ env.SERVER_HOST }} "
+            set -euo pipefail
+            echo '--- User tables ---'
+            tbl=\$(docker exec $PG psql -U postgres -d $DB -tAc \
+              \"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_name NOT LIKE '_prisma%'\")
+            echo \"user_tables = \$tbl\"
+
+            echo '--- _prisma_migrations status ---'
+            has=\$(docker exec $PG psql -U postgres -d $DB -tAc \
+              \"SELECT to_regclass('public._prisma_migrations') IS NOT NULL\")
+            echo \"has_prisma_table = \$has\"
+
+            if [ \"\$has\" = 't' ]; then
+              docker exec $PG psql -U postgres -d $DB -c \
+                \"SELECT migration_name, finished_at IS NOT NULL AS finished, rolled_back_at IS NOT NULL AS rolled_back FROM _prisma_migrations ORDER BY started_at DESC LIMIT 20;\"
+              applied=\$(docker exec $PG psql -U postgres -d $DB -tAc \
+                \"SELECT COUNT(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL\")
+              echo \"applied_migrations = \$applied\"
+            fi
+          "
+
+      - name: Refuse to baseline a DB that already has applied rows
+        env:
+          PG: ${{ steps.cfg.outputs.postgres_container }}
+          DB: ${{ steps.cfg.outputs.db_name }}
+        run: |
+          set -euo pipefail
+          # Hard guard: if applied_migrations is non-zero, this workflow
+          # is the wrong tool. The hidden-P3005 case requires applied=0.
+          # Anything else is a "partially-baselined" situation that needs
+          # a human deciding which migrations are missing.
+          applied=$(ssh root@${{ env.SERVER_HOST }} "docker exec $PG psql -U postgres -d $DB -tAc \"SELECT COALESCE((SELECT COUNT(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL), 0)\" 2>/dev/null" | tr -d ' \r\n')
+          if [ "${applied:-0}" -gt 0 ]; then
+            echo "::error::_prisma_migrations already has $applied applied rows."
+            echo "::error::This workflow only baselines a completely-unbaselined DB."
+            echo "::error::For partial state, resolve each migration manually with"
+            echo "::error::  docker exec ${{ steps.cfg.outputs.backend_container }} npx prisma migrate resolve --applied <name>"
+            exit 1
+          fi
+          echo "applied_migrations=0 — safe to baseline."
+
+      - name: List migrations that would be applied
+        id: plan
+        env:
+          BACKEND: ${{ steps.cfg.outputs.backend_container }}
+        run: |
+          set -euo pipefail
+          # Pull the ordered migration list straight out of the container
+          # so we honour the same on-disk order prisma uses.
+          plan=$(ssh root@${{ env.SERVER_HOST }} "
+            docker exec $BACKEND sh -c 'cd /app && ls prisma/migrations | grep -E \"^[0-9]\" | sort'
+          ")
+          count=$(echo "$plan" | grep -c .)
+          echo "Migrations to baseline (in order):"
+          echo "$plan" | sed 's/^/  - /'
+          echo "Total: $count"
+          {
+            echo "count=$count"
+            echo 'plan<<EOF'
+            echo "$plan"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Apply baseline
+        if: inputs.mode == 'apply'
+        env:
+          BACKEND: ${{ steps.cfg.outputs.backend_container }}
+        run: |
+          set -euo pipefail
+          echo "Baselining ${{ steps.plan.outputs.count }} migrations against $BACKEND…"
+          ssh root@${{ env.SERVER_HOST }} "
+            set -euo pipefail
+            docker exec $BACKEND sh -c '
+              set -euo pipefail
+              cd /app
+              for m in \$(ls prisma/migrations | grep -E \"^[0-9]\" | sort); do
+                echo \"→ \$m\"
+                npx --no-install prisma migrate resolve --applied \"\$m\"
+              done
+              echo \"--- migrate status after baseline ---\"
+              npx --no-install prisma migrate status || true
+            '
+          "
+
+      - name: Dry-run summary
+        if: inputs.mode == 'dry-run'
+        run: |
+          echo "Dry-run only — no DB changes were made."
+          echo "Re-run this workflow with mode=apply to actually baseline."
+
+      - name: Post-baseline DB sanity (apply mode only)
+        if: inputs.mode == 'apply'
+        env:
+          PG: ${{ steps.cfg.outputs.postgres_container }}
+          DB: ${{ steps.cfg.outputs.db_name }}
+        run: |
+          set -euo pipefail
+          ssh root@${{ env.SERVER_HOST }} "
+            docker exec $PG psql -U postgres -d $DB -c \
+              \"SELECT COUNT(*) AS now_applied FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL;\"
+          "
+          echo "Now re-trigger the deploy workflow (push to test, or workflow_dispatch)."
