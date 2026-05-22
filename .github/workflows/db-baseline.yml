@@ -95,32 +95,43 @@ jobs:
           DB: ${{ steps.cfg.outputs.db_name }}
         run: |
           set -eo pipefail
-          set -x   # trace every command; previous runs died silently
-          # SQL is sent over stdin (`docker exec -i psql`) so we avoid
-          # the four-layer quoting nightmare that comes with `psql -c`
-          # inside `ssh "…"` inside a YAML `run: |` block. One value
-          # per line keeps the awk parser trivial.
-          read -r user_tables applied_migs < <(
-            cat <<'SQL' | ssh root@${{ env.SERVER_HOST }} "docker exec -i $PG psql -U postgres -d $DB -tA -F ' '" | tr -d '\r' | awk 'NF==2 { print $1, $2; exit }'
-          SELECT
-            (SELECT COUNT(*) FROM information_schema.tables
-               WHERE table_schema='public' AND table_name NOT LIKE '_prisma%'),
-            CASE WHEN to_regclass('public._prisma_migrations') IS NULL
-                 THEN 0
-                 ELSE (SELECT COUNT(*) FROM _prisma_migrations
-                         WHERE finished_at IS NOT NULL
-                           AND rolled_back_at IS NULL)
-            END;
-          SQL
-          )
+          # Helper: run a single SELECT against the staging/prod DB
+          # and print the trimmed scalar. -tAc = tuples-only, unaligned.
+          q() {
+            ssh root@${{ env.SERVER_HOST }} \
+              "docker exec $PG psql -U postgres -d $DB -tAc \"$1\"" \
+              | tr -d ' \r\n'
+          }
+
+          # 1) User-table count is always safe to query.
+          user_tables=$(q "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_name NOT LIKE '_prisma%'")
+
+          # 2) Migration-table presence — has_table is 't' or 'f'.
+          # Postgres won't lazily skip the ELSE branch of a CASE, so we
+          # CAN'T combine this into one query. The earlier attempt died
+          # with "relation _prisma_migrations does not exist" at parse
+          # time even though to_regclass returned NULL.
+          has_table=$(q "SELECT to_regclass('public._prisma_migrations') IS NOT NULL")
+
+          # 3) Applied count only if the migrations table exists.
+          if [ "$has_table" = "t" ]; then
+            applied_migs=$(q "SELECT COUNT(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL")
+          else
+            applied_migs=0
+          fi
+
           user_tables="${user_tables:-?}"
           applied_migs="${applied_migs:-?}"
-          set +x
           echo "user_tables        = $user_tables"
+          echo "has_prisma_table   = $has_table"
           echo "applied_migrations = $applied_migs"
 
           # Best-effort audit dump (last 20 rows if the table exists).
-          ssh root@${{ env.SERVER_HOST }} "docker exec $PG psql -U postgres -d $DB -c \"SELECT migration_name, finished_at IS NOT NULL AS finished, rolled_back_at IS NOT NULL AS rolled_back FROM _prisma_migrations ORDER BY started_at DESC LIMIT 20;\" 2>&1 || true"
+          if [ "$has_table" = "t" ]; then
+            ssh root@${{ env.SERVER_HOST }} "docker exec $PG psql -U postgres -d $DB -c \"SELECT migration_name, finished_at IS NOT NULL AS finished, rolled_back_at IS NOT NULL AS rolled_back FROM _prisma_migrations ORDER BY started_at DESC LIMIT 20;\" 2>&1 || true"
+          else
+            echo "(no _prisma_migrations table — audit dump skipped)"
+          fi
 
           # Hard fail if either probe value is non-numeric — we'd rather
           # abort than make a baseline decision on a parse error.
