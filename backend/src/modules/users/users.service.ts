@@ -118,19 +118,43 @@ export class UsersService {
 
     const hashedPassword = await bcrypt.hash(createUserDto.password, this.bcryptCost());
 
-    return this.prisma.user.create({
-      data: {
-        email: createUserDto.email,
-        password: hashedPassword,
-        firstName: createUserDto.firstName,
-        lastName: createUserDto.lastName,
-        role: createUserDto.role,
-        // Admin/Manager-created accounts are already vetted — skip the
-        // PENDING_APPROVAL flow used by public self-registration.
-        status: 'ACTIVE',
-        tenantId,
-      },
-      select: LIST_SELECT,
+    // Enforce the subscription's maxUsers cap. Without this, an ADMIN
+    // on a 3-user plan can mint 100 users — reactivateUser already
+    // checks it, this path used to bypass entirely. The cap check +
+    // insert must share a transaction so two concurrent creates can't
+    // both observe "below cap" and both succeed past the limit;
+    // PAST_DUE counts as live (same grace-window logic as
+    // PlanFeatureGuard / reactivateUser).
+    return this.prisma.$transaction(async (tx) => {
+      const subscription = await tx.subscription.findFirst({
+        where: { tenantId, status: { in: ['ACTIVE', 'TRIALING', 'PAST_DUE'] } },
+        include: { plan: true },
+      });
+      if (subscription?.plan && subscription.plan.maxUsers !== -1) {
+        const activeCount = await tx.user.count({
+          where: { tenantId, status: 'ACTIVE' },
+        });
+        if (activeCount >= subscription.plan.maxUsers) {
+          throw new ForbiddenException(
+            `User limit reached (${subscription.plan.maxUsers}). Upgrade your plan to add more users.`,
+          );
+        }
+      }
+
+      return tx.user.create({
+        data: {
+          email: createUserDto.email,
+          password: hashedPassword,
+          firstName: createUserDto.firstName,
+          lastName: createUserDto.lastName,
+          role: createUserDto.role,
+          // Admin/Manager-created accounts are already vetted — skip the
+          // PENDING_APPROVAL flow used by public self-registration.
+          status: 'ACTIVE',
+          tenantId,
+        },
+        select: LIST_SELECT,
+      });
     });
   }
 
