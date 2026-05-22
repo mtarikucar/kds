@@ -332,13 +332,25 @@ export class MarketingLeadsService {
       );
     }
 
-    const updatedLead = await this.prisma.lead.update({
-      where: { id },
+    // Compound WHERE on the original status closes the TOCTOU window
+    // between the transition validation above and the write. Without
+    // it two managers (or a manager + rep) racing both pass the
+    // ALLOWED_TRANSITIONS check from the same lead.status snapshot
+    // then last-writer-wins the status — silently skipping any state
+    // that was supposed to be sequential.
+    const claim = await this.prisma.lead.updateMany({
+      where: { id, status: lead.status },
       data: {
         status,
         ...(status === 'LOST' && lostReason ? { lostReason } : {}),
       },
     });
+    if (claim.count === 0) {
+      throw new BadRequestException(
+        'Lead status changed concurrently — refresh and retry.',
+      );
+    }
+    const updatedLead = await this.prisma.lead.findUniqueOrThrow({ where: { id } });
 
     await this.prisma.leadActivity.create({
       data: {
@@ -562,14 +574,29 @@ export class MarketingLeadsService {
         });
       }
 
-      const updatedLead = await tx.lead.update({
-        where: { id },
+      // CRITICAL: compound WHERE on `convertedTenantId: null` to make
+      // conversion idempotent under concurrent calls. Two managers
+      // hitting Convert at the same millisecond both passed the
+      // `lead.convertedTenantId` check at line 445 (READ COMMITTED
+      // can't see the other's uncommitted write), both reached this
+      // tx, and both proceeded to create a tenant + admin + commission
+      // — producing TWO orphan tenants and a DOUBLE commission row
+      // for ONE lead. The claim below makes the second tx's
+      // updateMany return count=0, and the surrounding catch will
+      // roll the whole second transaction back (its tenant + user +
+      // commission rows go away with it).
+      const claim = await tx.lead.updateMany({
+        where: { id, convertedTenantId: null },
         data: {
           status: 'WON',
           convertedTenantId: tenant.id,
           convertedAt: new Date(),
         },
       });
+      if (claim.count === 0) {
+        throw new ConflictException('Lead was converted concurrently');
+      }
+      const updatedLead = await tx.lead.findUniqueOrThrow({ where: { id } });
 
       // Cancel any open tasks attached to this lead — the rep no
       // longer needs reminders for a closed deal.
