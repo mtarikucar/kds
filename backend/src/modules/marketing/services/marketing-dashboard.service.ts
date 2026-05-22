@@ -7,6 +7,7 @@ export class MarketingDashboardService {
 
   async getStats(userId: string, userRole: string) {
     const where = userRole === 'SALES_REP' ? { assignedToId: userId } : {};
+    const isManager = userRole === 'SALES_MANAGER';
 
     const [
       totalLeads,
@@ -15,6 +16,7 @@ export class MarketingDashboardService {
       lostLeads,
       activeOffers,
       pendingTasks,
+      unassignedLeads,
     ] = await Promise.all([
       this.prisma.lead.count({ where }),
       this.prisma.lead.count({ where: { ...where, status: 'NEW' } }),
@@ -32,6 +34,13 @@ export class MarketingDashboardService {
           ...(userRole === 'SALES_REP' ? { assignedToId: userId } : {}),
         },
       }),
+      // Managers see how much of the pipeline is waiting on dispatch;
+      // for a rep this is always 0 (their own bucket is all assigned).
+      isManager
+        ? this.prisma.lead.count({
+            where: { assignedToId: null, status: { notIn: ['WON', 'LOST'] } },
+          })
+        : Promise.resolve(0),
     ]);
 
     const totalProcessed = wonLeads + lostLeads;
@@ -44,6 +53,10 @@ export class MarketingDashboardService {
       lostLeads,
       activeOffers,
       pendingTasks,
+      // Manager-only metric; UI hides the card when role !== manager,
+      // but expose the field unconditionally so a rep client doesn't
+      // crash on a missing key.
+      unassignedLeads,
       conversionRate: Math.round(conversionRate * 100) / 100,
     };
   }
@@ -164,18 +177,33 @@ export class MarketingDashboardService {
     if (reps.length === 0) return [];
 
     // Batch query for won leads this month instead of N+1
-    const wonCounts = await this.prisma.lead.groupBy({
-      by: ['assignedToId'],
-      where: {
-        assignedToId: { in: reps.map((r) => r.id) },
-        status: 'WON',
-        convertedAt: { gte: firstDay },
-      },
-      _count: { id: true },
-    });
+    const [wonCounts, openCounts] = await Promise.all([
+      this.prisma.lead.groupBy({
+        by: ['assignedToId'],
+        where: {
+          assignedToId: { in: reps.map((r) => r.id) },
+          status: 'WON',
+          convertedAt: { gte: firstDay },
+        },
+        _count: { id: true },
+      }),
+      // Open = non-terminal — answers "who is currently buried under
+      // work?" so the manager can decide where to (or not to) dispatch.
+      this.prisma.lead.groupBy({
+        by: ['assignedToId'],
+        where: {
+          assignedToId: { in: reps.map((r) => r.id) },
+          status: { notIn: ['WON', 'LOST'] },
+        },
+        _count: { id: true },
+      }),
+    ]);
 
     const wonMap = new Map(
       wonCounts.map((w) => [w.assignedToId, w._count.id]),
+    );
+    const openMap = new Map(
+      openCounts.map((o) => [o.assignedToId, o._count.id]),
     );
 
     return reps
@@ -185,6 +213,7 @@ export class MarketingDashboardService {
         totalLeads: rep._count.leads,
         totalActivities: rep._count.activities,
         wonThisMonth: wonMap.get(rep.id) || 0,
+        openLeads: openMap.get(rep.id) || 0,
       }))
       .sort((a, b) => b.wonThisMonth - a.wonThisMonth)
       .slice(0, limit);

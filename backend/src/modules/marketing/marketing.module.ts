@@ -15,6 +15,7 @@ import {
   MarketingCommissionsController,
   MarketingNotificationsController,
   MarketingLeadsIngestController,
+  MarketingDistributionController,
 } from './controllers';
 
 // Services
@@ -31,6 +32,8 @@ import {
   MarketingNotificationsService,
   MarketingSchedulerService,
   MarketingLeadsIngestService,
+  LeadAutoAssignerService,
+  MarketingDistributionService,
 } from './services';
 
 // Guards
@@ -89,6 +92,7 @@ import { IngestTokenGuard } from './guards/ingest-token.guard';
     MarketingUsersController,
     MarketingCommissionsController,
     MarketingNotificationsController,
+    MarketingDistributionController,
   ],
   providers: [
     // Services
@@ -103,6 +107,8 @@ import { IngestTokenGuard } from './guards/ingest-token.guard';
     MarketingCommissionsService,
     MarketingNotificationsService,
     MarketingLeadsIngestService,
+    LeadAutoAssignerService,
+    MarketingDistributionService,
     // Cron jobs (offer expiry, notification TTL, follow-up reminders).
     MarketingSchedulerService,
     // Guards

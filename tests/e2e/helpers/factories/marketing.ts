@@ -79,13 +79,60 @@ export async function transitionLead(
 export async function assignLead(
   api: APIRequestContext,
   id: string,
-  assignedToId: string,
+  assignedToId: string | null,
 ): Promise<Lead> {
   const res = await api.patch(`marketing/leads/${id}/assign`, {
     data: { assignedToId },
   });
   if (!res.ok()) {
     throw new Error(`assignLead failed: ${res.status()} ${await res.text()}`);
+  }
+  return res.json();
+}
+
+export interface BulkAssignResult {
+  assigned: number;
+  skipped: string[];
+  unchanged: number;
+}
+
+export async function bulkAssignLeads(
+  api: APIRequestContext,
+  leadIds: string[],
+  assignedToId: string | null,
+): Promise<BulkAssignResult> {
+  const res = await api.post('marketing/leads/bulk-assign', {
+    data: { leadIds, assignedToId },
+  });
+  if (!res.ok()) {
+    throw new Error(
+      `bulkAssignLeads failed: ${res.status()} ${await res.text()}`,
+    );
+  }
+  return res.json();
+}
+
+export async function getDistributionConfig(api: APIRequestContext) {
+  const res = await api.get('marketing/distribution-config');
+  if (!res.ok()) {
+    throw new Error(
+      `getDistributionConfig failed: ${res.status()} ${await res.text()}`,
+    );
+  }
+  return res.json();
+}
+
+export async function setDistributionStrategy(
+  api: APIRequestContext,
+  strategy: 'DISABLED' | 'ROUND_ROBIN' | 'LEAST_LOADED',
+) {
+  const res = await api.patch('marketing/distribution-config', {
+    data: { strategy },
+  });
+  if (!res.ok()) {
+    throw new Error(
+      `setDistributionStrategy failed: ${res.status()} ${await res.text()}`,
+    );
   }
   return res.json();
 }

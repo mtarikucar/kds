@@ -12,6 +12,7 @@ import * as bcrypt from 'bcryptjs';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { EmailService } from '../../../common/services/email.service';
+import { LeadAutoAssignerService } from './lead-auto-assigner.service';
 import { CreateLeadDto } from '../dto/create-lead.dto';
 import { UpdateLeadDto } from '../dto/update-lead.dto';
 import { LeadFilterDto } from '../dto/lead-filter.dto';
@@ -53,6 +54,7 @@ export class MarketingLeadsService {
     private prisma: PrismaService,
     private configService: ConfigService,
     private emailService: EmailService,
+    private autoAssigner: LeadAutoAssignerService,
   ) {}
 
   private bcryptCost(): number {
@@ -84,7 +86,7 @@ export class MarketingLeadsService {
     throw new ConflictException('Could not allocate a free subdomain');
   }
 
-  async create(dto: CreateLeadDto, userId: string) {
+  async create(dto: CreateLeadDto, userId: string, userRole: string) {
     // Idempotency: refuse to create a second OPEN lead for the same
     // email. Two reps logging the same prospect was the actual
     // user-pain (no unique constraint at the DB level because the
@@ -109,11 +111,25 @@ export class MarketingLeadsService {
       }
     }
 
+    // Resolve the owner once, in this priority:
+    //   1. explicit dto.assignedToId (manager picks a rep at creation)
+    //   2. for SALES_REP creators → themselves (they own what they enter)
+    //   3. auto-assigner (round-robin / least-loaded) when configured
+    //   4. unassigned (null) — falls into the lead pool for the manager
+    let resolvedAssignee: string | null = null;
+    if (dto.assignedToId) {
+      resolvedAssignee = dto.assignedToId;
+    } else if (userRole === 'SALES_REP') {
+      resolvedAssignee = userId;
+    } else {
+      resolvedAssignee = await this.autoAssigner.pickAssignee();
+    }
+
     return this.prisma.lead.create({
       data: {
         ...dto,
         nextFollowUp: dto.nextFollowUp ? new Date(dto.nextFollowUp) : undefined,
-        assignedToId: dto.assignedToId || userId,
+        assignedToId: resolvedAssignee,
       },
       include: {
         assignedTo: {
@@ -131,9 +147,17 @@ export class MarketingLeadsService {
     const where: Prisma.LeadWhereInput = {};
 
     if (userRole === 'SALES_REP') {
+      // Reps always see only their leads — assignmentStatus has no
+      // effect on their scope ("mine" is implicit for them).
       where.assignedToId = userId;
     } else if (filter.assignedToId) {
       where.assignedToId = filter.assignedToId;
+    } else if (filter.assignmentStatus === 'unassigned') {
+      where.assignedToId = null;
+    } else if (filter.assignmentStatus === 'assigned') {
+      where.assignedToId = { not: null };
+    } else if (filter.assignmentStatus === 'mine') {
+      where.assignedToId = userId;
     }
 
     if (filter.search) {
@@ -394,46 +418,94 @@ export class MarketingLeadsService {
     return updatedLead;
   }
 
-  async assign(id: string, assignedToId: string, actorId: string) {
-    const lead = await this.prisma.lead.findUnique({ where: { id } });
+  async assign(
+    id: string,
+    assignedToId: string | null | undefined,
+    actorId: string,
+  ) {
+    const lead = await this.prisma.lead.findUnique({
+      where: { id },
+      include: {
+        assignedTo: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
     if (!lead) throw new NotFoundException('Lead not found');
 
-    const rep = await this.prisma.marketingUser.findUnique({
-      where: { id: assignedToId },
-      select: { id: true, role: true, status: true, firstName: true, lastName: true },
-    });
-    if (!rep) throw new NotFoundException('Sales rep not found');
-    if (rep.role !== 'SALES_REP') {
-      throw new BadRequestException('Target must be a SALES_REP');
+    // Empty string / null / undefined → unassign. Treat all three the
+    // same so the API is forgiving to clients that serialize "no
+    // selection" differently (FormData empties, JSON nulls, etc.).
+    const target = assignedToId && assignedToId.length > 0 ? assignedToId : null;
+    const previous = lead.assignedTo;
+
+    let rep:
+      | { id: string; role: string; status: string; firstName: string; lastName: string }
+      | null = null;
+    if (target) {
+      rep = await this.prisma.marketingUser.findUnique({
+        where: { id: target },
+        select: { id: true, role: true, status: true, firstName: true, lastName: true },
+      });
+      if (!rep) throw new NotFoundException('Sales rep not found');
+      if (rep.role !== 'SALES_REP') {
+        throw new BadRequestException('Target must be a SALES_REP');
+      }
+      if (rep.status !== 'ACTIVE') {
+        throw new BadRequestException('Target rep is not active');
+      }
     }
-    if (rep.status !== 'ACTIVE') {
-      throw new BadRequestException('Target rep is not active');
+
+    // No-op (same owner) — skip writes so we don't pollute the timeline
+    // with empty activity rows when a manager double-clicks Assign.
+    if ((previous?.id ?? null) === target) {
+      return this.prisma.lead.findUniqueOrThrow({
+        where: { id },
+        include: {
+          assignedTo: { select: { id: true, firstName: true, lastName: true } },
+        },
+      });
     }
 
     const updated = await this.prisma.lead.update({
       where: { id },
-      data: { assignedToId },
+      data: { assignedToId: target },
       include: {
         assignedTo: { select: { id: true, firstName: true, lastName: true } },
       },
     });
 
+    const fromName = previous
+      ? `${previous.firstName} ${previous.lastName}`
+      : null;
+    const toName = rep ? `${rep.firstName} ${rep.lastName}` : null;
+    const title = target
+      ? fromName
+        ? `Reassigned: ${fromName} → ${toName}`
+        : `Assigned to ${toName}`
+      : `Unassigned (was ${fromName ?? 'unknown'})`;
+
     await this.prisma.leadActivity.create({
       data: {
         type: 'STATUS_CHANGE',
-        title: 'Lead assigned',
-        description: `Assigned to ${rep.firstName} ${rep.lastName}`,
+        title,
         leadId: id,
         createdById: actorId,
+        metadata: {
+          kind: 'assignment',
+          fromUserId: previous?.id ?? null,
+          fromUserName: fromName,
+          toUserId: target,
+          toUserName: toName,
+        },
       },
     });
 
     // Notify the new owner — they need to know a lead just landed in
-    // their queue. Skip if they happened to assign it to themselves.
-    if (assignedToId !== actorId) {
+    // their queue. Skip if they happened to assign it to themselves,
+    // and skip entirely on unassign (no owner to notify).
+    if (target && target !== actorId) {
       await this.prisma.marketingNotification.create({
         data: {
-          userId: assignedToId,
+          userId: target,
           type: 'FOLLOW_UP_REMINDER',
           title: 'New lead assigned to you',
           message: `${updated.businessName} — ${updated.contactPerson}`,
@@ -443,6 +515,121 @@ export class MarketingLeadsService {
     }
 
     return updated;
+  }
+
+  /**
+   * Bulk-assign a batch of leads to a single rep in one transaction.
+   * Manager-only at the controller layer. Skips lead ids that don't
+   * exist (reported back as `skipped`) and emits one summary
+   * notification rather than N — keeps the rep's inbox usable when a
+   * manager dumps 50 leads at once. `null` target unassigns the batch.
+   */
+  async bulkAssign(
+    leadIds: string[],
+    assignedToId: string | null | undefined,
+    actorId: string,
+  ) {
+    const ids = Array.from(new Set(leadIds)).filter((s) => typeof s === 'string' && s.length > 0);
+    if (ids.length === 0) {
+      throw new BadRequestException('leadIds must contain at least one id');
+    }
+
+    const target = assignedToId && assignedToId.length > 0 ? assignedToId : null;
+    let rep:
+      | { id: string; role: string; status: string; firstName: string; lastName: string }
+      | null = null;
+    if (target) {
+      rep = await this.prisma.marketingUser.findUnique({
+        where: { id: target },
+        select: { id: true, role: true, status: true, firstName: true, lastName: true },
+      });
+      if (!rep) throw new NotFoundException('Sales rep not found');
+      if (rep.role !== 'SALES_REP') {
+        throw new BadRequestException('Target must be a SALES_REP');
+      }
+      if (rep.status !== 'ACTIVE') {
+        throw new BadRequestException('Target rep is not active');
+      }
+    }
+
+    // Fetch all leads (with current owner) in one round-trip so we can
+    // diff each one and write a meaningful per-lead activity entry.
+    const leads = await this.prisma.lead.findMany({
+      where: { id: { in: ids } },
+      include: {
+        assignedTo: { select: { id: true, firstName: true, lastName: true } },
+      },
+    });
+    const found = new Set(leads.map((l) => l.id));
+    const skipped = ids.filter((id) => !found.has(id));
+
+    // Filter out no-ops (already assigned to target) — same reasoning
+    // as the single-assign path: no audit churn when nothing changed.
+    const changing = leads.filter((l) => (l.assignedToId ?? null) !== target);
+
+    if (changing.length === 0) {
+      return { assigned: 0, skipped, unchanged: leads.length };
+    }
+
+    const toName = rep ? `${rep.firstName} ${rep.lastName}` : null;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.lead.updateMany({
+        where: { id: { in: changing.map((l) => l.id) } },
+        data: { assignedToId: target },
+      });
+      await tx.leadActivity.createMany({
+        data: changing.map((l) => {
+          const fromName = l.assignedTo
+            ? `${l.assignedTo.firstName} ${l.assignedTo.lastName}`
+            : null;
+          const title = target
+            ? fromName
+              ? `Reassigned: ${fromName} → ${toName}`
+              : `Assigned to ${toName}`
+            : `Unassigned (was ${fromName ?? 'unknown'})`;
+          return {
+            type: 'STATUS_CHANGE',
+            title,
+            leadId: l.id,
+            createdById: actorId,
+            metadata: {
+              kind: 'assignment',
+              fromUserId: l.assignedTo?.id ?? null,
+              fromUserName: fromName,
+              toUserId: target,
+              toUserName: toName,
+              bulk: true,
+            },
+          };
+        }),
+      });
+
+      // Single summary notification per rep — avoids burying the
+      // inbox under 50 individual "lead assigned" rows when the
+      // manager runs a batch. Skip when manager bulk-assigns to
+      // themselves or unassigns.
+      if (target && target !== actorId) {
+        await tx.marketingNotification.create({
+          data: {
+            userId: target,
+            type: 'FOLLOW_UP_REMINDER',
+            title: `${changing.length} new lead${changing.length === 1 ? '' : 's'} assigned to you`,
+            message: changing
+              .slice(0, 3)
+              .map((l) => l.businessName)
+              .join(', ') + (changing.length > 3 ? `, +${changing.length - 3} more` : ''),
+            metadata: {
+              leadIds: changing.map((l) => l.id),
+              assignedBy: actorId,
+              bulk: true,
+            },
+          },
+        });
+      }
+    });
+
+    return { assigned: changing.length, skipped, unchanged: leads.length - changing.length };
   }
 
   /**

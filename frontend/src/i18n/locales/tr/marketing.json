@@ -166,7 +166,27 @@
     "topPerformers": "En iyi performans",
     "noPerformers": "Bu dönemde dönüştürülen lead yok",
     "today": "Bugün",
-    "thisMonth": "Bu ay"
+    "thisMonth": "Bu ay",
+    "unassignedLeads": "Atanmamış lead",
+    "openLeads": "Açık lead"
+  },
+  "distribution": {
+    "title": "Otomatik Lead Dağıtımı",
+    "subtitle": "Yeni lead'ler otomatik olarak nasıl dağıtılsın?",
+    "strategy": {
+      "DISABLED": "Kapalı (manuel dağıtım)",
+      "ROUND_ROBIN": "Sırayla (Round-Robin)",
+      "LEAST_LOADED": "En Az Yüklü Temsilci"
+    },
+    "lastAssignedTo": "Son atanan",
+    "save": "Kaydet",
+    "saveSuccess": "Dağıtım kuralı güncellendi",
+    "saveError": "Kural kaydedilemedi"
+  },
+  "activityTimeline": {
+    "assignmentAuto": "Otomatik",
+    "assignmentBulk": "Toplu",
+    "assignmentUnassigned": "Atama kaldırıldı"
   },
   "leads": {
     "title": "Lead'ler",
@@ -177,6 +197,34 @@
     "filterSource": "Kaynak",
     "filterBusinessType": "İşletme türü",
     "filterAssignedTo": "Atanan",
+    "filterAssignmentStatus": "Atama durumu",
+    "assignmentStatus": {
+      "all": "Tümü",
+      "unassigned": "Atanmamış",
+      "assigned": "Atanmış",
+      "mine": "Bana atanmış"
+    },
+    "assignment": {
+      "title": "Lead Ata",
+      "unassigned": "Atanmamış",
+      "assignButton": "Ata",
+      "reassign": "Değiştir",
+      "unassign": "Atamayı Kaldır",
+      "selectRep": "Temsilci seçin…",
+      "searchRep": "Temsilci ara…",
+      "noReps": "Aktif temsilci yok",
+      "success": "Lead atandı",
+      "unassignSuccess": "Atama kaldırıldı",
+      "error": "Atama başarısız"
+    },
+    "bulkAssign": {
+      "toolbar": "{{count}} lead seçildi",
+      "button": "Toplu Ata",
+      "cancel": "Seçimi temizle",
+      "success": "{{count}} lead atandı",
+      "skipped": "{{count}} lead atlandı",
+      "error": "Toplu atama başarısız"
+    },
     "table": {
       "business": "İşletme",
       "contact": "İletişim",
@@ -184,7 +232,7 @@
       "city": "Şehir",
       "source": "Kaynak",
       "status": "Durum",
-      "assignedTo": "Sahibi",
+      "assignedTo": "Atanan",
       "createdAt": "Oluşturma"
     },
     "empty": "Bu filtreye uyan lead yok.",

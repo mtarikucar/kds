@@ -31,6 +31,15 @@ export class LeadFilterDto {
   @IsString()
   assignedToId?: string;
 
+  // Coarse-grained assignment filter used by the "Atanmamış / Atanmış /
+  // Bana atanmış" pills in the leads list. Lives alongside the
+  // fine-grained `assignedToId` filter: a manager can stack them
+  // (e.g., "mine" + a specific date range). Reps see only their own
+  // leads regardless of this filter — enforced in the service.
+  @IsOptional()
+  @IsIn(['unassigned', 'assigned', 'mine'])
+  assignmentStatus?: 'unassigned' | 'assigned' | 'mine';
+
   @IsOptional()
   @IsString()
   priority?: string;

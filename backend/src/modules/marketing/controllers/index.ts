@@ -9,3 +9,4 @@ export * from './marketing-users.controller';
 export * from './marketing-commissions.controller';
 export * from './marketing-notifications.controller';
 export * from './marketing-leads-ingest.controller';
+export * from './marketing-distribution.controller';

@@ -8,6 +8,7 @@ import {
   IngestLeadCandidateDto,
   IngestLeadsDto,
 } from '../dto/ingest-leads.dto';
+import { LeadAutoAssignerService } from './lead-auto-assigner.service';
 
 /**
  * Result shape for the ingest routine. Caller can use `errors` to feed
@@ -27,7 +28,10 @@ export class MarketingLeadsIngestService {
   // migration + seeder, so its id is effectively immutable per deploy.
   private sentinelId: string | null = null;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly autoAssigner: LeadAutoAssignerService,
+  ) {}
 
   private async resolveSentinel(): Promise<string> {
     if (this.sentinelId) return this.sentinelId;
@@ -65,8 +69,15 @@ export class MarketingLeadsIngestService {
           continue;
         }
         await this.prisma.$transaction(async (tx) => {
+          // Pick an owner via the configured distribution strategy
+          // before insert so the row is born already assigned — keeps
+          // the "atanmamış lead" dashboard count honest.
+          const autoOwner = await this.autoAssigner.pickAssignee(tx);
           const lead = await tx.lead.create({
-            data: this.mapToLeadData(c),
+            data: {
+              ...this.mapToLeadData(c),
+              ...(autoOwner ? { assignedToId: autoOwner } : {}),
+            },
           });
           await tx.leadActivity.create({
             data: {
@@ -77,6 +88,23 @@ export class MarketingLeadsIngestService {
               createdById: sentinelId,
             },
           });
+          if (autoOwner) {
+            await tx.leadActivity.create({
+              data: {
+                leadId: lead.id,
+                type: 'STATUS_CHANGE',
+                title: `Auto-assigned on ingest`,
+                createdById: sentinelId,
+                metadata: {
+                  kind: 'assignment',
+                  fromUserId: null,
+                  fromUserName: null,
+                  toUserId: autoOwner,
+                  auto: true,
+                },
+              },
+            });
+          }
         });
         created++;
       } catch (e: any) {

@@ -107,6 +107,16 @@ export interface Lead {
   _count?: { activities: number; offers: number; tasks: number };
 }
 
+export interface LeadActivityAssignmentMetadata {
+  kind: 'assignment';
+  fromUserId: string | null;
+  fromUserName?: string | null;
+  toUserId: string | null;
+  toUserName?: string | null;
+  auto?: boolean;
+  bulk?: boolean;
+}
+
 export interface LeadActivity {
   id: string;
   type: string;
@@ -114,6 +124,7 @@ export interface LeadActivity {
   description?: string;
   outcome?: string;
   duration?: number;
+  metadata?: LeadActivityAssignmentMetadata | Record<string, unknown> | null;
   leadId: string;
   createdById: string;
   createdBy: MarketingUserInfo;

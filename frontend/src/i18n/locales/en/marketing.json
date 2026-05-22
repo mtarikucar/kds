@@ -166,7 +166,27 @@
     "topPerformers": "Top performers",
     "noPerformers": "No converted leads this period",
     "today": "Today",
-    "thisMonth": "This month"
+    "thisMonth": "This month",
+    "unassignedLeads": "Unassigned leads",
+    "openLeads": "Open leads"
+  },
+  "distribution": {
+    "title": "Auto lead distribution",
+    "subtitle": "How should new leads get dispatched automatically?",
+    "strategy": {
+      "DISABLED": "Off (manual dispatch)",
+      "ROUND_ROBIN": "Round-robin",
+      "LEAST_LOADED": "Least-loaded rep"
+    },
+    "lastAssignedTo": "Last assigned",
+    "save": "Save",
+    "saveSuccess": "Distribution rule updated",
+    "saveError": "Couldn't save rule"
+  },
+  "activityTimeline": {
+    "assignmentAuto": "Auto",
+    "assignmentBulk": "Bulk",
+    "assignmentUnassigned": "Unassigned"
   },
   "leads": {
     "title": "Leads",
@@ -177,6 +197,34 @@
     "filterSource": "Source",
     "filterBusinessType": "Business type",
     "filterAssignedTo": "Assigned to",
+    "filterAssignmentStatus": "Assignment",
+    "assignmentStatus": {
+      "all": "All",
+      "unassigned": "Unassigned",
+      "assigned": "Assigned",
+      "mine": "Assigned to me"
+    },
+    "assignment": {
+      "title": "Assign lead",
+      "unassigned": "Unassigned",
+      "assignButton": "Assign",
+      "reassign": "Change",
+      "unassign": "Unassign",
+      "selectRep": "Select rep…",
+      "searchRep": "Search rep…",
+      "noReps": "No active reps",
+      "success": "Lead assigned",
+      "unassignSuccess": "Assignment cleared",
+      "error": "Failed to assign lead"
+    },
+    "bulkAssign": {
+      "toolbar": "{{count}} leads selected",
+      "button": "Bulk assign",
+      "cancel": "Clear selection",
+      "success": "Assigned {{count}} leads",
+      "skipped": "Skipped {{count}}",
+      "error": "Bulk assignment failed"
+    },
     "table": {
       "business": "Business",
       "contact": "Contact",

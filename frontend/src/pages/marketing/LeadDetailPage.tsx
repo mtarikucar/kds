@@ -13,7 +13,7 @@ import {
   CheckCircleIcon,
 } from '@heroicons/react/24/outline';
 import marketingApi from '../../features/marketing/api/marketingApi';
-import { LeadStatusBadge, ActivityTimeline } from '../../features/marketing/components';
+import { LeadStatusBadge, ActivityTimeline, AssignCell } from '../../features/marketing/components';
 import {
   LeadStatus,
   LEAD_STATUS_LABELS,
@@ -61,7 +61,7 @@ export default function LeadDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation('marketing');
   // Locale-aware date formatting: `toLocaleDateString()` with no arg
   // uses the runtime locale, which on a Turkish admin's browser is
   // usually `en-US` from the OS-level default. Threading i18n.language
@@ -110,9 +110,6 @@ export default function LeadDetailPage() {
   const [convertOfferId, setConvertOfferId] = useState('');
   const [convertCommission, setConvertCommission] = useState('');
 
-  // Assign
-  const [assignUserId, setAssignUserId] = useState('');
-
   // Close the convert modal on Escape. The modal otherwise traps the
   // user with no keyboard-only exit, which is a WCAG 2.1 fail and
   // surprising for power users who reflexively hit Esc on dialogs.
@@ -130,12 +127,6 @@ export default function LeadDetailPage() {
   const { data: lead, isLoading } = useQuery({
     queryKey: ['marketing', 'lead', id],
     queryFn: () => marketingApi.get<DetailLead>(`/leads/${id}`).then((r) => r.data),
-  });
-
-  const { data: repsData } = useQuery({
-    queryKey: ['marketing', 'users'],
-    queryFn: () => marketingApi.get('/users').then((r) => r.data),
-    enabled: isManager,
   });
 
   // Mutations
@@ -218,12 +209,6 @@ export default function LeadDetailPage() {
     mutationFn: () => marketingApi.delete(`/leads/${id}`),
     onSuccess: () => { toast.success('Lead deleted'); navigate('/marketing/leads'); },
     onError: () => toast.error('Failed to delete lead'),
-  });
-
-  const assignMutation = useMutation({
-    mutationFn: (repId: string) => marketingApi.patch(`/leads/${id}/assign`, { assignedToId: repId }),
-    onSuccess: () => { invalidate(); toast.success('Lead assigned'); },
-    onError: () => toast.error('Failed to assign lead'),
   });
 
   if (isLoading) return <div className="text-center py-12 text-gray-500">Loading...</div>;
@@ -332,29 +317,18 @@ export default function LeadDetailPage() {
             </dl>
           </div>
 
-          {/* Assign (Manager only) */}
+          {/* Assign (Manager only) — compact inline popover so the rest
+              of the panel still serves as the lead's info hub. */}
           {isManager && (
             <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h3 className="text-sm font-semibold text-gray-900 mb-3">Assign Lead</h3>
-              <div className="flex gap-2">
-                <select
-                  value={assignUserId}
-                  onChange={(e) => setAssignUserId(e.target.value)}
-                  className="flex-1 px-3 py-2 border rounded-lg text-sm"
-                >
-                  <option value="">Select rep...</option>
-                  {(repsData || []).map((r: any) => (
-                    <option key={r.id} value={r.id}>{r.firstName} {r.lastName}</option>
-                  ))}
-                </select>
-                <button
-                  onClick={() => assignUserId && assignMutation.mutate(assignUserId)}
-                  disabled={!assignUserId || assignMutation.isPending}
-                  className="px-3 py-2 bg-primary text-white rounded-lg text-sm disabled:opacity-50"
-                >
-                  Assign
-                </button>
-              </div>
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">
+                {t('leads.assignment.title')}
+              </h3>
+              <AssignCell
+                leadId={lead.id}
+                currentAssignee={lead.assignedTo ?? null}
+                onAssigned={invalidate}
+              />
             </div>
           )}
 

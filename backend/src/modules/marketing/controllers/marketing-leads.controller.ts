@@ -21,6 +21,7 @@ import { LeadFilterDto } from '../dto/lead-filter.dto';
 import { ConvertLeadDto } from '../dto/convert-lead.dto';
 import { UpdateLeadStatusDto } from '../dto/update-lead-status.dto';
 import { AssignLeadDto } from '../dto/assign-lead.dto';
+import { BulkAssignLeadDto } from '../dto/bulk-assign-lead.dto';
 import { MarketingUserPayload } from '../types';
 
 @Controller('marketing/leads')
@@ -31,7 +32,7 @@ export class MarketingLeadsController {
 
   @Post()
   create(@Body() dto: CreateLeadDto, @CurrentMarketingUser() user: MarketingUserPayload) {
-    return this.leadsService.create(dto, user.id);
+    return this.leadsService.create(dto, user.id, user.role);
   }
 
   @Get()
@@ -70,6 +71,18 @@ export class MarketingLeadsController {
     @CurrentMarketingUser() user: MarketingUserPayload,
   ) {
     return this.leadsService.assign(id, dto.assignedToId, user.id);
+  }
+
+  // Listed BEFORE the generic Patch routes above is unnecessary — Nest
+  // matches static paths before params anyway — but bulk-assign is a
+  // POST so there's no ambiguity. Manager-only at the decorator layer.
+  @Post('bulk-assign')
+  @MarketingRoles('SALES_MANAGER')
+  bulkAssign(
+    @Body() dto: BulkAssignLeadDto,
+    @CurrentMarketingUser() user: MarketingUserPayload,
+  ) {
+    return this.leadsService.bulkAssign(dto.leadIds, dto.assignedToId, user.id);
   }
 
   @Post(':id/convert')

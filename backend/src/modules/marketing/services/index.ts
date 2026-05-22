@@ -10,3 +10,5 @@ export * from './marketing-commissions.service';
 export * from './marketing-notifications.service';
 export * from './marketing-scheduler.service';
 export * from './marketing-leads-ingest.service';
+export * from './lead-auto-assigner.service';
+export * from './marketing-distribution.service';

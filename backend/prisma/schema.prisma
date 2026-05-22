@@ -3048,6 +3048,12 @@ model LeadActivity {
   description String? @db.Text
   outcome     String? // POSITIVE, NEGATIVE, NEUTRAL, NO_ANSWER
   duration    Int? // Duration in minutes (for calls/visits)
+  /// Structured payload for typed activity kinds. Currently used for
+  /// assignment events ({ kind: 'assignment', fromUserId, fromUserName,
+  /// toUserId, toUserName, bulk?, auto? }) so the timeline can render
+  /// "Ahmet → Mehmet" without re-parsing the title string. Nullable so
+  /// every legacy STATUS_CHANGE row stays valid without a backfill.
+  metadata    Json?
 
   leadId String
   lead   Lead   @relation(fields: [leadId], references: [id], onDelete: Cascade)
@@ -3174,6 +3180,23 @@ model MarketingNotification {
   @@index([userId, isRead])
   @@index([createdAt])
   @@map("marketing_notifications")
+}
+
+/// Singleton row controlling how newly-created leads are auto-assigned
+/// to sales reps. A NULL row (or strategy=DISABLED) means manual
+/// assignment only — managers dispatch leads themselves. ROUND_ROBIN
+/// rotates through ACTIVE SALES_REP users in stable createdAt order,
+/// using `lastAssignedToId` as a cursor. LEAST_LOADED picks the rep
+/// with the fewest open (non-WON/LOST) leads at the time of the new
+/// lead. Only one row is expected; seeded with strategy=DISABLED.
+model MarketingDistributionConfig {
+  id               String   @id @default(uuid())
+  strategy         String   @default("DISABLED") // DISABLED, ROUND_ROBIN, LEAST_LOADED
+  lastAssignedToId String?
+  updatedById      String?
+  updatedAt        DateTime @updatedAt
+
+  @@map("marketing_distribution_config")
 }
 
 // ========================================

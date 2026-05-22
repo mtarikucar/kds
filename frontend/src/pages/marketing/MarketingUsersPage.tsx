@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { PlusIcon, PencilIcon, KeyIcon } from '@heroicons/react/24/outline';
 import marketingApi from '../../features/marketing/api/marketingApi';
 import { fmtDateTime } from '../../features/marketing/utils/format';
+import { DistributionConfigCard } from '../../features/marketing/components';
 
 export default function MarketingUsersPage() {
   const queryClient = useQueryClient();
@@ -140,6 +141,10 @@ export default function MarketingUsersPage() {
           Add Member
         </button>
       </div>
+
+      {/* Auto-distribution rule — sits above the team list so the
+          manager sees both the policy and the rep pool it operates on. */}
+      <DistributionConfigCard />
 
       {/* Create Form */}
       {showForm && (

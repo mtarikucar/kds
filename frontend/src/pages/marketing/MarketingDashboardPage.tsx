@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
+import { Link } from 'react-router-dom';
 import {
   UserGroupIcon,
   StarIcon,
@@ -8,6 +9,7 @@ import {
   DocumentTextIcon,
   ArrowTrendingUpIcon,
   ArrowDownTrayIcon,
+  InboxIcon,
 } from '@heroicons/react/24/outline';
 import marketingApi from '../../features/marketing/api/marketingApi';
 import { StatsCard } from '../../features/marketing/components';
@@ -103,7 +105,7 @@ export default function MarketingDashboardPage() {
       </div>
 
       {/* Second row */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className={`grid grid-cols-1 sm:grid-cols-2 ${isManager ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4`}>
         <StatsCard title={t('leadStatus.NEW')} value={stats?.newLeads ?? 0} color="blue" />
         <StatsCard
           title={t('dashboard.openOffers')}
@@ -117,6 +119,26 @@ export default function MarketingDashboardPage() {
           icon={<ClipboardDocumentListIcon className="w-6 h-6" />}
           color="purple"
         />
+        {isManager && (
+          // The dispatch queue. Click-through goes straight into the
+          // pre-filtered list so the manager can act on it in one move.
+          // Color thresholds are intentional: >10 unassigned = a real
+          // backlog, 1-10 = "you should look", 0 = inbox-zero.
+          <Link to="/marketing/leads?assignmentStatus=unassigned" className="block">
+            <StatsCard
+              title={t('dashboard.unassignedLeads')}
+              value={stats?.unassignedLeads ?? 0}
+              icon={<InboxIcon className="w-6 h-6" />}
+              color={
+                (stats?.unassignedLeads ?? 0) > 10
+                  ? 'red'
+                  : (stats?.unassignedLeads ?? 0) > 0
+                    ? 'yellow'
+                    : 'green'
+              }
+            />
+          </Link>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -194,15 +216,17 @@ export default function MarketingDashboardPage() {
                 <tr className="text-left text-slate-500 border-b border-slate-200">
                   <th className="pb-2 font-medium">{t('users.table.name')}</th>
                   <th className="pb-2 font-medium">{t('dashboard.totalLeads')}</th>
+                  <th className="pb-2 font-medium">{t('dashboard.openLeads')}</th>
                   <th className="pb-2 font-medium">{t('leadDetail.tabs.activities')}</th>
                   <th className="pb-2 font-medium">{t('leadStatus.WON')}</th>
                 </tr>
               </thead>
               <tbody>
-                {topPerformers.map((rep: { id: string; name: string; totalLeads: number; totalActivities: number; wonThisMonth: number }) => (
+                {topPerformers.map((rep: { id: string; name: string; totalLeads: number; openLeads?: number; totalActivities: number; wonThisMonth: number }) => (
                   <tr key={rep.id} className="border-b border-slate-100 last:border-0">
                     <td className="py-2 font-medium text-slate-900">{rep.name}</td>
                     <td className="py-2">{rep.totalLeads}</td>
+                    <td className="py-2 text-slate-700">{rep.openLeads ?? 0}</td>
                     <td className="py-2">{rep.totalActivities}</td>
                     <td className="py-2 font-medium text-emerald-600">{rep.wonThisMonth}</td>
                   </tr>
