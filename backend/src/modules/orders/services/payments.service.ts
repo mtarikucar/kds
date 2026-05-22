@@ -738,6 +738,12 @@ export class PaymentsService {
         // above and both deducting from customer stats. The findUnique used
         // for that validation runs outside this tx and can race with another
         // request flipping status; updateMany + count check serializes them.
+        //
+        // Serializable isolation (set on $transaction below) covers the
+        // SEPARATE race where two refunds of DIFFERENT payments of the
+        // SAME order both reach this tx — without it, the customer-stats
+        // read-modify-write at line ~849 would lose-update (both read
+        // totalOrders=N, both write N-1).
         const refundResult = await tx.payment.updateMany({
           where: { id, status: PaymentStatus.COMPLETED },
           data: { status: PaymentStatus.REFUNDED, paidAt: null },
@@ -859,7 +865,7 @@ export class PaymentsService {
         }
 
         return updated;
-      });
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
       // Reverse the stock deductions the original PAID transition booked.
       // Until 2026-05-11 the refund flow silently left stock decremented
@@ -882,13 +888,20 @@ export class PaymentsService {
       return result;
     }
 
-    return this.prisma.payment.update({
-      where: { id },
+    // Defence-in-depth: tenantId in the WHERE so a regression of the
+    // findFirst pre-check at line 705 can't expose cross-tenant writes
+    // on non-refund transitions (e.g. COMPLETED → FAILED).
+    const claim = await this.prisma.payment.updateMany({
+      where: { id, tenantId },
       data: {
         status,
         paidAt: status === PaymentStatus.COMPLETED ? new Date() : null,
       },
     });
+    if (claim.count === 0) {
+      throw new NotFoundException(`Payment with ID ${id} not found`);
+    }
+    return this.prisma.payment.findUniqueOrThrow({ where: { id } });
   }
 
   // ========================================
