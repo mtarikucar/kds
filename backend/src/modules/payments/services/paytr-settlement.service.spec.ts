@@ -57,6 +57,13 @@ describe('PaytrSettlementService — commission routing', () => {
     prisma.pendingPlanChange.findUnique.mockResolvedValue(null);
     prisma.subscription.update.mockResolvedValue({} as any);
     prisma.tenant.update.mockResolvedValue({} as any);
+    // Race-safe claim path: updateMany returns the count, then a
+    // findUniqueOrThrow re-reads the now-SUCCEEDED row.
+    prisma.subscriptionPayment.updateMany.mockResolvedValue({ count: 1 } as any);
+    prisma.subscriptionPayment.findUniqueOrThrow.mockResolvedValue({
+      ...pendingPayment,
+      status: 'SUCCEEDED',
+    } as any);
     prisma.subscriptionPayment.update.mockResolvedValue({ ...pendingPayment, status: 'SUCCEEDED' } as any);
     prisma.user.findFirst.mockResolvedValue({ email: 'admin@example.com' } as any);
     prisma.subscription.findFirst.mockResolvedValue({

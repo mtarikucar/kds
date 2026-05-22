@@ -35,6 +35,19 @@ export type SettlementResult =
   | "ALREADY_TERMINAL"
   | "DUPLICATE_ACTIVE_REFUND_NEEDED";
 
+/**
+ * Thrown inside the settlement tx when the SubscriptionPayment row was
+ * already transitioned out of PENDING by a concurrent settle (webhook
+ * retry / recovery sweeper). Caught by `applySuccess`'s outer catch
+ * and translated to a clean ALREADY_TERMINAL return.
+ */
+class SettlementAlreadyTerminalError extends Error {
+  constructor() {
+    super("Settlement already terminal");
+    this.name = "SettlementAlreadyTerminalError";
+  }
+}
+
 type PaymentWithSubscription = NonNullable<
   Awaited<ReturnType<PrismaService["subscriptionPayment"]["findUnique"]>>
 > & { subscription: any };
@@ -228,13 +241,28 @@ export class PaytrSettlementService {
           }
         }
 
-        const succeededPayment = await tx.subscriptionPayment.update({
-          where: { id: payment.id },
+        // Atomic claim: only the first settlement transition transitions
+        // PENDING → SUCCEEDED. The outer line 85-91 status check is a
+        // fast-path filter, but webhook-retry + recovery-sweeper firing
+        // for the same merchantOid within the READ COMMITTED window
+        // would BOTH pass that check, BOTH enter applySuccess, BOTH run
+        // billing.createInvoice — producing duplicate invoices for the
+        // same charge. updateMany with status=PENDING in the WHERE
+        // serialises them; the loser throws ALREADY_TERMINAL upstream
+        // by aborting the transaction.
+        const claimResult = await tx.subscriptionPayment.updateMany({
+          where: { id: payment.id, status: PaymentStatus.PENDING },
           data: {
             status: PaymentStatus.SUCCEEDED,
             paidAt: now,
             paymentMethod: outcome.paymentType ?? null,
           },
+        });
+        if (claimResult.count === 0) {
+          throw new SettlementAlreadyTerminalError();
+        }
+        const succeededPayment = await tx.subscriptionPayment.findUniqueOrThrow({
+          where: { id: payment.id },
         });
 
         await this.billing.createInvoice(
@@ -296,6 +324,13 @@ export class PaytrSettlementService {
       }
       return "OK";
     } catch (err) {
+      // Concurrent settle (webhook retry / recovery sweeper) already
+      // transitioned this payment. Surface ALREADY_TERMINAL cleanly so
+      // the caller stays idempotent — the winning transaction will
+      // have created the invoice + notifications.
+      if (err instanceof SettlementAlreadyTerminalError) {
+        return "ALREADY_TERMINAL";
+      }
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === "P2002"
