@@ -53,6 +53,12 @@ const PublicReservationPage = lazy(() => import('./pages/reservations/PublicRese
 const ReservationLookupPage = lazy(() => import('./pages/reservations/ReservationLookupPage'));
 const TermsOfServicePage = lazy(() => import('./pages/legal/TermsOfServicePage'));
 const PrivacyPolicyPage = lazy(() => import('./pages/legal/PrivacyPolicyPage'));
+// Subscription checkout consent links to these three; without
+// matching routes the new-tab open lands on the Next.js landing
+// app, gets a locale prefix from next-intl, and 404s.
+const KvkkPage = lazy(() => import('./pages/legal/KvkkPage'));
+const DistanceSalesPage = lazy(() => import('./pages/legal/DistanceSalesPage'));
+const RefundPolicyPage = lazy(() => import('./pages/legal/RefundPolicyPage'));
 import DashboardPage from './pages/DashboardPage';
 import POSPage from './pages/pos/POSPage';
 import KitchenDisplayPage from './pages/kitchen/KitchenDisplayPage';
@@ -149,6 +155,11 @@ function App() {
       <Route path="/verify-email" element={<VerifyEmailPage />} />
       <Route path="/terms" element={<TermsOfServicePage />} />
       <Route path="/privacy" element={<PrivacyPolicyPage />} />
+      {/* Subscription checkout (CheckoutPage.tsx) opens these in a new
+          tab; paths must match the docLink hrefs there exactly. */}
+      <Route path="/legal/kvkk" element={<KvkkPage />} />
+      <Route path="/legal/distance-sales" element={<DistanceSalesPage />} />
+      <Route path="/legal/refund-policy" element={<RefundPolicyPage />} />
       <Route path="/qr-menu/:tenantId" element={<QRMenuPage />} />
       <Route path="/qr-menu/:tenantId/cart" element={<CartPage />} />
       <Route path="/qr-menu/:tenantId/orders" element={<OrderTrackingPage />} />
