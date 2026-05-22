@@ -244,19 +244,23 @@ pull_versioned_images() {
 
 ensure_data_layer() {
   dc up -d postgres redis
-  # Wait for both healthchecks to flip to "healthy". 60s budget is
-  # plenty for an already-running data layer; first boot may need more.
-  local i=0 deadline=60
+  # 60s was the original budget; a `redis:7.2-alpine` recreate on a
+  # fresh `start_period` setup overran it, so we give the data layer
+  # 3 minutes. healthcheck interval is 10s with 5 retries = 50s in
+  # the steady state, and start_period adds another 20s. 180s keeps
+  # us comfortably above worst case without making a real failure
+  # wait too long.
+  local i=0 deadline=180
+  local pg=starting redis_status=starting
   while [ $i -lt $deadline ]; do
-    local pg redis_status
     pg=$(docker inspect "$POSTGRES_CONTAINER" --format '{{.State.Health.Status}}' 2>/dev/null || echo "starting")
     redis_status=$(docker inspect "${POSTGRES_CONTAINER/postgres/redis}" --format '{{.State.Health.Status}}' 2>/dev/null || echo "starting")
     if [ "$pg" = "healthy" ] && [ "$redis_status" = "healthy" ]; then
-      ok "postgres + redis healthy"
+      ok "postgres + redis healthy (took ~${i}s)"
       return 0
     fi
-    sleep 2
-    i=$((i + 2))
+    sleep 3
+    i=$((i + 3))
   done
   err "Data layer not healthy after ${deadline}s (postgres=$pg redis=$redis_status)"
   return 1

@@ -47,6 +47,10 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      # Cold container needs ~15-20s on this box before redis-cli
+      # responds reliably; without start_period the first 5 checks
+      # were racing the bind and marking it unhealthy.
+      start_period: 20s
     networks:
       - kds_staging_network
     deploy:

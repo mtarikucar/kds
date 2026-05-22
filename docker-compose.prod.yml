@@ -47,6 +47,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      # See docker-compose.staging.yml for the rationale — cold redis
+      # needs ~15-20s before its first PING reliably succeeds.
+      start_period: 20s
     networks:
       - kds_network
 
