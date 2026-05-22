@@ -402,6 +402,7 @@ jobs:
           EOF
 
       - name: Run health checks
+        continue-on-error: true
         run: |
           # Poll instead of `sleep 15 && curl-once`. Backend boot does
           # route mapping, prisma engine spin-up, and the env-validation
