@@ -123,12 +123,28 @@ export class SubscriptionSchedulerService {
         take: 200,
       });
 
+      let transitioned = 0;
       for (const sub of expired) {
         try {
-          await this.prisma.subscription.update({
-            where: { id: sub.id },
+          // Compound WHERE on ACTIVE + cancelAtPeriodEnd=false: the
+          // job lock prevents concurrent cron runs, but per-row writes
+          // still interleave with USER actions. Between this loop's
+          // findMany and the per-row update, an admin can manually
+          // CANCEL the subscription (status → CANCELLED) or schedule
+          // a cancel-at-period-end. A bare update would clobber those
+          // states with PAST_DUE and trigger a confusing past-due
+          // email AFTER the user already saw "cancelled". The claim
+          // makes the loser a silent no-op.
+          const claim = await this.prisma.subscription.updateMany({
+            where: {
+              id: sub.id,
+              status: SubscriptionStatus.ACTIVE,
+              cancelAtPeriodEnd: false,
+            },
             data: { status: SubscriptionStatus.PAST_DUE },
           });
+          if (claim.count === 0) continue;
+          transitioned++;
 
           const admin = await this.prisma.user.findFirst({
             where: { tenantId: sub.tenant.id, role: "ADMIN" },
@@ -157,7 +173,7 @@ export class SubscriptionSchedulerService {
       }
 
       this.logger.log(
-        `Period-end sweep: ACTIVE → PAST_DUE count=${expired.length}`,
+        `Period-end sweep: ACTIVE → PAST_DUE found=${expired.length} transitioned=${transitioned}`,
       );
     });
   }

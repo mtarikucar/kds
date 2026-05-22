@@ -55,12 +55,20 @@ describe('SubscriptionSchedulerService.handleSubscriptionPeriodEnd', () => {
       tenant: { id: 'tenant-1', name: 'Test Restoran' },
     };
     prisma.subscription.findMany.mockResolvedValue([expiredSub] as any);
+    prisma.subscription.updateMany.mockResolvedValue({ count: 1 } as any);
     prisma.user.findFirst.mockResolvedValue({ email: 'admin@example.com' } as any);
 
     await svc.handleSubscriptionPeriodEnd();
 
-    expect(prisma.subscription.update).toHaveBeenCalledWith({
-      where: { id: 'sub-1' },
+    // Race-safe transition: compound WHERE on status=ACTIVE +
+    // cancelAtPeriodEnd=false so a concurrent user cancel doesn't get
+    // clobbered with PAST_DUE.
+    expect(prisma.subscription.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'sub-1',
+        status: 'ACTIVE',
+        cancelAtPeriodEnd: false,
+      },
       data: { status: 'PAST_DUE' },
     });
   });
@@ -76,6 +84,7 @@ describe('SubscriptionSchedulerService.handleSubscriptionPeriodEnd', () => {
         tenant: { id: 'tenant-1', name: 'Test Restoran' },
       },
     ] as any);
+    prisma.subscription.updateMany.mockResolvedValue({ count: 1 } as any);
     prisma.user.findFirst.mockResolvedValue({ email: 'admin@example.com' } as any);
 
     await svc.handleSubscriptionPeriodEnd();
