@@ -1,95 +1,134 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# backup-database.sh — verified pg_dump backup for KDS.
+#
+# Two modes:
+#   ./backup-database.sh          → infer env (prod if .env.production exists)
+#   ./backup-database.sh staging  → force staging
+#   ./backup-database.sh prod     → force prod
+#
+# Hard requirements: backup is created, gzip-verified, contains a
+# plausible schema. Failure exits non-zero; the caller (deploy.sh)
+# treats that as a deploy abort.
+#
+# Retention: 14 days for prod, 3 days for staging.
+#
+# TODO (out of scope, separate issue):
+#   - rclone/aws s3 cp off-site upload
+#   - WAL streaming for PITR
+#   - monthly restore drill runbook
 
-# Database Backup Script
-# Creates a timestamped backup of the production database
+set -euo pipefail
 
-set -e
-
-# Determine script directory and project root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-BACKUP_DIR="${PROJECT_ROOT}/backups/database"
-TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="${BACKUP_DIR}/backup_${TIMESTAMP}.sql"
+log()  { printf '\033[0;34m[backup]\033[0m %s\n' "$*"; }
+ok()   { printf '\033[0;32m[backup]\033[0m %s\n' "$*"; }
+err()  { printf '\033[0;31m[backup]\033[0m %s\n' "$*" >&2; }
 
-# Create backup directory if it doesn't exist
-mkdir -p ${BACKUP_DIR}
-
-# Get database credentials
-# Try to get from DATABASE_URL first, then fallback to docker-compose defaults
-if [ -f "${PROJECT_ROOT}/.env.production" ]; then
-  source ${PROJECT_ROOT}/.env.production
-elif [ -f "${PROJECT_ROOT}/.env" ]; then
-  source ${PROJECT_ROOT}/.env
-fi
-
-# If DATABASE_URL exists, parse it
-if [ ! -z "$DATABASE_URL" ]; then
-  # Extract database info from DATABASE_URL
-  # Format: postgresql://user:password@host:port/database
-  DB_URL=${DATABASE_URL}
-  DB_USER=$(echo $DB_URL | sed -n 's/.*\/\/\([^:]*\):.*/\1/p')
-  DB_PASS=$(echo $DB_URL | sed -n 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/p')
-  DB_HOST=$(echo $DB_URL | sed -n 's/.*@\([^:]*\):.*/\1/p')
-  DB_PORT=$(echo $DB_URL | sed -n 's/.*:\([0-9]*\)\/.*/\1/p')
-  DB_NAME=$(echo $DB_URL | sed -n 's/.*\/\([^?]*\).*/\1/p')
-else
-  # Use docker-compose defaults
-  DB_USER=${POSTGRES_USER:-postgres}
-  DB_PASS=${POSTGRES_PASSWORD:-postgres}
-  DB_HOST=${POSTGRES_HOST:-localhost}
-  DB_PORT=${POSTGRES_PORT:-5432}
-  DB_NAME=${POSTGRES_DB:-restaurant_pos_prod}
-fi
-
-echo "📦 Creating database backup..."
-echo "Database: ${DB_NAME}"
-echo "Host: ${DB_HOST}:${DB_PORT}"
-echo "Backup file: ${BACKUP_FILE}"
-
-# Check if running in Docker environment
-if command -v docker &> /dev/null && docker ps | grep -q postgres; then
-  # Use docker exec to run pg_dump inside postgres container
-  # Match container to database name to avoid using wrong database
-  if [[ "$DB_NAME" == *"staging"* ]]; then
-    POSTGRES_CONTAINER='kds_postgres_staging'
-  else
-    # For production database, use production container
-    POSTGRES_CONTAINER='kds_postgres_prod'
+# Pick environment ----------------------------------------------------
+ENV="${1:-}"
+if [ -z "$ENV" ]; then
+  if   [ -f "$PROJECT_ROOT/.env.production" ]; then ENV=prod
+  elif [ -f "$PROJECT_ROOT/.env.test" ];       then ENV=staging
+  else err "Cannot infer environment — pass 'staging' or 'prod' as arg"; exit 1
   fi
+fi
 
-  # Verify container exists and is running
-  if ! docker ps --format '{{.Names}}' | grep -q "^${POSTGRES_CONTAINER}$"; then
-    echo "❌ Error: Container ${POSTGRES_CONTAINER} is not running"
-    echo "Database: ${DB_NAME}"
-    echo "Please ensure the correct postgres container is running"
+case "$ENV" in
+  prod)
+    ENV_FILE="$PROJECT_ROOT/.env.production"
+    POSTGRES_CONTAINER="kds_postgres_prod"
+    DEFAULT_DB="restaurant_pos_prod"
+    RETENTION_DAYS=14
+    ;;
+  staging)
+    ENV_FILE="$PROJECT_ROOT/.env.test"
+    POSTGRES_CONTAINER="kds_postgres_staging"
+    DEFAULT_DB="restaurant_pos_staging"
+    RETENTION_DAYS=3
+    ;;
+  *)
+    err "Unknown env: $ENV (expected prod or staging)"
     exit 1
-  fi
+    ;;
+esac
 
-  echo "Using Docker container: ${POSTGRES_CONTAINER}"
+BACKUP_DIR="$PROJECT_ROOT/backups/database"
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+BACKUP_FILE="$BACKUP_DIR/backup_${ENV}_${TIMESTAMP}.sql.gz"
 
-  docker exec ${POSTGRES_CONTAINER} pg_dump -U ${DB_USER} -d ${DB_NAME} -F p > ${BACKUP_FILE}
-elif command -v pg_dump &> /dev/null; then
-  # Use local pg_dump
-  export PGPASSWORD=${DB_PASS}
-  pg_dump -h ${DB_HOST} -p ${DB_PORT} -U ${DB_USER} -F p -f ${BACKUP_FILE} ${DB_NAME}
-else
-  echo "❌ Error: Neither Docker nor pg_dump available"
+mkdir -p "$BACKUP_DIR"
+
+# Pull DB credentials without leaking them ----------------------------
+DB_NAME=""
+DB_USER=""
+if [ -f "$ENV_FILE" ]; then
+  DB_NAME=$(grep -E '^POSTGRES_DB=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr -d "'\"" || true)
+  DB_USER=$(grep -E '^POSTGRES_USER=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr -d "'\"" || true)
+fi
+DB_NAME="${DB_NAME:-$DEFAULT_DB}"
+DB_USER="${DB_USER:-postgres}"
+
+# Verify container is up ---------------------------------------------
+if ! docker ps --format '{{.Names}}' | grep -q "^${POSTGRES_CONTAINER}$"; then
+  err "Container '$POSTGRES_CONTAINER' is not running"
   exit 1
 fi
 
-# Compress backup
-gzip ${BACKUP_FILE}
+# Dump ---------------------------------------------------------------
+log "Dumping '$DB_NAME' from $POSTGRES_CONTAINER as user '$DB_USER'"
+log "Target: $BACKUP_FILE"
 
-echo "✅ Backup created successfully: ${BACKUP_FILE}.gz"
+# pg_dump in stream mode → gzip → file. The PIPESTATUS check below
+# catches the case where pg_dump fails but gzip succeeds writing an
+# empty (or partial) stream.
+docker exec "$POSTGRES_CONTAINER" pg_dump -U "$DB_USER" -d "$DB_NAME" \
+  | gzip -c > "$BACKUP_FILE"
 
-# Keep only last 7 days of backups
-find ${BACKUP_DIR} -name "backup_*.sql.gz" -mtime +7 -delete
+dump_rc=${PIPESTATUS[0]}
+gzip_rc=${PIPESTATUS[1]}
+if [ "$dump_rc" -ne 0 ] || [ "$gzip_rc" -ne 0 ]; then
+  err "Pipeline failed: pg_dump=$dump_rc gzip=$gzip_rc"
+  rm -f "$BACKUP_FILE"
+  exit 1
+fi
 
-echo "🗑️  Old backups cleaned (keeping last 7 days)"
+# Verify -------------------------------------------------------------
+if ! gzip -t "$BACKUP_FILE"; then
+  err "gzip integrity check failed on $BACKUP_FILE"
+  rm -f "$BACKUP_FILE"
+  exit 1
+fi
 
-# List recent backups
+size_bytes=$(stat -c '%s' "$BACKUP_FILE" 2>/dev/null \
+             || stat -f '%z' "$BACKUP_FILE" 2>/dev/null \
+             || echo 0)
+if [ "$size_bytes" -lt 1024 ]; then
+  err "Backup smaller than 1KB ($size_bytes bytes) — abort"
+  rm -f "$BACKUP_FILE"
+  exit 1
+fi
+
+# Plain pg_dump (default format -p) ⇒ readable SQL after gunzip.
+# A real schema dump has many CREATE statements; an empty dump or a
+# connection that died on the first line will have very few.
+create_count=$(gzip -dc "$BACKUP_FILE" | grep -cE '^(CREATE TABLE|CREATE INDEX|CREATE TYPE|CREATE SEQUENCE)' || true)
+if [ "$create_count" -lt 5 ]; then
+  err "Backup has only $create_count CREATE statements — looks bogus"
+  rm -f "$BACKUP_FILE"
+  exit 1
+fi
+
+ok "Backup verified ($size_bytes bytes, $create_count create stmts)"
+
+# Retention ----------------------------------------------------------
+pruned=$(find "$BACKUP_DIR" -name "backup_${ENV}_*.sql.gz" -mtime "+${RETENTION_DAYS}" -print -delete 2>/dev/null | wc -l)
+if [ "$pruned" -gt 0 ]; then
+  log "Pruned $pruned backup(s) older than ${RETENTION_DAYS}d"
+fi
+
+# Summary ------------------------------------------------------------
 echo ""
-echo "Recent backups:"
-ls -lh ${BACKUP_DIR} | tail -5
+log "Recent ${ENV} backups:"
+ls -lh "$BACKUP_DIR" | grep "backup_${ENV}_" | tail -5 | sed 's/^/   /'

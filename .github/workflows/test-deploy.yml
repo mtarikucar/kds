@@ -13,89 +13,98 @@ on:
 
 permissions:
   contents: read
-  packages: write
+  packages: write   # GHCR push
+
+# Staging is allowed to throw away in-flight work for the latest commit
+# — the inverse of production, where every release ships in order.
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '18.x'
+  SERVER_HOST: '38.242.233.166'
+  GHCR_BASE: 'ghcr.io/mtarikucar/kds'
 
 jobs:
-  deploy-test:
-    name: Deploy to Test Environment
+  pre-check:
+    name: Pre-flight gate
     runs-on: ubuntu-latest
-
-    env:
-      SERVER_HOST: '38.242.233.166'
-      PROJECT_PATH: /root/kds
-
+    timeout-minutes: 5
     steps:
-      - name: Checkout code
+      - name: Verify required secrets
+        env:
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          SUPERADMIN_JWT_SECRET: ${{ secrets.SUPERADMIN_JWT_SECRET }}
+          SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.SUPERADMIN_JWT_REFRESH_SECRET }}
+          MARKETING_JWT_SECRET: ${{ secrets.MARKETING_JWT_SECRET }}
+          MARKETING_JWT_REFRESH_SECRET: ${{ secrets.MARKETING_JWT_REFRESH_SECRET }}
+          MARKETING_INGEST_TOKEN: ${{ secrets.MARKETING_INGEST_TOKEN }}
+          ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
+        run: |
+          set -euo pipefail
+          missing=()
+          for n in POSTGRES_PASSWORD JWT_SECRET JWT_REFRESH_SECRET \
+                   SUPERADMIN_JWT_SECRET SUPERADMIN_JWT_REFRESH_SECRET \
+                   MARKETING_JWT_SECRET MARKETING_JWT_REFRESH_SECRET \
+                   MARKETING_INGEST_TOKEN ENCRYPTION_MASTER_KEY; do
+            [ -z "${!n}" ] && missing+=("$n")
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing required secrets:"
+            for n in "${missing[@]}"; do echo "::error::  - $n"; done
+            exit 1
+          fi
+
+      - name: Setup SSH (probe)
+        uses: ./.github/actions/setup-ssh
+        with:
+          ssh-private-key-base64: ${{ secrets.SSH_PRIVATE_KEY_BASE64 }}
+          ssh-known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          server-host: ${{ env.SERVER_HOST }}
+
+  build:
+    name: Build & push staging images
+    runs-on: ubuntu-latest
+    needs: pre-check
+    timeout-minutes: 30
+    outputs:
+      commit_sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           ref: test
           fetch-depth: 0
 
-      - name: Setup SSH
-        env:
-          SSH_PRIVATE_KEY_BASE64: ${{ secrets.SSH_PRIVATE_KEY_BASE64 }}
-          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
-        run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY_BASE64" | base64 -d > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
+      - name: Compute commit SHA
+        id: commit
+        run: echo "sha=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
-      - name: Validate SSH key format
-        run: |
-          echo "🔑 Validating SSH key format..."
-          if ! ssh-keygen -l -f ~/.ssh/id_ed25519 2>/dev/null; then
-            echo "❌ SSH key validation failed!"
-            exit 1
-          fi
-          echo "✅ SSH key format is valid"
-
-      - name: Verify SSH connection
-        run: |
-          echo "🔌 Testing SSH connection to ${{ env.SERVER_HOST }}..."
-          if ! ssh -o ConnectTimeout=10 -o BatchMode=yes -o StrictHostKeyChecking=yes root@${{ env.SERVER_HOST }} "echo 'SSH connection successful'" 2>&1; then
-            echo "❌ SSH connection to test server failed!"
-            exit 1
-          fi
-          echo "✅ SSH connection test passed"
-
-      - name: Get commit information
-        id: commit_info
-        run: |
-          echo "commit_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-          echo "commit_message=$(git log -1 --pretty=%s | head -c 100)" >> $GITHUB_OUTPUT
-          echo "author=$(git log -1 --pretty=%an)" >> $GITHUB_OUTPUT
-
-      - name: Get version information
-        id: version_info
-        run: |
-          echo "version=$(git describe --tags --always)" >> $GITHUB_OUTPUT
-          echo "build_time=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_OUTPUT
-          echo "commit_sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
-      - name: Set up Docker Buildx
+      - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Log in to GitHub Container Registry
+      - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push backend image
+      - name: Build & push backend
         uses: docker/build-push-action@v5
         with:
           context: ./backend
           file: ./backend/Dockerfile
           target: production
           push: true
-          tags: ghcr.io/${{ github.repository }}/backend-staging:latest,ghcr.io/${{ github.repository }}/backend-staging:${{ steps.commit_info.outputs.commit_sha }}
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/backend-staging:buildcache
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/backend-staging:buildcache,mode=max
+          tags: ${{ env.GHCR_BASE }}/backend-staging:${{ steps.commit.outputs.sha }}
+          cache-from: type=registry,ref=${{ env.GHCR_BASE }}/backend-staging:buildcache
+          cache-to:   type=registry,ref=${{ env.GHCR_BASE }}/backend-staging:buildcache,mode=max
 
-      - name: Build and push frontend image
+      - name: Build & push frontend
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
@@ -104,38 +113,60 @@ jobs:
           push: true
           no-cache: true
           pull: true
-          tags: ghcr.io/${{ github.repository }}/frontend-staging:latest,ghcr.io/${{ github.repository }}/frontend-staging:${{ steps.commit_info.outputs.commit_sha }}
+          tags: ${{ env.GHCR_BASE }}/frontend-staging:${{ steps.commit.outputs.sha }}
           build-args: |
             VITE_API_URL=https://staging.hummytummy.com/api
             VITE_API_BASE_URL=https://staging.hummytummy.com
             VITE_SOCKET_URL=https://staging.hummytummy.com
             VITE_WS_URL=wss://staging.hummytummy.com
             VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }}
-            VITE_APP_VERSION=${{ steps.version_info.outputs.version }}
-            VITE_BUILD_TIME=${{ steps.version_info.outputs.build_time }}
-            VITE_COMMIT_SHA=${{ steps.commit_info.outputs.commit_sha }}
+            VITE_APP_VERSION=${{ steps.commit.outputs.sha }}
+            VITE_BUILD_TIME=${{ github.event.head_commit.timestamp }}
+            VITE_COMMIT_SHA=${{ github.sha }}
 
-      - name: Build and push landing image
+      - name: Build & push landing
         uses: docker/build-push-action@v5
         with:
           context: ./landing
           file: ./landing/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository }}/landing-staging:latest,ghcr.io/${{ github.repository }}/landing-staging:${{ steps.commit_info.outputs.commit_sha }}
+          tags: ${{ env.GHCR_BASE }}/landing-staging:${{ steps.commit.outputs.sha }}
           build-args: |
             NEXT_PUBLIC_API_URL=https://staging.hummytummy.com/api
             NEXT_PUBLIC_SITE_URL=https://staging.hummytummy.com
-          cache-from: type=registry,ref=ghcr.io/${{ github.repository }}/landing-staging:buildcache
-          cache-to: type=registry,ref=ghcr.io/${{ github.repository }}/landing-staging:buildcache,mode=max
+          cache-from: type=registry,ref=${{ env.GHCR_BASE }}/landing-staging:buildcache
+          cache-to:   type=registry,ref=${{ env.GHCR_BASE }}/landing-staging:buildcache,mode=max
 
-      - name: Deploy to test environment
+  deploy:
+    name: Deploy staging
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 15
+    steps:
+      - name: Checkout (for env render)
+        uses: actions/checkout@v4
+        with:
+          ref: test
+
+      - name: Setup SSH (no re-probe)
+        uses: ./.github/actions/setup-ssh
+        with:
+          ssh-private-key-base64: ${{ secrets.SSH_PRIVATE_KEY_BASE64 }}
+          ssh-known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          server-host: ${{ env.SERVER_HOST }}
+          probe: 'false'
+
+      - name: Render .env.test
         env:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
-          MARKETING_JWT_SECRET: ${{ secrets.MARKETING_JWT_SECRET }}
           SUPERADMIN_JWT_SECRET: ${{ secrets.SUPERADMIN_JWT_SECRET }}
           SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.SUPERADMIN_JWT_REFRESH_SECRET }}
+          MARKETING_JWT_SECRET: ${{ secrets.MARKETING_JWT_SECRET }}
+          MARKETING_JWT_REFRESH_SECRET: ${{ secrets.MARKETING_JWT_REFRESH_SECRET }}
+          MARKETING_INGEST_TOKEN: ${{ secrets.MARKETING_INGEST_TOKEN }}
+          ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
           PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}
           PAYTR_MERCHANT_KEY: ${{ secrets.PAYTR_MERCHANT_KEY }}
           PAYTR_MERCHANT_SALT: ${{ secrets.PAYTR_MERCHANT_SALT }}
@@ -146,215 +177,111 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           DESKTOP_RELEASE_API_KEY: ${{ secrets.DESKTOP_RELEASE_API_KEY }}
-          ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
-          MARKETING_JWT_REFRESH_SECRET: ${{ secrets.MARKETING_JWT_REFRESH_SECRET }}
-          MARKETING_INGEST_TOKEN: ${{ secrets.MARKETING_INGEST_TOKEN }}
         run: |
-          echo "=========================================="
-          echo "Test Environment Deployment Started"
-          echo "=========================================="
-          echo ""
-          echo "Version: ${{ steps.version_info.outputs.version }}"
-          echo "Commit: ${{ steps.commit_info.outputs.commit_sha }}"
-          echo "Author: ${{ steps.commit_info.outputs.author }}"
-          echo "Message: ${{ steps.commit_info.outputs.commit_message }}"
-          echo "Trigger: ${{ github.event_name }}"
-          echo ""
+          set -euo pipefail
+          cat > .env.test.rendered <<ENV
+          TZ=Europe/Istanbul
 
-          ssh -o LogLevel=VERBOSE root@${{ env.SERVER_HOST }} bash -s << EOF
-            set -euxo pipefail
-            cd ${{ env.PROJECT_PATH }}
+          POSTGRES_DB=restaurant_pos_staging
+          POSTGRES_USER=postgres
+          POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+          DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/restaurant_pos_staging?connection_limit=25&pool_timeout=10
+          REDIS_URL=redis://redis:6379/0
 
-            # Create database backup
-            echo "Creating database backup..."
-            mkdir -p backups/database
-            BACKUP_FILE="backups/database/backup_test_\$(date +%Y%m%d_%H%M%S).sql.gz"
-            docker exec kds_postgres_staging pg_dump -U postgres -d restaurant_pos_staging | gzip > "\$BACKUP_FILE" || echo "Backup failed, continuing..."
+          JWT_SECRET=${JWT_SECRET}
+          JWT_EXPIRES_IN=7d
+          JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+          JWT_REFRESH_EXPIRES_IN=30d
+          SUPERADMIN_JWT_SECRET=${SUPERADMIN_JWT_SECRET}
+          SUPERADMIN_JWT_REFRESH_SECRET=${SUPERADMIN_JWT_REFRESH_SECRET}
+          MARKETING_JWT_SECRET=${MARKETING_JWT_SECRET}
+          MARKETING_JWT_REFRESH_SECRET=${MARKETING_JWT_REFRESH_SECRET}
+          MARKETING_INGEST_TOKEN=${MARKETING_INGEST_TOKEN}
+          ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY}
 
-            # Keep only last 3 test backups
-            ls -t backups/database/backup_test_*.sql.gz 2>/dev/null | tail -n +4 | xargs -r rm || true
+          CORS_ORIGIN=https://staging.hummytummy.com,http://tauri.localhost,tauri://localhost,https://tauri.localhost
+          FRONTEND_URL=https://staging.hummytummy.com
 
-            # Create .env.test
-            cat > .env.test << ENVFILE
-            # Test Environment Configuration
-            # Auto-generated by GitHub Actions
+          PAYTR_MERCHANT_ID=${PAYTR_MERCHANT_ID}
+          PAYTR_MERCHANT_KEY=${PAYTR_MERCHANT_KEY}
+          PAYTR_MERCHANT_SALT=${PAYTR_MERCHANT_SALT}
+          PAYTR_BASE_URL=https://www.paytr.com
+          PAYTR_TEST_MODE=1
+          BACKEND_URL=https://staging.hummytummy.com
 
-            # Timezone — keep staging on the same TZ as prod so cron
-            # firing times and timestamp formats are observably identical.
-            TZ=Europe/Istanbul
+          EMAIL_HOST=${EMAIL_HOST}
+          EMAIL_PORT=587
+          EMAIL_SECURE=false
+          EMAIL_USER=${EMAIL_USER}
+          EMAIL_PASSWORD=${EMAIL_PASSWORD}
+          EMAIL_FROM=${EMAIL_FROM}
+          ADMIN_EMAIL=contact@hummytummy.com
 
-            # Database
-            POSTGRES_DB=restaurant_pos_staging
-            POSTGRES_USER=postgres
-            POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-            DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/restaurant_pos_staging?connection_limit=25&pool_timeout=10
-            REDIS_URL=redis://redis:6379/0
+          DEFAULT_TRIAL_DAYS=14
+          TRIAL_REMINDER_DAYS=3
 
-            # JWT
-            JWT_SECRET=${JWT_SECRET}
-            JWT_EXPIRES_IN=7d
-            JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
-            JWT_REFRESH_EXPIRES_IN=30d
-            SUPERADMIN_JWT_SECRET=${SUPERADMIN_JWT_SECRET}
-            MARKETING_JWT_SECRET=${MARKETING_JWT_SECRET}
-            SUPERADMIN_JWT_REFRESH_SECRET=${SUPERADMIN_JWT_REFRESH_SECRET}
+          GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+          GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
 
-            # CORS
-            CORS_ORIGIN=https://staging.hummytummy.com,http://tauri.localhost,tauri://localhost,https://tauri.localhost
-            FRONTEND_URL=https://staging.hummytummy.com
+          VITE_API_URL=https://staging.hummytummy.com/api
+          VITE_API_BASE_URL=https://staging.hummytummy.com
+          VITE_SOCKET_URL=https://staging.hummytummy.com
+          VITE_WS_URL=wss://staging.hummytummy.com
+          VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
 
-            # Payment
-            PAYTR_MERCHANT_ID=${PAYTR_MERCHANT_ID}
-            PAYTR_MERCHANT_KEY=${PAYTR_MERCHANT_KEY}
-            PAYTR_MERCHANT_SALT=${PAYTR_MERCHANT_SALT}
-            PAYTR_BASE_URL=https://www.paytr.com
-            PAYTR_TEST_MODE=true
-            BACKEND_URL=https://staging.hummytummy.com
+          DESKTOP_RELEASE_API_KEY=${DESKTOP_RELEASE_API_KEY}
+          ENV
 
-            # Email
-            EMAIL_HOST=${EMAIL_HOST}
-            EMAIL_PORT=587
-            EMAIL_SECURE=false
-            EMAIL_USER=${EMAIL_USER}
-            EMAIL_PASSWORD=${EMAIL_PASSWORD}
-            EMAIL_FROM=${EMAIL_FROM}
-            ADMIN_EMAIL=contact@hummytummy.com
+      - name: Ship env file to server
+        run: scp -o ServerAliveInterval=15 .env.test.rendered root@${{ env.SERVER_HOST }}:/root/kds/.env.test
 
-            # Subscription
-            DEFAULT_TRIAL_DAYS=14
-            TRIAL_REMINDER_DAYS=3
-
-            # Google OAuth
-            GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-            GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-
-            # Frontend
-            VITE_API_URL=https://staging.hummytummy.com/api
-            VITE_API_BASE_URL=https://staging.hummytummy.com
-            VITE_SOCKET_URL=https://staging.hummytummy.com
-            VITE_WS_URL=wss://staging.hummytummy.com
-            VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-
-            # Desktop Release
-            DESKTOP_RELEASE_API_KEY=${DESKTOP_RELEASE_API_KEY}
-            ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY}
-            MARKETING_JWT_REFRESH_SECRET=${MARKETING_JWT_REFRESH_SECRET}
-
-            # Static bearer token for POST /api/marketing/leads/ingest
-            # consumed by the daily AI research routine. Guard fails closed
-            # when unset, so a missing secret silently disables ingest.
-            MARKETING_INGEST_TOKEN=${MARKETING_INGEST_TOKEN}
-          ENVFILE
-
-            # Login to GitHub Container Registry
-            echo "Logging in to GitHub Container Registry..." 
-            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-            # Pull latest images from GHCR
-            echo "Pulling new images..."
-            docker pull ghcr.io/${{ github.repository }}/backend-staging:latest
-            docker pull ghcr.io/${{ github.repository }}/frontend-staging:latest
-            docker pull ghcr.io/${{ github.repository }}/landing-staging:latest
-
-            # Capture image IDs the server just resolved :latest to, so we can verify
-            # the containers actually end up running these exact images and not a
-            # previously-cached variant.
-            FRONTEND_IMAGE_ID=\$(docker image inspect ghcr.io/${{ github.repository }}/frontend-staging:latest --format '{{.Id}}')
-            BACKEND_IMAGE_ID=\$(docker image inspect ghcr.io/${{ github.repository }}/backend-staging:latest --format '{{.Id}}')
-            echo "Expected frontend image: \$FRONTEND_IMAGE_ID"
-            echo "Expected backend image:  \$BACKEND_IMAGE_ID"
-
-            # Force recreate all containers with new images
-            echo "Recreating containers with new images..."
-            docker-compose -f docker-compose.staging.yml up -d --force-recreate
-
-            # Compose up -d returns before containers are fully spawned; give Docker a
-            # moment to replace the old containers before we inspect them.
-            sleep 5
-
-            # Verify each app container is actually running the freshly pulled image.
-            # Previous deploys reported success while silently keeping the old image;
-            # this digest check catches that exact failure mode.
-            FRONTEND_RUNNING_ID=\$(docker inspect kds_frontend_staging --format '{{.Image}}')
-            BACKEND_RUNNING_ID=\$(docker inspect kds_backend_staging --format '{{.Image}}')
-            echo "Frontend running image:  \$FRONTEND_RUNNING_ID"
-            echo "Backend running image:   \$BACKEND_RUNNING_ID"
-            if [ "\$FRONTEND_RUNNING_ID" != "\$FRONTEND_IMAGE_ID" ]; then
-              echo "ERROR: kds_frontend_staging is NOT running the image we just pulled" >&2
-              echo "  expected: \$FRONTEND_IMAGE_ID" >&2
-              echo "  running:  \$FRONTEND_RUNNING_ID" >&2
-              exit 1
-            fi
-            if [ "\$BACKEND_RUNNING_ID" != "\$BACKEND_IMAGE_ID" ]; then
-              echo "ERROR: kds_backend_staging is NOT running the image we just pulled" >&2
-              echo "  expected: \$BACKEND_IMAGE_ID" >&2
-              echo "  running:  \$BACKEND_RUNNING_ID" >&2
-              exit 1
-            fi
-            echo "Digest check passed: both app containers are on the freshly pulled images."
-
-            # Run database migrations
-            echo "Running database migrations..."
-            sleep 5
-            docker exec kds_backend_staging npx prisma migrate deploy || echo "Migration failed or no new migrations"
-
-            echo ""
-            echo "=========================================="
-            echo "Deployment completed successfully!"
-            echo "=========================================="
-          EOF
-
-      - name: Verify deployment health
+      - name: Run deploy.sh staging on the server
+        env:
+          SHA: ${{ needs.build.outputs.commit_sha }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "Waiting 30 seconds for services to stabilize..."
-          sleep 30
+          set -euo pipefail
+          ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
+            root@${{ env.SERVER_HOST }} "
+              set -euo pipefail
+              cd /root/kds
+              git fetch origin test
+              git checkout test
+              git reset --hard origin/test
+              export GHCR_USER='${GHCR_USER}'
+              export GHCR_TOKEN='${GHCR_TOKEN}'
+              ./scripts/deploy.sh staging ${SHA}
+            "
 
-          ssh root@${{ env.SERVER_HOST }} << 'EOF'
-            cd ${{ env.PROJECT_PATH }}
-
-            # Health check
-            echo "Performing health check..."
-            HEALTH_URL="http://localhost:3002/api/health"
-            MAX_RETRIES=30
-            RETRY_INTERVAL=2
-
-            for i in $(seq 1 $MAX_RETRIES); do
-              if curl -sf "$HEALTH_URL" > /dev/null 2>&1; then
-                echo "✅ Health check passed! Backend is healthy"
-
-                # Show container status
-                echo ""
-                echo "Container Status:"
-                docker ps --filter 'name=kds_.*_staging' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
-
-                exit 0
+      - name: Public health probe
+        run: |
+          set -euo pipefail
+          poll() {
+            local label="$1" url="$2"
+            local i=0
+            while [ $i -lt 18 ]; do  # 18 × 5s = 90s
+              if curl -fsS -o /dev/null --max-time 5 "$url"; then
+                echo "$label OK after $((i*5))s"; return 0
               fi
-              echo "Health check attempt $i/$MAX_RETRIES failed, retrying in ${RETRY_INTERVAL}s..."
-              sleep $RETRY_INTERVAL
+              i=$((i + 1)); sleep 5
             done
+            echo "::error::$label still not responding"
+            return 1
+          }
+          sleep 20
+          poll "API"      https://staging.hummytummy.com/api/health
+          poll "Frontend" https://staging.hummytummy.com
 
-            echo "❌ Health check failed after $MAX_RETRIES attempts"
-            echo "Container logs:"
-            docker logs kds_backend_staging --tail 50
-            exit 1
-          EOF
-
-      - name: Send success notification
-        if: success()
-        run: |
-          echo "✅ Test deployment successful!"
-          echo "🌐 URL: https://staging.hummytummy.com"
-          echo "📝 Commit: ${{ steps.commit_info.outputs.commit_sha }}"
-
-      - name: Send failure notification
+      - name: Rollback on failure
         if: failure()
         run: |
-          echo "❌ Test deployment failed!"
-          echo "📝 Commit: ${{ steps.commit_info.outputs.commit_sha }}"
-          echo "🔄 Rollback may have been triggered automatically"
+          ssh root@${{ env.SERVER_HOST }} '
+            set -euo pipefail
+            cd /root/kds
+            ./scripts/deploy.sh staging-rollback
+          '
 
-      - name: Cleanup
+      - name: Cleanup workspace
         if: always()
-        run: |
-          rm -f ~/.ssh/id_ed25519
-
+        run: rm -f .env.test.rendered

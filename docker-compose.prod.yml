@@ -7,7 +7,9 @@ services:
   postgres:
     env_file:
       - .env.production
-    image: postgres:15-alpine
+    # Minor-pin so a daemon restart can't silently roll us to 15.7 and
+    # break the wire format the running backend expects.
+    image: postgres:15.6-alpine
     container_name: kds_postgres_prod
     restart: always
     environment:
@@ -34,7 +36,7 @@ services:
   redis:
     env_file:
       - .env.production
-    image: redis:7-alpine
+    image: redis:7.2-alpine
     container_name: kds_redis_prod
     restart: always
     command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
@@ -52,7 +54,10 @@ services:
   backend:
     env_file:
       - .env.production
-    image: ${BACKEND_IMAGE:-kds-backend:latest}
+    # scripts/deploy.sh moves the :current tag atomically once a deploy
+    # is verified. The immutable :vX.Y.Z tag is what gets pulled and
+    # SHA-verified; :current is the pointer compose follows.
+    image: ghcr.io/mtarikucar/kds/backend:current
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -118,7 +123,7 @@ services:
   frontend:
     env_file:
       - .env.production
-    image: ${FRONTEND_IMAGE:-kds-frontend:latest}
+    image: ghcr.io/mtarikucar/kds/frontend:current
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -148,7 +153,7 @@ services:
   landing:
     env_file:
       - .env.production
-    image: ${LANDING_IMAGE:-kds-landing:latest}
+    image: ghcr.io/mtarikucar/kds/landing:current
     build:
       context: ./landing
       dockerfile: Dockerfile

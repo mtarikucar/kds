@@ -1,0 +1,51 @@
+name: 'Setup SSH'
+description: 'Install SSH key + known_hosts and verify connectivity to the deploy server.'
+inputs:
+  ssh-private-key-base64:
+    description: 'Base64-encoded SSH private key (passed verbatim to base64 -d).'
+    required: true
+  ssh-known-hosts:
+    description: 'Plain-text contents for ~/.ssh/known_hosts.'
+    required: true
+  server-host:
+    description: 'The host we expect to reach (used for the connectivity probe).'
+    required: true
+  probe:
+    description: 'Whether to attempt a live SSH connection. Disable for jobs that only need the key locally.'
+    required: false
+    default: 'true'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install SSH key
+      shell: bash
+      run: |
+        set -euo pipefail
+        mkdir -p ~/.ssh
+        echo "${{ inputs.ssh-private-key-base64 }}" | base64 -d > ~/.ssh/id_ed25519
+        chmod 600 ~/.ssh/id_ed25519
+        printf '%s\n' "${{ inputs.ssh-known-hosts }}" > ~/.ssh/known_hosts
+        chmod 644 ~/.ssh/known_hosts
+
+    - name: Validate SSH key format
+      shell: bash
+      run: |
+        set -euo pipefail
+        if ! ssh-keygen -l -f ~/.ssh/id_ed25519 >/dev/null 2>&1; then
+          echo "::error::SSH key did not parse — check the base64 payload"
+          exit 1
+        fi
+        echo "SSH key parsed."
+
+    - name: Probe SSH connection
+      if: inputs.probe == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        if ! ssh -o ConnectTimeout=10 -o BatchMode=yes -o StrictHostKeyChecking=yes \
+             "root@${{ inputs.server-host }}" 'echo ssh-ok' >/dev/null; then
+          echo "::error::Cannot SSH to ${{ inputs.server-host }} as root"
+          exit 1
+        fi
+        echo "SSH probe to ${{ inputs.server-host }} succeeded."

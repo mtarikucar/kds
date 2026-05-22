@@ -1,184 +1,79 @@
 name: Release Deployment
 
+# Trigger on annotated version tags. Manual dispatch is preserved for
+# operator recovery (e.g. re-running the same tag after fixing prod DB).
 on:
   push:
     tags:
-      - 'v*.*.*'  # Matches v1.0.0, v2.1.3, etc.
+      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (e.g., v1.0.0)'
+        description: 'Release tag (e.g. v2.8.77)'
         required: true
         type: string
 
 permissions:
-  contents: write
+  contents: write    # softprops/action-gh-release needs this
+  packages: write    # docker login + push to ghcr.io
   pull-requests: read
+
+# Sequential, no cancellation: if two tags get pushed back-to-back we
+# want them deployed in order, not the second one stomping on the first.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
 
 env:
   NODE_VERSION: '18.x'
   SERVER_HOST: '38.242.233.166'
+  GHCR_BASE: 'ghcr.io/mtarikucar/kds'
 
 jobs:
-  # Quick health check before starting expensive operations
+  # -------------------------------------------------------------------
+  # Gate the deploy on three things being true BEFORE we burn build time:
+  #   1. Production API is currently healthy (deploying on a fire = worse fire)
+  #   2. All required secrets are present in the runner env
+  #   3. SSH to the production box works
+  # Any of these failing fails the whole workflow; downstream jobs use
+  # `needs: pre-check` so they never start on a broken foundation.
+  # -------------------------------------------------------------------
   pre-check:
-    name: Pre-deployment Health Check
+    name: Pre-flight gate
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
-      - name: Check production API availability
+      - name: Production API liveness (HARD)
         run: |
-          echo "Checking if production API is accessible..."
-          if ! curl -sf https://hummytummy.com/api/health > /dev/null; then
-            echo "Warning: API health check failed, but continuing..."
-          else
-            echo "Production API is healthy"
-          fi
+          set -euo pipefail
+          # 3 attempts × 10s. If prod is already in a bad state, halt;
+          # we don't pile a new image on top of a broken database or
+          # half-restored container.
+          attempt=1
+          while [ $attempt -le 3 ]; do
+            if curl -fsS -o /dev/null --max-time 10 https://hummytummy.com/api/health; then
+              echo "Production /api/health is healthy."
+              exit 0
+            fi
+            echo "Attempt $attempt: production not responding, retrying in 10s..."
+            attempt=$((attempt + 1))
+            sleep 10
+          done
+          echo "::error::Production is unhealthy BEFORE deploy. Investigate the running stack, do not stack a new release on top."
+          exit 1
 
-      - name: Check production frontend availability
-        run: |
-          echo "Checking if production frontend is accessible..."
-          if ! curl -sf https://hummytummy.com > /dev/null; then
-            echo "Warning: Frontend check failed, but continuing..."
-          else
-            echo "Production frontend is accessible"
-          fi
-
-      - name: Setup SSH (for connection test)
-        env:
-          SSH_PRIVATE_KEY_BASE64: ${{ secrets.SSH_PRIVATE_KEY_BASE64 }}
-          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
-        run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY_BASE64" | base64 -d > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
-
-      - name: Validate SSH key format
-        run: |
-          echo "Validating SSH key format..."
-          if ! ssh-keygen -l -f ~/.ssh/id_ed25519 2>/dev/null; then
-            echo "SSH key validation failed!"
-            echo "Please check .github/SECRETS_SETUP.md for instructions."
-            exit 1
-          fi
-          echo "SSH key format is valid"
-
-      - name: Test SSH connection to production server
-        run: |
-          echo "Testing SSH connection to ${{ env.SERVER_HOST }}..."
-          if ! ssh -o ConnectTimeout=10 -o BatchMode=yes -o StrictHostKeyChecking=yes root@${{ env.SERVER_HOST }} "echo 'SSH connection successful'" 2>&1; then
-            echo "SSH connection to production server failed!"
-            exit 1
-          fi
-          echo "SSH connection test passed"
-
-  # Build and deploy to production
-  deploy-production:
-    name: Build and Deploy to Production
-    runs-on: ubuntu-latest
-    needs: pre-check
-    environment: production
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Get version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            echo "VERSION=${{ github.event.inputs.tag }}" >> $GITHUB_OUTPUT
-          else
-            echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Build backend image
-        run: |
-          docker build \
-            --target production \
-            --tag kds-backend:${{ steps.version.outputs.VERSION }} \
-            --tag kds-backend:latest \
-            ./backend
-
-      - name: Build frontend image
-        env:
-          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-          SENTRY_PROJECT_FRONTEND: ${{ secrets.SENTRY_PROJECT_FRONTEND }}
-        run: |
-          docker build \
-            --target production \
-            --build-arg VITE_API_URL=https://hummytummy.com/api \
-            --build-arg VITE_API_BASE_URL=https://hummytummy.com \
-            --build-arg VITE_SOCKET_URL=https://hummytummy.com \
-            --build-arg VITE_WS_URL=wss://hummytummy.com \
-            --build-arg "VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}" \
-            --build-arg VITE_APP_VERSION=${{ steps.version.outputs.VERSION }} \
-            --build-arg VITE_BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ") \
-            --build-arg VITE_COMMIT_SHA=$(git rev-parse --short HEAD) \
-            --build-arg SENTRY_AUTH_TOKEN="${SENTRY_AUTH_TOKEN}" \
-            --build-arg SENTRY_ORG="${SENTRY_ORG}" \
-            --build-arg SENTRY_PROJECT_FRONTEND="${SENTRY_PROJECT_FRONTEND}" \
-            --tag kds-frontend:${{ steps.version.outputs.VERSION }} \
-            --tag kds-frontend:latest \
-            ./frontend
-
-      - name: Build landing image
-        env:
-          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
-          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
-          SENTRY_PROJECT_LANDING: ${{ secrets.SENTRY_PROJECT_LANDING }}
-        run: |
-          docker build \
-            --build-arg NEXT_PUBLIC_API_URL=https://hummytummy.com/api \
-            --build-arg NEXT_PUBLIC_SITE_URL=https://hummytummy.com \
-            --build-arg SENTRY_AUTH_TOKEN="${SENTRY_AUTH_TOKEN}" \
-            --build-arg SENTRY_ORG="${SENTRY_ORG}" \
-            --build-arg SENTRY_PROJECT="${SENTRY_PROJECT_LANDING}" \
-            --tag kds-landing:${{ steps.version.outputs.VERSION }} \
-            --tag kds-landing:latest \
-            ./landing
-
-      - name: Save Docker images
-        run: |
-          docker save kds-backend:${{ steps.version.outputs.VERSION }} | gzip > backend-${{ steps.version.outputs.VERSION }}.tar.gz
-          docker save kds-frontend:${{ steps.version.outputs.VERSION }} | gzip > frontend-${{ steps.version.outputs.VERSION }}.tar.gz
-          docker save kds-landing:${{ steps.version.outputs.VERSION }} | gzip > landing-${{ steps.version.outputs.VERSION }}.tar.gz
-
-      - name: Setup SSH
-        env:
-          SSH_PRIVATE_KEY_BASE64: ${{ secrets.SSH_PRIVATE_KEY_BASE64 }}
-          SSH_KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
-        run: |
-          mkdir -p ~/.ssh
-          echo "$SSH_PRIVATE_KEY_BASE64" | base64 -d > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          echo "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-          chmod 644 ~/.ssh/known_hosts
-
-      - name: Transfer Docker images
-        run: |
-          scp backend-${{ steps.version.outputs.VERSION }}.tar.gz root@${{ env.SERVER_HOST }}:/root/kds/
-          scp frontend-${{ steps.version.outputs.VERSION }}.tar.gz root@${{ env.SERVER_HOST }}:/root/kds/
-          scp landing-${{ steps.version.outputs.VERSION }}.tar.gz root@${{ env.SERVER_HOST }}:/root/kds/
-
-      # Fail-fast guard: every secret the deploy heredoc interpolates
-      # below must be present and non-empty. Doing this in a dedicated
-      # step gives operators one clean error message listing every
-      # missing secret, instead of a redis container failing late in
-      # the deploy with cryptic docker-compose interpolation errors.
       - name: Verify required production secrets
         env:
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          SUPERADMIN_JWT_SECRET: ${{ secrets.SUPERADMIN_JWT_SECRET }}
+          SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.SUPERADMIN_JWT_REFRESH_SECRET }}
+          MARKETING_JWT_SECRET: ${{ secrets.MARKETING_JWT_SECRET }}
+          MARKETING_JWT_REFRESH_SECRET: ${{ secrets.MARKETING_JWT_REFRESH_SECRET }}
+          MARKETING_INGEST_TOKEN: ${{ secrets.MARKETING_INGEST_TOKEN }}
+          ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}
           PAYTR_MERCHANT_KEY: ${{ secrets.PAYTR_MERCHANT_KEY }}
           PAYTR_MERCHANT_SALT: ${{ secrets.PAYTR_MERCHANT_SALT }}
@@ -189,17 +84,12 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           DESKTOP_RELEASE_API_KEY: ${{ secrets.DESKTOP_RELEASE_API_KEY }}
-          MARKETING_JWT_SECRET: ${{ secrets.MARKETING_JWT_SECRET }}
-          SUPERADMIN_JWT_SECRET: ${{ secrets.SUPERADMIN_JWT_SECRET }}
-          SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.SUPERADMIN_JWT_REFRESH_SECRET }}
-          MARKETING_JWT_REFRESH_SECRET: ${{ secrets.MARKETING_JWT_REFRESH_SECRET }}
-          MARKETING_INGEST_TOKEN: ${{ secrets.MARKETING_INGEST_TOKEN }}
-          ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
-          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         run: |
-          # REQUIRED — backend won't boot without these (env-validation
-          # asserts presence + minLength + distinctFrom). Missing →
-          # hard fail.
+          set -euo pipefail
+          # backend env-validation.ts aborts boot on missing/short
+          # secrets — the workflow used to discover that by watching
+          # the container fail its health check. Catching it here
+          # gives a clean "::error::" listing every missing secret.
           required=(
             POSTGRES_PASSWORD
             JWT_SECRET JWT_REFRESH_SECRET
@@ -210,11 +100,8 @@ jobs:
             REDIS_PASSWORD
             PAYTR_MERCHANT_ID PAYTR_MERCHANT_KEY PAYTR_MERCHANT_SALT
           )
-          # RECOMMENDED — feature degrades gracefully when missing
-          # (SMTP silently skips email sends per notification.service.ts,
-          # Google OAuth is one of several login methods, the desktop
-          # release key is consumed by a separate workflow). Missing →
-          # warn but deploy continues.
+          # Missing recommended secrets only degrade non-critical paths
+          # (SMTP → no welcome emails; Google → only that login option).
           recommended=(
             EMAIL_HOST EMAIL_USER EMAIL_PASSWORD EMAIL_FROM
             GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET
@@ -227,10 +114,7 @@ jobs:
           done
           if [ ${#missing[@]} -gt 0 ]; then
             echo "::error::Refusing to deploy — required secrets unset or empty:"
-            for name in "${missing[@]}"; do
-              echo "::error::  - $name"
-            done
-            echo "Add each missing secret under repo Settings → Secrets and variables → Actions, then re-run."
+            for n in "${missing[@]}"; do echo "::error::  - $n"; done
             exit 1
           fi
 
@@ -239,19 +123,154 @@ jobs:
             [ -z "${!name}" ] && degraded+=("$name")
           done
           if [ ${#degraded[@]} -gt 0 ]; then
-            echo "::warning::Deploying with degraded functionality — recommended secrets unset:"
-            for name in "${degraded[@]}"; do
-              echo "::warning::  - $name"
-            done
+            echo "::warning::Deploying with degraded functionality:"
+            for n in "${degraded[@]}"; do echo "::warning::  - $n"; done
           fi
-          echo "All ${#required[@]} required secrets present (${#degraded[@]} recommended secret(s) missing)."
+          echo "All required secrets present (${#degraded[@]} recommended secrets missing)."
 
-      - name: Deploy to production
-        id: deploy
+      - name: Setup SSH and probe production box
+        uses: ./.github/actions/setup-ssh
+        with:
+          ssh-private-key-base64: ${{ secrets.SSH_PRIVATE_KEY_BASE64 }}
+          ssh-known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          server-host: ${{ env.SERVER_HOST }}
+
+  # -------------------------------------------------------------------
+  # Build images in parallel and push to GHCR. Production used to ship
+  # tar.gz over scp — replaced by registry pull, both for symmetry with
+  # staging and so the production box doesn't depend on a 1.5 GB scp
+  # surviving every deploy.
+  # -------------------------------------------------------------------
+  build:
+    name: Build & push to GHCR
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: pre-check
+    outputs:
+      version: ${{ steps.version.outputs.VERSION }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version from tag
+        id: version
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            v="${{ github.event.inputs.tag }}"
+          else
+            v="${GITHUB_REF#refs/tags/}"
+          fi
+          [[ "$v" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Tag '$v' is not vX.Y.Z"; exit 1; }
+          echo "VERSION=$v" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build & push backend
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          target: production
+          push: true
+          tags: |
+            ${{ env.GHCR_BASE }}/backend:${{ steps.version.outputs.VERSION }}
+          cache-from: type=registry,ref=${{ env.GHCR_BASE }}/backend:buildcache
+          cache-to:   type=registry,ref=${{ env.GHCR_BASE }}/backend:buildcache,mode=max
+
+      - name: Build & push frontend
+        uses: docker/build-push-action@v5
         env:
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+        with:
+          context: ./frontend
+          file: ./frontend/Dockerfile
+          target: production
+          push: true
+          # Frontend assets bake the Sentry sourcemap upload; cache
+          # poisoning between releases is a real risk, so we skip the
+          # cache here and rely on Vite's own incremental build.
+          no-cache: true
+          pull: true
+          tags: |
+            ${{ env.GHCR_BASE }}/frontend:${{ steps.version.outputs.VERSION }}
+          build-args: |
+            VITE_API_URL=https://hummytummy.com/api
+            VITE_API_BASE_URL=https://hummytummy.com
+            VITE_SOCKET_URL=https://hummytummy.com
+            VITE_WS_URL=wss://hummytummy.com
+            VITE_GOOGLE_CLIENT_ID=${{ secrets.VITE_GOOGLE_CLIENT_ID }}
+            VITE_APP_VERSION=${{ steps.version.outputs.VERSION }}
+            VITE_BUILD_TIME=${{ github.event.head_commit.timestamp }}
+            VITE_COMMIT_SHA=${{ github.sha }}
+            SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}
+            SENTRY_ORG=${{ secrets.SENTRY_ORG }}
+            SENTRY_PROJECT_FRONTEND=${{ secrets.SENTRY_PROJECT_FRONTEND }}
+
+      - name: Build & push landing
+        uses: docker/build-push-action@v5
+        with:
+          context: ./landing
+          file: ./landing/Dockerfile
+          push: true
+          tags: |
+            ${{ env.GHCR_BASE }}/landing:${{ steps.version.outputs.VERSION }}
+          build-args: |
+            NEXT_PUBLIC_API_URL=https://hummytummy.com/api
+            NEXT_PUBLIC_SITE_URL=https://hummytummy.com
+            SENTRY_AUTH_TOKEN=${{ secrets.SENTRY_AUTH_TOKEN }}
+            SENTRY_ORG=${{ secrets.SENTRY_ORG }}
+            SENTRY_PROJECT=${{ secrets.SENTRY_PROJECT_LANDING }}
+          cache-from: type=registry,ref=${{ env.GHCR_BASE }}/landing:buildcache
+          cache-to:   type=registry,ref=${{ env.GHCR_BASE }}/landing:buildcache,mode=max
+
+  # -------------------------------------------------------------------
+  # Render .env.production from secrets, ship it + the repo HEAD to the
+  # server, and run scripts/deploy.sh. deploy.sh owns every step from
+  # backup → migration doctor → image swap → :current promotion, and
+  # auto-rolls back on any ERR.
+  # -------------------------------------------------------------------
+  deploy:
+    name: Deploy to production
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: build
+    environment: production
+    steps:
+      - name: Checkout (for env file rendering)
+        uses: actions/checkout@v4
+
+      - name: Setup SSH (no probe — gate already validated it)
+        uses: ./.github/actions/setup-ssh
+        with:
+          ssh-private-key-base64: ${{ secrets.SSH_PRIVATE_KEY_BASE64 }}
+          ssh-known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          server-host: ${{ env.SERVER_HOST }}
+          probe: 'false'
+
+      - name: Render .env.production
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET }}
+          SUPERADMIN_JWT_SECRET: ${{ secrets.SUPERADMIN_JWT_SECRET }}
+          SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.SUPERADMIN_JWT_REFRESH_SECRET }}
+          MARKETING_JWT_SECRET: ${{ secrets.MARKETING_JWT_SECRET }}
+          MARKETING_JWT_REFRESH_SECRET: ${{ secrets.MARKETING_JWT_REFRESH_SECRET }}
+          MARKETING_INGEST_TOKEN: ${{ secrets.MARKETING_INGEST_TOKEN }}
+          ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}
           PAYTR_MERCHANT_KEY: ${{ secrets.PAYTR_MERCHANT_KEY }}
           PAYTR_MERCHANT_SALT: ${{ secrets.PAYTR_MERCHANT_SALT }}
@@ -262,65 +281,21 @@ jobs:
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
           DESKTOP_RELEASE_API_KEY: ${{ secrets.DESKTOP_RELEASE_API_KEY }}
-          MARKETING_JWT_SECRET: ${{ secrets.MARKETING_JWT_SECRET }}
-          SUPERADMIN_JWT_SECRET: ${{ secrets.SUPERADMIN_JWT_SECRET }}
-          SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.SUPERADMIN_JWT_REFRESH_SECRET }}
-          MARKETING_JWT_REFRESH_SECRET: ${{ secrets.MARKETING_JWT_REFRESH_SECRET }}
-          MARKETING_INGEST_TOKEN: ${{ secrets.MARKETING_INGEST_TOKEN }}
-          ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
-          # Verified non-empty by the "Verify required production secrets"
-          # step above. No fallback — if this is missing the deploy never
-          # reaches here, so docker-compose's `${REDIS_PASSWORD:?...}` is
-          # guaranteed to resolve.
-          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         run: |
-          ssh root@${{ env.SERVER_HOST }} << EOF
-            cd /root/kds
+          set -euo pipefail
+          cat > .env.production.rendered <<ENV
+          # Auto-generated by GitHub Actions for ${VERSION}.
+          # backend env-validation.ts asserts uniqueness + minLength on
+          # every secret below; missing one aborts container boot.
 
-            # Pull latest code
-            git fetch --all --tags
-            git reset --hard HEAD
-            git checkout ${{ steps.version.outputs.VERSION }}
-
-            # Load Docker images
-            echo "Loading Docker images..."
-            docker load < backend-${{ steps.version.outputs.VERSION }}.tar.gz
-            docker load < frontend-${{ steps.version.outputs.VERSION }}.tar.gz
-            docker load < landing-${{ steps.version.outputs.VERSION }}.tar.gz
-
-            # Tag images for deployment
-            docker tag kds-backend:${{ steps.version.outputs.VERSION }} kds-backend:latest
-            docker tag kds-frontend:${{ steps.version.outputs.VERSION }} kds-frontend:latest
-            docker tag kds-landing:${{ steps.version.outputs.VERSION }} kds-landing:latest
-
-            # Clean up tar files
-            rm -f backend-${{ steps.version.outputs.VERSION }}.tar.gz
-            rm -f frontend-${{ steps.version.outputs.VERSION }}.tar.gz
-            rm -f landing-${{ steps.version.outputs.VERSION }}.tar.gz
-
-            # Create .env.production
-            cat > .env.production << ENVFILE
-          # Production Environment Configuration
-          # Auto-generated by GitHub Actions - ${{ steps.version.outputs.VERSION }}
-
-          # Timezone — pins backend + postgres container wall-clock so
-          # the subscription-renewals cron (declared `0 2 * * *`) fires
-          # at 02:00 Europe/Istanbul, not 02:00 UTC. Logs and pg_dump
-          # timestamps also line up with TR business hours.
           TZ=Europe/Istanbul
 
-          # Database
           POSTGRES_DB=restaurant_pos_prod
           POSTGRES_USER=postgres
           POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
           DATABASE_URL=postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/restaurant_pos_prod?connection_limit=25&pool_timeout=10
           REDIS_URL=redis://redis:6379/0
 
-          # JWT realms — every secret here must be UNIQUE in production.
-          # backend env-validation.ts asserts `distinctFrom` across all
-          # seven core secrets and aborts boot if any two collide. Each
-          # value is therefore wired to its own GitHub secret; never
-          # alias one to another.
           JWT_SECRET=${JWT_SECRET}
           JWT_EXPIRES_IN=7d
           JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
@@ -331,33 +306,20 @@ jobs:
           MARKETING_JWT_REFRESH_SECRET=${MARKETING_JWT_REFRESH_SECRET}
           ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY}
 
-          # Static bearer token for POST /api/marketing/leads/ingest
-          # consumed by the daily AI research routine. Guard fails closed
-          # when unset, so a missing secret silently disables ingest.
           MARKETING_INGEST_TOKEN=${MARKETING_INGEST_TOKEN}
 
-          # CORS
           CORS_ORIGIN=https://hummytummy.com,http://tauri.localhost,tauri://localhost,https://tauri.localhost
           FRONTEND_URL=https://hummytummy.com
 
-          # PayTR Payment
           PAYTR_MERCHANT_ID=${PAYTR_MERCHANT_ID}
           PAYTR_MERCHANT_KEY=${PAYTR_MERCHANT_KEY}
           PAYTR_MERCHANT_SALT=${PAYTR_MERCHANT_SALT}
           PAYTR_BASE_URL=https://www.paytr.com
-          # backend env-validation aborts boot if PAYTR_TEST_MODE is "1"
-          # (or unset) in production — test-mode payments do not move
-          # real money. Must be the literal "0".
           PAYTR_TEST_MODE=0
-          # PayTR redirects users to these URLs after success/failure on
-          # its hosted iframe. Both are required (env-validation rules),
-          # so they're written here as literal production URLs rather
-          # than secrets — the value never differs by deployment.
           PAYTR_OK_URL=https://hummytummy.com/app/subscription/success
           PAYTR_FAIL_URL=https://hummytummy.com/app/subscription/fail
           BACKEND_URL=https://hummytummy.com
 
-          # Email (SMTP)
           EMAIL_HOST=${EMAIL_HOST}
           EMAIL_PORT=587
           EMAIL_SECURE=false
@@ -366,203 +328,188 @@ jobs:
           EMAIL_FROM=${EMAIL_FROM}
           ADMIN_EMAIL=contact@hummytummy.com
 
-          # Subscription
           DEFAULT_TRIAL_DAYS=14
           TRIAL_REMINDER_DAYS=3
 
-          # Google OAuth
           GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
           GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
 
-          # Frontend
           VITE_API_URL=https://hummytummy.com/api
           VITE_API_BASE_URL=https://hummytummy.com
           VITE_SOCKET_URL=https://hummytummy.com
           VITE_WS_URL=wss://hummytummy.com
           VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
 
-          # Desktop Release
           DESKTOP_RELEASE_API_KEY=${DESKTOP_RELEASE_API_KEY}
-
-          # Infrastructure
           REDIS_PASSWORD=${REDIS_PASSWORD}
-          ENVFILE
+          ENV
+          # scp will rename it on landing; keep the local name verbose
+          # so accidental commits get caught by .gitignore patterns.
 
-            # Strict mode: secret presence was verified in the
-            # "Verify required production secrets" step before this
-            # one ran. No fallback values — if a secret is missing the
-            # workflow exits early with a clear list, never reaching
-            # docker-compose with a half-broken .env.production.
-            ./scripts/deploy-production.sh deploy
+      - name: Ship env file to server
+        run: scp -o ServerAliveInterval=15 .env.production.rendered root@${{ env.SERVER_HOST }}:/root/kds/.env.production
 
-            if [ \$? -ne 0 ]; then
-              echo "Deployment failed!"
-              exit 1
-            fi
-          EOF
-
-      - name: Run health checks
-        continue-on-error: true
+      - name: Run deploy.sh on the server
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Poll instead of `sleep 15 && curl-once`. Backend boot does
-          # route mapping, prisma engine spin-up, and the env-validation
-          # pass before serving /api/health, which routinely takes
-          # 30-60s on the prod box. A single early curl reports "deploy
-          # failed" while the app is in fact starting normally — we
-          # have to wait for it.
-          #
-          # Budget: 5 minutes per surface (60 attempts × 5s). If either
-          # surface still isn't answering after that, something is
-          # genuinely broken — bail loud.
+          set -euo pipefail
+          # Single SSH session, set -euo pipefail at the top so any
+          # failed line aborts immediately. The previous workflow used
+          # a heredoc without set -e and silently continued on
+          # `git checkout` failure → wrong version deployed.
+          ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=4 \
+            root@${{ env.SERVER_HOST }} "
+              set -euo pipefail
+              cd /root/kds
+              git fetch --all --tags
+              git checkout ${VERSION}
+              export GHCR_USER='${GHCR_USER}'
+              export GHCR_TOKEN='${GHCR_TOKEN}'
+              ./scripts/deploy.sh prod ${VERSION}
+            "
+
+      # ----- Post-deploy verification (HARD; no continue-on-error) ----
+      - name: Public health probe
+        run: |
+          set -euo pipefail
           poll() {
             local label="$1" url="$2"
-            local max_attempts=60
-            local interval=5
-            local attempt=0
-            echo "Polling $label ($url) — up to $((max_attempts * interval))s..."
-            while [ $attempt -lt $max_attempts ]; do
-              if curl -sf -o /dev/null "$url"; then
-                echo "$label is healthy (after $((attempt * interval))s)"
-                return 0
+            local i=0
+            while [ $i -lt 24 ]; do  # 24 × 5s = 2 minutes
+              if curl -fsS -o /dev/null --max-time 5 "$url"; then
+                echo "$label OK after $((i*5))s"; return 0
               fi
-              attempt=$((attempt + 1))
-              sleep $interval
+              i=$((i + 1)); sleep 5
             done
-            echo "::error::$label still not responding after $((max_attempts * interval))s — failing"
+            echo "::error::$label still not responding after 120s"
             return 1
           }
+          # 30s grace so cloudflare/nginx settles on the new upstream.
+          sleep 30
+          poll "API"      https://hummytummy.com/api/health
+          poll "Frontend" https://hummytummy.com
 
-          # Initial grace so we don't hit a half-restarted container.
-          sleep 10
+      - name: SSL cert expiry guard
+        run: |
+          set -euo pipefail
+          host=hummytummy.com
+          end=$(echo | openssl s_client -servername "$host" -connect "$host:443" 2>/dev/null \
+                | openssl x509 -noout -enddate | cut -d= -f2)
+          end_ts=$(date -d "$end" +%s)
+          now_ts=$(date +%s)
+          days=$(( (end_ts - now_ts) / 86400 ))
+          echo "SSL expires in $days days ($end)"
+          if [ "$days" -le 3 ]; then
+            echo "::error::SSL cert expires in $days days — renew now"
+            exit 1
+          elif [ "$days" -le 14 ]; then
+            echo "::warning::SSL cert expires in $days days — renew this week"
+          fi
 
-          poll "API"      "https://hummytummy.com/api/health" || exit 1
-          poll "Frontend" "https://hummytummy.com"             || exit 1
+      - name: Performance smoke (warning only)
+        continue-on-error: true
+        run: |
+          start=$(date +%s%3N)
+          curl -fsS -o /dev/null --max-time 10 https://hummytummy.com/api/health || exit 0
+          end=$(date +%s%3N)
+          rt=$((end - start))
+          echo "API response time: ${rt}ms"
+          if [ "$rt" -gt 5000 ]; then
+            echo "::warning::API response time ${rt}ms — investigate if persistent"
+          fi
 
-          echo "All health checks passed."
-
-      - name: Create Sentry release
+      - name: Disk cleanup
         if: success()
+        run: |
+          ssh -o ServerAliveInterval=15 root@${{ env.SERVER_HOST }} '
+            set -euo pipefail
+            # Keep images touched in the last 7 days (covers rollback
+            # window). Anything older gets reaped.
+            docker image prune -af --filter "until=168h" || true
+          '
+
+      - name: Rollback on failure
+        if: failure()
+        run: |
+          ssh -o ServerAliveInterval=15 root@${{ env.SERVER_HOST }} '
+            set -euo pipefail
+            cd /root/kds
+            ./scripts/deploy.sh prod-rollback
+          '
+
+      - name: Cleanup workspace
+        if: always()
+        run: rm -f .env.production.rendered
+
+  # -------------------------------------------------------------------
+  # Best-effort post-deploy bookkeeping. None of these failing should
+  # roll back the deploy (the service is already live and healthy by
+  # the time we get here); they're decorations on a green deploy.
+  # -------------------------------------------------------------------
+  bookkeep:
+    name: Sentry release + GitHub release
+    runs-on: ubuntu-latest
+    needs: deploy
+    if: success()
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "VERSION=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Sentry release
+        continue-on-error: true
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
         run: |
-          # Install sentry-cli
+          set -euo pipefail
           curl -sL https://sentry.io/get-cli/ | bash
-
           VERSION="${{ steps.version.outputs.VERSION }}"
-
-          # Create releases for all projects
-          for PROJECT in "${{ secrets.SENTRY_PROJECT_BACKEND }}" "${{ secrets.SENTRY_PROJECT_FRONTEND }}" "${{ secrets.SENTRY_PROJECT_LANDING }}"; do
-            if [ -n "$PROJECT" ]; then
-              echo "Creating Sentry release for ${PROJECT}..."
-
-              # Create release
-              sentry-cli releases new "${PROJECT}@${VERSION}" --project "${PROJECT}" || true
-
-              # Associate commits
-              sentry-cli releases set-commits "${PROJECT}@${VERSION}" --auto --project "${PROJECT}" || true
-
-              # Create deployment
-              sentry-cli releases deploys "${PROJECT}@${VERSION}" new --env production --project "${PROJECT}" || true
-
-              # Finalize release
-              sentry-cli releases finalize "${PROJECT}@${VERSION}" --project "${PROJECT}" || true
-            fi
+          for PROJECT in \
+              "${{ secrets.SENTRY_PROJECT_BACKEND }}" \
+              "${{ secrets.SENTRY_PROJECT_FRONTEND }}" \
+              "${{ secrets.SENTRY_PROJECT_LANDING }}"; do
+            [ -z "$PROJECT" ] && continue
+            sentry-cli releases new      "${PROJECT}@${VERSION}" --project "${PROJECT}" || true
+            sentry-cli releases set-commits "${PROJECT}@${VERSION}" --auto --project "${PROJECT}" || true
+            sentry-cli releases deploys  "${PROJECT}@${VERSION}" new --env production --project "${PROJECT}" || true
+            sentry-cli releases finalize "${PROJECT}@${VERSION}" --project "${PROJECT}" || true
           done
 
-          echo "Sentry releases created successfully!"
-
-      - name: Create GitHub Release
-        if: success() && github.event_name == 'push'
+      - name: GitHub Release
         continue-on-error: true
-        uses: softprops/action-gh-release@v1
+        if: github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.VERSION }}
           name: Release ${{ steps.version.outputs.VERSION }}
           body: |
             ## Release ${{ steps.version.outputs.VERSION }}
 
-            **Deployed at:** ${{ github.event.head_commit.timestamp }}
-            **Commit:** ${{ github.sha }}
-            **Environment:** https://hummytummy.com
+            Deployed at: ${{ github.event.head_commit.timestamp }}
+            Commit: ${{ github.sha }}
+            URL: https://hummytummy.com
 
-            ### Deployment
-            - Database backup created
-            - Migrations applied
-            - Health checks passed
+            Deploy ran scripts/deploy.sh which executed:
+            - DB backup (verified)
+            - Migration doctor
+            - Image swap with rollback-on-error
+            - Public smoke probe
 
-            ### Changes
             See commit history for details.
           draft: false
           prerelease: false
-
-      - name: Notify success
-        if: success()
-        run: |
-          echo "Production deployment successful!"
-          echo "Version: ${{ steps.version.outputs.VERSION }}"
-          echo "URL: https://hummytummy.com"
-
-      - name: Rollback on failure
-        if: failure() && steps.deploy.outcome == 'failure'
-        run: |
-          echo "Deployment failed, initiating rollback..."
-          ssh root@${{ env.SERVER_HOST }} << 'EOF'
-            cd /root/kds
-            ./scripts/deploy-production.sh rollback
-          EOF
-
-      - name: Cleanup on failure
-        if: failure()
-        run: |
-          echo "Cleaning up failed deployment..."
-          ssh root@${{ env.SERVER_HOST }} << EOF
-            cd /root/kds
-            rm -f backend-${{ steps.version.outputs.VERSION }}.tar.gz
-            rm -f frontend-${{ steps.version.outputs.VERSION }}.tar.gz
-            rm -f landing-${{ steps.version.outputs.VERSION }}.tar.gz
-          EOF
-
-  # Post-deployment verification
-  verify:
-    name: Post-Deployment Verification
-    runs-on: ubuntu-latest
-    needs: deploy-production
-
-    steps:
-      - name: Comprehensive health check
-        continue-on-error: true
-        run: |
-          echo "Running comprehensive health checks..."
-
-          # API health
-          echo "Checking API..."
-          curl -sf https://hummytummy.com/api/health || exit 1
-
-          # Frontend
-          echo "Checking frontend..."
-          curl -sf https://hummytummy.com || exit 1
-
-          # SSL certificate
-          echo "Checking SSL certificate..."
-          echo | openssl s_client -servername hummytummy.com -connect hummytummy.com:443 2>/dev/null | \
-            openssl x509 -noout -dates || exit 1
-
-          echo "All verification checks passed!"
-
-      - name: Performance check
-        run: |
-          echo "Checking response times..."
-
-          start=$(date +%s%3N)
-          curl -sf https://hummytummy.com/api/health > /dev/null
-          end=$(date +%s%3N)
-
-          response_time=$((end - start))
-          echo "API response time: ${response_time}ms"
-
-          if [ $response_time -gt 5000 ]; then
-            echo "Warning: Response time is high (${response_time}ms)"
-          else
-            echo "Response time is good (${response_time}ms)"
-          fi

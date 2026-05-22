@@ -7,7 +7,8 @@ services:
   postgres:
     env_file:
       - .env.test
-    image: postgres:15-alpine
+    # Minor-pin to keep parity with prod; see docker-compose.prod.yml.
+    image: postgres:15.6-alpine
     container_name: kds_postgres_staging
     restart: always
     ports:
@@ -34,7 +35,7 @@ services:
   redis:
     env_file:
       - .env.test
-    image: redis:7-alpine
+    image: redis:7.2-alpine
     container_name: kds_redis_staging
     restart: always
     ports:
@@ -61,7 +62,7 @@ services:
   backend:
     env_file:
       - .env.test
-    image: ghcr.io/mtarikucar/kds/backend-staging:latest
+    image: ghcr.io/mtarikucar/kds/backend-staging:current
     container_name: kds_backend_staging
     restart: always
     depends_on:
@@ -97,7 +98,7 @@ services:
   frontend:
     env_file:
       - .env.test
-    image: ghcr.io/mtarikucar/kds/frontend-staging:latest
+    image: ghcr.io/mtarikucar/kds/frontend-staging:current
     container_name: kds_frontend_staging
     restart: always
     depends_on:
@@ -126,7 +127,7 @@ services:
   landing:
     env_file:
       - .env.test
-    image: ghcr.io/mtarikucar/kds/landing-staging:latest
+    image: ghcr.io/mtarikucar/kds/landing-staging:current
     container_name: kds_landing_staging
     restart: always
     environment:
