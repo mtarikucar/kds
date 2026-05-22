@@ -139,61 +139,78 @@ jobs:
             *[!0-9]*) echo "::error::Probe parse failure (user_tables='$user_tables' applied='$applied_migs'). Refusing to baseline."; exit 1 ;;
           esac
 
-          if [ "$applied_migs" -gt 0 ]; then
-            echo "::error::_prisma_migrations already has $applied_migs applied rows."
-            echo "::error::This workflow only baselines a completely-unbaselined DB (hidden-P3005)."
-            echo "::error::For partial state, resolve each missing migration manually:"
-            echo "::error::  docker exec ${{ steps.cfg.outputs.backend_container }} npx prisma migrate resolve --applied <name>"
-            exit 1
-          fi
           if [ "$user_tables" -eq 0 ]; then
             echo "::error::Database has no user tables — there's nothing to baseline."
             echo "::error::A fresh DB should run \`prisma migrate deploy\` instead."
             exit 1
           fi
-          echo "Safe to baseline: $user_tables user tables, 0 applied migrations."
+          # applied_migs > 0 is OK now — the apply step is idempotent
+          # and skips per-migration rows that are already applied. This
+          # also makes a half-finished previous run safe to resume.
+          echo "Safe to baseline: $user_tables user tables, $applied_migs migrations already applied."
 
       - name: List migrations that would be applied
-        id: plan
         env:
           BACKEND: ${{ steps.cfg.outputs.backend_container }}
         run: |
           set -euo pipefail
-          # `docker exec ... ls` directly — no remote shell wrapping,
-          # so no double-escape on the glob pattern.
+          # Audit dump only — the apply step recomputes the plan to
+          # avoid relying on multi-line GITHUB_OUTPUT plumbing (which
+          # silently passes only the first line in some shell contexts).
           plan=$(ssh root@${{ env.SERVER_HOST }} \
             "docker exec $BACKEND ls /app/prisma/migrations" \
             | grep -E '^[0-9]' | sort)
           count=$(printf '%s\n' "$plan" | grep -c .)
-          echo "Migrations to baseline (in order):"
+          echo "Migrations on disk (will be checked):"
           printf '%s\n' "$plan" | sed 's/^/  - /'
           echo "Total: $count"
-          {
-            echo "count=$count"
-            echo 'plan<<EOF'
-            printf '%s\n' "$plan"
-            echo 'EOF'
-          } >> "$GITHUB_OUTPUT"
 
       - name: Apply baseline
         if: inputs.mode == 'apply'
         env:
           BACKEND: ${{ steps.cfg.outputs.backend_container }}
+          PG: ${{ steps.cfg.outputs.postgres_container }}
+          DB: ${{ steps.cfg.outputs.db_name }}
         run: |
           set -euo pipefail
-          echo "Baselining ${{ steps.plan.outputs.count }} migrations against $BACKEND…"
-          # One ssh per migration. Slightly slower than a single ssh
-          # with a loop, but the nested ssh→bash→docker→sh quoting
-          # broke in two earlier attempts; one SSH per call uses
-          # exactly one layer of quoting and is trivially correct.
+
+          # Recompute plan locally — using a here-string sidesteps the
+          # multi-line GITHUB_OUTPUT issue we hit before.
+          plan=$(ssh root@${{ env.SERVER_HOST }} \
+            "docker exec $BACKEND ls /app/prisma/migrations" \
+            | grep -E '^[0-9]' | sort)
+
+          # Pull the set of migrations already marked applied, so we
+          # can skip them and stay idempotent (a half-finished previous
+          # apply can simply be re-run).
+          if [ "$(ssh root@${{ env.SERVER_HOST }} "docker exec $PG psql -U postgres -d $DB -tAc \"SELECT to_regclass('public._prisma_migrations') IS NOT NULL\"" | tr -d ' \r\n')" = "t" ]; then
+            applied_set=$(ssh root@${{ env.SERVER_HOST }} \
+              "docker exec $PG psql -U postgres -d $DB -tAc \"SELECT migration_name FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL\"" \
+              | tr -d ' \r' | sort -u)
+          else
+            applied_set=""
+          fi
+
+          echo "Already-applied rows: $(printf '%s\n' "$applied_set" | grep -c .)"
+          echo "Baseline plan:        $(printf '%s\n' "$plan" | grep -c .)"
+
+          new=0; skipped=0
+          # `<<<` here-string is bulletproof; while-IFS-read consumes it
+          # line by line, no heredoc indentation gotchas.
           while IFS= read -r m; do
             [ -z "$m" ] && continue
+            if printf '%s\n' "$applied_set" | grep -qx "$m"; then
+              echo "  skip $m (already applied)"
+              skipped=$((skipped + 1))
+              continue
+            fi
             echo "→ $m"
             ssh root@${{ env.SERVER_HOST }} \
               "docker exec $BACKEND npx --no-install prisma migrate resolve --applied $m"
-          done <<EOF
-          ${{ steps.plan.outputs.plan }}
-          EOF
+            new=$((new + 1))
+          done <<< "$plan"
+
+          echo "Done: $new newly baselined, $skipped already applied."
           echo "--- migrate status after baseline ---"
           ssh root@${{ env.SERVER_HOST }} \
             "docker exec $BACKEND npx --no-install prisma migrate status" \
