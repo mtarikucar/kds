@@ -332,9 +332,16 @@ swap_backend() {
   sleep 3
   verify_running_image "$BACKEND_CONTAINER" "$BACKEND_IMG"
   wait_until_healthy "$API_LOCAL_URL" "$HEALTH_BUDGET_SEC"
-  # Migrations may also have been deferred (very first deploy). Run
-  # again — it's a no-op if nothing's pending.
-  log "Applying any deferred migrations in new backend"
+  # Re-run the doctor against the freshly-started backend. The
+  # pre-swap pass (step 6) is a best-effort early warning; if the
+  # backend container wasn't running at that point — first deploy,
+  # or coming back from a hard stop — it skipped. Now we have a
+  # live container, so this pass is the authoritative one.
+  "$SCRIPT_DIR/db-migration-doctor.sh" "$BACKEND_CONTAINER" "$PROJECT_ROOT/backend"
+  # Doctor only invokes migrate deploy when it auto-recovers a
+  # failed migration. Pending-but-clean migrations are left for us
+  # to apply explicitly here.
+  log "Applying any pending migrations in new backend"
   docker exec "$BACKEND_CONTAINER" npx --no-install prisma migrate deploy
 }
 

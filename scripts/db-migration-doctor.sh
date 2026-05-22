@@ -59,14 +59,22 @@ echo "$status_out" | sed 's/^/   /'
 # Case detection (order matters — most specific first)
 # ----------------------------------------------------------------------
 
-# P3005 → baseline missing. Never auto-resolve; previous script's
+# P3005 → baseline missing. Prisma surfaces this either as the literal
+# error code or as the human-readable "database schema is not empty"
+# line, depending on which sub-command tripped it. We treat both as the
+# same failure mode. Never auto-resolve; the previous script's
 # "mark everything applied" loop was the silent-corruption bug.
-if echo "$status_out" | grep -q "P3005"; then
+if echo "$status_out" | grep -qE 'P3005|database schema is not empty'; then
   err "P3005 detected — database is not empty but no migration history exists."
   err "DO NOT auto-mark migrations as applied. An operator must baseline manually:"
   err "  1. Identify which migrations are already reflected in the DB schema"
   err "  2. \`docker exec $BACKEND_CONTAINER npx prisma migrate resolve --applied <each one>\`"
   err "  3. Re-run the deploy"
+  err ""
+  err "If you're sure ALL prior migrations were applied to this DB (e.g."
+  err "this is a staging box that was seeded from a prod dump), this"
+  err "one-liner baselines the whole history in order:"
+  err "  docker exec $BACKEND_CONTAINER sh -c 'cd /app && for m in \$(ls prisma/migrations | grep -E \"^[0-9]\" | sort); do npx --no-install prisma migrate resolve --applied \"\$m\"; done'"
   exit 1
 fi
 
