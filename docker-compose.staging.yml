@@ -7,8 +7,8 @@ services:
   postgres:
     env_file:
       - .env.test
-    # Minor-pin to keep parity with prod; see docker-compose.prod.yml.
-    image: postgres:15.6-alpine
+    # Major-pin; see docker-compose.prod.yml for the rationale.
+    image: postgres:15-alpine
     container_name: kds_postgres_staging
     restart: always
     ports:
@@ -35,7 +35,7 @@ services:
   redis:
     env_file:
       - .env.test
-    image: redis:7.2-alpine
+    image: redis:7-alpine
     container_name: kds_redis_staging
     restart: always
     ports:

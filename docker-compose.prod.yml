@@ -7,9 +7,12 @@ services:
   postgres:
     env_file:
       - .env.production
-    # Minor-pin so a daemon restart can't silently roll us to 15.7 and
-    # break the wire format the running backend expects.
-    image: postgres:15.6-alpine
+    # Major-pinned. Bumping to a minor (15.6 / 15.7) tag triggers a
+    # container recreate on the next pull, and the existing data
+    # volume isn't guaranteed to be readable across all minors
+    # without a one-shot pg_upgrade. Major (15) is enough to keep
+    # us out of pg14/pg16 wire-format land.
+    image: postgres:15-alpine
     container_name: kds_postgres_prod
     restart: always
     environment:
@@ -36,7 +39,9 @@ services:
   redis:
     env_file:
       - .env.production
-    image: redis:7.2-alpine
+    # Major-pinned for the same reason as postgres — the redis 7 → 7.2
+    # bump on staging failed to start against the existing RDB volume.
+    image: redis:7-alpine
     container_name: kds_redis_prod
     restart: always
     command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD must be set}
