@@ -73,3 +73,12 @@ nul
 playwright-report/
 playwright-results.xml
 test-results/
+
+# Deploy script ephemera. The unified deploy.sh keeps real state under
+# /var/lib/kds-deploy (outside the repo). These files are legacy
+# outputs from the old deploy-production.sh and rendered env files
+# from CI — if they end up in the working tree they'll block `git
+# reset --hard` on the deploy box.
+.last-deployment-images
+.env.production.rendered
+.env.test.rendered

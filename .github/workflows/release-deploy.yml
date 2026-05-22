@@ -369,8 +369,11 @@ jobs:
             root@${{ env.SERVER_HOST }} "
               set -euo pipefail
               cd /root/kds
+              # See test-deploy.yml for the rationale — stash any
+              # uncommitted state files left by the legacy deployer.
+              git stash --include-untracked --quiet || true
               git fetch --all --tags
-              git checkout ${VERSION}
+              git reset --hard ${VERSION}
               export GHCR_USER='${GHCR_USER}'
               export GHCR_TOKEN='${GHCR_TOKEN}'
               ./scripts/deploy.sh prod ${VERSION}
@@ -438,12 +441,20 @@ jobs:
 
       - name: Rollback on failure
         if: failure()
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
-          ssh -o ServerAliveInterval=15 root@${{ env.SERVER_HOST }} '
+          # Re-sync before invoking deploy.sh — if the deploy step
+          # crashed before its own reset, scripts/deploy.sh may not be
+          # present on disk in the version we're rolling back to.
+          ssh -o ServerAliveInterval=15 root@${{ env.SERVER_HOST }} "
             set -euo pipefail
             cd /root/kds
+            git stash --include-untracked --quiet || true
+            git fetch --all --tags
+            git reset --hard ${VERSION}
             ./scripts/deploy.sh prod-rollback
-          '
+          "
 
       - name: Cleanup workspace
         if: always()

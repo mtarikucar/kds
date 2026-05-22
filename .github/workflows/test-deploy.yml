@@ -249,8 +249,13 @@ jobs:
             root@${{ env.SERVER_HOST }} "
               set -euo pipefail
               cd /root/kds
+              # The legacy deployer left .last-deployment-images and
+              # other ephemera in the working tree. Stash anything
+              # uncommitted so `git reset --hard` below doesn't refuse
+              # to clobber it. The state we actually care about lives
+              # outside the repo (/var/lib/kds-deploy).
+              git stash --include-untracked --quiet || true
               git fetch origin test
-              git checkout test
               git reset --hard origin/test
               export GHCR_USER='${GHCR_USER}'
               export GHCR_TOKEN='${GHCR_TOKEN}'
@@ -279,9 +284,15 @@ jobs:
       - name: Rollback on failure
         if: failure()
         run: |
+          # Rollback re-syncs the worktree before calling deploy.sh —
+          # if the deploy step crashed before its own reset succeeded,
+          # the rollback script may not exist on disk yet.
           ssh root@${{ env.SERVER_HOST }} '
             set -euo pipefail
             cd /root/kds
+            git stash --include-untracked --quiet || true
+            git fetch origin test
+            git reset --hard origin/test
             ./scripts/deploy.sh staging-rollback
           '
 
