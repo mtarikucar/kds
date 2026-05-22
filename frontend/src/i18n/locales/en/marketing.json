@@ -152,6 +152,7 @@
     "title": "Dashboard",
     "subtitle": "Performance at a glance",
     "downloadGuide": "Download Marketer Guide (PDF)",
+    "downloadManagerGuide": "Download Manager Guide (PDF)",
     "totalLeads": "Total leads",
     "convertedLeads": "Converted",
     "conversionRate": "Conversion rate",

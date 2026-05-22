@@ -48,10 +48,12 @@ export default function MarketingDashboardPage() {
     enabled: isManager,
   });
 
-  // The guide PDF is shipped from frontend/public, so its URL is just
+  // The guide PDFs are shipped from frontend/public, so their URLs are just
   // the Vite base path + filename. Resolving at runtime keeps the
   // link correct under any deploy prefix (BASE_URL env / Vite `base`).
-  const guideUrl = `${import.meta.env.BASE_URL.replace(/\/?$/, '/')}pazarlamaci-rehberi.pdf`;
+  const basePath = import.meta.env.BASE_URL.replace(/\/?$/, '/');
+  const guideUrl = `${basePath}pazarlamaci-rehberi.pdf`;
+  const managerGuideUrl = `${basePath}yonetici-rehberi.pdf`;
 
   return (
     <div className="space-y-6">
@@ -60,20 +62,37 @@ export default function MarketingDashboardPage() {
           <h1 className="text-2xl font-bold text-slate-900">{t('dashboard.title')}</h1>
           <p className="text-sm text-slate-500">{t('dashboard.subtitle')}</p>
         </div>
-        {/* Pazarlamacı rehberi — sahaya çıkış, komisyon yapısı, sıkça
-            sorulan sorular. Yeni sekmede açar, tarayıcı isterse de
-            indirir (download attribute set). */}
-        <a
-          href={guideUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          download="KDS-Pazarlamaci-Rehberi.pdf"
-          className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
-          data-testid="dashboard-guide-download"
-        >
-          <ArrowDownTrayIcon className="w-4 h-4" />
-          {t('dashboard.downloadGuide', 'Pazarlamacı Rehberini İndir (PDF)')}
-        </a>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Manager rehberi — sadece SALES_MANAGER görür: lead atama,
+              otomatik dağıtım, komisyon onay akışı, ekip yönetimi. */}
+          {isManager && (
+            <a
+              href={managerGuideUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              download="KDS-Yonetici-Rehberi.pdf"
+              className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-100"
+              data-testid="dashboard-manager-guide-download"
+            >
+              <ArrowDownTrayIcon className="w-4 h-4" />
+              {t('dashboard.downloadManagerGuide', 'Yönetici Rehberini İndir (PDF)')}
+            </a>
+          )}
+          {/* Pazarlamacı rehberi — sahaya çıkış, komisyon yapısı, sıkça
+              sorulan sorular. Manager da görür: ekibinin elindeki belgenin
+              aynısını okuyabilsin. */}
+          <a
+            href={guideUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            download="KDS-Pazarlamaci-Rehberi.pdf"
+            className="inline-flex items-center gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
+            data-testid="dashboard-guide-download"
+          >
+            <ArrowDownTrayIcon className="w-4 h-4" />
+            {t('dashboard.downloadGuide', 'Pazarlamacı Rehberini İndir (PDF)')}
+          </a>
+        </div>
       </div>
 
       {/* Stats Grid */}
