@@ -16,9 +16,12 @@ interface OrderCardProps {
   onUpdateStatus: (orderId: string, status: OrderStatus) => void;
   onCancelOrder?: (orderId: string) => void;
   isUpdating?: boolean;
+  // When set, the action button receives data-tour=<value> so the onboarding
+  // tour can spotlight it. Used on the first PENDING card.
+  actionTourTag?: string;
 }
 
-const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating }: OrderCardProps) => {
+const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating, actionTourTag }: OrderCardProps) => {
   const [elapsedTime, setElapsedTime] = useState('');
   const [urgency, setUrgency] = useState(getOrderUrgency(order.createdAt));
   const { t } = useTranslation('kitchen');
@@ -214,15 +217,17 @@ const OrderCard = ({ order, onUpdateStatus, onCancelOrder, isUpdating }: OrderCa
 
         {/* Action Button */}
         {nextStatus && actionConfig && (
-          <Button
-            variant={actionConfig.variant}
-            className={cn('w-full', actionConfig.className)}
-            onClick={() => onUpdateStatus(order.id, nextStatus)}
-            isLoading={isUpdating}
-            size="sm"
-          >
-            {actionConfig.label}
-          </Button>
+          <div data-tour={actionTourTag}>
+            <Button
+              variant={actionConfig.variant}
+              className={cn('w-full', actionConfig.className)}
+              onClick={() => onUpdateStatus(order.id, nextStatus)}
+              isLoading={isUpdating}
+              size="sm"
+            >
+              {actionConfig.label}
+            </Button>
+          </div>
         )}
       </div>
     </div>

@@ -44,6 +44,7 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
     currentStep,
     steps,
     tourId,
+    retryNonce,
     openWelcomeModal,
     closeWelcomeModal,
     startTour,
@@ -84,7 +85,7 @@ export function OnboardingProvider({ children }: OnboardingProviderProps) {
       {/* Joyride Tour */}
       {isTourRunning && steps.length > 0 && (
         <Joyride
-          key={`tour-${tourId}-${isTourRunning}`}
+          key={`tour-${tourId}-${isTourRunning}-${retryNonce}`}
           callback={handleJoyrideCallback}
           continuous
           hideCloseButton={false}

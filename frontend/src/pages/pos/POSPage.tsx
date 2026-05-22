@@ -173,6 +173,26 @@ const POSPage = () => {
     }
   }, [isTablelessMode]);
 
+  // Onboarding tour preview: force into 'order' view (takeaway shape) while
+  // tour steps targeting menu-panel/order-cart are active, then restore the
+  // previous view. Snapshot prev view in a ref so we don't loop on view changes.
+  const posTourPreview = useUiStore((s) => s.posTourPreview);
+  const prevTourViewRef = useRef<POSView | null>(null);
+  useEffect(() => {
+    if (posTourPreview) {
+      if (prevTourViewRef.current === null) {
+        prevTourViewRef.current = currentView;
+      }
+      setSelectedTable(null);
+      setCurrentView('order');
+    } else if (prevTourViewRef.current !== null) {
+      setCurrentView(prevTourViewRef.current);
+      setSelectedTable(null);
+      prevTourViewRef.current = null;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posTourPreview]);
+
   // Fetch active orders for selected table (exclude pending approval, paid, and cancelled)
   const { data: tableOrders, refetch: refetchOrders } = useOrders(
     selectedTable

@@ -12,6 +12,9 @@ interface OrderQueueProps {
   onCancelOrder?: (orderId: string) => void;
   updatingOrderId?: string;
   dataTour?: string;
+  // Tag the first card's action button with data-tour="order-actions" so the
+  // onboarding tour can spotlight a concrete button instead of the column.
+  tagFirstActionForTour?: boolean;
 }
 
 const OrderQueue = ({
@@ -22,6 +25,7 @@ const OrderQueue = ({
   onCancelOrder,
   updatingOrderId,
   dataTour,
+  tagFirstActionForTour,
 }: OrderQueueProps) => {
   const { t } = useTranslation('kitchen');
 
@@ -111,13 +115,14 @@ const OrderQueue = ({
             )}
           </div>
         ) : (
-          filteredOrders.map((order) => (
+          filteredOrders.map((order, idx) => (
             <OrderCard
               key={order.id}
               order={order}
               onUpdateStatus={onUpdateStatus}
               onCancelOrder={onCancelOrder}
               isUpdating={updatingOrderId === order.id}
+              actionTourTag={tagFirstActionForTour && idx === 0 ? 'order-actions' : undefined}
             />
           ))
         )}

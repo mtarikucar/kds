@@ -26,6 +26,12 @@ interface UiState {
   setSkipAllTours: (skip: boolean) => void;
   resetAllOnboarding: () => void;
 
+  // Transient flag set by the onboarding tour to force POSPage into
+  // its 'order' view (menu-panel + order-cart visible) while those
+  // tour steps are active. Not persisted — reset on refresh.
+  posTourPreview: boolean;
+  setPosTourPreview: (on: boolean) => void;
+
   // Per-machine hardware preferences. Persisted in localStorage so each
   // POS terminal remembers its own paired printer / drawer / kitchen
   // printer; not synced to the backend (each terminal has its own
@@ -108,6 +114,11 @@ export const useUiStore = create<UiState>()(
         set({ onboarding: initialOnboardingState });
       },
 
+      posTourPreview: false,
+      setPosTourPreview: (on: boolean) => {
+        set({ posTourPreview: on });
+      },
+
       // Per-machine hardware preferences
       defaultReceiptPrinterId: null,
       defaultKitchenPrinterId: null,
@@ -120,6 +131,12 @@ export const useUiStore = create<UiState>()(
     }),
     {
       name: 'ui-storage',
+      partialize: (state) => ({
+        isSidebarCollapsed: state.isSidebarCollapsed,
+        onboarding: state.onboarding,
+        defaultReceiptPrinterId: state.defaultReceiptPrinterId,
+        defaultKitchenPrinterId: state.defaultKitchenPrinterId,
+      }),
     }
   )
 );
