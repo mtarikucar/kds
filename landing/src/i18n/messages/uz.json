@@ -271,7 +271,6 @@
     "trustBadge2": "14 kunlik bepul sinov",
     "trustBadge3": "Istalgan vaqtda bekor qilish"
   },
-
   "mascot": {
     "welcome": "Xush kelibsiz! 👋",
     "welcomeMessage": "Men HummyTummy oshpaziman. Sizga yordam berish uchun shu yerdaman!",
@@ -427,6 +426,41 @@
       "contact": {
         "title": "Biz bilan bog'laning",
         "content": "Ushbu Xizmat shartlari bo'yicha savollaringiz bo'lsa, biz bilan bog'laning:"
+      }
+    }
+  },
+  "contact": {
+    "title": "Aloqa",
+    "subtitle": "Savollar, so'rovlar va izohlaringiz uchun biz bilan bog'laning.",
+    "backToHome": "Bosh sahifaga qaytish",
+    "labels": {
+      "email": "Email"
+    },
+    "sections": {
+      "general": {
+        "title": "Umumiy aloqa",
+        "content": "Xizmatimiz, obuna rejalari yoki hamkorlik haqida savollaringiz uchun bizga email yuboring. Eng kechi 2 ish kuni ichida javob beramiz."
+      },
+      "support": {
+        "title": "Texnik yordam",
+        "content": "Texnik muammolar, hisob yoki to'lov masalalari uchun quyidagi manzilga yozing.",
+        "hours": "Ish kunlari 09:00 – 18:00 (Turkiya vaqti) javob beriladi. Shoshilinch masalalar obunangiz SLA shartlariga bo'ysunadi."
+      },
+      "kvkk": {
+        "title": "KVKK murojaatlari",
+        "content": "Turkiyaning 6698-sonli Shaxsiy Ma'lumotlarni Himoya Qilish Qonuni bo'yicha huquqlaringizdan (kirish, tuzatish, o'chirish, e'tiroz va h.k.) foydalanish uchun quyidagi emailga yozing. KVKK 13-modda bo'yicha 30 kun ichida javob beriladi.",
+        "linkHint": "Batafsil ma'lumot uchun <link>KVKK Bildirishnomasi</link>ga qarang."
+      },
+      "legal": {
+        "title": "Yuridik hujjatlar",
+        "content": "Xizmatimizga oid barcha yuridik matnlar:",
+        "links": {
+          "kvkk": "KVKK Bildirishnomasi (Türkçe)",
+          "distanceSales": "Masofaviy savdo shartnomasi (Türkçe)",
+          "refundPolicy": "Qaytarish siyosati (Türkçe)",
+          "privacy": "Maxfiylik siyosati",
+          "terms": "Foydalanish shartlari"
+        }
       }
     }
   }

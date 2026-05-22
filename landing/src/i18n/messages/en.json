@@ -271,7 +271,6 @@
     "trustBadge2": "14-day free trial",
     "trustBadge3": "Cancel anytime"
   },
-
   "mascot": {
     "welcome": "Welcome! 👋",
     "welcomeMessage": "I'm HummyTummy's chef. I'm here to help you!",
@@ -427,6 +426,41 @@
       "contact": {
         "title": "Contact Us",
         "content": "If you have any questions about these Terms of Service, please contact us:"
+      }
+    }
+  },
+  "contact": {
+    "title": "Contact",
+    "subtitle": "Get in touch for questions, requests, and feedback.",
+    "backToHome": "Back to home",
+    "labels": {
+      "email": "Email"
+    },
+    "sections": {
+      "general": {
+        "title": "General Contact",
+        "content": "For questions about our service, subscription plans, or partnership opportunities, drop us an email. We aim to respond within two business days."
+      },
+      "support": {
+        "title": "Technical Support",
+        "content": "For technical issues, account questions, or billing matters, reach us at the address below.",
+        "hours": "Replies on weekdays 09:00 – 18:00 (Turkey time). Urgent issues follow the SLA terms of your subscription."
+      },
+      "kvkk": {
+        "title": "KVKK Requests",
+        "content": "To exercise your rights under Turkish Personal Data Protection Law no. 6698 (access, correction, erasure, objection, etc.), please reach out via the email address below. Requests are answered within 30 days as required by KVKK Article 13.",
+        "linkHint": "See the <link>KVKK Notice</link> for full details."
+      },
+      "legal": {
+        "title": "Legal Documents",
+        "content": "All legal texts related to our service:",
+        "links": {
+          "kvkk": "KVKK Notice (Türkçe)",
+          "distanceSales": "Distance Sales Agreement (Türkçe)",
+          "refundPolicy": "Refund Policy (Türkçe)",
+          "privacy": "Privacy Policy",
+          "terms": "Terms of Service"
+        }
       }
     }
   }

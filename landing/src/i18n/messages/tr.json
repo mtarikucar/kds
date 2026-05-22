@@ -271,7 +271,6 @@
     "trustBadge2": "14 günlük ücretsiz deneme",
     "trustBadge3": "İstediğiniz zaman iptal"
   },
-
   "mascot": {
     "welcome": "Hoş geldiniz! 👋",
     "welcomeMessage": "Ben HummyTummy'nin şefiyim. Size yardımcı olmak için buradayım!",
@@ -427,6 +426,41 @@
       "contact": {
         "title": "Bize Ulaşın",
         "content": "Bu Kullanım Şartları hakkında sorularınız varsa, lütfen bizimle iletişime geçin:"
+      }
+    }
+  },
+  "contact": {
+    "title": "İletişim",
+    "subtitle": "Sorularınız, talepleriniz ve geri bildirimleriniz için bize ulaşın.",
+    "backToHome": "Ana Sayfaya Dön",
+    "labels": {
+      "email": "E-posta"
+    },
+    "sections": {
+      "general": {
+        "title": "Genel İletişim",
+        "content": "Hizmetimiz, abonelik planlarımız veya iş birliği fırsatları hakkında bilgi almak için bize e-posta gönderebilirsiniz. Tüm mesajları en geç 2 iş günü içinde yanıtlamaya özen gösteririz."
+      },
+      "support": {
+        "title": "Teknik Destek",
+        "content": "Hizmeti kullanırken karşılaştığınız teknik sorunlar, hesabınız veya faturalama ile ilgili konular için aşağıdaki adresten bize ulaşabilirsiniz.",
+        "hours": "Hafta içi 09:00 – 18:00 (Türkiye Saati) arasında yanıtlanır. Acil sorunlar için aboneliğinize bağlı SLA hükümleri geçerlidir."
+      },
+      "kvkk": {
+        "title": "KVKK Başvuruları",
+        "content": "6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamındaki haklarınızı (erişim, düzeltme, silme, itiraz vb.) kullanmak istiyorsanız aşağıdaki e-posta adresinden bize ulaşabilirsiniz. Başvurularınız KVKK Madde 13 uyarınca en geç 30 gün içinde sonuçlandırılır.",
+        "linkHint": "Detaylı bilgi için <link>KVKK Aydınlatma Metni</link>'ni inceleyebilirsiniz."
+      },
+      "legal": {
+        "title": "Yasal Belgeler",
+        "content": "Hizmetimizle ilgili tüm yasal metinlere buradan erişebilirsiniz:",
+        "links": {
+          "kvkk": "KVKK Aydınlatma Metni",
+          "distanceSales": "Mesafeli Satış Sözleşmesi",
+          "refundPolicy": "İade Politikası",
+          "privacy": "Gizlilik Politikası",
+          "terms": "Kullanım Koşulları"
+        }
       }
     }
   }

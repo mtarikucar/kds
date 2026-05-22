@@ -17,7 +17,7 @@ export default function Footer() {
     { label: t('links.about'), href: '#' },
     { label: t('links.blog'), href: '#' },
     { label: t('links.careers'), href: '#' },
-    { label: t('links.contact'), href: '#' },
+    { label: t('links.contact'), href: '/contact' },
   ];
 
   const legalLinks = [
