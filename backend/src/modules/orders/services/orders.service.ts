@@ -1041,9 +1041,24 @@ export class OrdersService {
       throw new BadRequestException('Can only delete pending or cancelled orders');
     }
 
-    return this.prisma.order.delete({
-      where: { id },
+    // Compound WHERE: tenantId IDOR guard + status still in the
+    // delete-eligible set. If a concurrent state change (a waiter
+    // moves the order to PREPARING between our findOne and this
+    // delete) the count=0 result tells us to refuse the delete
+    // rather than dropping a now-active kitchen order on the floor.
+    const result = await this.prisma.order.deleteMany({
+      where: {
+        id,
+        tenantId,
+        status: { in: [OrderStatus.PENDING, OrderStatus.CANCELLED] },
+      },
     });
+    if (result.count === 0) {
+      throw new BadRequestException(
+        'Order status changed concurrently — cannot delete.',
+      );
+    }
+    return { id };
   }
 
   /**
@@ -1209,15 +1224,28 @@ export class OrdersService {
       throw new BadRequestException('Order is not pending approval');
     }
 
-    // Update order status to PENDING and set approval info
-    const updatedOrder = await this.prisma.order.update({
-      where: { id: orderId },
+    // Compound WHERE on the original PENDING_APPROVAL status + tenantId.
+    // Without it, two waiters racing Approve vs Reject from two tablets
+    // could each pass the status check above against PENDING_APPROVAL,
+    // then the loser (say, Reject which sets CANCELLED) writes first and
+    // the winner's Approve overwrites — landing the order at PENDING
+    // with cancelledAt set from the reject path. Corrupt state.
+    const claim = await this.prisma.order.updateMany({
+      where: { id: orderId, tenantId, status: OrderStatus.PENDING_APPROVAL },
       data: {
         status: OrderStatus.PENDING,
         requiresApproval: false,
         approvedAt: new Date(),
         approvedById: userId,
       },
+    });
+    if (claim.count === 0) {
+      throw new BadRequestException(
+        'Order status changed concurrently — refresh and retry.',
+      );
+    }
+    const updatedOrder = await this.prisma.order.findUniqueOrThrow({
+      where: { id: orderId },
       include: {
         orderItems: {
           include: {
