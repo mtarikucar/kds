@@ -1,4 +1,5 @@
-import { Injectable, Optional, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Optional, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AccountingSettingsService } from './accounting-settings.service';
 import { TaxCalculationService } from './tax-calculation.service';
@@ -83,7 +84,22 @@ export class SalesInvoiceService {
     // Mint the invoice number inside the same transaction as the create.
     // If the create fails (e.g. DTO validation upstream of the DB) the
     // number-increment is rolled back too — no audit gap.
+    //
+    // Serializable isolation + an in-tx re-check on existing order-level
+    // invoices closes the duplicate-fatura race. The partial unique on
+    // (paymentId WHERE paymentId IS NOT NULL) only protects per-payment
+    // invoices; order-level invoices (paymentId IS NULL) have no DB-level
+    // unique, so two concurrent createFromOrder calls would both pass the
+    // length===0 check above and both create. Issuing two fataralar for
+    // one order violates Turkish e-fatura compliance.
     const invoice = await this.prisma.$transaction(async (tx) => {
+      const dupe = await tx.salesInvoice.findFirst({
+        where: { orderId: order.id, tenantId, paymentId: null },
+        select: { id: true },
+      });
+      if (dupe) {
+        throw new ConflictException('Invoice already exists for this order');
+      }
       const invoiceNumber = await this.settingsService.getNextInvoiceNumber(
         tenantId,
         tx,
@@ -123,7 +139,7 @@ export class SalesInvoiceService {
       },
       include: { items: true },
     });
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
     // Auto-sync if enabled
     if (this.syncService) {
@@ -327,9 +343,16 @@ export class SalesInvoiceService {
     if (invoice.status === InvoiceStatus.CANCELLED) {
       throw new BadRequestException('Invoice already cancelled');
     }
-    return this.prisma.salesInvoice.update({
-      where: { id },
+    // Compound WHERE on status + tenantId: race-safe against a concurrent
+    // cancel from another admin, and defence-in-depth IDOR so a regression
+    // of the findOne tenant check can't expose cross-tenant writes.
+    const claim = await this.prisma.salesInvoice.updateMany({
+      where: { id, tenantId, status: { not: InvoiceStatus.CANCELLED } },
       data: { status: InvoiceStatus.CANCELLED },
     });
+    if (claim.count === 0) {
+      throw new BadRequestException('Invoice already cancelled');
+    }
+    return this.prisma.salesInvoice.findUniqueOrThrow({ where: { id } });
   }
 }

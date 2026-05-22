@@ -50,6 +50,7 @@ export class AccountingSyncService {
     const claim = await this.prisma.salesInvoice.updateMany({
       where: {
         id: invoiceId,
+        tenantId,
         // Don't re-claim a row already mid-flight: SYNCING is itself a
         // serializing marker. If two `syncInvoice` calls race, the loser
         // sees count===0 here and skips. We also re-claim FAILED rows.
@@ -91,8 +92,10 @@ export class AccountingSyncService {
 
       const result = await adapter.pushInvoice(token, companyId, invoiceData);
 
-      await this.prisma.salesInvoice.update({
-        where: { id: invoiceId },
+      // Defence-in-depth: tenantId in the WHERE so a regression of the
+      // SYNCING claim can't write cross-tenant.
+      await this.prisma.salesInvoice.updateMany({
+        where: { id: invoiceId, tenantId },
         data: {
           externalId: result.externalId,
           externalProvider: settings.provider,
@@ -105,8 +108,8 @@ export class AccountingSyncService {
       this.logger.log(`Invoice ${invoice.invoiceNumber} synced to ${settings.provider}`);
     } catch (err) {
       this.logger.error(`Sync failed for invoice ${invoiceId}: ${err.message}`);
-      await this.prisma.salesInvoice.update({
-        where: { id: invoiceId },
+      await this.prisma.salesInvoice.updateMany({
+        where: { id: invoiceId, tenantId },
         data: { syncError: err.message, externalStatus: 'FAILED' },
       });
     }
