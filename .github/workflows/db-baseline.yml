@@ -205,7 +205,11 @@ jobs:
               continue
             fi
             echo "→ $m"
-            ssh root@${{ env.SERVER_HOST }} \
+            # -n redirects ssh's stdin from /dev/null. Without it, ssh
+            # eats the rest of the here-string the `while` is reading
+            # from, and the loop exits after a single iteration. This
+            # is the classic "ssh in a loop" gotcha.
+            ssh -n root@${{ env.SERVER_HOST }} \
               "docker exec $BACKEND npx --no-install prisma migrate resolve --applied $m"
             new=$((new + 1))
           done <<< "$plan"
