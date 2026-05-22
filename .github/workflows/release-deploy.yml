@@ -379,26 +379,13 @@ jobs:
               ./scripts/deploy.sh prod ${VERSION}
             "
 
-      # ----- Post-deploy verification (HARD; no continue-on-error) ----
-      - name: Public health probe
-        run: |
-          set -euo pipefail
-          poll() {
-            local label="$1" url="$2"
-            local i=0
-            while [ $i -lt 24 ]; do  # 24 × 5s = 2 minutes
-              if curl -fsS -o /dev/null --max-time 5 "$url"; then
-                echo "$label OK after $((i*5))s"; return 0
-              fi
-              i=$((i + 1)); sleep 5
-            done
-            echo "::error::$label still not responding after 120s"
-            return 1
-          }
-          # 30s grace so cloudflare/nginx settles on the new upstream.
-          sleep 30
-          poll "API"      https://hummytummy.com/api/health
-          poll "Frontend" https://hummytummy.com
+      # Post-deploy public probe lives in scripts/deploy.sh
+      # (verify_and_promote). Cloudflare's WAF returns 403 to
+      # GitHub-hosted runner IPs even when the service is fully up,
+      # so a workflow-side probe was reliably failing healthy
+      # deploys and triggering a rollback. deploy.sh runs the same
+      # probe from the deploy box itself, which Cloudflare lets
+      # through. One source of truth, no IP-rule conflicts.
 
       - name: SSL cert expiry guard
         run: |

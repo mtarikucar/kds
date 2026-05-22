@@ -262,24 +262,12 @@ jobs:
               ./scripts/deploy.sh staging ${SHA}
             "
 
-      - name: Public health probe
-        run: |
-          set -euo pipefail
-          poll() {
-            local label="$1" url="$2"
-            local i=0
-            while [ $i -lt 18 ]; do  # 18 × 5s = 90s
-              if curl -fsS -o /dev/null --max-time 5 "$url"; then
-                echo "$label OK after $((i*5))s"; return 0
-              fi
-              i=$((i + 1)); sleep 5
-            done
-            echo "::error::$label still not responding"
-            return 1
-          }
-          sleep 20
-          poll "API"      https://staging.hummytummy.com/api/health
-          poll "Frontend" https://staging.hummytummy.com
+      # The post-deploy public probe lives inside scripts/deploy.sh
+      # (verify_and_promote step), which runs on the deploy box itself.
+      # Cloudflare lets the server's own IP through but blocks
+      # GitHub-hosted runner IPs with a 403 WAF rule, so duplicating
+      # the probe at the workflow layer reliably reports a healthy
+      # deploy as failed. Trust deploy.sh's verdict.
 
       - name: Rollback on failure
         if: failure()
