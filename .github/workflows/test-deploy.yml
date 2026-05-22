@@ -148,6 +148,7 @@ jobs:
           DESKTOP_RELEASE_API_KEY: ${{ secrets.DESKTOP_RELEASE_API_KEY }}
           ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
           MARKETING_JWT_REFRESH_SECRET: ${{ secrets.MARKETING_JWT_REFRESH_SECRET }}
+          MARKETING_INGEST_TOKEN: ${{ secrets.MARKETING_INGEST_TOKEN }}
         run: |
           echo "=========================================="
           echo "Test Environment Deployment Started"
@@ -238,6 +239,11 @@ jobs:
             DESKTOP_RELEASE_API_KEY=${DESKTOP_RELEASE_API_KEY}
             ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY}
             MARKETING_JWT_REFRESH_SECRET=${MARKETING_JWT_REFRESH_SECRET}
+
+            # Static bearer token for POST /api/marketing/leads/ingest
+            # consumed by the daily AI research routine. Guard fails closed
+            # when unset, so a missing secret silently disables ingest.
+            MARKETING_INGEST_TOKEN=${MARKETING_INGEST_TOKEN}
           ENVFILE
 
             # Login to GitHub Container Registry

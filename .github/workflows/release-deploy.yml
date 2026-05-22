@@ -193,6 +193,7 @@ jobs:
           SUPERADMIN_JWT_SECRET: ${{ secrets.SUPERADMIN_JWT_SECRET }}
           SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.SUPERADMIN_JWT_REFRESH_SECRET }}
           MARKETING_JWT_REFRESH_SECRET: ${{ secrets.MARKETING_JWT_REFRESH_SECRET }}
+          MARKETING_INGEST_TOKEN: ${{ secrets.MARKETING_INGEST_TOKEN }}
           ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
         run: |
@@ -204,6 +205,7 @@ jobs:
             JWT_SECRET JWT_REFRESH_SECRET
             SUPERADMIN_JWT_SECRET SUPERADMIN_JWT_REFRESH_SECRET
             MARKETING_JWT_SECRET MARKETING_JWT_REFRESH_SECRET
+            MARKETING_INGEST_TOKEN
             ENCRYPTION_MASTER_KEY
             REDIS_PASSWORD
             PAYTR_MERCHANT_ID PAYTR_MERCHANT_KEY PAYTR_MERCHANT_SALT
@@ -264,6 +266,7 @@ jobs:
           SUPERADMIN_JWT_SECRET: ${{ secrets.SUPERADMIN_JWT_SECRET }}
           SUPERADMIN_JWT_REFRESH_SECRET: ${{ secrets.SUPERADMIN_JWT_REFRESH_SECRET }}
           MARKETING_JWT_REFRESH_SECRET: ${{ secrets.MARKETING_JWT_REFRESH_SECRET }}
+          MARKETING_INGEST_TOKEN: ${{ secrets.MARKETING_INGEST_TOKEN }}
           ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
           # Verified non-empty by the "Verify required production secrets"
           # step above. No fallback — if this is missing the deploy never
@@ -327,6 +330,11 @@ jobs:
           MARKETING_JWT_SECRET=${MARKETING_JWT_SECRET}
           MARKETING_JWT_REFRESH_SECRET=${MARKETING_JWT_REFRESH_SECRET}
           ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY}
+
+          # Static bearer token for POST /api/marketing/leads/ingest
+          # consumed by the daily AI research routine. Guard fails closed
+          # when unset, so a missing secret silently disables ingest.
+          MARKETING_INGEST_TOKEN=${MARKETING_INGEST_TOKEN}
 
           # CORS
           CORS_ORIGIN=https://hummytummy.com,http://tauri.localhost,tauri://localhost,https://tauri.localhost
