@@ -95,45 +95,40 @@ jobs:
           DB: ${{ steps.cfg.outputs.db_name }}
         run: |
           set -euo pipefail
-          # One round trip, one query. CASE/to_regclass collapses the
-          # "table missing → applied=0" case into the same numeric
-          # output as "table present → COUNT(*)", so we never have to
-          # parse psql stderr to tell the two apart.
-          read user_tables applied_migs <<EOF
-          $(ssh root@${{ env.SERVER_HOST }} "
-            docker exec $PG psql -U postgres -d $DB -tA -F ' ' -c \
-              \"SELECT
-                  (SELECT COUNT(*) FROM information_schema.tables
-                     WHERE table_schema='public' AND table_name NOT LIKE '_prisma%'),
-                  CASE WHEN to_regclass('public._prisma_migrations') IS NULL
-                       THEN 0
-                       ELSE (SELECT COUNT(*) FROM _prisma_migrations
-                               WHERE finished_at IS NOT NULL
-                                 AND rolled_back_at IS NULL)
-                  END
-               \"
-          ")
-          EOF
+          # Single query, two integers separated by a space.
+          # CASE/to_regclass collapses the "table missing" case to the
+          # same numeric output as "table present", so we never have to
+          # parse psql stderr to tell them apart.
+          sql="SELECT
+                 (SELECT COUNT(*) FROM information_schema.tables
+                    WHERE table_schema='public' AND table_name NOT LIKE '_prisma%'),
+                 CASE WHEN to_regclass('public._prisma_migrations') IS NULL
+                      THEN 0
+                      ELSE (SELECT COUNT(*) FROM _prisma_migrations
+                              WHERE finished_at IS NOT NULL
+                                AND rolled_back_at IS NULL)
+                 END"
 
+          raw=$(ssh root@${{ env.SERVER_HOST }} "docker exec $PG psql -U postgres -d $DB -tA -F ' ' -c \"$sql\"" | tr -d '\r')
+          echo "raw psql output: '$raw'"
+          user_tables=$(printf '%s\n' "$raw" | awk 'NR==1{print $1}')
+          applied_migs=$(printf '%s\n' "$raw" | awk 'NR==1{print $2}')
+          user_tables="${user_tables:-0}"
+          applied_migs="${applied_migs:-0}"
           echo "user_tables        = $user_tables"
           echo "applied_migrations = $applied_migs"
 
-          # Dump the last 20 rows of _prisma_migrations if it exists,
-          # so the audit trail captures what state we found.
-          ssh root@${{ env.SERVER_HOST }} "
-            docker exec $PG psql -U postgres -d $DB -c \
-              \"SELECT migration_name, finished_at IS NOT NULL AS finished, rolled_back_at IS NOT NULL AS rolled_back
-                  FROM _prisma_migrations ORDER BY started_at DESC LIMIT 20;\" 2>&1 || true
-          "
+          # Best-effort audit dump (last 20 rows if the table exists).
+          ssh root@${{ env.SERVER_HOST }} "docker exec $PG psql -U postgres -d $DB -c \"SELECT migration_name, finished_at IS NOT NULL AS finished, rolled_back_at IS NOT NULL AS rolled_back FROM _prisma_migrations ORDER BY started_at DESC LIMIT 20;\" 2>&1 || true"
 
-          if [ "${applied_migs:-0}" -gt 0 ]; then
+          if [ "$applied_migs" -gt 0 ]; then
             echo "::error::_prisma_migrations already has $applied_migs applied rows."
             echo "::error::This workflow only baselines a completely-unbaselined DB (hidden-P3005)."
             echo "::error::For partial state, resolve each missing migration manually:"
             echo "::error::  docker exec ${{ steps.cfg.outputs.backend_container }} npx prisma migrate resolve --applied <name>"
             exit 1
           fi
-          if [ "${user_tables:-0}" -eq 0 ]; then
+          if [ "$user_tables" -eq 0 ]; then
             echo "::error::Database has no user tables — there's nothing to baseline."
             echo "::error::A fresh DB should run \`prisma migrate deploy\` instead."
             exit 1
