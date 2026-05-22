@@ -89,52 +89,56 @@ jobs:
             echo "db_name=restaurant_pos_staging"           >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Pre-baseline DB sanity
+      - name: DB sanity + baseline gate
         env:
           PG: ${{ steps.cfg.outputs.postgres_container }}
           DB: ${{ steps.cfg.outputs.db_name }}
         run: |
           set -euo pipefail
+          # One round trip, one query. CASE/to_regclass collapses the
+          # "table missing → applied=0" case into the same numeric
+          # output as "table present → COUNT(*)", so we never have to
+          # parse psql stderr to tell the two apart.
+          read user_tables applied_migs <<EOF
+          $(ssh root@${{ env.SERVER_HOST }} "
+            docker exec $PG psql -U postgres -d $DB -tA -F ' ' -c \
+              \"SELECT
+                  (SELECT COUNT(*) FROM information_schema.tables
+                     WHERE table_schema='public' AND table_name NOT LIKE '_prisma%'),
+                  CASE WHEN to_regclass('public._prisma_migrations') IS NULL
+                       THEN 0
+                       ELSE (SELECT COUNT(*) FROM _prisma_migrations
+                               WHERE finished_at IS NOT NULL
+                                 AND rolled_back_at IS NULL)
+                  END
+               \"
+          ")
+          EOF
+
+          echo "user_tables        = $user_tables"
+          echo "applied_migrations = $applied_migs"
+
+          # Dump the last 20 rows of _prisma_migrations if it exists,
+          # so the audit trail captures what state we found.
           ssh root@${{ env.SERVER_HOST }} "
-            set -euo pipefail
-            echo '--- User tables ---'
-            tbl=\$(docker exec $PG psql -U postgres -d $DB -tAc \
-              \"SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_name NOT LIKE '_prisma%'\")
-            echo \"user_tables = \$tbl\"
-
-            echo '--- _prisma_migrations status ---'
-            has=\$(docker exec $PG psql -U postgres -d $DB -tAc \
-              \"SELECT to_regclass('public._prisma_migrations') IS NOT NULL\")
-            echo \"has_prisma_table = \$has\"
-
-            if [ \"\$has\" = 't' ]; then
-              docker exec $PG psql -U postgres -d $DB -c \
-                \"SELECT migration_name, finished_at IS NOT NULL AS finished, rolled_back_at IS NOT NULL AS rolled_back FROM _prisma_migrations ORDER BY started_at DESC LIMIT 20;\"
-              applied=\$(docker exec $PG psql -U postgres -d $DB -tAc \
-                \"SELECT COUNT(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL\")
-              echo \"applied_migrations = \$applied\"
-            fi
+            docker exec $PG psql -U postgres -d $DB -c \
+              \"SELECT migration_name, finished_at IS NOT NULL AS finished, rolled_back_at IS NOT NULL AS rolled_back
+                  FROM _prisma_migrations ORDER BY started_at DESC LIMIT 20;\" 2>&1 || true
           "
 
-      - name: Refuse to baseline a DB that already has applied rows
-        env:
-          PG: ${{ steps.cfg.outputs.postgres_container }}
-          DB: ${{ steps.cfg.outputs.db_name }}
-        run: |
-          set -euo pipefail
-          # Hard guard: if applied_migrations is non-zero, this workflow
-          # is the wrong tool. The hidden-P3005 case requires applied=0.
-          # Anything else is a "partially-baselined" situation that needs
-          # a human deciding which migrations are missing.
-          applied=$(ssh root@${{ env.SERVER_HOST }} "docker exec $PG psql -U postgres -d $DB -tAc \"SELECT COALESCE((SELECT COUNT(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL), 0)\" 2>/dev/null" | tr -d ' \r\n')
-          if [ "${applied:-0}" -gt 0 ]; then
-            echo "::error::_prisma_migrations already has $applied applied rows."
-            echo "::error::This workflow only baselines a completely-unbaselined DB."
-            echo "::error::For partial state, resolve each migration manually with"
+          if [ "${applied_migs:-0}" -gt 0 ]; then
+            echo "::error::_prisma_migrations already has $applied_migs applied rows."
+            echo "::error::This workflow only baselines a completely-unbaselined DB (hidden-P3005)."
+            echo "::error::For partial state, resolve each missing migration manually:"
             echo "::error::  docker exec ${{ steps.cfg.outputs.backend_container }} npx prisma migrate resolve --applied <name>"
             exit 1
           fi
-          echo "applied_migrations=0 — safe to baseline."
+          if [ "${user_tables:-0}" -eq 0 ]; then
+            echo "::error::Database has no user tables — there's nothing to baseline."
+            echo "::error::A fresh DB should run \`prisma migrate deploy\` instead."
+            exit 1
+          fi
+          echo "Safe to baseline: $user_tables user tables, 0 applied migrations."
 
       - name: List migrations that would be applied
         id: plan
