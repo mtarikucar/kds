@@ -21,14 +21,20 @@
 # silently masks data corruption when a migration was only partially
 # executed. If `--applied` is the right call, an operator must make it.
 #
-# Usage: db-migration-doctor.sh <backend_container> <backend_repo_dir>
-#   backend_container — running backend container that has prisma CLI + DB access
-#   backend_repo_dir  — host path containing prisma/migrations/
+# Usage: db-migration-doctor.sh <backend_container> <backend_repo_dir> \
+#                               <postgres_container> <db_user> <db_name>
+#   backend_container  — running backend container that has prisma CLI + DB access
+#   backend_repo_dir   — host path containing prisma/migrations/
+#   postgres_container — postgres container name (for direct psql probes)
+#   db_user / db_name  — postgres credentials for the same DB
 
 set -euo pipefail
 
 BACKEND_CONTAINER="${1:?backend container name required}"
 BACKEND_DIR="${2:?backend repo dir required}"
+POSTGRES_CONTAINER="${3:?postgres container name required}"
+DB_USER="${4:?db user required}"
+DB_NAME="${5:?db name required}"
 MIGRATIONS_DIR="$BACKEND_DIR/prisma/migrations"
 
 # Coloured logging — keep colours out of stderr so log parsers don't choke.
@@ -37,15 +43,58 @@ ok()   { printf '\033[0;32m[doctor]\033[0m %s\n' "$*"; }
 err()  { printf '\033[0;31m[doctor]\033[0m %s\n' "$*" >&2; }
 warn() { printf '\033[1;33m[doctor]\033[0m %s\n' "$*"; }
 
-if ! docker ps --format '{{.Names}}' | grep -q "^${BACKEND_CONTAINER}$"; then
-  log "Backend container '${BACKEND_CONTAINER}' not running — doctor skipped"
-  log "(migrations will run after the container comes up)"
-  exit 0
-fi
-
 if [ ! -d "$MIGRATIONS_DIR" ]; then
   err "Migrations dir not found on host: $MIGRATIONS_DIR"
   exit 1
+fi
+
+# ----------------------------------------------------------------------
+# Probe 1 (always runs): direct psql sanity. `prisma migrate status`
+# happily reports "N migrations pending" when there is NO
+# `_prisma_migrations` table but the schema is otherwise populated —
+# `migrate deploy` then explodes with "The database schema is not
+# empty" (P3005). That contradiction is invisible from the prisma CLI;
+# we need to ask postgres directly.
+# ----------------------------------------------------------------------
+
+pq() {
+  # short helper: psql -tAc, trimmed
+  docker exec "$POSTGRES_CONTAINER" psql -U "$DB_USER" -d "$DB_NAME" -tAc "$1" 2>/dev/null \
+    | tr -d ' \r\n'
+}
+
+if docker ps --format '{{.Names}}' | grep -q "^${POSTGRES_CONTAINER}$"; then
+  user_tables=$(pq "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_name NOT LIKE '_prisma%'")
+  user_tables="${user_tables:-0}"
+  has_mig_table=$(pq "SELECT to_regclass('public._prisma_migrations') IS NOT NULL")
+  if [ "$has_mig_table" = "t" ]; then
+    applied_migs=$(pq "SELECT COUNT(*) FROM _prisma_migrations WHERE finished_at IS NOT NULL AND rolled_back_at IS NULL")
+    applied_migs="${applied_migs:-0}"
+  else
+    applied_migs=0
+  fi
+
+  if [ "$user_tables" -gt 0 ] && [ "$applied_migs" -eq 0 ]; then
+    err "P3005 (hidden): $user_tables user tables exist but 0 migrations are recorded as applied."
+    err "Prisma's \`migrate status\` reports these as 'pending'; \`migrate deploy\` would refuse with"
+    err "\"database schema is not empty\". The script must NOT auto-resolve this — the DB might already"
+    err "have most of the schema (and dropping it to re-apply migrations would lose data)."
+    err ""
+    err "If you've verified manually that the schema is in fact a snapshot of an applied-everything"
+    err "state (e.g. staging restored from a prod dump), baseline it in one shot:"
+    err "  ssh root@<host> 'docker exec $BACKEND_CONTAINER sh -c \\"
+    err "    \"cd /app && for m in \\\$(ls prisma/migrations | grep -E \\\"^[0-9]\\\" | sort); do"
+    err "       npx --no-install prisma migrate resolve --applied \\\"\\\$m\\\";"
+    err "     done\\\"'"
+    err "Then re-run the deploy."
+    exit 1
+  fi
+fi
+
+if ! docker ps --format '{{.Names}}' | grep -q "^${BACKEND_CONTAINER}$"; then
+  log "Backend container '${BACKEND_CONTAINER}' not running — skipping prisma-level checks"
+  log "(post-swap doctor pass will run again with the live container)"
+  exit 0
 fi
 
 # Capture migrate status output. We tolerate non-zero exit because prisma

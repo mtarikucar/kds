@@ -267,7 +267,14 @@ ensure_data_layer() {
 }
 
 run_migration_doctor() {
-  "$SCRIPT_DIR/db-migration-doctor.sh" "$BACKEND_CONTAINER" "$PROJECT_ROOT/backend"
+  local db_name db_user
+  db_name=$(grep -E '^POSTGRES_DB=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr -d "'\"" || true)
+  db_user=$(grep -E '^POSTGRES_USER=' "$ENV_FILE" | head -n1 | cut -d= -f2- | tr -d "'\"" || true)
+  db_name="${db_name:-restaurant_pos_prod}"
+  db_user="${db_user:-postgres}"
+  "$SCRIPT_DIR/db-migration-doctor.sh" \
+    "$BACKEND_CONTAINER" "$PROJECT_ROOT/backend" \
+    "$POSTGRES_CONTAINER" "$db_user" "$db_name"
 }
 
 run_migrations_in_existing_backend() {
@@ -337,7 +344,7 @@ swap_backend() {
   # backend container wasn't running at that point — first deploy,
   # or coming back from a hard stop — it skipped. Now we have a
   # live container, so this pass is the authoritative one.
-  "$SCRIPT_DIR/db-migration-doctor.sh" "$BACKEND_CONTAINER" "$PROJECT_ROOT/backend"
+  run_migration_doctor
   # Doctor only invokes migrate deploy when it auto-recovers a
   # failed migration. Pending-but-clean migrations are left for us
   # to apply explicitly here.
