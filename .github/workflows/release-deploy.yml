@@ -384,7 +384,11 @@ jobs:
               # See test-deploy.yml for the rationale — stash any
               # uncommitted state files left by the legacy deployer.
               git stash --include-untracked --quiet || true
-              git fetch --all --tags
+              # --force on --tags overwrites any local tag the deploy
+              # box rewrote during earlier manual debugging. Without
+              # --force, fetch dies with "would clobber existing tag"
+              # and the whole deploy is aborted.
+              git fetch --all --tags --force
               git reset --hard ${VERSION}
               export GHCR_USER='${GHCR_USER}'
               export GHCR_TOKEN='${GHCR_TOKEN}'
@@ -450,7 +454,7 @@ jobs:
             set -euo pipefail
             cd /root/kds
             git stash --include-untracked --quiet || true
-            git fetch --all --tags
+            git fetch --all --tags --force
             git reset --hard ${VERSION}
             ./scripts/deploy.sh prod-rollback
           "
