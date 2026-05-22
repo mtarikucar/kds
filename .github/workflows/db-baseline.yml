@@ -159,19 +159,19 @@ jobs:
           BACKEND: ${{ steps.cfg.outputs.backend_container }}
         run: |
           set -euo pipefail
-          # Pull the ordered migration list straight out of the container
-          # so we honour the same on-disk order prisma uses.
-          plan=$(ssh root@${{ env.SERVER_HOST }} "
-            docker exec $BACKEND sh -c 'cd /app && ls prisma/migrations | grep -E \"^[0-9]\" | sort'
-          ")
-          count=$(echo "$plan" | grep -c .)
+          # `docker exec ... ls` directly — no remote shell wrapping,
+          # so no double-escape on the glob pattern.
+          plan=$(ssh root@${{ env.SERVER_HOST }} \
+            "docker exec $BACKEND ls /app/prisma/migrations" \
+            | grep -E '^[0-9]' | sort)
+          count=$(printf '%s\n' "$plan" | grep -c .)
           echo "Migrations to baseline (in order):"
-          echo "$plan" | sed 's/^/  - /'
+          printf '%s\n' "$plan" | sed 's/^/  - /'
           echo "Total: $count"
           {
             echo "count=$count"
             echo 'plan<<EOF'
-            echo "$plan"
+            printf '%s\n' "$plan"
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
 
@@ -182,19 +182,22 @@ jobs:
         run: |
           set -euo pipefail
           echo "Baselining ${{ steps.plan.outputs.count }} migrations against $BACKEND…"
-          ssh root@${{ env.SERVER_HOST }} "
-            set -euo pipefail
-            docker exec $BACKEND sh -c '
-              set -euo pipefail
-              cd /app
-              for m in \$(ls prisma/migrations | grep -E \"^[0-9]\" | sort); do
-                echo \"→ \$m\"
-                npx --no-install prisma migrate resolve --applied \"\$m\"
-              done
-              echo \"--- migrate status after baseline ---\"
-              npx --no-install prisma migrate status || true
-            '
-          "
+          # One ssh per migration. Slightly slower than a single ssh
+          # with a loop, but the nested ssh→bash→docker→sh quoting
+          # broke in two earlier attempts; one SSH per call uses
+          # exactly one layer of quoting and is trivially correct.
+          while IFS= read -r m; do
+            [ -z "$m" ] && continue
+            echo "→ $m"
+            ssh root@${{ env.SERVER_HOST }} \
+              "docker exec $BACKEND npx --no-install prisma migrate resolve --applied $m"
+          done <<EOF
+          ${{ steps.plan.outputs.plan }}
+          EOF
+          echo "--- migrate status after baseline ---"
+          ssh root@${{ env.SERVER_HOST }} \
+            "docker exec $BACKEND npx --no-install prisma migrate status" \
+            || true
 
       - name: Dry-run summary
         if: inputs.mode == 'dry-run'
