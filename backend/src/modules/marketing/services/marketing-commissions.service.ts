@@ -91,38 +91,54 @@ export class MarketingCommissionsService {
   }
 
   async approve(id: string, actorId: string) {
-    const commission = await this.prisma.commission.findUnique({ where: { id } });
-    if (!commission) throw new NotFoundException('Commission not found');
-    if (commission.status !== 'PENDING') {
-      throw new BadRequestException('Only pending commissions can be approved');
-    }
-    // An amount of zero usually means the auto-calculation had nothing
-    // to apply (FREE-plan conversion, etc.). Require the manager to
-    // set a real amount before approval so accounting has something to
-    // pay out.
-    if (new (commission.amount.constructor as any)(commission.amount).isZero?.() ||
-        Number(commission.amount) === 0) {
-      throw new BadRequestException(
-        'Commission amount is zero. Set an amount before approving.',
-      );
-    }
+    // Serializable + read-modify-write inside one tx: two SALES_MANAGERs
+    // clicking Approve at the same millisecond previously both passed
+    // the status check then both wrote APPROVED + appended one audit
+    // entry each from THEIR snapshot — meaning the auditLog lost the
+    // loser's entry (last writer wins). With Serializable the second
+    // tx retries against the now-APPROVED row and surfaces the proper
+    // "already processed" error.
+    return this.prisma.$transaction(async (tx) => {
+      const commission = await tx.commission.findUnique({ where: { id } });
+      if (!commission) throw new NotFoundException('Commission not found');
+      if (commission.status !== 'PENDING') {
+        throw new BadRequestException('Only pending commissions can be approved');
+      }
+      // An amount of zero usually means the auto-calculation had nothing
+      // to apply (FREE-plan conversion, etc.). Require the manager to
+      // set a real amount before approval so accounting has something to
+      // pay out.
+      if (new (commission.amount.constructor as any)(commission.amount).isZero?.() ||
+          Number(commission.amount) === 0) {
+        throw new BadRequestException(
+          'Commission amount is zero. Set an amount before approving.',
+        );
+      }
 
-    const auditLog = appendAuditEntry(commission.auditLog, {
-      action: 'approve',
-      actorId,
-      prevStatus: commission.status,
-      nextStatus: 'APPROVED',
-    });
+      const auditLog = appendAuditEntry(commission.auditLog, {
+        action: 'approve',
+        actorId,
+        prevStatus: commission.status,
+        nextStatus: 'APPROVED',
+      });
 
-    return this.prisma.commission.update({
-      where: { id },
-      data: {
-        status: 'APPROVED',
-        approvedAt: new Date(),
-        approvedById: actorId,
-        auditLog,
-      },
-    });
+      // Compound WHERE on the original PENDING status is the belt to
+      // Serializable's suspenders — even if isolation downgrades for
+      // some reason, only the first writer transitions.
+      const claim = await tx.commission.updateMany({
+        where: { id, status: 'PENDING' },
+        data: {
+          status: 'APPROVED',
+          approvedAt: new Date(),
+          approvedById: actorId,
+          auditLog,
+        },
+      });
+      if (claim.count === 0) {
+        throw new BadRequestException('Commission already approved');
+      }
+      return tx.commission.findUniqueOrThrow({ where: { id } });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
   /**
@@ -135,44 +151,59 @@ export class MarketingCommissionsService {
     if (!Number.isFinite(amount) || amount < 0) {
       throw new BadRequestException('Amount must be a non-negative number');
     }
-    const commission = await this.prisma.commission.findUnique({ where: { id } });
-    if (!commission) throw new NotFoundException('Commission not found');
-    if (commission.status !== 'PENDING') {
-      throw new BadRequestException('Only pending commissions can be updated');
-    }
-    const auditLog = appendAuditEntry(commission.auditLog, {
-      action: 'amount',
-      actorId,
-      prevAmount: commission.amount.toString(),
-      nextAmount: amount.toString(),
-    });
-    // Normalise through Prisma.Decimal to avoid passing a JS float at the
-    // edge of IEEE-754 precision into a Decimal(10,2) column. The
-    // canonical create path in marketing-leads already does this.
-    return this.prisma.commission.update({
-      where: { id },
-      data: { amount: new Prisma.Decimal(amount).toDecimalPlaces(2), auditLog },
-    });
+    // Same Serializable + compound-WHERE pattern as approve(): the
+    // bare update used to lose audit-log entries on a manager-race.
+    return this.prisma.$transaction(async (tx) => {
+      const commission = await tx.commission.findUnique({ where: { id } });
+      if (!commission) throw new NotFoundException('Commission not found');
+      if (commission.status !== 'PENDING') {
+        throw new BadRequestException('Only pending commissions can be updated');
+      }
+      const auditLog = appendAuditEntry(commission.auditLog, {
+        action: 'amount',
+        actorId,
+        prevAmount: commission.amount.toString(),
+        nextAmount: amount.toString(),
+      });
+      // Normalise through Prisma.Decimal to avoid passing a JS float at the
+      // edge of IEEE-754 precision into a Decimal(10,2) column. The
+      // canonical create path in marketing-leads already does this.
+      const claim = await tx.commission.updateMany({
+        where: { id, status: 'PENDING' },
+        data: { amount: new Prisma.Decimal(amount).toDecimalPlaces(2), auditLog },
+      });
+      if (claim.count === 0) {
+        throw new BadRequestException('Commission no longer pending');
+      }
+      return tx.commission.findUniqueOrThrow({ where: { id } });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 
   async markPaid(id: string, actorId: string) {
-    const commission = await this.prisma.commission.findUnique({ where: { id } });
-    if (!commission) throw new NotFoundException('Commission not found');
-    if (commission.status !== 'APPROVED') {
-      throw new BadRequestException('Only approved commissions can be marked as paid');
-    }
+    // Same Serializable + compound-WHERE pattern as approve().
+    return this.prisma.$transaction(async (tx) => {
+      const commission = await tx.commission.findUnique({ where: { id } });
+      if (!commission) throw new NotFoundException('Commission not found');
+      if (commission.status !== 'APPROVED') {
+        throw new BadRequestException('Only approved commissions can be marked as paid');
+      }
 
-    const auditLog = appendAuditEntry(commission.auditLog, {
-      action: 'pay',
-      actorId,
-      prevStatus: commission.status,
-      nextStatus: 'PAID',
-    });
+      const auditLog = appendAuditEntry(commission.auditLog, {
+        action: 'pay',
+        actorId,
+        prevStatus: commission.status,
+        nextStatus: 'PAID',
+      });
 
-    return this.prisma.commission.update({
-      where: { id },
-      data: { status: 'PAID', paidAt: new Date(), paidById: actorId, auditLog },
-    });
+      const claim = await tx.commission.updateMany({
+        where: { id, status: 'APPROVED' },
+        data: { status: 'PAID', paidAt: new Date(), paidById: actorId, auditLog },
+      });
+      if (claim.count === 0) {
+        throw new BadRequestException('Commission already marked as paid');
+      }
+      return tx.commission.findUniqueOrThrow({ where: { id } });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 }
 

@@ -535,28 +535,52 @@ export class UsersService {
    * Approve a pending user. Uses a conditional updateMany so two admins
    * racing to approve the same user don't both flip approvedById — only
    * the first write sees status=PENDING_APPROVAL.
+   *
+   * The maxUsers plan cap is enforced INSIDE the transaction: without
+   * it, approval could push the tenant past their billing tier (the
+   * self-signup path queues users as PENDING_APPROVAL, which doesn't
+   * count toward maxUsers — but the approval step previously didn't
+   * check either, so the cap was a no-op for any tenant that grew via
+   * self-signup + admin approve).
    */
   async approveUser(userId: string, approverId: string, tenantId: string) {
-    const result = await this.prisma.user.updateMany({
-      where: {
-        id: userId,
-        tenantId,
-        status: 'PENDING_APPROVAL',
-      },
-      data: {
-        status: 'ACTIVE',
-        approvedAt: new Date(),
-        approvedById: approverId,
-      },
-    });
+    return this.prisma.$transaction(async (tx) => {
+      const subscription = await tx.subscription.findFirst({
+        where: { tenantId, status: { in: ['ACTIVE', 'TRIALING', 'PAST_DUE'] } },
+        include: { plan: true },
+      });
+      if (subscription?.plan && subscription.plan.maxUsers !== -1) {
+        const activeCount = await tx.user.count({
+          where: { tenantId, status: 'ACTIVE' },
+        });
+        if (activeCount >= subscription.plan.maxUsers) {
+          throw new ForbiddenException(
+            `User limit reached (${subscription.plan.maxUsers}). Upgrade your plan or deactivate another user before approving.`,
+          );
+        }
+      }
 
-    if (result.count === 0) {
-      throw new NotFoundException('Onay bekleyen kullanıcı bulunamadı');
-    }
+      const result = await tx.user.updateMany({
+        where: {
+          id: userId,
+          tenantId,
+          status: 'PENDING_APPROVAL',
+        },
+        data: {
+          status: 'ACTIVE',
+          approvedAt: new Date(),
+          approvedById: approverId,
+        },
+      });
 
-    return this.prisma.user.findUnique({
-      where: { id: userId },
-      select: LIST_SELECT,
+      if (result.count === 0) {
+        throw new NotFoundException('Onay bekleyen kullanıcı bulunamadı');
+      }
+
+      return tx.user.findUnique({
+        where: { id: userId },
+        select: LIST_SELECT,
+      });
     });
   }
 
