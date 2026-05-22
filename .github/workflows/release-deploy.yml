@@ -48,24 +48,36 @@ jobs:
       - name: Checkout (for composite action)
         uses: actions/checkout@v4
 
-      - name: Production API liveness (HARD)
+      - name: Setup SSH (early — pre-check probes need it)
+        uses: ./.github/actions/setup-ssh
+        with:
+          ssh-private-key-base64: ${{ secrets.SSH_PRIVATE_KEY_BASE64 }}
+          ssh-known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          server-host: ${{ env.SERVER_HOST }}
+
+      - name: Production API liveness (HARD, probed via SSH)
         run: |
           set -euo pipefail
-          # 3 attempts × 10s. If prod is already in a bad state, halt;
-          # we don't pile a new image on top of a broken database or
-          # half-restored container.
-          attempt=1
-          while [ $attempt -le 3 ]; do
-            if curl -fsS -o /dev/null --max-time 10 https://hummytummy.com/api/health; then
-              echo "Production /api/health is healthy."
-              exit 0
-            fi
-            echo "Attempt $attempt: production not responding, retrying in 10s..."
-            attempt=$((attempt + 1))
-            sleep 10
-          done
-          echo "::error::Production is unhealthy BEFORE deploy. Investigate the running stack, do not stack a new release on top."
-          exit 1
+          # Probe localhost:3000 from the deploy box, not from this
+          # runner. Cloudflare's WAF returns 403 to GitHub-hosted
+          # runner IPs even when the service is fully up — see
+          # commit 0179ef5 — so a runner-side probe was rejecting
+          # every healthy production as "down".
+          ssh -n root@${{ env.SERVER_HOST }} 'bash -s' <<'PROBE'
+            set -euo pipefail
+            attempt=1
+            while [ $attempt -le 3 ]; do
+              if curl -fsS --max-time 10 http://localhost:3000/api/health > /dev/null; then
+                echo "Production /api/health (loopback) is healthy."
+                exit 0
+              fi
+              echo "Attempt $attempt: backend not responding on localhost, retrying in 10s..."
+              attempt=$((attempt + 1))
+              sleep 10
+            done
+            echo "::error::Production backend is unhealthy on its own host. Investigate before stacking a new release."
+            exit 1
+          PROBE
 
       - name: Verify required production secrets
         env:
