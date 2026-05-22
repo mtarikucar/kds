@@ -296,15 +296,16 @@ export default function LeadsPage() {
                 <th className="px-4 py-3 font-medium">{t('leads.table.business')}</th>
                 <th className="px-4 py-3 font-medium">{t('leads.table.contact')}</th>
                 <th className="px-4 py-3 font-medium">{t('leads.table.status')}</th>
-                <th className="px-4 py-3 font-medium hidden md:table-cell">
+                <th className="px-4 py-3 font-medium hidden lg:table-cell">
                   {t('leads.table.source')}
                 </th>
                 <th className="px-4 py-3 font-medium hidden lg:table-cell">
                   {t('leads.table.city')}
                 </th>
-                {/* Owner column is visible at md+ so tablet managers can
-                    dispatch leads without rotating into landscape. */}
-                <th className="px-4 py-3 font-medium hidden md:table-cell">
+                {/* Owner column visible from sm: up. Lead assignment is
+                    the primary manager workflow — keep it reachable on
+                    phones, not just tablets. */}
+                <th className="px-4 py-3 font-medium hidden sm:table-cell">
                   {t('leads.table.assignedTo')}
                 </th>
                 <th className="px-4 py-3 font-medium hidden lg:table-cell">
@@ -328,7 +329,14 @@ export default function LeadsPage() {
                     colSpan={isManager ? 8 : 7}
                     className="px-4 py-8 text-center text-gray-500"
                   >
-                    {t('leads.empty')}
+                    {assignmentStatus === 'unassigned'
+                      ? t('leads.emptyUnassigned', 'Atanmamış lead yok — hepsi takipte.')
+                      : isManager
+                      ? t(
+                          'leads.emptyManager',
+                          'Henüz lead yok. Sağ üstteki "Yeni Lead" ile ekleyin veya AI Research routine tarafından oluşturulmasını bekleyin.',
+                        )
+                      : t('leads.empty')}
                   </td>
                 </tr>
               ) : (
@@ -367,7 +375,7 @@ export default function LeadsPage() {
                     <td className="px-4 py-3">
                       <LeadStatusBadge status={lead.status} />
                     </td>
-                    <td className="px-4 py-3 hidden md:table-cell text-gray-600">
+                    <td className="px-4 py-3 hidden lg:table-cell text-gray-600">
                       {t(`source.${lead.source}`, {
                         defaultValue:
                           LEAD_SOURCE_LABELS[lead.source as LeadSource] || lead.source,
@@ -376,7 +384,7 @@ export default function LeadsPage() {
                     <td className="px-4 py-3 hidden lg:table-cell text-gray-600">
                       {lead.city || '-'}
                     </td>
-                    <td className="px-4 py-3 hidden md:table-cell">
+                    <td className="px-4 py-3 hidden sm:table-cell">
                       <AssignCell
                         leadId={lead.id}
                         currentAssignee={lead.assignedTo ?? null}

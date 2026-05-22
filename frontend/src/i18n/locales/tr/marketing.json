@@ -237,6 +237,8 @@
       "createdAt": "Oluşturma"
     },
     "empty": "Bu filtreye uyan lead yok.",
+    "emptyUnassigned": "Atanmamış lead yok — hepsi takipte.",
+    "emptyManager": "Henüz lead yok. Sağ üstteki \"Yeni Lead\" ile ekleyin veya AI Research routine tarafından oluşturulmasını bekleyin.",
     "loadError": "Lead'ler yüklenemedi. Tekrar dene.",
     "rowCount": "{{count}} lead"
   },

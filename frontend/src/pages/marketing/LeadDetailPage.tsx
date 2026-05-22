@@ -249,6 +249,19 @@ export default function LeadDetailPage() {
               Convert to Customer
             </button>
           )}
+          {/* Header-level assignment — primary discoverability point.
+              Sol panel'deki "Assign Lead" kartı semantik bütünlük için
+              duruyor; iki AssignCell instance aynı queryKey'leri paylaşır,
+              biri mutate ettiğinde diğeri invalidate olur (no manual sync). */}
+          {isManager && (
+            <div className="flex items-center gap-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
+              <AssignCell
+                leadId={lead.id}
+                currentAssignee={lead.assignedTo ?? null}
+                onAssigned={invalidate}
+              />
+            </div>
+          )}
           <Link to={`/marketing/leads/${id}/edit`} className="flex items-center gap-1 px-3 py-1.5 border border-gray-300 rounded-lg text-sm hover:bg-gray-50">
             <PencilSquareIcon className="w-4 h-4" /> Edit
           </Link>

@@ -237,6 +237,8 @@
       "createdAt": "Created"
     },
     "empty": "No leads match your filters.",
+    "emptyUnassigned": "No unassigned leads — everything is being followed up.",
+    "emptyManager": "No leads yet. Add one via \"New Lead\" up top, or wait for the AI Research routine to import some.",
     "loadError": "Couldn't load leads. Try again.",
     "rowCount": "{{count}} leads"
   },
