@@ -128,8 +128,9 @@ export class CameraService {
       }
     }
 
-    const updated = await this.prisma.camera.update({
-      where: { id: cameraId },
+    // Defence-in-depth: tenantId in the WHERE (B41-B45 pattern).
+    const claim = await this.prisma.camera.updateMany({
+      where: { id: cameraId, tenantId },
       data: {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.description !== undefined && { description: dto.description }),
@@ -142,6 +143,10 @@ export class CameraService {
         ...(dto.edgeDeviceId !== undefined && { edgeDeviceId: dto.edgeDeviceId }),
       },
     });
+    if (claim.count === 0) {
+      throw new NotFoundException(`Camera with ID ${cameraId} not found`);
+    }
+    const updated = await this.prisma.camera.findUniqueOrThrow({ where: { id: cameraId } });
 
     this.logger.log(`Updated camera ${cameraId}`);
     return this.mapToResponseDto(updated);
@@ -162,8 +167,9 @@ export class CameraService {
       throw new NotFoundException(`Camera with ID ${cameraId} not found`);
     }
 
-    await this.prisma.camera.delete({
-      where: { id: cameraId },
+    // Defence-in-depth: tenantId in the WHERE.
+    await this.prisma.camera.deleteMany({
+      where: { id: cameraId, tenantId },
     });
 
     this.logger.log(`Deleted camera ${cameraId}`);
@@ -227,13 +233,18 @@ export class CameraService {
       throw new NotFoundException(`Camera with ID ${cameraId} not found`);
     }
 
-    const updated = await this.prisma.camera.update({
-      where: { id: cameraId },
+    // Defence-in-depth: tenantId in the WHERE.
+    const claim = await this.prisma.camera.updateMany({
+      where: { id: cameraId, tenantId },
       data: {
         calibrationData: calibrationData as Prisma.InputJsonValue,
         status: CameraStatus.CALIBRATING,
       },
     });
+    if (claim.count === 0) {
+      throw new NotFoundException(`Camera with ID ${cameraId} not found`);
+    }
+    const updated = await this.prisma.camera.findUniqueOrThrow({ where: { id: cameraId } });
 
     this.logger.log(`Updated calibration for camera ${cameraId}`);
     return this.mapToResponseDto(updated);

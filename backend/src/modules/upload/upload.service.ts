@@ -243,9 +243,9 @@ export class UploadService {
       }
     }
 
-    // Delete from database
-    await this.prisma.productImage.delete({
-      where: { id: imageId },
+    // Defence-in-depth: tenantId in the WHERE (B41-B45 pattern).
+    await this.prisma.productImage.deleteMany({
+      where: { id: imageId, tenantId },
     });
 
     this.logger.log(`Deleted image ${imageId} for tenant ${tenantId}`);
@@ -319,6 +319,18 @@ export class UploadService {
 
     if (!image) {
       throw new NotFoundException('Image not found');
+    }
+
+    // Cross-tenant attachment guard: without this, a tenant with a
+    // valid image of their own could attach it to ANOTHER tenant's
+    // product just by guessing the productId. The junction-table FKs
+    // are tenant-agnostic so the DB happily accepts the link.
+    const product = await this.prisma.product.findFirst({
+      where: { id: productId, tenantId },
+      select: { id: true },
+    });
+    if (!product) {
+      throw new NotFoundException('Product not found');
     }
 
     // Create or update link in junction table

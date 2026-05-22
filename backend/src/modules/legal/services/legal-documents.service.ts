@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { LegalDocumentKind } from "../constants";
 import { PublishLegalDocumentDto } from "../dto/publish-document.dto";
@@ -81,6 +82,14 @@ export class LegalDocumentsService {
       ? new Date(dto.effectiveAt)
       : new Date();
 
+    // Serializable isolation: without it, two concurrent publish calls
+    // for the same (kind, locale) with different version numbers would
+    // both updateMany the prior isCurrent row (idempotent — fine), then
+    // both insert their own isCurrent=true row — landing the table with
+    // TWO active versions and breaking the "atomic swap" promise the
+    // comment above makes. Serializable serialises them so the second
+    // attempt's updateMany flips the first attempt's newly-inserted row
+    // back to false before its own insert.
     return this.prisma.$transaction(async (tx) => {
       await tx.legalDocument.updateMany({
         where: { kind: dto.kind, locale: dto.locale, isCurrent: true },
@@ -97,6 +106,6 @@ export class LegalDocumentsService {
           isCurrent: true,
         },
       });
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 }
