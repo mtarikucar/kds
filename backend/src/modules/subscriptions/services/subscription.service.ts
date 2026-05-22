@@ -506,12 +506,30 @@ export class SubscriptionService {
     // Downgrade: validate current usage against new plan limits first.
     await this.assertDowngradeAllowed(subscription.tenantId, newPlan);
 
-    const updatedSubscription = await this.prisma.subscription.update({
-      where: { id: subscriptionId },
+    // Compound WHERE on tenantId + scheduledDowngradePlanId IS NULL.
+    // Without the null guard, two admins clicking "Downgrade to Plan B"
+    // and "Downgrade to Plan C" within the same millisecond both pass
+    // the line 449 null check from the same snapshot and both write —
+    // last writer wins, loser's intent silently dropped after they saw
+    // a 200. The user closes the tab thinking the downgrade is queued.
+    const claim = await this.prisma.subscription.updateMany({
+      where: {
+        id: subscriptionId,
+        tenantId,
+        scheduledDowngradePlanId: null,
+      },
       data: {
         scheduledDowngradePlanId: dto.newPlanId,
         scheduledDowngradeBillingCycle: billingCycle,
       },
+    });
+    if (claim.count === 0) {
+      throw new BadRequestException(
+        'A scheduled plan change was just registered by another session — refresh and retry.',
+      );
+    }
+    const updatedSubscription = await this.prisma.subscription.findUniqueOrThrow({
+      where: { id: subscriptionId },
       include: { plan: true, scheduledDowngradePlan: true },
     });
 
@@ -597,8 +615,17 @@ export class SubscriptionService {
         ? newPlan.monthlyPrice
         : newPlan.yearlyPrice;
 
-    const updated = await this.prisma.subscription.update({
-      where: { id: subscriptionId },
+    // Atomic claim with compound WHERE on scheduledDowngradePlanId NOT
+    // NULL. The cron should never fire twice for one subscription, but
+    // a manual SuperAdmin re-trigger overlapping the scheduled fire
+    // would otherwise re-apply the same downgrade with a fresh
+    // `amount` write (idempotent) AND notify the admin twice. The
+    // claim makes the loser see count=0 and skip silently.
+    const claim = await this.prisma.subscription.updateMany({
+      where: {
+        id: subscriptionId,
+        scheduledDowngradePlanId: { not: null },
+      },
       data: {
         planId: subscription.scheduledDowngradePlanId,
         billingCycle,
@@ -607,6 +634,15 @@ export class SubscriptionService {
         scheduledDowngradePlanId: null,
         scheduledDowngradeBillingCycle: null,
       },
+    });
+    if (claim.count === 0) {
+      this.logger.debug(
+        `Scheduled downgrade for ${subscriptionId} already applied by another run`,
+      );
+      return null;
+    }
+    const updated = await this.prisma.subscription.findUniqueOrThrow({
+      where: { id: subscriptionId },
       include: { plan: true },
     });
 
@@ -661,13 +697,27 @@ export class SubscriptionService {
     if (!subscription.scheduledDowngradePlanId) {
       throw new BadRequestException("No scheduled downgrade found");
     }
-    await this.prisma.subscription.update({
-      where: { id: subscriptionId },
+    // Compound WHERE on tenantId IDOR + scheduledDowngradePlanId NOT
+    // NULL. The race here is benign (two cancels are idempotent) but
+    // the tenant guard is the B41-B45 defence-in-depth pattern; the
+    // not-null guard surfaces a useful 400 if the cron already
+    // applied the downgrade between read and write.
+    const claim = await this.prisma.subscription.updateMany({
+      where: {
+        id: subscriptionId,
+        tenantId,
+        scheduledDowngradePlanId: { not: null },
+      },
       data: {
         scheduledDowngradePlanId: null,
         scheduledDowngradeBillingCycle: null,
       },
     });
+    if (claim.count === 0) {
+      throw new BadRequestException(
+        'Scheduled downgrade no longer exists — it may have just been applied.',
+      );
+    }
     return { success: true, message: "Scheduled downgrade cancelled" };
   }
 
