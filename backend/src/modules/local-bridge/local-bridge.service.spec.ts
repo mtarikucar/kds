@@ -12,13 +12,15 @@ describe('LocalBridgeService', () => {
     svc = new LocalBridgeService(prisma as any, outbox as any);
   });
 
-  it('createSlot rejects branches in other tenants', async () => {
-    prisma.branch.findUnique.mockResolvedValue({ id: 'b-1', tenantId: 't-other' } as any);
+  it('createSlot rejects branches in other tenants (compound WHERE returns null)', async () => {
+    // After iter-38 the service uses findFirst({where:{id, tenantId}})
+    // so a cross-tenant branchId never resolves to a row.
+    prisma.branch.findFirst.mockResolvedValue(null);
     await expect(svc.createSlot('t1', { branchId: 'b-1' })).rejects.toThrow(/Branch not found/);
   });
 
   it('createSlot returns the raw provisioning token exactly once', async () => {
-    prisma.branch.findUnique.mockResolvedValue({ id: 'b-1', tenantId: 't1' } as any);
+    prisma.branch.findFirst.mockResolvedValue({ id: 'b-1', tenantId: 't1' } as any);
     (prisma.localBridgeAgent.create as any).mockImplementation(async ({ data }: any) => ({ id: 'lba-1', ...data }));
 
     const out = await svc.createSlot('t1', { branchId: 'b-1' });

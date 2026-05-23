@@ -41,8 +41,10 @@ export class LocalBridgeService {
     tenantId: string,
     input: { branchId: string; productSku?: string; hostname?: string },
   ) {
-    const branch = await this.prisma.branch.findUnique({ where: { id: input.branchId } });
-    if (!branch || branch.tenantId !== tenantId) throw new BadRequestException('Branch not found');
+    const branch = await this.prisma.branch.findFirst({
+      where: { id: input.branchId, tenantId },
+    });
+    if (!branch) throw new BadRequestException('Branch not found');
 
     const provisioningToken = this.newToken();
     const row = await this.prisma.localBridgeAgent.create({
@@ -161,11 +163,19 @@ export class LocalBridgeService {
   }
 
   async retire(tenantId: string, bridgeId: string) {
-    const row = await this.prisma.localBridgeAgent.findUnique({ where: { id: bridgeId } });
-    if (!row || row.tenantId !== tenantId) throw new NotFoundException('Bridge not found');
-    return this.prisma.localBridgeAgent.update({
-      where: { id: bridgeId },
+    // Atomic claim: compound WHERE both guarantees tenant scope AND
+    // gives us the row in one round-trip. The previous find +
+    // manual !== check then update-by-id shape was an IDOR-adjacent
+    // surface — a refactor that drops the inequality check would
+    // retire a cross-tenant bridge and null its tokenHash, locking
+    // a different tenant out of their hardware.
+    const claim = await this.prisma.localBridgeAgent.updateMany({
+      where: { id: bridgeId, tenantId },
       data: { status: 'retired', tokenHash: null, provisioningTokenHash: null },
+    });
+    if (claim.count === 0) throw new NotFoundException('Bridge not found');
+    return this.prisma.localBridgeAgent.findFirstOrThrow({
+      where: { id: bridgeId, tenantId },
     });
   }
 }
