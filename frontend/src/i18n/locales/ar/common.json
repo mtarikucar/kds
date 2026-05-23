@@ -58,8 +58,102 @@
     "personnel": "الموظفين",
     "stock": "المخزون",
     "invoices": "الفواتير",
+    "devices": "الأجهزة",
+    "branches": "الفروع",
+    "health": "صحة الفروع",
+    "marketplace": "متجر الإضافات",
+    "store": "متجر المعدات",
+    "bridges": "الجسور المحلية",
+    "webhooks": "ويب هوكس",
+    "fiscalRecovery": "استرداد الإيصالات",
+    "callerFeed": "سجل المكالمات",
     "expandSidebar": "توسيع الشريط الجانبي",
     "collapseSidebar": "طي الشريط الجانبي"
+  },
+  "hummytummy": {
+    "common": {
+      "loading": "جارٍ التحميل…",
+      "empty": "لا يوجد شيء هنا حتى الآن.",
+      "save": "حفظ",
+      "cancel": "إلغاء",
+      "retire": "إيقاف",
+      "remove": "إزالة"
+    },
+    "devices": {
+      "title": "الأجهزة",
+      "create": "إنشاء فتحة",
+      "showRetired": "عرض الأجهزة الموقفة",
+      "empty": "لا توجد أجهزة بعد. انقر على \"إنشاء فتحة\" لإضافة جهازك الأول.",
+      "col": {
+        "kind": "النوع",
+        "status": "الحالة",
+        "pairCode": "رمز الإقران",
+        "capabilities": "الإمكانيات",
+        "lastSeen": "آخر اتصال"
+      },
+      "confirmRetire": "هل تريد إيقاف هذا الجهاز؟",
+      "kind": {
+        "kds_screen": "شاشة المطبخ",
+        "tablet_waiter": "جهاز النادل اللوحي",
+        "tablet_customer": "جهاز العميل اللوحي",
+        "receipt_printer": "طابعة إيصالات",
+        "kitchen_printer": "طابعة المطبخ",
+        "pos_terminal": "محطة الدفع",
+        "yazarkasa": "Yazarkasa",
+        "caller_id": "هوية المتصل",
+        "scanner": "ماسح ضوئي",
+        "local_bridge": "جسر محلي"
+      }
+    },
+    "marketplace": {
+      "title": "متجر الإضافات",
+      "subtitle": "وسّع اشتراكك بالإضافات. تفعيل فوري.",
+      "filter": { "all": "الكل", "software": "البرمجيات", "integration": "التكاملات", "capacity": "السعة", "support": "الدعم" },
+      "purchase": "شراء",
+      "mine": "إضافاتك",
+      "mineEmpty": "ليس لديك إضافات نشطة.",
+      "requires": "يتطلب:",
+      "col": { "addOn": "الإضافة", "quantity": "الكمية", "status": "الحالة", "periodEnds": "نهاية الفترة" },
+      "cancelAtPeriodEnd": "سيتم إلغاؤه في نهاية الفترة"
+    },
+    "store": {
+      "title": "متجر المعدات",
+      "category": { "all": "كل الفئات" },
+      "empty": "لا توجد منتجات في هذه الفئة.",
+      "addToCart": "أضف إلى السلة",
+      "outOfStock": "غير متوفر",
+      "warranty": "ضمان {{months}} شهرًا",
+      "cart": {
+        "title": "السلة",
+        "empty": "سلتك فارغة.",
+        "getQuote": "احصل على عرض السعر",
+        "pricing": "جارٍ التسعير…",
+        "subtotal": "المجموع الفرعي",
+        "tax": "الضريبة",
+        "shipping": "الشحن",
+        "total": "الإجمالي",
+        "place": "تأكيد الطلب",
+        "placing": "جارٍ الإرسال…"
+      }
+    },
+    "health": {
+      "title": "صحة الفروع",
+      "subtitle": "مؤشر مركب: نسبة الأجهزة المتصلة، آخر إيصال، وآخر طلب. يتم التحديث كل 30 ثانية.",
+      "empty": "لا توجد فروع نشطة.",
+      "score": "{{score}} / 100",
+      "devicesOnline": "الأجهزة المتصلة",
+      "fiscalAge": "آخر إيصال",
+      "orderAge": "آخر طلب"
+    },
+    "branches": {
+      "title": "الفروع",
+      "name": "الاسم",
+      "code": "الرمز",
+      "timezone": "المنطقة الزمنية",
+      "status": "الحالة",
+      "created": "تاريخ الإنشاء",
+      "add": "إضافة فرع"
+    }
   },
   "header": {
     "notifications": "الإشعارات",

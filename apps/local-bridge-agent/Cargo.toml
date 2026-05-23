@@ -1,0 +1,57 @@
+[package]
+name = "hummytummy-local-bridge"
+version = "0.1.0"
+edition = "2021"
+license = "Proprietary"
+description = "Local Bridge Agent for the HummyTummy restaurant operating platform — talks to printers, yazarkasa, POS terminals, and KDS screens on the restaurant LAN, tunnels commands to/from the cloud over WSS."
+
+# The bridge is the trust boundary between the cloud and the restaurant LAN.
+# We optimise for: small static binary (one-file install), zero runtime
+# dependencies (no Node/Python/Java), and explicit driver isolation so a
+# misbehaving printer driver cannot take down the whole agent.
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+# Cloud transport.
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+tokio-tungstenite = { version = "0.24", features = ["rustls-tls-webpki-roots"] }
+url = "2"
+# Serialisation.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Local persistence (offline cache + command queue).
+rusqlite = { version = "0.32", features = ["bundled"] }
+# Crypto + UUIDv7.
+sha2 = "0.10"
+uuid = { version = "1", features = ["v7", "serde"] }
+# Logging.
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+# CLI args + config.
+clap = { version = "4", features = ["derive"] }
+# Drivers.
+serialport = "4"
+# ESC/POS receipt printers — pure-Rust stack.
+escposify = "0.1"
+# Error type plumbing.
+thiserror = "1"
+anyhow = "1"
+
+[dev-dependencies]
+# Scratch directories for SQLite integration tests so they never collide
+# and clean up automatically when the test process exits.
+tempfile = "3"
+
+[features]
+default = []
+# Optional features for size optimisation in trimmed builds.
+yazarkasa-hugin = []
+yazarkasa-beko  = []
+terminal-ingenico = []
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

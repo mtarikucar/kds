@@ -1,0 +1,89 @@
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { v7 as uuidv7 } from 'uuid';
+import { PrismaService } from '../../prisma/prisma.service';
+import { OutboxService } from '../outbox/outbox.service';
+
+/**
+ * Installation request lifecycle:
+ *   requested -> scheduled -> in_progress -> done
+ *               └→ cancelled / no_show
+ *
+ * Scheduling for MVP is a flat date + free-form notes. Phase 11 brings a
+ * partner-technician calendar with real availability.
+ */
+@Injectable()
+export class InstallationService {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly outbox: OutboxService,
+  ) {}
+
+  async create(
+    tenantId: string,
+    input: { branchId?: string; hwOrderId?: string; preferredDates?: Date[]; notes?: string },
+  ) {
+    const row = await this.prisma.installationRequest.create({
+      data: {
+        id: uuidv7(),
+        tenantId,
+        branchId: input.branchId,
+        hwOrderId: input.hwOrderId,
+        preferredDates: input.preferredDates ?? [],
+        notes: input.notes,
+        status: 'requested',
+      },
+    });
+    await this.outbox
+      .append({
+        type: 'installation.requested.v1',
+        tenantId,
+        payload: { requestId: row.id, branchId: input.branchId, hwOrderId: input.hwOrderId },
+      })
+      .catch(() => undefined);
+    return row;
+  }
+
+  async schedule(tenantId: string, requestId: string, scheduledFor: Date, assignedTo?: string) {
+    const row = await this.prisma.installationRequest.findUnique({ where: { id: requestId } });
+    if (!row || row.tenantId !== tenantId) throw new NotFoundException('Installation request not found');
+    if (!['requested', 'scheduled'].includes(row.status)) {
+      throw new BadRequestException(`Cannot schedule from status=${row.status}`);
+    }
+    const updated = await this.prisma.installationRequest.update({
+      where: { id: requestId },
+      data: { status: 'scheduled', scheduledFor, assignedTo },
+    });
+    await this.outbox
+      .append({
+        type: 'installation.scheduled.v1',
+        tenantId,
+        payload: { requestId, scheduledFor, assignedTo },
+      })
+      .catch(() => undefined);
+    return updated;
+  }
+
+  async complete(tenantId: string, requestId: string, notes?: string) {
+    const row = await this.prisma.installationRequest.findUnique({ where: { id: requestId } });
+    if (!row || row.tenantId !== tenantId) throw new NotFoundException('Installation request not found');
+    const updated = await this.prisma.installationRequest.update({
+      where: { id: requestId },
+      data: { status: 'done', completedAt: new Date(), notes: notes ?? row.notes },
+    });
+    await this.outbox
+      .append({
+        type: 'installation.completed.v1',
+        tenantId,
+        payload: { requestId },
+      })
+      .catch(() => undefined);
+    return updated;
+  }
+
+  async list(tenantId: string, status?: string) {
+    return this.prisma.installationRequest.findMany({
+      where: { tenantId, ...(status ? { status } : {}) },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+}

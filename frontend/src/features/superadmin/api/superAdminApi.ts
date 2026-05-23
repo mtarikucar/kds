@@ -25,8 +25,10 @@ import {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
-// Create axios instance for SuperAdmin API
-const superAdminApi = axios.create({
+// Create axios instance for SuperAdmin API. Exported so feature modules
+// (marketplace admin, catalog admin) can share the same auth + refresh
+// pipeline instead of each one rebuilding the interceptor stack.
+export const superAdminApi = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://schema.tauri.app/config/2/capability",
+  "identifier": "default",
+  "description": "Capability set for the KDS kiosk: invoke our two Tauri commands plus core webview controls.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "core:webview:default"
+    }
+  ]
+}

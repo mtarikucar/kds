@@ -152,6 +152,64 @@ const Sidebar = ({ isOpen, onClose, isRTL: isRTLProp }: SidebarProps) => {
       label: t('navigation.settings'),
       roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
+    // HummyTummy Phase 3-12 additions. Ordered by typical use:
+    // operational (devices, branches, health) before commercial
+    // (marketplace, store).
+    {
+      to: '/admin/devices',
+      icon: Activity,
+      label: t('navigation.devices'),
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
+    },
+    {
+      to: '/admin/branches',
+      icon: Receipt,
+      label: t('navigation.branches'),
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
+    },
+    {
+      to: '/admin/health',
+      icon: Activity,
+      label: t('navigation.health'),
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
+    },
+    {
+      to: '/admin/marketplace',
+      icon: Package,
+      label: t('navigation.marketplace'),
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
+    },
+    {
+      to: '/admin/store',
+      icon: Package,
+      label: t('navigation.store'),
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
+    },
+    // Operasyonel ek sayfalar — admin için.
+    {
+      to: '/admin/bridges',
+      icon: Activity,
+      label: t('navigation.bridges'),
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
+    },
+    {
+      to: '/admin/webhooks',
+      icon: Activity,
+      label: t('navigation.webhooks'),
+      roles: [UserRole.ADMIN],
+    },
+    {
+      to: '/admin/fiscal-recovery',
+      icon: Receipt,
+      label: t('navigation.fiscalRecovery'),
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
+    },
+    {
+      to: '/admin/caller-feed',
+      icon: Activity,
+      label: t('navigation.callerFeed'),
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
+    },
   ];
 
   const filteredNavItems = navItems.filter((item) => {

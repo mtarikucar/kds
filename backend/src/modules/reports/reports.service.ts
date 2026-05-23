@@ -57,13 +57,18 @@ export class ReportsService {
     return { start, end };
   }
 
-  async getSalesSummary(tenantId: string, startDate?: Date, endDate?: Date) {
+  async getSalesSummary(tenantId: string, startDate?: Date, endDate?: Date, branchId?: string) {
     const dateRange = await this.getDateRange(tenantId, startDate, endDate);
+    // branchScope is spread into every order.where so the same expression
+    // covers tenant-wide (no branchId) and branch-scoped reads. Null-branch
+    // legacy orders are excluded from branch-scoped totals by construction.
+    const branchScope = branchId ? { branchId } : {};
 
     // Get aggregated order data
     const orderStats = await this.prisma.order.aggregate({
       where: {
         tenantId,
+        ...branchScope,
         status: OrderStatus.PAID,
         createdAt: {
           gte: dateRange.start,
@@ -90,6 +95,7 @@ export class ReportsService {
       where: {
         order: {
           tenantId,
+          ...branchScope,
           status: OrderStatus.PAID,
           createdAt: {
             gte: dateRange.start,
@@ -114,6 +120,7 @@ export class ReportsService {
     const paidOrders = await this.prisma.order.findMany({
       where: {
         tenantId,
+        ...branchScope,
         status: OrderStatus.PAID,
         createdAt: {
           gte: dateRange.start,
@@ -163,9 +170,11 @@ export class ReportsService {
     startDate?: Date,
     endDate?: Date,
     limit: number = 10,
+    branchId?: string,
   ) {
     const dateRange = await this.getDateRange(tenantId, startDate, endDate);
     const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const branchScope = branchId ? { branchId } : {};
 
     // Get top selling products
     const topProducts = await this.prisma.orderItem.groupBy({
@@ -173,6 +182,7 @@ export class ReportsService {
       where: {
         order: {
           tenantId,
+          ...branchScope,
           status: OrderStatus.PAID,
           createdAt: {
             gte: dateRange.start,
@@ -233,14 +243,17 @@ export class ReportsService {
     tenantId: string,
     startDate?: Date,
     endDate?: Date,
+    branchId?: string,
   ) {
     const dateRange = await this.getDateRange(tenantId, startDate, endDate);
+    const branchScope = branchId ? { branchId } : {};
 
     const paymentBreakdown = await this.prisma.payment.groupBy({
       by: ['method'],
       where: {
         order: {
           tenantId,
+          ...branchScope,
           status: OrderStatus.PAID,
           createdAt: {
             gte: dateRange.start,
@@ -268,7 +281,7 @@ export class ReportsService {
     };
   }
 
-  async getOrdersByHour(tenantId: string, date?: Date) {
+  async getOrdersByHour(tenantId: string, date?: Date, branchId?: string) {
     // Day boundaries and the hour-of-day grouping below must use the
     // tenant's timezone, not the server pod's. Otherwise an Istanbul
     // tenant on a UTC pod loses the 21:00-23:59 hour of orders to "the
@@ -284,10 +297,12 @@ export class ReportsService {
       new Date(anchor.getTime() + 24 * 60 * 60 * 1000),
       tz,
     );
+    const branchScope = branchId ? { branchId } : {};
 
     const orders = await this.prisma.order.findMany({
       where: {
         tenantId,
+        ...branchScope,
         status: OrderStatus.PAID,
         createdAt: {
           gte: targetDate,
@@ -335,8 +350,9 @@ export class ReportsService {
   /**
    * Get customer analytics report
    */
-  async getCustomerAnalytics(tenantId: string, startDate?: Date, endDate?: Date) {
+  async getCustomerAnalytics(tenantId: string, startDate?: Date, endDate?: Date, branchId?: string) {
     const dateRange = await this.getDateRange(tenantId, startDate, endDate);
+    const branchScope = branchId ? { branchId } : {};
 
     // Get customer tier distribution
     const tierDistribution = await this.prisma.customer.groupBy({
@@ -360,6 +376,7 @@ export class ReportsService {
     const returningCustomersOrders = await this.prisma.order.findMany({
       where: {
         tenantId,
+        ...branchScope,
         status: OrderStatus.PAID,
         createdAt: {
           gte: dateRange.start,
@@ -520,14 +537,16 @@ export class ReportsService {
   /**
    * Get staff performance report
    */
-  async getStaffPerformance(tenantId: string, startDate?: Date, endDate?: Date) {
+  async getStaffPerformance(tenantId: string, startDate?: Date, endDate?: Date, branchId?: string) {
     const dateRange = await this.getDateRange(tenantId, startDate, endDate);
+    const branchScope = branchId ? { branchId } : {};
 
     // Get orders grouped by staff
     const staffOrders = await this.prisma.order.groupBy({
       by: ['userId'],
       where: {
         tenantId,
+        ...branchScope,
         status: OrderStatus.PAID,
         createdAt: {
           gte: dateRange.start,

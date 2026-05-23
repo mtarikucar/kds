@@ -58,8 +58,241 @@
     "personnel": "Personnel",
     "stock": "Stock",
     "invoices": "Invoices",
+    "devices": "Devices",
+    "branches": "Branches",
+    "health": "Branch Health",
+    "marketplace": "Marketplace",
+    "store": "Hardware Store",
+    "bridges": "Local Bridges",
+    "webhooks": "Webhooks",
+    "fiscalRecovery": "Fiscal Recovery",
+    "callerFeed": "Phone Calls",
     "expandSidebar": "Expand Sidebar",
     "collapseSidebar": "Collapse Sidebar"
+  },
+  "hummytummy": {
+    "common": {
+      "loading": "Loading…",
+      "empty": "Nothing here yet.",
+      "save": "Save",
+      "cancel": "Cancel",
+      "retire": "Retire",
+      "remove": "Remove"
+    },
+    "devices": {
+      "title": "Devices",
+      "create": "Create slot",
+      "showRetired": "Show retired devices",
+      "empty": "No devices yet. Click Create slot to provision your first device.",
+      "col": {
+        "kind": "Kind",
+        "status": "Status",
+        "pairCode": "Pair code",
+        "capabilities": "Capabilities",
+        "lastSeen": "Last seen"
+      },
+      "confirmRetire": "Retire this device?",
+      "kind": {
+        "kds_screen": "KDS screen",
+        "tablet_waiter": "Waiter tablet",
+        "tablet_customer": "Customer tablet",
+        "receipt_printer": "Receipt printer",
+        "kitchen_printer": "Kitchen printer",
+        "pos_terminal": "POS terminal",
+        "yazarkasa": "Yazarkasa",
+        "caller_id": "Caller ID",
+        "scanner": "Scanner",
+        "local_bridge": "Local bridge"
+      }
+    },
+    "marketplace": {
+      "title": "Marketplace",
+      "subtitle": "Extend your subscription with add-ons. Effective immediately.",
+      "filter": { "all": "All", "software": "Software", "integration": "Integrations", "capacity": "Capacity", "support": "Support" },
+      "purchase": "Purchase",
+      "mine": "Your add-ons",
+      "mineEmpty": "You have no active add-ons.",
+      "requires": "Requires:",
+      "col": {
+        "addOn": "Add-on",
+        "quantity": "Quantity",
+        "status": "Status",
+        "periodEnds": "Period ends"
+      },
+      "cancelAtPeriodEnd": "cancels at period end"
+    },
+    "store": {
+      "title": "Hardware Store",
+      "category": { "all": "All categories" },
+      "empty": "No products in this category.",
+      "addToCart": "Add to cart",
+      "outOfStock": "Out of stock",
+      "warranty": "{{months}} months warranty",
+      "cart": {
+        "title": "Cart",
+        "empty": "Your cart is empty.",
+        "getQuote": "Get quote",
+        "pricing": "Pricing…",
+        "subtotal": "Subtotal",
+        "tax": "Tax",
+        "shipping": "Shipping",
+        "total": "Total",
+        "place": "Place order",
+        "placing": "Placing…"
+      }
+    },
+    "health": {
+      "title": "Branch Health",
+      "subtitle": "Composite of device online %, last fiscal receipt, and last order. Refreshes every 30s.",
+      "empty": "No active branches.",
+      "score": "{{score}} / 100",
+      "devicesOnline": "Devices online",
+      "fiscalAge": "Fiscal age",
+      "orderAge": "Order age"
+    },
+    "branches": {
+      "title": "Branches",
+      "name": "Name",
+      "code": "Code",
+      "timezone": "Timezone",
+      "status": "Status",
+      "created": "Created",
+      "add": "Add branch"
+    },
+    "webhooks": {
+      "title": "Webhooks",
+      "subtitle": "Subscribe an HTTPS endpoint to HummyTummy events. Deliveries are HMAC-SHA256 signed with timestamp. Auto-paused after 20 consecutive failures.",
+      "newSubscription": "New subscription",
+      "urlPlaceholder": "https://your-server.example.com/hummytummy-webhook",
+      "events": "Events",
+      "create": "Create subscription",
+      "yours": "Your subscriptions",
+      "noSubscriptions": "No subscriptions.",
+      "col": { "url": "URL", "events": "Events", "status": "Status", "lastDelivery": "Last delivery" },
+      "revoke": "Revoke",
+      "createdBanner": "Subscription created.",
+      "secretWarning": "Below is the signing secret. Copy it now — we cannot show it again.",
+      "copiedIt": "I've copied it",
+      "failures": "fail"
+    },
+    "bridges": {
+      "title": "Local Bridges",
+      "newBridge": "New bridge",
+      "provision": "Provision",
+      "branch": "Branch",
+      "selectBranch": "— select —",
+      "sku": "SKU",
+      "hostname": "Hostname (optional)",
+      "createdBanner": "Bridge provisioned.",
+      "tokenWarning": "Token (single-use) — copy now and configure on the device:",
+      "list": "Bridges",
+      "noBridges": "No bridges provisioned yet.",
+      "col": { "branch": "Branch", "sku": "SKU", "hostname": "Hostname", "status": "Status", "lastSeen": "Last seen" },
+      "confirmRetire": "Retire this bridge?",
+      "retire": "Retire"
+    },
+    "fiscalRecovery": {
+      "title": "Fiscal Recovery",
+      "subtitle": "Queued + failed receipts. Retry uses the original idempotency key, so the device cannot double-issue.",
+      "refresh": "Refresh",
+      "empty": "No pending or failed receipts. 🎉",
+      "col": {
+        "created": "Created",
+        "provider": "Provider",
+        "order": "Order",
+        "status": "Status",
+        "total": "Total",
+        "lastError": "Last error"
+      },
+      "retry": "Retry"
+    },
+    "callerFeed": {
+      "title": "Phone Calls",
+      "subtitle": "Inbound caller-ID events. Updates every 10 seconds.",
+      "empty": "No call events yet. Pair a caller-ID device or enable a VoIP integration in the marketplace.",
+      "col": {
+        "time": "Time",
+        "provider": "Provider",
+        "kind": "Kind",
+        "phone": "Phone",
+        "customer": "Customer",
+        "duration": "Duration",
+        "order": "Order"
+      },
+      "view": "View",
+      "unmatched": "unmatched",
+      "open": "Open"
+    },
+    "setupChecklist": {
+      "title": "Set up your restaurant",
+      "items": {
+        "branch": "Create at least one branch",
+        "kds": "Pair a Kitchen Display Screen",
+        "tablet": "Pair at least one waiter tablet",
+        "bridge": "Bring a Local Bridge online (HummyBox)",
+        "fiscal": "Connect a fiscal provider"
+      },
+      "goTo": "Go to {{label}} →"
+    },
+    "reportsBranchFilter": {
+      "label": "Branch",
+      "all": "All branches"
+    },
+    "superAdminMarketplace": {
+      "title": "Marketplace Admin",
+      "tabs": { "addons": "Add-ons", "products": "Hardware" },
+      "addons": {
+        "title": "Add-on catalogue",
+        "new": "New add-on",
+        "edit": "Edit",
+        "publish": "Publish",
+        "archive": "Archive",
+        "confirmArchive": "Archive add-on \"{{code}}\"?",
+        "form": {
+          "newTitle": "New add-on",
+          "editTitle": "Edit add-on",
+          "code": "Code",
+          "name": "Name",
+          "kind": "Kind",
+          "billing": "Billing",
+          "priceCents": "Price (cents)",
+          "currency": "Currency",
+          "status": "Status",
+          "deps": "Deps (comma-separated; plan:PRO or addon code)",
+          "description": "Description",
+          "grants": "Grants (JSON)",
+          "cancel": "Cancel",
+          "create": "Create",
+          "save": "Save",
+          "grantsInvalid": "grants must be valid JSON"
+        }
+      },
+      "products": {
+        "title": "Hardware catalogue",
+        "new": "New SKU",
+        "receiveStock": "Receive stock",
+        "receiveStockPrompt": "Receive how many units?",
+        "publish": "Publish",
+        "archive": "Archive",
+        "confirmArchive": "Archive SKU \"{{sku}}\"?",
+        "form": {
+          "title": "New hardware SKU",
+          "sku": "SKU",
+          "name": "Name",
+          "category": "Category",
+          "brand": "Brand",
+          "model": "Model",
+          "priceCents": "Price (cents)",
+          "rental": "Rental / month (cents, optional)",
+          "currency": "Currency",
+          "warranty": "Warranty (months)",
+          "status": "Status",
+          "description": "Description",
+          "cancel": "Cancel",
+          "create": "Create"
+        }
+      }
+    }
   },
   "header": {
     "notifications": "Notifications",

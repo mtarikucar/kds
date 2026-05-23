@@ -113,13 +113,26 @@ services:
       TRIAL_REMINDER_DAYS: ${TRIAL_REMINDER_DAYS:-3}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      # HummyTummy Phase 11+ — at-rest encryption key for integration
+      # credentials. Used by EnvKmsProvider; switch to AWS KMS in prod by
+      # setting KMS_PROVIDER=aws + the AWS-side env vars.
+      INTEGRATION_KEY: ${INTEGRATION_KEY:?INTEGRATION_KEY must be set in production}
+      KMS_PROVIDER: ${KMS_PROVIDER:-env}
+      KMS_MASTER_KEY: ${KMS_MASTER_KEY:-}
+      # OpenTelemetry — opt-in. Leave empty to keep using the existing
+      # Sentry-based tracing path; set to your collector URL to enable
+      # OTLP HTTP export.
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-hummytummy-backend}
     ports:
       - '3000:3000'
     volumes:
       - invoice_storage:/app/storage
       - uploads_storage:/app/uploads
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://0.0.0.0:3000/api/health']
+      # /healthz/ready validates DB + Redis + KMS + payment/fiscal registries.
+      # /api/health stays as a backward-compat alias.
+      test: ['CMD', 'curl', '-f', 'http://0.0.0.0:3000/api/healthz/ready']
       interval: 30s
       timeout: 10s
       retries: 3

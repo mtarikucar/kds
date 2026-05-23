@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsDateString, IsInt, IsOptional, Max, Min } from 'class-validator';
+import { IsDateString, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { EmptyStringToUndefined } from '../../../common/dto/transforms';
 
 export class DateRangeQueryDto {
@@ -15,6 +15,15 @@ export class DateRangeQueryDto {
   @IsOptional()
   @IsDateString()
   endDate?: string;
+
+  // HummyTummy Phase 3 — branch-scoping. Omitting this returns tenant-wide
+  // numbers (including null-branch legacy orders); providing it restricts
+  // to orders booked against that branch.
+  @ApiPropertyOptional({ description: 'Restrict to a specific branch' })
+  @EmptyStringToUndefined()
+  @IsOptional()
+  @IsString()
+  branchId?: string;
 }
 
 export class TopProductsQueryDto extends DateRangeQueryDto {
@@ -33,4 +42,10 @@ export class SingleDateQueryDto {
   @IsOptional()
   @IsDateString()
   date?: string;
+
+  @ApiPropertyOptional({ description: 'Restrict to a specific branch' })
+  @EmptyStringToUndefined()
+  @IsOptional()
+  @IsString()
+  branchId?: string;
 }

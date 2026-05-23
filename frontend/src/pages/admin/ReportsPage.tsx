@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { format, subDays } from 'date-fns';
 import { useSalesReport, useTopProducts } from '../../features/reports/reportsApi';
+import { useListBranches } from '../../features/branches/branchesApi';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
@@ -40,7 +41,9 @@ const ReportsPage = () => {
   const lastWeek = format(subDays(new Date(), 7), 'yyyy-MM-dd');
 
   const [activeTab, setActiveTab] = useState<TabType>('sales');
-  const [dateRange, setDateRange] = useState({
+  // dateRange carries branchId too — undefined means "all branches" which
+  // matches the backend's tenant-wide default.
+  const [dateRange, setDateRange] = useState<{ startDate: string; endDate: string; branchId?: string }>({
     startDate: lastWeek,
     endDate: today,
   });
@@ -143,6 +146,10 @@ const ReportsPage = () => {
                   {...register('endDate')}
                 />
               </div>
+              <BranchFilter
+                value={dateRange.branchId}
+                onChange={(branchId) => setDateRange((d) => ({ ...d, branchId }))}
+              />
               <Button type="submit" className="w-full sm:w-auto">{t('common:buttons.apply')}</Button>
             </form>
           </CardContent>
@@ -346,5 +353,33 @@ const ReportsPage = () => {
     </div>
   );
 };
+
+/**
+ * Branch filter dropdown used inline by the date-range form. Inline so it
+ * lives next to the date pickers — operators expect to refine "this date
+ * range" and "this branch" in the same gesture. Renders only when the
+ * tenant has more than one branch; single-branch tenants see nothing and
+ * the request stays tenant-wide.
+ */
+function BranchFilter({ value, onChange }: { value?: string; onChange: (v?: string) => void }) {
+  const { t } = useTranslation('common');
+  const { data: branches = [] } = useListBranches();
+  if (branches.length <= 1) return null;
+  return (
+    <div className="flex-1">
+      <label className="block text-sm font-medium mb-1">{t('hummytummy.reportsBranchFilter.label')}</label>
+      <select
+        className="w-full rounded border px-2 py-2 text-sm"
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value || undefined)}
+      >
+        <option value="">{t('hummytummy.reportsBranchFilter.all')}</option>
+        {branches.map((b) => (
+          <option key={b.id} value={b.id}>{b.name}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
 
 export default ReportsPage;

@@ -37,7 +37,7 @@ export class ReportsController {
   async getSalesSummary(@Request() req, @Query() query: DateRangeQueryDto) {
     const start = query.startDate ? new Date(query.startDate) : undefined;
     const end = query.endDate ? new Date(query.endDate) : undefined;
-    return this.reportsService.getSalesSummary(req.tenantId, start, end);
+    return this.reportsService.getSalesSummary(req.tenantId, start, end, query.branchId);
   }
 
   @Get('top-products')
@@ -48,7 +48,13 @@ export class ReportsController {
   async getTopProducts(@Request() req, @Query() query: TopProductsQueryDto) {
     const start = query.startDate ? new Date(query.startDate) : undefined;
     const end = query.endDate ? new Date(query.endDate) : undefined;
-    return this.reportsService.getTopProducts(req.tenantId, start, end, query.limit ?? 10);
+    return this.reportsService.getTopProducts(
+      req.tenantId,
+      start,
+      end,
+      query.limit ?? 10,
+      query.branchId,
+    );
   }
 
   @Get('payments')
@@ -58,7 +64,7 @@ export class ReportsController {
   async getPaymentMethodBreakdown(@Request() req, @Query() query: DateRangeQueryDto) {
     const start = query.startDate ? new Date(query.startDate) : undefined;
     const end = query.endDate ? new Date(query.endDate) : undefined;
-    return this.reportsService.getPaymentMethodBreakdown(req.tenantId, start, end);
+    return this.reportsService.getPaymentMethodBreakdown(req.tenantId, start, end, query.branchId);
   }
 
   @Get('orders-by-hour')
@@ -67,7 +73,7 @@ export class ReportsController {
   @ApiOperation({ summary: 'Get orders grouped by hour (ADMIN, MANAGER)' })
   async getOrdersByHour(@Request() req, @Query() query: SingleDateQueryDto) {
     const targetDate = query.date ? new Date(query.date) : undefined;
-    return this.reportsService.getOrdersByHour(req.tenantId, targetDate);
+    return this.reportsService.getOrdersByHour(req.tenantId, targetDate, query.branchId);
   }
 
   @Get('customers')
@@ -77,7 +83,7 @@ export class ReportsController {
   async getCustomerAnalytics(@Request() req, @Query() query: DateRangeQueryDto) {
     const start = query.startDate ? new Date(query.startDate) : undefined;
     const end = query.endDate ? new Date(query.endDate) : undefined;
-    return this.reportsService.getCustomerAnalytics(req.tenantId, start, end);
+    return this.reportsService.getCustomerAnalytics(req.tenantId, start, end, query.branchId);
   }
 
   @Get('inventory')
@@ -95,6 +101,6 @@ export class ReportsController {
   async getStaffPerformance(@Request() req, @Query() query: DateRangeQueryDto) {
     const start = query.startDate ? new Date(query.startDate) : undefined;
     const end = query.endDate ? new Date(query.endDate) : undefined;
-    return this.reportsService.getStaffPerformance(req.tenantId, start, end);
+    return this.reportsService.getStaffPerformance(req.tenantId, start, end, query.branchId);
   }
 }

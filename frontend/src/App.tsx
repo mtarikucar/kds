@@ -17,6 +17,7 @@ const PlansPage = lazy(() => import('./pages/superadmin/PlansPage'));
 const SubscriptionsPage = lazy(() => import('./pages/superadmin/SubscriptionsPage'));
 const AuditLogsPage = lazy(() => import('./pages/superadmin/AuditLogsPage'));
 const SuperAdminSettingsPage = lazy(() => import('./pages/superadmin/SuperAdminSettingsPage'));
+const MarketplaceAdminPage = lazy(() => import('./pages/superadmin/MarketplaceAdminPage'));
 import { SuperAdminLayout, SuperAdminProtectedRoute } from './features/superadmin/components';
 
 // Marketing Panel Pages (lazy-loaded)
@@ -93,6 +94,16 @@ const SmsSettingsPage = lazy(() => import('./pages/settings/SmsSettingsPage'));
 const AccountingSettingsPage = lazy(() => import('./pages/settings/AccountingSettingsPage'));
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+// HummyTummy Phase 3–12 admin screens.
+import DevicesPage from './features/devices/DevicesPage';
+import MarketplacePage from './features/marketplace/MarketplacePage';
+import StorePage from './features/hardware-store/StorePage';
+import BranchesPage from './features/branches/BranchesPage';
+import HealthPage from './features/health/HealthPage';
+import WebhooksPage from './features/webhooks/WebhooksPage';
+import BridgesPage from './features/bridges/BridgesPage';
+import FiscalRecoveryPage from './features/fiscal/FiscalRecoveryPage';
+import CallerFeedPage from './features/caller/CallerFeedPage';
 import { UpdateDialog } from './components/UpdateDialog';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
 import { useNotificationSocket } from './features/notifications/notificationsApi';
@@ -230,6 +241,17 @@ function App() {
         <Route path="/subscription/payment" element={<Navigate to="/subscription/plans" replace />} />
         <Route path="/subscription/payment/success" element={<Navigate to="/subscription/success" replace />} />
         <Route path="/subscription/payment/failed" element={<Navigate to="/subscription/fail" replace />} />
+
+        {/* HummyTummy Phase 3–12: devices, marketplace, hardware store, branches, health */}
+        <Route path="/admin/devices" element={<DevicesPage />} />
+        <Route path="/admin/marketplace" element={<MarketplacePage />} />
+        <Route path="/admin/store" element={<StorePage />} />
+        <Route path="/admin/branches" element={<BranchesPage />} />
+        <Route path="/admin/health" element={<HealthPage />} />
+        <Route path="/admin/bridges" element={<BridgesPage />} />
+        <Route path="/admin/webhooks" element={<WebhooksPage />} />
+        <Route path="/admin/fiscal-recovery" element={<FiscalRecoveryPage />} />
+        <Route path="/admin/caller-feed" element={<CallerFeedPage />} />
       </Route>
 
       {/* SuperAdmin Routes */}
@@ -243,6 +265,7 @@ function App() {
           <Route path="/superadmin/tenants/:id" element={<TenantDetailPage />} />
           <Route path="/superadmin/users" element={<AllUsersPage />} />
           <Route path="/superadmin/plans" element={<PlansPage />} />
+          <Route path="/superadmin/marketplace" element={<MarketplaceAdminPage />} />
           <Route path="/superadmin/subscriptions" element={<SubscriptionsPage />} />
           <Route path="/superadmin/audit-logs" element={<AuditLogsPage />} />
           <Route path="/superadmin/settings" element={<SuperAdminSettingsPage />} />

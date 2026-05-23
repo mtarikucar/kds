@@ -10,6 +10,8 @@ import { addDays, addMonths, addYears } from "date-fns";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { BillingService } from "./billing.service";
 import { NotificationService } from "./notification.service";
+import { OutboxService } from "../../outbox/outbox.service";
+import { EventTypes } from "../../outbox/event-types";
 import {
   SubscriptionStatus,
   BillingCycle,
@@ -28,7 +30,42 @@ export class SubscriptionService {
     private prisma: PrismaService,
     private billingService: BillingService,
     private notificationService: NotificationService,
+    // OutboxModule is @Global, so injection works without a module-level
+    // import. Wired so meaningful subscription transitions emit events
+    // for the entitlement projector and any later consumers (audit,
+    // marketing automation, support tickets) to react to.
+    private readonly outbox: OutboxService,
   ) {}
+
+  /**
+   * Append a subscription lifecycle event to the outbox.
+   *
+   * Centralised so every mutation site uses the same payload shape; the
+   * outbox worker delivers to the in-process bus and the entitlement
+   * projector reprojects. Failures here are swallowed — the user-facing
+   * action has already succeeded, and the nightly reconcile would catch
+   * any miss anyway. Logged for observability.
+   */
+  private async emitLifecycle(
+    type: string,
+    sub: { id: string; tenantId: string; plan?: { name?: string } | null; currentPeriodStart?: Date | null; currentPeriodEnd?: Date | null },
+  ): Promise<void> {
+    try {
+      await this.outbox.append({
+        type,
+        tenantId: sub.tenantId,
+        payload: {
+          subscriptionId: sub.id,
+          tenantId: sub.tenantId,
+          planCode: sub.plan?.name,
+          periodStart: sub.currentPeriodStart?.toISOString(),
+          periodEnd: sub.currentPeriodEnd?.toISOString(),
+        },
+      });
+    } catch (e) {
+      this.logger.warn(`outbox emit ${type} failed for sub=${sub.id}: ${(e as Error).message}`);
+    }
+  }
 
   /**
    * Best-effort trial-started email. Always called post-commit so a
@@ -390,6 +427,11 @@ export class SubscriptionService {
       // Fire-and-forget welcome email. Failures are logged but don't
       // unwind the trial creation.
       void this.notifyTrialStarted(tenantId, plan.displayName, plan.trialDays);
+
+      // TRIALING grants the same access as ACTIVE (see PlanFeatureGuard),
+      // so the entitlement projector treats activation and trial start
+      // identically. Emit a single canonical "activated" event.
+      await this.emitLifecycle(EventTypes.SubscriptionActivated, subscription);
 
       return subscription;
     } catch (err) {
@@ -813,6 +855,15 @@ export class SubscriptionService {
       );
     }
 
+    // Only "immediate" cancellations terminate access right away; "at period
+    // end" leaves the subscription ACTIVE/TRIALING until the scheduler closes
+    // it. The projector reads current state, so we only emit when access
+    // actually changes — at-period-end emits will fire when the scheduler
+    // transitions the row.
+    if (immediate) {
+      await this.emitLifecycle(EventTypes.SubscriptionCancelled, updated);
+    }
+
     return updated;
   }
 
@@ -853,6 +904,10 @@ export class SubscriptionService {
       where: { id: subscriptionId },
       include: { plan: true },
     });
+    // Reactivation restores entitlement access if it had degraded (it usually
+    // hasn't — at-period-end keeps ACTIVE — but the projector is cheap and
+    // the safe choice is "emit anyway, reproject is idempotent").
+    await this.emitLifecycle(EventTypes.SubscriptionActivated, updated);
     return updated;
   }
 
@@ -1099,6 +1154,17 @@ export class SubscriptionService {
         this.logger.log(
           `Trial subscription ${subscription.id} expired → tenant ${subscription.tenantId} dropped to FREE`,
         );
+
+        // Plan tier changed → entitlement set needs rebuilding. Treated as a
+        // downgrade so consumers can distinguish trial-expiry from a paid
+        // upgrade if they ever need to (the projector itself doesn't care).
+        await this.emitLifecycle(EventTypes.SubscriptionDowngraded, {
+          id: subscription.id,
+          tenantId: subscription.tenantId,
+          plan: { name: 'FREE' },
+          currentPeriodStart: now,
+          currentPeriodEnd: freePeriodEnd,
+        });
 
         // Best-effort trial-expired email; failure here mustn't block the
         // status transition (the cron must remain idempotent).

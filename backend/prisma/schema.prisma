@@ -471,6 +471,13 @@ model Table {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  // HummyTummy Phase 3: branch the table physically belongs to.
+  // Nullable — pre-existing tables predate the Branch model and stay
+  // tenant-scoped. New tables created via the branches UI carry a real
+  // branchId, and OrdersService.create copies it onto the order.
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -490,6 +497,7 @@ model Table {
   @@unique([tenantId, number])
   @@index([tenantId])
   @@index([tenantId, groupId])
+  @@index([tenantId, branchId])
   @@map("tables")
 }
 
@@ -553,6 +561,15 @@ model Order {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  // HummyTummy Phase 3: branch-scoping. Nullable because orders that
+  // pre-date the Branch model don't have one; new orders pick the branch
+  // from the table or from the cashier's session. Reports filter on this
+  // column when the caller passes branchId — null-branch orders simply
+  // aren't returned by branch-scoped queries, which is the correct
+  // behavior (they're shown in tenant-wide reports).
+  branchId String?
+  branch   Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   paidAt      DateTime?
@@ -572,6 +589,7 @@ model Order {
   @@index([tenantId])
   @@index([userId])
   @@index([tableId])
+  @@index([tenantId, branchId, createdAt])
   @@index([customerId])
   @@index([status])
   @@index([sessionId])
@@ -3393,4 +3411,782 @@ model Consent {
   @@index([subscriptionId])
   @@index([documentId])
   @@map("consents")
+}
+
+// ========================================
+// ENTITLEMENTS + OUTBOX (HummyTummy Phase 1)
+// ========================================
+//
+// The Entitlement Engine answers "what can this tenant do *right now*". It is
+// the single source of truth for feature gating — separate from how features
+// were *bought* (Subscription/SubscriptionPlan/featureOverrides). Every grant
+// is a row sourced from a plan, an add-on, an admin override, or a grace
+// window. The fold rules are:
+//   feature.*        boolean   OR    (any source granting -> enabled)
+//   limit.*          number    SUM   (plan base + addon increments)
+//   integration.*    string[]  UNION
+// `source` is the precise origin (e.g. "plan:PRO", "addon:kds-extra-station:abc",
+// "override:admin:user_42", "grace:past-due"). Revoking a source removes only
+// the rows tagged with that source — no other rows are touched. `value` is
+// JSONB to allow future shapes (per-branch limits, structured config).
+//
+// The OutboxEvent table buffers domain events for durable, at-least-once
+// delivery. Producers write event rows inside the same transaction that
+// mutates business state; the worker drains them onto the in-process bus
+// (EventEmitter2). Consumers MUST be idempotent on `id` (UUIDv7 = sortable).
+// This unblocks every cross-module path (entitlement recompute on subscription
+// change, fulfilment on payment, KDS routing on order, etc.) without forcing
+// a message broker yet.
+
+model FeatureEntitlement {
+  id         String    @id @default(uuid())
+  tenantId   String
+  // Scope: `tenant` (default), `branch` (future once branches are extracted),
+  // `device` (future device-level licensing). Stored as plain string to stay
+  // consistent with the project's "String + comment" enum convention.
+  scope      String    @default("tenant")
+  branchId   String?
+  // Dotted key, e.g. "feature.kds", "limit.maxTables", "integration.delivery".
+  key        String
+  // JSONB value: boolean for feature.*, number for limit.*, string[] for
+  // integration.*, free-form for forward compatibility.
+  value      Json
+  // Precise origin so revocation can target exactly one row.
+  // Examples: "plan:PRO", "addon:kds-extra-station:7f...", "override:admin",
+  // "grace:past-due".
+  source     String
+  // Optional expiry — used by grace windows and time-boxed trials.
+  validUntil DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  // One (tenant, branch, key, source) tuple at a time. Reprojecting a source
+  // upserts in place, so the table stays the size of "current state" not
+  // "every change ever made" (the audit log carries the history).
+  @@unique([tenantId, branchId, key, source])
+  @@index([tenantId, key])
+  @@index([tenantId, scope])
+  @@index([validUntil])
+  @@map("feature_entitlements")
+}
+
+model OutboxEvent {
+  // UUIDv7 generated at the application layer so events sort by creation time
+  // without needing a sequence; safe across replicas.
+  id             String    @id
+  // Versioned dotted name, e.g. "subscription.activated.v1", "order.created.v1".
+  type           String
+  tenantId       String?
+  // The full event body. Consumers parse this with Zod against the event
+  // contract in packages/event-contracts.
+  payload        Json
+  // Idempotency key emitted by the producer (often the same as id, but kept
+  // separate so the same logical event can be re-emitted with a fresh id if
+  // ever needed). Consumers dedupe on this.
+  idempotencyKey String
+  // Drain state machine: queued -> dispatching -> dispatched | failed.
+  status         String    @default("queued")
+  attempts       Int       @default(0)
+  lastError      String?
+  // Time the worker first dispatched the event to the bus. Used to compute
+  // delivery lag p95 in observability.
+  dispatchedAt   DateTime?
+  // Earliest moment the worker should attempt redelivery after a failure.
+  // Exponential backoff lives in OutboxWorkerService.
+  nextAttemptAt  DateTime?
+  createdAt      DateTime  @default(now())
+
+  // Worker scans `status='queued' AND nextAttemptAt <= now()` in id order.
+  @@index([status, nextAttemptAt])
+  @@index([type, createdAt])
+  @@index([tenantId, createdAt])
+  @@map("outbox_events")
+}
+
+// ========================================
+// MARKETPLACE: PLANS + ADD-ONS (HummyTummy Phase 2)
+// ========================================
+//
+// SubscriptionPlan stays as the existing 4-tier plan model. The marketplace
+// adds an orthogonal AddOn catalog: discrete units of capability that
+// extend a tenant's entitlements without changing their plan. Add-ons are
+// data-driven — super-admin can ship a new add-on by inserting a row.
+//
+// `grants` JSONB encodes the entitlement delta the add-on grants. Shape:
+//   {
+//     "feature.foo":            true,
+//     "limit.kdsScreens":       1,
+//     "integration.delivery":   ["yemeksepeti","getir"]
+//   }
+// The projector multiplies numeric grants by the tenant's `quantity` so the
+// same add-on row supports `qty=3 extra KDS screens` without inflating the
+// catalog. `deps` lists other add-on codes or `plan:<NAME>` prefixes that
+// must already be present before purchase is allowed.
+
+model MarketplaceAddOn {
+  id          String   @id @default(uuid())
+  // Stable code used by checkout/UI/dependencies. NEVER reuse a retired code.
+  code        String   @unique
+  name        String
+  description String?
+  // Coarse buckets for filtering in the marketplace UI:
+  //   software     — extra modules (advanced reports, multi-branch)
+  //   integration  — provider grants (fiscal-hugin, delivery-yemeksepeti)
+  //   capacity     — numeric add-ons (extra-kds-screen, extra-tablet)
+  //   support      — service tiers (priority support, on-site install)
+  kind        String
+  // Recurring add-ons charge each subscription cycle; one-time add-ons fire
+  // once at purchase (typical for setup/install fees).
+  billing     String   @default("recurring") // recurring|oneTime
+  priceCents  Int
+  currency    String   @default("TRY")
+  // Entitlement delta — see header comment.
+  grants      Json
+  // Other add-on codes (or plan:<NAME>) required before purchase.
+  deps        String[] @default([])
+  // Lifecycle: draft can be edited freely; published is offered for sale;
+  // archived stays in the catalog for already-active tenants but is hidden
+  // from the marketplace.
+  status      String   @default("draft")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenantAddOns TenantAddOn[]
+
+  @@index([status, kind])
+  @@map("marketplace_addons")
+}
+
+model TenantAddOn {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  addOnId             String
+  addOn               MarketplaceAddOn @relation(fields: [addOnId], references: [id], onDelete: Restrict)
+  // Optional branch scope. Null means tenant-wide; once branches land in
+  // Phase 3 the marketplace UI will require a branch for capacity add-ons.
+  branchId            String?
+  // Multiplies numeric grants (capacity add-ons buy in quantity).
+  quantity            Int      @default(1)
+  // active during the period; cancelled stays visible until cancelAtPeriodEnd
+  // hits the next billing tick; expired = ended billing period, no entitlement.
+  status              String   @default("active")
+  // Billing cycle bookkeeping. One-time add-ons set start = end = activatedAt.
+  activatedAt         DateTime @default(now())
+  currentPeriodStart  DateTime?
+  currentPeriodEnd    DateTime?
+  cancelAtPeriodEnd   Boolean  @default(false)
+  cancelledAt         DateTime?
+  endedAt             DateTime?
+  // Link to the invoice/payment row that paid for this. Nullable for free
+  // add-ons (promo grants, admin-issued comps).
+  paymentRef          String?
+
+  @@index([tenantId, status])
+  @@index([addOnId])
+  @@index([tenantId, branchId])
+  @@map("tenant_addons")
+}
+
+// ========================================
+// BRANCHES + DEVICE MESH (HummyTummy Phase 3)
+// ========================================
+//
+// Branch is the per-location seam. Existing tenants are migrated with one
+// "Main" branch, and the application keeps using "tenant-wide" for queries
+// until features explicitly opt into branch-scoping. This is the first big
+// step toward multi-branch chains.
+//
+// The Device Mesh treats every restaurant peripheral (tablet, KDS screen,
+// printer, yazarkasa, POS terminal, caller box, local bridge) uniformly:
+// a Device row + a capability list. The application never branches on
+// vendor brand — capability presence is what routes commands.
+
+model Branch {
+  id          String   @id @default(uuid())
+  tenantId    String
+  name        String   @default("Main")
+  // Free-form code so chains can label as "IST-01", "ANK-Mall", etc.
+  code        String?
+  timezone    String   @default("UTC")
+  // Address stored as JSON to avoid premature normalization (single,
+  // double, embedded formats vary by country).
+  address     Json?
+  status      String   @default("active") // active|suspended|archived
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  devices     Device[]
+  bridges     LocalBridgeAgent[]
+  orders      Order[]
+  tables      Table[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId, status])
+  @@map("branches")
+}
+
+// Polymorphic device registry — `kind` distinguishes the surface, but the
+// routing layer dispatches on the union of `capabilities`. Adding a new
+// hardware class is a config change, not a code change.
+model Device {
+  id              String   @id @default(uuid())
+  tenantId        String
+  // Optional until the device is assigned to a branch via pairing. Nullable
+  // also covers a chain admin creating slots ahead of branch deployment.
+  branchId        String?
+  branch          Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  // tablet_waiter | tablet_customer | kds_screen | bar_screen | pos_terminal
+  // yazarkasa | receipt_printer | kitchen_printer | caller_id | scanner | local_bridge
+  kind            String
+  // Capability tags — e.g. ['print_80mm', 'cash_drawer'] or ['display_kitchen'].
+  // Free-form strings so a new firmware/feature can surface immediately.
+  capabilities    String[] @default([])
+  // online|offline|busy|error|maintenance|retired
+  status          String   @default("unprovisioned")
+  // Wall-clock last successful heartbeat. Null while unprovisioned.
+  lastSeenAt      DateTime?
+  serial          String?
+  model           String?
+  // sold (HummyTummy fulfilled), rented, byo (customer brought their own).
+  ownership       String   @default("byo")
+  warrantyUntil   DateTime?
+  // When this device lives behind a bridge, the bridgeId is its parent.
+  // Cloud-direct devices (tablets, KDS screens) have null bridgeId.
+  bridgeId        String?
+  bridge          LocalBridgeAgent? @relation(fields: [bridgeId], references: [id], onDelete: SetNull)
+  // Pairing one-time-use bits. pairCode is what the user types; claimToken is
+  // a single-use token returned by the API to bootstrap auth.
+  pairCode        String?  @unique
+  pairCodeExpiresAt DateTime?
+  // Rotating bearer token (sha256 hashed) issued post-pair. Refreshed via
+  // /devices/:id/token/refresh. Never store the raw token at rest.
+  tokenHash       String?
+  tokenExpiresAt  DateTime?
+  // Free-form provisioning config — e.g. printer width, kitchen station id.
+  config          Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  commands        DeviceCommand[]
+  logs            DeviceLog[]
+
+  @@unique([tenantId, serial])
+  @@index([tenantId, branchId, kind])
+  @@index([tenantId, status])
+  @@index([bridgeId])
+  @@map("devices")
+}
+
+// Outbound commands to a device. Per-device FIFO with priority. Workers ack
+// by transitioning queued → done|failed with a result/error.
+model DeviceCommand {
+  id              String   @id @default(uuid())
+  tenantId        String
+  deviceId        String
+  device          Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  // print_receipt | fiscal_receipt | charge_card | show_order | open_drawer | reboot ...
+  kind            String
+  payload         Json
+  // Higher = pulled first by the device.
+  priority        Int      @default(0)
+  status          String   @default("queued") // queued|inflight|done|failed|expired
+  attempts        Int      @default(0)
+  expiresAt       DateTime?
+  // Client-side idempotency key (UUIDv7 from producer). Unique per device
+  // so retried sends don't duplicate.
+  idempotencyKey  String
+  result          Json?
+  error           String?
+  ackedAt         DateTime?
+  createdAt       DateTime @default(now())
+
+  @@unique([deviceId, idempotencyKey])
+  @@index([deviceId, status, priority(sort: Desc), createdAt])
+  @@index([tenantId, status])
+  @@map("device_commands")
+}
+
+model DeviceLog {
+  id          String   @id @default(uuid())
+  tenantId    String
+  deviceId    String
+  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  // info|warn|error|metric — keeps the table dense.
+  level       String
+  category    String   // 'heartbeat'|'command'|'capability'|'lifecycle'
+  message     String
+  payload     Json?
+  createdAt   DateTime @default(now())
+
+  @@index([deviceId, createdAt(sort: Desc)])
+  @@index([tenantId, level, createdAt])
+  @@map("device_logs")
+}
+
+// Local Bridge Agent registry. One row per agent install (one per branch is
+// typical, but multiple are supported for redundancy or per-station bridges).
+model LocalBridgeAgent {
+  id              String   @id @default(uuid())
+  tenantId        String
+  branchId        String
+  branch          Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  // Provisioning token: a one-time-use string embedded at manufacture or
+  // generated when the bridge is associated with a branch via admin UI.
+  // Hashed at rest (sha256); never raw.
+  provisioningTokenHash String?
+  // Rotating bearer token (sha256 hashed) post-claim.
+  tokenHash       String?
+  tokenExpiresAt  DateTime?
+  hostname        String?
+  os              String?
+  agentVersion    String?
+  // online|offline|claiming|retired
+  status          String   @default("claiming")
+  lastSeenAt      DateTime?
+  provisionedAt   DateTime?
+  // SKU code if this bridge came from the HummyTummy hardware store.
+  productSku      String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  devices         Device[]
+
+  @@index([tenantId, branchId, status])
+  @@map("local_bridge_agents")
+}
+
+// ========================================
+// HARDWARE CATALOG + ORDERS (HummyTummy Phase 5)
+// ========================================
+//
+// HardwareProduct is the SKU master. HardwareInventory tracks stock + serial
+// allocations. HardwareOrder + HardwareOrderItem model the cart→order→ship
+// flow. Shipment carries carrier-side state. InstallationRequest and Warranty
+// hang off completed orders.
+
+model HardwareProduct {
+  id              String   @id @default(uuid())
+  sku             String   @unique
+  category        String   // tablet|kds_screen|pos_terminal|printer|yazarkasa|bridge|scanner|caller_id|other
+  name            String
+  brand           String?
+  model           String?
+  description     String?  @db.Text
+  // Free-form specs: dimensions, ports, OS, etc.
+  specs           Json?
+  // Compat: { capabilities: ["print_80mm"], requiredPlan: ["PRO"], requiredAddOn: ["fiscal_hugin"] }
+  compat          Json?
+  priceCents      Int
+  // For rental SKUs (e.g. HummyBox-Lite); null for sale-only.
+  rentalMonthlyCents Int?
+  currency        String   @default("TRY")
+  warrantyMonths  Int      @default(12)
+  images          String[] @default([])
+  // in_stock|preorder|out_of_stock|discontinued
+  stockStatus     String   @default("in_stock")
+  // shippingProfile = { weightKg, dimsCm, carrier?, leadTimeDays }
+  shippingProfile Json?
+  // Lifecycle inside the catalog: published rows are sold in the public store;
+  // draft is admin-only; archived hides from the store but keeps history.
+  status          String   @default("draft")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  inventory       HardwareInventory[]
+  orderItems      HardwareOrderItem[]
+
+  @@index([category, status])
+  @@map("hardware_products")
+}
+
+// Per-SKU stock counts and serial allocations. Single-warehouse for MVP;
+// adding `warehouseId` later is trivial.
+model HardwareInventory {
+  id          String   @id @default(uuid())
+  productId   String
+  product     HardwareProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  // available + allocated + shipped = lifetime received. The triple is kept
+  // explicit so finance/ops queries don't need joins to derive flow stats.
+  available   Int      @default(0)
+  allocated   Int      @default(0)
+  shipped     Int      @default(0)
+  // Free serials pool (FIFO). When an order line allocates units, the first
+  // N serials are popped and assigned to HardwareOrderItem.serials.
+  serialsAvailable String[] @default([])
+  updatedAt   DateTime @updatedAt
+
+  @@unique([productId])
+  @@map("hardware_inventory")
+}
+
+model HardwareOrder {
+  id              String   @id @default(uuid())
+  tenantId        String
+  // Optional branch the buyer wants the hardware shipped to / installed at.
+  branchId        String?
+  // draft (cart) → pending_payment → paid → fulfillment → shipped →
+  // delivered → installed → completed.  Cancellation states: cancelled,
+  // refunded. Status transitions are append-only — a returned order keeps
+  // the shipped → delivered → returned history.
+  status          String   @default("draft")
+  subtotalCents   Int      @default(0)
+  taxCents        Int      @default(0)
+  shippingCents   Int      @default(0)
+  totalCents      Int      @default(0)
+  currency        String   @default("TRY")
+  shippingAddress Json?
+  billingAddress  Json?
+  // installation: null | requested | scheduled | done | declined
+  installation    String?
+  paymentRef      String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  items           HardwareOrderItem[]
+  shipments       Shipment[]
+  installations   InstallationRequest[]
+
+  @@index([tenantId, status])
+  @@index([createdAt])
+  @@map("hardware_orders")
+}
+
+model HardwareOrderItem {
+  id          String   @id @default(uuid())
+  orderId     String
+  order       HardwareOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId   String
+  product     HardwareProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
+  sku         String   // snapshot at purchase time
+  name        String   // snapshot
+  qty         Int
+  unitCents   Int
+  // Serials allocated to this line item, in order of allocation.
+  serials     String[] @default([])
+  // rent | sell — determines whether the resulting Device row is `rented`
+  // or `sold` for warranty/billing purposes.
+  acquisition String   @default("sell")
+
+  @@index([orderId])
+  @@map("hardware_order_items")
+}
+
+model Shipment {
+  id          String   @id @default(uuid())
+  orderId     String
+  order       HardwareOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  carrier     String   // 'manual'|'yurtici'|'aras'|'mng'|... — adapter id
+  trackingNo  String?
+  // pending|in_transit|out_for_delivery|delivered|returned|lost
+  status      String   @default("pending")
+  shippedAt   DateTime?
+  deliveredAt DateTime?
+  // Free-form payload for carrier-specific metadata (label url, etc.)
+  meta        Json?
+
+  @@index([orderId])
+  @@index([carrier, status])
+  @@map("shipments")
+}
+
+model InstallationRequest {
+  id              String   @id @default(uuid())
+  tenantId        String
+  branchId        String?
+  hwOrderId       String?
+  hwOrder         HardwareOrder? @relation(fields: [hwOrderId], references: [id], onDelete: SetNull)
+  // requested|scheduled|in_progress|done|cancelled|no_show
+  status          String   @default("requested")
+  scheduledFor    DateTime?
+  assignedTo      String?  // SuperAdmin id (technician) — optional
+  // Operator-supplied preferences from the request form.
+  preferredDates  DateTime[] @default([])
+  notes           String?  @db.Text
+  completedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([scheduledFor])
+  @@map("installation_requests")
+}
+
+model Warranty {
+  id          String   @id @default(uuid())
+  tenantId    String
+  // Device row this warranty covers (nullable until device is paired).
+  deviceId    String?
+  productId   String
+  serial      String
+  startAt     DateTime
+  endAt       DateTime
+  // Each claim is { date, issue, status, resolution? } appended into JSON
+  // for now; promote to its own table once volume warrants.
+  claims      Json[]   @default([])
+  status      String   @default("active") // active|expired|claimed|voided
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([productId, serial])
+  @@index([tenantId, status])
+  @@index([endAt])
+  @@map("warranties")
+}
+
+// ========================================
+// FISCAL DEVICES + RECEIPTS (HummyTummy Phase 7)
+// ========================================
+//
+// Models stay vendor-agnostic. Brand-specific behavior lives in a separate
+// adapter module that implements the FiscalProvider interface.
+
+model FiscalDeviceRecord {
+  id            String   @id @default(uuid())
+  tenantId      String
+  branchId      String?
+  // 'efatura' (cloud, no hardware), 'hugin', 'beko', 'profilo', 'mock'
+  providerId    String
+  // Optional link to the Device mesh row when this fiscal device is a
+  // physical yazarkasa wired through a bridge.
+  deviceId      String?
+  serial        String
+  model         String?
+  // Free-form capability tags: 'receipt', 'invoice', 'cancel', 'z_report'
+  capabilities  String[] @default([])
+  // online|offline|error|maintenance|retired
+  status        String   @default("offline")
+  lastSeenAt    DateTime?
+  // Provider-specific config (API keys, station code, VAT group map).
+  config        Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  receipts      FiscalReceipt[]
+
+  @@unique([tenantId, providerId, serial])
+  @@index([tenantId, branchId, status])
+  @@map("fiscal_devices")
+}
+
+model FiscalReceipt {
+  id              String   @id @default(uuid())
+  tenantId        String
+  // Order this receipt is for. Nullable so admin-driven manual receipts can
+  // be issued (rare; supported for parity with the legacy flow).
+  orderId         String?
+  fiscalDeviceId  String
+  fiscalDevice    FiscalDeviceRecord @relation(fields: [fiscalDeviceId], references: [id], onDelete: Restrict)
+  providerId      String
+  // The fiscal_no / Z-no the device emits — populated after the device acks.
+  fiscalNo        String?
+  fiscalZNo       String?
+  issuedAt        DateTime?
+  totalCents      Int
+  currency        String   @default("TRY")
+  vatBreakdown    Json     // { "20": 4000, "10": 500, "1": 0 }
+  // queued|inflight|issued|failed|cancelled
+  status          String   @default("queued")
+  // Per-call idempotency — survives retries from the outbox / device queue.
+  idempotencyKey  String
+  attempts        Int      @default(0)
+  lastError       String?
+  // Append-only line items for audit.
+  lines           FiscalReceiptItem[]
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([orderId])
+  @@index([fiscalDeviceId, issuedAt])
+  @@map("fiscal_receipts")
+}
+
+model FiscalReceiptItem {
+  id             String   @id @default(uuid())
+  fiscalReceiptId String
+  fiscalReceipt  FiscalReceipt @relation(fields: [fiscalReceiptId], references: [id], onDelete: Cascade)
+  lineNo         Int
+  productCode    String
+  name           String
+  qty            Decimal  @db.Decimal(10, 3)
+  unitPriceCents Int
+  vatRate        Int
+  // Yazarkasa department code in TR (A..F). Optional for non-TR providers.
+  vatGroup       String?
+  discountCents  Int      @default(0)
+
+  @@index([fiscalReceiptId, lineNo])
+  @@map("fiscal_receipt_items")
+}
+
+model FiscalDayClose {
+  id            String   @id @default(uuid())
+  tenantId      String
+  fiscalDeviceId String
+  zNo           String?
+  openedAt      DateTime?
+  closedAt      DateTime?
+  totals        Json     // { 'card': 12345, 'cash': 6789, 'vat_20': 1500 }
+
+  @@index([tenantId, closedAt])
+  @@map("fiscal_day_closes")
+}
+
+// ========================================
+// CALLER / PHONE ORDERS (HummyTummy Phase 9)
+// ========================================
+
+model CallerEvent {
+  id          String   @id @default(uuid())
+  tenantId    String
+  branchId    String?
+  // 'twilio', 'verimor', 'analog-caller-id-box', ...
+  providerId  String
+  callId      String   // provider-side call id
+  // 'incoming'|'answered'|'ended'|'missed'
+  kind        String
+  // E.164 if available; raw display otherwise.
+  e164        String?
+  // Optional matched customer (filled by the lookup pass after creation).
+  customerId  String?
+  agentUserId String?
+  durationMs  Int?
+  // Provider-specific extras (trunk id, recording url, etc.).
+  meta        Json?
+  // Order created from this call, when applicable.
+  orderId     String?
+  occurredAt  DateTime
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, occurredAt(sort: Desc)])
+  @@index([tenantId, e164])
+  @@index([callId])
+  @@map("caller_events")
+}
+
+// ========================================
+// INTEGRATION GATEWAY (HummyTummy Phase 11)
+// ========================================
+
+model IntegrationProviderDef {
+  // 'yemeksepeti', 'getir', 'iyzico', 'stripe', 'efatura', 'verimor', ...
+  id          String  @id
+  // 'delivery'|'payment'|'fiscal'|'voip'|'accounting'|'sms'|'whatsapp'
+  kind        String
+  name        String
+  description String?
+  // JSON Schema of the credentials the adapter needs. Rendered by the
+  // admin UI; values stored in IntegrationConnection.credentialsEnc.
+  configSchema Json
+  // Whether HummyTummy provides this adapter officially or it's a partner
+  // contribution (community).
+  isOfficial  Boolean @default(true)
+  status      String  @default("published")  // published|deprecated
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  connections IntegrationConnection[]
+
+  @@index([kind, status])
+  @@map("integration_providers")
+}
+
+model IntegrationConnection {
+  id              String   @id @default(uuid())
+  tenantId        String
+  branchId        String?
+  providerId      String
+  provider        IntegrationProviderDef @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  // 'connected'|'error'|'pending'|'disconnected'
+  status          String   @default("pending")
+  // Envelope-encrypted credentials JSON. Storage layer applies AES-256-GCM
+  // with a tenant-scoped key derived from KMS. Until KMS lands the bytea is
+  // encrypted with a process-wide key from env — never raw secrets.
+  credentialsEnc  Bytes?
+  // Non-secret provider-specific config (store id, channel, etc.).
+  config          Json?
+  lastEventAt     DateTime?
+  lastError       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  webhookEvents   IntegrationWebhookEvent[]
+
+  @@index([tenantId, providerId])
+  @@index([status])
+  @@map("integration_connections")
+}
+
+model IntegrationWebhookEvent {
+  id              String   @id @default(uuid())
+  tenantId        String?
+  connectionId    String?
+  connection      IntegrationConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  providerId      String
+  // Provider-emitted event type, e.g. 'order.created', 'payment.succeeded'.
+  type            String
+  // Truncated signature for audit; raw never stored.
+  signature       String?
+  // Raw payload — kept for forensic replay. Auto-purged after 90d by the
+  // existing audit retention job once that runs.
+  payload         Json
+  receivedAt      DateTime @default(now())
+  processedAt     DateTime?
+  result          String?
+  attempts        Int      @default(0)
+  lastError       String?
+
+  @@index([connectionId, receivedAt])
+  @@index([providerId, receivedAt])
+  @@map("integration_webhook_events")
+}
+
+// ========================================
+// OUTBOUND WEBHOOKS (tenant subscribers)
+// ========================================
+
+model TenantWebhookSubscription {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  url                 String
+  // Event types the tenant wants to receive. "*" subscribes to everything.
+  events              String[] @default([])
+  // HMAC-SHA256 of the shared secret. We never store the secret raw; it's
+  // returned to the tenant exactly once at creation.
+  secretHash          String
+  // active|paused. Auto-paused after `consecutiveFailures` >= 20 so a dead
+  // endpoint doesn't drain the worker.
+  status              String   @default("active")
+  lastDeliveryAt      DateTime?
+  lastDeliveryCode    Int?
+  consecutiveFailures Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  deliveries          WebhookDelivery[]
+
+  @@index([tenantId, status])
+  @@map("tenant_webhook_subscriptions")
+}
+
+model WebhookDelivery {
+  id                  String   @id @default(uuid())
+  subscriptionId      String
+  subscription        TenantWebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  eventType           String
+  eventId             String              // outbox event id (UUIDv7)
+  url                 String
+  status              String   @default("pending") // pending|delivered|failed
+  attempts            Int      @default(0)
+  lastStatusCode      Int?
+  lastResponseSnippet String?
+  nextAttemptAt       DateTime?
+  deliveredAt         DateTime?
+  createdAt           DateTime @default(now())
+
+  @@unique([subscriptionId, eventId])
+  @@index([status, nextAttemptAt])
+  @@index([subscriptionId, createdAt])
+  @@map("webhook_deliveries")
 }

@@ -26,6 +26,7 @@ import { TaxCalculationService } from '../../accounting/services/tax-calculation
 import { withTransaction, addBreadcrumb } from '../../../common/utils/tracing';
 import { ReceiptSnapshotBuilder } from './receipt-snapshot.builder';
 import { ReservationStatus } from '../../reservations/constants/reservation-status.enum';
+import { OutboxService } from '../../outbox/outbox.service';
 
 /**
  * Walk-in (POST /orders) guard window: refuse to open a new order on
@@ -54,7 +55,36 @@ export class OrdersService {
     private smsNotificationService?: SmsNotificationService,
     @Optional()
     private taxCalculationService?: TaxCalculationService,
+    // OutboxModule is @Global — Optional() because tests construct the
+    // service directly without an outbox mock. When absent, emits silently
+    // no-op (kds-routing falls back to the existing kdsGateway broadcast).
+    @Optional()
+    private outbox?: OutboxService,
   ) {}
+
+  /**
+   * Best-effort outbox emit so the new device-mesh KDS routing (and any
+   * future consumer) sees the order lifecycle. Failures are swallowed so a
+   * misconfigured outbox never breaks order creation — the existing
+   * kdsGateway Socket.IO path continues to power the live KDS UI.
+   */
+  private emitOrderEvent(type: 'order.created.v1' | 'order.updated.v1' | 'order.completed.v1' | 'order.cancelled.v1', order: any): void {
+    if (!this.outbox) return;
+    this.outbox
+      .append({
+        type,
+        tenantId: order?.tenantId,
+        payload: {
+          orderId: order?.id,
+          tenantId: order?.tenantId,
+          branchId: (order as any)?.branchId ?? null,
+          tableId: order?.tableId ?? null,
+          status: order?.status,
+          totalCents: typeof order?.finalAmount === 'number' ? Math.round(order.finalAmount * 100) : undefined,
+        },
+      })
+      .catch((e) => this.logger.warn(`outbox emit ${type} failed: ${(e as Error).message}`));
+  }
 
   /**
    * Block a destructive operation (item-set rewrite, item delete,
@@ -141,6 +171,15 @@ export class OrdersService {
   }
 
   async create(createOrderDto: CreateOrderDto, userId: string, tenantId: string) {
+    const created = await this.createInner(createOrderDto, userId, tenantId);
+    // Outbox emit happens AFTER the transaction commits so consumers don't
+    // see an order that later rolled back. Best-effort: a failed emit logs
+    // a warning but never undoes a committed order.
+    this.emitOrderEvent('order.created.v1', created);
+    return created;
+  }
+
+  private async createInner(createOrderDto: CreateOrderDto, userId: string, tenantId: string) {
     return withTransaction(
       {
         name: 'order.create',
@@ -196,17 +235,23 @@ export class OrdersService {
         }
 
         // Validate table if provided
+        let tableBranchId: string | null = null;
         if (createOrderDto.tableId) {
           const table = await this.prisma.table.findFirst({
             where: {
               id: createOrderDto.tableId,
               tenantId,
             },
+            select: { id: true, branchId: true },
           });
 
           if (!table) {
             throw new BadRequestException('Invalid table or table does not belong to your tenant');
           }
+
+          // HummyTummy Phase 3: capture the table's branch so the order
+          // inherits it for branch-scoped reports and KDS routing.
+          tableBranchId = table.branchId;
 
           // Reservation-overlap guard: refuse a walk-in if there's an
           // active CONFIRMED reservation on this table that either
@@ -355,6 +400,12 @@ export class OrdersService {
 
       if (createOrderDto.tableId) {
         createData.tableId = createOrderDto.tableId;
+      }
+      // Inherit the table's branch onto the order so the new branch-scoped
+      // reports (and KDS routing) pick it up. Null is fine — pre-Branch
+      // tables keep null which falls into tenant-wide queries.
+      if (tableBranchId) {
+        createData.branchId = tableBranchId;
       }
 
       return this.prisma.order.create({
@@ -864,6 +915,11 @@ export class OrdersService {
     // This ensures KDS updates even when only discount/notes/customerName change
     this.kdsGateway.emitOrderUpdated(tenantId, updatedOrder);
 
+    // Mesh-side consumers (kds-routing, webhooks-outbound) see the change via
+    // the outbox. Distinct event type so consumers can opt into "any update"
+    // vs. "completion" vs. "cancellation" without parsing payload bodies.
+    this.emitOrderEvent('order.updated.v1', updatedOrder);
+
     return updatedOrder;
   }
 
@@ -1028,6 +1084,23 @@ export class OrdersService {
         });
       }
     }
+
+    // Outbox emit with the matching event type so kds-routing can clear the
+    // KDS screen on completion / cancellation. The mesh consumer subscribes
+    // to all three (created/updated/completed/cancelled) and dispatches a
+    // `clear_order` command on the terminal transitions.
+    // PAID and SERVED are the two "terminal" non-cancel statuses: PAID is
+    // cashier-side closure, SERVED is kitchen-side. Both translate to
+    // "completed" on the mesh because that's when the KDS clear_order
+    // command should fire.
+    const status = updateStatusDto.status as OrderStatus;
+    const eventType =
+      status === OrderStatus.PAID || status === OrderStatus.SERVED
+        ? 'order.completed.v1'
+        : status === OrderStatus.CANCELLED
+          ? 'order.cancelled.v1'
+          : 'order.updated.v1';
+    this.emitOrderEvent(eventType as any, updatedOrder);
 
     return updatedOrder;
   }

@@ -77,12 +77,17 @@ services:
     environment:
       NODE_ENV: staging
       PORT: 3002
+      # Staging-side mirror of the prod env. INTEGRATION_KEY and KMS keys
+      # come from .env.test; OTel collector left disabled by default.
+      INTEGRATION_KEY: ${INTEGRATION_KEY:-staging-only-do-not-use}
+      KMS_PROVIDER: ${KMS_PROVIDER:-env}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
     ports:
       - '3002:3002'
     volumes:
       - invoice_storage_staging:/app/storage
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:3002/api/health']
+      test: ['CMD', 'curl', '-f', 'http://localhost:3002/api/healthz/ready']
       interval: 30s
       timeout: 10s
       retries: 3

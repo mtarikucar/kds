@@ -590,6 +590,9 @@ export interface CreateStockMovementDto {
 export interface SalesReportDto {
   startDate: string;
   endDate: string;
+  // Restrict to a specific branch. Optional — omitting yields tenant-wide
+  // numbers (including pre-Phase-3 orders that have no branchId set).
+  branchId?: string;
 }
 
 export interface SalesReport {

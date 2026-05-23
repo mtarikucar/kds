@@ -15,6 +15,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { UserRole } from '../types';
+import SetupChecklist from '../features/onboarding/SetupChecklist';
 
 interface QuickAction {
   to: string;
@@ -108,6 +109,15 @@ const DashboardPage = () => {
 
   return (
     <div className="h-[calc(100vh-10rem)] flex flex-col" data-tour="dashboard-container">
+      {/* Setup checklist — only admins/managers, only when items remain. The
+          component renders nothing once every item is checked, so mature
+          tenants never see it. */}
+      {user?.role && [UserRole.ADMIN, UserRole.MANAGER].includes(user.role as UserRole) && (
+        <div className="mb-4 flex-shrink-0">
+          <SetupChecklist />
+        </div>
+      )}
+
       {/* POS Hero Card */}
       {primaryAction && (
         <Link

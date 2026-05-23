@@ -39,7 +39,12 @@ describe('SubscriptionService.startTrialFromIntent', () => {
     notifications = {
       sendTrialStarted: jest.fn().mockResolvedValue(undefined),
     } as any;
-    svc = new SubscriptionService(prisma as any, billing, notifications);
+    svc = new SubscriptionService(
+      prisma as any,
+      billing,
+      notifications,
+      { append: jest.fn().mockResolvedValue('outbox-id') } as any,
+    );
 
     // Sensible defaults — individual tests override.
     prisma.user.findUnique.mockResolvedValue({ emailVerified: true } as any);
@@ -304,7 +309,12 @@ describe('SubscriptionService.cancelSubscription', () => {
       sendSubscriptionCancelledImmediate: jest.fn().mockResolvedValue(undefined),
       sendSubscriptionWillCancel: jest.fn().mockResolvedValue(undefined),
     } as any;
-    svc = new SubscriptionService(prisma as any, billing, notifications);
+    svc = new SubscriptionService(
+      prisma as any,
+      billing,
+      notifications,
+      { append: jest.fn().mockResolvedValue('outbox-id') } as any,
+    );
 
     // getSubscriptionById uses findUnique({ id })
     prisma.subscription.findUnique.mockResolvedValue(activeSub);

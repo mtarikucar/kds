@@ -39,6 +39,22 @@ import { StockManagementModule } from './modules/stock-management/stock-manageme
 import { MarketingModule } from './modules/marketing/marketing.module';
 import { AccountingModule } from './modules/accounting/accounting.module';
 import { SmsSettingsModule } from './modules/sms-settings/sms-settings.module';
+import { EntitlementsModule } from './modules/entitlements/entitlements.module';
+import { OutboxModule } from './modules/outbox/outbox.module';
+import { MarketplaceModule } from './modules/marketplace/marketplace.module';
+import { DeviceMeshModule } from './modules/device-mesh/device-mesh.module';
+import { LocalBridgeModule } from './modules/local-bridge/local-bridge.module';
+import { KdsRoutingModule } from './modules/kds-routing/kds-routing.module';
+import { CatalogModule } from './modules/catalog/catalog.module';
+import { CheckoutModule } from './modules/checkout/checkout.module';
+import { PaymentsCoreModule } from './modules/payments-core/payments-core.module';
+import { FiscalCoreModule } from './modules/fiscal-core/fiscal-core.module';
+import { CallerModule } from './modules/caller/caller.module';
+import { FulfillmentModule } from './modules/fulfillment/fulfillment.module';
+import { IntegrationGatewayModule } from './modules/integration-gateway/integration-gateway.module';
+import { HealthDashboardModule } from './modules/health-dashboard/health-dashboard.module';
+import { WebhooksOutboundModule } from './modules/webhooks-outbound/webhooks-outbound.module';
+import { KmsModule } from './modules/kms/kms.module';
 import { RequestLoggerMiddleware } from './common/middleware/request-logger.middleware';
 
 @Module({
@@ -103,6 +119,36 @@ import { RequestLoggerMiddleware } from './common/middleware/request-logger.midd
     MarketingModule,
     SmsSettingsModule,
     AccountingModule,
+    // HummyTummy Phase 1: outbox must load before any feature module that
+    // wants to append events at bootstrap. Marked @Global so feature modules
+    // need not re-import it. Entitlements depends on Prisma only.
+    OutboxModule,
+    EntitlementsModule,
+    // HummyTummy Phase 2: add-on marketplace.
+    MarketplaceModule,
+    // HummyTummy Phase 3: branches + device mesh + local bridge.
+    LocalBridgeModule,
+    DeviceMeshModule,
+    // HummyTummy Phase 4: bridge Order events → KDS mesh commands.
+    KdsRoutingModule,
+    // HummyTummy Phase 5: hardware catalog + checkout (mixed cart).
+    CatalogModule,
+    CheckoutModule,
+    // HummyTummy Phase 6 & 7: payment + fiscal abstractions (vendor-neutral).
+    PaymentsCoreModule,
+    FiscalCoreModule,
+    // HummyTummy Phase 9: caller / phone-order ingest.
+    CallerModule,
+    // HummyTummy Phase 10: shipments, warranty, installation.
+    FulfillmentModule,
+    // HummyTummy Phase 11: unified integration gateway.
+    IntegrationGatewayModule,
+    // HummyTummy Phase 12: branch health-score dashboard.
+    HealthDashboardModule,
+    // Outbound webhook delivery to tenant endpoints.
+    WebhooksOutboundModule,
+    // KMS abstraction (env-derived today; AWS KMS stub for production).
+    KmsModule,
   ],
   controllers: [AppController],
   providers: [

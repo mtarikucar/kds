@@ -13,6 +13,8 @@ import { NotificationsService } from '../../notifications/notifications.service'
 import { NotificationType } from '../../notifications/dto/create-notification.dto';
 import { EmailService } from '../../../common/services/email.service';
 import { reserveSubdomain } from '../../../common/helpers/subdomain.helper';
+import { OutboxService } from '../../outbox/outbox.service';
+import { EventTypes } from '../../outbox/event-types';
 
 type PlanFeatureKey =
   | 'advancedReports'
@@ -59,6 +61,10 @@ export class SuperAdminTenantsService {
     private auditService: SuperAdminAuditService,
     private notificationsService: NotificationsService,
     private emailService: EmailService,
+    // OutboxModule is @Global, so no module import is needed. Override edits
+    // by super-admin are entitlement-shaping events: the projector reads the
+    // freshly written Tenant row and rebuilds grants.
+    private readonly outbox: OutboxService,
   ) {}
 
   async findAll(filters: TenantFilterDto) {
@@ -643,6 +649,18 @@ export class SuperAdminTenantsService {
       targetTenantName: tenant.name,
     });
 
+    // Signal the entitlement engine to reproject. The event payload is
+    // deliberately minimal — the projector re-reads the canonical state
+    // from Postgres, sidestepping any race between the event payload and
+    // the row it describes.
+    await this.outbox
+      .append({
+        type: EventTypes.TenantOverridesChanged,
+        tenantId,
+        payload: { tenantId },
+      })
+      .catch(() => undefined);
+
     return { featureOverrides: newFeatureOverrides, limitOverrides: newLimitOverrides };
   }
 
@@ -687,6 +705,14 @@ export class SuperAdminTenantsService {
       targetTenantId: tenantId,
       targetTenantName: tenant.name,
     });
+
+    await this.outbox
+      .append({
+        type: EventTypes.TenantOverridesChanged,
+        tenantId,
+        payload: { tenantId },
+      })
+      .catch(() => undefined);
 
     return { featureOverrides: null, limitOverrides: null };
   }

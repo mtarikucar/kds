@@ -96,6 +96,10 @@ import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
     SuperAdminAuthService,
     SuperAdminAuditService,
     SuperAdminUsersService,
+    // Exported so feature modules (marketplace, hardware catalog) can
+    // protect their super-admin controllers with the same guard, rather
+    // than each one redefining its own. The guard is stateless.
+    SuperAdminGuard,
   ],
 })
 export class SuperAdminModule {}
