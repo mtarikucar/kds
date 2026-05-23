@@ -54,8 +54,10 @@ export class WarrantyService {
     warrantyId: string,
     input: { issue: string; severity?: 'low' | 'medium' | 'high'; description?: string },
   ) {
-    const row = await this.prisma.warranty.findUnique({ where: { id: warrantyId } });
-    if (!row || row.tenantId !== tenantId) throw new NotFoundException('Warranty not found');
+    const row = await this.prisma.warranty.findFirst({
+      where: { id: warrantyId, tenantId },
+    });
+    if (!row) throw new NotFoundException('Warranty not found');
     if (row.status !== 'active') throw new BadRequestException(`Warranty status=${row.status}`);
 
     const claim = {

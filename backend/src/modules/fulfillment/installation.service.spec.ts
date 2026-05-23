@@ -19,20 +19,21 @@ describe('InstallationService', () => {
   });
 
   it('schedule rejects unknown ids and tenant mismatches', async () => {
-    prisma.installationRequest.findUnique.mockResolvedValue(null);
+    // After iter-37 the service uses findFirst({where:{id, tenantId}}),
+    // so both the "unknown id" and "wrong tenant" cases collapse to
+    // findFirst returning null at the DB layer.
+    prisma.installationRequest.findFirst.mockResolvedValue(null);
     await expect(svc.schedule('t1', 'nope', new Date())).rejects.toThrow(/not found/i);
-
-    prisma.installationRequest.findUnique.mockResolvedValue({ id: 'i-1', tenantId: 't-other', status: 'requested' } as any);
     await expect(svc.schedule('t1', 'i-1', new Date())).rejects.toThrow(/not found/i);
   });
 
   it('schedule rejects from terminal statuses', async () => {
-    prisma.installationRequest.findUnique.mockResolvedValue({ id: 'i-1', tenantId: 't1', status: 'done' } as any);
+    prisma.installationRequest.findFirst.mockResolvedValue({ id: 'i-1', tenantId: 't1', status: 'done' } as any);
     await expect(svc.schedule('t1', 'i-1', new Date())).rejects.toThrow(/status=done/);
   });
 
   it('complete sets completedAt and emits installation.completed.v1', async () => {
-    prisma.installationRequest.findUnique.mockResolvedValue({ id: 'i-1', tenantId: 't1', status: 'in_progress', notes: '' } as any);
+    prisma.installationRequest.findFirst.mockResolvedValue({ id: 'i-1', tenantId: 't1', status: 'in_progress', notes: '' } as any);
     let captured: any = null;
     (prisma.installationRequest.updateMany as any).mockImplementation(async ({ data }: any) => {
       captured = data;
@@ -52,9 +53,10 @@ describe('InstallationService', () => {
   });
 
   it('complete is idempotent — re-completing a done row is rejected', async () => {
-    // findUnique still finds it but the updateMany compound WHERE
-    // excludes status=done so claim.count is 0 and we throw.
-    prisma.installationRequest.findUnique.mockResolvedValue({ id: 'i-1', tenantId: 't1', status: 'done', notes: '' } as any);
+    // findFirst still finds it (tenant matches) but the updateMany
+    // compound WHERE excludes status=done so claim.count is 0 and we
+    // throw.
+    prisma.installationRequest.findFirst.mockResolvedValue({ id: 'i-1', tenantId: 't1', status: 'done', notes: '' } as any);
     (prisma.installationRequest.updateMany as any).mockResolvedValue({ count: 0 });
     await expect(svc.complete('t1', 'i-1')).rejects.toThrow(/Cannot complete from status=done/);
   });

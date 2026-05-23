@@ -44,8 +44,10 @@ export class InstallationService {
   }
 
   async schedule(tenantId: string, requestId: string, scheduledFor: Date, assignedTo?: string) {
-    const row = await this.prisma.installationRequest.findUnique({ where: { id: requestId } });
-    if (!row || row.tenantId !== tenantId) throw new NotFoundException('Installation request not found');
+    const row = await this.prisma.installationRequest.findFirst({
+      where: { id: requestId, tenantId },
+    });
+    if (!row) throw new NotFoundException('Installation request not found');
     if (!['requested', 'scheduled'].includes(row.status)) {
       throw new BadRequestException(`Cannot schedule from status=${row.status}`);
     }
@@ -78,8 +80,10 @@ export class InstallationService {
   }
 
   async complete(tenantId: string, requestId: string, notes?: string) {
-    const row = await this.prisma.installationRequest.findUnique({ where: { id: requestId } });
-    if (!row || row.tenantId !== tenantId) throw new NotFoundException('Installation request not found');
+    const row = await this.prisma.installationRequest.findFirst({
+      where: { id: requestId, tenantId },
+    });
+    if (!row) throw new NotFoundException('Installation request not found');
     // Block re-completion (idempotency) and cross-tenant writes in one
     // compound WHERE. status:not_in for terminal states is the canonical
     // re-completion guard; without it a second complete() call would

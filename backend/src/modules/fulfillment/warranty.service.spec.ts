@@ -30,18 +30,21 @@ describe('WarrantyService', () => {
     );
   });
 
-  it('rejects claims against a warranty in another tenant', async () => {
-    prisma.warranty.findUnique.mockResolvedValue({ id: 'w-1', tenantId: 't-other', status: 'active' } as any);
+  it('rejects claims against a warranty in another tenant (compound WHERE returns null)', async () => {
+    // After iter-37 the service uses findFirst({where:{id, tenantId}}),
+    // so a cross-tenant request never gets a row back. (Previously this
+    // mocked findUnique returning a foreign-tenant row.)
+    prisma.warranty.findFirst.mockResolvedValue(null);
     await expect(svc.fileClaim('t1', 'w-1', { issue: 'broken' })).rejects.toThrow(/not found/i);
   });
 
   it('rejects claims against expired warranties', async () => {
-    prisma.warranty.findUnique.mockResolvedValue({ id: 'w-1', tenantId: 't1', status: 'expired' } as any);
+    prisma.warranty.findFirst.mockResolvedValue({ id: 'w-1', tenantId: 't1', status: 'expired' } as any);
     await expect(svc.fileClaim('t1', 'w-1', { issue: 'broken' })).rejects.toThrow(/status=expired/);
   });
 
   it('files a claim and emits an event', async () => {
-    prisma.warranty.findUnique.mockResolvedValue({ id: 'w-1', tenantId: 't1', status: 'active' } as any);
+    prisma.warranty.findFirst.mockResolvedValue({ id: 'w-1', tenantId: 't1', status: 'active' } as any);
     (prisma.warranty.update as any).mockResolvedValue({ id: 'w-1', claims: [{}] });
     await svc.fileClaim('t1', 'w-1', { issue: 'screen flickers', severity: 'high', description: 'after 6 months' });
     expect(outbox.append).toHaveBeenCalledWith(
