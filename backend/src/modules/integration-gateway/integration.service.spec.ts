@@ -43,3 +43,109 @@ describe('IntegrationService crypto', () => {
     expect(() => svc.decrypt('tenant-1', enc)).toThrow();
   });
 });
+
+/**
+ * Storage-DoS guards added in iter-16. The /v1/integrations/webhooks/*
+ * route is PUBLIC — anyone can POST a payload — so the service must
+ * reject (or silently drop) requests against unknown tenants, unknown
+ * providers, or oversized bodies before writing a row to
+ * IntegrationWebhookEvent. Without these guards a spammer hitting
+ * random UUIDs against the public URL could fill disk on the JSONB
+ * payload column.
+ *
+ * The "drop silently with 200" semantics are deliberate: a real
+ * provider on a typo'd URL would otherwise retry forever, but we don't
+ * want to enable enumeration of which tenants exist — so the success
+ * envelope contains an `ignored: true` flag visible only to internal
+ * callers (this test), and ops sees the actual reason via the logger.
+ */
+describe('IntegrationService.ingestWebhook (iter-16 storage-DoS guards)', () => {
+  let prisma: MockPrismaClient;
+  let outbox: { append: jest.Mock };
+  let svc: IntegrationService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    outbox = { append: jest.fn().mockResolvedValue('outbox') };
+    svc = new IntegrationService(prisma as any, outbox as any);
+    process.env.INTEGRATION_KEY = 'test-key-1234';
+  });
+
+  it('drops the webhook when tenantId is missing entirely', async () => {
+    const out = await svc.ingestWebhook('yemeksepeti', null, {}, Buffer.from('{}'));
+
+    expect(out).toEqual({ ignored: true, reason: 'missing tenant' });
+    // No DB writes. The load-bearing assertion — a row created here is
+    // the storage-flood hole this iter-16 fix closed.
+    expect((prisma.integrationWebhookEvent.create as any).mock.calls.length).toBe(0);
+    expect(outbox.append).not.toHaveBeenCalled();
+  });
+
+  it('drops the webhook when the tenant does not exist', async () => {
+    prisma.tenant.findUnique.mockResolvedValue(null);
+    prisma.integrationProviderDef.findUnique.mockResolvedValue({ id: 'yemeksepeti' } as any);
+
+    const out = await svc.ingestWebhook('yemeksepeti', 'bogus-tenant', {}, Buffer.from('{}'));
+
+    expect(out).toEqual({ ignored: true, reason: 'unknown tenant' });
+    expect((prisma.integrationWebhookEvent.create as any).mock.calls.length).toBe(0);
+  });
+
+  it('drops the webhook when the provider does not exist', async () => {
+    prisma.tenant.findUnique.mockResolvedValue({ id: 't1' } as any);
+    prisma.integrationProviderDef.findUnique.mockResolvedValue(null);
+
+    const out = await svc.ingestWebhook('bogus-provider', 't1', {}, Buffer.from('{}'));
+
+    expect(out).toEqual({ ignored: true, reason: 'unknown provider' });
+    expect((prisma.integrationWebhookEvent.create as any).mock.calls.length).toBe(0);
+  });
+
+  it('rejects oversized bodies before JSON.parse (CPU + storage DoS guard)', async () => {
+    prisma.tenant.findUnique.mockResolvedValue({ id: 't1' } as any);
+    prisma.integrationProviderDef.findUnique.mockResolvedValue({ id: 'yemeksepeti' } as any);
+    // 64KB cap + 1 byte → over the limit.
+    const oversized = Buffer.alloc(64 * 1024 + 1, 0x7b);
+
+    const out = await svc.ingestWebhook('yemeksepeti', 't1', {}, oversized);
+
+    expect(out).toEqual({ ignored: true, reason: 'payload too large' });
+    // Crucially the body never gets JSON.parsed — pulling a 100MB
+    // alleged-JSON apart only to drop the row would still be a CPU DoS.
+    // We can't directly assert "JSON.parse was not called" without spying
+    // on a global, but the create-call check covers the observable
+    // outcome.
+    expect((prisma.integrationWebhookEvent.create as any).mock.calls.length).toBe(0);
+  });
+
+  it('writes the row and appends to outbox on the happy path', async () => {
+    prisma.tenant.findUnique.mockResolvedValue({ id: 't1' } as any);
+    prisma.integrationProviderDef.findUnique.mockResolvedValue({ id: 'yemeksepeti' } as any);
+    let createArgs: any = null;
+    (prisma.integrationWebhookEvent.create as any).mockImplementation(async ({ data }: any) => {
+      createArgs = data;
+      return { id: 'wh-1', ...data };
+    });
+
+    const out: any = await svc.ingestWebhook(
+      'yemeksepeti',
+      't1',
+      { 'x-signature': 'sig-value' },
+      Buffer.from('{"type":"order.created"}'),
+    );
+
+    // id is a server-side UUIDv7 (the `wh-1` in the mock gets overwritten
+    // by the spread). The actual debugging hook is the createArgs shape.
+    expect(out.id).toMatch(/^[0-9a-f-]{36}$/);
+    expect(createArgs.tenantId).toBe('t1');
+    expect(createArgs.providerId).toBe('yemeksepeti');
+    expect(createArgs.type).toBe('order.created');
+    expect(createArgs.signature).toBe('sig-value');
+    expect(outbox.append).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'integration.webhook.yemeksepeti.received.v1',
+        tenantId: 't1',
+      }),
+    );
+  });
+});
