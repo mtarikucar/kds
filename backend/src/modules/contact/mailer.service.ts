@@ -3,6 +3,7 @@ import * as nodemailer from 'nodemailer';
 import * as handlebars from 'handlebars';
 import * as fs from 'fs';
 import * as path from 'path';
+import { maskEmail } from '../../common/helpers/pii-mask.helper';
 
 @Injectable()
 export class MailerService {
@@ -96,7 +97,7 @@ export class MailerService {
       };
 
       await this.transporter.sendMail(mailOptions);
-      this.logger.log(`Admin notification sent for contact form from ${data.email}`);
+      this.logger.log(`Admin notification sent for contact form from ${maskEmail(data.email)}`);
       return true;
     } catch (error) {
       this.logger.error('Failed to send admin notification', error);
@@ -125,10 +126,10 @@ export class MailerService {
       };
 
       await this.transporter.sendMail(mailOptions);
-      this.logger.log(`Confirmation email sent to ${data.email}`);
+      this.logger.log(`Confirmation email sent to ${maskEmail(data.email)}`);
       return true;
     } catch (error) {
-      this.logger.error(`Failed to send user confirmation to ${data.email}`, error);
+      this.logger.error(`Failed to send user confirmation to ${maskEmail(data.email)}`, error as any);
       return false;
     }
   }

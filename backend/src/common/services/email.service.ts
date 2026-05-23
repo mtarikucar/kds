@@ -5,6 +5,7 @@ import { Transporter } from 'nodemailer';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as Handlebars from 'handlebars';
+import { maskEmail } from '../helpers/pii-mask.helper';
 
 // Register Handlebars helpers
 Handlebars.registerHelper('currentYear', () => new Date().getFullYear());
@@ -90,10 +91,13 @@ export class EmailService {
         html,
       });
 
-      this.logger.log(`Email sent successfully to ${to}. Message ID: ${info.messageId}`);
+      // PII: mask recipient in the structured log stream — message id is
+      // the actual debugging hook, not the full address (see iter-30
+      // commit message + pii-mask.helper.ts for context).
+      this.logger.log(`Email sent successfully to ${maskEmail(to)}. Message ID: ${info.messageId}`);
       return true;
     } catch (error) {
-      this.logger.error(`Failed to send email to ${options.to}:`, error);
+      this.logger.error(`Failed to send email to ${maskEmail(options.to)}`, error as any);
       return false;
     }
   }

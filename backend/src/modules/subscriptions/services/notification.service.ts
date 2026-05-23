@@ -5,6 +5,7 @@ import { Transporter } from "nodemailer";
 import * as handlebars from "handlebars";
 import * as fs from "fs";
 import * as path from "path";
+import { maskEmail } from "../../../common/helpers/pii-mask.helper";
 
 export interface EmailOptions {
   to: string;
@@ -79,7 +80,7 @@ export class NotificationService {
         html,
       });
 
-      this.logger.log(`Email sent to ${options.to}: ${options.subject}`);
+      this.logger.log(`Email sent to ${maskEmail(options.to)}: ${options.subject}`);
       return true;
     } catch (error) {
       this.logger.error(`Failed to send email: ${error.message}`);
