@@ -25,7 +25,7 @@ pub struct PendingCommand {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandOutcome {
-    pub status: String,             // "done" | "failed"
+    pub status: String, // "done" | "failed"
     pub result: serde_json::Value,
     pub error: Option<String>,
 }

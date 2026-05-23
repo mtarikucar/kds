@@ -6,7 +6,10 @@
 //! but resilient against captive portals or weird LAN proxies that drop
 //! upgrade headers.
 
-use crate::{command_queue::{CommandOutcome, CommandQueue, PendingCommand}, config::BridgeConfig};
+use crate::{
+    command_queue::{CommandOutcome, CommandQueue, PendingCommand},
+    config::BridgeConfig,
+};
 use anyhow::Result;
 use std::sync::Arc;
 use tracing::warn;
@@ -30,7 +33,9 @@ impl CloudClient {
             .connect_timeout(std::time::Duration::from_secs(10))
             .build()
             .expect("reqwest client build");
-        Self { inner: Arc::new(Inner { cfg, http }) }
+        Self {
+            inner: Arc::new(Inner { cfg, http }),
+        }
     }
 
     /// Quick GET to confirm the cloud is reachable. Used at boot so the agent

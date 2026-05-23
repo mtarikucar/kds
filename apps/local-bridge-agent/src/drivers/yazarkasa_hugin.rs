@@ -5,7 +5,10 @@
 //! crate stubs the interface so the rest of the agent can be built and
 //! tested without the proprietary spec.
 
-use crate::{command_queue::{CommandOutcome, PendingCommand}, drivers::LocalDriver};
+use crate::{
+    command_queue::{CommandOutcome, PendingCommand},
+    drivers::LocalDriver,
+};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::json;

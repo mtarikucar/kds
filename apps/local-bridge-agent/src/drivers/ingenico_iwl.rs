@@ -4,7 +4,10 @@
 //! deployments will use BKM Express or the bank's white-labelled SDK.
 //! Stubbed here so the agent compiles standalone.
 
-use crate::{command_queue::{CommandOutcome, PendingCommand}, drivers::LocalDriver};
+use crate::{
+    command_queue::{CommandOutcome, PendingCommand},
+    drivers::LocalDriver,
+};
 use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::json;

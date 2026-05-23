@@ -10,7 +10,10 @@
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
-use std::{env, path::{Path, PathBuf}};
+use std::{
+    env,
+    path::{Path, PathBuf},
+};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct BridgeConfig {
@@ -28,7 +31,7 @@ pub struct BridgeConfig {
 pub fn load(config_dir: Option<&str>) -> Result<BridgeConfig> {
     let cfg_dir = config_dir
         .map(PathBuf::from)
-        .or_else(|| dirs_config_dir())
+        .or_else(dirs_config_dir)
         .context("unable to determine config dir")?;
     let cfg_path = cfg_dir.join("bridge.toml");
     let s = std::fs::read_to_string(&cfg_path)

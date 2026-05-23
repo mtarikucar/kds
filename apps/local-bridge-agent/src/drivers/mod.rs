@@ -11,8 +11,8 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 
 pub mod escpos;
-pub mod yazarkasa_hugin;
 pub mod ingenico_iwl;
+pub mod yazarkasa_hugin;
 
 #[async_trait]
 pub trait LocalDriver: Send + Sync {
@@ -61,7 +61,11 @@ impl Registry {
             .unwrap_or("");
         match self.drivers.get(target) {
             Some(driver) => driver.execute(cmd).await,
-            None => anyhow::bail!("no driver installed for target='{}' (kind={})", target, cmd.kind),
+            None => anyhow::bail!(
+                "no driver installed for target='{}' (kind={})",
+                target,
+                cmd.kind
+            ),
         }
     }
 }

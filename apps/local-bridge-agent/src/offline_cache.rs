@@ -9,6 +9,12 @@ use rusqlite::Connection;
 use std::path::Path;
 
 pub struct OfflineCache {
+    // Held but not yet read — the bridge currently only creates the schema
+    // at startup (in `open` below). Readers + writers land alongside the
+    // first feature that needs the cache (Phase 6 — offline order replay).
+    // Until then we keep the connection alive so the file handle outlives
+    // this struct's caller and SQLite WAL flushes happen on Drop.
+    #[allow(dead_code)]
     conn: std::sync::Mutex<Connection>,
 }
 
@@ -22,6 +28,8 @@ impl OfflineCache {
                 updated_at INTEGER NOT NULL
             );",
         )?;
-        Ok(Self { conn: std::sync::Mutex::new(conn) })
+        Ok(Self {
+            conn: std::sync::Mutex::new(conn),
+        })
     }
 }

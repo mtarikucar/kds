@@ -28,11 +28,18 @@ async fn push_pop_marks_done() {
     assert_eq!(popped.id, "c-1");
     q.mark_done(
         &popped.id,
-        &CommandOutcome { status: "done".into(), result: json!({}), error: None },
+        &CommandOutcome {
+            status: "done".into(),
+            result: json!({}),
+            error: None,
+        },
     )
     .await
     .unwrap();
-    assert!(q.pop_next().await.unwrap().is_none(), "queue should be empty");
+    assert!(
+        q.pop_next().await.unwrap().is_none(),
+        "queue should be empty"
+    );
 }
 
 #[tokio::test]
@@ -55,7 +62,7 @@ async fn push_is_idempotent_on_id() {
     let q = CommandQueue::open(dir.path().join("q.db")).unwrap();
     let c = make_cmd("dup-id", 0);
     q.push(&c).await.unwrap();
-    q.push(&c).await.unwrap();   // second push silently ignored
+    q.push(&c).await.unwrap(); // second push silently ignored
 
     let first = q.pop_next().await.unwrap().expect("first");
     assert_eq!(first.id, "dup-id");

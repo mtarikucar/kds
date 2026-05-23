@@ -37,7 +37,9 @@ struct Cli {
 async fn main() -> Result<()> {
     // Structured JSON logs to stderr by default; honor RUST_LOG.
     tracing_subscriber::fmt()
-        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
         .with_writer(std::io::stderr)
         .json()
         .init();
@@ -53,7 +55,7 @@ async fn main() -> Result<()> {
     // The command queue is the single source of truth for "what does this
     // bridge owe?". It outlives the cloud connection, so the agent keeps
     // working through transient internet outages.
-    let queue = command_queue::CommandQueue::open(&cfg.data_dir.join("command_queue.db"))?;
+    let queue = command_queue::CommandQueue::open(cfg.data_dir.join("command_queue.db"))?;
 
     // The drivers registry resolves device kinds → executors at runtime.
     // A driver that fails to initialise (e.g. printer not yet wired) is
@@ -70,8 +72,11 @@ async fn main() -> Result<()> {
         warn!(error = %e, "cloud warm-up failed — agent continues in offline mode");
     }
 
-    // Spawn telemetry heartbeat in the background.
-    let heartbeat_handle = telemetry::spawn_heartbeat(cloud.clone());
+    // Spawn telemetry heartbeat in the background. Handle is intentionally
+    // detached — the task runs for the lifetime of the agent and is torn
+    // down on process exit. Prefixed `_` so clippy doesn't flag it under
+    // -D warnings.
+    let _heartbeat_handle = telemetry::spawn_heartbeat(cloud.clone());
 
     // Main loop: pull next queued command, dispatch, ack.
     loop {
@@ -96,10 +101,10 @@ async fn main() -> Result<()> {
         tokio::task::yield_now().await;
     }
 
-    // (heartbeat_handle drops with the process; the OS reclaims it.)
+    // (_heartbeat_handle drops with the process; the OS reclaims it.)
     #[allow(unreachable_code)]
     {
-        drop(heartbeat_handle);
+        drop(_heartbeat_handle);
         Ok(())
     }
 }
