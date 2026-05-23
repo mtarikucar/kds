@@ -901,7 +901,11 @@ export class PaymentsService {
     if (claim.count === 0) {
       throw new NotFoundException(`Payment with ID ${id} not found`);
     }
-    return this.prisma.payment.findUniqueOrThrow({ where: { id } });
+    // Defence-in-depth — the compound updateMany above proved tenant
+    // ownership; keep the same compound WHERE on the post-write read so
+    // a future reorder of these steps can't regress into a cross-tenant
+    // leak (same pattern as the inner-tx writes at L894 above).
+    return this.prisma.payment.findFirstOrThrow({ where: { id, tenantId } });
   }
 
   // ========================================

@@ -70,7 +70,11 @@ export class CategoriesService {
     if (claim.count === 0) {
       throw new ConflictException('Category not found');
     }
-    return this.prisma.category.findUnique({ where: { id } });
+    // Defence-in-depth — the updateMany above proved tenant ownership,
+    // but a refactor that reorders steps would see an id-only read and
+    // miss the constraint. Same pattern iter-9 closed across tables/
+    // suppliers/stock-categories.
+    return this.prisma.category.findFirstOrThrow({ where: { id, tenantId } });
   }
 
   async remove(id: string, tenantId: string) {
