@@ -1,9 +1,11 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UpdatePosSettingsDto } from './dto/update-pos-settings.dto';
 
 @Injectable()
 export class PosSettingsService {
+  private readonly logger = new Logger(PosSettingsService.name);
+
   constructor(private prisma: PrismaService) {}
 
   async findByTenant(tenantId: string) {
@@ -82,10 +84,8 @@ export class PosSettingsService {
         // Visible signal so an admin can see how many customers
         // were mid-flow when the toggle went off — needed for any
         // dispute / refund follow-up.
-        // eslint-disable-next-line no-console
-        console.warn(
-          `[pos-settings] Disabled self-pay for tenant ${tenantId}; ` +
-            `cancelled ${cancelled.count} PENDING intent(s).`,
+        this.logger.warn(
+          `Disabled self-pay for tenant ${tenantId}; cancelled ${cancelled.count} PENDING intent(s).`,
         );
       }
     }

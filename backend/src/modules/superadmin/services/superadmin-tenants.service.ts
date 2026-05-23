@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import {
@@ -56,6 +56,8 @@ const LIMIT_KEYS: readonly PlanLimitKey[] = [
 
 @Injectable()
 export class SuperAdminTenantsService {
+  private readonly logger = new Logger(SuperAdminTenantsService.name);
+
   constructor(
     private prisma: PrismaService,
     private auditService: SuperAdminAuditService,
@@ -311,7 +313,7 @@ export class SuperAdminTenantsService {
     if (previousStatus !== updateDto.status) {
       await this.notifyTenantStatusChange(id, tenant.name, updateDto).catch(
         (err) => {
-          console.error('Failed to notify tenant of status change:', err);
+          this.logger.error('Failed to notify tenant of status change', err as any);
         },
       );
     }
@@ -355,10 +357,10 @@ export class SuperAdminTenantsService {
             tenantId,
             data: { action: 'TENANT_STATUS_CHANGE', status: updateDto.status },
           })
-          .catch((err) => console.error('notifyAdmins failed:', err)),
+          .catch((err) => this.logger.error('notifyAdmins failed', err as any)),
         this.emailService
           .sendPlainEmail(admin.email, title, message)
-          .catch((err) => console.error('sendPlainEmail failed:', err)),
+          .catch((err) => this.logger.error('sendPlainEmail failed', err as any)),
       ]),
     );
   }

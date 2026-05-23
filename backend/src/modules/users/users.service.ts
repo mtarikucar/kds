@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ConflictException,
   BadRequestException,
@@ -47,6 +48,8 @@ export interface UserListFilters {
 
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
@@ -490,7 +493,7 @@ export class UsersService {
     try {
       await this.authService.sendEmailVerification(userId);
     } catch (error) {
-      console.error('Failed to send verification email after email update:', error);
+      this.logger.error('Failed to send verification email after email update', error as any);
     }
 
     return updatedUser;

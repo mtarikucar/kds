@@ -1,4 +1,4 @@
-import { Injectable, Optional, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, Logger, Optional, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { AccountingSettingsService } from './accounting-settings.service';
@@ -10,6 +10,8 @@ import { paginated } from '../../../common/pagination';
 
 @Injectable()
 export class SalesInvoiceService {
+  private readonly logger = new Logger(SalesInvoiceService.name);
+
   constructor(
     private prisma: PrismaService,
     private settingsService: AccountingSettingsService,
@@ -146,7 +148,7 @@ export class SalesInvoiceService {
       const accSettings = await this.settingsService.findByTenant(tenantId);
       if (accSettings.autoSync && accSettings.provider !== 'NONE') {
         this.syncService.syncInvoice(invoice.id, tenantId).catch((err) => {
-          console.error('Auto-sync failed:', err.message);
+          this.logger.error(`Auto-sync failed: ${err.message}`);
         });
       }
     }
@@ -277,7 +279,7 @@ export class SalesInvoiceService {
         const accSettings = await this.settingsService.findByTenant(tenantId);
         if (accSettings.autoSync && accSettings.provider !== 'NONE') {
           this.syncService.syncInvoice(invoice.id, tenantId).catch((err) => {
-            console.error('Auto-sync failed:', err.message);
+            this.logger.error(`Auto-sync failed: ${err.message}`);
           });
         }
       }

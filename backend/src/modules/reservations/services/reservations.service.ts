@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { NotificationsService } from '../../notifications/notifications.service';
@@ -12,6 +12,9 @@ import { ReservationNotificationService } from './reservation-notification.servi
 
 @Injectable()
 export class ReservationsService {
+  // Structured-logger consistency (see iter-25 commit message for context).
+  private readonly logger = new Logger(ReservationsService.name);
+
   constructor(
     private prisma: PrismaService,
     private notificationsService: NotificationsService,
@@ -298,7 +301,7 @@ export class ReservationsService {
         data: { reservationId: reservation.id, type: 'new_reservation' },
       });
     } catch (e) {
-      console.error('Failed to send reservation notification:', e.message);
+      this.logger.error(`Failed to send reservation notification: ${e.message}`);
     }
 
     // Notify customer. Channel chosen at call time: email if the
@@ -469,7 +472,7 @@ export class ReservationsService {
         data: { reservationId: reservation.id, type: 'reservation_confirmed' },
       });
     } catch (e) {
-      console.error('Failed to send confirmation notification:', e.message);
+      this.logger.error(`Failed to send confirmation notification: ${e.message}`);
     }
 
     // Notify customer (email-first, SMS-fallback).
@@ -516,7 +519,7 @@ export class ReservationsService {
         data: { reservationId: reservation.id, type: 'reservation_rejected' },
       });
     } catch (e) {
-      console.error('Failed to send rejection notification:', e.message);
+      this.logger.error(`Failed to send rejection notification: ${e.message}`);
     }
 
     // Notify customer (email-first, SMS-fallback). reservationNumber
@@ -753,7 +756,7 @@ export class ReservationsService {
         data: { reservationId: reservation.id, type: 'reservation_cancelled' },
       });
     } catch (e) {
-      console.error('Failed to send cancellation notification:', e.message);
+      this.logger.error(`Failed to send cancellation notification: ${e.message}`);
     }
 
     // Notify customer (email-first, SMS-fallback).

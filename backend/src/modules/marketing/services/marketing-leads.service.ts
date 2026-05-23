@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   BadRequestException,
   ConflictException,
   ForbiddenException,
@@ -50,6 +51,8 @@ const DEFAULT_SIGNUP_COMMISSION_RATE = 0.1;
 
 @Injectable()
 export class MarketingLeadsService {
+  private readonly logger = new Logger(MarketingLeadsService.name);
+
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
@@ -873,8 +876,7 @@ export class MarketingLeadsService {
       });
     } catch (err) {
       // Log only; do not fail the response.
-      // eslint-disable-next-line no-console
-      console.error('Failed to send welcome email after lead conversion:', err);
+      this.logger.error('Failed to send welcome email after lead conversion', err as any);
     }
 
     return result;
