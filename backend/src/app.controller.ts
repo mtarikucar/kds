@@ -79,7 +79,18 @@ export class AppController {
 
     if (this.kms) {
       try {
-        checks.kms = await this.kms.healthCheck();
+        // Bound the probe — a network KMS that's hung would otherwise
+        // stall the readiness response past the kubelet's timeoutSeconds
+        // and cascade pod-not-ready → load-balancer drain → restart.
+        // Same pattern AppService.getHealth uses for DB + Redis.
+        let t: NodeJS.Timeout;
+        const probe = Promise.race([
+          this.kms.healthCheck(),
+          new Promise<{ ok: false; details: any }>((_, reject) => {
+            t = setTimeout(() => reject(new Error('kms timeout after 2000ms')), 2000);
+          }),
+        ]).finally(() => clearTimeout(t!));
+        checks.kms = await probe;
       } catch (e) {
         checks.kms = { ok: false, details: { error: (e as Error).message } };
       }

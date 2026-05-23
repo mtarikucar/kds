@@ -100,12 +100,52 @@ export class IntegrationService {
 
   // -- Webhook ingestion -------------------------------------------------
 
+  // Cap on stored webhook payload bytes. Real provider webhooks are
+  // generally <10kB; bigger requests are either misconfigured or hostile.
+  // Storing the full body in JSONB unbounded is a storage-flood vector
+  // against the public /v1/integrations/webhooks/* route.
+  private static readonly WEBHOOK_MAX_BYTES = 64 * 1024;
+
   async ingestWebhook(
     providerId: string,
     tenantId: string | null,
     headers: Record<string, string | string[] | undefined>,
     raw: Buffer,
   ) {
+    // Storage-DoS guard. The public route accepts any (providerId, tenantId)
+    // from the URL and previously wrote unconditionally — a spammer could
+    // pour rows into integration_webhook_events for non-existent tenants /
+    // providers. Validate both exist first; on miss we still return a 200
+    // (no NotFoundException) so the caller — likely the real provider on
+    // a typo'd URL — doesn't see a hint that other paths return 200, and
+    // PayTR-style infinite-retry providers don't hammer us indefinitely.
+    // Internal observability via the logger gets the operator's attention.
+    if (!tenantId) {
+      this.logger.warn(`Dropping webhook with empty tenantId (provider=${providerId})`);
+      return { ignored: true, reason: 'missing tenant' };
+    }
+    const [tenant, provider] = await Promise.all([
+      this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true } }),
+      this.prisma.integrationProviderDef.findUnique({ where: { id: providerId }, select: { id: true } }),
+    ]);
+    if (!tenant) {
+      this.logger.warn(`Dropping webhook for unknown tenantId=${tenantId} (provider=${providerId})`);
+      return { ignored: true, reason: 'unknown tenant' };
+    }
+    if (!provider) {
+      this.logger.warn(`Dropping webhook for unknown providerId=${providerId} (tenant=${tenantId})`);
+      return { ignored: true, reason: 'unknown provider' };
+    }
+
+    // Bound the body BEFORE JSON.parse so a 100MB blob doesn't burn CPU
+    // building a giant object only to be rejected after.
+    if (raw.length > IntegrationService.WEBHOOK_MAX_BYTES) {
+      this.logger.warn(
+        `Dropping oversized webhook body (provider=${providerId} tenant=${tenantId} bytes=${raw.length})`,
+      );
+      return { ignored: true, reason: 'payload too large' };
+    }
+
     const signature = String(headers['x-signature'] ?? headers['x-hub-signature-256'] ?? headers['stripe-signature'] ?? '').slice(0, 200);
     let parsed: any = {};
     try {
