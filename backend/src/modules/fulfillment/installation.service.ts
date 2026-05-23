@@ -49,10 +49,24 @@ export class InstallationService {
     if (!['requested', 'scheduled'].includes(row.status)) {
       throw new BadRequestException(`Cannot schedule from status=${row.status}`);
     }
-    const updated = await this.prisma.installationRequest.update({
-      where: { id: requestId },
+    // Atomic claim on (tenantId, status). Two parallel schedule() calls
+    // both pass the findUnique + status check, then race on the write;
+    // without this WHERE the second call silently overwrites the first
+    // call's scheduledFor + assignedTo. updateMany with the status set
+    // gate means only one wins; the loser surfaces as a conflict the
+    // operator can retry.
+    const claim = await this.prisma.installationRequest.updateMany({
+      where: {
+        id: requestId,
+        tenantId,
+        status: { in: ['requested', 'scheduled'] },
+      },
       data: { status: 'scheduled', scheduledFor, assignedTo },
     });
+    if (claim.count === 0) {
+      throw new BadRequestException('Installation request status changed concurrently — refresh and retry.');
+    }
+    const updated = await this.prisma.installationRequest.findUniqueOrThrow({ where: { id: requestId } });
     await this.outbox
       .append({
         type: 'installation.scheduled.v1',
@@ -66,10 +80,22 @@ export class InstallationService {
   async complete(tenantId: string, requestId: string, notes?: string) {
     const row = await this.prisma.installationRequest.findUnique({ where: { id: requestId } });
     if (!row || row.tenantId !== tenantId) throw new NotFoundException('Installation request not found');
-    const updated = await this.prisma.installationRequest.update({
-      where: { id: requestId },
+    // Block re-completion (idempotency) and cross-tenant writes in one
+    // compound WHERE. status:not_in for terminal states is the canonical
+    // re-completion guard; without it a second complete() call would
+    // overwrite completedAt with a later timestamp.
+    const claim = await this.prisma.installationRequest.updateMany({
+      where: {
+        id: requestId,
+        tenantId,
+        status: { notIn: ['done', 'cancelled'] },
+      },
       data: { status: 'done', completedAt: new Date(), notes: notes ?? row.notes },
     });
+    if (claim.count === 0) {
+      throw new BadRequestException(`Cannot complete from status=${row.status}`);
+    }
+    const updated = await this.prisma.installationRequest.findUniqueOrThrow({ where: { id: requestId } });
     await this.outbox
       .append({
         type: 'installation.completed.v1',

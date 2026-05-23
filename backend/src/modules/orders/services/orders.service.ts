@@ -1519,10 +1519,13 @@ export class OrdersService {
 
     // Perform the transfer in a transaction
     const result = await this.prisma.$transaction(async (tx) => {
-      // Update all active orders to the new table
+      // Compound WHERE on tenantId — defence-in-depth so a regression
+      // in the pre-validation above can't be amplified by an
+      // unconditional updateMany.
       await tx.order.updateMany({
         where: {
           id: { in: activeOrders.map((o) => o.id) },
+          tenantId,
         },
         data: {
           tableId: targetTableId,
@@ -1530,14 +1533,14 @@ export class OrdersService {
       });
 
       // Update source table to AVAILABLE
-      await tx.table.update({
-        where: { id: sourceTableId },
+      await tx.table.updateMany({
+        where: { id: sourceTableId, tenantId },
         data: { status: TableStatus.AVAILABLE },
       });
 
       // Update target table to OCCUPIED
-      await tx.table.update({
-        where: { id: targetTableId },
+      await tx.table.updateMany({
+        where: { id: targetTableId, tenantId },
         data: { status: TableStatus.OCCUPIED },
       });
 

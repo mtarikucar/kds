@@ -34,13 +34,28 @@ describe('InstallationService', () => {
   it('complete sets completedAt and emits installation.completed.v1', async () => {
     prisma.installationRequest.findUnique.mockResolvedValue({ id: 'i-1', tenantId: 't1', status: 'in_progress', notes: '' } as any);
     let captured: any = null;
-    (prisma.installationRequest.update as any).mockImplementation(async ({ data }: any) => {
+    (prisma.installationRequest.updateMany as any).mockImplementation(async ({ data }: any) => {
       captured = data;
-      return { id: 'i-1', ...data };
+      return { count: 1 };
     });
+    (prisma.installationRequest.findUniqueOrThrow as any).mockImplementation(async () => ({
+      id: 'i-1',
+      tenantId: 't1',
+      status: 'done',
+      completedAt: new Date(),
+      notes: 'done by team',
+    }));
     await svc.complete('t1', 'i-1', 'done by team');
     expect(captured.status).toBe('done');
     expect(captured.completedAt).toBeInstanceOf(Date);
     expect(outbox.append).toHaveBeenCalledWith(expect.objectContaining({ type: 'installation.completed.v1' }));
+  });
+
+  it('complete is idempotent — re-completing a done row is rejected', async () => {
+    // findUnique still finds it but the updateMany compound WHERE
+    // excludes status=done so claim.count is 0 and we throw.
+    prisma.installationRequest.findUnique.mockResolvedValue({ id: 'i-1', tenantId: 't1', status: 'done', notes: '' } as any);
+    (prisma.installationRequest.updateMany as any).mockResolvedValue({ count: 0 });
+    await expect(svc.complete('t1', 'i-1')).rejects.toThrow(/Cannot complete from status=done/);
   });
 });
