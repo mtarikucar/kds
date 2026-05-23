@@ -35,6 +35,16 @@ const CORE_SECRETS = [
   // forward to boot, which the orchestrator catches and surfaces as
   // a deploy failure instead of an opaque 500.
   'INTEGRATION_KEY',
+  // MARKETING_INGEST_TOKEN: shared secret the marketing CRM uses to
+  // POST /marketing/leads/ingest. The IngestTokenGuard fails closed
+  // when unset, but only when an ingest request actually arrives —
+  // so a misconfigured deploy passes /healthz, accepts internal
+  // traffic, and then 401s the first marketing-platform call. The
+  // CI deploy workflow (test-deploy.yml:55) already requires the
+  // secret to be set as a GitHub secret; this aligns the RUNTIME
+  // boot-gate with the CI deploy-gate so the failure mode is
+  // identical in both environments.
+  'MARKETING_INGEST_TOKEN',
 ];
 
 const RULES: EnvRule[] = [
