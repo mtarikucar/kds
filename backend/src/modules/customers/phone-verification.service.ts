@@ -12,6 +12,7 @@ import {
   hashOtp,
   normalizePhone,
 } from './customers.helpers';
+import { maskPhone } from '../../common/helpers/pii-mask.helper';
 
 // Per-tenant and per-phone daily send caps to bound SMS cost and blunt
 // pumping-fraud (attacker cycles target phones to evade the 60s per-phone
@@ -96,10 +97,16 @@ export class PhoneVerificationService {
 
     const smsSent = await this.smsService.sendVerificationCode(phone, code);
     if (!smsSent && this.smsService.isServiceEnabled()) {
-      this.logger.warn(`SMS delivery failed for ${phone}`);
+      this.logger.warn(`SMS delivery failed for ${maskPhone(phone)}`);
     }
     if (!this.smsService.isServiceEnabled()) {
-      this.logger.debug(`OTP for ${phone}: ${code} (dev only)`);
+      // Dev-only OTP echo. Phone masked but code stays visible because
+      // the whole point of this branch is local-dev OTP testing without
+      // a real SMS provider — masking the code would defeat the use case.
+      // This branch is unreachable in prod (iter-28 makes SMS_PROVIDER
+      // config required, indirectly via the provider's own creds check
+      // — and isServiceEnabled() returns true when a provider is wired).
+      this.logger.debug(`OTP for ${maskPhone(phone)}: ${code} (dev only)`);
     }
 
     return {

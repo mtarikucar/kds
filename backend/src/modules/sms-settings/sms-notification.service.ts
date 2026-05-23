@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SmsService } from '../customers/sms.service';
 import { SmsSettingsService } from './sms-settings.service';
+import { maskPhone } from '../../common/helpers/pii-mask.helper';
 
 @Injectable()
 export class SmsNotificationService {
@@ -128,7 +129,7 @@ export class SmsNotificationService {
       if (!settings[settingKey]) return;
 
       this.smsService.send(phone, message).catch((err) => {
-        this.logger.error(`SMS send failed for ${phone}: ${err.message}`);
+        this.logger.error(`SMS send failed for ${maskPhone(phone)}: ${err.message}`);
       });
     } catch (err) {
       this.logger.error(`SMS notification check failed: ${err.message}`);

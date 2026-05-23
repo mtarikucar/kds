@@ -27,3 +27,29 @@ export function maskEmail(value: string | null | undefined): string {
   if (local.length === 1) return `*@${domain}`;
   return `${local[0]}***@${domain}`;
 }
+
+/**
+ * Mask a phone number for log output. Keeps country-code prefix + last 2
+ * digits so support can match a customer report to a log entry without
+ * exposing the full number to anyone with log access.
+ *
+ *   "+905551112233"  → "+90****33"
+ *   "+15551112233"   → "+1****33"
+ *   "5551112233"     → "***33"          (no leading + → no country code kept)
+ *   "abc"            → "***"            (too short → fully masked)
+ *   ""               → ""
+ */
+export function maskPhone(value: string | null | undefined): string {
+  if (!value) return '';
+  // Strip whitespace for length checks; preserve only digits + optional +.
+  const trimmed = value.trim();
+  if (trimmed.length < 4) return '***';
+  if (trimmed.startsWith('+')) {
+    // Country code = + plus 1-3 digits up to the first non-digit OR after 3 digits.
+    // Cheap rule: keep + + the first 1-2 digits and the last 2.
+    const cc = trimmed.startsWith('+9') ? trimmed.slice(0, 3) : trimmed.slice(0, 2);
+    const tail = trimmed.slice(-2);
+    return `${cc}****${tail}`;
+  }
+  return `***${trimmed.slice(-2)}`;
+}
