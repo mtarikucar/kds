@@ -299,6 +299,7 @@ export class OrdersService {
             tenantId,
             isAvailable: true,
           },
+          select: { id: true, name: true, priceAdjustment: true, groupId: true },
         })
       : [];
 
@@ -308,6 +309,39 @@ export class OrdersService {
     for (const modifierId of allModifierIds) {
       if (!modifierMap.has(modifierId)) {
         throw new BadRequestException(`Modifier ${modifierId} not found or unavailable`);
+      }
+    }
+
+    // Validate each modifier is allowed on the product the client attached
+    // it to. Without this check, a malicious client could attach a $100
+    // "add caviar" modifier (defined for a steak) to a $2 drink, since the
+    // modifier exists somewhere in the tenant and passes isAvailable. The
+    // ProductModifierGroup junction is the source of truth for "which
+    // groups apply to which product"; cross-reference each modifier's
+    // groupId against that mapping.
+    if (allModifierIds.length > 0) {
+      const productGroupLinks = await this.prisma.productModifierGroup.findMany({
+        where: { productId: { in: productIds } },
+        select: { productId: true, groupId: true },
+      });
+      // Map productId → Set<groupId> for O(1) lookup per modifier.
+      const allowedGroupsByProduct = new Map<string, Set<string>>();
+      for (const link of productGroupLinks) {
+        const s = allowedGroupsByProduct.get(link.productId) ?? new Set<string>();
+        s.add(link.groupId);
+        allowedGroupsByProduct.set(link.productId, s);
+      }
+      for (const item of createOrderDto.items) {
+        const allowed = allowedGroupsByProduct.get(item.productId) ?? new Set<string>();
+        for (const m of item.modifiers ?? []) {
+          const modifier = modifierMap.get(m.modifierId);
+          if (!modifier) continue;   // already caught above
+          if (!allowed.has(modifier.groupId)) {
+            throw new BadRequestException(
+              `Modifier "${modifier.name}" is not allowed on this product`,
+            );
+          }
+        }
       }
     }
 

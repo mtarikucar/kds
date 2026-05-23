@@ -36,6 +36,11 @@ export interface PaymentIntentRequest {
   };
   // Where to send the buyer for 3DS / success / failure pages.
   returnUrl?: string;
+  // Buyer IP — passed to the acquirer for fraud-scoring (most TR providers
+  // weight this heavily). Optional so non-online modes don't have to set
+  // it; online-mode adapters MUST reject the intent when missing rather
+  // than fall back to 0.0.0.0, which fraud-pollutes the payments log.
+  buyerIp?: string;
   metadata?: Record<string, unknown>;
 }
 

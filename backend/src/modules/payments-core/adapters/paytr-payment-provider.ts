@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import {
   PaymentIntent,
   PaymentIntentRequest,
@@ -53,14 +53,31 @@ export class PaytrPaymentProvider implements PaymentProvider, OnModuleInit {
     // (amount, oid, email, basket). The basket is a single line for
     // hardware orders; subscriptions already provide a multi-line basket
     // upstream via BillingService and don't usually call this façade.
+    //
+    // PayTR uses email + IP for fraud scoring. Sending placeholder values
+    // ("unknown@example.com" / "0.0.0.0") pollutes the acquirer's risk model
+    // and can get the merchant flagged. Require the real values explicitly
+    // and reject the intent if they're missing — failing here is better
+    // than silently submitting bad telemetry.
+    const buyer = req.buyer ?? {};
+    const missing: string[] = [];
+    if (!buyer.email) missing.push('buyer.email');
+    if (!buyer.name) missing.push('buyer.name');
+    if (!buyer.phone) missing.push('buyer.phone');
+    if (!req.buyerIp) missing.push('buyerIp');
+    if (missing.length > 0) {
+      throw new BadRequestException(
+        `PayTR intent requires: ${missing.join(', ')}. Provide them at checkout — fraud-scoring needs real values.`,
+      );
+    }
     const result = await this.paytr.getIframeToken({
       amount: req.amountCents / 100,
       merchantOid: req.externalRef.slice(0, 64),
-      email: req.buyer?.email ?? 'unknown@example.com',
-      userName: req.buyer?.name ?? 'Customer',
-      userAddress: typeof req.buyer?.address === 'string' ? req.buyer.address : 'N/A',
-      userPhone: req.buyer?.phone ?? '+900000000000',
-      userIp: '0.0.0.0',
+      email: buyer.email!,
+      userName: buyer.name!,
+      userAddress: typeof buyer.address === 'string' ? buyer.address : 'N/A',
+      userPhone: buyer.phone!,
+      userIp: req.buyerIp!,
       userBasket: [[req.purpose, String(req.amountCents / 100), 1]],
       okUrl: req.returnUrl ?? 'https://hummytummy.com/checkout/success',
       failUrl: req.returnUrl ?? 'https://hummytummy.com/checkout/failure',

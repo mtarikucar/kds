@@ -184,6 +184,12 @@ export class FiscalService {
    * yazarkasa serial port hung, GİB API was down) and the receipt can now
    * be issued without re-keying.
    */
+  // Cooldown between retries of the same receipt. Without this, an
+  // operator spam-clicking Retry while the printer is wedged can stack
+  // dozens of concurrent requests and crash the device (real-world
+  // yazarkasa drivers do not handle parallel writes gracefully).
+  private static readonly RETRY_COOLDOWN_MS = 30_000;
+
   async retryFailed(tenantId: string, fiscalReceiptId: string) {
     const row = await this.prisma.fiscalReceipt.findUnique({
       where: { id: fiscalReceiptId },
@@ -193,6 +199,17 @@ export class FiscalService {
     if (row.status === 'issued') return row;   // already succeeded
     if (row.status === 'cancelled') {
       throw new BadRequestException('Cannot retry a cancelled receipt');
+    }
+
+    // Cooldown gate. `updatedAt` bumps on each retry attempt (the next
+    // step's update sets a new status/lastError, refreshing it). Reject
+    // if the last touch was within the cooldown window.
+    const sinceLast = Date.now() - row.updatedAt.getTime();
+    if (sinceLast < FiscalService.RETRY_COOLDOWN_MS) {
+      const waitMs = FiscalService.RETRY_COOLDOWN_MS - sinceLast;
+      throw new BadRequestException(
+        `Cooldown active — retry in ${Math.ceil(waitMs / 1000)}s. The previous attempt's outcome may still be in flight.`,
+      );
     }
 
     const provider = this.registry.get(row.providerId);
