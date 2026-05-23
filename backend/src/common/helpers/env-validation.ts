@@ -27,6 +27,14 @@ const CORE_SECRETS = [
   'MARKETING_JWT_SECRET',
   'MARKETING_JWT_REFRESH_SECRET',
   'ENCRYPTION_MASTER_KEY',
+  // INTEGRATION_KEY is the seed for the per-tenant envelope key in
+  // IntegrationService (see iter-8 commit message). IntegrationService
+  // throws on missing key in production, but only at the FIRST encrypt
+  // or decrypt call — too late if the first integration call is a
+  // webhook from PayTR/Yemeksepeti. Validating here pulls the failure
+  // forward to boot, which the orchestrator catches and surfaces as
+  // a deploy failure instead of an opaque 500.
+  'INTEGRATION_KEY',
 ];
 
 const RULES: EnvRule[] = [
