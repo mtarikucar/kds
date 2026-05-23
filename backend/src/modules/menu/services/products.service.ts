@@ -390,20 +390,22 @@ export class ProductsService {
     // Verify product exists and belongs to tenant
     await this.findOne(productId, tenantId);
 
-    // Verify link exists in junction table
-    const link = await this.prisma.productToImage.findUnique({
+    // Verify link exists AND the image belongs to the same tenant. The
+    // nested `image: { tenantId }` filter does the second check at the
+    // query layer instead of in JS — same defense-in-depth pattern as
+    // iter-35 onward. Even though findOne() above already proved the
+    // PRODUCT is tenant-owned, the link's IMAGE is a separate
+    // tenant-scoped resource that needs its own guard.
+    const link = await this.prisma.productToImage.findFirst({
       where: {
-        productId_imageId: {
-          productId,
-          imageId,
-        },
+        productId,
+        imageId,
+        image: { tenantId },
       },
-      include: {
-        image: true,
-      },
+      include: { image: true },
     });
 
-    if (!link || link.image.tenantId !== tenantId) {
+    if (!link) {
       throw new NotFoundException('Image not found on this product');
     }
 
