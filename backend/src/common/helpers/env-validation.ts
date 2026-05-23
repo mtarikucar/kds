@@ -76,6 +76,18 @@ const RULES: EnvRule[] = [
   { key: 'PAYTR_ALLOWED_RETURN_ORIGINS', required: false, prodOnly: false },
   // PAYTR_TEST_MODE defaults to "1" in adapter; PAYTR_WEBHOOK_ALLOWED_IPS
   // is optional defence-in-depth. Production-mode guard below.
+
+  // SMTP — required in production. EmailService.initializeTransporter()
+  // warns and continues if these are missing, which silently drops every
+  // outbound email (password resets, email verification, plan-change
+  // confirmations, contact-form replies). In a B2B SaaS that's
+  // data-loss-by-misconfiguration. dev keeps the lax behavior so local
+  // workflows aren't blocked on SMTP creds.
+  { key: 'EMAIL_HOST', required: true, prodOnly: true, minLength: 3 },
+  { key: 'EMAIL_USER', required: true, prodOnly: true },
+  { key: 'EMAIL_PASSWORD', required: true, prodOnly: true },
+  // EMAIL_PORT optional — defaults to 587 in the transporter; EMAIL_FROM
+  // optional — falls back to noreply@hummytummy.com in callers.
 ];
 
 export function validateEnv(): void {
