@@ -33,6 +33,10 @@ export default function KitchenScreen({ token, onLogout }: { token: DeviceToken;
     async function loop() {
       try {
         const cmd = await claimNextCommand(token);
+        // After each await we re-check `stop` so a fetch that resolves
+        // after unmount or token change cannot mutate a torn-down
+        // component or talk to the old token's auth context.
+        if (stop) return;
         if (!cmd) return;
         const orderId = (cmd.payload?.orderId as string | undefined) ?? '';
         if (cmd.kind === 'show_order' && orderId) {
@@ -47,8 +51,10 @@ export default function KitchenScreen({ token, onLogout }: { token: DeviceToken;
         } else if (cmd.kind === 'clear_order' && orderId) {
           setTickets((prev) => prev.filter((t) => t.orderId !== orderId));
         }
+        if (stop) return;
         await ackCommand(token, cmd.id, { status: 'done', result: {} });
       } catch (e: any) {
+        if (stop) return;
         setLastError(e?.message ?? 'poll failed');
       }
     }

@@ -3699,10 +3699,15 @@ model DeviceCommand {
   error           String?
   ackedAt         DateTime?
   createdAt       DateTime @default(now())
+  // Tracks the last transition. The sweeper uses this (not createdAt) to
+  // detect "inflight for too long": a command created an hour ago but
+  // claimed seconds ago must NOT be swept as stuck.
+  updatedAt       DateTime @updatedAt
 
   @@unique([deviceId, idempotencyKey])
   @@index([deviceId, status, priority(sort: Desc), createdAt])
   @@index([tenantId, status])
+  @@index([status, updatedAt])
   @@map("device_commands")
 }
 
@@ -4152,9 +4157,15 @@ model TenantWebhookSubscription {
   url                 String
   // Event types the tenant wants to receive. "*" subscribes to everything.
   events              String[] @default([])
-  // HMAC-SHA256 of the shared secret. We never store the secret raw; it's
-  // returned to the tenant exactly once at creation.
+  // sha256 of the shared secret. Used as a fast-lookup fingerprint and
+  // for backward-compatible verify-on-disk; the raw secret needed for the
+  // outbound HMAC signature lives in `secretEnc` below, encrypted via KMS.
   secretHash          String
+  // KMS-encrypted raw secret. The worker decrypts on each delivery and
+  // signs the body so receivers can verify with their copy of the raw
+  // secret. Encrypted with context { tenantId, purpose:'webhook_secret' }
+  // so a leaked blob from tenant A is unusable for tenant B.
+  secretEnc           Bytes?
   // active|paused. Auto-paused after `consecutiveFailures` >= 20 so a dead
   // endpoint doesn't drain the worker.
   status              String   @default("active")

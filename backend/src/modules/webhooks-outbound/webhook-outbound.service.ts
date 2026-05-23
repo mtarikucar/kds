@@ -1,8 +1,10 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { v7 as uuidv7 } from 'uuid';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainEventBus } from '../outbox/domain-event-bus.service';
+import { KMS_PROVIDER_TOKEN } from '../kms/kms.module';
+import { KmsProvider } from '../kms/kms-provider.interface';
 
 /**
  * Outbound webhook delivery — tenants subscribe to event types and we POST
@@ -21,6 +23,11 @@ import { DomainEventBus } from '../outbox/domain-event-bus.service';
  *   - Auto-pause after 20 consecutive failures so a dead endpoint doesn't
  *     drain the worker.
  */
+// Encryption context for webhook secrets. Bound into the KMS AAD so a
+// leaked ciphertext from a different purpose (e.g. integration credentials)
+// can't be decrypted as a webhook secret.
+const KMS_PURPOSE = 'webhook_secret';
+
 @Injectable()
 export class WebhookOutboundService {
   private readonly logger = new Logger(WebhookOutboundService.name);
@@ -28,6 +35,7 @@ export class WebhookOutboundService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly bus: DomainEventBus,
+    @Inject(KMS_PROVIDER_TOKEN) private readonly kms: KmsProvider,
   ) {}
 
   /** Tenant-side: create a subscription. Returns the secret exactly once. */
@@ -37,6 +45,12 @@ export class WebhookOutboundService {
     }
     const secret = `whs_${randomBytes(24).toString('base64url')}`;
     const secretHash = createHash('sha256').update(secret).digest('hex');
+    // KMS-encrypt the raw secret so the worker can sign deliveries with it.
+    // Tenant-scoped AAD means a leak in tenant A's blob is useless for B.
+    const secretEncBuf = await this.kms.encrypt({
+      context: { tenantId, purpose: KMS_PURPOSE },
+      plaintext: secret,
+    });
     const row = await this.prisma.tenantWebhookSubscription.create({
       data: {
         id: uuidv7(),
@@ -44,9 +58,27 @@ export class WebhookOutboundService {
         url: input.url,
         events: input.events ?? ['*'],
         secretHash,
+        // Prisma's Bytes column expects Uint8Array; widen Node Buffer.
+        secretEnc: new Uint8Array(secretEncBuf),
       },
     });
     return { ...row, secret };  // secret returned once; never re-derivable
+  }
+
+  /**
+   * Internal helper used by the delivery worker. Decrypts the stored
+   * ciphertext back to the raw secret used for HMAC signing. Throws if
+   * the row predates the secretEnc column — that delivery should be
+   * marked permanently failed by the caller.
+   */
+  async unsealSecret(subscription: { tenantId: string; secretEnc: Uint8Array | null }): Promise<string> {
+    if (!subscription.secretEnc) {
+      throw new Error('legacy subscription has no encrypted secret — re-subscribe to receive deliveries');
+    }
+    return this.kms.decrypt({
+      context: { tenantId: subscription.tenantId, purpose: KMS_PURPOSE },
+      ciphertext: Buffer.from(subscription.secretEnc),
+    });
   }
 
   async list(tenantId: string) {

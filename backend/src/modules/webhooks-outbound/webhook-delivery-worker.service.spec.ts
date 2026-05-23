@@ -13,7 +13,15 @@ describe('WebhookDeliveryWorkerService.tick', () => {
 
   beforeEach(() => {
     prisma = mockPrismaClient();
-    svc = new WebhookDeliveryWorkerService(prisma as any);
+    // The worker now depends on WebhookOutboundService for secret unsealing.
+    // Mock returns a fixed raw secret so the HMAC signing path stays
+    // deterministic without dragging KMS plumbing into this spec.
+    const outbound: any = {
+      async unsealSecret(_sub: any) {
+        return 'test-raw-secret';
+      },
+    };
+    svc = new WebhookDeliveryWorkerService(prisma as any, outbound);
     originalFetch = (global as any).fetch;
   });
 
@@ -101,18 +109,22 @@ describe('WebhookDeliveryWorkerService.tick', () => {
     (prisma.webhookDelivery.findMany as any).mockResolvedValue([pendingDelivery()]);
     (prisma.outboxEvent.findUnique as any).mockResolvedValue({ payload: {} });
     (prisma.webhookDelivery.update as any).mockResolvedValue({ id: 'd-1' });
-    (prisma.tenantWebhookSubscription.update as any).mockResolvedValue({ id: 's-1' });
-    (prisma.tenantWebhookSubscription.findUnique as any).mockResolvedValue({ consecutiveFailures: 20 });
+    // The increment-then-select-back UPDATE returns the post-increment
+    // value. We pin it at 20 (== AUTO_PAUSE_AFTER) so the worker flips
+    // the subscription to 'paused' via the updateMany guard.
+    (prisma.tenantWebhookSubscription.update as any).mockResolvedValue({
+      id: 's-1',
+      consecutiveFailures: 20,
+    });
+    (prisma.tenantWebhookSubscription.updateMany as any).mockResolvedValue({ count: 1 });
     (global as any).fetch = jest.fn().mockResolvedValue({
       status: 500, ok: false, text: async () => '',
     });
 
     await svc.tick();
 
-    // The second `tenantWebhookSubscription.update` call (after the freshness
-    // check) flips status to 'paused'.
-    const calls = (prisma.tenantWebhookSubscription.update as any).mock.calls;
-    const pauseCall = calls.find((c: any) => c[0].data.status === 'paused');
+    const pauseCalls = (prisma.tenantWebhookSubscription.updateMany as any).mock.calls;
+    const pauseCall = pauseCalls.find((c: any) => c[0].data.status === 'paused');
     expect(pauseCall).toBeDefined();
   });
 

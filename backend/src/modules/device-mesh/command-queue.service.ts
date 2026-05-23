@@ -160,16 +160,15 @@ export class CommandQueueService {
    * unless attempts >= MAX in which case they go to `failed`.
    */
   async sweepStuck(): Promise<number> {
+    // The signal is "this command was last touched > 5min ago". `updatedAt`
+    // bumps on every status transition (queued → inflight → ...), so it's
+    // the correct proxy for "claimed and never ack'd". Using `createdAt`
+    // would sweep a slow-claim queue: a command created an hour ago that
+    // JUST went inflight 10s ago would be wrongly marked stuck.
     const stale = await this.prisma.deviceCommand.findMany({
       where: {
         status: 'inflight',
-        // 5 minutes is generous; covers slow ESC/POS receipts.
-        // expiresAt is the wall clock TTL, but a stuck inflight is detected
-        // by lack of ack rather than TTL.
-        // Using updatedAt would require a separate column; for now use a
-        // 5-minute wall-clock window from createdAt + attempts*minute.
-        // Conservative — false positives just retry.
-        createdAt: { lt: new Date(Date.now() - 5 * 60 * 1000) },
+        updatedAt: { lt: new Date(Date.now() - 5 * 60 * 1000) },
       },
       select: { id: true, attempts: true, tenantId: true, deviceId: true, kind: true },
     });

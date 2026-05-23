@@ -20,7 +20,21 @@ describe('WebhookOutboundService.subscribe + fanOut', () => {
   beforeEach(() => {
     prisma = mockPrismaClient();
     bus = { on: jest.fn(), off: jest.fn(), onAny: jest.fn() };
-    svc = new WebhookOutboundService(prisma as any, bus);
+    // Deterministic KMS that just round-trips the plaintext so the
+    // subscribe path can store + the worker can retrieve secrets.
+    const kms: any = {
+      id: 'test',
+      async encrypt({ plaintext }: any) {
+        return Buffer.from(`enc:${plaintext}`);
+      },
+      async decrypt({ ciphertext }: any) {
+        return ciphertext.toString().replace(/^enc:/, '');
+      },
+      async healthCheck() {
+        return { ok: true };
+      },
+    };
+    svc = new WebhookOutboundService(prisma as any, bus, kms);
   });
 
   it('subscribe refuses non-http(s) URLs', async () => {

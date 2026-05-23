@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { useCreateWebhook, useListWebhooks, useRevokeWebhook, type WebhookSubscription } from './webhooksApi';
 
 /**
@@ -53,19 +54,7 @@ export default function WebhooksPage() {
       </p>
 
       {justCreated && justCreated.secret && (
-        <div className="rounded border border-amber-400 bg-amber-50 p-4">
-          <p className="font-medium text-amber-900">Subscription created.</p>
-          <p className="mt-1 text-sm text-amber-800">
-            Below is the signing secret. <strong>Copy it now — we cannot show it again.</strong>
-          </p>
-          <pre className="mt-2 rounded bg-white p-2 font-mono text-sm">{justCreated.secret}</pre>
-          <button
-            className="mt-3 rounded bg-amber-900 px-3 py-1 text-xs text-white"
-            onClick={() => setJustCreated(null)}
-          >
-            I've copied it
-          </button>
-        </div>
+        <SecretReveal secret={justCreated.secret} onDismiss={() => setJustCreated(null)} />
       )}
 
       <section className="rounded border bg-white p-4">
@@ -157,6 +146,85 @@ export default function WebhooksPage() {
           </table>
         )}
       </section>
+    </div>
+  );
+}
+
+/**
+ * One-time secret reveal.
+ *
+ * Behavior:
+ *  - Pre-copies the secret to the clipboard on mount so the user can
+ *    paste it without selecting text (which would leak to mouse-tracker
+ *    extensions / accessibility tools).
+ *  - Renders the secret masked behind a "Show" toggle so screen-shares
+ *    and walk-bys don't capture it inadvertently.
+ *  - Auto-dismisses after 90 seconds — operators that wander off don't
+ *    leave a credential sitting on the screen.
+ */
+function SecretReveal({ secret, onDismiss }: { secret: string; onDismiss: () => void }) {
+  const [shown, setShown] = useState(false);
+  const [secondsLeft, setSecondsLeft] = useState(90);
+
+  useEffect(() => {
+    // Best-effort clipboard prime. Clipboard API requires a secure context
+    // (HTTPS); in dev over plain HTTP this throws and we just skip.
+    navigator.clipboard
+      ?.writeText(secret)
+      .then(() => toast.success('Secret copied to clipboard'))
+      .catch(() => undefined);
+  }, [secret]);
+
+  useEffect(() => {
+    const tick = setInterval(() => {
+      setSecondsLeft((s) => {
+        if (s <= 1) {
+          onDismiss();
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [onDismiss]);
+
+  return (
+    <div className="rounded border border-amber-400 bg-amber-50 p-4">
+      <p className="font-medium text-amber-900">Subscription created.</p>
+      <p className="mt-1 text-sm text-amber-800">
+        Signing secret copied to your clipboard. <strong>Save it now — we cannot show it again.</strong>{' '}
+        Auto-hiding in {secondsLeft}s.
+      </p>
+      <div className="mt-2 flex items-center gap-2">
+        <code
+          className="flex-1 rounded bg-white p-2 font-mono text-sm select-all"
+          style={shown ? undefined : { filter: 'blur(6px)', userSelect: 'none' }}
+        >
+          {secret}
+        </code>
+        <button
+          className="rounded border bg-white px-3 py-1 text-xs"
+          onClick={() => setShown((v) => !v)}
+        >
+          {shown ? 'Hide' : 'Show'}
+        </button>
+      </div>
+      <div className="mt-3 flex gap-2">
+        <button
+          className="rounded border bg-white px-3 py-1 text-xs"
+          onClick={() => {
+            navigator.clipboard?.writeText(secret).then(() => toast.success('Copied'));
+          }}
+        >
+          Copy again
+        </button>
+        <button
+          className="rounded bg-amber-900 px-3 py-1 text-xs text-white"
+          onClick={onDismiss}
+        >
+          I've saved it
+        </button>
+      </div>
     </div>
   );
 }

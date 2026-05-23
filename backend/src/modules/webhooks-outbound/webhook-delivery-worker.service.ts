@@ -16,7 +16,10 @@ export class WebhookDeliveryWorkerService {
   private static readonly BACKOFF_MS = [30_000, 2 * 60_000, 10 * 60_000, 60 * 60_000, 6 * 60 * 60_000];
   private static readonly AUTO_PAUSE_AFTER = 20;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly outbound: WebhookOutboundService,
+  ) {}
 
   @Cron(CronExpression.EVERY_30_SECONDS)
   async tick(): Promise<void> {
@@ -51,13 +54,28 @@ export class WebhookDeliveryWorkerService {
       payload: await this.loadPayload(d.eventId),
     });
     const ts = Date.now();
-    // We can't derive the raw secret from the stored hash — the signature
-    // path requires the raw. The tenant-side receiver verifies with their
-    // copy of the secret; here we sign with the hash + ts, which is enough
-    // for HummyTummy → tenant authenticity once the tenant SDK stores the
-    // raw secret. For receivers without an SDK, this is the spec the docs
-    // expose to them.
-    const signature = WebhookOutboundService.sign(d.subscription.secretHash, ts, body);
+
+    // Decrypt the raw secret stored at subscribe time so the HMAC matches
+    // what the receiver computes with their copy. Legacy subscriptions
+    // (pre-KMS migration) have a null secretEnc — those go straight to
+    // `failed` with a clear message so ops sees them in the dashboard and
+    // the tenant re-subscribes.
+    let signature: string;
+    try {
+      const rawSecret = await this.outbound.unsealSecret(d.subscription);
+      signature = WebhookOutboundService.sign(rawSecret, ts, body);
+    } catch (e) {
+      this.logger.warn(`webhook ${d.id}: cannot unseal secret: ${(e as Error).message}`);
+      await this.prisma.webhookDelivery.update({
+        where: { id: d.id },
+        data: {
+          status: 'failed',
+          lastStatusCode: 0,
+          lastResponseSnippet: 'subscription predates KMS encryption — tenant must re-subscribe',
+        },
+      });
+      return;
+    }
 
     try {
       const res = await fetch(d.url, {
@@ -87,28 +105,39 @@ export class WebhookDeliveryWorkerService {
             : new Date(Date.now() + (WebhookDeliveryWorkerService.BACKOFF_MS[attempts - 1] ?? 6 * 60 * 60_000)),
         },
       });
-      await this.prisma.tenantWebhookSubscription.update({
-        where: { id: d.subscriptionId },
-        data: {
-          lastDeliveryAt: new Date(),
-          lastDeliveryCode: res.status,
-          consecutiveFailures: success ? 0 : { increment: 1 } as any,
-        },
-      });
 
-      // Auto-pause when this delivery's failure pushed the subscription
-      // past the threshold.
-      if (!success) {
-        const fresh = await this.prisma.tenantWebhookSubscription.findUnique({
+      // Atomic increment + threshold check in one statement so two parallel
+      // failing deliveries can't miss the auto-pause threshold by racing the
+      // read-then-write pattern. updateMany with a conditional WHERE on the
+      // post-increment value flips status only when this delivery's failure
+      // is the one that crosses the line.
+      if (success) {
+        await this.prisma.tenantWebhookSubscription.update({
           where: { id: d.subscriptionId },
-          select: { consecutiveFailures: true },
+          data: { lastDeliveryAt: new Date(), lastDeliveryCode: res.status, consecutiveFailures: 0 },
         });
-        if (fresh && fresh.consecutiveFailures >= WebhookDeliveryWorkerService.AUTO_PAUSE_AFTER) {
-          await this.prisma.tenantWebhookSubscription.update({
-            where: { id: d.subscriptionId },
+      } else {
+        const updated = await this.prisma.tenantWebhookSubscription.update({
+          where: { id: d.subscriptionId },
+          data: {
+            lastDeliveryAt: new Date(),
+            lastDeliveryCode: res.status,
+            consecutiveFailures: { increment: 1 },
+          },
+          select: { id: true, consecutiveFailures: true },
+        });
+        if (updated.consecutiveFailures >= WebhookDeliveryWorkerService.AUTO_PAUSE_AFTER) {
+          // Use updateMany with the status guard so a concurrent worker
+          // that already paused us doesn't trip a no-op log line race.
+          const r = await this.prisma.tenantWebhookSubscription.updateMany({
+            where: { id: d.subscriptionId, status: 'active' },
             data: { status: 'paused' },
           });
-          this.logger.warn(`Auto-paused subscription ${d.subscriptionId} after ${fresh.consecutiveFailures} failures`);
+          if (r.count > 0) {
+            this.logger.warn(
+              `Auto-paused subscription ${d.subscriptionId} after ${updated.consecutiveFailures} failures`,
+            );
+          }
         }
       }
     } catch (e) {
