@@ -69,7 +69,7 @@ describe('WebhookDeliveryWorkerService.tick', () => {
       text: async () => 'ok',
     });
 
-    await svc.tick();
+    await svc.tickOnce();
 
     expect((global as any).fetch).toHaveBeenCalledTimes(1);
     expect(updatedDelivery.status).toBe('delivered');
@@ -97,7 +97,7 @@ describe('WebhookDeliveryWorkerService.tick', () => {
       text: async () => 'busy',
     });
 
-    await svc.tick();
+    await svc.tickOnce();
 
     expect(updatedDelivery.status).toBe('pending');
     expect(updatedDelivery.lastStatusCode).toBe(503);
@@ -121,7 +121,7 @@ describe('WebhookDeliveryWorkerService.tick', () => {
       status: 500, ok: false, text: async () => '',
     });
 
-    await svc.tick();
+    await svc.tickOnce();
 
     const pauseCalls = (prisma.tenantWebhookSubscription.updateMany as any).mock.calls;
     const pauseCall = pauseCalls.find((c: any) => c[0].data.status === 'paused');
@@ -135,7 +135,7 @@ describe('WebhookDeliveryWorkerService.tick', () => {
     const fetchSpy = jest.fn();
     (global as any).fetch = fetchSpy;
 
-    await svc.tick();
+    await svc.tickOnce();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
@@ -149,7 +149,7 @@ describe('WebhookDeliveryWorkerService.tick', () => {
     });
     (global as any).fetch = jest.fn().mockRejectedValue(new Error('ECONNRESET'));
 
-    await svc.tick();
+    await svc.tickOnce();
 
     expect(updated.status).toBe('pending');
     expect(updated.lastStatusCode).toBe(0);

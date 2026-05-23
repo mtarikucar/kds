@@ -3756,6 +3756,13 @@ model LocalBridgeAgent {
 
   devices         Device[]
 
+  // Provisioning tokens are single-use across the entire fleet — making
+  // the hash globally unique means a race between two concurrent claim
+  // requests (same token, same millisecond) fails the second one with a
+  // unique-violation rather than handing out two valid bearer tokens.
+  // Nullable column needs a partial index so the constraint only applies
+  // to rows that still have a claim outstanding (cleared post-claim).
+  @@unique([provisioningTokenHash])
   @@index([tenantId, branchId, status])
   @@map("local_bridge_agents")
 }

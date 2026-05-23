@@ -56,4 +56,35 @@ describe('EnvKmsProvider', () => {
     });
     expect(pt).toBe('secret');
   });
+
+  it('versioned envelope decrypts with the matching master key', async () => {
+    process.env.KMS_KEY_VERSION = '2';
+    process.env.KMS_MASTER_KEY_V2 = 'spec-v2-key';
+    provider = new EnvKmsProvider();
+    const ct = await provider.encrypt({ context: { tenantId: 't1' }, plaintext: 'v2-blob' });
+    const pt = await provider.decrypt({ context: { tenantId: 't1' }, ciphertext: ct });
+    expect(pt).toBe('v2-blob');
+    // Cleanup so later tests in this suite don't inherit v2.
+    delete process.env.KMS_KEY_VERSION;
+    delete process.env.KMS_MASTER_KEY_V2;
+  });
+
+  it('decrypts both v1 and v2 ciphertexts after rotation', async () => {
+    // Encrypt under v1, rotate to v2, encrypt again, then confirm both
+    // ciphertexts round-trip — the version byte in the envelope tells
+    // the decoder which key derivation to use.
+    process.env.KMS_KEY_VERSION = '1';
+    provider = new EnvKmsProvider();
+    const ctV1 = await provider.encrypt({ context: { tenantId: 't1' }, plaintext: 'v1-blob' });
+
+    process.env.KMS_KEY_VERSION = '2';
+    process.env.KMS_MASTER_KEY_V2 = 'spec-v2-key';
+    provider = new EnvKmsProvider();
+    const ctV2 = await provider.encrypt({ context: { tenantId: 't1' }, plaintext: 'v2-blob' });
+
+    expect(await provider.decrypt({ context: { tenantId: 't1' }, ciphertext: ctV1 })).toBe('v1-blob');
+    expect(await provider.decrypt({ context: { tenantId: 't1' }, ciphertext: ctV2 })).toBe('v2-blob');
+    delete process.env.KMS_KEY_VERSION;
+    delete process.env.KMS_MASTER_KEY_V2;
+  });
 });

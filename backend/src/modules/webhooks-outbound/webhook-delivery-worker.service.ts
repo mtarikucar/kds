@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
+import { withAdvisoryLock } from '../../common/scheduling/advisory-lock';
 import { WebhookOutboundService } from './webhook-outbound.service';
 
 /**
@@ -23,6 +24,20 @@ export class WebhookDeliveryWorkerService {
 
   @Cron(CronExpression.EVERY_30_SECONDS)
   async tick(): Promise<void> {
+    // Without the lock, two replicas would each `findMany` the same 50 due
+    // rows and double-POST to every tenant URL. The webhook spec says
+    // at-least-once delivery — but doubling the QPS for free is silly, and
+    // we'd also race the auto-pause threshold from both sides.
+    await withAdvisoryLock(
+      this.prisma,
+      'webhooks.delivery.tick',
+      () => this.tickOnce(),
+      this.logger,
+    );
+  }
+
+  /** Inner body — extracted so tests can call it without the lock wrapper. */
+  async tickOnce(): Promise<void> {
     try {
       const due = await this.prisma.webhookDelivery.findMany({
         where: {

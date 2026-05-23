@@ -7,6 +7,7 @@ import { EntitlementsController } from './entitlements.controller';
 import { EntitlementService } from './entitlement.service';
 import { EntitlementGuard } from './entitlement.guard';
 import { PlanProjectorService } from './plan-projector.service';
+import { EntitlementInvalidationBus } from './entitlement-invalidation.bus';
 
 /**
  * The entitlement engine ships as a leaf module — no inbound deps from
@@ -19,7 +20,12 @@ import { PlanProjectorService } from './plan-projector.service';
 @Module({
   imports: [PrismaModule],
   controllers: [EntitlementsController],
-  providers: [EntitlementService, EntitlementGuard, PlanProjectorService],
+  providers: [
+    EntitlementService,
+    EntitlementGuard,
+    PlanProjectorService,
+    EntitlementInvalidationBus,
+  ],
   exports: [EntitlementService, EntitlementGuard, PlanProjectorService],
 })
 export class EntitlementsModule implements OnApplicationBootstrap, OnModuleInit {

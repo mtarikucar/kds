@@ -39,7 +39,7 @@ describe('TenantAddOnSweeperService.runDaily', () => {
       return { id: 'ta-1', ...data };
     });
 
-    await svc.runDaily();
+    await svc.runOnce();
 
     expect(updated.status).toBe('cancelled');
     expect(outbox.append).toHaveBeenCalledWith(
@@ -55,7 +55,7 @@ describe('TenantAddOnSweeperService.runDaily', () => {
       return { id: 'ta-1', ...data };
     });
 
-    await svc.runDaily();
+    await svc.runOnce();
 
     expect(updated.status).toBe('cancelled');
     expect(updated.endedAt).toBeInstanceOf(Date);
@@ -69,7 +69,7 @@ describe('TenantAddOnSweeperService.runDaily', () => {
       return { id: 'ta-1', ...data };
     });
 
-    await svc.runDaily();
+    await svc.runOnce();
 
     expect(updated.status).toBeUndefined();      // not transitioned
     expect(updated.currentPeriodStart).toBeInstanceOf(Date);
@@ -80,6 +80,6 @@ describe('TenantAddOnSweeperService.runDaily', () => {
 
   it('returns silently when nothing to sweep', async () => {
     (prisma.tenantAddOn.findMany as any).mockResolvedValue([]);
-    await expect(svc.runDaily()).resolves.toBeUndefined();
+    await expect(svc.runOnce()).resolves.toBeUndefined();
   });
 });

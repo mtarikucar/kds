@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
+import { withAdvisoryLock } from '../../common/scheduling/advisory-lock';
 import { EntitlementService } from './entitlement.service';
 import { EntitlementGrant } from './entitlement.types';
 
@@ -250,24 +251,39 @@ export class PlanProjectorService {
    */
   @Cron('15 3 * * *')
   async reconcileNightly(): Promise<void> {
-    const tenants = await this.prisma.tenant.findMany({ select: { id: true } });
-    for (const t of tenants) {
-      try {
-        await this.projectTenant(t.id);
-      } catch (e) {
-        this.logger.warn(`projectTenant ${t.id} failed: ${(e as Error).message}`);
-      }
-    }
-    this.logger.log(`Nightly entitlement reconcile: ${tenants.length} tenants`);
+    await withAdvisoryLock(
+      this.prisma,
+      'entitlements.reconcileNightly',
+      async () => {
+        const tenants = await this.prisma.tenant.findMany({ select: { id: true } });
+        for (const t of tenants) {
+          try {
+            await this.projectTenant(t.id);
+          } catch (e) {
+            this.logger.warn(`projectTenant ${t.id} failed: ${(e as Error).message}`);
+          }
+        }
+        this.logger.log(`Nightly entitlement reconcile: ${tenants.length} tenants`);
+      },
+      this.logger,
+    );
   }
 
   /**
    * Sweeper for expired grace grants. Runs every 5 minutes — cheap because
    * the partial index on validUntil makes the scan effectively free until
-   * something actually expires.
+   * something actually expires. Advisory lock prevents duplicate sweeps
+   * (which would each invalidate the in-process cache on every replica).
    */
   @Cron(CronExpression.EVERY_5_MINUTES)
   async sweepExpired(): Promise<void> {
-    await this.entitlements.sweepExpired();
+    await withAdvisoryLock(
+      this.prisma,
+      'entitlements.sweepExpired',
+      async () => {
+        await this.entitlements.sweepExpired();
+      },
+      this.logger,
+    );
   }
 }

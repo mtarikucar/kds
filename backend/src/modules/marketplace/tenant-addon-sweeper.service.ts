@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
+import { withAdvisoryLock } from '../../common/scheduling/advisory-lock';
 import { OutboxService } from '../outbox/outbox.service';
 import { EventTypes } from '../outbox/event-types';
 
@@ -28,6 +29,11 @@ export class TenantAddOnSweeperService {
 
   @Cron('0 3 * * *')
   async runDaily(): Promise<void> {
+    await withAdvisoryLock(this.prisma, 'marketplace.addonSweeper', () => this.runOnce(), this.logger);
+  }
+
+  /** Inner body — extracted so tests can call it without the lock wrapper. */
+  async runOnce(): Promise<void> {
     const now = new Date();
 
     const expired = await this.prisma.tenantAddOn.findMany({

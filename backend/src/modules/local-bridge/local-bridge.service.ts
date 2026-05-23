@@ -67,33 +67,45 @@ export class LocalBridgeService {
   /** Bridge: exchange provisioning token for a long-lived bearer token. */
   async claim(input: { provisioningToken: string; hostname?: string; os?: string; agentVersion?: string }) {
     const provisioningTokenHash = this.hash(input.provisioningToken);
-    const row = await this.prisma.localBridgeAgent.findFirst({
-      where: { provisioningTokenHash, status: 'claiming' },
-    });
-    if (!row) throw new NotFoundException('Invalid or already-used provisioning token');
 
+    // Atomically transition the row out of `claiming` with the provisioning
+    // token hash as the matching predicate. updateMany returns count=1 only
+    // for the FIRST concurrent claim — the second sees count=0 and gets a
+    // clean rejection instead of issuing a duplicate bearer.
     const token = this.newToken();
-    const updated = await this.prisma.localBridgeAgent.update({
-      where: { id: row.id },
+    const newTokenHash = this.hash(token);
+    const tokenExpiresAt = new Date(Date.now() + LocalBridgeService.TOKEN_TTL_MS);
+
+    const claim = await this.prisma.localBridgeAgent.updateMany({
+      where: { provisioningTokenHash, status: 'claiming' },
       data: {
-        tokenHash: this.hash(token),
-        tokenExpiresAt: new Date(Date.now() + LocalBridgeService.TOKEN_TTL_MS),
-        // Provisioning token is single-use — clear it.
-        provisioningTokenHash: null,
+        tokenHash: newTokenHash,
+        tokenExpiresAt,
+        provisioningTokenHash: null,  // single-use
         provisionedAt: new Date(),
-        hostname: input.hostname ?? row.hostname,
-        os: input.os ?? row.os,
-        agentVersion: input.agentVersion ?? row.agentVersion,
+        hostname: input.hostname,
+        os: input.os,
+        agentVersion: input.agentVersion,
         status: 'online',
         lastSeenAt: new Date(),
       },
+    });
+    if (claim.count === 0) {
+      throw new NotFoundException('Invalid or already-used provisioning token');
+    }
+
+    // Re-read by the new token hash. Doing the lookup-by-result, not by id,
+    // keeps the operation race-free even under concurrent identical claims
+    // — only the winning replica's token hash points at this row.
+    const updated = await this.prisma.localBridgeAgent.findFirstOrThrow({
+      where: { tokenHash: newTokenHash },
     });
 
     await this.outbox
       .append({
         type: 'bridge.provisioned.v1',
-        tenantId: row.tenantId,
-        payload: { bridgeId: row.id, branchId: row.branchId },
+        tenantId: updated.tenantId,
+        payload: { bridgeId: updated.id, branchId: updated.branchId },
       })
       .catch(() => undefined);
 
