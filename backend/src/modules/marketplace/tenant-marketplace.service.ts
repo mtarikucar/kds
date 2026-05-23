@@ -71,6 +71,37 @@ export class TenantMarketplaceService {
 
     const qty = input.quantity ?? 1;
     const now = new Date();
+
+    // Idempotency: if this paymentRef has already been provisioned, return
+    // the existing row instead of double-granting. Without this, a webhook
+    // replay or a buyer double-clicking "Purchase" would mint two
+    // TenantAddOns and the projector would stack two entitlement grants
+    // — effectively doubling the limit increment for free.
+    if (input.paymentRef) {
+      const existing = await this.prisma.tenantAddOn.findFirst({
+        where: { tenantId, paymentRef: input.paymentRef },
+      });
+      if (existing) return existing;
+    }
+
+    // Block duplicate ACTIVE purchases of the same add-on for the same
+    // (tenant, branch) tuple. The marketplace UI only allows one active
+    // copy at a time per scope; bypassing via direct API call would
+    // double the entitlement grant and confuse cancellation.
+    const dup = await this.prisma.tenantAddOn.findFirst({
+      where: {
+        tenantId,
+        addOnId: addOn.id,
+        branchId: input.branchId ?? null,
+        status: 'active',
+      },
+    });
+    if (dup) {
+      throw new BadRequestException(
+        `Add-on "${addOn.code}" is already active for this ${input.branchId ? 'branch' : 'tenant'}. Cancel the existing subscription or change quantity instead.`,
+      );
+    }
+
     // Recurring add-ons project a 30-day window so the cancellation flow has
     // a meaningful `currentPeriodEnd`. Real billing cycles are aligned to
     // the parent Subscription cycle once Phase 5 checkout wires them up.

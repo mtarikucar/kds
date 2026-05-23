@@ -56,52 +56,49 @@ export class EfaturaFiscalProvider implements FiscalProvider, OnModuleInit {
 
     const fiscalNo = `EARS-${new Date().getFullYear()}-${String(Date.now()).slice(-8)}`;
 
+    // Write the SalesInvoice mirror row. Failure here used to be swallowed
+    // ("best-effort log and continue"), which left the fiscal receipt
+    // marked 'issued' while accounting had no record — an auditable
+    // divergence. Now we fail the FiscalReceiptResult on any write error
+    // so the caller marks the receipt 'failed' and the ops manual-recovery
+    // panel picks it up.
     try {
-      // Best-effort: write a SalesInvoice row tagged as e-arşiv. If the
-      // existing schema doesn't include all the fields we use, the call
-      // surfaces a clear error at runtime — much better than silently
-      // diverging from the canonical accounting state.
-      await (this.prisma as any).salesInvoice
-        .create({
-          data: {
-            id: uuidv7(),
-            tenantId: req.tenantId,
-            orderId: req.orderId,
-            invoiceNumber: fiscalNo,
-            kind: req.kind ?? 'earsiv',
-            issueDate: new Date(),
-            subtotal: subtotal / 100,
-            taxAmount: taxAmount / 100,
-            total: subtotal / 100,
-            currency: 'TRY',
-            status: 'pending',
-            items: {
-              create: req.lines.map((l, i) => ({
-                description: l.name,
-                quantity: l.qty,
-                unitPrice: l.unitPriceCents / 100,
-                taxRate: l.vatRate,
-                taxAmount: ((l.qty * l.unitPriceCents - (l.discountCents ?? 0)) * l.vatRate) / (100 + l.vatRate) / 100,
-                subtotal: (l.qty * l.unitPriceCents - (l.discountCents ?? 0)) / 100,
-                total: (l.qty * l.unitPriceCents - (l.discountCents ?? 0)) / 100,
-              })),
-            },
+      await (this.prisma as any).salesInvoice.create({
+        data: {
+          id: uuidv7(),
+          tenantId: req.tenantId,
+          orderId: req.orderId,
+          invoiceNumber: fiscalNo,
+          kind: req.kind ?? 'earsiv',
+          issueDate: new Date(),
+          subtotal: subtotal / 100,
+          taxAmount: taxAmount / 100,
+          total: subtotal / 100,
+          currency: 'TRY',
+          status: 'pending',
+          items: {
+            create: req.lines.map((l) => ({
+              description: l.name,
+              quantity: l.qty,
+              unitPrice: l.unitPriceCents / 100,
+              taxRate: l.vatRate,
+              taxAmount:
+                ((l.qty * l.unitPriceCents - (l.discountCents ?? 0)) * l.vatRate) /
+                (100 + l.vatRate) /
+                100,
+              subtotal: (l.qty * l.unitPriceCents - (l.discountCents ?? 0)) / 100,
+              total: (l.qty * l.unitPriceCents - (l.discountCents ?? 0)) / 100,
+            })),
           },
-        })
-        .catch((e: any) => {
-          // The legacy accounting schema may evolve; we log instead of
-          // failing the receipt because the caller has already committed
-          // the FiscalReceipt row. Operations can reconcile via the
-          // manual-recovery panel.
-          this.logger.warn(`SalesInvoice mirror failed: ${e.message}`);
-        });
+        },
+      });
     } catch (e) {
-      // Total failure — fall through and surface to the caller.
+      this.logger.warn(`SalesInvoice mirror failed for receipt ${req.idempotencyKey}: ${(e as Error).message}`);
       return {
         providerId: this.id,
         receiptId: req.idempotencyKey,
         status: 'failed',
-        error: (e as Error).message,
+        error: `SalesInvoice mirror failed: ${(e as Error).message}`,
       };
     }
 

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
 /**
@@ -20,6 +20,18 @@ export class HealthDashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
   async branchScore(tenantId: string, branchId: string) {
+    // Confirm the branch actually belongs to this tenant before scoring.
+    // The downstream queries are already tenant-scoped so cross-tenant
+    // data leakage is impossible — but without this preliminary check the
+    // response is just empty stats for a wrong branchId, which the UI
+    // would render as "this branch has nothing", confusing operators.
+    // A 404 makes the bug visible.
+    const branch = await this.prisma.branch.findFirst({
+      where: { id: branchId, tenantId },
+      select: { id: true },
+    });
+    if (!branch) throw new NotFoundException('Branch not found for this tenant');
+
     const [devices, lastFiscal, lastOrder] = await Promise.all([
       this.prisma.device.findMany({
         where: { tenantId, branchId, status: { notIn: ['retired'] } },

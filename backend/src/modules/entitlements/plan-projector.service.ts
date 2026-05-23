@@ -99,16 +99,18 @@ export class PlanProjectorService {
     await this.entitlements.setGrantsForSource(tenantId, planSource, planGrants);
 
     // Clear any stale plan:* sources from prior plans (downgrade, switch).
-    const stale = await this.prisma.featureEntitlement.findMany({
+    // Single deleteMany covers all stale sources atomically — the previous
+    // per-source loop could leave a partial state if one revoke failed
+    // (downstream consumers would then see mixed grants from two plans).
+    const deletedStale = await this.prisma.featureEntitlement.deleteMany({
       where: {
         tenantId,
         source: { startsWith: 'plan:', not: planSource },
       },
-      distinct: ['source'],
-      select: { source: true },
     });
-    for (const s of stale) {
-      await this.entitlements.revokeSource(tenantId, s.source);
+    if (deletedStale.count > 0) {
+      // Drop the in-process cache so the next read picks up the deletion.
+      this.entitlements.invalidate(tenantId);
     }
 
     // Overrides → admin source. Overrides REPLACE the plan value, so they
@@ -207,17 +209,24 @@ export class PlanProjectorService {
       await this.entitlements.setGrantsForSource(tenantId, source, grants);
     }
 
-    // Revoke stale add-on sources. The projector is the only writer of
-    // `addon:*` sources, so any extra row here is by definition orphaned.
-    const existing = await this.prisma.featureEntitlement.findMany({
-      where: { tenantId, source: { startsWith: 'addon:' } },
-      distinct: ['source'],
-      select: { source: true },
-    });
-    for (const e of existing) {
-      if (!desiredSources.has(e.source)) {
-        await this.entitlements.revokeSource(tenantId, e.source);
-      }
+    // Revoke stale add-on sources atomically. The projector is the only
+    // writer of `addon:*` sources, so anything not in `desiredSources` is
+    // by definition orphaned. Single deleteMany prevents the partial-revoke
+    // class of bug the prior per-source loop had: if one revoke failed,
+    // downstream consumers would see mixed grants from two add-on lifecycles.
+    if (desiredSources.size === 0) {
+      const swept = await this.prisma.featureEntitlement.deleteMany({
+        where: { tenantId, source: { startsWith: 'addon:' } },
+      });
+      if (swept.count > 0) this.entitlements.invalidate(tenantId);
+    } else {
+      const swept = await this.prisma.featureEntitlement.deleteMany({
+        where: {
+          tenantId,
+          source: { startsWith: 'addon:', notIn: Array.from(desiredSources) },
+        },
+      });
+      if (swept.count > 0) this.entitlements.invalidate(tenantId);
     }
   }
 

@@ -8,6 +8,10 @@ describe('HealthDashboardService.branchScore', () => {
   beforeEach(() => {
     prisma = mockPrismaClient();
     svc = new HealthDashboardService(prisma as any);
+    // branchScore now validates the branch belongs to the tenant before
+    // scoring. Default the ownership check to "yes, branch exists" so the
+    // existing test fixtures keep working; specific tests can override.
+    (prisma.branch.findFirst as any).mockResolvedValue({ id: 'b1' });
   });
 
   it('returns score 100 when devices are online and recent fiscal/orders', async () => {

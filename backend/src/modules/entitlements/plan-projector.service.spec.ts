@@ -32,6 +32,9 @@ describe('PlanProjectorService.projectTenant', () => {
     svc = new PlanProjectorService(prisma as any, entitlements);
     // Default: no active add-ons. Tests that need them override per-case.
     (prisma.tenantAddOn.findMany as any).mockResolvedValue([]);
+    // Default: stale-sources sweep is a no-op. The "switches plan" test
+    // overrides this to assert the sweep + invalidate call happen.
+    (prisma.featureEntitlement.deleteMany as any).mockResolvedValue({ count: 0 });
   });
 
   it('projects PRO plan features and limits as grants under plan:PRO', async () => {
@@ -179,13 +182,20 @@ describe('PlanProjectorService.projectTenant', () => {
       },
     } as any);
     // Simulate that this tenant previously had a BASIC plan still tagged.
-    prisma.featureEntitlement.findMany.mockResolvedValue([
-      { source: 'plan:BASIC' },
-    ] as any);
+    // New behaviour: stale sources are wiped via a single deleteMany +
+    // cache invalidate, not per-source revoke calls. The DELETE filter
+    // matches anything `plan:*` except the current planSource, which is
+    // exactly the right semantic.
+    (prisma.featureEntitlement.deleteMany as any).mockResolvedValue({ count: 1 });
 
     await svc.projectTenant(TENANT);
 
-    expect(entitlements.revokeSource).toHaveBeenCalledWith(TENANT, 'plan:BASIC');
+    const deleteCalls = (prisma.featureEntitlement.deleteMany as any).mock.calls;
+    const staleSweep = deleteCalls.find((c: any) =>
+      c[0]?.where?.source?.startsWith === 'plan:' && c[0]?.where?.source?.not === 'plan:PRO',
+    );
+    expect(staleSweep).toBeDefined();
+    expect(entitlements.invalidate).toHaveBeenCalledWith(TENANT);
   });
 
   it('treats a tenant with no current plan as plan:NONE and writes no plan grants', async () => {

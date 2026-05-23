@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useCreateWebhook, useListWebhooks, useRevokeWebhook, type WebhookSubscription } from './webhooksApi';
 
@@ -175,18 +175,24 @@ function SecretReveal({ secret, onDismiss }: { secret: string; onDismiss: () => 
       .catch(() => undefined);
   }, [secret]);
 
+  // `onDismiss` is a fresh inline function on every parent render, which
+  // would re-fire this effect each time and stack timers. Pin the latest
+  // version in a ref and reference that inside the interval so the deps
+  // can stay empty.
+  const onDismissRef = useRef(onDismiss);
+  onDismissRef.current = onDismiss;
   useEffect(() => {
     const tick = setInterval(() => {
       setSecondsLeft((s) => {
         if (s <= 1) {
-          onDismiss();
+          onDismissRef.current();
           return 0;
         }
         return s - 1;
       });
     }, 1000);
     return () => clearInterval(tick);
-  }, [onDismiss]);
+  }, []);
 
   return (
     <div className="rounded border border-amber-400 bg-amber-50 p-4">

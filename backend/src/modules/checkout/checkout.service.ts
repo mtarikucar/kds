@@ -45,6 +45,30 @@ export class CheckoutService {
   ): Promise<{ quote: CartQuote; hardwareOrderId?: string; addOnIds: string[] }> {
     const quote = await this.quoteSvc.quote(cart);
 
+    // Idempotency: webhook retries and double-clicks on the success page
+    // both replay confirmAndProvision with the same paymentRef. Without
+    // this guard we'd mint a second HardwareOrder, allocate stock twice,
+    // and stack add-on grants. paymentRef is null only on the admin-comp
+    // path (super-admin force-complete) — that one is operator-driven and
+    // we trust the operator not to fire it twice.
+    if (paymentRef) {
+      const existing = await this.prisma.hardwareOrder.findFirst({
+        where: { tenantId, paymentRef },
+        include: { items: true },
+      });
+      if (existing) {
+        // Return the cached provisioning summary. The add-on rows for this
+        // paymentRef are recoverable via tenant_addons.paymentRef, but the
+        // common UI usage is "show me my order" — the id is enough.
+        const addOnRows = await this.prisma.tenantAddOn.findMany({
+          where: { tenantId, paymentRef },
+          select: { id: true },
+        });
+        this.logger.log(`Idempotent confirmAndProvision hit for paymentRef=${paymentRef}`);
+        return { quote, hardwareOrderId: existing.id, addOnIds: addOnRows.map((r) => r.id) };
+      }
+    }
+
     const hardwareLines = quote.lines.filter((l) => l.type === 'hardware' || l.type === 'service');
     const addOnLines = quote.lines.filter((l) => l.type === 'addon');
     const planLines = quote.lines.filter((l) => l.type === 'plan');

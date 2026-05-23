@@ -138,25 +138,47 @@ export class CatalogService {
     });
   }
 
-  /** Allocate qty units to an order line item — also pops serials when present. */
+  /**
+   * Atomically check-and-decrement stock for an order line. Without this
+   * being a single statement, two concurrent checkouts each read the same
+   * `available` count and both decrement — overselling by 1×qty.
+   *
+   * `updateMany` with the `available >= qty` guard is atomic in Postgres:
+   * the rowlock + WHERE clause ensures only one transaction sees the row
+   * as eligible. Count=0 on return means another checkout claimed it
+   * first, so we throw a 409-style BadRequest with the current stock.
+   *
+   * Serial allocation happens in a second read after the decrement
+   * commits — at that point the row is exclusively ours, so a plain
+   * read + update of the remaining serials is race-free.
+   */
   async allocate(productId: string, qty: number, tx?: Prisma.TransactionClient) {
     const client = (tx ?? this.prisma) as Prisma.TransactionClient | PrismaService;
-    const inv = await client.hardwareInventory.findUnique({ where: { productId } });
-    if (!inv) throw new NotFoundException('No inventory row for product');
-    if (inv.available < qty) {
-      throw new BadRequestException(`Insufficient stock: have ${inv.available}, need ${qty}`);
-    }
-    const popped = inv.serialsAvailable.slice(0, qty);
-    const remaining = inv.serialsAvailable.slice(popped.length);
 
-    await client.hardwareInventory.update({
-      where: { productId },
+    const claim = await client.hardwareInventory.updateMany({
+      where: { productId, available: { gte: qty } },
       data: {
         available: { decrement: qty },
         allocated: { increment: qty },
-        serialsAvailable: remaining,
       },
     });
+    if (claim.count === 0) {
+      const inv = await client.hardwareInventory.findUnique({ where: { productId } });
+      if (!inv) throw new NotFoundException('No inventory row for product');
+      throw new BadRequestException(`Insufficient stock: have ${inv.available}, need ${qty}`);
+    }
+
+    // Pop serials post-claim. Re-reading is cheap (single row) and we know
+    // we own the decrement at this point.
+    const inv = await client.hardwareInventory.findUnique({ where: { productId } });
+    const popped = inv!.serialsAvailable.slice(0, qty);
+    if (popped.length > 0) {
+      const remaining = inv!.serialsAvailable.slice(popped.length);
+      await client.hardwareInventory.update({
+        where: { productId },
+        data: { serialsAvailable: remaining },
+      });
+    }
     return { serials: popped };
   }
 
