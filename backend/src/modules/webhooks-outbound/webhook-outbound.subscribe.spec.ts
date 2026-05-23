@@ -85,4 +85,41 @@ describe('WebhookOutboundService.subscribe + fanOut', () => {
     await svc.fanOut({ id: 'evt-1', type: 'x', tenantId: null, payload: {} });
     expect((prisma.tenantWebhookSubscription.findMany as any).mock.calls.length).toBe(0);
   });
+
+  // The iter-34 commit collapsed revoke()'s find-by-id + manual !==tenant
+  // + delete-by-id pattern into a single tenant-scoped deleteMany. These
+  // cases pin the new contract so a future refactor can't silently regress
+  // it back to find-by-id and reintroduce the IDOR-adjacent surface.
+  describe('revoke', () => {
+    it('throws NotFoundException when the subscription belongs to a different tenant', async () => {
+      // Compound deleteMany WHERE (id, tenantId) excludes the foreign row
+      // at the DB layer, so the mock returns count=0.
+      (prisma.tenantWebhookSubscription.deleteMany as any).mockResolvedValue({ count: 0 });
+      await expect(svc.revoke('t1', 's-other')).rejects.toThrow(/Subscription not found/);
+    });
+
+    it('throws NotFoundException when the subscription does not exist', async () => {
+      (prisma.tenantWebhookSubscription.deleteMany as any).mockResolvedValue({ count: 0 });
+      await expect(svc.revoke('t1', 's-missing')).rejects.toThrow(/Subscription not found/);
+    });
+
+    it('issues a compound WHERE deleteMany on the happy path (no find-by-id read)', async () => {
+      let captured: any = null;
+      (prisma.tenantWebhookSubscription.deleteMany as any).mockImplementation(async ({ where }: any) => {
+        captured = where;
+        return { count: 1 };
+      });
+
+      await svc.revoke('t1', 's-1');
+
+      // The tenant scope must be at the query layer, not in JS.
+      expect(captured).toEqual({ id: 's-1', tenantId: 't1' });
+      // Crucially, the service must NOT do a separate find-by-id read
+      // before the delete — that was the IDOR-adjacent shape iter-34
+      // eliminated. (If a future refactor reintroduces it, this assertion
+      // breaks.)
+      expect((prisma.tenantWebhookSubscription.findUnique as any).mock.calls.length).toBe(0);
+      expect((prisma.tenantWebhookSubscription.findFirst as any).mock.calls.length).toBe(0);
+    });
+  });
 });
