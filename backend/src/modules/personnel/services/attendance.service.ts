@@ -214,12 +214,18 @@ export class AttendanceService {
     );
 
     // Compound WHERE on status — race-safe; tenant guard defence-in-depth.
+    // totalBreakMinutes uses { increment } instead of stale-read + delta:
+    // the row was read at the top of the method; if an admin payroll-
+    // correction endpoint or a separate breakStart/breakEnd cycle touched
+    // totalBreakMinutes between the read and the write here, the bare
+    // `attendance.totalBreakMinutes + breakDuration` form would silently
+    // overwrite that change with this stale snapshot.
     const claim = await this.prisma.attendance.updateMany({
       where: { id: attendance.id, tenantId, status: AttendanceStatus.ON_BREAK },
       data: {
         breakEnd: now,
         status: AttendanceStatus.CLOCKED_IN,
-        totalBreakMinutes: attendance.totalBreakMinutes + breakDuration,
+        totalBreakMinutes: { increment: breakDuration },
       },
     });
     if (claim.count === 0) {
