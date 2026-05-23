@@ -196,6 +196,6 @@ export class StockCountsService {
       where: { id, tenantId },
       data: { status: StockCountStatus.CANCELLED },
     });
-    return this.prisma.stockCount.findUnique({ where: { id } });
+    return this.prisma.stockCount.findFirstOrThrow({ where: { id, tenantId } });
   }
 }

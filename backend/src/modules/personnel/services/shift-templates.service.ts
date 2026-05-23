@@ -49,7 +49,9 @@ export class ShiftTemplatesService {
     if (claim.count === 0) {
       throw new NotFoundException('Shift template not found');
     }
-    return this.prisma.shiftTemplate.findUnique({ where: { id } });
+    // Defence-in-depth — keep the read tenant-scoped too. Same pattern
+    // as iter-33's categories + payments fixes.
+    return this.prisma.shiftTemplate.findFirstOrThrow({ where: { id, tenantId } });
   }
 
   async remove(id: string, tenantId: string) {

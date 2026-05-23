@@ -89,9 +89,15 @@ export class WebhookOutboundService {
   }
 
   async revoke(tenantId: string, id: string) {
-    const row = await this.prisma.tenantWebhookSubscription.findUnique({ where: { id } });
-    if (!row || row.tenantId !== tenantId) throw new NotFoundException('Subscription not found');
-    await this.prisma.tenantWebhookSubscription.delete({ where: { id } });
+    // Compound deleteMany — single round-trip that's already
+    // tenant-scoped, replacing the read → manual-check → delete-by-id
+    // pattern. The find-by-id read was an IDOR-adjacent shape (a
+    // refactor that drops the !== check would leak the row's data
+    // back to the caller). Same defence-in-depth pattern iter-9 et al.
+    const result = await this.prisma.tenantWebhookSubscription.deleteMany({
+      where: { id, tenantId },
+    });
+    if (result.count === 0) throw new NotFoundException('Subscription not found');
   }
 
   /** Bus-side fan-out: enqueue one delivery row per matching subscription. */
