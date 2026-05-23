@@ -53,3 +53,43 @@ export function maskPhone(value: string | null | undefined): string {
   }
   return `***${trimmed.slice(-2)}`;
 }
+
+/**
+ * Mask an IP address for log output. KVKK / GDPR treat IPs as personal
+ * data when paired with timestamps + identifiers.
+ *
+ * The masking rule keeps roughly /16 worth of structure — enough to
+ * group requests from the same ISP block when debugging a flood / rate
+ * issue, but not enough to track an individual user.
+ *
+ *   "203.0.113.42"        → "203.0.x.x"          (IPv4 → /16 retained)
+ *   "2001:db8::1"         → "2001:db8:x:x:x:x:x:x" (IPv6 → /32 retained)
+ *   "::1"                 → "::1"                (loopback — left as-is)
+ *   "127.0.0.1"           → "127.0.0.1"          (loopback — left as-is)
+ *   "unknown"             → "unknown"            (no dots/colons → returned verbatim)
+ *   ""                    → ""
+ *
+ * SECURITY EXCEPTION: when logging an attacker's IP (e.g. webhook from
+ * a non-allowlisted source, repeated auth failure from a single host),
+ * keep the full IP — it's evidence in an investigation, not PII about
+ * a customer. Use the raw value at those callsites and document why.
+ */
+export function maskIp(value: string | null | undefined): string {
+  if (!value) return '';
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  // Loopback addresses aren't PII; keep them verbatim for local-dev clarity.
+  if (trimmed === '127.0.0.1' || trimmed === '::1') return trimmed;
+  if (trimmed.includes(':')) {
+    // IPv6 — keep the first two hextets (≈ /32, ISP-block grain).
+    const parts = trimmed.split(':');
+    if (parts.length < 3) return trimmed; // Malformed; return as-is.
+    return `${parts[0]}:${parts[1]}:${'x:'.repeat(parts.length - 2).slice(0, -1)}`;
+  }
+  if (trimmed.includes('.')) {
+    const octets = trimmed.split('.');
+    if (octets.length !== 4) return trimmed; // Not a normal IPv4.
+    return `${octets[0]}.${octets[1]}.x.x`;
+  }
+  return trimmed;
+}

@@ -1,4 +1,4 @@
-import { maskEmail, maskPhone } from './pii-mask.helper';
+import { maskEmail, maskIp, maskPhone } from './pii-mask.helper';
 
 describe('maskEmail', () => {
   it('masks the local part keeping first character and domain', () => {
@@ -59,5 +59,34 @@ describe('maskPhone', () => {
 
   it('trims surrounding whitespace before masking', () => {
     expect(maskPhone('  +905551112233  ')).toBe('+90****33');
+  });
+});
+
+describe('maskIp', () => {
+  it('truncates IPv4 to first two octets', () => {
+    expect(maskIp('203.0.113.42')).toBe('203.0.x.x');
+    expect(maskIp('192.168.1.1')).toBe('192.168.x.x');
+  });
+
+  it('truncates IPv6 to first two hextets', () => {
+    expect(maskIp('2001:db8::1')).toBe('2001:db8:x:x');
+    // 8-segment fully-expanded form
+    expect(maskIp('2001:db8:0:0:0:0:0:1')).toBe('2001:db8:x:x:x:x:x:x');
+  });
+
+  it('preserves loopback addresses verbatim (not PII, useful in dev)', () => {
+    expect(maskIp('127.0.0.1')).toBe('127.0.0.1');
+    expect(maskIp('::1')).toBe('::1');
+  });
+
+  it('returns malformed input as-is rather than guessing', () => {
+    expect(maskIp('unknown')).toBe('unknown');
+    expect(maskIp('203.0.113')).toBe('203.0.113'); // only 3 octets
+  });
+
+  it('returns empty for null / undefined / empty', () => {
+    expect(maskIp('')).toBe('');
+    expect(maskIp(null)).toBe('');
+    expect(maskIp(undefined)).toBe('');
   });
 });

@@ -33,6 +33,10 @@ export class PaytrIpAllowlistGuard implements CanActivate {
       req.socket?.remoteAddress ||
       '';
     if (this.allowed.has(ip)) return true;
+    // Security log — keep the full IP un-masked. This is an
+    // attacker's source address (forged-webhook attempt), not a
+    // customer PII data point. See the SECURITY EXCEPTION note in
+    // common/helpers/pii-mask.helper.ts:maskIp.
     this.logger.warn(`Rejected PayTR webhook from non-allowlisted IP=${ip}`);
     return false;
   }

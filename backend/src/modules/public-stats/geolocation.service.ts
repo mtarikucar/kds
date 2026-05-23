@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import axios from 'axios';
+import { maskIp } from '../../common/helpers/pii-mask.helper';
 
 export interface GeoData {
   country: string;
@@ -79,7 +80,7 @@ export class GeolocationService {
         return geoData;
       }
     } catch (error) {
-      this.logger.warn(`Geolocation lookup failed for ${ip}: ${error.message}`);
+      this.logger.warn(`Geolocation lookup failed for ${maskIp(ip)}: ${error.message}`);
     }
 
     // Cache failed lookups too to avoid repeated failures
