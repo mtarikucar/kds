@@ -121,6 +121,26 @@ export class CatalogService {
   }
 
   async archive(id: string) {
+    // Reject archive while there are unfulfilled order lines pointing at
+    // this product. Otherwise the fulfillment workflow (packing slips,
+    // shipping labels, warranty registration) hits a hidden product and
+    // either silently shows blanks or fails at render time. Operators
+    // should either ship those orders first or cancel them.
+    //
+    // "Pending" here = the HardwareOrder is not yet delivered/installed/
+    // refunded — the FK from items to orders gives us the order status
+    // for the eligibility check.
+    const pending = await this.prisma.hardwareOrderItem.count({
+      where: {
+        productId: id,
+        order: { status: { notIn: ['delivered', 'installed', 'refunded', 'returned', 'cancelled'] } },
+      },
+    });
+    if (pending > 0) {
+      throw new BadRequestException(
+        `Cannot archive — ${pending} unfulfilled order line(s) reference this product. Ship or cancel them first.`,
+      );
+    }
     return this.update(id, { status: 'archived' });
   }
 

@@ -1,4 +1,4 @@
-import { Injectable, Logger, Inject, forwardRef } from "@nestjs/common";
+import { Injectable, Logger, Inject, forwardRef, Optional } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { addDays, addHours } from "date-fns";
 import { PrismaService } from "../../../prisma/prisma.service";
@@ -11,6 +11,8 @@ import {
   PaymentStatus,
   SubscriptionStatus,
 } from "../../../common/constants/subscription.enum";
+import { OutboxService } from "../../outbox/outbox.service";
+import { EventTypes } from "../../outbox/event-types";
 
 /**
  * All jobs acquire a Postgres advisory lock per job name before running,
@@ -33,6 +35,9 @@ export class SubscriptionSchedulerService {
     // bootstrap and throws.
     @Inject(forwardRef(() => PaytrSettlementService))
     private readonly settlement: PaytrSettlementService,
+    // OutboxModule is @Global; Optional() so the legacy tests that build
+    // the scheduler directly don't need to supply it.
+    @Optional() private readonly outbox?: OutboxService,
   ) {}
 
   /**
@@ -251,17 +256,48 @@ export class SubscriptionSchedulerService {
     await this.withJobLock("past-due-subscriptions", async () => {
       this.logger.log("Running past-due subscription check...");
       const sevenDaysAgo = addDays(new Date(), -7);
-      const result = await this.prisma.subscription.updateMany({
+      // Two-step transition so we can emit one outbox event per expired
+      // subscription. Plain updateMany was atomic but silent — the
+      // entitlement projector never got the signal to revoke grants on
+      // grace expiry, so tenants whose payment lapsed kept premium
+      // features indefinitely. Now: find expiring rows → flip each one
+      // → emit subscription.cancelled.v1. The cancellation event is the
+      // same one the projector already listens for; downgrade event
+      // semantics ("you're losing access") match grace-expiry intent.
+      const expiring = await this.prisma.subscription.findMany({
         where: {
           status: SubscriptionStatus.PAST_DUE,
           currentPeriodEnd: { lte: sevenDaysAgo },
         },
-        data: {
-          status: SubscriptionStatus.EXPIRED,
-          endedAt: new Date(),
-        },
+        select: { id: true, tenantId: true, planId: true, plan: { select: { name: true } } },
       });
-      this.logger.log(`Expired ${result.count} past-due subscriptions`);
+      if (expiring.length === 0) {
+        this.logger.log("No past-due subscriptions to expire");
+        return;
+      }
+      const now = new Date();
+      const ids = expiring.map((s) => s.id);
+      const updated = await this.prisma.subscription.updateMany({
+        where: { id: { in: ids }, status: SubscriptionStatus.PAST_DUE },
+        data: { status: SubscriptionStatus.EXPIRED, endedAt: now },
+      });
+      for (const sub of expiring) {
+        await this.outbox
+          ?.append({
+            type: EventTypes.SubscriptionCancelled,
+            tenantId: sub.tenantId,
+            payload: {
+              subscriptionId: sub.id,
+              tenantId: sub.tenantId,
+              planCode: sub.plan?.name,
+              reason: "grace_expired",
+            },
+          })
+          .catch((e) =>
+            this.logger.warn(`expired emit failed for sub=${sub.id}: ${(e as Error).message}`),
+          );
+      }
+      this.logger.log(`Expired ${updated.count} past-due subscriptions (events emitted)`);
     });
   }
 

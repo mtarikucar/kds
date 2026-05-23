@@ -23,9 +23,12 @@ export default function PairingScreen({ onPaired }: { onPaired: (token: DeviceTo
     setSubmitting(true);
     setError(null);
     try {
-      // Persist the API URL so a kiosk reboot doesn't lose it.
-      localStorage.setItem('kds_api_url', apiUrl);
       const out = await pairDevice(apiUrl, pairCode.trim().toUpperCase());
+      // Persist ONLY after the server has accepted the pair. The earlier
+      // version wrote pre-pair, so a typo or attacker URL became the
+      // persisted default even on failure — the next pair attempt's
+      // code would then leak to that server.
+      localStorage.setItem('kds_api_url', apiUrl);
       onPaired({ ...out, apiUrl });
     } catch (e: any) {
       setError(e?.message ?? 'Pair failed');

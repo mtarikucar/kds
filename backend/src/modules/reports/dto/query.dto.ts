@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsDateString, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { IsDateString, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
 import { EmptyStringToUndefined } from '../../../common/dto/transforms';
 
 export class DateRangeQueryDto {
@@ -19,10 +19,12 @@ export class DateRangeQueryDto {
   // HummyTummy Phase 3 — branch-scoping. Omitting this returns tenant-wide
   // numbers (including null-branch legacy orders); providing it restricts
   // to orders booked against that branch.
-  @ApiPropertyOptional({ description: 'Restrict to a specific branch' })
+  // Format-validate up front: a typo'd id used to silently filter to zero
+  // rows ("no data for this period"), now returns 400 with a clear error.
+  @ApiPropertyOptional({ description: 'Restrict to a specific branch (UUID)' })
   @EmptyStringToUndefined()
   @IsOptional()
-  @IsString()
+  @IsUUID()
   branchId?: string;
 }
 
@@ -43,9 +45,9 @@ export class SingleDateQueryDto {
   @IsDateString()
   date?: string;
 
-  @ApiPropertyOptional({ description: 'Restrict to a specific branch' })
+  @ApiPropertyOptional({ description: 'Restrict to a specific branch (UUID)' })
   @EmptyStringToUndefined()
   @IsOptional()
-  @IsString()
+  @IsUUID()
   branchId?: string;
 }

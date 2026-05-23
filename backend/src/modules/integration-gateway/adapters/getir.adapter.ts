@@ -1,6 +1,7 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { IntegrationAdapter, IntegrationKind } from '../integration-adapter.interface';
+import { verifyHmacHex } from '../sig-verify';
 
 /**
  * Getir Yemek delivery adapter (scaffold). Same shape as Yemeksepeti — kept
@@ -36,7 +37,7 @@ export class GetirAdapter implements IntegrationAdapter {
     const body = typeof raw === 'string' ? raw : raw.toString('utf8');
     if (this.cfg.webhookSecret) {
       const expected = createHmac('sha256', this.cfg.webhookSecret).update(body).digest('hex');
-      if (expected.length !== signature.length || !timingSafeEqual(Buffer.from(expected), Buffer.from(signature))) {
+      if (!verifyHmacHex(expected, signature)) {
         throw new Error('getir: invalid signature');
       }
     }

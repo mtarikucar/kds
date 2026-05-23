@@ -1,6 +1,7 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
+import { createHmac } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { IntegrationAdapter, IntegrationKind } from '../integration-adapter.interface';
+import { verifyHmacHex } from '../sig-verify';
 
 /**
  * Trendyol Yemek delivery adapter (scaffold).
@@ -41,7 +42,7 @@ export class TrendyolYemekAdapter implements IntegrationAdapter {
     const secret = this.cfg.webhookSecret ?? this.cfg.apiSecret;
     if (secret) {
       const expected = createHmac('sha256', secret).update(body).digest('hex');
-      if (expected.length !== signature.length || !timingSafeEqual(Buffer.from(expected), Buffer.from(signature))) {
+      if (!verifyHmacHex(expected, signature)) {
         throw new Error('trendyol: invalid signature');
       }
     }
