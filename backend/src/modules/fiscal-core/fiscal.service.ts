@@ -27,10 +27,14 @@ export class FiscalService {
   ) {}
 
   async issueReceipt(req: FiscalReceiptRequest) {
-    const device = await this.prisma.fiscalDeviceRecord.findUnique({
-      where: { id: req.fiscalDeviceId },
+    // Compound WHERE — same defense-in-depth pattern as iter-35
+    // device-mesh findOrThrow. Fiscal records are TR-law-mandated
+    // financial data; an id-only lookup that returns the row to a
+    // later step (status check, provider dispatch) is too brittle.
+    const device = await this.prisma.fiscalDeviceRecord.findFirst({
+      where: { id: req.fiscalDeviceId, tenantId: req.tenantId },
     });
-    if (!device || device.tenantId !== req.tenantId) {
+    if (!device) {
       throw new NotFoundException('Fiscal device not found');
     }
     if (device.status === 'retired') throw new BadRequestException('Fiscal device retired');
@@ -128,8 +132,10 @@ export class FiscalService {
   }
 
   async cancelReceipt(tenantId: string, fiscalReceiptId: string, reason: string) {
-    const row = await this.prisma.fiscalReceipt.findUnique({ where: { id: fiscalReceiptId } });
-    if (!row || row.tenantId !== tenantId) throw new NotFoundException('Receipt not found');
+    const row = await this.prisma.fiscalReceipt.findFirst({
+      where: { id: fiscalReceiptId, tenantId },
+    });
+    if (!row) throw new NotFoundException('Receipt not found');
     if (row.status !== 'issued') throw new BadRequestException('Only issued receipts can be cancelled');
     const provider = this.registry.get(row.providerId);
     await provider.cancelReceipt(fiscalReceiptId, reason);
@@ -140,8 +146,10 @@ export class FiscalService {
   }
 
   async closeDay(tenantId: string, fiscalDeviceId: string) {
-    const device = await this.prisma.fiscalDeviceRecord.findUnique({ where: { id: fiscalDeviceId } });
-    if (!device || device.tenantId !== tenantId) throw new NotFoundException('Fiscal device not found');
+    const device = await this.prisma.fiscalDeviceRecord.findFirst({
+      where: { id: fiscalDeviceId, tenantId },
+    });
+    if (!device) throw new NotFoundException('Fiscal device not found');
     const provider = this.registry.get(device.providerId);
     const report = await provider.closeDay(fiscalDeviceId);
     await this.prisma.fiscalDayClose.create({
@@ -191,11 +199,11 @@ export class FiscalService {
   private static readonly RETRY_COOLDOWN_MS = 30_000;
 
   async retryFailed(tenantId: string, fiscalReceiptId: string) {
-    const row = await this.prisma.fiscalReceipt.findUnique({
-      where: { id: fiscalReceiptId },
+    const row = await this.prisma.fiscalReceipt.findFirst({
+      where: { id: fiscalReceiptId, tenantId },
       include: { lines: true, fiscalDevice: true },
     });
-    if (!row || row.tenantId !== tenantId) throw new NotFoundException('Receipt not found');
+    if (!row) throw new NotFoundException('Receipt not found');
     if (row.status === 'issued') return row;   // already succeeded
     if (row.status === 'cancelled') {
       throw new BadRequestException('Cannot retry a cancelled receipt');

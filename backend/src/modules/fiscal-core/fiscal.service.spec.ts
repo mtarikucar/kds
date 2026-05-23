@@ -24,7 +24,7 @@ describe('FiscalService.issueReceipt', () => {
   });
 
   it('returns the existing row on idempotent retry', async () => {
-    prisma.fiscalDeviceRecord.findUnique.mockResolvedValue({
+    prisma.fiscalDeviceRecord.findFirst.mockResolvedValue({
       id: DEVICE_ID, tenantId: TENANT, providerId: 'mock', status: 'online',
     } as any);
     prisma.fiscalReceipt.findUnique.mockResolvedValue({ id: 'fr-1', tenantId: TENANT, status: 'issued' } as any);
@@ -41,7 +41,7 @@ describe('FiscalService.issueReceipt', () => {
   });
 
   it('computes VAT breakdown per rate and persists the queued row', async () => {
-    prisma.fiscalDeviceRecord.findUnique.mockResolvedValue({
+    prisma.fiscalDeviceRecord.findFirst.mockResolvedValue({
       id: DEVICE_ID, tenantId: TENANT, providerId: 'mock', status: 'online',
     } as any);
     prisma.fiscalReceipt.findUnique.mockResolvedValue(null);
@@ -79,7 +79,7 @@ describe('FiscalService.issueReceipt', () => {
   });
 
   it('marks the row failed and emits a failure event when the adapter throws', async () => {
-    prisma.fiscalDeviceRecord.findUnique.mockResolvedValue({
+    prisma.fiscalDeviceRecord.findFirst.mockResolvedValue({
       id: DEVICE_ID, tenantId: TENANT, providerId: 'mock', status: 'online',
     } as any);
     prisma.fiscalReceipt.findUnique.mockResolvedValue(null);
