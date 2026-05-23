@@ -69,4 +69,40 @@ describe('LocalBridgeService', () => {
     } as any);
     expect(await svc.authenticateToken('any')).toBeNull();
   });
+
+  // The iter-38 commit collapsed retire()'s read + manual-check + update
+  // shape into one tenant-scoped updateMany. These cases pin that contract.
+  it('retire rejects when the bridge belongs to a different tenant (updateMany count=0)', async () => {
+    (prisma.localBridgeAgent.updateMany as any).mockResolvedValue({ count: 0 });
+    await expect(svc.retire('t1', 'lba-other')).rejects.toThrow(/not found/i);
+  });
+
+  it('retire flips status to retired and clears both token hashes atomically', async () => {
+    let captured: any = null;
+    (prisma.localBridgeAgent.updateMany as any).mockImplementation(async ({ where, data }: any) => {
+      captured = { where, data };
+      return { count: 1 };
+    });
+    (prisma.localBridgeAgent.findFirstOrThrow as any).mockResolvedValue({
+      id: 'lba-1',
+      tenantId: 't1',
+      status: 'retired',
+      tokenHash: null,
+      provisioningTokenHash: null,
+    } as any);
+
+    const out = await svc.retire('t1', 'lba-1');
+
+    // Tenant scope is at the query layer, not in JS — this is the
+    // defense-in-depth invariant iter-38 introduced.
+    expect(captured.where).toEqual({ id: 'lba-1', tenantId: 't1' });
+    expect(captured.data).toEqual({
+      status: 'retired',
+      tokenHash: null,
+      provisioningTokenHash: null,
+    });
+    expect(out.status).toBe('retired');
+    expect(out.tokenHash).toBeNull();
+    expect(out.provisioningTokenHash).toBeNull();
+  });
 });
