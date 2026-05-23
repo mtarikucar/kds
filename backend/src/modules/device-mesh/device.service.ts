@@ -110,8 +110,12 @@ export class DeviceService {
   }
 
   async findOrThrow(tenantId: string, id: string) {
-    const row = await this.prisma.device.findUnique({ where: { id } });
-    if (!row || row.tenantId !== tenantId) throw new NotFoundException('Device not found');
+    // Compound WHERE — see branches.service.ts:findOrThrow for the
+    // defense-in-depth rationale. The row returned is exposed to the
+    // caller, so a future refactor that drops the `!==` check would
+    // leak a cross-tenant device's pairing metadata.
+    const row = await this.prisma.device.findFirst({ where: { id, tenantId } });
+    if (!row) throw new NotFoundException('Device not found');
     return row;
   }
 

@@ -20,8 +20,13 @@ export class BranchesService {
   }
 
   async findOrThrow(tenantId: string, id: string) {
-    const row = await this.prisma.branch.findUnique({ where: { id } });
-    if (!row || row.tenantId !== tenantId) throw new NotFoundException('Branch not found');
+    // Compound WHERE rather than findUnique + manual !== check — same
+    // defense-in-depth rationale as iter-9/12/33/34's write-path sweeps.
+    // The previous shape returns the row from a find-by-id step before
+    // the tenant guard, so a future refactor that extracts the find
+    // into a helper would silently leak a cross-tenant row's contents.
+    const row = await this.prisma.branch.findFirst({ where: { id, tenantId } });
+    if (!row) throw new NotFoundException('Branch not found');
     return row;
   }
 
