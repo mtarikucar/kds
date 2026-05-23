@@ -322,8 +322,14 @@ export class AuthService {
       } as any;
     }
 
-    // Track successful registration in Sentry
-    Sentry.captureMessage(`New user registered: ${user.email}`, {
+    // Track successful registration in Sentry. We deliberately exclude
+    // email + firstName + lastName from both the message body and the
+    // `extra` payload — sentry.config.ts's beforeSend only scrubs known
+    // user.email/ip_address fields, NOT arbitrary message text or extras,
+    // so anything we interpolate here would persist in Sentry's long-term
+    // retention. GDPR/KVKK violation for a TR-resident SaaS. userId is
+    // enough to join back to the app DB when debugging.
+    Sentry.captureMessage('New user registered', {
       level: 'info',
       tags: {
         event: 'user.register',
@@ -333,9 +339,6 @@ export class AuthService {
       extra: {
         userId: user.id,
         tenantId: user.tenantId,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
       },
     });
 
@@ -346,14 +349,14 @@ export class AuthService {
     const user = await this.validateUser(loginDto.email, loginDto.password);
 
     if (!user) {
-      // Track failed login attempt
-      Sentry.captureMessage(`Failed login attempt: ${loginDto.email}`, {
+      // Track failed login attempt. Like in `register`, we keep the
+      // submitted email out of Sentry — message body and extra fields
+      // bypass beforeSend's user.email scrubber, so plaintext emails
+      // would land in long-term retention.
+      Sentry.captureMessage('Failed login attempt', {
         level: 'warning',
         tags: {
           event: 'user.login.failed',
-        },
-        extra: {
-          email: loginDto.email,
         },
       });
 
@@ -369,8 +372,9 @@ export class AuthService {
       throw new InvalidCredentialsException();
     }
 
-    // Track successful login in Sentry
-    Sentry.captureMessage(`User logged in: ${user.email}`, {
+    // Track successful login in Sentry. Email excluded — see register/login
+    // failed comments above.
+    Sentry.captureMessage('User logged in', {
       level: 'info',
       tags: {
         event: 'user.login',
@@ -379,7 +383,6 @@ export class AuthService {
       extra: {
         userId: user.id,
         tenantId: user.tenantId,
-        email: user.email,
       },
     });
 
@@ -392,10 +395,12 @@ export class AuthService {
       data: { lastLogin: new Date() },
     });
 
-    // Set user context for future errors
+    // Set user context for future errors. Email omitted — beforeSend would
+    // strip event.user.email on outbound events anyway, but not passing it
+    // in the first place means it's never sitting in the SDK's in-memory
+    // scope where a misconfiguration could leak it.
     Sentry.setUser({
       id: user.id,
-      email: user.email,
     });
 
     return this.generateTokens(user, ip, userAgent);
@@ -1093,8 +1098,8 @@ export class AuthService {
         }
         await this.assertTenantActive(user.tenantId);
 
-        // Track Google login in Sentry
-        Sentry.captureMessage(`User logged in via Google: ${user.email}`, {
+        // Track Google login in Sentry — email omitted (PII scrub policy).
+        Sentry.captureMessage('User logged in via Google', {
           level: 'info',
           tags: {
             event: 'user.login.google',
@@ -1103,7 +1108,6 @@ export class AuthService {
           extra: {
             userId: user.id,
             tenantId: user.tenantId,
-            email: user.email,
           },
         });
 
@@ -1150,8 +1154,8 @@ export class AuthService {
           },
         });
 
-        // Track Google account linking in Sentry
-        Sentry.captureMessage(`Google account linked: ${user.email}`, {
+        // Track Google account linking in Sentry — email omitted.
+        Sentry.captureMessage('Google account linked', {
           level: 'info',
           tags: {
             event: 'user.link.google',
@@ -1160,7 +1164,6 @@ export class AuthService {
           extra: {
             userId: user.id,
             tenantId: user.tenantId,
-            email: user.email,
           },
         });
 
@@ -1225,8 +1228,8 @@ export class AuthService {
         }
         await this.assertTenantActive(user.tenantId);
 
-        // Track Apple login in Sentry
-        Sentry.captureMessage(`User logged in via Apple: ${user.email}`, {
+        // Track Apple login in Sentry — email omitted (PII scrub policy).
+        Sentry.captureMessage('User logged in via Apple', {
           level: 'info',
           tags: {
             event: 'user.login.apple',
@@ -1235,7 +1238,6 @@ export class AuthService {
           extra: {
             userId: user.id,
             tenantId: user.tenantId,
-            email: user.email,
           },
         });
 
@@ -1282,8 +1284,8 @@ export class AuthService {
           },
         });
 
-        // Track Apple account linking in Sentry
-        Sentry.captureMessage(`Apple account linked: ${user.email}`, {
+        // Track Apple account linking in Sentry — email omitted.
+        Sentry.captureMessage('Apple account linked', {
           level: 'info',
           tags: {
             event: 'user.link.apple',
@@ -1292,7 +1294,6 @@ export class AuthService {
           extra: {
             userId: user.id,
             tenantId: user.tenantId,
-            email: user.email,
           },
         });
 
@@ -1416,8 +1417,9 @@ export class AuthService {
       throw err;
     }
 
-    // Track new social auth registration in Sentry
-    Sentry.captureMessage(`New user registered via ${authProvider}: ${email}`, {
+    // Track new social auth registration in Sentry — email + name omitted
+    // (PII scrub policy). restaurantName is business metadata not PII.
+    Sentry.captureMessage('New user registered via social auth', {
       level: 'info',
       tags: {
         event: 'user.register.social',
@@ -1427,9 +1429,6 @@ export class AuthService {
       extra: {
         userId: user.id,
         tenantId: user.tenantId,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
         restaurantName,
       },
     });
