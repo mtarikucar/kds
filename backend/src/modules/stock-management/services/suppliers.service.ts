@@ -38,10 +38,16 @@ export class SuppliersService {
 
   async update(id: string, dto: UpdateSupplierDto, tenantId: string) {
     await this.findOne(id, tenantId);
-    return this.prisma.supplier.update({
-      where: { id },
+    // Compound WHERE so a regression in findOne (e.g. someone replaces
+    // findFirst with findUnique without re-checking tenantId) can't leak
+    // into a cross-tenant supplier rename. Same defense-in-depth pattern
+    // `removeStockItem` already uses below.
+    const claim = await this.prisma.supplier.updateMany({
+      where: { id, tenantId },
       data: dto,
     });
+    if (claim.count === 0) throw new NotFoundException('Supplier not found');
+    return this.prisma.supplier.findFirstOrThrow({ where: { id, tenantId } });
   }
 
   async remove(id: string, tenantId: string) {
@@ -53,7 +59,9 @@ export class SuppliersService {
     if (activePOs > 0) {
       throw new BadRequestException('Cannot delete supplier with active purchase orders');
     }
-    return this.prisma.supplier.delete({ where: { id } });
+    const claim = await this.prisma.supplier.deleteMany({ where: { id, tenantId } });
+    if (claim.count === 0) throw new NotFoundException('Supplier not found');
+    return { id };
   }
 
   async addStockItem(supplierId: string, dto: SupplierStockItemDto, tenantId: string) {

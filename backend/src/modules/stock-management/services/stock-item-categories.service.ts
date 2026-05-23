@@ -44,14 +44,21 @@ export class StockItemCategoriesService {
       if (existing) throw new ConflictException('Category with this name already exists');
     }
 
-    return this.prisma.stockItemCategory.update({
-      where: { id },
+    // Compound WHERE so the write is tenant-scoped independently of the
+    // findOne pre-check — a future refactor that drops the pre-check
+    // can't regress into cross-tenant edits.
+    const claim = await this.prisma.stockItemCategory.updateMany({
+      where: { id, tenantId },
       data: dto,
     });
+    if (claim.count === 0) throw new NotFoundException('Stock item category not found');
+    return this.prisma.stockItemCategory.findFirstOrThrow({ where: { id, tenantId } });
   }
 
   async remove(id: string, tenantId: string) {
     await this.findOne(id, tenantId);
-    return this.prisma.stockItemCategory.delete({ where: { id } });
+    const claim = await this.prisma.stockItemCategory.deleteMany({ where: { id, tenantId } });
+    if (claim.count === 0) throw new NotFoundException('Stock item category not found');
+    return { id };
   }
 }

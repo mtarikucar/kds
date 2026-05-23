@@ -297,10 +297,17 @@ export class TablesService {
         }
       }
 
-      return tx.table.update({
-        where: { id },
+      // Defense-in-depth: the findFirst above is a TOCTOU check; the write
+      // must also be tenant-scoped so a future refactor that drops the
+      // findFirst (or the ConflictException early-return) can't regress
+      // into a cross-tenant status overwrite. Same pattern as `update()`
+      // above (line 258).
+      const claim = await tx.table.updateMany({
+        where: { id, tenantId },
         data: { status: updateStatusDto.status },
       });
+      if (claim.count === 0) throw new NotFoundException('Table not found');
+      return tx.table.findFirstOrThrow({ where: { id, tenantId } });
     });
   }
 
@@ -322,7 +329,12 @@ export class TablesService {
       if (activeOrders > 0) {
         throw new ConflictException('Cannot delete table with active orders');
       }
-      return tx.table.delete({ where: { id } });
+      // Compound WHERE on the delete (defense-in-depth — same as update/
+      // updateStatus). deleteMany returns count rather than throwing so a
+      // missing row is explicit; we re-raise as 404 to preserve the API.
+      const claim = await tx.table.deleteMany({ where: { id, tenantId } });
+      if (claim.count === 0) throw new NotFoundException('Table not found');
+      return { id };
     });
   }
 
