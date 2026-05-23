@@ -20,7 +20,19 @@ export class NotificationService {
   private templatesPath: string;
 
   constructor(private configService: ConfigService) {
-    this.templatesPath = path.join(__dirname, "../templates/emails");
+    // process.cwd() instead of __dirname — same reasoning EmailService
+    // documents (common/services/email.service.ts:26). NestJS+webpack
+    // bundles to a single dist/main.js, so __dirname at runtime is
+    // /app/dist/ regardless of source location. Combined with the
+    // `path.join(__dirname, '../templates/emails')` form, prod
+    // accidentally resolved to /app/templates/emails/ — same dir
+    // EmailService uses — but DEV resolved to
+    // backend/src/modules/subscriptions/templates/emails/, forcing
+    // 17 templates to be maintained in two locations to make dev work.
+    // process.cwd() collapses both environments onto the same canonical
+    // dir (backend/templates/emails/), making the subscriptions/
+    // template duplicates obviously dead.
+    this.templatesPath = path.join(process.cwd(), "templates/emails");
     this.initializeTransporter();
   }
 
