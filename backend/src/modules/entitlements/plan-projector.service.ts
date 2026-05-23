@@ -57,8 +57,38 @@ export class PlanProjectorService {
     private readonly entitlements: EntitlementService,
   ) {}
 
+  /**
+   * Per-tenant in-process mutex for projectTenant. Two parallel events
+   * for the same tenant (e.g. addon.purchased + subscription.activated
+   * arriving in the same outbox batch) would otherwise race the
+   * read-then-write cycle, each missing the other's mutation. The mutex
+   * serialises projections per tenant; different tenants still run in
+   * parallel. Cross-replica serialisation isn't required because the
+   * projection is idempotent — the worst case is the second run sees
+   * what the first wrote and is a no-op.
+   */
+  private readonly tenantLocks = new Map<string, Promise<void>>();
+
   /** Project one tenant. Call after any subscription/override mutation. */
   async projectTenant(tenantId: string): Promise<void> {
+    // Chain onto the existing in-flight projection for this tenant. Each
+    // caller awaits the chain head; new callers extend it. Failures
+    // propagate naturally because we await before continuing.
+    const prior = this.tenantLocks.get(tenantId) ?? Promise.resolve();
+    const next = prior.catch(() => undefined).then(() => this.projectTenantInner(tenantId));
+    this.tenantLocks.set(tenantId, next);
+    try {
+      await next;
+    } finally {
+      // Clear the slot only if it's still pointing at us (a later caller
+      // may have already overwritten it with their own chain).
+      if (this.tenantLocks.get(tenantId) === next) {
+        this.tenantLocks.delete(tenantId);
+      }
+    }
+  }
+
+  private async projectTenantInner(tenantId: string): Promise<void> {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
       include: { currentPlan: true },

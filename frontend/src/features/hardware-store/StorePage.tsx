@@ -151,16 +151,20 @@ export default function StorePage() {
             </button>
             {currentQuote && (
               <div className="space-y-1 rounded bg-gray-50 p-3 text-sm">
-                <Row label="Subtotal" cents={currentQuote.subtotalCents} />
-                <Row label="Tax" cents={currentQuote.taxCents} />
-                <Row label="Shipping" cents={currentQuote.shippingCents} />
-                <Row label="Total" cents={currentQuote.totalCents} bold />
+                <Row label="Subtotal" cents={currentQuote.subtotalCents} currency={currentQuote.currency} />
+                <Row label="Tax" cents={currentQuote.taxCents} currency={currentQuote.currency} />
+                <Row label="Shipping" cents={currentQuote.shippingCents} currency={currentQuote.currency} />
+                <Row label="Total" cents={currentQuote.totalCents} currency={currentQuote.currency} bold />
               </div>
             )}
             <button
-              className="w-full rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              className="w-full rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
               onClick={placeOrder}
-              disabled={confirm.isPending}
+              // Block clicks when there's nothing to provision or while a
+              // confirm is mid-flight. Without the cart.length guard, the
+              // button silently no-ops and operators re-click thinking the
+              // page is frozen.
+              disabled={confirm.isPending || cart.length === 0}
             >
               {confirm.isPending ? 'Placing…' : 'Place order'}
             </button>
@@ -171,11 +175,15 @@ export default function StorePage() {
   );
 }
 
-function Row({ label, cents, bold }: { label: string; cents: number; bold?: boolean }) {
+function Row({ label, cents, currency, bold }: { label: string; cents: number; currency: string; bold?: boolean }) {
+  // Use the quote's actual currency rather than hard-coding TRY. A tenant
+  // selling USD hardware must not see ₺ next to their cart total.
+  // `tr-TR` locale still controls grouping/separator format, which is
+  // appropriate for the dashboard's primary audience.
   return (
     <div className={`flex items-center justify-between ${bold ? 'border-t pt-1 font-medium' : ''}`}>
       <span>{label}</span>
-      <span>{(cents / 100).toLocaleString('tr-TR', { style: 'currency', currency: 'TRY' })}</span>
+      <span>{(cents / 100).toLocaleString('tr-TR', { style: 'currency', currency })}</span>
     </div>
   );
 }

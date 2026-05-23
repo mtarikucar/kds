@@ -59,14 +59,30 @@ export class WebhookDeliveryWorkerService {
   }
 
   private async attempt(d: any): Promise<void> {
+    // The outbox payload is loaded lazily from outbox_events. If retention
+    // purged the source event (long-pending delivery + aggressive purge
+    // policy), `loadPayload` returns null — sending {"payload":null} to
+    // the receiver is silent data loss they can't detect. Mark this
+    // delivery `failed` with an actionable message instead.
+    const payload = await this.loadPayload(d.eventId);
+    if (payload == null) {
+      this.logger.warn(`webhook ${d.id}: source outbox event ${d.eventId} no longer exists; marking failed`);
+      await this.prisma.webhookDelivery.update({
+        where: { id: d.id },
+        data: {
+          status: 'failed',
+          lastStatusCode: 0,
+          lastResponseSnippet: 'source event purged before delivery — payload unavailable',
+        },
+      });
+      return;
+    }
+
     const body = JSON.stringify({
       id: d.eventId,
       type: d.eventType,
       tenantId: d.subscription.tenantId,
-      // The outbox payload itself is loaded lazily from outbox_events. We
-      // could embed it on the delivery row but that explodes storage if a
-      // tenant subscribes to many event types. Cheap join at delivery time.
-      payload: await this.loadPayload(d.eventId),
+      payload,
     });
     const ts = Date.now();
 

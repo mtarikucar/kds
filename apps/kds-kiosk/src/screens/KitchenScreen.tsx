@@ -29,19 +29,26 @@ export default function KitchenScreen({ token, onLogout }: { token: DeviceToken;
 
   useEffect(() => {
     let stop = false;
+    // Guard against overlapping iterations. ESC/POS prints can take 3-5s;
+    // without this flag the 2s setInterval would re-enter loop() before
+    // the previous ack completes, claim the same command in the new race,
+    // and print the same ticket twice. Per-effect scope so a token
+    // change resets it via cleanup.
+    let inFlight = false;
+    // Exponential skip after errors so a wedged cloud doesn't get
+    // hammered every 2s. Resets on the first clean iteration.
+    let consecutiveErrors = 0;
 
     async function loop() {
+      if (inFlight || stop) return;
+      inFlight = true;
       try {
         const cmd = await claimNextCommand(token);
-        // After each await we re-check `stop` so a fetch that resolves
-        // after unmount or token change cannot mutate a torn-down
-        // component or talk to the old token's auth context.
         if (stop) return;
+        consecutiveErrors = 0;
         if (!cmd) return;
         const orderId = (cmd.payload?.orderId as string | undefined) ?? '';
         if (cmd.kind === 'show_order' && orderId) {
-          // Skip duplicates — the cloud may resend the same command on
-          // network blips; the dedup keeps the screen stable.
           if (!ticketsRef.current.find((t) => t.orderId === orderId)) {
             setTickets((prev) => [
               ...prev,
@@ -55,12 +62,21 @@ export default function KitchenScreen({ token, onLogout }: { token: DeviceToken;
         await ackCommand(token, cmd.id, { status: 'done', result: {} });
       } catch (e: any) {
         if (stop) return;
+        consecutiveErrors = Math.min(consecutiveErrors + 1, 6);
         setLastError(e?.message ?? 'poll failed');
+      } finally {
+        inFlight = false;
       }
     }
 
     const pollHandle = setInterval(() => {
-      if (!stop) void loop();
+      if (stop) return;
+      // Skip ticks while in flight (covered inside loop() too, but this
+      // avoids the wasted call cost). Backoff after errors: skip with
+      // probability 1 - 1/2^N so 2 errors ≈ skip 75% of ticks, 6+ errors
+      // ≈ skip ~98%. Self-recovering on first successful iteration.
+      if (consecutiveErrors > 0 && Math.random() < 1 - 1 / (1 << consecutiveErrors)) return;
+      void loop();
     }, 2000);
     const heartbeatHandle = setInterval(() => {
       if (!stop) heartbeat(token, { queueDepth: ticketsRef.current.length }).catch(() => undefined);

@@ -80,10 +80,44 @@ export class OrdersService {
           branchId: (order as any)?.branchId ?? null,
           tableId: order?.tableId ?? null,
           status: order?.status,
-          totalCents: typeof order?.finalAmount === 'number' ? Math.round(order.finalAmount * 100) : undefined,
+          // finalAmount lands here as a Prisma.Decimal (DB type) almost
+          // always, so the previous `typeof === 'number'` check was always
+          // false and `totalCents` came out undefined. Normalise via
+          // String() → integer cents to dodge the IEEE-754 conversion that
+          // would otherwise lose precision on large orders.
+          totalCents: this.toIntCents(order?.finalAmount),
         },
       })
       .catch((e) => this.logger.warn(`outbox emit ${type} failed: ${(e as Error).message}`));
+  }
+
+  /**
+   * Convert any of {number, Prisma.Decimal, string} → integer cents.
+   *
+   * Why this exists: Prisma.Decimal columns deserialise to Decimal objects
+   * whose `*100 → Math.round` path goes through IEEE-754, dropping precision
+   * for large amounts and quietly losing the kuruş on edge values. The
+   * Decimal API exposes `.toFixed(2)` which renders the canonical 2-dp
+   * string; we then strip the decimal point and parse, never crossing the
+   * float boundary.
+   */
+  private toIntCents(v: unknown): number | undefined {
+    if (v == null) return undefined;
+    // Decimal has a toFixed; number doesn't. Detect by feature instead of
+    // by `instanceof Decimal` so the helper works in test fixtures that
+    // pass plain numbers.
+    const asDecimal = (v as { toFixed?: (n: number) => string });
+    if (typeof asDecimal.toFixed === 'function' && typeof v !== 'number') {
+      const fixed = asDecimal.toFixed!(2);                 // "123.45"
+      const cents = Number(fixed.replace('.', ''));         // 12345
+      return Number.isFinite(cents) ? cents : undefined;
+    }
+    if (typeof v === 'number') return Math.round(v * 100);
+    if (typeof v === 'string') {
+      const cents = Math.round(parseFloat(v) * 100);
+      return Number.isFinite(cents) ? cents : undefined;
+    }
+    return undefined;
   }
 
   /**
