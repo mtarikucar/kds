@@ -230,25 +230,42 @@ export class ProductsService {
       throw new BadRequestException('Stock tracking is not enabled for this product');
     }
 
-    const newStock = product.currentStock + quantity;
-
-    if (newStock < 0) {
-      throw new BadRequestException('Insufficient stock');
-    }
-
-    // Compound WHERE — IDOR guard (B41-B45 pattern). Every other write
-    // path in this service goes through updateMany with tenantId; the
-    // bare `update where: { id }` here was the only outlier.
+    // Atomic increment with a conditional gate so two concurrent
+    // decrement calls can't both read currentStock=10, each compute
+    // 10-5=5, and both write 5 (lost-update). For OUT (quantity < 0)
+    // the WHERE includes `currentStock >= -quantity` so the second
+    // racer's update misses the row and we surface InsufficientStock.
+    // sister StockService.createMovement uses the same shape (line 60).
     const claim = await this.prisma.product.updateMany({
-      where: { id, tenantId },
-      data: {
-        currentStock: newStock,
-        isAvailable: newStock > 0,
+      where: {
+        id,
+        tenantId,
+        ...(quantity < 0 ? { currentStock: { gte: -quantity } } : {}),
       },
+      data: { currentStock: { increment: quantity } },
     });
     if (claim.count === 0) {
-      throw new NotFoundException(`Product with ID ${id} not found`);
+      // Disambiguate "not found" from "insufficient": a fresh read
+      // tells us which 4xx to throw.
+      const fresh = await this.prisma.product.findFirst({
+        where: { id, tenantId },
+        select: { id: true },
+      });
+      if (!fresh) throw new NotFoundException(`Product with ID ${id} not found`);
+      throw new BadRequestException('Insufficient stock');
     }
+    // Sync isAvailable from the post-increment value. Two concurrent
+    // updateStock calls both run this follow-up; both converge to the
+    // same boolean (currentStock > 0), so the writer interleaving is
+    // idempotent — no need for a transaction here.
+    const post = await this.prisma.product.findUniqueOrThrow({
+      where: { id },
+      select: { currentStock: true },
+    });
+    await this.prisma.product.updateMany({
+      where: { id, tenantId },
+      data: { isAvailable: post.currentStock > 0 },
+    });
 
     return this.findOne(id, tenantId);
   }
