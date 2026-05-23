@@ -101,7 +101,15 @@ async function bootstrap() {
     }),
   );
 
-  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
+  // process.cwd() (not __dirname) — webpack bundles to dist/main.js so
+  // __dirname collapses to /app/dist/ in prod. The previous `__dirname/..`
+  // form happened to resolve correctly because /app/dist/../uploads/ is
+  // /app/uploads/ (where the Dockerfile creates the mount), but that's
+  // pure accident of the current bundle layout. process.cwd() pins the
+  // resolution to the canonical app root in both dev and prod. Same
+  // pattern as EmailService + iter-23 SubscriptionNotificationService +
+  // iter-24 ContactMailerService.
+  app.useStaticAssets(join(process.cwd(), 'uploads'), {
     prefix: '/uploads/',
   });
 

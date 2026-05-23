@@ -37,7 +37,24 @@ export class MailerService {
 
   private async loadTemplate(templateName: string, context: any): Promise<string> {
     try {
-      const templatePath = path.join(__dirname, 'templates', `${templateName}.hbs`);
+      // Same webpack-bundle gotcha iter-23 documents in
+      // subscriptions/services/notification.service.ts: NestJS+webpack
+      // collapses every .ts into dist/main.js, so at runtime __dirname
+      // is /app/dist/ regardless of source location. The old form
+      // (path.join(__dirname, 'templates', ...)) tried to load from
+      // /app/dist/templates/ in prod — a directory the Dockerfile never
+      // creates — so every contact-form admin + user-confirmation email
+      // raised "Failed to load email template" and was swallowed by the
+      // catch boundaries below. process.cwd() pins the resolution to
+      // the backend root in both dev AND prod, matching the source
+      // layout the Dockerfile preserves at /app/src/modules/contact/
+      // templates/ (see the COPY rule added to backend/Dockerfile in
+      // this same commit).
+      const templatePath = path.join(
+        process.cwd(),
+        'src/modules/contact/templates',
+        `${templateName}.hbs`,
+      );
       const templateContent = fs.readFileSync(templatePath, 'utf-8');
       const template = handlebars.compile(templateContent);
       return template(context);
