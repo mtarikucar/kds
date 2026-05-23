@@ -1,4 +1,5 @@
 import { Injectable, Inject, NotFoundException, forwardRef } from '@nestjs/common';
+import { v7 as uuidv7 } from 'uuid';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateNotificationDto, NotificationType } from './dto/create-notification.dto';
 import { NotificationsGateway } from './notifications.gateway';
@@ -158,29 +159,31 @@ export class NotificationsService {
     });
     if (admins.length === 0) return [];
 
+    // Generate ids client-side so the re-fetch can scope to exactly the
+    // rows this call inserted. The previous re-fetch keyed on
+    // (tenantId, userId IN admins, createdAt, title) — two concurrent
+    // notifyAdmins calls within the same millisecond with the same
+    // (tenantId, title) would pick up each other's rows, doubling the
+    // WS broadcast per admin. (Notification.id is a uuid, schema-default
+    // generated; we override it here so we know the value up-front.)
     const createdAt = new Date();
-    await this.prisma.notification.createMany({
-      data: admins.map((admin) => ({
-        title: notificationData.title,
-        message: notificationData.message,
-        type: notificationData.type,
-        tenantId,
-        userId: admin.id,
-        isGlobal: false,
-        priority: 'NORMAL',
-        data: notificationData.data,
-        createdAt,
-      })),
-    });
+    const rows = admins.map((admin) => ({
+      id: uuidv7(),
+      title: notificationData.title,
+      message: notificationData.message,
+      type: notificationData.type,
+      tenantId,
+      userId: admin.id,
+      isGlobal: false,
+      priority: 'NORMAL',
+      data: notificationData.data,
+      createdAt,
+    }));
+    await this.prisma.notification.createMany({ data: rows });
 
-    // Re-read so we have ids + schema-computed columns to ship to the UI.
+    // Re-read so the gateway gets fully-hydrated rows with default columns.
     const notifications = await this.prisma.notification.findMany({
-      where: {
-        tenantId,
-        userId: { in: admins.map((a) => a.id) },
-        createdAt,
-        title: notificationData.title,
-      },
+      where: { id: { in: rows.map((r) => r.id) } },
     });
     for (const n of notifications) {
       this.notificationsGateway.sendNotificationToUser(n.userId!, n);

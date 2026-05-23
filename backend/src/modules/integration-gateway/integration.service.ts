@@ -142,7 +142,19 @@ export class IntegrationService {
   // -- Crypto helpers ----------------------------------------------------
 
   private deriveKey(tenantId: string): Buffer {
-    const base = process.env.INTEGRATION_KEY ?? 'dev-only-do-not-use-in-prod';
+    const base = process.env.INTEGRATION_KEY;
+    if (!base) {
+      // Hard fail in production. The earlier fallback to a literal string
+      // ("dev-only-do-not-use-in-prod") meant a deploy with a missing env
+      // var silently used a key that lives in the source — anyone with
+      // read access to the repo could decrypt every tenant's integration
+      // credentials. Dev/test still falls back so local workflows don't
+      // demand the env be set.
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error('INTEGRATION_KEY env var must be set in production');
+      }
+      return createHash('sha256').update(`dev-only-do-not-use-in-prod:${tenantId}`).digest();
+    }
     // Per-tenant key derivation — leaking one tenant's payload doesn't help
     // decrypt another's. Cheap and fast; replace with KMS-issued DEKs.
     return createHash('sha256').update(`${base}:${tenantId}`).digest();
