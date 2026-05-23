@@ -2,6 +2,7 @@ import {
   Injectable,
   Inject,
   forwardRef,
+  Logger,
   UnauthorizedException,
   BadRequestException,
   NotFoundException,
@@ -49,6 +50,12 @@ const DUMMY_BCRYPT_HASH = bcrypt.hashSync(
 
 @Injectable()
 export class AuthService {
+  // Use NestJS Logger so messages flow through the structured-JSON pipeline
+  // configured in main.ts. The previous `console.error` callsites bypassed
+  // it, writing plain-text lines into the middle of the JSON log stream —
+  // which breaks parsers (Loki/Datadog) that expect one valid JSON object
+  // per line and skips any PII redaction the logger pipeline has.
+  private readonly logger = new Logger(AuthService.name);
   private googleClient: OAuth2Client;
 
   private hashToken(token: string): string {
@@ -286,7 +293,7 @@ export class AuthService {
       await this.sendEmailVerification(user.id);
     } catch (error) {
       // Log error but don't fail registration if email sending fails
-      console.error('Failed to send verification email:', error);
+      this.logger.error('Failed to send verification email', error as any);
     }
 
     // If user is pending approval, notify admins and return without tokens
@@ -302,7 +309,7 @@ export class AuthService {
           },
         });
       } catch (error) {
-        console.error('Failed to notify admins about pending user:', error);
+        this.logger.error('Failed to notify admins about pending user', error as any);
       }
 
       // Return response without tokens - user needs approval
@@ -426,7 +433,7 @@ export class AuthService {
         },
       });
     } catch (error) {
-      console.error('Failed to log user activity:', error);
+      this.logger.error('Failed to log user activity', error as any);
     }
   }
 
@@ -910,7 +917,7 @@ export class AuthService {
       });
     } catch (error) {
       // Log error but don't fail if notification sending fails
-      console.error('Failed to send verification notification:', error);
+      this.logger.error('Failed to send verification notification', error as any);
     }
 
     return {
@@ -986,7 +993,7 @@ export class AuthService {
       });
     } catch (error) {
       // Log error but don't fail if notification sending fails
-      console.error('Failed to send verification success notification:', error);
+      this.logger.error('Failed to send verification success notification', error as any);
     }
 
     return {
@@ -1182,7 +1189,7 @@ export class AuthService {
       if (error instanceof UnauthorizedException || error instanceof BadRequestException) {
         throw error;
       }
-      console.error('Google auth error:', error);
+      this.logger.error('Google auth error', error as any);
       throw new UnauthorizedException('Failed to authenticate with Google');
     }
   }
@@ -1313,7 +1320,7 @@ export class AuthService {
       if (error instanceof UnauthorizedException || error instanceof BadRequestException) {
         throw error;
       }
-      console.error('Apple auth error:', error);
+      this.logger.error('Apple auth error', error as any);
       throw new UnauthorizedException('Failed to authenticate with Apple');
     }
   }
