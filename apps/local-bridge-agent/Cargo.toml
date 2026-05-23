@@ -36,6 +36,13 @@ escposify = "0.1"
 # Error type plumbing.
 thiserror = "1"
 anyhow = "1"
+# `async fn` in traits — required because LocalDriver is dyn-stored
+# (Box<dyn LocalDriver>) for the driver registry, and stable Rust's
+# native `async fn in trait` isn't dyn-compatible. The proc-macro
+# wraps async methods into Box<dyn Future + Send>, restoring
+# object-safety. Without this crate, the bridge agent does not compile
+# (4 import errors + 7 cascading "not dyn-compatible" errors).
+async-trait = "0.1"
 
 [dev-dependencies]
 # Scratch directories for SQLite integration tests so they never collide
