@@ -5,3 +5,4 @@ export * from './superadmin-users.controller';
 export * from './superadmin-subscriptions.controller';
 export * from './superadmin-audit.controller';
 export * from './superadmin-marketing.controller';
+export * from './superadmin-outbox.controller';

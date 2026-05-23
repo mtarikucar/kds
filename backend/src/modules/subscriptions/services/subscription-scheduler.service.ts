@@ -236,18 +236,48 @@ export class SubscriptionSchedulerService {
     await this.withJobLock("pending-cancellations", async () => {
       this.logger.log("Running pending cancellation check...");
       const now = new Date();
-      const result = await this.prisma.subscription.updateMany({
+      // Two-step (find → updateMany → emit) so the entitlement projector
+      // gets one subscription.cancelled.v1 per row. A bare updateMany
+      // would flip the status but leave grants in place until the next
+      // ad-hoc projection — tenants who opted into cancel-at-period-end
+      // would keep premium access for hours past their paid window.
+      const expiring = await this.prisma.subscription.findMany({
         where: {
           cancelAtPeriodEnd: true,
           currentPeriodEnd: { lte: now },
           status: { not: SubscriptionStatus.CANCELLED },
         },
+        select: { id: true, tenantId: true, plan: { select: { name: true } } },
+      });
+      if (expiring.length === 0) {
+        this.logger.log("No pending cancellations to apply");
+        return;
+      }
+      const ids = expiring.map((s) => s.id);
+      const result = await this.prisma.subscription.updateMany({
+        where: { id: { in: ids }, status: { not: SubscriptionStatus.CANCELLED } },
         data: {
           status: SubscriptionStatus.CANCELLED,
           endedAt: now,
         },
       });
-      this.logger.log(`Cancelled ${result.count} subscriptions at period end`);
+      for (const sub of expiring) {
+        await this.outbox
+          ?.append({
+            type: EventTypes.SubscriptionCancelled,
+            tenantId: sub.tenantId,
+            payload: {
+              subscriptionId: sub.id,
+              tenantId: sub.tenantId,
+              planCode: sub.plan?.name,
+              reason: "period_end_cancel",
+            },
+          })
+          .catch((e) =>
+            this.logger.warn(`cancel emit failed for sub=${sub.id}: ${(e as Error).message}`),
+          );
+      }
+      this.logger.log(`Cancelled ${result.count} subscriptions at period end (events emitted)`);
     });
   }
 

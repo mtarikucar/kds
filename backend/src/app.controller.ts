@@ -68,7 +68,14 @@ export class AppController {
     const base = await this.appService.getHealth();
     // Per-module checks. Optional dependencies are skipped when absent so
     // a partial deployment (e.g. payments disabled) doesn't trip readiness.
+    // Short-circuit on first failure: K8s readiness probes are hot-path
+    // (1Hz per pod across many pods); when KMS is down we don't need to
+    // also enumerate every payment + fiscal provider before saying "no".
     const checks: Record<string, { ok: boolean; details?: unknown }> = {};
+
+    if ((base as any).status !== 'ok') {
+      return { ok: false, base, checks };
+    }
 
     if (this.kms) {
       try {
@@ -76,24 +83,22 @@ export class AppController {
       } catch (e) {
         checks.kms = { ok: false, details: { error: (e as Error).message } };
       }
+      if (!checks.kms.ok) return { ok: false, base, checks };
     }
 
     if (this.payments) {
       const providers = this.payments.list();
       checks.payments = { ok: true, details: { installed: providers.map((p) => p.id) } };
+      if (!checks.payments.ok) return { ok: false, base, checks };
     }
 
     if (this.fiscal) {
       const providers = this.fiscal.list();
       checks.fiscal = { ok: true, details: { installed: providers.map((p) => p.id) } };
+      if (!checks.fiscal.ok) return { ok: false, base, checks };
     }
 
-    const allOk = (base as any).status === 'ok' && Object.values(checks).every((c) => c.ok);
-    return {
-      ok: allOk,
-      base,
-      checks,
-    };
+    return { ok: true, base, checks };
   }
 
   @Public()
