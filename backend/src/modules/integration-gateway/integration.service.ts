@@ -83,10 +83,16 @@ export class IntegrationService {
   }
 
   async disconnect(tenantId: string, connectionId: string) {
-    const row = await this.prisma.integrationConnection.findUnique({ where: { id: connectionId } });
-    if (!row || row.tenantId !== tenantId) throw new NotFoundException('Connection not found');
-    await this.prisma.integrationConnection.update({
-      where: { id: connectionId },
+    const row = await this.prisma.integrationConnection.findFirst({
+      where: { id: connectionId, tenantId },
+    });
+    if (!row) throw new NotFoundException('Connection not found');
+    // Compound WHERE on the write too — providerId outbox emit below
+    // reads from `row`, but the update itself must remain tenant-scoped
+    // in case the row's tenantId mutates (today it can't, but defense-
+    // in-depth).
+    await this.prisma.integrationConnection.updateMany({
+      where: { id: connectionId, tenantId },
       data: { status: 'disconnected', credentialsEnc: null },
     });
     await this.outbox

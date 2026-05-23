@@ -139,8 +139,10 @@ export class TenantMarketplaceService {
   }
 
   async cancel(tenantId: string, tenantAddOnId: string, immediate = false) {
-    const row = await this.prisma.tenantAddOn.findUnique({ where: { id: tenantAddOnId } });
-    if (!row || row.tenantId !== tenantId) throw new NotFoundException('Add-on not found for this tenant');
+    const row = await this.prisma.tenantAddOn.findFirst({
+      where: { id: tenantAddOnId, tenantId },
+    });
+    if (!row) throw new NotFoundException('Add-on not found for this tenant');
     if (row.status !== 'active') throw new BadRequestException(`Cannot cancel — status is ${row.status}`);
 
     const now = new Date();

@@ -31,11 +31,11 @@ export class CommandQueueService {
     deviceId: string,
     input: { kind: string; payload: Record<string, unknown>; priority?: number; idempotencyKey?: string },
   ) {
-    const device = await this.prisma.device.findUnique({
-      where: { id: deviceId },
-      select: { id: true, tenantId: true, status: true },
+    const device = await this.prisma.device.findFirst({
+      where: { id: deviceId, tenantId },
+      select: { id: true, status: true },
     });
-    if (!device || device.tenantId !== tenantId) throw new NotFoundException('Device not found');
+    if (!device) throw new NotFoundException('Device not found');
     if (device.status === 'retired') throw new BadRequestException('Device retired');
 
     const idempotencyKey = input.idempotencyKey ?? uuidv7();

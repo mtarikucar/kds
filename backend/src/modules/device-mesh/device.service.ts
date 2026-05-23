@@ -54,8 +54,10 @@ export class DeviceService {
     input: { kind: string; branchId?: string; capabilities?: string[]; model?: string; serial?: string; ownership?: 'sold' | 'rented' | 'byo' },
   ) {
     if (input.branchId) {
-      const branch = await this.prisma.branch.findUnique({ where: { id: input.branchId } });
-      if (!branch || branch.tenantId !== tenantId) {
+      const branch = await this.prisma.branch.findFirst({
+        where: { id: input.branchId, tenantId },
+      });
+      if (!branch) {
         throw new BadRequestException('Branch not found for this tenant');
       }
     }

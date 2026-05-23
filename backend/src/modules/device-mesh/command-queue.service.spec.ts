@@ -18,7 +18,7 @@ describe('CommandQueueService', () => {
   });
 
   it('enqueue dedupes on (deviceId, idempotencyKey)', async () => {
-    prisma.device.findUnique.mockResolvedValue({ id: 'dev', tenantId: 't', status: 'online' } as any);
+    prisma.device.findFirst.mockResolvedValue({ id: 'dev', status: 'online' } as any);
 
     const { Prisma } = await import('@prisma/client');
     let attempt = 0;
