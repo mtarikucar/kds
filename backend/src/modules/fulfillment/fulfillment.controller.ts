@@ -28,6 +28,58 @@ export class InstallationController {
   }
 }
 
+/**
+ * SuperAdmin-side installation ops queue. Operators here schedule a
+ * technician, mark visits complete, or cancel obsolete requests.
+ * Tenant-side controller above only creates + lists their own; the
+ * lifecycle transitions live here.
+ */
+@ApiTags('SuperAdmin · Installation')
+@ApiBearerAuth()
+@UseGuards(SuperAdminGuard)
+@Controller('v1/superadmin/installation')
+export class SuperadminInstallationController {
+  constructor(private readonly installation: InstallationService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'Ops queue across all tenants (status / assignedTo filter optional)' })
+  list(@Query('status') status?: string, @Query('assignedTo') assignedTo?: string) {
+    return this.installation.listAll(status, assignedTo);
+  }
+
+  @Patch(':id/schedule')
+  @ApiOperation({ summary: 'Assign technician + scheduled date' })
+  schedule(
+    @Param('id') id: string,
+    @Body() body: { scheduledFor: string; assignedTo?: string; tenantId: string },
+  ) {
+    // tenantId is in the body rather than derived from req.user — the
+    // SuperAdmin guard means the caller has no tenant of their own;
+    // scheduling on behalf of a tenant needs the target tenant id.
+    return this.installation.schedule(
+      body.tenantId,
+      id,
+      new Date(body.scheduledFor),
+      body.assignedTo,
+    );
+  }
+
+  @Patch(':id/complete')
+  @ApiOperation({ summary: 'Mark installation done with optional close-out note' })
+  complete(
+    @Param('id') id: string,
+    @Body() body: { tenantId: string; notes?: string },
+  ) {
+    return this.installation.complete(body.tenantId, id, body.notes);
+  }
+
+  @Patch(':id/cancel')
+  @ApiOperation({ summary: 'Cancel a non-terminal installation request' })
+  cancel(@Param('id') id: string, @Body() body: { reason?: string }) {
+    return this.installation.cancel(id, body.reason);
+  }
+}
+
 @ApiTags('Fulfillment · Warranty')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)

@@ -7,13 +7,19 @@ import { WarrantyService } from './warranty.service';
 import { InstallationService } from './installation.service';
 import {
   InstallationController,
+  SuperadminInstallationController,
   WarrantyController,
   SuperadminShipmentsController,
 } from './fulfillment.controller';
 
 @Module({
   imports: [PrismaModule, CatalogModule, SuperAdminModule],
-  controllers: [InstallationController, WarrantyController, SuperadminShipmentsController],
+  controllers: [
+    InstallationController,
+    SuperadminInstallationController,
+    WarrantyController,
+    SuperadminShipmentsController,
+  ],
   providers: [ShipmentService, WarrantyService, InstallationService],
   exports: [ShipmentService, WarrantyService, InstallationService],
 })

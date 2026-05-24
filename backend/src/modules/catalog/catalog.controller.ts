@@ -3,6 +3,9 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
 import { SuperAdminGuard } from '../superadmin/guards/superadmin.guard';
 import { CatalogService } from './catalog.service';
+import { CreateHardwareProductDto } from './dto/create-hardware-product.dto';
+import { UpdateHardwareProductDto } from './dto/update-hardware-product.dto';
+import { ReceiveStockDto } from './dto/receive-stock.dto';
 
 @ApiTags('Hardware Catalog')
 @Controller('v1/catalog')
@@ -37,12 +40,12 @@ export class SuperadminCatalogController {
   }
 
   @Post('products')
-  create(@Body() body: Parameters<CatalogService['create']>[0]) {
+  create(@Body() body: CreateHardwareProductDto) {
     return this.catalog.create(body);
   }
 
   @Patch('products/:id')
-  update(@Param('id') id: string, @Body() body: Parameters<CatalogService['update']>[1]) {
+  update(@Param('id') id: string, @Body() body: UpdateHardwareProductDto) {
     return this.catalog.update(id, body);
   }
 
@@ -53,7 +56,7 @@ export class SuperadminCatalogController {
 
   @Post('products/:id/stock')
   @ApiOperation({ summary: 'Receive stock — optionally with serials' })
-  receive(@Param('id') id: string, @Body() body: { qty: number; serials?: string[] }) {
+  receive(@Param('id') id: string, @Body() body: ReceiveStockDto) {
     return this.catalog.receiveStock(id, body.qty, body.serials);
   }
 }

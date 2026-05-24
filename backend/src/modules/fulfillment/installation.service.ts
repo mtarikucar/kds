@@ -116,4 +116,45 @@ export class InstallationService {
       orderBy: { createdAt: 'desc' },
     });
   }
+
+  /**
+   * SuperAdmin-side cancel. Allowed from any non-terminal state. Uses the
+   * same updateMany + status-gate pattern as schedule/complete so two
+   * concurrent operators can't both flip a row.
+   */
+  async cancel(requestId: string, reason?: string) {
+    const row = await this.prisma.installationRequest.findUnique({ where: { id: requestId } });
+    if (!row) throw new NotFoundException('Installation request not found');
+    const claim = await this.prisma.installationRequest.updateMany({
+      where: { id: requestId, status: { notIn: ['done', 'cancelled'] } },
+      data: {
+        status: 'cancelled',
+        notes: reason ? `${row.notes ?? ''}\n[cancelled] ${reason}`.trim() : row.notes,
+      },
+    });
+    if (claim.count === 0) {
+      throw new BadRequestException(`Cannot cancel from status=${row.status}`);
+    }
+    const updated = await this.prisma.installationRequest.findUniqueOrThrow({ where: { id: requestId } });
+    await this.outbox
+      .append({
+        type: 'installation.cancelled.v1',
+        tenantId: row.tenantId,
+        payload: { requestId, reason },
+      })
+      .catch(() => undefined);
+    return updated;
+  }
+
+  /** SuperAdmin-side list across all tenants for the ops queue. */
+  async listAll(status?: string, assignedTo?: string) {
+    return this.prisma.installationRequest.findMany({
+      where: {
+        ...(status ? { status } : {}),
+        ...(assignedTo ? { assignedTo } : {}),
+      },
+      orderBy: [{ scheduledFor: 'asc' }, { createdAt: 'desc' }],
+      take: 200,
+    });
+  }
 }
