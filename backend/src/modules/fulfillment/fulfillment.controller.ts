@@ -5,6 +5,11 @@ import { SuperAdminGuard } from '../superadmin/guards/superadmin.guard';
 import { ShipmentService } from './shipment.service';
 import { WarrantyService } from './warranty.service';
 import { InstallationService } from './installation.service';
+import {
+  CancelInstallationDto,
+  CompleteInstallationDto,
+  ScheduleInstallationDto,
+} from './dto/installation-ops.dto';
 
 @ApiTags('Fulfillment · Installation')
 @ApiBearerAuth()
@@ -49,33 +54,23 @@ export class SuperadminInstallationController {
 
   @Patch(':id/schedule')
   @ApiOperation({ summary: 'Assign technician + scheduled date' })
-  schedule(
-    @Param('id') id: string,
-    @Body() body: { scheduledFor: string; assignedTo?: string; tenantId: string },
-  ) {
-    // tenantId is in the body rather than derived from req.user — the
-    // SuperAdmin guard means the caller has no tenant of their own;
-    // scheduling on behalf of a tenant needs the target tenant id.
-    return this.installation.schedule(
-      body.tenantId,
-      id,
-      new Date(body.scheduledFor),
-      body.assignedTo,
-    );
+  schedule(@Param('id') id: string, @Body() body: ScheduleInstallationDto) {
+    // tenantId derived from the row inside the service — the SuperAdmin
+    // guard means the caller has no tenant of their own. Passing it in
+    // the body invites the operator to type the wrong tenant id; deriving
+    // it from the row is the single source of truth.
+    return this.installation.scheduleByOps(id, new Date(body.scheduledFor), body.assignedTo);
   }
 
   @Patch(':id/complete')
   @ApiOperation({ summary: 'Mark installation done with optional close-out note' })
-  complete(
-    @Param('id') id: string,
-    @Body() body: { tenantId: string; notes?: string },
-  ) {
-    return this.installation.complete(body.tenantId, id, body.notes);
+  complete(@Param('id') id: string, @Body() body: CompleteInstallationDto) {
+    return this.installation.completeByOps(id, body.notes);
   }
 
   @Patch(':id/cancel')
   @ApiOperation({ summary: 'Cancel a non-terminal installation request' })
-  cancel(@Param('id') id: string, @Body() body: { reason?: string }) {
+  cancel(@Param('id') id: string, @Body() body: CancelInstallationDto) {
     return this.installation.cancel(id, body.reason);
   }
 }

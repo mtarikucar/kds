@@ -146,6 +146,30 @@ export class InstallationService {
     return updated;
   }
 
+  /**
+   * SuperAdmin-side wrappers that look up the row to derive tenantId,
+   * then delegate to the tenant-scoped methods. Keeps the lifecycle
+   * checks + status gates in one place while giving ops a clean
+   * "I only know the request id" entry point.
+   */
+  async scheduleByOps(requestId: string, scheduledFor: Date, assignedTo?: string) {
+    const row = await this.prisma.installationRequest.findUnique({
+      where: { id: requestId },
+      select: { tenantId: true },
+    });
+    if (!row) throw new NotFoundException('Installation request not found');
+    return this.schedule(row.tenantId, requestId, scheduledFor, assignedTo);
+  }
+
+  async completeByOps(requestId: string, notes?: string) {
+    const row = await this.prisma.installationRequest.findUnique({
+      where: { id: requestId },
+      select: { tenantId: true },
+    });
+    if (!row) throw new NotFoundException('Installation request not found');
+    return this.complete(row.tenantId, requestId, notes);
+  }
+
   /** SuperAdmin-side list across all tenants for the ops queue. */
   async listAll(status?: string, assignedTo?: string) {
     return this.prisma.installationRequest.findMany({
