@@ -201,8 +201,18 @@ export default function StorePage() {
                 return (
                   <article key={p.id} className="overflow-hidden rounded-lg border bg-white">
                     {p.images?.[0] && (
+                      // onError hides the slot when the photo file is
+                      // missing (404). Until every SKU has a real photo
+                      // in landing/public/products/, some images return
+                      // 404 — the alternative is the browser's broken-
+                      // image icon, which looks worse than no image.
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={p.images[0]} alt={p.name} className="aspect-[4/3] w-full object-cover" />
+                      <img
+                        src={p.images[0]}
+                        alt={p.name}
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
+                        className="aspect-[4/3] w-full object-cover"
+                      />
                     )}
                     <div className="p-4">
                       <div className="flex items-center gap-2 flex-wrap text-xs text-gray-500">

@@ -2,6 +2,7 @@ import { getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/routing';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/sections/Footer';
+import ProductImage from './ProductImage';
 
 /**
  * Public hardware store. Pulls the catalogue from the backend at request time
@@ -182,18 +183,13 @@ export default async function StorePage() {
                           className="flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white transition-shadow hover:shadow-lg"
                         >
                           {p.images?.[0] && (
-                            // Plain <img> rather than next/image — the seed
-                            // can carry URLs from arbitrary vendor CDNs; if
-                            // a domain isn't in next.config.ts/remotePatterns
-                            // <Image> would 500 the whole page rather than
-                            // degrade.
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={p.images[0]}
-                              alt={p.name}
-                              loading="lazy"
-                              className="aspect-[4/3] w-full object-cover"
-                            />
+                            // Client component so a 404 on the photo file
+                            // hides the slot cleanly instead of showing the
+                            // browser's broken-image icon. Until every SKU
+                            // has a real photo in landing/public/products/,
+                            // some slots will fall back to the text-only
+                            // card layout.
+                            <ProductImage src={p.images[0]} alt={p.name} />
                           )}
                           <div className="flex flex-col grow p-5">
                             <div className="mb-2 flex items-center gap-2 flex-wrap">

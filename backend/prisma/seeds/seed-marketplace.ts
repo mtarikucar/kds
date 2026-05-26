@@ -195,7 +195,7 @@ const PRODUCTS = [
     },
     priceCents: 640_000,
     warrantyMonths: 24,
-    images: [] as string[],
+    images: ['/products/yazarkasa-hugin-tiger-t300.webp'],
     stockStatus: 'in_stock',
   },
   {
@@ -212,7 +212,7 @@ const PRODUCTS = [
     },
     priceCents: 650_000,
     warrantyMonths: 24,
-    images: [],
+    images: ['/products/yazarkasa-beko-300tr.webp'],
     stockStatus: 'in_stock',
   },
   {
@@ -229,7 +229,7 @@ const PRODUCTS = [
     },
     priceCents: 1_900_000,
     warrantyMonths: 24,
-    images: [],
+    images: ['/products/yazarkasa-ingenico-move5000f.webp'],
     stockStatus: 'in_stock',
   },
 
@@ -248,7 +248,7 @@ const PRODUCTS = [
     },
     priceCents: 450_000,
     warrantyMonths: 24,
-    images: [],
+    images: ['/products/printer-epson-tm-t20iii-lan.webp'],
     stockStatus: 'in_stock',
   },
   {
@@ -264,7 +264,7 @@ const PRODUCTS = [
     },
     priceCents: 900_000,
     warrantyMonths: 24,
-    images: [],
+    images: ['/products/printer-epson-tm-t88vi-eth.webp'],
     stockStatus: 'in_stock',
   },
   {
@@ -280,7 +280,7 @@ const PRODUCTS = [
     },
     priceCents: 650_000,
     warrantyMonths: 24,
-    images: [],
+    images: ['/products/printer-star-tsp143iiibi.webp'],
     stockStatus: 'in_stock',
   },
 
@@ -298,7 +298,7 @@ const PRODUCTS = [
     },
     priceCents: 1_500_000,
     warrantyMonths: 24,
-    images: [],
+    images: ['/products/kds-sunmi-d2s.webp'],
     stockStatus: 'in_stock',
   },
   {
@@ -314,7 +314,7 @@ const PRODUCTS = [
     },
     priceCents: 2_200_000,
     warrantyMonths: 24,
-    images: [],
+    images: ['/products/kds-penetek-15in-ip65.webp'],
     stockStatus: 'in_stock',
   },
 
@@ -332,7 +332,7 @@ const PRODUCTS = [
     },
     priceCents: 1_400_000,
     warrantyMonths: 12,
-    images: [],
+    images: ['/products/tablet-sunmi-v2-pro.webp'],
     stockStatus: 'in_stock',
   },
   {
@@ -346,7 +346,7 @@ const PRODUCTS = [
     compat: { sourceUrl: 'https://www.samsung.com/tr/tablets/galaxy-tab-a/' },
     priceCents: 1_100_000,
     warrantyMonths: 24,
-    images: [],
+    images: ['/products/tablet-samsung-tab-a9-plus.webp'],
     stockStatus: 'in_stock',
   },
 
@@ -362,7 +362,7 @@ const PRODUCTS = [
     compat: { sourceUrl: 'https://www.akbarkod.com.tr/urun/honeywell-1450g-2d' },
     priceCents: 350_000,
     warrantyMonths: 12,
-    images: [],
+    images: ['/products/scanner-honeywell-voyager-1450g.webp'],
     stockStatus: 'in_stock',
   },
   {
@@ -376,7 +376,7 @@ const PRODUCTS = [
     compat: { sourceUrl: 'https://www.trendbarkod.com.tr/zebra-ds2208-2d-kablolu-barkod-okuyucu' },
     priceCents: 350_000,
     warrantyMonths: 24,
-    images: [],
+    images: ['/products/scanner-zebra-ds2208.webp'],
     stockStatus: 'in_stock',
   },
 
@@ -395,7 +395,7 @@ const PRODUCTS = [
     },
     priceCents: 40_000,
     warrantyMonths: 12,
-    images: [],
+    images: ['/products/caller-id-cidshow-cid602.webp'],
     stockStatus: 'in_stock',
   },
 
@@ -414,7 +414,7 @@ const PRODUCTS = [
     },
     priceCents: 150_000,
     warrantyMonths: 12,
-    images: [],
+    images: ['/products/cash-drawer-afanda-lb405k.webp'],
     stockStatus: 'in_stock',
   },
 
@@ -431,7 +431,7 @@ const PRODUCTS = [
     priceCents: 480_000,
     rentalMonthlyCents: 9_900,
     warrantyMonths: 24,
-    images: [],
+    images: ['/products/hummybox-lite.webp'],
     stockStatus: 'in_stock',
   },
   {
@@ -446,7 +446,7 @@ const PRODUCTS = [
     priceCents: 950_000,
     rentalMonthlyCents: 19_900,
     warrantyMonths: 24,
-    images: [],
+    images: ['/products/hummybox-pro.webp'],
     stockStatus: 'in_stock',
   },
 ];
