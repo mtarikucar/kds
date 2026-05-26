@@ -85,8 +85,15 @@ services:
       test: ['CMD', 'curl', '-f', 'http://localhost:3002/api/health']
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 40s
+      retries: 5
+      # Cold backend bootstrap takes ~3-4 min — NestJS registers hundreds
+      # of routes from marketplace + hardware-store + fiscal + caller +
+      # integration-gateway + outbound-webhooks before opening its HTTP
+      # listener, plus Prisma client introspection across 50+ tables.
+      # Old 40s start_period tripped well before the listener was up,
+      # causing docker compose to declare unhealthy → deploy.sh aborted.
+      # 240s leaves comfortable margin.
+      start_period: 240s
     networks:
       - kds_staging_network
     deploy:
