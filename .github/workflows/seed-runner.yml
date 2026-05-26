@@ -79,14 +79,17 @@ jobs:
           CONTAINER: ${{ steps.resolve.outputs.container }}
           SEED_PATH: ${{ inputs.seed }}
         run: |
-          # The backend production image prunes devDependencies, so ts-node
-          # isn't installed by default. `npx -y` auto-installs the listed
-          # packages into the container's npm cache (~30s on first run,
-          # instant on repeats) and then executes the seed against the
-          # container's already-configured DATABASE_URL — no secrets ship
-          # through the workflow.
+          # The backend production image prunes devDependencies, so neither
+          # ts-node nor tsx is installed by default. We use `tsx` (auto-
+          # installed by npx -y) rather than ts-node because tsx handles
+          # both ESM and CommonJS .ts files transparently — ts-node 10 in
+          # an npx context resolves the file as ESM and fails with
+          #   TypeError: Unknown file extension ".ts" for ...
+          # tsx is a swc-based runner so it's faster too.
+          # The container's already-configured DATABASE_URL is honoured;
+          # no secrets ship through the workflow.
           ssh -n -o StrictHostKeyChecking=no root@$SERVER_HOST \
-            "docker exec -i $CONTAINER sh -c 'cd /app && npx -y -p ts-node@10 -p typescript ts-node \"$SEED_PATH\"'"
+            "docker exec -i $CONTAINER sh -c 'cd /app && npx -y tsx \"$SEED_PATH\"'"
 
       - name: Verify product count
         if: inputs.seed == 'prisma/seeds/seed-marketplace.ts'
