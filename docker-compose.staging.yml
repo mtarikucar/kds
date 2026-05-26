@@ -87,17 +87,21 @@ services:
     volumes:
       - invoice_storage_staging:/app/storage
     healthcheck:
-      test: ['CMD', 'curl', '-f', 'http://localhost:3002/api/healthz/ready']
+      # /api/health (basic alive + DB + Redis) is the safe probe URL
+      # because it exists in every image we've ever shipped. /healthz/ready
+      # is a richer K8s-style probe but only exists in HummyTummy+ images;
+      # using it here meant the rollback target (older image without that
+      # route) always 404'd and was eternally "unhealthy" — cascading the
+      # failure of every rollback attempt. /api/health is the durable
+      # contract.
+      test: ['CMD', 'curl', '-f', 'http://localhost:3002/api/health']
       interval: 30s
       timeout: 10s
       retries: 5
-      # Cold backend bootstrap takes ~3-4 min — NestJS registers hundreds
-      # of routes from marketplace + hardware-store + fiscal + caller +
-      # integration-gateway + outbound-webhooks before opening its HTTP
-      # listener, plus Prisma client introspection across 50+ tables.
-      # Old 40s start_period tripped well before the listener was up,
-      # causing docker compose to declare unhealthy → deploy.sh aborted.
-      # 240s leaves comfortable margin.
+      # Cold bootstrap of the HummyTummy-sized backend takes ~3-4 min on
+      # this 1 CPU / 1GB limit (NestJS module init + Prisma introspection
+      # over 50+ tables). 240s leaves margin against the observed cold
+      # path.
       start_period: 240s
     networks:
       - kds_staging_network

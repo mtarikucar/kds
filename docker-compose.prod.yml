@@ -130,14 +130,15 @@ services:
       - invoice_storage:/app/storage
       - uploads_storage:/app/uploads
     healthcheck:
-      # /healthz/ready validates DB + Redis + KMS + payment/fiscal registries.
-      # /api/health stays as a backward-compat alias.
-      test: ['CMD', 'curl', '-f', 'http://0.0.0.0:3000/api/healthz/ready']
+      # /api/health is the durable contract — exists in every image we've
+      # ever shipped, so rollback to an older image is always probe-able.
+      # /healthz/ready is richer (KMS + payment/fiscal registries) but
+      # only exists in HummyTummy+ images, which broke the rollback path.
+      # See docker-compose.staging.yml for the full story.
+      test: ['CMD', 'curl', '-f', 'http://0.0.0.0:3000/api/health']
       interval: 30s
       timeout: 10s
       retries: 5
-      # See docker-compose.staging.yml for rationale — backend bootstrap
-      # has grown past the old 40s budget.
       start_period: 240s
     networks:
       - kds_network
