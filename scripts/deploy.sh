@@ -337,6 +337,18 @@ wait_until_healthy() {
     i=$((i + 1))
   done
   err "$url did not respond within ${budget}s"
+  # Forensic dump: when the backend never opens its listener, the
+  # rollback path will recreate the container and we lose its logs.
+  # Capture them here while the container still exists so the workflow
+  # log includes the smoking gun. Best-effort — never let log capture
+  # mask the original failure.
+  if [[ "$url" == *":3002/api/health"* ]] || [[ "$url" == *":3000/api/health"* ]]; then
+    log "─── backend logs (last 200) on health-probe failure ───"
+    docker logs "$BACKEND_CONTAINER" --tail 200 2>&1 | sed 's/^/  /' || true
+    log "─── backend container inspect (state) ───"
+    docker inspect "$BACKEND_CONTAINER" --format '{{.State.Status}} pid={{.State.Pid}} exitCode={{.State.ExitCode}} oomKilled={{.State.OOMKilled}} error={{.State.Error}}' 2>&1 || true
+    log "─── end forensic dump ───"
+  fi
   return 1
 }
 
