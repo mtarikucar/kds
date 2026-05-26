@@ -79,11 +79,14 @@ jobs:
           CONTAINER: ${{ steps.resolve.outputs.container }}
           SEED_PATH: ${{ inputs.seed }}
         run: |
-          # The backend image bundles ts-node and the seed scripts at /app.
-          # We run via `docker exec` so the container's own env (DATABASE_URL,
-          # etc.) is honoured — no need to ship secrets through the workflow.
+          # The backend production image prunes devDependencies, so ts-node
+          # isn't installed by default. `npx -y` auto-installs the listed
+          # packages into the container's npm cache (~30s on first run,
+          # instant on repeats) and then executes the seed against the
+          # container's already-configured DATABASE_URL — no secrets ship
+          # through the workflow.
           ssh -n -o StrictHostKeyChecking=no root@$SERVER_HOST \
-            "docker exec -i $CONTAINER sh -c 'cd /app && npx --no-install ts-node \"$SEED_PATH\"'"
+            "docker exec -i $CONTAINER sh -c 'cd /app && npx -y -p ts-node@10 -p typescript ts-node \"$SEED_PATH\"'"
 
       - name: Verify product count
         if: inputs.seed == 'prisma/seeds/seed-marketplace.ts'
