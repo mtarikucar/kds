@@ -1,0 +1,98 @@
+name: Staging Diagnose
+
+# Read-only diagnostic against the staging host. Runs over SSH from a
+# GitHub-hosted runner (server is allowlisted) and prints container logs,
+# health probes, and `docker ps -a` so we can see what went wrong without
+# the local laptop SSHing in.
+#
+# Manual-only (workflow_dispatch). Writes nothing on the server.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "staging" to confirm — guards against accidental fires.'
+        required: true
+        type: string
+      tail_lines:
+        description: 'docker logs --tail (max 500)'
+        required: true
+        default: '300'
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  SERVER_HOST: 38.242.233.166
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Confirm input
+        run: |
+          if [[ "${{ inputs.confirm }}" != "staging" ]]; then
+            echo "::error::confirm input must be exactly 'staging'"
+            exit 1
+          fi
+          if ! [[ "${{ inputs.tail_lines }}" =~ ^[1-9][0-9]{0,2}$ ]] || [[ "${{ inputs.tail_lines }}" -gt 500 ]]; then
+            echo "::error::tail_lines must be 1..500"
+            exit 1
+          fi
+
+      - name: Setup SSH
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Container inventory
+        run: |
+          echo "::group::docker ps -a (kds_*)"
+          ssh -n -o StrictHostKeyChecking=no root@$SERVER_HOST \
+            'docker ps -a --format "table {{.Names}}\t{{.Status}}\t{{.Image}}" | (head -1; grep kds_)'
+          echo "::endgroup::"
+
+      - name: Backend container logs
+        run: |
+          echo "::group::kds_backend_staging --tail ${{ inputs.tail_lines }}"
+          ssh -n -o StrictHostKeyChecking=no root@$SERVER_HOST \
+            "docker logs kds_backend_staging --tail ${{ inputs.tail_lines }} 2>&1 || echo '[container not found]'"
+          echo "::endgroup::"
+
+      - name: Health probes (from inside docker network)
+        run: |
+          echo "::group::loopback /api/health and /api/healthz/ready"
+          ssh -n -o StrictHostKeyChecking=no root@$SERVER_HOST \
+            'set +e
+             echo "--- localhost:3002/api/health ---"
+             curl -sS -m 5 -o - -w "\nHTTP %{http_code} · %{time_total}s\n" http://localhost:3002/api/health || true
+             echo
+             echo "--- localhost:3002/api/healthz/ready ---"
+             curl -sS -m 5 -o - -w "\nHTTP %{http_code} · %{time_total}s\n" http://localhost:3002/api/healthz/ready || true'
+          echo "::endgroup::"
+
+      - name: Backend env summary (non-secret keys only)
+        run: |
+          echo "::group::env keys present in .env.test (values redacted)"
+          ssh -n -o StrictHostKeyChecking=no root@$SERVER_HOST \
+            'if [ -f /root/kds/.env.test ]; then
+               awk -F= "NF>0 && !/^#/ {print \$1}" /root/kds/.env.test | sort -u
+             else
+               echo "[/root/kds/.env.test missing]"
+             fi'
+          echo "::endgroup::"
+
+      - name: Recent docker events (last 5 min)
+        run: |
+          echo "::group::docker events --since 5m"
+          ssh -n -o StrictHostKeyChecking=no root@$SERVER_HOST \
+            'timeout 4 docker events --since 5m --until 1s --filter "container=kds_backend_staging" --format "{{.Time}} {{.Action}} {{.Actor.Attributes.exitCode}}" || true'
+          echo "::endgroup::"
