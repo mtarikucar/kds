@@ -122,14 +122,15 @@ configure_env() {
     API_PUBLIC_URL="https://staging.hummytummy.com/api/health"
     FRONTEND_PUBLIC_URL="https://staging.hummytummy.com"
     LANDING_PUBLIC_URL="https://staging.hummytummy.com/landing"
-    # Aligned with prod (300s). NestJS bootstrap now registers hundreds of
-    # routes from marketplace + hardware-store + fiscal + caller +
-    # integration-gateway + outbound-webhooks, plus Prisma client
-    # introspection across 50+ tables. The original 180s budget assumed a
-    # leaner module graph; rotation logs show route-mapping continuing
-    # past 180s on cold boots, so the old budget caused false-positive
-    # rollbacks where the backend was simply still booting.
-    HEALTH_BUDGET_SEC=300
+    # Bumped to 600s. Run 26431353670 showed the new (HummyTummy+) image
+    # still hadn't responded to /api/health at the 300s mark. The previous
+    # image boots in ~2 min, the new one takes longer — module init for
+    # marketplace + hardware-store + fiscal + caller + integration-gateway
+    # + outbound-webhooks, plus Prisma client introspection over 50+
+    # tables, plus likely an onModuleInit doing DB reads. 600s leaves
+    # comfortable margin; if a future boot exceeds that, it's a real
+    # signal worth investigating.
+    HEALTH_BUDGET_SEC=600
     BACKUP_RETENTION_DAYS=3
     BACKUP_PREFIX="staging"
   fi
