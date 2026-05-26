@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { type CartItem, useListProducts, useQuoteCart, useConfirmCheckout, type HardwareProduct, type CartQuote } from './storeApi';
 
 /**
@@ -12,20 +13,97 @@ import { type CartItem, useListProducts, useQuoteCart, useConfirmCheckout, type 
  * Keeps the cart state in-memory only — survives navigation within the SPA
  * but not a full reload, which is the right MVP behaviour (no half-finished
  * carts littering local storage).
+ *
+ * URL bridge: `?sku=<sku>` is read once on mount. If the public landing
+ * store sends the visitor here with `?sku=…`, the matching product is
+ * auto-added to the cart (idempotent — re-visiting doesn't stack). This
+ * lets the landing's "Sipariş ver" CTA hand off a one-click checkout.
  */
-const CATEGORIES = ['all', 'kds_screen', 'tablet', 'pos_terminal', 'printer', 'yazarkasa', 'bridge', 'scanner', 'caller_id'];
+
+// Categories must match the backend CreateHardwareProductDto enum
+// (see backend/src/modules/catalog/dto/create-hardware-product.dto.ts).
+const CATEGORIES = [
+  'all',
+  'yazarkasa',
+  'pos_terminal',
+  'printer',
+  'kds_screen',
+  'tablet',
+  'scanner',
+  'caller_id',
+  'cash_drawer',
+  'bridge',
+  'accessory',
+  'service',
+];
+
+const CATEGORY_LABELS_TR: Record<string, string> = {
+  all: 'Tüm kategoriler',
+  yazarkasa: 'Yazarkasa POS',
+  pos_terminal: 'POS Terminal',
+  printer: 'Yazıcı',
+  kds_screen: 'KDS Ekranı',
+  tablet: 'Tablet',
+  scanner: 'Barkod Okuyucu',
+  caller_id: 'Arayan Numara',
+  cash_drawer: 'Para Çekmecesi',
+  bridge: 'Network Bridge',
+  accessory: 'Aksesuar',
+  service: 'Hizmet',
+};
+
+// LocalStorage key for the BYO disclaimer dismiss state. Versioned in case
+// we update the copy later — bumping the suffix re-shows the banner.
+const BYO_DISMISS_KEY = 'hardware-store-byo-dismiss-v1';
 
 interface LocalCartLine {
   product: HardwareProduct;
   qty: number;
 }
 
+function gibCertified(p: HardwareProduct): boolean {
+  return Boolean(p.compat && (p.compat as { gibCertified?: boolean }).gibCertified === true);
+}
+
 export default function StorePage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [category, setCategory] = useState<string>('all');
   const [cart, setCart] = useState<LocalCartLine[]>([]);
+  const [byoDismissed, setByoDismissed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem(BYO_DISMISS_KEY) === '1';
+  });
+
+  // For the SKU bridge we need the unfiltered catalogue so a deeplink to a
+  // product in a category that's not currently filtered still resolves.
   const { data: products = [], isLoading } = useListProducts(category === 'all' ? undefined : category);
+  const { data: allProducts = [] } = useListProducts(undefined);
   const quote = useQuoteCart();
   const confirm = useConfirmCheckout();
+
+  // Auto-add the ?sku=<sku> product on mount. Guarded with `processed` so
+  // re-renders + state changes don't keep adding. Once it's processed we
+  // also strip the param from the URL so a refresh doesn't trigger again.
+  useEffect(() => {
+    const sku = searchParams.get('sku');
+    if (!sku || allProducts.length === 0) return;
+    const product = allProducts.find((p) => p.sku === sku);
+    if (!product) {
+      // Strip the param even if we couldn't resolve the sku — otherwise
+      // every re-render tries again as the catalogue list shuffles.
+      const next = new URLSearchParams(searchParams);
+      next.delete('sku');
+      setSearchParams(next, { replace: true });
+      return;
+    }
+    setCart((c) => {
+      if (c.some((l) => l.product.id === product.id)) return c;
+      return [...c, { product, qty: 1 }];
+    });
+    const next = new URLSearchParams(searchParams);
+    next.delete('sku');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, allProducts, setSearchParams]);
 
   const cartItems: CartItem[] = useMemo(
     () => cart.map((l) => ({ type: 'hardware' as const, sku: l.product.sku, qty: l.qty })),
@@ -61,116 +139,160 @@ export default function StorePage() {
     setCart([]);
   }
 
+  function dismissByo() {
+    setByoDismissed(true);
+    try {
+      window.localStorage.setItem(BYO_DISMISS_KEY, '1');
+    } catch {
+      // Private mode / quota — non-fatal, banner just re-shows next session.
+    }
+  }
+
   const currentQuote = (quote.data as CartQuote | undefined) ?? null;
 
   return (
-    <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-[1fr_360px]">
-      <div className="space-y-4">
-        <header className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Hardware Store</h1>
-          <select
-            className="rounded border px-2 py-1 text-sm"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
+    <div className="space-y-4 p-6">
+      {/* BYO disclaimer banner — dismissible. */}
+      {!byoDismissed && (
+        <div className="flex items-start justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+          <div>
+            <strong className="font-semibold">Mevcut donanımınız var mı?</strong>{' '}
+            Elinizdeki yazarkasa POS, termal yazıcı veya KDS ekranını da entegre edebiliriz —
+            yeni cihaz almak zorunda değilsiniz. Marka/model bilgisini destek ekibine iletmeniz yeterli.
+          </div>
+          <button
+            type="button"
+            onClick={dismissByo}
+            className="text-blue-700 hover:text-blue-900 text-xs underline whitespace-nowrap"
           >
-            {CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c === 'all' ? 'All categories' : c.replace('_', ' ')}
-              </option>
-            ))}
-          </select>
-        </header>
+            Anladım, kapat
+          </button>
+        </div>
+      )}
 
-        {isLoading ? (
-          <div className="text-sm text-gray-500">Loading…</div>
-        ) : products.length === 0 ? (
-          <div className="rounded border border-dashed p-8 text-center text-sm text-gray-500">
-            No products in this category.
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {products.map((p) => (
-              <article key={p.id} className="overflow-hidden rounded-lg border bg-white">
-                {p.images?.[0] && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={p.images[0]} alt={p.name} className="aspect-[4/3] w-full object-cover" />
-                )}
-                <div className="p-4">
-                  <div className="text-xs text-gray-500">{p.brand} · {p.category}</div>
-                  <h3 className="font-semibold">{p.name}</h3>
-                  <p className="mt-1 line-clamp-2 text-sm text-gray-600">{p.description}</p>
-                  <div className="mt-3 flex items-center justify-between">
-                    <span className="text-lg font-medium">
-                      {(p.priceCents / 100).toLocaleString('tr-TR', { style: 'currency', currency: p.currency })}
-                    </span>
-                    <button
-                      className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
-                      disabled={p.stockStatus === 'out_of_stock' || p.stockStatus === 'discontinued'}
-                      onClick={() => add(p)}
-                    >
-                      {p.stockStatus === 'out_of_stock' ? 'Out of stock' : 'Add to cart'}
-                    </button>
-                  </div>
-                  <div className="mt-2 text-xs text-gray-500">{p.warrantyMonths} months warranty</div>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <aside className="space-y-4 rounded-lg border bg-white p-4 lg:sticky lg:top-6 lg:self-start">
-        <h2 className="text-lg font-semibold">Cart</h2>
-        {cart.length === 0 ? (
-          <p className="text-sm text-gray-500">Your cart is empty.</p>
-        ) : (
-          <>
-            <ul className="space-y-2">
-              {cart.map((l) => (
-                <li key={l.product.id} className="flex items-center justify-between text-sm">
-                  <span>
-                    {l.product.name} <span className="text-gray-500">× {l.qty}</span>
-                  </span>
-                  <div className="flex items-center gap-2">
-                    <span>
-                      {((l.product.priceCents * l.qty) / 100).toLocaleString('tr-TR', { style: 'currency', currency: l.product.currency })}
-                    </span>
-                    <button className="text-xs text-red-600 hover:underline" onClick={() => remove(l.product.id)}>
-                      Remove
-                    </button>
-                  </div>
-                </li>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
+        <div className="space-y-4">
+          <header className="flex items-center justify-between gap-4 flex-wrap">
+            <h1 className="text-2xl font-semibold">Donanım Mağazası</h1>
+            <select
+              className="rounded border px-2 py-1 text-sm"
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {CATEGORY_LABELS_TR[c] ?? c.replace(/_/g, ' ')}
+                </option>
               ))}
-            </ul>
-            <button
-              className="w-full rounded border px-3 py-1.5 text-sm hover:bg-gray-50"
-              onClick={refreshQuote}
-              disabled={quote.isPending}
-            >
-              {quote.isPending ? 'Pricing…' : 'Get quote'}
-            </button>
-            {currentQuote && (
-              <div className="space-y-1 rounded bg-gray-50 p-3 text-sm">
-                <Row label="Subtotal" cents={currentQuote.subtotalCents} currency={currentQuote.currency} />
-                <Row label="Tax" cents={currentQuote.taxCents} currency={currentQuote.currency} />
-                <Row label="Shipping" cents={currentQuote.shippingCents} currency={currentQuote.currency} />
-                <Row label="Total" cents={currentQuote.totalCents} currency={currentQuote.currency} bold />
-              </div>
-            )}
-            <button
-              className="w-full rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              onClick={placeOrder}
-              // Block clicks when there's nothing to provision or while a
-              // confirm is mid-flight. Without the cart.length guard, the
-              // button silently no-ops and operators re-click thinking the
-              // page is frozen.
-              disabled={confirm.isPending || cart.length === 0}
-            >
-              {confirm.isPending ? 'Placing…' : 'Place order'}
-            </button>
-          </>
-        )}
-      </aside>
+            </select>
+          </header>
+
+          {isLoading ? (
+            <div className="text-sm text-gray-500">Yükleniyor…</div>
+          ) : products.length === 0 ? (
+            <div className="rounded border border-dashed p-8 text-center text-sm text-gray-500">
+              Bu kategoride ürün yok.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {products.map((p) => {
+                const showGibBadge = gibCertified(p);
+                const isOos = p.stockStatus === 'out_of_stock' || p.stockStatus === 'discontinued';
+                return (
+                  <article key={p.id} className="overflow-hidden rounded-lg border bg-white">
+                    {p.images?.[0] && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={p.images[0]} alt={p.name} className="aspect-[4/3] w-full object-cover" />
+                    )}
+                    <div className="p-4">
+                      <div className="flex items-center gap-2 flex-wrap text-xs text-gray-500">
+                        <span>{p.brand} · {p.category.replace(/_/g, ' ')}</span>
+                        {showGibBadge && (
+                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                            GİB onaylı
+                          </span>
+                        )}
+                      </div>
+                      <h3 className="font-semibold mt-1">{p.name}</h3>
+                      <p className="mt-1 line-clamp-2 text-sm text-gray-600">{p.description}</p>
+                      <div className="mt-3 flex items-center justify-between">
+                        <span className="text-lg font-medium">
+                          {(p.priceCents / 100).toLocaleString('tr-TR', { style: 'currency', currency: p.currency })}
+                        </span>
+                        <button
+                          className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={isOos}
+                          onClick={() => add(p)}
+                        >
+                          {p.stockStatus === 'out_of_stock'
+                            ? 'Stokta yok'
+                            : p.stockStatus === 'discontinued'
+                              ? 'Üretimden kaldırıldı'
+                              : 'Sepete ekle'}
+                        </button>
+                      </div>
+                      <div className="mt-2 text-xs text-gray-500">{p.warrantyMonths} ay garanti</div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <aside className="space-y-4 rounded-lg border bg-white p-4 lg:sticky lg:top-6 lg:self-start">
+          <h2 className="text-lg font-semibold">Sepet</h2>
+          {cart.length === 0 ? (
+            <p className="text-sm text-gray-500">Sepetiniz boş.</p>
+          ) : (
+            <>
+              <ul className="space-y-2">
+                {cart.map((l) => (
+                  <li key={l.product.id} className="flex items-center justify-between text-sm">
+                    <span>
+                      {l.product.name} <span className="text-gray-500">× {l.qty}</span>
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span>
+                        {((l.product.priceCents * l.qty) / 100).toLocaleString('tr-TR', { style: 'currency', currency: l.product.currency })}
+                      </span>
+                      <button className="text-xs text-red-600 hover:underline" onClick={() => remove(l.product.id)}>
+                        Çıkar
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <button
+                className="w-full rounded border px-3 py-1.5 text-sm hover:bg-gray-50"
+                onClick={refreshQuote}
+                disabled={quote.isPending}
+              >
+                {quote.isPending ? 'Fiyatlandırılıyor…' : 'Teklif al'}
+              </button>
+              {currentQuote && (
+                <div className="space-y-1 rounded bg-gray-50 p-3 text-sm">
+                  <Row label="Ara toplam" cents={currentQuote.subtotalCents} currency={currentQuote.currency} />
+                  <Row label="KDV" cents={currentQuote.taxCents} currency={currentQuote.currency} />
+                  <Row label="Kargo" cents={currentQuote.shippingCents} currency={currentQuote.currency} />
+                  <Row label="Toplam" cents={currentQuote.totalCents} currency={currentQuote.currency} bold />
+                </div>
+              )}
+              <button
+                className="w-full rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                onClick={placeOrder}
+                // Block clicks when there's nothing to provision or while a
+                // confirm is mid-flight. Without the cart.length guard, the
+                // button silently no-ops and operators re-click thinking the
+                // page is frozen.
+                disabled={confirm.isPending || cart.length === 0}
+              >
+                {confirm.isPending ? 'Sipariş veriliyor…' : 'Siparişi tamamla'}
+              </button>
+            </>
+          )}
+        </aside>
+      </div>
     </div>
   );
 }

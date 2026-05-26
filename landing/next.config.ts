@@ -9,14 +9,24 @@ const nextConfig: NextConfig = {
 
   images: {
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'hummytummy.com',
-      },
-      {
-        protocol: 'https',
-        hostname: 'staging.hummytummy.com',
-      },
+      { protocol: 'https', hostname: 'hummytummy.com' },
+      { protocol: 'https', hostname: 'staging.hummytummy.com' },
+      // Manufacturer / authorized-distributor CDNs referenced from the
+      // hardware-store seed. Whitelisted up-front so that future seed
+      // updates that include image URLs don't need a deploy-time config
+      // change. Restricted to known POS-hardware vendors.
+      { protocol: 'https', hostname: '**.hugin.com.tr' },
+      { protocol: 'https', hostname: 'www.beko.com.tr' },
+      { protocol: 'https', hostname: 'www.epson.com.tr' },
+      { protocol: 'https', hostname: 'www.sunmi.com' },
+      { protocol: 'https', hostname: 'shop.interpay.com.tr' },
+      { protocol: 'https', hostname: 'www.penetek.com' },
+      { protocol: 'https', hostname: 'sps.honeywell.com' },
+      { protocol: 'https', hostname: 'www.zebra.com' },
+      { protocol: 'https', hostname: 'images.samsung.com' },
+      { protocol: 'https', hostname: 'productimages.hepsiburada.net' },
+      { protocol: 'https', hostname: 'cdn.dsmcdn.com' },
+      { protocol: 'https', hostname: 'img.akakce.com' },
     ],
   },
 
@@ -31,7 +41,7 @@ const nextConfig: NextConfig = {
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https://hummytummy.com https://staging.hummytummy.com",
+      "img-src 'self' data: blob: https://hummytummy.com https://staging.hummytummy.com https://*.hugin.com.tr https://www.beko.com.tr https://www.epson.com.tr https://www.sunmi.com https://shop.interpay.com.tr https://www.penetek.com https://sps.honeywell.com https://www.zebra.com https://images.samsung.com https://productimages.hepsiburada.net https://cdn.dsmcdn.com https://img.akakce.com",
       "font-src 'self' data:",
       "connect-src 'self' https://*.sentry.io https://hummytummy.com https://staging.hummytummy.com",
       "frame-ancestors 'self'",

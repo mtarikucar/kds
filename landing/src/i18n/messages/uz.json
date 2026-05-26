@@ -9,6 +9,7 @@
     "features": "Xususiyatlar",
     "pricing": "Narxlar",
     "security": "Xavfsizlik",
+    "store": "Do'kon",
     "signIn": "Kirish",
     "startFree": "Bepul boshlash",
     "openMenu": "Menyuni ochish",
@@ -428,6 +429,44 @@
         "content": "Ushbu Xizmat shartlari bo'yicha savollaringiz bo'lsa, biz bilan bog'laning:"
       }
     }
+  },
+  "store": {
+    "title": "POS jihozlari do'koni",
+    "subtitle": "Restoran, kafe va chakana savdo uchun tanlangan kassa terminallari, termal printerlar, KDS ekranlari, skanerlar va aksessuarlar.",
+    "backToHome": "Bosh sahifaga qaytish",
+    "headerBadge": "May 2026 narxlari",
+    "categoryAll": "Hammasi",
+    "categories": {
+      "yazarkasa": "Fiskal POS",
+      "pos_terminal": "POS Terminal",
+      "printer": "Printer",
+      "kds_screen": "KDS ekrani",
+      "tablet": "Planshet",
+      "scanner": "Shtrix-kod skaneri",
+      "caller_id": "Qo'ng'iroq identifikatori",
+      "cash_drawer": "Pul yashigi",
+      "bridge": "Tarmoq ko'prigi",
+      "scale": "Tarozi",
+      "accessory": "Aksessuar",
+      "service": "Xizmat"
+    },
+    "buy": "Buyurtma berish",
+    "viewSource": "Ishlab chiqaruvchi sahifasi",
+    "from": "{currency}{amount}",
+    "warrantyMonths": "{months} oy kafolat",
+    "rentalFrom": "yoki {currency}{amount}/oy ijaraga",
+    "gibCertified": "GİB sertifikatlangan",
+    "outOfStock": "Sotuvda yo'q",
+    "discontinued": "Ishlab chiqarish to'xtatilgan",
+    "preorder": "Oldindan buyurtma",
+    "empty": "Bu turkumda hozircha mahsulotlar yo'q.",
+    "loadError": "Mahsulotlarni yuklab bo'lmadi. Birozdan keyin qayta urinib ko'ring.",
+    "byo": {
+      "title": "Sizda jihoz bormi?",
+      "body": "Mavjud fiskal POS, termal printer, KDS ekrani yoki shtrix-kod skaneringizni tizimimizga integratsiya qila olamiz — yangi jihoz sotib olish shart emas. Ro'yxatdan o'tgandan keyin brend va modelni qo'llab-quvvatlash jamoamizga ayting.",
+      "cta": "Qo'llab-quvvatlash bilan bog'lanish"
+    },
+    "gibFootnote": "Turkiya yangi avlod fiskal POS qurilmalari (YN ÖKC) GİB ro'yxatida bo'lishi va vakolatli diler orqali faollashtirilishi shart. HummyTummy orqali buyurtma bersangiz, faollashtirish so'rovi avtomatik ochiladi."
   },
   "contact": {
     "title": "Aloqa",

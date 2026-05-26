@@ -9,6 +9,7 @@
     "features": "Features",
     "pricing": "Pricing",
     "security": "Security",
+    "store": "Shop",
     "signIn": "Sign in",
     "startFree": "Start free",
     "openMenu": "Open menu",
@@ -294,6 +295,7 @@
       "features": "Features",
       "pricing": "Pricing",
       "security": "Security",
+      "shop": "Hardware Shop",
       "integrations": "Integrations",
       "about": "About",
       "blog": "Blog",
@@ -428,6 +430,44 @@
         "content": "If you have any questions about these Terms of Service, please contact us:"
       }
     }
+  },
+  "store": {
+    "title": "POS Hardware Shop",
+    "subtitle": "Curated point-of-sale terminals, thermal printers, KDS screens, scanners, caller-ID modules, and accessories for restaurants, cafés, and retail.",
+    "backToHome": "Back to home",
+    "headerBadge": "May 2026 pricing",
+    "categoryAll": "All",
+    "categories": {
+      "yazarkasa": "Fiscal POS (YN ÖKC)",
+      "pos_terminal": "POS Terminal",
+      "printer": "Printer",
+      "kds_screen": "KDS Screen",
+      "tablet": "Tablet",
+      "scanner": "Barcode Scanner",
+      "caller_id": "Caller ID",
+      "cash_drawer": "Cash Drawer",
+      "bridge": "Network Bridge",
+      "scale": "Scale",
+      "accessory": "Accessory",
+      "service": "Service"
+    },
+    "buy": "Order now",
+    "viewSource": "Manufacturer page",
+    "from": "{currency}{amount}",
+    "warrantyMonths": "{months}-month warranty",
+    "rentalFrom": "or {currency}{amount}/mo rental",
+    "gibCertified": "GİB-certified YN ÖKC",
+    "outOfStock": "Out of stock",
+    "discontinued": "Discontinued",
+    "preorder": "Pre-order",
+    "empty": "No products in this category yet.",
+    "loadError": "We couldn't load the products right now. Please try again in a few minutes.",
+    "byo": {
+      "title": "Already own equipment?",
+      "body": "We can integrate your existing fiscal POS, thermal printer, KDS screen, or barcode scanner into the platform — you don't have to buy new hardware. After you sign up, share the brand and model with our support team and we'll confirm compatibility together.",
+      "cta": "Talk to support"
+    },
+    "gibFootnote": "Turkey's Next-Generation Fiscal POS (YN ÖKC) devices must appear on the GİB approved list and be activated through an authorized dealer. Orders placed via HummyTummy automatically open an activation request. Full list at ynokc.gib.gov.tr."
   },
   "contact": {
     "title": "Contact",

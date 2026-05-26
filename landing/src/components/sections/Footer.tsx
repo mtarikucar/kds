@@ -10,6 +10,9 @@ export default function Footer() {
     { label: t('links.features'), href: '#features' },
     { label: t('links.pricing'), href: '#pricing' },
     { label: t('links.security'), href: '#security' },
+    // Locale-aware page link (rest are anchors). Renderer below switches
+    // between <Link> and <a> based on the href shape.
+    { label: t('links.shop'), href: '/store' },
     { label: t('links.integrations'), href: '#' },
   ];
 
@@ -65,12 +68,21 @@ export default function Footer() {
             <ul className="space-y-3">
               {productLinks.map((link) => (
                 <li key={link.label}>
-                  <a
-                    href={link.href}
-                    className="text-sm text-slate-500 hover:text-slate-900 transition-colors"
-                  >
-                    {link.label}
-                  </a>
+                  {link.href.startsWith('/') && !link.href.startsWith('/#') ? (
+                    <Link
+                      href={link.href}
+                      className="text-sm text-slate-500 hover:text-slate-900 transition-colors"
+                    >
+                      {link.label}
+                    </Link>
+                  ) : (
+                    <a
+                      href={link.href}
+                      className="text-sm text-slate-500 hover:text-slate-900 transition-colors"
+                    >
+                      {link.label}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>

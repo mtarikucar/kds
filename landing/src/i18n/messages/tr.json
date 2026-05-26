@@ -9,6 +9,7 @@
     "features": "Özellikler",
     "pricing": "Fiyatlandırma",
     "security": "Güvenlik",
+    "store": "Mağaza",
     "signIn": "Giriş yap",
     "startFree": "Ücretsiz başla",
     "openMenu": "Menüyü aç",
@@ -294,6 +295,7 @@
       "features": "Özellikler",
       "pricing": "Fiyatlandırma",
       "security": "Güvenlik",
+      "shop": "Donanım Mağazası",
       "integrations": "Entegrasyonlar",
       "about": "Hakkımızda",
       "blog": "Blog",
@@ -428,6 +430,44 @@
         "content": "Bu Kullanım Şartları hakkında sorularınız varsa, lütfen bizimle iletişime geçin:"
       }
     }
+  },
+  "store": {
+    "title": "POS Donanım Mağazası",
+    "subtitle": "Restoran, cafe ve perakende işletmeleri için kürelenmiş yeni nesil yazarkasa POS, termal yazıcı, KDS ekranı, barkod okuyucu, arayan numara modülü ve aksesuarlar.",
+    "backToHome": "Ana Sayfaya Dön",
+    "headerBadge": "Mayıs 2026 fiyatlandırması",
+    "categoryAll": "Tümü",
+    "categories": {
+      "yazarkasa": "Yazarkasa POS",
+      "pos_terminal": "POS Terminal",
+      "printer": "Yazıcı",
+      "kds_screen": "KDS Ekranı",
+      "tablet": "Tablet",
+      "scanner": "Barkod Okuyucu",
+      "caller_id": "Arayan Numara",
+      "cash_drawer": "Para Çekmecesi",
+      "bridge": "Network Bridge",
+      "scale": "Tartı",
+      "accessory": "Aksesuar",
+      "service": "Hizmet"
+    },
+    "buy": "Sipariş ver",
+    "viewSource": "Üretici sayfası",
+    "from": "{currency}{amount}",
+    "warrantyMonths": "{months} ay garanti",
+    "rentalFrom": "veya {currency}{amount}/ay kira",
+    "gibCertified": "GİB onaylı YN ÖKC",
+    "outOfStock": "Stokta yok",
+    "discontinued": "Üretimi durduruldu",
+    "preorder": "Ön sipariş",
+    "empty": "Bu kategoride henüz ürün yok.",
+    "loadError": "Ürünler yüklenirken bir sorun oluştu. Birkaç dakika sonra tekrar deneyin.",
+    "byo": {
+      "title": "Mevcut donanımınız var mı?",
+      "body": "Elinizdeki yazarkasa POS, termal yazıcı, KDS ekranı veya barkod okuyucuyu da sistemimize entegre edebiliriz — yeni cihaz almak zorunda değilsiniz. Mevcut ekipmanınızın markası ve modelini kayıt sonrası destek ekibimizle paylaşmanız yeterli; uyumluluğu birlikte doğrularız.",
+      "cta": "Destek ile iletişime geç"
+    },
+    "gibFootnote": "Yeni Nesil Yazarkasa POS (YN ÖKC) cihazları GİB onay listesinde olmak zorundadır ve aktivasyon yetkili bayi kanalı üzerinden yapılır. HummyTummy üzerinden sipariş ettiğinizde aktivasyon talebi otomatik açılır. Detaylı liste: ynokc.gib.gov.tr."
   },
   "contact": {
     "title": "İletişim",

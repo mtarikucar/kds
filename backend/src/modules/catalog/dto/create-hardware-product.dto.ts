@@ -13,7 +13,25 @@ import {
   Min,
 } from 'class-validator';
 
-const CATEGORIES = ['pos', 'printer', 'scale', 'scanner', 'tablet', 'cable', 'accessory', 'service'] as const;
+// Categories the seed + frontend storefront actually use, plus a few
+// generic buckets. Kept in sync with frontend/src/features/hardware-store/
+// StorePage.tsx and backend/prisma/seeds/seed-marketplace.ts. Adding a
+// category requires touching all three.
+const CATEGORIES = [
+  'yazarkasa',     // YN ÖKC (GİB-certified)
+  'pos_terminal',  // generic POS terminal (non-fiscal)
+  'printer',       // thermal receipt + kitchen printers
+  'kds_screen',    // kitchen display screen
+  'tablet',        // garson / customer-facing tablet
+  'scanner',       // barcode scanner
+  'caller_id',     // arayan numara modülü
+  'cash_drawer',   // para çekmecesi
+  'bridge',        // network bridge (HummyBox)
+  'scale',         // tartı
+  'cable',
+  'accessory',
+  'service',       // installation / setup services
+] as const;
 const STATUSES = ['draft', 'published', 'archived'] as const;
 
 export class CreateHardwareProductDto {
@@ -25,12 +43,12 @@ export class CreateHardwareProductDto {
   })
   sku: string;
 
-  @ApiProperty({ example: 'pos', enum: CATEGORIES })
+  @ApiProperty({ example: 'yazarkasa', enum: CATEGORIES })
   @IsString()
   @IsIn(CATEGORIES as unknown as string[])
   category: string;
 
-  @ApiProperty({ example: 'Ingenico Lane 3000 POS Terminal' })
+  @ApiProperty({ example: 'Hugin Tiger T300 4G Yazarkasa POS' })
   @IsString()
   @IsNotEmpty()
   name: string;

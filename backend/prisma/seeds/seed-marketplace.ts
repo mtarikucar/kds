@@ -164,90 +164,272 @@ const ADDONS = [
 ];
 
 // ---- Launch hardware SKUs ---------------------------------------------
+//
+// Curated Türkiye-market catalog (Mayıs 2026). Prices are TRY street-price
+// estimates from Akakce / Hepsiburada / Hugin official shop / Interpay /
+// Desnet / official manufacturer pages — treat as B2C indicative, not
+// distributor pricing. compat.sourceUrl points to a public reference page
+// so customers can verify the device exists; compat.gibCertified marks
+// YN ÖKC devices that appear on the GİB onay listesi (mandatory for
+// retail/F&B in Türkiye, see https://ynokc.gib.gov.tr/Home/OnayAlanFirmalar/1003).
+//
+// Images intentionally empty for now — manufacturer hot-linking is fragile
+// and copyright-grey. The store UI gracefully handles empty arrays
+// (category-name fallback card). Replace with own-CDN URLs in a follow-up
+// once we have permission/uploads in place.
 
 const PRODUCTS = [
+  // ── Yeni Nesil Yazarkasa POS (YN ÖKC — GİB onaylı) ───────────────────
   {
-    sku: 'kds-21in-touch',
-    category: 'kds_screen',
-    name: '21" KDS Touchscreen',
-    brand: 'HummyTummy',
-    model: 'KDS-21',
-    description: '21-inch capacitive touchscreen. Wall-mount or desk-stand. Runs the Tauri KDS kiosk.',
-    priceCents: 750_000,
+    sku: 'yazarkasa-hugin-tiger-t300',
+    category: 'yazarkasa',
+    name: 'Hugin Tiger T300 4G',
+    brand: 'Hugin',
+    model: 'Tiger T300',
+    description:
+      'GİB onaylı, 4G mobil yeni nesil yazarkasa POS. Tek elle kullanım için 360g hafif, kebap/cafe gibi paket-servis ağırlıklı işletmelerde yaygın. Aktivasyon yetkili bayi kanalı üzerinden yapılır.',
+    compat: {
+      requiredAddOn: ['fiscal_hugin'],
+      gibCertified: true,
+      sourceUrl: 'https://shop.hugin.com.tr/urun/tiger-t300',
+    },
+    priceCents: 640_000,
     warrantyMonths: 24,
     images: [] as string[],
     stockStatus: 'in_stock',
   },
   {
-    sku: 'kds-27in-touch',
-    category: 'kds_screen',
-    name: '27" KDS Touchscreen',
-    brand: 'HummyTummy',
-    model: 'KDS-27',
-    description: '27-inch high-brightness display for busy kitchens.',
-    priceCents: 1_150_000,
+    sku: 'yazarkasa-beko-300tr',
+    category: 'yazarkasa',
+    name: 'Beko 300TR Temassız Android',
+    brand: 'Beko',
+    model: '300TR',
+    description:
+      'GİB onaylı, 5" dokunmatik Android yeni nesil yazarkasa POS. WiFi + 4G dahili SIM. Pay-at-table senaryosu ve yazılım entegrasyonu için ideal.',
+    compat: {
+      gibCertified: true,
+      sourceUrl: 'https://www.beko.com.tr/yazar-kasa-pos/300-tr-temassiz-odeme-sistemleri',
+    },
+    priceCents: 650_000,
     warrantyMonths: 24,
     images: [],
     stockStatus: 'in_stock',
   },
   {
-    sku: 'tab-galaxy-a8-10in',
-    category: 'tablet',
-    name: 'Galaxy Tab A8 10"',
-    brand: 'Samsung',
-    model: 'SM-X205',
-    description: 'Standard waiter tablet pre-flashed with the HummyTummy waiter app.',
-    priceCents: 450_000,
-    warrantyMonths: 12,
+    sku: 'yazarkasa-ingenico-move5000f',
+    category: 'yazarkasa',
+    name: 'Ingenico Move/5000F',
+    brand: 'Ingenico',
+    model: 'Move/5000F',
+    description:
+      'GİB onaylı, premium mobil yeni nesil yazarkasa POS. 4G + Ethernet + WiFi + entegre termal printer; EMV L1/L2 + PCI PTS 5.x sertifikalı. Yüksek hacimli restoran/cafe için.',
+    compat: {
+      gibCertified: true,
+      sourceUrl: 'https://shop.interpay.com.tr/Product/SingleProduct/?id=1004',
+    },
+    priceCents: 1_900_000,
+    warrantyMonths: 24,
     images: [],
     stockStatus: 'in_stock',
   },
+
+  // ── Termal Fiş Yazıcılar ─────────────────────────────────────────────
   {
     sku: 'printer-epson-tm-t20iii-lan',
     category: 'printer',
     name: 'Epson TM-T20III (LAN)',
     brand: 'Epson',
     model: 'TM-T20III',
-    description: '80mm ESC/POS receipt printer with auto-cutter. LAN-connected.',
-    priceCents: 380_000,
+    description:
+      '80mm ESC/POS termal fiş yazıcısı, auto-cutter, LAN bağlantı. SambaPOS / Simpra / RestApp gibi POS yazılımlarıyla uyumlu. Standart counter printer.',
+    compat: {
+      sourceUrl:
+        'https://www.epson.com.tr/%C3%9Cr%C3%BCnler/perakende/pos-yaz%C4%B1c%C4%B1lar/pc-pos-printers/epson-tm-t20iii-series/p/28271',
+    },
+    priceCents: 450_000,
     warrantyMonths: 24,
     images: [],
     stockStatus: 'in_stock',
   },
   {
-    sku: 'printer-star-tsp143iv',
+    sku: 'printer-epson-tm-t88vi-eth',
     category: 'printer',
-    name: 'Star TSP143IV',
-    brand: 'Star',
-    model: 'TSP143IV',
-    description: 'Fast 80mm receipt printer with bluetooth + LAN.',
-    priceCents: 420_000,
+    name: 'Epson TM-T88VI (Ethernet)',
+    brand: 'Epson',
+    model: 'TM-T88VI',
+    description:
+      'Premium 80mm termal yazıcı, otomatik kesici, network-resilient. Yoğun mutfak/bar ortamları için tasarlandı — istasyon başı bir adet yerleştirme önerilir.',
+    compat: {
+      sourceUrl: 'https://www.barkomatik.com/epson-tm-t88vi-112-termal-fis-yazici-3-port-7315.html',
+    },
+    priceCents: 900_000,
     warrantyMonths: 24,
     images: [],
     stockStatus: 'in_stock',
   },
   {
-    sku: 'yazarkasa-hugin-cf350',
-    category: 'yazarkasa',
-    name: 'Hugin CF350 Yazarkasa',
-    brand: 'Hugin',
-    model: 'CF350',
-    description: 'GİB-onaylı yazarkasa. Drives via the Local Bridge Agent.',
-    compat: { requiredAddOn: ['fiscal_hugin'] },
-    priceCents: 1_800_000,
+    sku: 'printer-star-tsp143iiibi',
+    category: 'printer',
+    name: 'Star TSP143IIIBI (Bluetooth)',
+    brand: 'Star Micronics',
+    model: 'TSP143IIIBI',
+    description:
+      'BLE eşleştirmeli 80mm termal yazıcı. iPad veya Android tabanlı POS sistemlerinde Ethernet çekmek pratik olmayan yerlerde tercih edilir.',
+    compat: {
+      sourceUrl: 'https://www.meltas-tedarik.com/star-micronics/tsp-100/3698964',
+    },
+    priceCents: 650_000,
     warrantyMonths: 24,
     images: [],
     stockStatus: 'in_stock',
   },
+
+  // ── KDS Ekranları ────────────────────────────────────────────────────
+  {
+    sku: 'kds-sunmi-d2s',
+    category: 'kds_screen',
+    name: 'Sunmi D2s KDS (15.6" PoE Android)',
+    brand: 'Sunmi',
+    model: 'D2s',
+    description:
+      'Mutfak ekranı olarak özel tasarlanmış 15.6" PoE Android cihaz. HummyTummy KDS uygulaması ile uyumlu, Türkiye distribütörü Noyatech.',
+    compat: {
+      sourceUrl: 'https://noyatech.com/marka/sunmi/',
+    },
+    priceCents: 1_500_000,
+    warrantyMonths: 24,
+    images: [],
+    stockStatus: 'in_stock',
+  },
+  {
+    sku: 'kds-penetek-15in-ip65',
+    category: 'kds_screen',
+    name: 'PENETEK 15.6" IP65 Restaurant Panel PC',
+    brand: 'PENETEK',
+    model: 'P3224-M82',
+    description:
+      'IP65 koruma sınıfı (buhar/sıvı temasına dayanıklı) panel PC, mutfak ortamı için Türkiye üretimi. Yüksek dayanıklılık gereken kebap/grill restoranlarında tercih edilir.',
+    compat: {
+      sourceUrl: 'https://www.penetek.com/tr/product/kitchen-display-panel-pc_P3224-M82.html',
+    },
+    priceCents: 2_200_000,
+    warrantyMonths: 24,
+    images: [],
+    stockStatus: 'in_stock',
+  },
+
+  // ── Garson / Müşteri Tabletleri ──────────────────────────────────────
+  {
+    sku: 'tablet-sunmi-v2-pro',
+    category: 'tablet',
+    name: 'Sunmi V2 Pro (yazıcılı handheld POS)',
+    brand: 'Sunmi',
+    model: 'V2 Pro',
+    description:
+      '5.99" Android handheld POS, dahili 58mm termal yazıcı. Garson el terminali olarak kullanılır; sipariş + adisyon kesimi tek cihazdan.',
+    compat: {
+      sourceUrl: 'https://www.desnet.com.tr/urun/sunmi-v2-pro-yazicili-android-el-terminali/',
+    },
+    priceCents: 1_400_000,
+    warrantyMonths: 12,
+    images: [],
+    stockStatus: 'in_stock',
+  },
+  {
+    sku: 'tablet-samsung-tab-a9-plus',
+    category: 'tablet',
+    name: 'Samsung Galaxy Tab A9+ 11"',
+    brand: 'Samsung',
+    model: 'SM-X216',
+    description:
+      'Müşteri menüsü veya basit sipariş alımı için 11" Android tablet. Vatan/MediaMarkt/Trendyol kanallarından bol; ekonomik seçenek.',
+    compat: { sourceUrl: 'https://www.samsung.com/tr/tablets/galaxy-tab-a/' },
+    priceCents: 1_100_000,
+    warrantyMonths: 24,
+    images: [],
+    stockStatus: 'in_stock',
+  },
+
+  // ── Barkod Okuyucu ───────────────────────────────────────────────────
+  {
+    sku: 'scanner-honeywell-voyager-1450g',
+    category: 'scanner',
+    name: 'Honeywell Voyager 1450g (1D/2D USB)',
+    brand: 'Honeywell',
+    model: '1450g',
+    description:
+      'Kablolu USB 2D barkod okuyucu, counter + paketli ürün okutma için piyasanın standart cihazı. Telefon ekranındaki QR kodları da okur.',
+    compat: { sourceUrl: 'https://www.akbarkod.com.tr/urun/honeywell-1450g-2d' },
+    priceCents: 350_000,
+    warrantyMonths: 12,
+    images: [],
+    stockStatus: 'in_stock',
+  },
+  {
+    sku: 'scanner-zebra-ds2208',
+    category: 'scanner',
+    name: 'Zebra DS2208 (1D/2D USB)',
+    brand: 'Zebra',
+    model: 'DS2208',
+    description:
+      'Premium 2D barkod okuyucu, hasarlı/silik barkodları ve telefon ekranındaki QR kodları rahat okur. Yoğun retail/F&B counter\'ları için.',
+    compat: { sourceUrl: 'https://www.trendbarkod.com.tr/zebra-ds2208-2d-kablolu-barkod-okuyucu' },
+    priceCents: 350_000,
+    warrantyMonths: 24,
+    images: [],
+    stockStatus: 'in_stock',
+  },
+
+  // ── Caller ID (Arayan Numara) ────────────────────────────────────────
+  {
+    sku: 'caller-id-cidshow-cid602',
+    category: 'caller_id',
+    name: 'Cidshow CID602 (2-hat Caller ID)',
+    brand: 'Cidshow',
+    model: 'CID602',
+    description:
+      '2 PSTN hat, USB Caller ID kutusu. Telefon çaldığında müşteri kaydını otomatik açar — paket-servis (pizza/kebap/pide) için kritik. Stack edilerek 4 hatta çıkar.',
+    compat: {
+      requiredAddOn: ['caller_id_integration'],
+      sourceUrl: 'https://www.hepsiburada.com/cidshow-cid602-2-hatli-caller-id-pm-telatilimcid602',
+    },
+    priceCents: 40_000,
+    warrantyMonths: 12,
+    images: [],
+    stockStatus: 'in_stock',
+  },
+
+  // ── Para Çekmecesi ───────────────────────────────────────────────────
+  {
+    sku: 'cash-drawer-afanda-lb405k',
+    category: 'cash_drawer',
+    name: 'AFANDA LB-405K Para Çekmecesi',
+    brand: 'AFANDA',
+    model: 'LB-405K',
+    description:
+      '5 banknot + 5 madeni para bölmesi, RJ11 12V drawer kick portu. Termal yazıcının drawer-kick çıkışından açılır; ayrı güç/data kablosu istemez.',
+    compat: {
+      sourceUrl:
+        'https://www.trendyol.com/pd/afanda/para-cekmecesi-5-bolmeli-lb-405k-cash-drawer-rj11-12v-siyah-p-300322413',
+    },
+    priceCents: 150_000,
+    warrantyMonths: 12,
+    images: [],
+    stockStatus: 'in_stock',
+  },
+
+  // ── Network Bridge (HummyTummy kendi cihazı) ─────────────────────────
   {
     sku: 'hummybox-lite',
     category: 'bridge',
     name: 'HummyBox Lite',
     brand: 'HummyTummy',
     model: 'BOX-LITE-01',
-    description: 'Mini-PC pre-flashed with the Local Bridge Agent. 4GB RAM, 64GB SSD, fanless.',
+    description:
+      'HummyTummy Local Bridge Agent önyüklü mini-PC. 4GB RAM, 64GB SSD, fanless. Yazarkasa + printer + caller-ID donanımını buluta bağlar; offline çalışır.',
+    compat: { sourceUrl: 'https://hummytummy.com/landing' },
     priceCents: 480_000,
-    rentalMonthlyCents: 9900,
+    rentalMonthlyCents: 9_900,
     warrantyMonths: 24,
     images: [],
     stockStatus: 'in_stock',
@@ -258,34 +440,12 @@ const PRODUCTS = [
     name: 'HummyBox Pro',
     brand: 'HummyTummy',
     model: 'BOX-PRO-01',
-    description: 'Higher-spec bridge with UPS + dual-LAN failover for high-volume venues.',
+    description:
+      'Yüksek hacim için: dahili UPS + dual-LAN failover. Elektrik/internet kesintilerinde işin durmaması gereken çok şubeli işletmeler için.',
+    compat: { sourceUrl: 'https://hummytummy.com/landing' },
     priceCents: 950_000,
-    rentalMonthlyCents: 19900,
+    rentalMonthlyCents: 19_900,
     warrantyMonths: 24,
-    images: [],
-    stockStatus: 'in_stock',
-  },
-  {
-    sku: 'caller-id-box-4line',
-    category: 'caller_id',
-    name: 'Caller ID Box (4-line)',
-    brand: 'Generic',
-    model: 'CID-4L',
-    description: 'Analog caller-ID box with serial output. Connects via the Local Bridge Agent.',
-    priceCents: 250_000,
-    warrantyMonths: 12,
-    images: [],
-    stockStatus: 'in_stock',
-  },
-  {
-    sku: 'scanner-honeywell-1900',
-    category: 'scanner',
-    name: 'Honeywell Xenon 1900',
-    brand: 'Honeywell',
-    model: '1900',
-    description: 'Wired 2D barcode scanner. USB HID; works directly with tablets.',
-    priceCents: 320_000,
-    warrantyMonths: 12,
     images: [],
     stockStatus: 'in_stock',
   },
