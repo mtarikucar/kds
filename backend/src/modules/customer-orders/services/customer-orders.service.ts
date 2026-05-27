@@ -281,15 +281,25 @@ export class CustomerOrdersService {
       if (!table) throw new NotFoundException('Table not found');
     }
 
-    // Per-session 60s dedupe — matches the existing bill-request pattern and
-    // prevents a customer tapping "Call waiter" 10× in 3s from creating 10 rows.
+    // Dedup. The earlier version ANDed `status active` with `createdAt
+    // recent`, which broke the common case: a still-PENDING waiter
+    // request older than 60s would fail the AND, and the next customer
+    // tap would create a SECOND active row — the POS tray ended up with
+    // two open requests for the same table and the staff acknowledged
+    // both. Switch to OR so:
+    //   - any PENDING/ACKNOWLEDGED row dedupes regardless of age, AND
+    //   - any row (incl. COMPLETED) in the last 60s also dedupes,
+    //     throttling re-requests right after a waiter just finished one.
+    // Mirrors createBillRequest below.
     const oneMinAgo = new Date(Date.now() - 60_000);
     const existing = await this.prisma.waiterRequest.findFirst({
       where: {
         sessionId: dto.sessionId,
         tenantId,
-        status: { in: ['PENDING', 'ACKNOWLEDGED'] },
-        createdAt: { gte: oneMinAgo },
+        OR: [
+          { status: { in: ['PENDING', 'ACKNOWLEDGED'] } },
+          { createdAt: { gte: oneMinAgo } },
+        ],
       },
       include: { table: true },
     });
@@ -407,10 +417,12 @@ export class CustomerOrdersService {
     }
 
     // Coalesce: returning a PENDING/ACKNOWLEDGED row covers the common
-    // "waiter hasn't gotten to me yet" case, but a customer can also
-    // tap the button immediately after one was COMPLETED. Add a 60s
-    // window — mirrors createWaiterRequest — so the POS tray doesn't
-    // get spammed by an impatient table.
+    // "waiter hasn't gotten to me yet" case (ANY age — a slow staff
+    // member shouldn't open the door to dup rows). The second OR clause
+    // catches the "immediately after COMPLETED" tap-spam case with a
+    // 60s throttle window. createWaiterRequest above uses the same
+    // shape — see the comment block there for the bug that motivated
+    // OR over AND.
     const oneMinAgo = new Date(Date.now() - 60_000);
     const existing = await this.prisma.billRequest.findFirst({
       where: {
