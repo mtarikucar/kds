@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { ShieldCheck, Lock, ExternalLink } from 'lucide-react';
+import { ShieldCheck, Lock, ExternalLink, Phone, X } from 'lucide-react';
 import { useCreatePaymentIntent } from '../../api/paymentsApi';
 import { useGetCurrentLegalDocument } from '../../features/legal/legalApi';
+import { useUpdateProfile } from '../../features/users/usersApi';
 import Spinner from '../../components/ui/Spinner';
 import Button from '../../components/ui/Button';
+import Input from '../../components/ui/Input';
 import { BillingCycle } from '../../types';
 
 const AUTO_REDIRECT_MS = 3000;
@@ -46,14 +48,22 @@ const CheckoutPage = () => {
   const [paymentLink, setPaymentLink] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(AUTO_REDIRECT_MS / 1000);
 
+  // Inline phone-prompt state: when the backend rejects the payment
+  // intent with PROFILE_PHONE_REQUIRED, we collect the missing phone
+  // here instead of bouncing the user to /profile. After save we
+  // automatically re-fire handleSubmit so the checkout flow continues
+  // without the user having to re-tick the consents or click again.
+  const [phonePromptOpen, setPhonePromptOpen] = useState(false);
+  const [phoneValue, setPhoneValue] = useState('');
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const { mutate: updateProfile, isPending: phoneSaving } = useUpdateProfile();
+
   useEffect(() => {
     if (!planId) navigate('/subscription/plans', { replace: true });
   }, [planId, navigate]);
 
-  const handleSubmit = () => {
-    if (!planId || !allChecked || submitted) return;
-    if (!kvkkQ.data || !distanceQ.data || !refundQ.data) return;
-    setSubmitted(true);
+  const submitIntent = () => {
+    if (!planId || !kvkkQ.data || !distanceQ.data || !refundQ.data) return;
     createIntent.mutate(
       {
         planId,
@@ -79,11 +89,14 @@ const CheckoutPage = () => {
         onError: (err: any) => {
           const code = err?.response?.data?.code;
           if (code === 'PROFILE_PHONE_REQUIRED') {
-            const returnTo = `/subscription/checkout?planId=${encodeURIComponent(planId)}&billingCycle=${encodeURIComponent(billingCycle)}`;
-            navigate(
-              `/profile?returnTo=${encodeURIComponent(returnTo)}&reason=phone-required`,
-              { replace: true },
-            );
+            // Inline collection instead of redirecting to /profile. We
+            // re-fire submitIntent() once the phone PATCH succeeds —
+            // the user stays on the checkout page, keeps their consent
+            // ticks, and doesn't have to navigate the page graph.
+            setPhoneValue('');
+            setPhoneError(null);
+            setPhonePromptOpen(true);
+            setSubmitted(false);
             return;
           }
           if (code === 'LEGAL_CONSENT_REQUIRED') {
@@ -100,6 +113,51 @@ const CheckoutPage = () => {
             return;
           }
           setError(err?.response?.data?.message ?? err?.message ?? 'Payment intent failed');
+        },
+      },
+    );
+  };
+
+  const handleSubmit = () => {
+    if (!planId || !allChecked || submitted) return;
+    if (!kvkkQ.data || !distanceQ.data || !refundQ.data) return;
+    setSubmitted(true);
+    submitIntent();
+  };
+
+  const handlePhoneSave = () => {
+    const trimmed = phoneValue.trim();
+    // Light validation: digits/+/spaces/dashes/parens, 7-20 chars. PayTR
+    // will validate the strict format server-side; this just blocks the
+    // obvious-typo paths so the user doesn't burn another round-trip.
+    if (!/^[+0-9\s()-]{7,20}$/.test(trimmed)) {
+      setPhoneError(
+        t(
+          'subscriptions.checkout.phoneInvalid',
+          'Geçerli bir telefon numarası girin (örn. +90 555 123 45 67).',
+        ),
+      );
+      return;
+    }
+    setPhoneError(null);
+    updateProfile(
+      { phone: trimmed },
+      {
+        onSuccess: () => {
+          // Profile cache invalidated by the hook. Close + re-fire intent
+          // immediately — user doesn't have to re-tick or re-click.
+          setPhonePromptOpen(false);
+          setSubmitted(true);
+          submitIntent();
+        },
+        onError: (err: any) => {
+          setPhoneError(
+            err?.response?.data?.message ??
+              t(
+                'subscriptions.checkout.phoneSaveFailed',
+                'Telefon kaydedilemedi. Lütfen tekrar deneyin.',
+              ),
+          );
         },
       },
     );
@@ -281,6 +339,80 @@ const CheckoutPage = () => {
           )}
         </p>
       </div>
+
+      {/* Phone-prompt modal. Opens when the backend rejects the payment
+          intent with PROFILE_PHONE_REQUIRED. We collect the phone here,
+          PATCH it to the user's profile, and auto-resume the intent —
+          no navigation away from checkout. */}
+      {phonePromptOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                  <Phone className="w-5 h-5 text-indigo-600" />
+                </div>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  {t('subscriptions.checkout.phonePromptTitle', 'Telefon numarası gerekli')}
+                </h2>
+              </div>
+              <button
+                onClick={() => {
+                  setPhonePromptOpen(false);
+                  setPhoneError(null);
+                }}
+                className="text-slate-400 hover:text-slate-600"
+                aria-label={t('common.close', 'Kapat')}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-sm text-slate-600 mb-4">
+              {t(
+                'subscriptions.checkout.phonePromptBody',
+                'PayTR fatura için geçerli bir telefon numarası talep ediyor. Numaranızı girin, ödeme adımına devam edelim.',
+              )}
+            </p>
+            <Input
+              type="tel"
+              value={phoneValue}
+              onChange={(e) => {
+                setPhoneValue(e.target.value);
+                if (phoneError) setPhoneError(null);
+              }}
+              placeholder="+90 555 123 45 67"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !phoneSaving) handlePhoneSave();
+              }}
+              disabled={phoneSaving}
+              error={phoneError ?? undefined}
+            />
+            <div className="mt-5 flex items-center gap-2">
+              <Button
+                variant="primary"
+                className="flex-1"
+                onClick={handlePhoneSave}
+                disabled={phoneSaving || !phoneValue.trim()}
+              >
+                {phoneSaving
+                  ? t('subscriptions.checkout.phoneSaving', 'Kaydediliyor...')
+                  : t('subscriptions.checkout.phoneSaveAndContinue', 'Kaydet ve devam et')}
+              </Button>
+              <button
+                onClick={() => {
+                  setPhonePromptOpen(false);
+                  setPhoneError(null);
+                }}
+                className="text-sm text-slate-500 hover:text-slate-700 px-3 py-2"
+                disabled={phoneSaving}
+              >
+                {t('subscriptions.checkout.cancel', 'Vazgeç')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
