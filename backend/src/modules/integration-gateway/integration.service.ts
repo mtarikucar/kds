@@ -250,6 +250,39 @@ export class IntegrationService {
       return { ignored: true, reason: 'verify failed' };
     }
 
+    // Replay protection. The HMAC verify above proves the body+sig was
+    // signed by someone holding the connection's secret — but doesn't
+    // prevent the same captured body+sig from being POSTed N times.
+    // Without dedup an attacker (or a buggy provider retry loop) can
+    // pump the same valid webhook into our pipeline indefinitely,
+    // double-charging order downstreams, double-firing notifications,
+    // and inflating our outbox.
+    //
+    // Signature is HMAC-SHA256 over the raw body — collision is
+    // cryptographically negligible, so (tenant, provider, signature)
+    // within a recent window is a reliable replay-detect key without
+    // requiring a schema change. 24h window is conservative; providers
+    // that legitimately resend identical bodies more than a day apart
+    // (e.g. daily heartbeats) won't trip the gate.
+    if (signature) {
+      const recentDuplicate = await this.prisma.integrationWebhookEvent.findFirst({
+        where: {
+          tenantId,
+          providerId,
+          signature,
+          receivedAt: { gte: new Date(Date.now() - 24 * 60 * 60_000) },
+        },
+        select: { id: true, receivedAt: true },
+      });
+      if (recentDuplicate) {
+        this.logger.warn(
+          `Replay rejected: duplicate signature for provider=${providerId} tenant=${tenantId} ` +
+            `— original event ${recentDuplicate.id} received at ${recentDuplicate.receivedAt.toISOString()}`,
+        );
+        return { ignored: true, reason: 'duplicate' };
+      }
+    }
+
     let parsed: any = {};
     try {
       parsed = JSON.parse(raw.toString('utf8'));

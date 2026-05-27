@@ -4151,6 +4151,7 @@ model IntegrationWebhookEvent {
 
   @@index([connectionId, receivedAt])
   @@index([providerId, receivedAt])
+  @@index([tenantId, providerId, signature])
   @@map("integration_webhook_events")
 }
 

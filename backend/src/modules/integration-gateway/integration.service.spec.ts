@@ -210,6 +210,38 @@ describe('IntegrationService.ingestWebhook (iter-16 storage-DoS guards)', () => 
     expect(outbox.append).not.toHaveBeenCalled();
   });
 
+  it('rejects a duplicate signature within the replay window (iter-17)', async () => {
+    // HMAC verify proves the body+sig was signed by the provider's secret.
+    // It does NOT prevent capture-and-replay. If a captured body+sig is
+    // POSTed twice, the second one must short-circuit so we don't double-
+    // process the same order/event downstream.
+    prisma.tenant.findUnique.mockResolvedValue({ id: 't1' } as any);
+    prisma.integrationProviderDef.findUnique.mockResolvedValue({ id: 'yemeksepeti' } as any);
+    const credsBlob = (svc as any).encrypt('t1', JSON.stringify({ secret: 's' }));
+    prisma.integrationConnection.findFirst.mockResolvedValue({
+      id: 'conn-1',
+      tenantId: 't1',
+      providerId: 'yemeksepeti',
+      status: 'connected',
+      credentialsEnc: credsBlob,
+    } as any);
+    prisma.integrationWebhookEvent.findFirst.mockResolvedValue({
+      id: 'prev-event-id',
+      receivedAt: new Date('2026-05-25T10:00:00Z'),
+    } as any);
+
+    const out = await svc.ingestWebhook(
+      'yemeksepeti',
+      't1',
+      { 'x-signature': 'replayed-sig' },
+      Buffer.from('{"type":"order.created"}'),
+    );
+
+    expect(out).toEqual({ ignored: true, reason: 'duplicate' });
+    expect((prisma.integrationWebhookEvent.create as any).mock.calls.length).toBe(0);
+    expect(outbox.append).not.toHaveBeenCalled();
+  });
+
   it('drops the webhook when the adapter rejects the signature', async () => {
     prisma.tenant.findUnique.mockResolvedValue({ id: 't1' } as any);
     prisma.integrationProviderDef.findUnique.mockResolvedValue({ id: 'yemeksepeti' } as any);
