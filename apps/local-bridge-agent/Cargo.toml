@@ -29,6 +29,9 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 # CLI args + config.
 clap = { version = "4", features = ["derive"] }
+# Config file parser. `serde` derive on BridgeConfig handles the
+# mapping; we just need toml::from_str to read bridge.toml.
+toml = "0.8"
 # Drivers.
 serialport = "4"
 # ESC/POS receipt printers — pure-Rust stack.

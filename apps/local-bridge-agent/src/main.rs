@@ -67,7 +67,7 @@ async fn main() -> Result<()> {
     );
 
     // Cloud transport. WSS is the primary channel; REST polling is fallback.
-    let cloud = cloud_ws::CloudClient::new(cfg.clone());
+    let cloud = cloud_ws::CloudClient::new(cfg.clone())?;
     if let Err(e) = cloud.warm_up().await {
         warn!(error = %e, "cloud warm-up failed — agent continues in offline mode");
     }

@@ -10,7 +10,7 @@ use crate::{
     command_queue::{CommandOutcome, CommandQueue, PendingCommand},
     config::BridgeConfig,
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use std::sync::Arc;
 use tracing::warn;
 
@@ -25,17 +25,21 @@ struct Inner {
 }
 
 impl CloudClient {
-    pub fn new(cfg: BridgeConfig) -> Self {
+    pub fn new(cfg: BridgeConfig) -> Result<Self> {
+        // rustls / OS TLS root init can fail (e.g. malformed CA bundle on
+        // a misconfigured host). Returning Result propagates the cause
+        // through `main` instead of aborting the process — the caller can
+        // log it cleanly and exit with a usable message.
         let http = reqwest::Client::builder()
             .https_only(true)
             // Conservative timeouts so a wedged proxy doesn't stall the agent.
             .timeout(std::time::Duration::from_secs(30))
             .connect_timeout(std::time::Duration::from_secs(10))
             .build()
-            .expect("reqwest client build");
-        Self {
+            .context("build reqwest client")?;
+        Ok(Self {
             inner: Arc::new(Inner { cfg, http }),
-        }
+        })
     }
 
     /// Quick GET to confirm the cloud is reachable. Used at boot so the agent

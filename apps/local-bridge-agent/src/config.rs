@@ -57,19 +57,3 @@ fn dirs_config_dir() -> Option<PathBuf> {
     }
     None
 }
-
-// `toml` is intentionally not declared in Cargo.toml; this file is the
-// scaffold and will pull in the dep when the implementation is wired.
-mod toml {
-    use super::*;
-    pub fn from_str(_s: &str) -> Result<BridgeConfig> {
-        // Placeholder until the toml crate is added. Returns a sentinel
-        // config that triggers a clear "configure me" message at runtime.
-        Ok(BridgeConfig {
-            cloud_url: "https://api.hummytummy.com".to_string(),
-            bridge_id: "unconfigured".to_string(),
-            provisioning_token: None,
-            data_dir: dirs_config_dir().unwrap_or_else(|| PathBuf::from("/tmp/hummytummy-bridge")),
-        })
-    }
-}
