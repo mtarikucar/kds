@@ -40,11 +40,12 @@ export class TrendyolYemekAdapter implements IntegrationAdapter {
   async parseWebhook(signature: string, raw: Buffer | string): Promise<unknown[]> {
     const body = typeof raw === 'string' ? raw : raw.toString('utf8');
     const secret = this.cfg.webhookSecret ?? this.cfg.apiSecret;
-    if (secret) {
-      const expected = createHmac('sha256', secret).update(body).digest('hex');
-      if (!verifyHmacHex(expected, signature)) {
-        throw new Error('trendyol: invalid signature');
-      }
+    if (!secret) {
+      throw new Error('trendyol: webhook secret not configured');
+    }
+    const expected = createHmac('sha256', secret).update(body).digest('hex');
+    if (!verifyHmacHex(expected, signature)) {
+      throw new Error('trendyol: invalid signature');
     }
     try {
       const parsed = JSON.parse(body);

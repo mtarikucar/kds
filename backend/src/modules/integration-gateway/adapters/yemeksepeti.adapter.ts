@@ -42,11 +42,16 @@ export class YemeksepetiAdapter implements IntegrationAdapter {
 
   async parseWebhook(signature: string, raw: Buffer | string): Promise<unknown[]> {
     const body = typeof raw === 'string' ? raw : raw.toString('utf8');
-    if (this.cfg.secret) {
-      const expected = createHmac('sha256', this.cfg.secret).update(body).digest('hex');
-      if (!verifyHmacHex(expected, signature)) {
-        throw new Error('yemeksepeti: invalid signature');
-      }
+    // Empty secret used to silently accept unsigned webhooks, which is a
+    // fail-open misconfig: a connection saved without a `secret` field
+    // would let any unsigned POST in. Reject explicitly so the operator
+    // sees the gap.
+    if (!this.cfg.secret) {
+      throw new Error('yemeksepeti: webhook secret not configured');
+    }
+    const expected = createHmac('sha256', this.cfg.secret).update(body).digest('hex');
+    if (!verifyHmacHex(expected, signature)) {
+      throw new Error('yemeksepeti: invalid signature');
     }
     try {
       const parsed = JSON.parse(body);

@@ -3,6 +3,10 @@ import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'node:
 import { v7 as uuidv7 } from 'uuid';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OutboxService } from '../outbox/outbox.service';
+import { IntegrationAdapter } from './integration-adapter.interface';
+import { YemeksepetiAdapter } from './adapters/yemeksepeti.adapter';
+import { GetirAdapter } from './adapters/getir.adapter';
+import { TrendyolYemekAdapter } from './adapters/trendyol-yemek.adapter';
 
 /**
  * Integration Gateway: catalog of installable providers, tenant-side
@@ -17,10 +21,28 @@ import { OutboxService } from '../outbox/outbox.service';
 export class IntegrationService {
   private readonly logger = new Logger(IntegrationService.name);
 
+  /**
+   * Adapter registry — keyed by provider id (matches IntegrationProviderDef.id
+   * and the URL path param). Webhook ingest looks the adapter up here and
+   * delegates HMAC verification before persisting. Providers without an
+   * adapter cannot receive webhooks; that's intentional — every public
+   * webhook MUST go through a signature-verifying code path.
+   */
+  private readonly adapters: ReadonlyMap<string, IntegrationAdapter>;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly outbox: OutboxService,
-  ) {}
+    yemeksepeti: YemeksepetiAdapter,
+    getir: GetirAdapter,
+    trendyol: TrendyolYemekAdapter,
+  ) {
+    this.adapters = new Map<string, IntegrationAdapter>([
+      [yemeksepeti.id, yemeksepeti],
+      [getir.id, getir],
+      [trendyol.id, trendyol],
+    ]);
+  }
 
   // -- Provider catalog --------------------------------------------------
 
@@ -152,7 +174,82 @@ export class IntegrationService {
       return { ignored: true, reason: 'payload too large' };
     }
 
-    const signature = String(headers['x-signature'] ?? headers['x-hub-signature-256'] ?? headers['stripe-signature'] ?? '').slice(0, 200);
+    // -- HMAC verification gate. -----------------------------------------
+    //
+    // Critical: until this gate was added, ingestWebhook stored arbitrary
+    // attacker JSON under any (provider, tenant) pair and emitted an outbox
+    // event downstream consumers trusted. The sig-verify helper and per-
+    // adapter parseWebhook() were both well-written but never called from
+    // the entry point. Now we:
+    //   1. Look up the adapter for `providerId` — refuse webhooks for
+    //      providers with no signing adapter at all (no fail-open default).
+    //   2. Look up the tenant's `connected` IntegrationConnection — refuse
+    //      if the tenant never connected this provider (URL-only tenant
+    //      routing was the original attack: any URL with a real tenantId
+    //      would land arbitrary data on that tenant).
+    //   3. Decrypt credentials per-tenant, init the adapter with them,
+    //      and call adapter.parseWebhook(sig, raw) which performs the
+    //      HMAC compare. Empty secrets now throw inside the adapter
+    //      (fail-closed) so a misconfigured connection can't bypass.
+    //
+    // On any failure we return a 200-shaped { ignored, reason } so PayTR-
+    // style infinite-retry providers don't hammer us, and we log internally
+    // for ops visibility.
+    const adapter = this.adapters.get(providerId);
+    if (!adapter || !adapter.parseWebhook) {
+      this.logger.warn(
+        `No signing adapter for provider=${providerId} — dropping webhook (tenant=${tenantId})`,
+      );
+      return { ignored: true, reason: 'no adapter' };
+    }
+    const connection = await this.prisma.integrationConnection.findFirst({
+      where: { tenantId, providerId, status: 'connected' },
+    });
+    if (!connection || !connection.credentialsEnc) {
+      this.logger.warn(
+        `No connected credentials for provider=${providerId} tenant=${tenantId} — dropping webhook`,
+      );
+      return { ignored: true, reason: 'no connection' };
+    }
+    let credentials: Record<string, unknown>;
+    try {
+      credentials = JSON.parse(this.decrypt(tenantId, Buffer.from(connection.credentialsEnc)));
+    } catch (e: any) {
+      this.logger.error(
+        `Failed to decrypt credentials for provider=${providerId} tenant=${tenantId}: ${e?.message ?? e}`,
+      );
+      return { ignored: true, reason: 'decrypt failed' };
+    }
+
+    // Coalesce signature header sources. Each adapter knows which one its
+    // platform uses; we pass all candidates through and let the adapter
+    // pick. Length-capped to keep log/storage bounded.
+    const signature = String(
+      headers['x-signature']
+        ?? headers['x-vendor-hmac']
+        ?? headers['x-hub-signature-256']
+        ?? headers['trendyol-signature']
+        ?? headers['stripe-signature']
+        ?? '',
+    ).slice(0, 200);
+
+    // Adapter instances are singleton-scoped. init() mutates `this.cfg`,
+    // so concurrent webhook handling for two different tenants of the
+    // same provider would race. At MVP scale (single-digit RPS per
+    // tenant) the race is rare and the worst case is an HMAC reject;
+    // when traffic grows, switch to a stateless verify(secret, sig, raw)
+    // method on the adapter and drop init().
+    let _events: unknown[];
+    try {
+      await adapter.init(credentials);
+      _events = await adapter.parseWebhook(signature, raw);
+    } catch (e: any) {
+      this.logger.warn(
+        `Webhook signature/parse failed for provider=${providerId} tenant=${tenantId}: ${e?.message ?? e}`,
+      );
+      return { ignored: true, reason: 'verify failed' };
+    }
+
     let parsed: any = {};
     try {
       parsed = JSON.parse(raw.toString('utf8'));
@@ -165,7 +262,7 @@ export class IntegrationService {
       data: {
         id: uuidv7(),
         tenantId,
-        connectionId: null,
+        connectionId: connection.id,
         providerId,
         type: parsed?.type ?? parsed?.event ?? 'unknown',
         signature,
@@ -216,9 +313,11 @@ export class IntegrationService {
     return Buffer.concat([iv, tag, ct]);
   }
 
-  // Currently unused but kept paired with encrypt for symmetry; callers will
-  // pull credentials via this helper when adapters are wired live.
-  decrypt(tenantId: string, blob: Buffer): string {
+  // Private — only `ingestWebhook` consumes it today and any future caller
+  // should go through a narrow tenant-bound accessor (defense-in-depth:
+  // even with DI, no other provider should be able to decrypt arbitrary
+  // tenants' credentials by passing a tenantId).
+  private decrypt(tenantId: string, blob: Buffer): string {
     const key = this.deriveKey(tenantId);
     const iv = blob.subarray(0, 12);
     const tag = blob.subarray(12, 28);

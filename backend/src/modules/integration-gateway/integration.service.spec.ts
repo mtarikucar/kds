@@ -1,6 +1,31 @@
 import { IntegrationService } from './integration.service';
 import { mockPrismaClient, MockPrismaClient } from '../../common/test/prisma-mock.service';
 
+// Fake adapter implementations for unit tests — small enough to inline,
+// keeps tests independent of the real adapter shells. Each behaves as
+// `parseWebhook(sig, raw)` happy-path returns []; tests that need a
+// rejection path override the implementation per-test.
+function fakeAdapter(id: string) {
+  return {
+    id,
+    kind: 'delivery' as const,
+    configSchema: {},
+    init: jest.fn().mockResolvedValue(undefined),
+    healthCheck: jest.fn().mockResolvedValue({ ok: true }),
+    parseWebhook: jest.fn().mockResolvedValue([]),
+  };
+}
+
+function buildSvc(prisma: MockPrismaClient, outbox: { append: jest.Mock }) {
+  return new IntegrationService(
+    prisma as any,
+    outbox as any,
+    fakeAdapter('yemeksepeti') as any,
+    fakeAdapter('getir') as any,
+    fakeAdapter('trendyol_yemek') as any,
+  );
+}
+
 /**
  * The crypto helpers are the security-sensitive surface of this module —
  * a regression here would mean leaked tenant credentials. These tests pin
@@ -14,14 +39,15 @@ describe('IntegrationService crypto', () => {
   beforeEach(() => {
     prisma = mockPrismaClient();
     outbox = { append: jest.fn().mockResolvedValue('outbox') };
-    svc = new IntegrationService(prisma as any, outbox as any);
+    svc = buildSvc(prisma, outbox);
     process.env.INTEGRATION_KEY = 'test-key-1234';
   });
 
   it('encrypts and decrypts a payload back to itself', () => {
-    // Access the private encrypt via the public path — decrypt is exposed.
+    // encrypt + decrypt are private — `as any` is the established pattern
+    // for unit-testing internal helpers without exporting them.
     const enc = (svc as any).encrypt('tenant-1', 'super-secret-token');
-    const dec = svc.decrypt('tenant-1', enc);
+    const dec = (svc as any).decrypt('tenant-1', enc);
     expect(dec).toBe('super-secret-token');
   });
 
@@ -33,14 +59,14 @@ describe('IntegrationService crypto', () => {
 
   it('refuses to decrypt with a different tenant key', () => {
     const enc = (svc as any).encrypt('tenant-1', 'super-secret-token');
-    expect(() => svc.decrypt('tenant-2', enc)).toThrow();
+    expect(() => (svc as any).decrypt('tenant-2', enc)).toThrow();
   });
 
   it('refuses to decrypt when ciphertext has been tampered with', () => {
     const enc = (svc as any).encrypt('tenant-1', 'super-secret-token');
     // Flip a byte deep in the ciphertext (after iv+tag).
     enc[40] = enc[40] ^ 0x01;
-    expect(() => svc.decrypt('tenant-1', enc)).toThrow();
+    expect(() => (svc as any).decrypt('tenant-1', enc)).toThrow();
   });
 });
 
@@ -67,7 +93,7 @@ describe('IntegrationService.ingestWebhook (iter-16 storage-DoS guards)', () => 
   beforeEach(() => {
     prisma = mockPrismaClient();
     outbox = { append: jest.fn().mockResolvedValue('outbox') };
-    svc = new IntegrationService(prisma as any, outbox as any);
+    svc = buildSvc(prisma, outbox);
     process.env.INTEGRATION_KEY = 'test-key-1234';
   });
 
@@ -121,6 +147,20 @@ describe('IntegrationService.ingestWebhook (iter-16 storage-DoS guards)', () => 
   it('writes the row and appends to outbox on the happy path', async () => {
     prisma.tenant.findUnique.mockResolvedValue({ id: 't1' } as any);
     prisma.integrationProviderDef.findUnique.mockResolvedValue({ id: 'yemeksepeti' } as any);
+
+    // The new HMAC-verification gate (iter-11) needs:
+    //   1. a `connected` IntegrationConnection row with non-null
+    //      credentialsEnc, decryptable with the test INTEGRATION_KEY.
+    //   2. the adapter's parseWebhook to resolve (fake adapter does).
+    const credsBlob = (svc as any).encrypt('t1', JSON.stringify({ secret: 's' }));
+    prisma.integrationConnection.findFirst.mockResolvedValue({
+      id: 'conn-1',
+      tenantId: 't1',
+      providerId: 'yemeksepeti',
+      status: 'connected',
+      credentialsEnc: credsBlob,
+    } as any);
+
     let createArgs: any = null;
     (prisma.integrationWebhookEvent.create as any).mockImplementation(async ({ data }: any) => {
       createArgs = data;
@@ -139,6 +179,7 @@ describe('IntegrationService.ingestWebhook (iter-16 storage-DoS guards)', () => 
     expect(out.id).toMatch(/^[0-9a-f-]{36}$/);
     expect(createArgs.tenantId).toBe('t1');
     expect(createArgs.providerId).toBe('yemeksepeti');
+    expect(createArgs.connectionId).toBe('conn-1');
     expect(createArgs.type).toBe('order.created');
     expect(createArgs.signature).toBe('sig-value');
     expect(outbox.append).toHaveBeenCalledWith(
@@ -147,5 +188,53 @@ describe('IntegrationService.ingestWebhook (iter-16 storage-DoS guards)', () => 
         tenantId: 't1',
       }),
     );
+  });
+
+  it('drops the webhook when no IntegrationConnection exists for the tenant', async () => {
+    // Critical iter-11 invariant: URL-only tenant routing is not enough.
+    // Without a connected row, an attacker could land arbitrary "verified"
+    // payloads under any real tenant by guessing the URL — we refuse here.
+    prisma.tenant.findUnique.mockResolvedValue({ id: 't1' } as any);
+    prisma.integrationProviderDef.findUnique.mockResolvedValue({ id: 'yemeksepeti' } as any);
+    prisma.integrationConnection.findFirst.mockResolvedValue(null);
+
+    const out = await svc.ingestWebhook(
+      'yemeksepeti',
+      't1',
+      { 'x-signature': 'sig-value' },
+      Buffer.from('{}'),
+    );
+
+    expect(out).toEqual({ ignored: true, reason: 'no connection' });
+    expect((prisma.integrationWebhookEvent.create as any).mock.calls.length).toBe(0);
+    expect(outbox.append).not.toHaveBeenCalled();
+  });
+
+  it('drops the webhook when the adapter rejects the signature', async () => {
+    prisma.tenant.findUnique.mockResolvedValue({ id: 't1' } as any);
+    prisma.integrationProviderDef.findUnique.mockResolvedValue({ id: 'yemeksepeti' } as any);
+    const credsBlob = (svc as any).encrypt('t1', JSON.stringify({ secret: 's' }));
+    prisma.integrationConnection.findFirst.mockResolvedValue({
+      id: 'conn-1',
+      tenantId: 't1',
+      providerId: 'yemeksepeti',
+      status: 'connected',
+      credentialsEnc: credsBlob,
+    } as any);
+
+    // Reach into the adapter and make parseWebhook reject.
+    const adapter = (svc as any).adapters.get('yemeksepeti');
+    adapter.parseWebhook.mockRejectedValueOnce(new Error('invalid signature'));
+
+    const out = await svc.ingestWebhook(
+      'yemeksepeti',
+      't1',
+      { 'x-signature': 'bad' },
+      Buffer.from('{}'),
+    );
+
+    expect(out).toEqual({ ignored: true, reason: 'verify failed' });
+    expect((prisma.integrationWebhookEvent.create as any).mock.calls.length).toBe(0);
+    expect(outbox.append).not.toHaveBeenCalled();
   });
 });

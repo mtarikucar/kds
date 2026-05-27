@@ -35,11 +35,12 @@ export class GetirAdapter implements IntegrationAdapter {
 
   async parseWebhook(signature: string, raw: Buffer | string): Promise<unknown[]> {
     const body = typeof raw === 'string' ? raw : raw.toString('utf8');
-    if (this.cfg.webhookSecret) {
-      const expected = createHmac('sha256', this.cfg.webhookSecret).update(body).digest('hex');
-      if (!verifyHmacHex(expected, signature)) {
-        throw new Error('getir: invalid signature');
-      }
+    if (!this.cfg.webhookSecret) {
+      throw new Error('getir: webhook secret not configured');
+    }
+    const expected = createHmac('sha256', this.cfg.webhookSecret).update(body).digest('hex');
+    if (!verifyHmacHex(expected, signature)) {
+      throw new Error('getir: invalid signature');
     }
     try {
       const parsed = JSON.parse(body);
