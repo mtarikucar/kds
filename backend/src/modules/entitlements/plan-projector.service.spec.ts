@@ -213,4 +213,42 @@ describe('PlanProjectorService.projectTenant', () => {
     expect(source).toBe('plan:NONE');
     expect(grants).toHaveLength(0);
   });
+
+  // Drift guard (iter-24): the projector reads a hardcoded list of
+  // SubscriptionPlan columns at FEATURE_COLUMNS / LIMIT_COLUMNS. If the
+  // Prisma schema gains a new feature flag (`Boolean @default(false)`)
+  // or limit (`Int @default(...)`) without the dev also adding it to
+  // the projector list, no test fails — the new column just silently
+  // never lands in the entitlement table. This test pins the expected
+  // column set so any schema-side addition is a deliberate, two-file
+  // change (schema + this list).
+  it('FEATURE_COLUMNS / LIMIT_COLUMNS match the SubscriptionPlan model snapshot (iter-24)', () => {
+    // Snapshot of SubscriptionPlan's feature-flag Boolean columns as of
+    // 2026-05-28. Update this list AND the projector's FEATURE_COLUMNS
+    // whenever a new flag column is added to schema.prisma so the
+    // entitlement engine starts surfacing it.
+    const EXPECTED_FEATURES = [
+      'advancedReports',
+      'multiLocation',
+      'customBranding',
+      'apiAccess',
+      'prioritySupport',
+      'inventoryTracking',
+      'kdsIntegration',
+      'reservationSystem',
+      'personnelManagement',
+      'deliveryIntegration',
+    ];
+    // Same intent for numeric limit columns.
+    const EXPECTED_LIMITS = [
+      'maxUsers',
+      'maxTables',
+      'maxProducts',
+      'maxCategories',
+      'maxMonthlyOrders',
+    ];
+    // `as any` to reach the private static — guard is a test-only escape.
+    expect((PlanProjectorService as any).FEATURE_COLUMNS).toEqual(EXPECTED_FEATURES);
+    expect((PlanProjectorService as any).LIMIT_COLUMNS).toEqual(EXPECTED_LIMITS);
+  });
 });

@@ -44,12 +44,19 @@ export class EntitlementsModule implements OnApplicationBootstrap, OnModuleInit 
    * Listeners are intentionally generic — they just call projectTenant.
    * Producers (SubscriptionService, marketplace, super-admin override UI)
    * write to the outbox; the worker delivers; the projector reconciles.
-   * If a listener throws, the outbox worker bumps `attempts` and retries
-   * with backoff (see OutboxWorkerService).
+   *
+   * Failure handling: since iter-14, DomainEventBus.dispatch wraps each
+   * listener in try/catch and logs without rethrowing — so a throw here
+   * does NOT bubble back to the outbox worker for retry. The actual
+   * safety net for a missed reprojection is the nightly reconcile cron
+   * at 03:15 UTC (plan-projector.service.ts#reconcileNightly), which
+   * walks every tenant and reprojects from scratch. A missed activation
+   * therefore self-heals within ~24h. The logger.warn below is what
+   * surfaces it before then.
    *
    * After reprojection we emit FeatureEntitlementChanged so UI/realtime
-   * channels can refresh — kept in this module so producers never need to
-   * know about it.
+   * channels can refresh — kept in this module so producers never need
+   * to know about it.
    */
   onModuleInit(): void {
     const reproject = async (tenantId: string, reason: string) => {
@@ -68,10 +75,12 @@ export class EntitlementsModule implements OnApplicationBootstrap, OnModuleInit 
           },
         });
       } catch (e) {
+        // Logged for ops visibility; nightly reconcile is the retry.
+        // Do NOT rethrow — the bus already swallows, and tossing here
+        // just produces a confusing "unhandled rejection caught" line.
         this.logger.warn(
           `Reprojection failed tenant=${tenantId} reason=${reason}: ${(e as Error).message}`,
         );
-        throw e; // bubble to outbox worker for retry
       }
     };
 

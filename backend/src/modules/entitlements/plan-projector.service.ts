@@ -31,6 +31,14 @@ export class PlanProjectorService {
 
   // Map SubscriptionPlan column names → entitlement keys. These mirror the
   // PlanFeature enum but live here so the engine never imports legacy types.
+  //
+  // ⚠ DRIFT TRIPWIRE: This list must include every Boolean feature column
+  // on the SubscriptionPlan model in prisma/schema.prisma. Forgetting to
+  // add a new column here means the projector silently never surfaces it
+  // and tenants on the paying plan don't get the feature. A snapshot
+  // test in plan-projector.service.spec.ts (iter-24) pins the expected
+  // list and fails when the projector and schema diverge. If you're
+  // adding a new flag, update both.
   private static readonly FEATURE_COLUMNS = [
     'advancedReports',
     'multiLocation',
