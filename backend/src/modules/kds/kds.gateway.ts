@@ -188,8 +188,27 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.data.tenantId = session.tenantId;
     client.data.customerId = session.customerId;
     client.data.userType = 'customer';
+    client.data.sessionExpiresAt = session.expiresAt;
 
     client.join(`customer-session-${session.sessionId}`);
+
+    // Mirror the staff JWT-exp timer below: a customer that connected
+    // with 5 minutes left on their session must NOT keep receiving the
+    // tenant's realtime events for hours afterward. Without this they
+    // do — the expiry check above only fires at connect time. The
+    // ceiling at 0x7fffffff is Node's max setTimeout ms (~24.8d).
+    // `.unref()` keeps the timer from holding the process alive.
+    const msToExpiry = session.expiresAt.getTime() - Date.now();
+    if (msToExpiry > 0 && msToExpiry < 0x7fffffff) {
+      setTimeout(() => {
+        if (client.connected) {
+          this.logger.log(
+            `Customer client ${client.id} session expired; disconnecting (session=${session.sessionId}).`,
+          );
+          client.disconnect(true);
+        }
+      }, msToExpiry).unref?.();
+    }
 
     // Debounce lastActivity writes: a flaky mobile network reconnecting every
     // few seconds would otherwise hammer the DB. At most one write per minute
