@@ -190,9 +190,21 @@ export class PhoneVerificationService {
     return !!verification;
   }
 
-  async getVerificationStatus(verificationId: string, tenantId: string) {
+  /**
+   * Look up a verification's status. SCOPE BY SESSION, not just by
+   * tenant — without the session bind, any active customer session in
+   * the same tenant could look up another customer's verificationId
+   * (URL leak, log scrape, support-ticket screenshot) and learn the
+   * phone number. The session is what's bound to the send in the first
+   * place, so the same session is the only legitimate reader.
+   *
+   * Phone is masked in the response (e.g. "+90 5** *** **45") — the
+   * caller already knows the phone they sent the OTP to; the response
+   * is for status polling, not phone disclosure.
+   */
+  async getVerificationStatus(verificationId: string, sessionId: string, tenantId: string) {
     const verification = await this.prisma.phoneVerification.findFirst({
-      where: { id: verificationId, tenantId },
+      where: { id: verificationId, sessionId, tenantId },
       select: {
         id: true,
         phone: true,
@@ -208,6 +220,7 @@ export class PhoneVerificationService {
     if (!verification) throw new BadRequestException('Verification not found');
     return {
       ...verification,
+      phone: maskPhone(verification.phone),
       expired: verification.expiresAt < new Date(),
       attemptsRemaining: verification.maxAttempts - verification.attempts,
     };

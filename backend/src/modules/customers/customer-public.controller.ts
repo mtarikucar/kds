@@ -233,7 +233,11 @@ export class CustomerPublicController {
     @Query('sessionId') sessionId: string,
   ) {
     const session = await this.sessionService.requireSession(sessionId);
-    return this.phoneVerificationService.getVerificationStatus(verificationId, session.tenantId);
+    return this.phoneVerificationService.getVerificationStatus(
+      verificationId,
+      sessionId,
+      session.tenantId,
+    );
   }
 
   // ========================================
