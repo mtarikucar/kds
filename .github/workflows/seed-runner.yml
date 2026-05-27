@@ -1,0 +1,106 @@
+name: Seed Runner
+
+# Manual workflow that runs a Prisma seed script inside a target
+# environment's backend container. Useful when content (marketplace
+# add-ons, hardware catalogue, integration providers) changes via the
+# seed file in the repo — the seed is NOT auto-run on deploy because
+# it's a content change, not a schema change.
+#
+# Each seed file is idempotent (upserts on a stable code/sku/id) so
+# running this repeatedly is safe.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - prod
+      seed:
+        description: 'Seed file (relative to backend/)'
+        required: true
+        type: choice
+        options:
+          - prisma/seeds/seed-marketplace.ts
+      confirm:
+        description: 'Type the environment name back (e.g. "staging" or "prod") to confirm.'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+# Don't let a seed run race with a deploy.
+concurrency:
+  group: ${{ inputs.environment }}-deploy
+  cancel-in-progress: false
+
+env:
+  SERVER_HOST: 38.242.233.166
+
+jobs:
+  seed:
+    name: ${{ inputs.environment }} seed (${{ inputs.seed }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Confirm input
+        run: |
+          if [[ "${{ inputs.confirm }}" != "${{ inputs.environment }}" ]]; then
+            echo "::error::confirm input must match environment: '${{ inputs.environment }}'"
+            exit 1
+          fi
+
+      - name: Checkout (for composite SSH action)
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: ./.github/actions/setup-ssh
+        with:
+          ssh-private-key-base64: ${{ secrets.SSH_PRIVATE_KEY_BASE64 }}
+          ssh-known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+          server-host: ${{ env.SERVER_HOST }}
+
+      - name: Resolve container name
+        id: resolve
+        run: |
+          if [[ "${{ inputs.environment }}" == "prod" ]]; then
+            echo "container=kds_backend_prod" >> "$GITHUB_OUTPUT"
+          else
+            echo "container=kds_backend_staging" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run seed inside backend container
+        env:
+          CONTAINER: ${{ steps.resolve.outputs.container }}
+          SEED_PATH: ${{ inputs.seed }}
+        run: |
+          # The backend production image prunes devDependencies, so neither
+          # ts-node nor tsx is installed by default. We use `tsx` (auto-
+          # installed by npx -y) rather than ts-node because tsx handles
+          # both ESM and CommonJS .ts files transparently — ts-node 10 in
+          # an npx context resolves the file as ESM and fails with
+          #   TypeError: Unknown file extension ".ts" for ...
+          # tsx is a swc-based runner so it's faster too.
+          # The container's already-configured DATABASE_URL is honoured;
+          # no secrets ship through the workflow.
+          ssh -n -o StrictHostKeyChecking=no root@$SERVER_HOST \
+            "docker exec -i $CONTAINER sh -c 'cd /app && npx -y tsx \"$SEED_PATH\"'"
+
+      - name: Verify product count
+        if: inputs.seed == 'prisma/seeds/seed-marketplace.ts'
+        run: |
+          # Public catalog endpoint returns `status='published'` rows only.
+          # We sanity-check the count is ≥15 (the new Türkiye catalogue
+          # ships 15+ entries). Smaller than that means the seed didn't run
+          # cleanly. We hit the loopback API on the server itself rather
+          # than the public hostname to avoid Cloudflare WAF noise.
+          PORT=3002
+          [[ "${{ inputs.environment }}" == "prod" ]] && PORT=3000
+          ssh -n -o StrictHostKeyChecking=no root@$SERVER_HOST \
+            "curl -s http://localhost:$PORT/api/v1/catalog/products | \
+              python3 -c 'import sys,json; d=json.load(sys.stdin); print(f\"published products: {len(d)}\"); assert len(d) >= 15, f\"expected >= 15, got {len(d)}\"'"
