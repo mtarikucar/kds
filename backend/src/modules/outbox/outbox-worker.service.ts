@@ -22,8 +22,19 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
   private readonly BASE_POLL_MS = 500;
   private readonly BATCH = 50;
   private readonly MAX_ATTEMPTS = 8;
+  // Retention: how long dispatched (success) rows stay around before the
+  // pruner deletes them. Configurable via env so ops can extend the
+  // forensic window without a deploy. Failed rows are NEVER auto-pruned
+  // — they're the DLQ; operator must triage manually.
+  private readonly RETENTION_DAYS = Number(process.env.OUTBOX_RETENTION_DAYS ?? '14');
+  private readonly PRUNE_INTERVAL_MS = 60 * 60_000; // every hour
+  // Cap deletions per batch so a backlog doesn't lock the table.
+  private readonly PRUNE_BATCH = 5_000;
+
   private timer: NodeJS.Timeout | null = null;
+  private pruneTimer: NodeJS.Timeout | null = null;
   private running = false;
+  private pruning = false;
   private stopping = false;
 
   constructor(
@@ -33,16 +44,61 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     this.scheduleNext(0);
+    // First prune fires shortly after boot so a stale ops dashboard
+    // shows a fresh count immediately; subsequent runs are hourly.
+    this.schedulePrune(60_000);
   }
 
   onModuleDestroy(): void {
     this.stopping = true;
     if (this.timer) clearTimeout(this.timer);
+    if (this.pruneTimer) clearTimeout(this.pruneTimer);
   }
 
   private scheduleNext(delayMs: number): void {
     if (this.stopping) return;
     this.timer = setTimeout(() => this.tick().catch(() => undefined), delayMs);
+  }
+
+  private schedulePrune(delayMs: number): void {
+    if (this.stopping) return;
+    this.pruneTimer = setTimeout(() => {
+      this.pruneOnce()
+        .catch((e) => this.logger.warn(`outbox prune failed: ${(e as Error).message}`))
+        .finally(() => this.schedulePrune(this.PRUNE_INTERVAL_MS));
+    }, delayMs);
+  }
+
+  /**
+   * Delete dispatched rows older than RETENTION_DAYS. Bounded batch keeps
+   * the lock window short; if a backlog exists the next hourly run picks
+   * up the rest. Failed rows are excluded by design — they're the DLQ
+   * and need operator triage via the SuperadminOutboxController.
+   */
+  private async pruneOnce(): Promise<void> {
+    if (this.pruning) return;
+    if (this.RETENTION_DAYS < 1) return; // safety: never delete on bad config
+    this.pruning = true;
+    try {
+      const cutoff = new Date(Date.now() - this.RETENTION_DAYS * 24 * 60 * 60_000);
+      const result = await this.prisma.$executeRaw`
+        DELETE FROM "outbox_events"
+         WHERE "id" IN (
+           SELECT "id" FROM "outbox_events"
+            WHERE "status" = 'dispatched'
+              AND "dispatchedAt" IS NOT NULL
+              AND "dispatchedAt" < ${cutoff}
+            LIMIT ${this.PRUNE_BATCH}
+         )
+      `;
+      if (result > 0) {
+        this.logger.log(
+          `outbox prune: removed ${result} dispatched rows older than ${this.RETENTION_DAYS}d`,
+        );
+      }
+    } finally {
+      this.pruning = false;
+    }
   }
 
   private async tick(): Promise<void> {
@@ -119,9 +175,19 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
             nextAttemptAt: final ? null : new Date(Date.now() + backoffMs),
           },
         });
-        this.logger.warn(
-          `outbox event ${r.id} (${r.type}) ${final ? 'gave up' : 'will retry'} after ${r.attempts} attempts: ${msg}`,
-        );
+        if (final) {
+          // DLQ wording is intentional: ops alert rules grep on
+          // "outbox DLQ" to wake someone up. Once an event lands here
+          // it will not be retried automatically — operator must
+          // requeue via SuperadminOutboxController or delete it.
+          this.logger.error(
+            `outbox DLQ: event ${r.id} (${r.type}) gave up after ${r.attempts} attempts — ${msg}`,
+          );
+        } else {
+          this.logger.warn(
+            `outbox event ${r.id} (${r.type}) will retry after ${r.attempts} attempts: ${msg}`,
+          );
+        }
       }
     }
     return rows.length;
