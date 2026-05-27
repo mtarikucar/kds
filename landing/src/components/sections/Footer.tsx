@@ -54,7 +54,7 @@ export default function Footer() {
                 {t('address')}
               </p>
               <a
-                href="tel:+905060687100"
+                href="tel:+905466780495"
                 className="text-sm text-slate-500 hover:text-slate-900 transition-colors block"
               >
                 {t('phone')}
