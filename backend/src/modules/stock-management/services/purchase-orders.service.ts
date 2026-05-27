@@ -141,6 +141,9 @@ export class PurchaseOrdersService {
     tenantId: string,
     userId?: string,
   ) {
+    // Cheap pre-flight rejection so the obvious "wrong status" case
+    // doesn't burn a Serializable txn. The in-txn re-read below is
+    // what actually guards the race.
     const po = await this.findOne(id, tenantId);
     if (
       po.status !== PurchaseOrderStatus.SUBMITTED &&
@@ -151,29 +154,44 @@ export class PurchaseOrdersService {
       );
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      for (const lineItem of dto.items) {
-        const poItem = po.items.find((i) => i.id === lineItem.purchaseOrderItemId);
-        if (!poItem) {
-          throw new BadRequestException(
-            `Purchase order item ${lineItem.purchaseOrderItemId} not found`,
-          );
-        }
+    return this.prisma.$transaction(
+      async (tx) => {
+        for (const lineItem of dto.items) {
+          // Re-read poItem INSIDE the txn. The earlier code computed
+          // `alreadyReceived` from the outside-txn `findOne` snapshot, so
+          // two concurrent partial receives both saw quantityReceived=N
+          // and both wrote N+their_qty → the second update silently
+          // clobbered the first (lost update). Postgres' default READ
+          // COMMITTED won't catch this; only the in-txn re-read does,
+          // and the Serializable isolation below promotes any remaining
+          // write-vs-write race into a 40001 that Prisma retries.
+          const poItem = await tx.purchaseOrderItem.findFirst({
+            where: {
+              id: lineItem.purchaseOrderItemId,
+              purchaseOrderId: id,
+            },
+            include: { stockItem: { select: { name: true } } },
+          });
+          if (!poItem) {
+            throw new BadRequestException(
+              `Purchase order item ${lineItem.purchaseOrderItemId} not found`,
+            );
+          }
 
-        const receivedQty = new Prisma.Decimal(lineItem.quantityReceived);
-        const alreadyReceived = new Prisma.Decimal(poItem.quantityReceived);
-        const ordered = new Prisma.Decimal(poItem.quantityOrdered);
-        const newReceived = alreadyReceived.add(receivedQty);
-        if (newReceived.gt(ordered)) {
-          throw new BadRequestException(
-            `Cannot receive more than ordered for ${poItem.stockItem.name}. Ordered: ${ordered}, Already received: ${alreadyReceived}, Attempting: ${receivedQty}`,
-          );
-        }
+          const receivedQty = new Prisma.Decimal(lineItem.quantityReceived);
+          const alreadyReceived = new Prisma.Decimal(poItem.quantityReceived);
+          const ordered = new Prisma.Decimal(poItem.quantityOrdered);
+          const newReceived = alreadyReceived.add(receivedQty);
+          if (newReceived.gt(ordered)) {
+            throw new BadRequestException(
+              `Cannot receive more than ordered for ${poItem.stockItem.name}. Ordered: ${ordered}, Already received: ${alreadyReceived}, Attempting: ${receivedQty}`,
+            );
+          }
 
-        await tx.purchaseOrderItem.update({
-          where: { id: poItem.id },
-          data: { quantityReceived: newReceived as any },
-        });
+          await tx.purchaseOrderItem.update({
+            where: { id: poItem.id },
+            data: { quantityReceived: newReceived as any },
+          });
 
         // Weighted-average costing: new unit cost is
         // (existingStock*existingCost + receivedQty*unitPrice) /
@@ -265,7 +283,15 @@ export class PurchaseOrdersService {
           },
         },
       });
-    });
+      },
+      // Mirrors stock-deduction and sales-invoice: the read-modify-
+      // write on quantityReceived + the FIFO batch insert + the
+      // weighted-cost recompute all touch rows another concurrent
+      // receive might touch. Serializable promotes the write-vs-write
+      // race into a 40001 that Prisma retries against a fresh snapshot
+      // — without it we'd silently double-receive or under-receive.
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   /**
