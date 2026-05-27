@@ -13,6 +13,7 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Public } from '../../auth/decorators/public.decorator';
 import { CustomerSelfPayService } from '../services/customer-self-pay.service';
 import { CreatePayIntentDto } from '../dto/pay-intent.dto';
+import { getClientIp } from '../../../common/helpers/client-ip.helper';
 
 /**
  * Customer-facing self-pay endpoints. All routes are @Public — the
@@ -57,16 +58,16 @@ export class CustomerSelfPayController {
     @Param('sessionId') sessionId: string,
     @Body() dto: CreatePayIntentDto,
     @Req() req: any,
-    @Headers('x-forwarded-for') forwardedFor?: string,
     @Headers('origin') origin?: string,
     @Headers('referer') referer?: string,
   ) {
-    // Real client IP, with proxy header preferred over the socket.
-    const ip =
-      (forwardedFor?.split(',')[0]?.trim()) ||
-      req?.ip ||
-      req?.connection?.remoteAddress ||
-      '0.0.0.0';
+    // Use the shared helper: req.ip resolves through Express's trust-
+    // proxy chain (one LB hop), so the value is the upstream-supplied
+    // client address — not anything the client itself can set. The
+    // earlier "X-Forwarded-For first" read trusted client headers and
+    // let the recorded IP on the consent / fiscal trail diverge from
+    // the actual peer.
+    const ip = getClientIp(req) || req?.connection?.remoteAddress || '0.0.0.0';
     // Origin lets the backend send PayTR's redirect URLs back to the
     // same host the QR menu was opened on (subdomain restaurants would
     // otherwise bounce back to the wrong host). Fall back to Referer

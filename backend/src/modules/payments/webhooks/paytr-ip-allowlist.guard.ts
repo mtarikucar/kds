@@ -27,9 +27,18 @@ export class PaytrIpAllowlistGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     if (!this.allowed) return true; // allowlist disabled
     const req = context.switchToHttp().getRequest();
+    // Trust order: prefer req.ip (Express resolves it using the
+    // app-level `trust proxy` setting, so the LB-supplied XFF is
+    // honoured for exactly the right number of hops) — then fall back
+    // to header parsing only if Express couldn't resolve a value. The
+    // earlier "XFF first, req.ip second" order let anyone bypass the
+    // allowlist by setting their own X-Forwarded-For; Express's trust-
+    // proxy chain is the source of truth. Cloudflare rewrites XFF
+    // anyway, but defense in depth — if the front proxy ever changes
+    // we don't want the guard silently weakened.
     const ip =
-      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
       req.ip ||
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
       req.socket?.remoteAddress ||
       '';
     if (this.allowed.has(ip)) return true;

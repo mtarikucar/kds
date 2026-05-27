@@ -11,6 +11,7 @@ import { PaymentsService } from './payments.service';
 import { CreateIntentDto } from './dto/create-intent.dto';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
+import { getClientIp } from '../../common/helpers/client-ip.helper';
 
 /**
  * Subscription-payment intents. JwtAuthGuard / TenantGuard / RolesGuard
@@ -34,11 +35,15 @@ export class PaymentsController {
   // a typo.
   @Throttle({ long: { ttl: 60_000, limit: 5 } })
   async createIntent(@Body() dto: CreateIntentDto, @Req() req: any) {
-    const userIp =
-      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
-      req.ip ||
-      req.socket?.remoteAddress ||
-      '0.0.0.0';
+    // Use the shared helper: req.ip first (Express resolves through the
+    // app-level trust-proxy chain), then a raw XFF parse as a fallback
+    // for environments where Express couldn't populate it. The earlier
+    // XFF-first read meant the IP stamped on KVKK consent audit rows
+    // could be set by the client; that's a forensic gap, not a security
+    // boundary, but auditors still ask why the recorded IP differs
+    // from the connection-level IP, and the answer can't be "trust
+    // the client".
+    const userIp = getClientIp(req) || req.socket?.remoteAddress || '0.0.0.0';
     // userAgent feeds into the Consent audit row alongside ip. KVKK
     // expects "kim onayladı, hangi cihazdan" answerable later.
     const userAgent =
