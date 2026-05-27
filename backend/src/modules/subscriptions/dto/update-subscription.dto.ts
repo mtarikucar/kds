@@ -1,11 +1,13 @@
-import { IsEnum, IsOptional, IsBoolean } from "class-validator";
-import { BillingCycle } from "../../../common/constants/subscription.enum";
+import { IsOptional, IsBoolean } from "class-validator";
 
+/**
+ * PATCH /subscriptions/:id — the service only honours
+ * `cancelAtPeriodEnd`. A `billingCycle` field previously lived here too
+ * but `updateSubscription` silently ignored it, so clients got a
+ * 200-success even though nothing changed. Removed to stop misleading
+ * the API surface; cycle changes go through POST /change-plan instead.
+ */
 export class UpdateSubscriptionDto {
-  @IsEnum(BillingCycle)
-  @IsOptional()
-  billingCycle?: BillingCycle;
-
   @IsBoolean()
   @IsOptional()
   cancelAtPeriodEnd?: boolean;

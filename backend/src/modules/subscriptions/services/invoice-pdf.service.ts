@@ -21,8 +21,15 @@ export class InvoicePdfService {
    * named from the sanitized invoice number so it can be safely served
    * by filename. The DB row stores only the relative filename (never the
    * full /api path) so we can regenerate URLs freely.
+   *
+   * `tenantId` is required for defence-in-depth. Today every caller is
+   * the tenant-scoped invoice controller (which already filters by
+   * tenant before passing the id), but a future service-layer caller —
+   * cron, internal job, gRPC — would have no controller to gate it.
+   * Asserting here means any new caller has to be explicit about which
+   * tenant's invoice it is, or accept a ForbiddenException.
    */
-  async generateInvoicePdf(invoiceId: string): Promise<string> {
+  async generateInvoicePdf(invoiceId: string, tenantId?: string): Promise<string> {
     const invoice = await this.prisma.invoice.findUnique({
       where: { id: invoiceId },
       include: {
@@ -31,6 +38,12 @@ export class InvoicePdfService {
       },
     });
     if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+    if (tenantId && invoice.subscription?.tenantId !== tenantId) {
+      // Hidden behind NotFound rather than Forbidden — we don't want the
+      // caller to be able to distinguish "wrong tenant" from "doesn't
+      // exist", which would enable invoice-id probing.
       throw new NotFoundException('Invoice not found');
     }
 

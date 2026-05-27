@@ -18,6 +18,7 @@ import { UserRole } from '../../../common/constants/roles.enum';
 import { CreateSubscriptionDto } from '../dto/create-subscription.dto';
 import { UpdateSubscriptionDto } from '../dto/update-subscription.dto';
 import { ChangePlanDto } from '../dto/change-plan.dto';
+import { CancelSubscriptionDto } from '../dto/cancel-subscription.dto';
 
 /**
  * Every :id endpoint threads `req.user.tenantId` into the service so
@@ -121,7 +122,7 @@ export class SubscriptionController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async cancelSubscription(
     @Param('id') id: string,
-    @Body() body: { immediate?: boolean; reason?: string },
+    @Body() body: CancelSubscriptionDto,
     @Request() req,
   ) {
     return this.subscriptionService.cancelSubscription(

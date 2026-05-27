@@ -57,7 +57,7 @@ export class InvoiceController {
     }
 
     if (!this.invoicePdfService.invoicePdfExists(invoice.invoiceNumber)) {
-      await this.invoicePdfService.generateInvoicePdf(invoice.id);
+      await this.invoicePdfService.generateInvoicePdf(invoice.id, tenantId);
     }
 
     const fileContent = this.invoicePdfService.readInvoiceFile(invoice.invoiceNumber);
@@ -81,7 +81,7 @@ export class InvoiceController {
     if (!invoice) {
       throw new NotFoundException('Invoice not found');
     }
-    const filename = await this.invoicePdfService.generateInvoicePdf(invoice.id);
+    const filename = await this.invoicePdfService.generateInvoicePdf(invoice.id, tenantId);
     return { success: true, filename };
   }
 }
