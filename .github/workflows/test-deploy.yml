@@ -236,7 +236,20 @@ jobs:
           ENV
 
       - name: Ship env file to server
-        run: scp -o ServerAliveInterval=15 .env.test.rendered root@${{ env.SERVER_HOST }}:/root/kds/.env.test
+        # Atomic write: scp → .new sibling, then `mv` (a POSIX rename
+        # on the same filesystem) swaps it in. A network blip during
+        # scp leaves the existing .env.test intact; the half-written
+        # file lands at .new and either retries or surfaces as a
+        # non-zero exit. Without this, scp's in-place truncate
+        # could leave docker-compose reading a malformed env at the
+        # next container swap.
+        run: |
+          set -euo pipefail
+          scp -o ServerAliveInterval=15 \
+            .env.test.rendered \
+            root@${{ env.SERVER_HOST }}:/root/kds/.env.test.new
+          ssh -o ServerAliveInterval=15 root@${{ env.SERVER_HOST }} \
+            'mv /root/kds/.env.test.new /root/kds/.env.test'
 
       - name: Run deploy.sh staging on the server
         env:

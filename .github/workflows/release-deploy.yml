@@ -364,7 +364,22 @@ jobs:
           # so accidental commits get caught by .gitignore patterns.
 
       - name: Ship env file to server
-        run: scp -o ServerAliveInterval=15 .env.production.rendered root@${{ env.SERVER_HOST }}:/root/kds/.env.production
+        # Atomic write: scp lands the file at a sibling .new path, then
+        # `mv` (a POSIX rename on the same filesystem) swaps it into
+        # place in a single inode-level operation. If scp dies mid-
+        # transfer on a network blip, the existing .env.production
+        # stays intact — the half-written file is at .new and either
+        # the next deploy retries cleanly or this step exits non-zero.
+        # Previously `scp` wrote directly to .env.production and a
+        # truncated transfer would have left docker-compose reading a
+        # malformed env on the next swap.
+        run: |
+          set -euo pipefail
+          scp -o ServerAliveInterval=15 \
+            .env.production.rendered \
+            root@${{ env.SERVER_HOST }}:/root/kds/.env.production.new
+          ssh -o ServerAliveInterval=15 root@${{ env.SERVER_HOST }} \
+            'mv /root/kds/.env.production.new /root/kds/.env.production'
 
       - name: Run deploy.sh on the server
         env:

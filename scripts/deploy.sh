@@ -58,6 +58,7 @@ ACTION=""  # deploy | rollback
 COMPOSE_FILE=""
 ENV_FILE=""
 POSTGRES_CONTAINER=""
+REDIS_CONTAINER=""
 BACKEND_CONTAINER=""
 FRONTEND_CONTAINER=""
 LANDING_CONTAINER=""
@@ -95,6 +96,7 @@ configure_env() {
     COMPOSE_FILE="$PROJECT_ROOT/docker-compose.prod.yml"
     ENV_FILE="$PROJECT_ROOT/.env.production"
     POSTGRES_CONTAINER="kds_postgres_prod"
+    REDIS_CONTAINER="kds_redis_prod"
     BACKEND_CONTAINER="kds_backend_prod"
     FRONTEND_CONTAINER="kds_frontend_prod"
     LANDING_CONTAINER="kds_landing_prod"
@@ -112,6 +114,7 @@ configure_env() {
     COMPOSE_FILE="$PROJECT_ROOT/docker-compose.staging.yml"
     ENV_FILE="$PROJECT_ROOT/.env.test"
     POSTGRES_CONTAINER="kds_postgres_staging"
+    REDIS_CONTAINER="kds_redis_staging"
     BACKEND_CONTAINER="kds_backend_staging"
     FRONTEND_CONTAINER="kds_frontend_staging"
     LANDING_CONTAINER="kds_landing_staging"
@@ -262,7 +265,7 @@ ensure_data_layer() {
   local pg=starting redis_status=starting
   while [ $i -lt $deadline ]; do
     pg=$(docker inspect "$POSTGRES_CONTAINER" --format '{{.State.Health.Status}}' 2>/dev/null || echo "starting")
-    redis_status=$(docker inspect "${POSTGRES_CONTAINER/postgres/redis}" --format '{{.State.Health.Status}}' 2>/dev/null || echo "starting")
+    redis_status=$(docker inspect "$REDIS_CONTAINER" --format '{{.State.Health.Status}}' 2>/dev/null || echo "starting")
     if [ "$pg" = "healthy" ] && [ "$redis_status" = "healthy" ]; then
       ok "postgres + redis healthy (took ~${i}s)"
       return 0
