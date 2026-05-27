@@ -81,6 +81,22 @@ superAdminApi.interceptors.response.use(
         return superAdminApi(originalRequest);
       } catch (refreshError) {
         useSuperAdminAuthStore.getState().logout();
+        // Mirror the tenant-side 401 deeplink preservation
+        // (see frontend/src/lib/api.ts). Stash the path in
+        // sessionStorage so SuperAdminLoginPage can return the
+        // operator to the page they were on (e.g.
+        // /superadmin/tenants/abc) instead of always landing on
+        // the dashboard root.
+        try {
+          if (typeof window !== 'undefined' && window.location) {
+            const here = window.location.pathname + window.location.search + window.location.hash;
+            if (here && !here.startsWith('/superadmin/login')) {
+              window.sessionStorage.setItem('superAdminPostLoginReturn', here);
+            }
+          }
+        } catch {
+          // Private-mode / sandbox iframe: non-fatal.
+        }
         window.location.href = import.meta.env.BASE_URL + 'superadmin/login';
         return Promise.reject(refreshError);
       }

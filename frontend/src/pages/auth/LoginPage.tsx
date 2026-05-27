@@ -79,7 +79,18 @@ const LoginPage = () => {
     const candidate =
       locationState?.from ||
       (typeof window !== 'undefined' ? readAndClearReturnPath() : null);
-    return candidate && /^\/[^/]/.test(candidate) ? candidate : '/dashboard';
+    // Belt-and-suspenders on the /login self-loop: the regex accepts
+    // any `/<non-slash>...` and would happily route us back to /login
+    // if a stale value (or a future regression) writes that path in.
+    // api.ts also guards on the write side; this guards on the read.
+    if (
+      candidate &&
+      /^\/[^/]/.test(candidate) &&
+      !candidate.startsWith('/login')
+    ) {
+      return candidate;
+    }
+    return '/dashboard';
     // Computed once at mount; failed-login re-renders don't change it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
