@@ -3,6 +3,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../prisma/prisma.service';
 import { withAdvisoryLock } from '../../common/scheduling/advisory-lock';
 import { WebhookOutboundService } from './webhook-outbound.service';
+import { assertPublicHttpUrl, UnsafeUrlError } from '../../common/net/url-safety';
 
 /**
  * Drains pending webhook deliveries and POSTs them.
@@ -108,6 +109,29 @@ export class WebhookDeliveryWorkerService {
       return;
     }
 
+    // Re-validate the URL against the SSRF allowlist immediately before
+    // fetching. The subscribe-time check caught the obvious cases, but a
+    // tenant-controlled DNS server can answer "public IP" at subscribe
+    // and "private IP" here (DNS rebind). Marking the delivery `failed`
+    // — not retried — means the auto-pause threshold catches a
+    // misconfigured-or-malicious endpoint quickly.
+    try {
+      await assertPublicHttpUrl(d.url);
+    } catch (e) {
+      const msg = e instanceof UnsafeUrlError ? e.message : 'invalid webhook URL';
+      this.logger.warn(`webhook ${d.id}: URL safety check failed: ${msg}`);
+      await this.prisma.webhookDelivery.update({
+        where: { id: d.id },
+        data: {
+          status: 'failed',
+          attempts: d.attempts + 1,
+          lastStatusCode: 0,
+          lastResponseSnippet: `URL rejected by SSRF guard: ${msg}`,
+        },
+      });
+      return;
+    }
+
     try {
       const res = await fetch(d.url, {
         method: 'POST',
@@ -119,6 +143,10 @@ export class WebhookDeliveryWorkerService {
           'X-HummyTummy-Signature': signature,
         },
         body,
+        // Cap one delivery at 15s. Without this a slow-loris sink would
+        // hold the worker tick (30s cron) hostage and starve every other
+        // delivery in this and the next tick.
+        signal: AbortSignal.timeout(15_000),
       });
       const text = await res.text().catch(() => '');
       const success = res.status >= 200 && res.status < 300;

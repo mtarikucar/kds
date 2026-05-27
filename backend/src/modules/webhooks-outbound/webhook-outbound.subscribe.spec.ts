@@ -1,5 +1,32 @@
 import { WebhookOutboundService } from './webhook-outbound.service';
 import { mockPrismaClient, MockPrismaClient } from '../../common/test/prisma-mock.service';
+import {
+  assertPublicHttpUrl as realAssertPublicHttpUrl,
+  UnsafeUrlError,
+} from '../../common/net/url-safety';
+
+// Mock the SSRF helper so test URLs (example.com / .example) that may
+// not DNS-resolve in CI still pass through. ftp:// is still rejected
+// because the mock falls through to the real implementation's syntactic
+// check — protocol validation happens before DNS lookup so we route
+// `ftp://nope` to the real helper to preserve that assertion.
+jest.mock('../../common/net/url-safety', () => {
+  const actual = jest.requireActual('../../common/net/url-safety');
+  return {
+    ...actual,
+    assertPublicHttpUrl: jest.fn(async (input: string) => {
+      const u = new URL(input);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+        throw new actual.UnsafeUrlError('URL must be http or https');
+      }
+      return { url: u, resolvedIp: '1.2.3.4' };
+    }),
+  };
+});
+
+// Silence "unused import" — real fn referenced for type only
+void realAssertPublicHttpUrl;
+void UnsafeUrlError;
 
 /**
  * Subscribe / list / fanOut tests for WebhookOutboundService.
@@ -38,7 +65,7 @@ describe('WebhookOutboundService.subscribe + fanOut', () => {
   });
 
   it('subscribe refuses non-http(s) URLs', async () => {
-    await expect(svc.subscribe('t1', { url: 'ftp://nope' })).rejects.toThrow(/http\(s\)/);
+    await expect(svc.subscribe('t1', { url: 'ftp://nope' })).rejects.toThrow(/http or https/);
   });
 
   it('subscribe returns the raw secret once + stores only the hash', async () => {

@@ -1,10 +1,11 @@
-import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { v7 as uuidv7 } from 'uuid';
 import { PrismaService } from '../../prisma/prisma.service';
 import { DomainEventBus } from '../outbox/domain-event-bus.service';
 import { KMS_PROVIDER_TOKEN } from '../kms/kms.module';
 import { KmsProvider } from '../kms/kms-provider.interface';
+import { assertPublicHttpUrl, UnsafeUrlError } from '../../common/net/url-safety';
 
 /**
  * Outbound webhook delivery — tenants subscribe to event types and we POST
@@ -28,6 +29,31 @@ import { KmsProvider } from '../kms/kms-provider.interface';
 // can't be decrypted as a webhook secret.
 const KMS_PURPOSE = 'webhook_secret';
 
+// Event-type allowlist gate. Outbound webhooks fire `*` subscriptions for
+// every tenant event by default — without this filter, a tenant could
+// subscribe `*` and receive internal events that were never intended for
+// external receivers (password-reset state, billing internals, audit
+// records, KMS rotation flags, etc.). The check runs in fanOut before
+// per-subscription matching, so no explicit-named subscription can bypass
+// it either.
+//
+// Block by prefix instead of allowlist to keep adding new business events
+// frictionless; only sensitive events need to be added here.
+const BLOCKED_EVENT_TYPE_PREFIXES: readonly string[] = [
+  'user.password',
+  'user.email_verification',
+  'auth.',
+  'subscription.upgrade.requested',
+  'subscription.renewal.failed',
+  'subscription.payment.',
+  'kms.',
+  'audit.',
+];
+
+function isPublishableEventType(type: string): boolean {
+  return !BLOCKED_EVENT_TYPE_PREFIXES.some((p) => type.startsWith(p));
+}
+
 @Injectable()
 export class WebhookOutboundService {
   private readonly logger = new Logger(WebhookOutboundService.name);
@@ -40,8 +66,21 @@ export class WebhookOutboundService {
 
   /** Tenant-side: create a subscription. Returns the secret exactly once. */
   async subscribe(tenantId: string, input: { url: string; events?: string[] }) {
-    if (!/^https?:\/\//.test(input.url)) {
-      throw new Error('webhook URL must be http(s)');
+    // SSRF gate. The bare `^https?://` regex used to be all that stood
+    // between a tenant and a self-fetch of `169.254.169.254/...` (AWS
+    // IMDS) or any internal service — combined with the worker's storage
+    // of `lastResponseSnippet` that's a clean authenticated exfil channel
+    // for the tenant. assertPublicHttpUrl also blocks userinfo, dangerous
+    // ports (Redis, Postgres, …), and IPv4-mapped IPv6 of any of the
+    // above. The worker calls it again before each fetch to catch DNS-
+    // rebind attacks; this is the subscribe-time front line.
+    let canonical: URL;
+    try {
+      const { url } = await assertPublicHttpUrl(input.url);
+      canonical = url;
+    } catch (e) {
+      const msg = e instanceof UnsafeUrlError ? e.message : 'invalid webhook URL';
+      throw new BadRequestException(msg);
     }
     const secret = `whs_${randomBytes(24).toString('base64url')}`;
     const secretHash = createHash('sha256').update(secret).digest('hex');
@@ -55,7 +94,9 @@ export class WebhookOutboundService {
       data: {
         id: uuidv7(),
         tenantId,
-        url: input.url,
+        // Store the canonical (lowercased-host) URL so duplicate
+        // subscriptions for the same endpoint look like duplicates.
+        url: canonical.toString(),
         events: input.events ?? ['*'],
         secretHash,
         // Prisma's Bytes column expects Uint8Array; widen Node Buffer.
@@ -103,6 +144,11 @@ export class WebhookOutboundService {
   /** Bus-side fan-out: enqueue one delivery row per matching subscription. */
   async fanOut(event: { id: string; type: string; tenantId: string | null; payload: unknown }): Promise<void> {
     if (!event.tenantId) return;
+    // Internal events (password resets, billing internals, audit records,
+    // KMS rotation) must never reach an external webhook subscriber. This
+    // guard runs *before* per-subscription matching so no explicit-named
+    // subscription can opt in either.
+    if (!isPublishableEventType(event.type)) return;
     const subs = await this.prisma.tenantWebhookSubscription.findMany({
       where: {
         tenantId: event.tenantId,

@@ -1,6 +1,15 @@
 import { WebhookDeliveryWorkerService } from './webhook-delivery-worker.service';
 import { mockPrismaClient, MockPrismaClient } from '../../common/test/prisma-mock.service';
 
+// Stub the SSRF helper: every test URL points at example.com which may
+// fail or return private addresses on the test box. The helper itself
+// is unit-tested separately (url-safety.spec.ts) — here we just want
+// the worker to behave as if every URL is allowed.
+jest.mock('../../common/net/url-safety', () => ({
+  assertPublicHttpUrl: jest.fn().mockResolvedValue({ url: new URL('https://x'), resolvedIp: '1.2.3.4' }),
+  UnsafeUrlError: class UnsafeUrlError extends Error {},
+}));
+
 /**
  * The worker is the part that actually POSTs to tenant URLs. These tests
  * stub `global.fetch` so the success / failure / auto-pause branches are
