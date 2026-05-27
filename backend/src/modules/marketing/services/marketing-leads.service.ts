@@ -119,6 +119,19 @@ export class MarketingLeadsService {
     //   2. for SALES_REP creators → themselves (they own what they enter)
     //   3. auto-assigner (round-robin / least-loaded) when configured
     //   4. unassigned (null) — falls into the lead pool for the manager
+    //
+    // SALES_REP guard: assigning to another rep is a manager-only
+    // action — `PATCH /leads/:id/assign` enforces that, so we have to
+    // enforce it here too. Without this check a rep could POST a new
+    // lead with `assignedToId` set to another rep and bypass the patch
+    // guard entirely. Self-assignment is fine and matches priority 2.
+    if (
+      userRole === 'SALES_REP' &&
+      dto.assignedToId &&
+      dto.assignedToId !== userId
+    ) {
+      throw new ForbiddenException('Only managers can assign leads to other reps');
+    }
     let resolvedAssignee: string | null = null;
     if (dto.assignedToId) {
       resolvedAssignee = dto.assignedToId;

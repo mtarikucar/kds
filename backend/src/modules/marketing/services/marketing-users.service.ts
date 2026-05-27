@@ -101,7 +101,11 @@ export class MarketingUsersService {
 
     const data: any = { ...dto };
     if (dto.password) {
-      data.password = await bcrypt.hash(dto.password, 10);
+      // Use the same configurable cost create() uses. Hard-coding 10
+      // here meant operators raising BCRYPT_COST (e.g. to 12 or 14)
+      // would silently get downgraded hashes on every password
+      // rotation — a real regression in their hardening intent.
+      data.password = await bcrypt.hash(dto.password, this.bcryptCost());
     }
 
     return this.prisma.marketingUser.update({
