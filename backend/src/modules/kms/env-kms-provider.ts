@@ -27,9 +27,14 @@ import { KmsDecryptInput, KmsEncryptInput, KmsProvider } from './kms-provider.in
  *   bytes 14..30 : auth tag (16 bytes)
  *   bytes 30..   : ciphertext
  *
- * Legacy format (pre-versioning, written before this commit) has no
- * envelope byte — `decrypt` falls back to `decryptLegacy` so historical
- * blobs remain readable across the rollout.
+ * No pre-versioning legacy format: the v1 envelope was introduced with
+ * this class, before any blob was written via `kms.encrypt()`. A
+ * decryptLegacy() helper used to exist as defensive scaffold but
+ * collided with v1 blobs whose first byte happened to be 0x01 (1/256
+ * of all v1 blobs) — see iter-13 review. Since no producer ever wrote
+ * the legacy format, deleting the fallback removes the data-loss risk
+ * cleanly. If a future migration imports pre-envelope blobs, add a
+ * format flag column on the row (not a magic-byte heuristic).
  */
 const ENVELOPE_VERSION_V1 = 0x01;
 const ALGORITHM_AES_256_GCM = 'aes-256-gcm';
@@ -104,11 +109,15 @@ export class EnvKmsProvider implements KmsProvider {
 
   async decrypt({ context, ciphertext }: KmsDecryptInput): Promise<string> {
     if (ciphertext.length === 0) throw new Error('Empty ciphertext');
-    // First byte is the envelope marker; second is the key version. A
-    // missing marker means a pre-versioning blob — fall through to the
-    // legacy decoder.
+    // First byte must be the v1 envelope marker. Previously a non-v1 byte
+    // would fall through to a legacy decoder that collided with the
+    // 1/256 of real v1 blobs whose IV began with a non-0x01 byte — wait,
+    // the inverse: legacy blobs starting with 0x01 hit the v1 path and
+    // failed tag check, masquerading as data corruption. Since no
+    // producer in this codebase ever wrote the legacy format, refuse
+    // unknown markers explicitly.
     if (ciphertext[0] !== ENVELOPE_VERSION_V1) {
-      return this.decryptLegacy(context, ciphertext);
+      throw new Error(`Unknown KMS envelope version: 0x${ciphertext[0].toString(16)}`);
     }
     const version = ciphertext[1];
     const key = this.deriveKey(version, context);
@@ -117,29 +126,6 @@ export class EnvKmsProvider implements KmsProvider {
     const ct = ciphertext.subarray(30);
     const decipher = createDecipheriv('aes-256-gcm', key, iv);
     decipher.setAAD(this.aad(version, context));
-    decipher.setAuthTag(tag);
-    return Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8');
-  }
-
-  /**
-   * Pre-versioning decryption: no envelope header, no algorithm tag in
-   * the AAD, iv at offset 0. Kept so blobs written before the rotation
-   * scheme landed remain decryptable. New encryptions never use this
-   * format.
-   */
-  private decryptLegacy(context: Record<string, string>, ciphertext: Buffer): string {
-    const base = this.masterKeyFor(1);
-    if (!base) throw new Error('Legacy KMS key not configured');
-    const ctx = Object.keys(context)
-      .sort()
-      .map((k) => `${k}=${context[k]}`)
-      .join('|');
-    const key = createHash('sha256').update(`${base}::${ctx}`).digest();
-    const iv = ciphertext.subarray(0, 12);
-    const tag = ciphertext.subarray(12, 28);
-    const ct = ciphertext.subarray(28);
-    const decipher = createDecipheriv('aes-256-gcm', key, iv);
-    decipher.setAAD(Buffer.from(ctx, 'utf8'));
     decipher.setAuthTag(tag);
     return Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8');
   }
