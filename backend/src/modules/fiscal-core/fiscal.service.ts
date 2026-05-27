@@ -150,6 +150,14 @@ export class FiscalService {
       where: { id: fiscalDeviceId, tenantId },
     });
     if (!device) throw new NotFoundException('Fiscal device not found');
+    // Mirror issueReceipt's retired-device gate. A retired yazarkasa
+    // can't legally produce a Z report (the unit is decommissioned and
+    // its counters frozen at the time of retirement), so the operator
+    // probably wanted to close the day on a DIFFERENT device. Surface
+    // that with a clean 400 rather than letting it fail mid-adapter.
+    if (device.status === 'retired') {
+      throw new BadRequestException('Fiscal device retired — cannot close day');
+    }
     const provider = this.registry.get(device.providerId);
     const report = await provider.closeDay(fiscalDeviceId);
     await this.prisma.fiscalDayClose.create({

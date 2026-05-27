@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nest
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FiscalService } from './fiscal.service';
+import { CancelReceiptDto } from './dto/cancel-receipt.dto';
 
 @ApiTags('Fiscal')
 @ApiBearerAuth()
@@ -24,7 +25,7 @@ export class FiscalController {
 
   @Post('receipts/:id/cancel')
   @ApiOperation({ summary: 'Cancel an already-issued receipt' })
-  cancel(@Req() req: any, @Param('id') id: string, @Body() body: { reason: string }) {
+  cancel(@Req() req: any, @Param('id') id: string, @Body() body: CancelReceiptDto) {
     return this.fiscal.cancelReceipt(req.user.tenantId, id, body.reason);
   }
 

@@ -78,6 +78,18 @@ describe('FiscalService.issueReceipt', () => {
     );
   });
 
+  it('closeDay rejects a retired fiscal device (iter-29)', async () => {
+    // A retired yazarkasa has its counters frozen at retirement time; the
+    // operator probably wanted to close the day on a DIFFERENT device.
+    // Surface a clean 400 instead of letting it fail mid-adapter.
+    prisma.fiscalDeviceRecord.findFirst.mockResolvedValue({
+      id: DEVICE_ID, tenantId: TENANT, providerId: 'mock', status: 'retired',
+    } as any);
+
+    await expect(svc.closeDay(TENANT, DEVICE_ID)).rejects.toThrow(/retired/i);
+    expect(registry.get).not.toHaveBeenCalled();
+  });
+
   it('marks the row failed and emits a failure event when the adapter throws', async () => {
     prisma.fiscalDeviceRecord.findFirst.mockResolvedValue({
       id: DEVICE_ID, tenantId: TENANT, providerId: 'mock', status: 'online',

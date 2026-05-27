@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
 import { v7 as uuidv7 } from 'uuid';
 import {
   FiscalCapability,
@@ -54,7 +55,13 @@ export class EfaturaFiscalProvider implements FiscalProvider, OnModuleInit {
       return acc + Math.round((lineNet * l.vatRate) / (100 + l.vatRate));
     }, 0);
 
-    const fiscalNo = `EARS-${new Date().getFullYear()}-${String(Date.now()).slice(-8)}`;
+    // Invoice numbers were previously `EARS-${year}-${Date.now().slice(-8)}`.
+    // Two issuances in the same millisecond produced an identical number,
+    // hit the salesInvoice.invoiceNumber unique constraint with P2002, and
+    // dumped the receipt into manual-recovery — for no real reason. Append
+    // a 4-byte random suffix so concurrent issuances stay unique by design.
+    // Format stays grep-friendly: EARS-YYYY-<8-digit-time>-<8-hex-rand>.
+    const fiscalNo = `EARS-${new Date().getFullYear()}-${String(Date.now()).slice(-8)}-${randomBytes(4).toString('hex')}`;
 
     // Write the SalesInvoice mirror row. Failure here used to be swallowed
     // ("best-effort log and continue"), which left the fiscal receipt
