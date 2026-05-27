@@ -111,8 +111,16 @@ export class CommandQueueService {
     commandId: string,
     input: { status: 'done' | 'failed'; result?: Record<string, unknown>; error?: string },
   ) {
-    const cmd = await this.prisma.deviceCommand.findUnique({ where: { id: commandId } });
-    if (!cmd || cmd.deviceId !== deviceId) throw new NotFoundException('Command not found');
+    // Compound WHERE at the DB layer rather than `findUnique` + in-JS
+    // `deviceId !==` check. The post-fetch check is an IDOR-adjacent
+    // pattern — if a future refactor drops the comparison, the row's
+    // tenantId/payload leaks back via the throw path. Codebase
+    // convention (see orders.service, kds.service, webhook-outbound)
+    // is to enforce scope at the query layer.
+    const cmd = await this.prisma.deviceCommand.findFirst({
+      where: { id: commandId, deviceId },
+    });
+    if (!cmd) throw new NotFoundException('Command not found');
     if (cmd.status !== 'inflight') throw new BadRequestException(`Cannot ack — status is ${cmd.status}`);
 
     // Failed commands with retries remaining go back to `queued`; otherwise
@@ -122,14 +130,24 @@ export class CommandQueueService {
       nextStatus = 'queued';
     }
 
-    const updated = await this.prisma.deviceCommand.update({
-      where: { id: commandId },
+    // Compound-WHERE updateMany + count check closes the same TOCTOU
+    // window as the read above: the deviceId stays in scope from query
+    // to write, so a row-id-only update can't accidentally clobber a
+    // different device's command if the JS code is refactored.
+    const claim = await this.prisma.deviceCommand.updateMany({
+      where: { id: commandId, deviceId, status: 'inflight' },
       data: {
         status: nextStatus,
         result: (input.result as any) ?? undefined,
         error: input.error ?? null,
         ackedAt: input.status === 'done' || nextStatus === 'failed' ? new Date() : null,
       },
+    });
+    if (claim.count === 0) {
+      throw new BadRequestException('Command status changed concurrently — refresh and retry');
+    }
+    const updated = await this.prisma.deviceCommand.findUniqueOrThrow({
+      where: { id: commandId },
     });
 
     await this.outbox
