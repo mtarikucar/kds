@@ -314,8 +314,12 @@ export class SalesInvoiceService {
       ];
     }
 
-    const page = Number(query.page) || 1;
-    const limit = Number(query.limit) || 20;
+    // DTO already caps these (iter-33), but a service-side Math.min is
+    // cheap defence-in-depth: if a future caller bypasses the DTO (a
+    // worker, a cron, an internal RPC) we still don't pull arbitrarily
+    // large pages of invoice rows + nested items.
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(Math.max(1, Number(query.limit) || 20), 200);
 
     const [invoices, total] = await Promise.all([
       this.prisma.salesInvoice.findMany({
