@@ -216,8 +216,13 @@ export class StockDeductionService {
       },
     });
 
-    const refreshed = await tx.stockItem.findUnique({
-      where: { id: deduction.stockItemId },
+    // Re-read post-decrement so the low-stock alert reflects the row
+    // we just wrote. Compound WHERE for symmetry with the rest of the
+    // service — id is globally unique, but a defensive tenantId filter
+    // keeps a future refactor that splits stockItem.id by tenant from
+    // silently breaking alert emission.
+    const refreshed = await tx.stockItem.findFirst({
+      where: { id: deduction.stockItemId, tenantId },
     });
     if (
       refreshed &&
@@ -243,19 +248,30 @@ export class StockDeductionService {
     });
     if (movements.length === 0) return;
 
-    const existingReversals = await this.prisma.ingredientMovement.findMany({
-      where: {
-        tenantId,
-        type: IngredientMovementType.ORDER_REVERSAL,
-        referenceType: 'ORDER_REVERSAL',
-        referenceId: orderId,
-      },
-      select: { stockItemId: true },
-    });
-    const reversedItems = new Set(existingReversals.map((m) => m.stockItemId));
-
     return this.prisma.$transaction(
       async (tx) => {
+        // CRITICAL: read existingReversals INSIDE the txn, not above.
+        // The Serializable isolation only protects writes-vs-writes —
+        // it can't see an in-memory Set that was computed before the
+        // txn started. Two concurrent reversal calls (cancel + refund
+        // firing together — the documented case this txn-mode was
+        // chosen for) both read an empty Set outside, both enter the
+        // txn, and both re-create the same ORDER_REVERSAL movements →
+        // stock gets double-credited. Reading inside the txn means
+        // both calls see each other's writes (the second aborts with
+        // 40001 and is retried by Prisma against the new snapshot,
+        // which now includes the first call's reversals).
+        const existingReversals = await tx.ingredientMovement.findMany({
+          where: {
+            tenantId,
+            type: IngredientMovementType.ORDER_REVERSAL,
+            referenceType: 'ORDER_REVERSAL',
+            referenceId: orderId,
+          },
+          select: { stockItemId: true },
+        });
+        const reversedItems = new Set(existingReversals.map((m) => m.stockItemId));
+
         for (const movement of movements) {
           if (reversedItems.has(movement.stockItemId)) continue;
 
