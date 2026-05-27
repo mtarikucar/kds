@@ -9,7 +9,6 @@ import { ReportFilterDto } from '../dto/report-filter.dto';
 @MarketingRoute()
 @Controller('marketing/reports')
 @UseGuards(MarketingGuard, MarketingRolesGuard)
-@MarketingRoute()
 export class MarketingReportsController {
   constructor(private readonly reportsService: MarketingReportsService) {}
 

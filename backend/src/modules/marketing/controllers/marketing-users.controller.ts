@@ -19,7 +19,6 @@ import { UpdateMarketingUserDto } from '../dto/update-marketing-user.dto';
 @MarketingRoute()
 @Controller('marketing/users')
 @UseGuards(MarketingGuard, MarketingRolesGuard)
-@MarketingRoute()
 @MarketingRoles('SALES_MANAGER')
 export class MarketingUsersController {
   constructor(private readonly usersService: MarketingUsersService) {}

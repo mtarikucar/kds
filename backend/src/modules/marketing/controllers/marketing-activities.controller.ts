@@ -19,7 +19,6 @@ import { MarketingUserPayload } from '../types';
 @MarketingRoute()
 @Controller('marketing')
 @UseGuards(MarketingGuard, MarketingRolesGuard)
-@MarketingRoute()
 export class MarketingActivitiesController {
   constructor(private readonly activitiesService: MarketingActivitiesService) {}
 
