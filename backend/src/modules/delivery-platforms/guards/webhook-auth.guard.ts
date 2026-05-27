@@ -19,7 +19,7 @@ export const WEBHOOK_PLATFORM_KEY = 'webhookPlatform';
 export const WebhookPlatform = (platform: string) =>
   SetMetadata(WEBHOOK_PLATFORM_KEY, platform.toUpperCase());
 
-/** Trendyol only: reject signed bodies older than this many seconds. */
+/** Trendyol + Yemeksepeti: reject signed credentials older than this many seconds. */
 const WEBHOOK_MAX_AGE_SECONDS = 300;
 
 @Injectable()
@@ -75,6 +75,27 @@ export class WebhookAuthGuard implements CanActivate {
       }
 
       const [header, payload, signature] = parts;
+
+      // Validate the `alg` header claim before computing anything.
+      // The HMAC compute below uses SHA-512 unconditionally, so the
+      // strict-equal comparison already rejects `alg: "none"` and any
+      // foreign algorithm — but pinning the header explicitly is
+      // defence-in-depth against a future refactor that swaps to a
+      // JWT library and silently honours whatever `alg` the sender
+      // declared. The classic alg-confusion attack pivots on exactly
+      // that gap.
+      let decodedHeader: any;
+      try {
+        decodedHeader = JSON.parse(
+          Buffer.from(header, 'base64url').toString('utf8'),
+        );
+      } catch {
+        throw new Error('Invalid JWT header');
+      }
+      if (decodedHeader.alg !== 'HS512') {
+        throw new Error(`Unsupported JWT alg: ${decodedHeader.alg}`);
+      }
+
       const expectedSignature = createHmac('sha512', webhookSecret)
         .update(`${header}.${payload}`)
         .digest('base64url');
@@ -89,8 +110,24 @@ export class WebhookAuthGuard implements CanActivate {
         Buffer.from(payload, 'base64url').toString('utf8'),
       );
       // Defensive: `exp` must be a number, and the token must be fresh.
-      if (typeof decoded.exp !== 'number' || decoded.exp < Date.now() / 1000) {
+      const nowSec = Date.now() / 1000;
+      if (typeof decoded.exp !== 'number' || decoded.exp < nowSec) {
         throw new Error('Token expired or malformed');
+      }
+      // Freshness window mirrors the Trendyol path. The JWT is a bearer
+      // credential — it isn't bound to the request body — so a captured
+      // long-lived token could otherwise be replayed with a different
+      // body until exp lapses. Downstream `processIncomingOrder` dedupes
+      // on externalOrderId so replay of the SAME body is harmless, but
+      // an attacker pairing the JWT with a fresh body is not blocked by
+      // dedup. Require `iat` within the last 5 minutes.
+      if (typeof decoded.iat !== 'number' || nowSec - decoded.iat > WEBHOOK_MAX_AGE_SECONDS) {
+        throw new Error('Token issued-at outside freshness window');
+      }
+      // Also defend against clock skew shipping tokens with iat in the
+      // future — reject anything more than 60s ahead.
+      if (decoded.iat - nowSec > 60) {
+        throw new Error('Token issued-at in the future');
       }
 
       return true;
