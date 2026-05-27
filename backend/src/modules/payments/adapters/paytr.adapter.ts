@@ -298,7 +298,23 @@ export interface InstallmentTableResult {
 export class PaytrAdapter {
   private readonly logger = new Logger(PaytrAdapter.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(private readonly config: ConfigService) {
+    // PAYTR_USE_FAKE_ADAPTER is an E2E-only short-circuit that mints
+    // synthetic "successful" tokens without hitting PayTR — useful for
+    // CI / dev. In production the flag MUST be off; leaving it on means
+    // every payment attempt looks successful while no real money moves,
+    // and worse, the webhook callback would arrive carrying the
+    // synthetic OID and the settlement service would treat it as a
+    // genuine paid invoice. Fail loud at startup rather than silently
+    // accept the misconfig.
+    const fake = this.config.get<string>('PAYTR_USE_FAKE_ADAPTER');
+    const env = this.config.get<string>('NODE_ENV');
+    if (env === 'production' && fake === 'true') {
+      throw new Error(
+        'PAYTR_USE_FAKE_ADAPTER=true is forbidden in production — refusing to boot',
+      );
+    }
+  }
 
   private get credentials(): PaytrCredentials & {
     merchantId: string;
