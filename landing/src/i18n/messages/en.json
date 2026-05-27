@@ -448,6 +448,7 @@
       "cash_drawer": "Cash Drawer",
       "bridge": "Network Bridge",
       "scale": "Scale",
+      "cable": "Cable",
       "accessory": "Accessory",
       "service": "Service"
     },

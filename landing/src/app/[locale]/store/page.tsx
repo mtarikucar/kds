@@ -134,7 +134,10 @@ export default async function StorePage() {
           {orderedCategories.length > 0 && (
             <nav
               aria-label={t('title')}
-              className="sticky top-16 z-20 -mx-4 mb-10 border-b border-slate-200 bg-white/95 backdrop-blur px-4 py-3"
+              // Navbar.tsx is h-16 mobile / h-20 desktop; match both
+              // breakpoints so the sticky pills land flush with the
+              // header instead of sliding under it on lg+.
+              className="sticky top-16 lg:top-20 z-20 -mx-4 mb-10 border-b border-slate-200 bg-white/95 backdrop-blur px-4 py-3"
             >
               <div className="flex flex-wrap gap-2">
                 {orderedCategories.map((c) => (

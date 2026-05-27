@@ -3,6 +3,30 @@ import { useSearchParams } from 'react-router-dom';
 import { type CartItem, useListProducts, useQuoteCart, useConfirmCheckout, type HardwareProduct, type CartQuote } from './storeApi';
 
 /**
+ * Renders a product image but hides itself when the file is missing (404).
+ * Until every SKU has a real photo in landing/public/products/, some
+ * paths return 404 — without this fallback the browser shows the broken-
+ * image icon. useState matches the landing's <ProductImage> pattern;
+ * resets if the parent swaps a new src in (defensive even though product
+ * cards key on id and unmount on swap).
+ */
+function ProductImage({ src, alt }: { src: string; alt: string }) {
+  const [broken, setBroken] = useState(false);
+  useEffect(() => {
+    setBroken(false);
+  }, [src]);
+  if (broken) return null;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      onError={() => setBroken(true)}
+      className="aspect-[4/3] w-full object-cover"
+    />
+  );
+}
+
+/**
  * Tenant-facing hardware store. Three panels:
  *   - Catalogue grid (filtered by category).
  *   - Cart drawer with priced lines from the live /quote endpoint.
@@ -33,6 +57,8 @@ const CATEGORIES = [
   'caller_id',
   'cash_drawer',
   'bridge',
+  'scale',
+  'cable',
   'accessory',
   'service',
 ];
@@ -48,6 +74,8 @@ const CATEGORY_LABELS_TR: Record<string, string> = {
   caller_id: 'Arayan Numara',
   cash_drawer: 'Para Çekmecesi',
   bridge: 'Network Bridge',
+  scale: 'Tartı',
+  cable: 'Kablo',
   accessory: 'Aksesuar',
   service: 'Hizmet',
 };
@@ -200,20 +228,7 @@ export default function StorePage() {
                 const isOos = p.stockStatus === 'out_of_stock' || p.stockStatus === 'discontinued';
                 return (
                   <article key={p.id} className="overflow-hidden rounded-lg border bg-white">
-                    {p.images?.[0] && (
-                      // onError hides the slot when the photo file is
-                      // missing (404). Until every SKU has a real photo
-                      // in landing/public/products/, some images return
-                      // 404 — the alternative is the browser's broken-
-                      // image icon, which looks worse than no image.
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={p.images[0]}
-                        alt={p.name}
-                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }}
-                        className="aspect-[4/3] w-full object-cover"
-                      />
-                    )}
+                    {p.images?.[0] && <ProductImage src={p.images[0]} alt={p.name} />}
                     <div className="p-4">
                       <div className="flex items-center gap-2 flex-wrap text-xs text-gray-500">
                         <span>{p.brand} · {p.category.replace(/_/g, ' ')}</span>

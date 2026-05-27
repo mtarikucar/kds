@@ -19,6 +19,10 @@ import { AlertCircle, CheckCircle } from 'lucide-react';
 interface LocationState {
   pendingApproval?: boolean;
   message?: string;
+  // Set by ProtectedRoute when it bounces an unauthenticated visitor.
+  // Carries the original `pathname + search + hash` so deeplinks (e.g.
+  // /admin/store?sku=... from the landing storefront) survive login.
+  from?: string;
 }
 
 const LoginPage = () => {
@@ -48,16 +52,25 @@ const LoginPage = () => {
     mode: 'onBlur',
   });
 
+  // Post-login redirect target. Honour `state.from` (set by
+  // ProtectedRoute when it bounced an unauthenticated deeplink),
+  // but only when it's a safe internal path — never absolute URLs
+  // or anything starting with `//` (open-redirect protection).
+  const postLoginTarget =
+    locationState?.from && /^\/[^/]/.test(locationState.from)
+      ? locationState.from
+      : '/dashboard';
+
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard');
+      navigate(postLoginTarget, { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, postLoginTarget]);
 
   const onSubmit = (data: LoginFormData) => {
     login(data, {
       onSuccess: () => {
-        navigate('/dashboard');
+        navigate(postLoginTarget, { replace: true });
       },
     });
   };
@@ -67,7 +80,7 @@ const LoginPage = () => {
     onSuccess: (tokenResponse) => {
       googleAuth(tokenResponse.access_token, {
         onSuccess: () => {
-          navigate('/dashboard');
+          navigate(postLoginTarget, { replace: true });
         },
       });
     },

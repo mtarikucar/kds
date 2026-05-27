@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
 import { UserRole } from '../types';
@@ -43,6 +43,7 @@ function bootstrapAccessToken(): Promise<{ accessToken: string } | null> {
 const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
   const { isAuthenticated, user, accessToken, setAccessToken, logout } =
     useAuthStore();
+  const location = useLocation();
   const [bootstrapping, setBootstrapping] = useState(
     isAuthenticated && !accessToken,
   );
@@ -70,7 +71,19 @@ const ProtectedRoute = ({ children, allowedRoles }: ProtectedRouteProps) => {
   }, [isAuthenticated, accessToken, setAccessToken, logout]);
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    // Preserve the route the user was trying to reach (including any
+    // query string like `?sku=…` from the landing storefront's
+    // "Sipariş ver" CTA). LoginPage reads `state.from` for the post-
+    // login redirect so deeplinks survive the auth bounce.
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{
+          from: `${location.pathname}${location.search}${location.hash}`,
+        }}
+      />
+    );
   }
 
   if (bootstrapping) {
