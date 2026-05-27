@@ -7,7 +7,6 @@ import {
   IsObject,
   IsOptional,
   IsString,
-  IsUrl,
   Matches,
   Max,
   Min,
@@ -104,10 +103,21 @@ export class CreateHardwareProductDto {
   @Max(120)
   warrantyMonths?: number;
 
-  @ApiProperty({ required: false, type: [String], description: 'Product image URLs (CDN)' })
+  @ApiProperty({
+    required: false,
+    type: [String],
+    description: 'Product image URLs — absolute (https://...) or root-relative (/products/<sku>.webp)',
+  })
   @IsOptional()
   @IsArray()
-  @IsUrl({}, { each: true })
+  // Accept both absolute URLs (vendor CDN) and root-relative paths
+  // (self-hosted under landing/public/products/). The previous IsUrl()
+  // rejected the seed's own /products/<sku>.webp pattern; any admin
+  // upsert that copied the existing row's images out would 400.
+  @Matches(/^(https?:\/\/[^\s]+|\/[^\s]*)$/, {
+    each: true,
+    message: 'each image must be an absolute URL (https://...) or root-relative path (/...)',
+  })
   images?: string[];
 
   @ApiProperty({
