@@ -287,31 +287,50 @@ export class PaytrSettlementService {
         `Settlement succeeded for subscription=${subscription.id} oid=${payment.paytrMerchantOid}`,
       );
 
-      void this.notifyActivation(
+      // Fire-and-forget after the settlement transaction commits. Each
+      // callee wraps its own body in try/catch, but `void` alone does
+      // NOT catch promise rejections — if a sync throw ever escaped
+      // those inner blocks (Node ≥15 default), the whole API process
+      // would die mid-request. The outer `.catch` is a process-level
+      // safety net; it never masks real bugs because the inner catch
+      // already logs.
+      this.notifyActivation(
         subscription.tenantId,
         subscription.tenant.name,
+      ).catch((err) =>
+        this.logger.error(
+          `unhandled notifyActivation rejection for tenant=${subscription.tenantId}: ${err?.message ?? err}`,
+        ),
       );
 
       if (upgradeContext) {
-        void this.creditUpsellCommission(
+        this.creditUpsellCommission(
           subscription.tenantId,
           upgradeContext as {
             planId: string;
             amount: Prisma.Decimal;
             commissionRate: Prisma.Decimal;
           },
+        ).catch((err) =>
+          this.logger.error(
+            `unhandled creditUpsellCommission rejection for tenant=${subscription.tenantId}: ${err?.message ?? err}`,
+          ),
         );
       } else if (renewalContext) {
-        void this.creditRenewalCommission(
+        this.creditRenewalCommission(
           subscription.tenantId,
           renewalContext as {
             planId: string;
             amount: Prisma.Decimal;
             commissionRate: Prisma.Decimal;
           },
+        ).catch((err) =>
+          this.logger.error(
+            `unhandled creditRenewalCommission rejection for tenant=${subscription.tenantId}: ${err?.message ?? err}`,
+          ),
         );
       } else if (signupContext) {
-        void this.creditSignupCommissionForReferral(
+        this.creditSignupCommissionForReferral(
           subscription.tenantId,
           subscription.tenant?.name ?? subscription.tenantId,
           signupContext as {
@@ -320,6 +339,10 @@ export class PaytrSettlementService {
             amount: Prisma.Decimal;
             commissionRate: Prisma.Decimal;
           },
+        ).catch((err) =>
+          this.logger.error(
+            `unhandled creditSignupCommissionForReferral rejection for tenant=${subscription.tenantId}: ${err?.message ?? err}`,
+          ),
         );
       }
       return "OK";
