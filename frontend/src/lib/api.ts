@@ -86,6 +86,24 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         useAuthStore.getState().logout();
+        // Capture the user's current path so LoginPage can redirect
+        // them back after re-authentication. `window.location.href`
+        // does a full page load that wipes React Router's history.state,
+        // so we hop via sessionStorage — LoginPage reads + clears it
+        // on mount. Same internal-path validation runs there.
+        try {
+          if (typeof window !== 'undefined' && window.location) {
+            const here = window.location.pathname + window.location.search + window.location.hash;
+            // Skip if we're already on /login (or about to be) — no
+            // need to bounce back to ourselves.
+            if (here && !here.startsWith('/login')) {
+              window.sessionStorage.setItem('postLoginReturn', here);
+            }
+          }
+        } catch {
+          // sessionStorage can throw in private-mode / cross-origin
+          // sandbox iframes — non-fatal, fall through to /dashboard.
+        }
         window.location.href = import.meta.env.BASE_URL + 'login';
         return Promise.reject(refreshError);
       }

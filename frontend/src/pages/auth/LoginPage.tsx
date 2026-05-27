@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -23,6 +23,20 @@ interface LocationState {
   // Carries the original `pathname + search + hash` so deeplinks (e.g.
   // /admin/store?sku=... from the landing storefront) survive login.
   from?: string;
+}
+
+// One-shot read of the post-login return path stashed by api.ts's 401
+// response interceptor (warm-session expiry → hard reload → React
+// Router state would be wiped). Clears on read so a subsequent visit
+// to /login doesn't reuse a stale target.
+function readAndClearReturnPath(): string | null {
+  try {
+    const value = window.sessionStorage.getItem('postLoginReturn');
+    if (value) window.sessionStorage.removeItem('postLoginReturn');
+    return value;
+  } catch {
+    return null;
+  }
 }
 
 const LoginPage = () => {
@@ -52,14 +66,23 @@ const LoginPage = () => {
     mode: 'onBlur',
   });
 
-  // Post-login redirect target. Honour `state.from` (set by
-  // ProtectedRoute when it bounced an unauthenticated deeplink),
-  // but only when it's a safe internal path — never absolute URLs
-  // or anything starting with `//` (open-redirect protection).
-  const postLoginTarget =
-    locationState?.from && /^\/[^/]/.test(locationState.from)
-      ? locationState.from
-      : '/dashboard';
+  // Post-login redirect target. Two paths feed it:
+  //   1. `state.from` — set by ProtectedRoute when it bounced an
+  //      unauthenticated visitor on a cold deeplink (cheap, in-SPA).
+  //   2. sessionStorage `postLoginReturn` — set by api.ts's 401
+  //      response interceptor when a warm session expires and we
+  //      do a hard `window.location.href` reload (history.state
+  //      doesn't survive that). One-shot — cleared on read.
+  // Either path runs through the same internal-path regex so an
+  // attacker can't sneak `//evil.com` or `http://evil.com` in.
+  const postLoginTarget = useMemo(() => {
+    const candidate =
+      locationState?.from ||
+      (typeof window !== 'undefined' ? readAndClearReturnPath() : null);
+    return candidate && /^\/[^/]/.test(candidate) ? candidate : '/dashboard';
+    // Computed once at mount; failed-login re-renders don't change it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated) {
