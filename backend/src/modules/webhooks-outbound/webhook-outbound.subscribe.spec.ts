@@ -68,6 +68,34 @@ describe('WebhookOutboundService.subscribe + fanOut', () => {
     await expect(svc.subscribe('t1', { url: 'ftp://nope' })).rejects.toThrow(/http or https/);
   });
 
+  it('subscribe enforces the per-tenant cap (iter-18)', async () => {
+    // Cap default is 20. Simulate 20 active rows already present.
+    (prisma.tenantWebhookSubscription.count as any).mockResolvedValue(20);
+
+    await expect(
+      svc.subscribe('t1', { url: 'https://r.example.com/hook' }),
+    ).rejects.toThrow(/subscription cap reached/);
+
+    // Crucially the create must NOT have been attempted — the cap is
+    // checked before any KMS encrypt or DB write happens.
+    expect((prisma.tenantWebhookSubscription.create as any).mock.calls.length).toBe(0);
+  });
+
+  it('subscribe counts active-only, so paused rows do not block creation (iter-18)', async () => {
+    // The cap check passes a {status:'active'} filter — paused rows do
+    // not consume cap budget. This test pins the contract.
+    let countArgs: any = null;
+    (prisma.tenantWebhookSubscription.count as any).mockImplementation(async (args: any) => {
+      countArgs = args;
+      return 0;
+    });
+    (prisma.tenantWebhookSubscription.create as any).mockResolvedValue({ id: 's-1' });
+
+    await svc.subscribe('t1', { url: 'https://r.example.com/hook' });
+
+    expect(countArgs).toEqual({ where: { tenantId: 't1', status: 'active' } });
+  });
+
   it('subscribe returns the raw secret once + stores only the hash', async () => {
     let captured: any = null;
     (prisma.tenantWebhookSubscription.create as any).mockImplementation(async ({ data }: any) => {

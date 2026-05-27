@@ -54,6 +54,19 @@ function isPublishableEventType(type: string): boolean {
   return !BLOCKED_EVENT_TYPE_PREFIXES.some((p) => type.startsWith(p));
 }
 
+// Per-tenant cap on active subscriptions. Without this a tenant — by
+// mistake or by design — can subscribe N endpoints to `*` and turn each
+// emitted event into N WebhookDelivery rows + N outbound HTTP attempts.
+// Auto-pause after 20 consecutive failures helps tame dead endpoints but
+// doesn't bound the *creation* rate, which is the resource-DoS shape
+// this cap closes. Default 20 fits even the largest real integrators
+// (most use 1–3); ops can raise via env without a deploy if a partner
+// genuinely needs more.
+const SUBSCRIPTION_CAP_PER_TENANT = Math.max(
+  1,
+  Number(process.env.WEBHOOK_SUBSCRIPTION_CAP_PER_TENANT ?? '20'),
+);
+
 @Injectable()
 export class WebhookOutboundService {
   private readonly logger = new Logger(WebhookOutboundService.name);
@@ -66,6 +79,20 @@ export class WebhookOutboundService {
 
   /** Tenant-side: create a subscription. Returns the secret exactly once. */
   async subscribe(tenantId: string, input: { url: string; events?: string[] }) {
+    // Resource cap. Count `active` rows only — paused rows don't fan out
+    // and shouldn't block the tenant from creating a healthy replacement.
+    // We accept the small race window where two concurrent calls both see
+    // (cap-1) and create the cap-th row; the absolute bound is N+1 which
+    // is acceptable for what is a DoS guard, not a precise quota.
+    const activeCount = await this.prisma.tenantWebhookSubscription.count({
+      where: { tenantId, status: 'active' },
+    });
+    if (activeCount >= SUBSCRIPTION_CAP_PER_TENANT) {
+      throw new BadRequestException(
+        `subscription cap reached (${SUBSCRIPTION_CAP_PER_TENANT}); revoke unused subscriptions first`,
+      );
+    }
+
     // SSRF gate. The bare `^https?://` regex used to be all that stood
     // between a tenant and a self-fetch of `169.254.169.254/...` (AWS
     // IMDS) or any internal service — combined with the worker's storage
