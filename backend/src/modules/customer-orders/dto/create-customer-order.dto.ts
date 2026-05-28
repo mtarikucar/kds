@@ -5,6 +5,7 @@ import {
   ValidateNested,
   IsOptional,
   IsInt,
+  IsUUID,
   Min,
   Max,
   IsNumber,
@@ -24,8 +25,7 @@ const PHONE_REGEX = /^\+?[1-9]\d{7,14}$/;
 
 export class OrderItemModifierDto {
   @ApiProperty({ example: 'uuid-of-modifier' })
-  @IsString()
-  @IsNotEmpty()
+  @IsUUID()
   modifierId: string;
 
   @ApiProperty({ example: 1 })
@@ -37,8 +37,7 @@ export class OrderItemModifierDto {
 
 export class CreateOrderItemDto {
   @ApiProperty({ example: 'uuid-of-product' })
-  @IsString()
-  @IsNotEmpty()
+  @IsUUID()
   productId: string;
 
   @ApiProperty({ example: 2 })
@@ -67,9 +66,8 @@ export class CreateOrderItemDto {
 
 export class CreateCustomerOrderDto {
   @ApiPropertyOptional({ example: 'uuid-of-table', description: 'Optional for COUNTER orders (tableless mode)' })
-  @IsString()
   @IsOptional()
-  @MaxLength(64)
+  @IsUUID()
   tableId?: string;
 
   @ApiPropertyOptional({ enum: OrderType })
@@ -106,15 +104,27 @@ export class CreateCustomerOrderDto {
   @MaxLength(500)
   notes?: string;
 
+  // Geographic range bounds — a value outside [-90, 90] for latitude
+  // (or [-180, 180] for longitude) is mathematically impossible and
+  // would skew the haversine distance calc in
+  // isLocationWithinRange. Without the @Min/@Max a malicious client
+  // posting `latitude: 1e30` flows into the geo math and produces
+  // either NaN distance (passes the range check by accident) or
+  // garbage values the comparison treats as "far". Same iter-42
+  // shape: cap the input before downstream code reads it.
   @ApiPropertyOptional()
   @EmptyStringToNumber()
   @IsNumber()
   @IsOptional()
+  @Min(-90)
+  @Max(90)
   latitude?: number;
 
   @ApiPropertyOptional()
   @EmptyStringToNumber()
   @IsNumber()
   @IsOptional()
+  @Min(-180)
+  @Max(180)
   longitude?: number;
 }
