@@ -334,6 +334,10 @@ export class CustomerOrdersService {
   }
 
   async getActiveWaiterRequests(tenantId: string) {
+    // Iter-86: cap matches the per-session listings above (50 is plenty
+    // for any single dashboard tick on an event-night tenant; 200 here
+    // gives headroom for a large chain summary while still bounding
+    // the payload + PII surface).
     return this.prisma.waiterRequest.findMany({
       where: { tenantId, status: { in: ['PENDING', 'ACKNOWLEDGED'] } },
       include: {
@@ -341,6 +345,7 @@ export class CustomerOrdersService {
         acknowledgedBy: { select: { id: true, firstName: true, lastName: true } },
       },
       orderBy: { createdAt: 'asc' },
+      take: 200,
     });
   }
 
@@ -376,18 +381,49 @@ export class CustomerOrdersService {
       throw new BadRequestException('Waiter request is already completed');
     }
 
-    const result = await this.prisma.waiterRequest.updateMany({
-      where: { id, tenantId, status: { not: 'COMPLETED' } },
-      data: {
-        status: 'COMPLETED',
-        completedAt: new Date(),
-        acknowledgedById: request.acknowledgedById || userId,
-        acknowledgedAt: request.acknowledgedAt || new Date(),
-      },
+    // Iter-86: complete with TWO disjoint updateMany predicates so a
+    // race between the findFirst snapshot above and the write below
+    // cannot corrupt the acknowledger audit trail.
+    //
+    // Pre-fix shape used a single `acknowledgedById: request.ack || userId`
+    // — if a concurrent acknowledgeWaiterRequest call landed between
+    // the read and the write, our null snapshot OR'd to userId,
+    // overwriting the actual acknowledger's id with the completer's.
+    // The row then claimed "acknowledged by the completer" forever
+    // even though the real acknowledger was someone else.
+    //
+    // Both updateMany calls scope to a STATUS predicate, so they
+    // never both match. The whole pair runs inside one $transaction
+    // — racer either sees PENDING (branch 1 wins) or ACKNOWLEDGED
+    // (branch 2 wins, preserves existing ack metadata) but never
+    // overwrites a non-null acknowledger.
+    const now = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      // Branch 1: row was still PENDING — complete + stamp the ack
+      // metadata from this user (the completer is implicitly also
+      // the acknowledger when nobody acknowledged separately).
+      const fromPending = await tx.waiterRequest.updateMany({
+        where: { id, tenantId, status: 'PENDING' },
+        data: {
+          status: 'COMPLETED',
+          completedAt: now,
+          acknowledgedById: userId,
+          acknowledgedAt: now,
+        },
+      });
+      if (fromPending.count === 1) return;
+
+      // Branch 2: someone already acknowledged — just close it. Do
+      // NOT touch acknowledgedById / acknowledgedAt; that is the
+      // load-bearing change.
+      const fromAcked = await tx.waiterRequest.updateMany({
+        where: { id, tenantId, status: 'ACKNOWLEDGED' },
+        data: { status: 'COMPLETED', completedAt: now },
+      });
+      if (fromAcked.count !== 1) {
+        throw new BadRequestException('Waiter request not found or already completed');
+      }
     });
-    if (result.count !== 1) {
-      throw new BadRequestException('Waiter request not found or already completed');
-    }
 
     const updated = await this.prisma.waiterRequest.findFirstOrThrow({
       where: { id, tenantId },
@@ -465,6 +501,7 @@ export class CustomerOrdersService {
   }
 
   async getActiveBillRequests(tenantId: string) {
+    // Iter-86: same cap rationale as getActiveWaiterRequests above.
     return this.prisma.billRequest.findMany({
       where: { tenantId, status: { in: ['PENDING', 'ACKNOWLEDGED'] } },
       include: {
@@ -472,6 +509,7 @@ export class CustomerOrdersService {
         acknowledgedBy: { select: { id: true, firstName: true, lastName: true } },
       },
       orderBy: { createdAt: 'asc' },
+      take: 200,
     });
   }
 
@@ -506,18 +544,32 @@ export class CustomerOrdersService {
     if (request.status === 'COMPLETED') {
       throw new BadRequestException('Bill request is already completed');
     }
-    const result = await this.prisma.billRequest.updateMany({
-      where: { id, tenantId, status: { not: 'COMPLETED' } },
-      data: {
-        status: 'COMPLETED',
-        completedAt: new Date(),
-        acknowledgedById: request.acknowledgedById || userId,
-        acknowledgedAt: request.acknowledgedAt || new Date(),
-      },
+
+    // Iter-86: same TOCTOU fix as completeWaiterRequest above. Split
+    // into two status-scoped updateMany calls inside a transaction so
+    // a concurrent acknowledge cannot have its acknowledger id
+    // overwritten by the completer.
+    const now = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      const fromPending = await tx.billRequest.updateMany({
+        where: { id, tenantId, status: 'PENDING' },
+        data: {
+          status: 'COMPLETED',
+          completedAt: now,
+          acknowledgedById: userId,
+          acknowledgedAt: now,
+        },
+      });
+      if (fromPending.count === 1) return;
+
+      const fromAcked = await tx.billRequest.updateMany({
+        where: { id, tenantId, status: 'ACKNOWLEDGED' },
+        data: { status: 'COMPLETED', completedAt: now },
+      });
+      if (fromAcked.count !== 1) {
+        throw new BadRequestException('Bill request not found or already completed');
+      }
     });
-    if (result.count !== 1) {
-      throw new BadRequestException('Bill request not found or already completed');
-    }
     const updated = await this.prisma.billRequest.findFirstOrThrow({
       where: { id, tenantId },
       include: {

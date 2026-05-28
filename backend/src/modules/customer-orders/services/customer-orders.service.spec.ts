@@ -131,4 +131,135 @@ describe('CustomerOrdersService dedup parity (iter-25)', () => {
       expect(where.OR).toHaveLength(2);
     });
   });
+
+  /**
+   * Iter-86 regression. completeWaiterRequest / completeBillRequest
+   * used to snapshot the row, then write the snapshot's
+   * acknowledgedById OR'd with the completer's userId. A concurrent
+   * acknowledgeXRequest call between read and write produced a
+   * snapshot with null ack metadata → the OR resolved to the
+   * COMPLETER's id → the row claimed "acknowledged by the completer"
+   * forever. Audit trail corruption.
+   *
+   * The fix splits the write into two disjoint status-scoped
+   * updateMany predicates inside a transaction: from PENDING
+   * (stamp completer as the implicit acknowledger) OR from
+   * ACKNOWLEDGED (keep the existing ack metadata untouched).
+   */
+  describe('iter-86 complete-request acknowledger preservation', () => {
+    it('completeWaiterRequest from PENDING stamps completer as the implicit acknowledger', async () => {
+      (prisma.waiterRequest.findFirst as any).mockResolvedValue({
+        id: 'wr-1',
+        tenantId: 't1',
+        status: 'PENDING',
+        acknowledgedById: null,
+        acknowledgedAt: null,
+      });
+      (prisma.$transaction as any).mockImplementation(async (fn: any) => fn(prisma));
+      const updates: any[] = [];
+      (prisma.waiterRequest.updateMany as any).mockImplementation(async (args: any) => {
+        updates.push(args);
+        // PENDING branch matches first; subsequent ACKNOWLEDGED branch
+        // never fires.
+        if (args.where.status === 'PENDING') return { count: 1 };
+        return { count: 0 };
+      });
+      (prisma.waiterRequest.findFirstOrThrow as any).mockResolvedValue({ id: 'wr-1' });
+
+      await svc.completeWaiterRequest('wr-1', 'completer-user', 't1');
+
+      // Exactly one updateMany call against the PENDING branch.
+      const pendingCalls = updates.filter((u) => u.where.status === 'PENDING');
+      expect(pendingCalls).toHaveLength(1);
+      expect(pendingCalls[0].data.acknowledgedById).toBe('completer-user');
+      expect(pendingCalls[0].data.status).toBe('COMPLETED');
+    });
+
+    it('completeWaiterRequest from ACKNOWLEDGED preserves the original acknowledger (the load-bearing race fix)', async () => {
+      // Snapshot still shows status='ACKNOWLEDGED' (a concurrent ack
+      // landed between the snapshot read and the write). Pre-iter-86
+      // shape would have written `acknowledgedById: request.ack || userId`
+      // — but request.ack here IS set, so that snapshot path
+      // happened to work; the load-bearing race is the OTHER way:
+      // PENDING-at-read, ACKNOWLEDGED-at-write. Either way the new
+      // shape never writes acknowledgedById in the ACKNOWLEDGED
+      // branch, which is what we assert.
+      (prisma.waiterRequest.findFirst as any).mockResolvedValue({
+        id: 'wr-2',
+        tenantId: 't1',
+        status: 'ACKNOWLEDGED',
+        acknowledgedById: 'original-acker',
+        acknowledgedAt: new Date('2026-01-01'),
+      });
+      (prisma.$transaction as any).mockImplementation(async (fn: any) => fn(prisma));
+      const updates: any[] = [];
+      (prisma.waiterRequest.updateMany as any).mockImplementation(async (args: any) => {
+        updates.push(args);
+        if (args.where.status === 'PENDING') return { count: 0 }; // no-op; row not PENDING
+        if (args.where.status === 'ACKNOWLEDGED') return { count: 1 };
+        return { count: 0 };
+      });
+      (prisma.waiterRequest.findFirstOrThrow as any).mockResolvedValue({ id: 'wr-2' });
+
+      await svc.completeWaiterRequest('wr-2', 'completer-user', 't1');
+
+      // The ACKNOWLEDGED-branch update must NOT touch acknowledgedById
+      // or acknowledgedAt. That's the load-bearing preservation.
+      const acked = updates.find((u) => u.where.status === 'ACKNOWLEDGED');
+      expect(acked).toBeDefined();
+      expect(acked!.data.acknowledgedById).toBeUndefined();
+      expect(acked!.data.acknowledgedAt).toBeUndefined();
+      expect(acked!.data.status).toBe('COMPLETED');
+      expect(acked!.data.completedAt).toBeInstanceOf(Date);
+    });
+
+    it('completeBillRequest applies the same two-branch shape', async () => {
+      (prisma.billRequest.findFirst as any).mockResolvedValue({
+        id: 'br-1',
+        tenantId: 't1',
+        status: 'ACKNOWLEDGED',
+        acknowledgedById: 'original-acker',
+      });
+      (prisma.$transaction as any).mockImplementation(async (fn: any) => fn(prisma));
+      const updates: any[] = [];
+      (prisma.billRequest.updateMany as any).mockImplementation(async (args: any) => {
+        updates.push(args);
+        if (args.where.status === 'ACKNOWLEDGED') return { count: 1 };
+        return { count: 0 };
+      });
+      (prisma.billRequest.findFirstOrThrow as any).mockResolvedValue({ id: 'br-1' });
+
+      await svc.completeBillRequest('br-1', 'completer-user', 't1');
+
+      const acked = updates.find((u) => u.where.status === 'ACKNOWLEDGED');
+      expect(acked).toBeDefined();
+      expect(acked!.data.acknowledgedById).toBeUndefined();
+    });
+  });
+
+  describe('iter-86 active-listing take cap', () => {
+    it('getActiveWaiterRequests caps the listing at 200', async () => {
+      let captured: any = null;
+      (prisma.waiterRequest.findMany as any).mockImplementation(async (args: any) => {
+        captured = args;
+        return [];
+      });
+
+      await svc.getActiveWaiterRequests('t1');
+
+      expect(captured.take).toBe(200);
+    });
+
+    it('getActiveBillRequests caps the listing at 200', async () => {
+      let captured: any = null;
+      (prisma.billRequest.findMany as any).mockImplementation(async (args: any) => {
+        captured = args;
+        return [];
+      });
+
+      await svc.getActiveBillRequests('t1');
+
+      expect(captured.take).toBe(200);
+    });
+  });
 });
