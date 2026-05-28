@@ -1,8 +1,24 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrderStatus } from '../../common/constants/order-status.enum';
 import { getTenantMidnight } from '../../common/helpers/timezone.helper';
+
+/**
+ * Hard cap on the explicit date window a single report call can request.
+ * Everything past the cap is rejected at getDateRange.
+ *
+ * getSalesSummary / getOrdersByHour / getCustomerAnalytics all run
+ * findMany over PAID Orders inside the window and bucket in JS. A
+ * tenant with even modest order volume (1K/day) hits 366K rows for a
+ * 1-year window — already at the edge of comfortable memory pressure.
+ * Letting an admin pass `startDate=2020-01-01` (effectively "all time")
+ * was a one-request DoS lever. 366 days covers every real reporting
+ * use case (calendar-year comparisons, leap-year edge cases) while
+ * keeping per-call memory bounded.
+ */
+const REPORT_MAX_WINDOW_DAYS = 366;
+const MILLIS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /**
  * Convert a Prisma Decimal to a JSON-safe number while preserving full
@@ -42,6 +58,21 @@ export class ReportsService {
     endDate?: Date,
   ) {
     if (startDate && endDate) {
+      // Validate dates are sensible — Date constructed from a malformed
+      // ISO string is `Invalid Date` (getTime() → NaN), which would make
+      // every downstream gte/lte comparison return false silently.
+      if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+        throw new BadRequestException('startDate / endDate must be valid dates');
+      }
+      if (startDate > endDate) {
+        throw new BadRequestException('startDate must be before or equal to endDate');
+      }
+      const windowDays = (endDate.getTime() - startDate.getTime()) / MILLIS_PER_DAY;
+      if (windowDays > REPORT_MAX_WINDOW_DAYS) {
+        throw new BadRequestException(
+          `Date range cannot exceed ${REPORT_MAX_WINDOW_DAYS} days. Split the report into smaller windows.`,
+        );
+      }
       return { start: startDate, end: endDate };
     }
     const tenant = await this.prisma.tenant.findUnique({
@@ -53,7 +84,7 @@ export class ReportsService {
     const start = startDate ?? getTenantMidnight(now, tz);
     const end =
       endDate ??
-      getTenantMidnight(new Date(now.getTime() + 24 * 60 * 60 * 1000), tz);
+      getTenantMidnight(new Date(now.getTime() + MILLIS_PER_DAY), tz);
     return { start, end };
   }
 
