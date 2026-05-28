@@ -107,4 +107,60 @@ describe('EntitlementService', () => {
     expect(set.features['feature.kds']).toBeUndefined();
     expect(set.features['feature.api']).toBe(true);
   });
+
+  /**
+   * Iter-75 regression — cache eviction. The Map used to grow without
+   * bound. Every getForTenant inserted an entry; nothing evicted it
+   * unless invalidate() fired for that tenant. With 10K registered
+   * tenants and natural churn (most inactive at any given moment),
+   * stale entries would pin forever on every replica.
+   *
+   * Two layers: a per-write size cap (oldest-by-insertion eviction
+   * after expired sweep) and a periodic timer that prunes expired
+   * entries when reads are idle.
+   */
+  describe('iter-75 cache eviction', () => {
+    it('hydrates fresh on first read, serves from cache on second', async () => {
+      // baseline + sanity that the cache still functions after iter-75
+      (prisma.featureEntitlement.findMany as any).mockResolvedValue([]);
+      await svc.getForTenant('t-x');
+      await svc.getForTenant('t-x');
+      expect(prisma.featureEntitlement.findMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('evicts oldest entries when the cache crosses MAX_CACHE_SIZE', async () => {
+      (prisma.featureEntitlement.findMany as any).mockResolvedValue([]);
+      // Slam in enough distinct tenant ids to push past the cap.
+      const MAX = (EntitlementService as any).MAX_CACHE_SIZE as number;
+      // We'll go ~5 over the cap to verify multiple evictions, not just one.
+      const N = MAX + 5;
+      for (let i = 0; i < N; i++) {
+        await svc.getForTenant(`tenant-${i}`);
+      }
+      const cacheSize = (svc as any).cache.size as number;
+      expect(cacheSize).toBeLessThanOrEqual(MAX);
+      // The earliest-written tenant must have been evicted — re-reading
+      // hits the DB again (which is exactly the LRU-ish contract).
+      const findManyCalls = (prisma.featureEntitlement.findMany as any).mock.calls.length;
+      await svc.getForTenant('tenant-0');
+      const findManyAfter = (prisma.featureEntitlement.findMany as any).mock.calls.length;
+      expect(findManyAfter).toBe(findManyCalls + 1);
+    });
+
+    it('sweepExpiredCache (private) drops only entries past their TTL', async () => {
+      (prisma.featureEntitlement.findMany as any).mockResolvedValue([]);
+      // Seed two entries with the public API, then poison one entry's
+      // expiry so the sweep finds something to clean.
+      await svc.getForTenant('t-a');
+      await svc.getForTenant('t-b');
+      const cache = (svc as any).cache as Map<string, { set: any; expiresAt: number }>;
+      const aKey = [...cache.keys()].find((k) => k.startsWith('t-a::'))!;
+      cache.get(aKey)!.expiresAt = Date.now() - 1; // expired
+
+      const evicted = (svc as any).sweepExpiredCache() as number;
+
+      expect(evicted).toBe(1);
+      expect(cache.has(aKey)).toBe(false);
+    });
+  });
 });

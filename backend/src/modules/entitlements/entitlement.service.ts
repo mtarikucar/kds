@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { fold } from './entitlement-engine';
 import {
@@ -24,10 +24,31 @@ import { EntitlementInvalidationBus } from './entitlement-invalidation.bus';
  * one source never touches another's grants.
  */
 @Injectable()
-export class EntitlementService implements OnModuleInit {
+export class EntitlementService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(EntitlementService.name);
   private readonly cache = new Map<string, { set: EntitlementSet; expiresAt: number }>();
   private readonly cacheTtlMs = 30_000;
+
+  // Iter-75 — cache eviction. The Map is keyed by `${tenantId}::${branchId}`
+  // and every authed request that lands on EntitlementGuard inserts an
+  // entry on miss. With nothing to evict it, a fleet of 10K registered
+  // tenants (90% inactive on any given day) keeps 9K stale entries pinned
+  // on every API replica forever. Two layers:
+  //
+  //  1. Per-write cap. Any insert that pushes the map above MAX_CACHE_SIZE
+  //     first sweeps expired entries; if still over the cap, drops the
+  //     oldest by insertion order (JS Maps preserve insertion order, so
+  //     iterating keys returns them oldest-first — effectively LRU when
+  //     we re-insert on every hit). Bounded memory regardless of
+  //     load shape.
+  //
+  //  2. Periodic sweep (60s) to evict expired entries when reads are
+  //     idle — a tenant that hits once then disappears would otherwise
+  //     keep its slot until the cap pushes it out. Light enough to run
+  //     in-process without a separate scheduler.
+  private static readonly MAX_CACHE_SIZE = 10_000;
+  private static readonly CACHE_SWEEP_INTERVAL_MS = 60_000;
+  private cacheSweepTimer: NodeJS.Timeout | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -41,6 +62,64 @@ export class EntitlementService implements OnModuleInit {
     // replica publishes an invalidation, we drop our own cache for that
     // tenant — without publishing again (the bus filters by senderId).
     this.invalidationBus?.registerListener((tenantId) => this.invalidateLocal(tenantId));
+
+    // Periodic eviction. `unref` so the timer doesn't keep the Node
+    // process alive past shutdown.
+    this.cacheSweepTimer = setInterval(
+      () => this.sweepExpiredCache(),
+      EntitlementService.CACHE_SWEEP_INTERVAL_MS,
+    );
+    this.cacheSweepTimer.unref?.();
+  }
+
+  onModuleDestroy(): void {
+    if (this.cacheSweepTimer) {
+      clearInterval(this.cacheSweepTimer);
+      this.cacheSweepTimer = null;
+    }
+  }
+
+  /**
+   * Drop every cache entry whose TTL has passed. Cheap when the cache is
+   * mostly hot — the iteration is O(n) but the per-entry check is a
+   * single integer compare. Called from the periodic timer above and
+   * from setCacheEntry when it needs to make room.
+   */
+  private sweepExpiredCache(): number {
+    const now = Date.now();
+    let evicted = 0;
+    for (const [k, v] of this.cache.entries()) {
+      if (v.expiresAt <= now) {
+        this.cache.delete(k);
+        evicted++;
+      }
+    }
+    if (evicted > 0) {
+      this.logger.debug(`Swept ${evicted} expired entitlement cache entries`);
+    }
+    return evicted;
+  }
+
+  /**
+   * Cap-aware cache write. Sweeps expired entries first; if still over
+   * the cap, drops the oldest by insertion order until under. Maps
+   * preserve insertion order in JS, so the first key returned by
+   * `keys()` is the oldest written — re-writing a cache hit by calling
+   * `delete` then `set` (the natural pattern of cache.set on every
+   * read miss) keeps the order LRU-ish.
+   */
+  private setCacheEntry(key: string, value: { set: EntitlementSet; expiresAt: number }): void {
+    // Re-set on existing key updates insertion order if we delete first.
+    if (this.cache.has(key)) this.cache.delete(key);
+    this.cache.set(key, value);
+    if (this.cache.size > EntitlementService.MAX_CACHE_SIZE) {
+      this.sweepExpiredCache();
+      while (this.cache.size > EntitlementService.MAX_CACHE_SIZE) {
+        const oldest = this.cache.keys().next().value;
+        if (!oldest) break;
+        this.cache.delete(oldest);
+      }
+    }
   }
 
   /** Read the effective entitlement set for a tenant. Cached. */
@@ -78,7 +157,7 @@ export class EntitlementService implements OnModuleInit {
       }));
 
     const set = fold(grants, now);
-    this.cache.set(cacheKey, { set, expiresAt: Date.now() + this.cacheTtlMs });
+    this.setCacheEntry(cacheKey, { set, expiresAt: Date.now() + this.cacheTtlMs });
     return set;
   }
 
