@@ -1,5 +1,5 @@
 import { Controller, Get, Query, Request, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
@@ -9,6 +9,10 @@ import { PlanFeatureGuard } from '../../subscriptions/guards/plan-feature.guard'
 import { RequiresFeature } from '../../subscriptions/decorators/requires-feature.decorator';
 import { PlanFeature } from '../../../common/constants/subscription.enum';
 import { StockDashboardService } from '../services/stock-dashboard.service';
+// Iter-95: same shape as the iter-92 waste-logs summary DTO — startDate
+// / endDate with @IsDateString. ValidationPipe rejects bad strings at
+// the boundary; the service-side parseWindow adds NaN defense + 366d cap.
+import { WasteLogsSummaryQueryDto } from '../dto/list-stock-logs.dto';
 
 @ApiTags('stock-management/dashboard')
 @ApiBearerAuth()
@@ -35,13 +39,7 @@ export class StockDashboardController {
   @Get('movement-summary')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get movement summary by type' })
-  @ApiQuery({ name: 'startDate', required: false })
-  @ApiQuery({ name: 'endDate', required: false })
-  getMovementSummary(
-    @Request() req,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    return this.service.getMovementSummary(req.tenantId, startDate, endDate);
+  getMovementSummary(@Request() req, @Query() query: WasteLogsSummaryQueryDto) {
+    return this.service.getMovementSummary(req.tenantId, query.startDate, query.endDate);
   }
 }
