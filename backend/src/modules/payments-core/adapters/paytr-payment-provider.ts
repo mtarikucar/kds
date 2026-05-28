@@ -1,4 +1,12 @@
-import { BadRequestException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  OnModuleInit,
+  UnauthorizedException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { URLSearchParams } from 'url';
 import {
   PaymentIntent,
   PaymentIntentRequest,
@@ -11,6 +19,7 @@ import {
 } from '../payment-provider.interface';
 import { PaymentProviderRegistry } from '../payment-provider.registry';
 import { PaytrAdapter } from '../../payments/adapters/paytr.adapter';
+import { verifyCallbackHash } from '../../payments/webhooks/paytr-hash.util';
 
 /**
  * Thin shim that exposes the existing PaytrAdapter behind the
@@ -35,6 +44,7 @@ export class PaytrPaymentProvider implements PaymentProvider, OnModuleInit {
   constructor(
     private readonly registry: PaymentProviderRegistry,
     private readonly paytr: PaytrAdapter,
+    private readonly config: ConfigService,
   ) {}
 
   onModuleInit(): void {
@@ -139,19 +149,101 @@ export class PaytrPaymentProvider implements PaymentProvider, OnModuleInit {
     };
   }
 
+  /**
+   * Verify a PayTR callback and normalise it into a ProviderWebhookEvent.
+   *
+   * Iter-90: prior to this method actually verifying, the façade's
+   * `ingestWebhook` would silently emit unverified events to the outbox
+   * the moment v2.8.85 wired it to an HTTP route — the same blocker that
+   * iter-11 closed on the integration-gateway path. The legacy
+   * `/webhooks/paytr` controller still owns the production subscription
+   * settlement path; this method exists so the *next* wiring (mixed-cart
+   * checkout) inherits hash verification for free.
+   *
+   * PayTR specifics:
+   *   - Body is application/x-www-form-urlencoded, not JSON. The previous
+   *     code did `JSON.parse` and fell back to `{ _raw: body }`, which
+   *     meant the event payload never carried the real fields.
+   *   - The hash lives inside the body (`hash` field), not in a header.
+   *     The interface's `signature` arg is therefore unused for PayTR,
+   *     same as the Stripe-style header-based providers will keep it.
+   *   - Verification uses HMAC-SHA256(merchantKey,
+   *     merchantOid+merchantSalt+status+totalAmount) — identical to
+   *     `verifyCallbackHash` used by the legacy controller.
+   */
   async parseWebhook(_signature: string, raw: Buffer | string): Promise<ProviderWebhookEvent[]> {
-    // PayTR's webhook verification lives in the legacy webhook controller;
-    // here we just normalise the post-verification body.
     const body = typeof raw === 'string' ? raw : raw.toString('utf8');
-    let parsed: any = {};
-    try {
-      parsed = JSON.parse(body);
-    } catch {
-      // PayTR sends application/x-www-form-urlencoded; the legacy controller
-      // hands us the parsed object via the raw arg in test mode.
-      parsed = { _raw: body };
+    const parsed = this.parsePaytrBody(body);
+
+    const merchantOid = String(parsed.merchant_oid ?? '');
+    const status = String(parsed.status ?? '');
+    const totalAmount = String(parsed.total_amount ?? '');
+    const providedHash = String(parsed.hash ?? '');
+
+    const merchantKey = this.config.get<string>('PAYTR_MERCHANT_KEY');
+    const merchantSalt = this.config.get<string>('PAYTR_MERCHANT_SALT');
+    if (!merchantKey || !merchantSalt) {
+      // Mirrors the legacy controller's posture: if we can't verify, we
+      // refuse to emit downstream events. The legacy controller returns
+      // "OK" to PayTR to stop retries; the façade path is internal so
+      // throwing surfaces the misconfiguration in the caller's logs.
+      this.logger.error('PayTR webhook verification skipped — credentials missing in env');
+      throw new UnauthorizedException('PayTR webhook verification unavailable');
     }
-    return [{ providerId: this.id, type: parsed.event ?? 'payment.notification', payload: parsed }];
+
+    if (
+      !merchantOid ||
+      !status ||
+      !totalAmount ||
+      !providedHash ||
+      !verifyCallbackHash({
+        merchantOid,
+        merchantSalt,
+        status,
+        totalAmount,
+        merchantKey,
+        providedHash,
+      })
+    ) {
+      this.logger.warn(
+        `Rejected PayTR façade callback with bad/missing hash for oid=${merchantOid || '<empty>'}`,
+      );
+      throw new UnauthorizedException('PayTR webhook signature mismatch');
+    }
+
+    return [
+      {
+        providerId: this.id,
+        type: status === 'success' ? 'payment.succeeded' : 'payment.failed',
+        payload: {
+          merchantOid,
+          status,
+          totalAmount,
+          paymentType: parsed.payment_type,
+          // Keep the unmasked raw body off the event payload — downstream
+          // outbox readers should not need the hash to act, and shipping it
+          // around makes it harder to audit who can see it.
+        },
+      },
+    ];
+  }
+
+  /**
+   * PayTR sends form-urlencoded callbacks. If a caller hands us a JSON
+   * body (CI tests do), prefer that. Otherwise fall back to URLSearchParams.
+   */
+  private parsePaytrBody(body: string): Record<string, string | undefined> {
+    if (body.startsWith('{')) {
+      try {
+        return JSON.parse(body) as Record<string, string | undefined>;
+      } catch {
+        // fall through to form decode
+      }
+    }
+    const params = new URLSearchParams(body);
+    const out: Record<string, string | undefined> = {};
+    for (const [k, v] of params.entries()) out[k] = v;
+    return out;
   }
 
   async healthCheck() {
