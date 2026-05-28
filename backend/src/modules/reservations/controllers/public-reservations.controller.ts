@@ -16,6 +16,7 @@ import {
   CreateReservationDto,
   CancelPublicReservationDto,
 } from '../dto/create-reservation.dto';
+import { LookupReservationDto } from '../dto/lookup-reservation.dto';
 
 // Aggressive throttles on the guest-facing endpoints: the global ThrottlerModule
 // default of 100/min/IP is not enough for a booking form where PII-by-enumeration
@@ -94,10 +95,13 @@ export class PublicReservationsController {
   @ApiOperation({ summary: 'Lookup reservation by phone and number' })
   lookup(
     @Param('tenantId') tenantId: string,
-    @Query('phone') phone: string,
-    @Query('reservationNumber') reservationNumber: string,
+    @Query() dto: LookupReservationDto,
   ) {
-    return this.reservationsService.lookupReservation(tenantId, phone, reservationNumber);
+    return this.reservationsService.lookupReservation(
+      tenantId,
+      dto.phone,
+      dto.reservationNumber,
+    );
   }
 
   @Public()
