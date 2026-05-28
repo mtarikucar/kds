@@ -46,6 +46,19 @@ export class CustomersService {
     const limit = Math.min(Math.max(1, opts.limit ?? 50), 200);
     const skip = (page - 1) * limit;
 
+    // Iter-78: cap the search needle. opts.search feeds Prisma's
+    // contains (ILIKE on name + email, regular LIKE on phone) — three
+    // unindexed full-text scans per matching row. This endpoint is
+    // accessible to WAITER (front-of-house POS), a much broader role
+    // than the iter-74 users.findAll admin gate, so the abuse surface
+    // is wider. 200 chars covers every realistic "find Mehmet" needle;
+    // longer is not a use case here, and a stolen WAITER token posting
+    // a 1MB string would otherwise trigger a 3 × 1MB ILIKE-scan per
+    // customer row (10K rows → 30GB of comparison work).
+    if (opts.search && opts.search.length > 200) {
+      throw new BadRequestException('search must be 200 chars or less');
+    }
+
     const where: Prisma.CustomerWhereInput = { tenantId };
     if (opts.search) {
       const term = opts.search.trim();
