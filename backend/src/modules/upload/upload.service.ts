@@ -111,6 +111,15 @@ export class UploadService {
 
       await fs.writeFile(filePath, optimizedBuffer);
 
+      // Sweep prior logo files for this tenant. Each upload writes a
+      // new `${tenantId}-logo-${Date.now()}.png`; without this prune
+      // step the previous logos sit on disk forever and the volume
+      // grows monotonically — at one logo per tenant per week, a
+      // 1000-tenant deployment hoards ~50k orphan files a year.
+      // Filter by the well-known prefix so we never touch another
+      // tenant's logo, and skip the file we just wrote.
+      await this.pruneTenantLogos(logosDir, tenantId, uniqueFilename);
+
       // Return the URL
       const absoluteUrl = `${this.baseUrl}/${relativePath.replace(/\\/g, '/')}`;
 
@@ -121,6 +130,39 @@ export class UploadService {
       this.logger.error(`Failed to upload logo: ${error.message}`);
       throw new BadRequestException('Failed to upload logo');
     }
+  }
+
+  /**
+   * Remove prior `${tenantId}-logo-*.png` files from `logosDir`,
+   * leaving `keepFilename` (the file we just wrote) intact. Failures
+   * to delete individual files are logged but never raised — disk
+   * cleanup is best-effort and must not fail the upload.
+   */
+  private async pruneTenantLogos(
+    logosDir: string,
+    tenantId: string,
+    keepFilename: string,
+  ): Promise<void> {
+    let entries: string[];
+    try {
+      entries = await fs.readdir(logosDir);
+    } catch {
+      return; // dir disappeared — nothing to prune
+    }
+    const prefix = `${tenantId}-logo-`;
+    await Promise.all(
+      entries
+        .filter((name) => name.startsWith(prefix) && name !== keepFilename)
+        .map(async (name) => {
+          try {
+            await fs.unlink(path.join(logosDir, name));
+          } catch (err: any) {
+            this.logger.warn(
+              `Failed to prune old logo ${name}: ${err?.message ?? err}`,
+            );
+          }
+        }),
+    );
   }
 
   async uploadProductImage(
@@ -251,9 +293,17 @@ export class UploadService {
     this.logger.log(`Deleted image ${imageId} for tenant ${tenantId}`);
   }
 
+  // 500 covers any realistic admin gallery in one round-trip while
+  // bounding the payload + DB scan cost. A tenant with 10k+ images
+  // (would be unusual) should paginate via a future limit/offset
+  // parameter rather than expecting an unbounded dump here.
+  private static readonly LIST_HARD_CAP = 500;
+
   async getProductImages(tenantId: string, productId?: string): Promise<any[]> {
     if (productId) {
-      // Get images for specific product via junction table
+      // Get images for specific product via junction table — bounded by
+      // the per-product image cap (already small in practice; the take
+      // here is defence-in-depth).
       const productToImages = await this.prisma.productToImage.findMany({
         where: {
           productId,
@@ -265,21 +315,29 @@ export class UploadService {
           image: true,
         },
         orderBy: { order: 'asc' },
+        take: UploadService.LIST_HARD_CAP,
       });
       return productToImages.map(pti => ({ ...pti.image, order: pti.order }));
     }
 
-    // Get all images for tenant
+    // Get all images for tenant — previously unbounded; an admin who
+    // had bulk-uploaded thousands of images saw the whole set in one
+    // payload, blowing memory + JSON parse time on the client.
     return this.prisma.productImage.findMany({
       where: {
         tenantId,
       },
       orderBy: { createdAt: 'desc' },
+      take: UploadService.LIST_HARD_CAP,
     });
   }
 
   async getUnusedImages(tenantId: string): Promise<any[]> {
-    // Get images that are not linked to any product in junction table
+    // Get images that are not linked to any product in junction table.
+    // The `notIn: usedIds` array was previously unbounded — a tenant
+    // with N images and M product-attachments paid M IDs across the
+    // wire on every call. Cap the candidate set so the IN-list stays
+    // sane.
     const usedImageIds = await this.prisma.productToImage.findMany({
       where: {
         image: {
@@ -301,6 +359,7 @@ export class UploadService {
         },
       },
       orderBy: { createdAt: 'desc' },
+      take: UploadService.LIST_HARD_CAP,
     });
   }
 
