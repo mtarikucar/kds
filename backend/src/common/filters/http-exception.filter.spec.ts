@@ -224,5 +224,44 @@ describe('HttpExceptionFilter', () => {
       expect(requestId1).toBeTruthy();
       expect(requestId2).toBeTruthy();
     });
+
+    /**
+     * Iter-83 regression. The Sentry capture path explicitly omitted
+     * user.email "for GDPR/KVKK reduction" — Sentry retains
+     * breadcrumbs/events for weeks. But the local logError path used
+     * to bake req.user.email into every 4xx/5xx log line, so file
+     * logs retained for weeks under standard ops policy archived
+     * every authenticated user's email anyway. iter-83 switches the
+     * log payload to user.id + tenantId.
+     */
+    it('does not log req.user.email in error metadata (iter-83 PII guard)', () => {
+      // Capture warn/error log payloads through the private LoggerService.
+      const warnSpy = jest.spyOn((filter as any).logger, 'warn').mockImplementation();
+      const errorSpy = jest.spyOn((filter as any).logger, 'error').mockImplementation();
+
+      mockRequest.user = { id: 'u-1', email: 'leaky@example.com', tenantId: 't-1' };
+      filter.catch(new HttpException('BadRequest', HttpStatus.BAD_REQUEST), mockArgumentsHost);
+
+      // The metadata blob ends up either as the 2nd arg of warn (4xx)
+      // or the 3rd arg of error (5xx). For 400 it's warn.
+      const blob = warnSpy.mock.calls.flat().join(' ');
+      expect(blob).not.toContain('leaky@example.com');
+      expect(blob).toContain('u-1');
+
+      warnSpy.mockRestore();
+      errorSpy.mockRestore();
+    });
+
+    it('logs userId="anonymous" when no req.user is present', () => {
+      const warnSpy = jest.spyOn((filter as any).logger, 'warn').mockImplementation();
+
+      mockRequest.user = undefined;
+      filter.catch(new HttpException('Forbidden', HttpStatus.FORBIDDEN), mockArgumentsHost);
+
+      const blob = warnSpy.mock.calls.flat().join(' ');
+      expect(blob).toContain('anonymous');
+
+      warnSpy.mockRestore();
+    });
   });
 });

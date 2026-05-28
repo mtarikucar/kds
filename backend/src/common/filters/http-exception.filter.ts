@@ -221,12 +221,23 @@ export class HttpExceptionFilter implements ExceptionFilter {
     statusCode: number,
     requestId: string,
   ): void {
+    // Iter-83: do NOT log req.user.email. Sentry already omits it
+    // ("Sentry retains breadcrumbs/events for weeks and user email is
+    // unnecessary for triage when we already have the user id +
+    // tenant id" — see captureException block above) but the local
+    // file/console logger used to bake it into every 4xx/5xx log
+    // line. With file logs retained for weeks under standard ops
+    // policy, every error response that fired for an authenticated
+    // user persisted their email in the log archive — GDPR/KVKK
+    // surface that the matching Sentry path was already protecting
+    // against. user.id + tenant.id correlate to the auth/audit
+    // tables on demand.
     const logMessage = {
       requestId,
       method: request.method,
       url: request.url,
       statusCode,
-      user: (request as any).user?.email || 'anonymous',
+      userId: (request as any).user?.id ?? 'anonymous',
       tenant: (request as any).user?.tenantId || 'N/A',
       userAgent: request.headers['user-agent'],
       ip: request.ip,

@@ -48,93 +48,17 @@ export class RequestLoggerMiddleware implements NestMiddleware {
   }
 }
 
-/**
- * Enhanced request logger with more details (for production)
- */
-@Injectable()
-export class DetailedRequestLoggerMiddleware implements NestMiddleware {
-  private readonly logger = new LoggerService('HTTP');
-
-  use(req: Request, res: Response, next: NextFunction): void {
-    const { method, originalUrl, ip, body, query, params } = req;
-    const userAgent = req.get('user-agent') || '';
-    const startTime = Date.now();
-
-    // Generate unique request ID
-    const requestId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-    // Attach request ID to request and response
-    (req as any).requestId = requestId;
-    res.setHeader('X-Request-ID', requestId);
-
-    // Extract user info if available. Email is intentionally omitted — file
-    // logs are retained for weeks and shipping every authenticated user's
-    // email into them would be a GDPR/KVKK violation. user id + tenant id
-    // are enough to correlate with the auth/audit tables on demand.
-    const user = (req as any).user;
-    const userInfo = user ? `User: ${user.userId}` : 'Anonymous';
-    const tenantInfo = user ? `Tenant: ${user.tenantId}` : 'N/A';
-
-    // Log request with details
-    const requestDetails = {
-      requestId,
-      method,
-      url: originalUrl,
-      ip,
-      userAgent,
-      user: userInfo,
-      tenant: tenantInfo,
-      // Only log body for non-sensitive routes
-      body: this.shouldLogBody(originalUrl) ? body : '[REDACTED]',
-      query,
-      params,
-    };
-
-    this.logger.log(
-      `[${requestId}] Incoming request: ${JSON.stringify(requestDetails)}`,
-    );
-
-    // Log response when finished
-    res.on('finish', () => {
-      const { statusCode } = res;
-      const contentLength = res.get('content-length');
-      const responseTime = Date.now() - startTime;
-
-      const responseDetails = {
-        requestId,
-        method,
-        url: originalUrl,
-        statusCode,
-        contentLength: contentLength || 0,
-        responseTime: `${responseTime}ms`,
-        user: userInfo,
-        tenant: tenantInfo,
-      };
-
-      const logLevel = statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'log';
-
-      this.logger[logLevel](
-        `[${requestId}] Response: ${JSON.stringify(responseDetails)}`,
-      );
-    });
-
-    next();
-  }
-
-  /**
-   * Determine if request body should be logged
-   * Exclude sensitive endpoints like auth, password reset, etc.
-   */
-  private shouldLogBody(url: string): boolean {
-    const sensitiveRoutes = [
-      '/auth/login',
-      '/auth/register',
-      '/auth/reset-password',
-      '/auth/change-password',
-      '/users/password',
-      '/subscriptions/webhook',
-    ];
-
-    return !sensitiveRoutes.some((route) => url.includes(route));
-  }
-}
+// NOTE: a `DetailedRequestLoggerMiddleware` used to live here. It
+// logged the full request body (with a substring-match
+// `shouldLogBody` route filter) into JSON.stringify lines on every
+// request. Pre-iter-83 it had zero callers — no app.module wiring,
+// no test, no @Module import. The middleware was dead code and could
+// have been resurrected by accident into a production code path
+// that retains logs for weeks; the body-filter was a substring match
+// (`originalUrl.includes(route)`) so a URL like `/foo?p=/auth/login`
+// would falsely match the sensitive route, while a route like
+// `/api/v2/auth/login/admin` would also match correctly — fragile
+// shape. Removed entirely in iter-83 so a fresh implementation will
+// be forced to wire a proper exact-match sensitive-route filter +
+// per-tenant body size cap from scratch instead of resurrecting the
+// loose shape.
