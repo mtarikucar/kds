@@ -71,4 +71,77 @@ describe('KdsRoutingService.onOrderEvent', () => {
     await handler!({ id: 'evt-4', tenantId: null, payload: {} });
     expect(prisma.device.findMany).not.toHaveBeenCalled();
   });
+
+  /**
+   * Iter-69 regressions.
+   *
+   * 1. Tenant-scope precedence: the outbox envelope's tenantId is the
+   *    authoritative source. The pre-fix code preferred payload's id,
+   *    so a publisher bug could fan KDS commands to a foreign tenant.
+   * 2. Mismatched envelope/payload tenantIds = publisher bug; the
+   *    service must refuse to dispatch (and log) rather than pick one.
+   * 3. Per-event fan-out cap so a runaway provisioning bug doesn't
+   *    turn every order event into a thousand-statement enqueue burst.
+   */
+  describe('iter-69 tenant precedence + fan-out cap', () => {
+    it('uses envelope.tenantId, not payload.tenantId, for the device lookup', async () => {
+      prisma.device.findMany.mockResolvedValue([{ id: 'd-1' }] as any);
+      let lookupWhere: any = null;
+      (prisma.device.findMany as any).mockImplementation(async ({ where }: any) => {
+        lookupWhere = where;
+        return [{ id: 'd-1' }];
+      });
+
+      const handler = getHandler('order.created.v1');
+      // Envelope says t1, payload says t1 too — happy path.
+      await handler!({
+        id: 'evt-9',
+        tenantId: 't1',
+        payload: { orderId: 'o-1', tenantId: 't1' },
+      });
+
+      expect(lookupWhere.tenantId).toBe('t1');
+    });
+
+    it('refuses to dispatch when envelope and payload tenantIds disagree', async () => {
+      const handler = getHandler('order.created.v1');
+      await handler!({
+        id: 'evt-mismatch',
+        tenantId: 't1',
+        payload: { orderId: 'o-1', tenantId: 't2' },
+      });
+
+      expect(prisma.device.findMany).not.toHaveBeenCalled();
+      expect(commands.enqueue).not.toHaveBeenCalled();
+    });
+
+    it('still dispatches when envelope.tenantId is null and only payload carries one (system events)', async () => {
+      prisma.device.findMany.mockResolvedValue([{ id: 'd-1' }] as any);
+      const handler = getHandler('order.created.v1');
+      await handler!({
+        id: 'evt-sys',
+        tenantId: null,
+        payload: { orderId: 'o-1', tenantId: 't1' },
+      });
+      expect(commands.enqueue).toHaveBeenCalled();
+    });
+
+    it('caps the device lookup at 50 to bound per-event fan-out', async () => {
+      prisma.device.findMany.mockResolvedValue([{ id: 'd-1' }] as any);
+      let take: any = null;
+      (prisma.device.findMany as any).mockImplementation(async (args: any) => {
+        take = args.take;
+        return [{ id: 'd-1' }];
+      });
+
+      const handler = getHandler('order.created.v1');
+      await handler!({
+        id: 'evt-cap',
+        tenantId: 't1',
+        payload: { orderId: 'o-1', tenantId: 't1' },
+      });
+
+      expect(take).toBe(50);
+    });
+  });
 });

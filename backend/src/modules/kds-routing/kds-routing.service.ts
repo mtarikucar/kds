@@ -45,9 +45,34 @@ export class KdsRoutingService implements OnModuleInit {
   private async onOrderEvent(event: { id: string; payload: any; tenantId: string | null }, kind: 'show_order' | 'clear_order'): Promise<void> {
     try {
       const p = event.payload as { orderId?: string; tenantId?: string; branchId?: string };
-      const tenantId = p.tenantId ?? event.tenantId;
-      if (!tenantId || !p.orderId) return;
 
+      // Tenant-scope precedence — the outbox envelope's tenantId is the
+      // authoritative source (the publisher writes both the column and
+      // the payload, and the worker uses the column for sharded
+      // delivery). The previous shape preferred `payload.tenantId`
+      // first, so a publisher bug that serialised the wrong tenantId
+      // into the payload could fan KDS commands out to a foreign
+      // tenant's screens.
+      //
+      // If both are present AND disagree, that's a publisher bug —
+      // log it and refuse to dispatch. Silently picking one of them
+      // would hide the bug.
+      const tenantId = event.tenantId ?? p.tenantId;
+      if (!tenantId || !p.orderId) return;
+      if (event.tenantId && p.tenantId && event.tenantId !== p.tenantId) {
+        this.logger.error(
+          `Tenant mismatch on event ${event.id}: envelope=${event.tenantId} ` +
+            `payload=${p.tenantId} — refusing to dispatch (publisher bug).`,
+        );
+        return;
+      }
+
+      // Per-event fan-out cap. A legitimate restaurant has 1-10 KDS
+      // screens; a runaway provisioning bug (or a malicious admin) could
+      // create thousands and turn every order event into an N-statement
+      // enqueue burst. 50 is generous for the largest real chain
+      // footprint and bounded enough that one bad row can't starve the
+      // command-queue worker for the rest of the tenant.
       const devices = await this.prisma.device.findMany({
         where: {
           tenantId,
@@ -56,6 +81,7 @@ export class KdsRoutingService implements OnModuleInit {
           ...(p.branchId ? { branchId: p.branchId } : {}),
         },
         select: { id: true },
+        take: 50,
       });
       if (devices.length === 0) return;
 
