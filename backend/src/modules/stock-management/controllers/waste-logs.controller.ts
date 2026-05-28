@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Query, Request, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
@@ -10,6 +10,10 @@ import { RequiresFeature } from '../../subscriptions/decorators/requires-feature
 import { PlanFeature } from '../../../common/constants/subscription.enum';
 import { WasteLogsService } from '../services/waste-logs.service';
 import { CreateWasteLogDto } from '../dto/create-waste-log.dto';
+import {
+  ListWasteLogsQueryDto,
+  WasteLogsSummaryQueryDto,
+} from '../dto/list-stock-logs.dto';
 
 @ApiTags('stock-management/waste-logs')
 @ApiBearerAuth()
@@ -22,27 +26,15 @@ export class WasteLogsController {
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN)
   @ApiOperation({ summary: 'Get all waste logs' })
-  @ApiQuery({ name: 'stockItemId', required: false })
-  @ApiQuery({ name: 'reason', required: false })
-  @ApiQuery({ name: 'startDate', required: false })
-  @ApiQuery({ name: 'endDate', required: false })
-  findAll(
-    @Request() req,
-    @Query('stockItemId') stockItemId?: string,
-    @Query('reason') reason?: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    return this.service.findAll(req.tenantId, { stockItemId, reason, startDate, endDate });
+  findAll(@Request() req, @Query() query: ListWasteLogsQueryDto) {
+    return this.service.findAll(req.tenantId, query);
   }
 
   @Get('summary')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Get waste summary with totals by reason' })
-  @ApiQuery({ name: 'startDate', required: false })
-  @ApiQuery({ name: 'endDate', required: false })
-  getSummary(@Request() req, @Query('startDate') startDate?: string, @Query('endDate') endDate?: string) {
-    return this.service.getSummary(req.tenantId, startDate, endDate);
+  getSummary(@Request() req, @Query() query: WasteLogsSummaryQueryDto) {
+    return this.service.getSummary(req.tenantId, query.startDate, query.endDate);
   }
 
   @Post()

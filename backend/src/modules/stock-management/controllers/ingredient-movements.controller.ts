@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, Query, Request, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
@@ -10,6 +10,7 @@ import { RequiresFeature } from '../../subscriptions/decorators/requires-feature
 import { PlanFeature } from '../../../common/constants/subscription.enum';
 import { IngredientMovementsService } from '../services/ingredient-movements.service';
 import { CreateIngredientMovementDto } from '../dto/create-ingredient-movement.dto';
+import { ListIngredientMovementsQueryDto } from '../dto/list-stock-logs.dto';
 
 @ApiTags('stock-management/movements')
 @ApiBearerAuth()
@@ -22,29 +23,8 @@ export class IngredientMovementsController {
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN)
   @ApiOperation({ summary: 'Get all ingredient movements' })
-  @ApiQuery({ name: 'stockItemId', required: false })
-  @ApiQuery({ name: 'type', required: false })
-  @ApiQuery({ name: 'startDate', required: false })
-  @ApiQuery({ name: 'endDate', required: false })
-  @ApiQuery({ name: 'limit', required: false, description: 'Default 500, max 5000' })
-  @ApiQuery({ name: 'offset', required: false })
-  findAll(
-    @Request() req,
-    @Query('stockItemId') stockItemId?: string,
-    @Query('type') type?: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query('limit') limit?: string,
-    @Query('offset') offset?: string,
-  ) {
-    return this.service.findAll(req.tenantId, {
-      stockItemId,
-      type,
-      startDate,
-      endDate,
-      limit: limit ? parseInt(limit, 10) : undefined,
-      offset: offset ? parseInt(offset, 10) : undefined,
-    });
+  findAll(@Request() req, @Query() query: ListIngredientMovementsQueryDto) {
+    return this.service.findAll(req.tenantId, query);
   }
 
   @Post()

@@ -8,24 +8,86 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateWasteLogDto } from '../dto/create-waste-log.dto';
 import { IngredientMovementType } from '../../../common/constants/stock-management.enum';
 
+// Iter-92: hard cap on the explicit date window for the waste log list /
+// summary queries. Same memory-bound reasoning as iter-64 (reports) and
+// iter-89 (analytics) — 366 days covers calendar-year + leap-year
+// reporting while a 1970→2100 query can't scan the whole table.
+const STOCK_LOG_MAX_RANGE_DAYS = 366;
+const MILLIS_PER_DAY = 24 * 60 * 60 * 1000;
+const DEFAULT_TAKE = 500;
+
+/**
+ * Parse + validate a [startDate, endDate] window from already-IsDateString-
+ * validated query strings. @IsDateString catches obvious garbage upstream;
+ * this is defense-in-depth (e.g. 2025-02-30 passes @IsDateString but
+ * constructs Invalid Date) plus the range cap that doesn't fit cleanly
+ * into the DTO layer.
+ */
+function parseWindow(startDate?: string, endDate?: string): { gte?: Date; lte?: Date } {
+  const window: { gte?: Date; lte?: Date } = {};
+  let start: Date | undefined;
+  let end: Date | undefined;
+  if (startDate) {
+    start = new Date(startDate);
+    if (Number.isNaN(start.getTime())) {
+      throw new BadRequestException('startDate must be a valid ISO-8601 date');
+    }
+    window.gte = start;
+  }
+  if (endDate) {
+    end = new Date(endDate);
+    if (Number.isNaN(end.getTime())) {
+      throw new BadRequestException('endDate must be a valid ISO-8601 date');
+    }
+    window.lte = end;
+  }
+  if (start && end) {
+    if (start > end) {
+      throw new BadRequestException('startDate must be before or equal to endDate');
+    }
+    const windowDays = (end.getTime() - start.getTime()) / MILLIS_PER_DAY;
+    if (windowDays > STOCK_LOG_MAX_RANGE_DAYS) {
+      throw new BadRequestException(
+        `Date range cannot exceed ${STOCK_LOG_MAX_RANGE_DAYS} days. Split the request into smaller windows.`,
+      );
+    }
+  }
+  return window;
+}
+
 @Injectable()
 export class WasteLogsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(tenantId: string, filters?: { stockItemId?: string; reason?: string; startDate?: string; endDate?: string }) {
+  async findAll(
+    tenantId: string,
+    filters?: {
+      stockItemId?: string;
+      reason?: string;
+      startDate?: string;
+      endDate?: string;
+      limit?: number;
+      offset?: number;
+    },
+  ) {
     const where: any = { tenantId };
     if (filters?.stockItemId) where.stockItemId = filters.stockItemId;
     if (filters?.reason) where.reason = filters.reason;
-    if (filters?.startDate || filters?.endDate) {
-      where.createdAt = {};
-      if (filters.startDate) where.createdAt.gte = new Date(filters.startDate);
-      if (filters.endDate) where.createdAt.lte = new Date(filters.endDate);
-    }
+    const window = parseWindow(filters?.startDate, filters?.endDate);
+    if (window.gte || window.lte) where.createdAt = window;
+
+    // Iter-92: paginate. Pre-fix waste-logs returned every row for the
+    // tenant in one shot — fine for a fresh tenant, an unbounded payload
+    // for a chain doing thousands of waste entries a year.
+    const take = filters?.limit ?? DEFAULT_TAKE;
+    const skip = filters?.offset ?? 0;
 
     return this.prisma.wasteLog.findMany({
       where,
       include: { stockItem: { select: { id: true, name: true, unit: true } } },
       orderBy: { createdAt: 'desc' },
+      take,
+      skip,
     });
   }
 
@@ -95,11 +157,8 @@ export class WasteLogsService {
 
   async getSummary(tenantId: string, startDate?: string, endDate?: string) {
     const where: any = { tenantId };
-    if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) where.createdAt.gte = new Date(startDate);
-      if (endDate) where.createdAt.lte = new Date(endDate);
-    }
+    const window = parseWindow(startDate, endDate);
+    if (window.gte || window.lte) where.createdAt = window;
 
     const [byReason, totalCost, recentLogs] = await Promise.all([
       this.prisma.wasteLog.groupBy({
