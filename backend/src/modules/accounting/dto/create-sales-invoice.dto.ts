@@ -34,7 +34,20 @@ export class CreateSalesInvoiceDto {
   customerTaxId?: string;
 
   @ApiPropertyOptional() @IsString() @IsOptional() @MaxLength(120) customerTaxOffice?: string;
-  @ApiPropertyOptional() @IsString() @IsOptional() @MaxLength(20) customerPhone?: string;
+
+  // Phone shape mirrors the PHONE_REGEX used in create-payment.dto.ts +
+  // create-customer-order.dto.ts. Accounting doesn't feed
+  // findOrCreateByPhone, but Foriba/Parasut downstream rejects non-E.164
+  // shapes too — fail fast at write time instead of after sync round-trip.
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  @MaxLength(20)
+  @Matches(/^\+?[1-9]\d{7,14}$/, {
+    message: 'customerPhone must match E.164 shape (8-15 digits, optional +)',
+  })
+  customerPhone?: string;
+
   @ApiPropertyOptional() @IsOptional() @IsEmail() @MaxLength(254) customerEmail?: string;
 }
 

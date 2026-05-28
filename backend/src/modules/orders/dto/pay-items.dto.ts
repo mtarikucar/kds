@@ -6,6 +6,8 @@ import {
   IsString,
   IsUUID,
   Length,
+  Matches,
+  MaxLength,
   Min,
   ValidateNested,
   ArrayMinSize,
@@ -15,6 +17,12 @@ import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PaymentMethod } from '../../../common/constants/order-status.enum';
 import { EmptyStringToUndefined } from '../../../common/dto/transforms';
+
+// E.164-ish: 8-15 digits, optional leading +. Same shape every other
+// surface that feeds findOrCreateByPhone uses (create-payment.dto.ts,
+// create-customer-order.dto.ts) — keeps the canonical Customer.phone
+// column from inheriting junk via this admin-side entry path.
+const PHONE_REGEX = /^\+?[1-9]\d{7,14}$/;
 
 export class PayItemEntry {
   @ApiProperty({ description: 'OrderItem the customer is paying for' })
@@ -64,7 +72,8 @@ export class PayItemsDto {
   @EmptyStringToUndefined()
   @IsString()
   @IsOptional()
-  @Length(4, 32)
+  @MaxLength(20)
+  @Matches(PHONE_REGEX, { message: 'customerPhone must match E.164 shape (8-15 digits, optional +)' })
   customerPhone?: string;
 
   @ApiPropertyOptional({

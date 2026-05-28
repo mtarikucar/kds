@@ -5,6 +5,8 @@ import {
   IsArray,
   IsOptional,
   IsUUID,
+  Matches,
+  MaxLength,
   ValidateNested,
   Min,
   ArrayMinSize,
@@ -12,6 +14,12 @@ import {
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PaymentMethod } from '../../../common/constants/order-status.enum';
+import { EmptyStringToUndefined } from '../../../common/dto/transforms';
+
+// E.164-ish: 8-15 digits, optional leading +. Same shape every other
+// surface that feeds findOrCreateByPhone uses — keeps the canonical
+// Customer.phone column from inheriting junk via the splitBill path.
+const PHONE_REGEX = /^\+?[1-9]\d{7,14}$/;
 
 export enum SplitType {
   EQUAL = 'EQUAL',
@@ -68,8 +76,11 @@ export class SplitBillDto {
   payments: SplitPaymentEntry[];
 
   @ApiPropertyOptional({ description: 'Customer phone for linking' })
+  @EmptyStringToUndefined()
   @IsString()
   @IsOptional()
+  @MaxLength(20)
+  @Matches(PHONE_REGEX, { message: 'customerPhone must match E.164 shape (8-15 digits, optional +)' })
   customerPhone?: string;
 
   @ApiPropertyOptional({
