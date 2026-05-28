@@ -92,4 +92,58 @@ describe('CustomerSessionService (iter-77 cleanup + cap)', () => {
       expect((prisma.customerSession.deleteMany as any).mock.calls.length).toBe(0);
     });
   });
+
+  /**
+   * Iter-79 regression — createSession is reachable from the public
+   * QR-menu surface. Pre-fix it accepted any string for tenantId /
+   * tableId and inserted the row blind, so a multi-IP attacker could
+   * flood customer_sessions with spoofed tenant/table UUIDs (each row
+   * carrying IP + userAgent + 4h TTL + 30-day retention). Existence
+   * checks reject the row BEFORE the insert.
+   */
+  describe('iter-79 createSession existence checks', () => {
+    it('rejects an unknown tenantId with Unauthorized (no row written)', async () => {
+      prisma.tenant.findUnique.mockResolvedValue(null);
+      await expect(svc.createSession('t-bogus')).rejects.toThrow(/invalid tenant/i);
+      expect((prisma.customerSession.create as any).mock.calls.length).toBe(0);
+    });
+
+    it('rejects a tableId that belongs to a different tenant', async () => {
+      prisma.tenant.findUnique.mockResolvedValue({ id: 't1' } as any);
+      prisma.table.findFirst.mockResolvedValue(null); // tenant-scoped lookup misses
+      await expect(svc.createSession('t1', 'table-from-tenant-2')).rejects.toThrow(
+        /invalid table/i,
+      );
+      expect((prisma.customerSession.create as any).mock.calls.length).toBe(0);
+    });
+
+    it('writes the row when both tenantId and tableId check out', async () => {
+      prisma.tenant.findUnique.mockResolvedValue({ id: 't1' } as any);
+      prisma.table.findFirst.mockResolvedValue({ id: 'tab-1' } as any);
+      (prisma.customerSession.create as any).mockResolvedValue({
+        sessionId: 'sess-1',
+        expiresAt: new Date(Date.now() + 4 * 3600_000),
+      });
+
+      const out = await svc.createSession('t1', 'tab-1', { userAgent: 'ua', ipAddress: 'ip' });
+      expect(out.sessionId).toBe('sess-1');
+      // The create payload must carry the validated ids — not a spoofed
+      // pair that the caller passed but never verified.
+      const data = (prisma.customerSession.create as any).mock.calls[0][0].data;
+      expect(data.tenantId).toBe('t1');
+      expect(data.tableId).toBe('tab-1');
+    });
+
+    it('skips the table check when no tableId is given (counter-only QR sessions)', async () => {
+      prisma.tenant.findUnique.mockResolvedValue({ id: 't1' } as any);
+      (prisma.customerSession.create as any).mockResolvedValue({
+        sessionId: 's',
+        expiresAt: new Date(),
+      });
+
+      await svc.createSession('t1');
+
+      expect((prisma.table.findFirst as any).mock.calls.length).toBe(0);
+    });
+  });
 });

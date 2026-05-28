@@ -3,6 +3,7 @@ import {
   IsEmail,
   IsOptional,
   IsString,
+  IsUUID,
   Length,
   Matches,
   MaxLength,
@@ -77,15 +78,21 @@ export class UpdateCustomerDto {
 // ---- Public controller DTOs ----
 
 export class CreatePublicSessionDto {
+  // Iter-79: this endpoint is @Public — anyone on the internet can post
+  // to it. Pre-fix the validators were @IsString @Length(1, 64), so
+  // garbage strings landed in CustomerSession.tenantId / .tableId
+  // without any reality check. Combined with the per-IP throttle being
+  // the only gate, an attacker rotating IPs could pump tens of
+  // thousands of fake sessions per day onto any guessed (or spoofed
+  // non-existent) tenant. @IsUUID forces the shape; service-side
+  // existence checks reject unknown rows before the create write fires.
   @ApiProperty()
-  @IsString()
-  @Length(1, 64)
+  @IsUUID()
   tenantId: string;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsString()
-  @Length(1, 64)
+  @IsUUID()
   tableId?: string;
 }
 

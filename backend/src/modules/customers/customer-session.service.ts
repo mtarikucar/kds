@@ -36,6 +36,32 @@ export class CustomerSessionService {
     tableId?: string,
     metadata?: { userAgent?: string; ipAddress?: string },
   ) {
+    // Iter-79: createSession is @Public-reachable via
+    // CustomerPublicController. Without existence checks an attacker
+    // rotating IPs could pump sessions for non-existent or guessed
+    // tenant UUIDs and table UUIDs — each row carries IP + userAgent
+    // + 4h TTL + 30-day retention, so a single 20-req/min throttle
+    // slot becomes ~840k garbage rows in a month. Verify the tenant
+    // exists, and if tableId is given verify it actually belongs to
+    // the claimed tenant (a spoofed tableId from a DIFFERENT tenant
+    // would otherwise persist a logically inconsistent link).
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { id: true },
+    });
+    if (!tenant) {
+      throw new UnauthorizedException('Invalid tenant');
+    }
+    if (tableId) {
+      const table = await this.prisma.table.findFirst({
+        where: { id: tableId, tenantId },
+        select: { id: true },
+      });
+      if (!table) {
+        throw new UnauthorizedException('Invalid table for this tenant');
+      }
+    }
+
     const sessionId = randomBytes(32).toString('hex');
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 4);
