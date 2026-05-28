@@ -21,6 +21,20 @@ const REGISTER_THROTTLE = { default: { limit: 3, ttl: 3_600_000 } };
 const FORGOT_THROTTLE = { default: { limit: 5, ttl: 60_000 } };
 const VERIFY_THROTTLE = { default: { limit: 5, ttl: 60_000 } };
 const SOCIAL_THROTTLE = { default: { limit: 3, ttl: 3_600_000 } };
+// Iter-82: /refresh is @Public and does a DB updateMany + findUnique
+// per call; without a throttle an attacker spamming bogus refresh
+// tokens triggers ~2 writes per request plus JWT verification CPU.
+// Real clients rotate ~once per access-token lifetime (default 15
+// minutes), so 10/min/IP is generous for a tab burst and tight enough
+// to collapse the abuse window.
+const REFRESH_THROTTLE = { default: { limit: 10, ttl: 60_000 } };
+// Iter-82: /change-password is auth-gated, but with a stolen access
+// token an attacker can brute-force the current password via repeated
+// bcrypt.compare attempts. iter-43 capped the input length (anti-CPU-
+// DoS); the matching throttle bounds attempt count. 5/min mirrors
+// LOGIN_THROTTLE — a legitimate user changing their password retries
+// at most a couple of times before they get it right.
+const CHANGE_PASSWORD_THROTTLE = { default: { limit: 5, ttl: 60_000 } };
 
 // Refresh-token cookie. `/api/auth` path scopes it to refresh + logout;
 // httpOnly blocks JS access (XSS mitigation), sameSite: strict blocks
@@ -97,6 +111,7 @@ export class AuthController {
   }
 
   @Public()
+  @Throttle(REFRESH_THROTTLE)
   @Post('refresh')
   @ApiOperation({ summary: 'Refresh access token using httpOnly refresh cookie' })
   @ApiResponse({ status: 200, description: 'Token successfully refreshed' })
@@ -161,6 +176,7 @@ export class AuthController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Throttle(CHANGE_PASSWORD_THROTTLE)
   @Post('change-password')
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Change password for authenticated user' })
