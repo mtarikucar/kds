@@ -6,6 +6,7 @@ import { KdsGateway } from '../../kds/kds.gateway';
 import { AdapterFactory } from '../adapters/adapter-factory';
 import { DeliveryLogService } from './delivery-log.service';
 import { DeliveryAuthService } from './delivery-auth.service';
+import { DeliveryConfigService } from './delivery-config.service';
 import { NormalizedOrder } from '../interfaces/platform-order.interface';
 import { PlatformLogDirection, PlatformLogAction } from '../constants/platform.enum';
 import { OrderStatus } from '../../../common/constants/order-status.enum';
@@ -21,6 +22,7 @@ export class DeliveryOrderService {
     private adapterFactory: AdapterFactory,
     private logService: DeliveryLogService,
     private authService: DeliveryAuthService,
+    private configService: DeliveryConfigService,
   ) {}
 
   /**
@@ -33,6 +35,19 @@ export class DeliveryOrderService {
     normalizedOrder: NormalizedOrder,
   ) {
     const { platform, externalOrderId } = normalizedOrder;
+
+    // Read config ONCE up front so the inside-txn `requiresApproval`
+    // decision and the outside-txn platform-side accept decision use
+    // the same snapshot. The earlier code re-read the config after
+    // commit; if an admin toggled autoAccept in the few ms in between,
+    // the order would be persisted as PENDING (autoAccept=true) but
+    // the platform-side acceptOrder call would skip (autoAccept=false),
+    // leaving the order in-kitchen while the platform thought it was
+    // unaccepted.
+    const config = await this.prisma.deliveryPlatformConfig.findUnique({
+      where: { tenantId_platform: { tenantId, platform } },
+    });
+    const autoAccept = config?.isEnabled ? (config.autoAccept ?? false) : false;
 
     // 1-4. Deduplicate + map items + create order in a transaction.
     // Final dedup guarantee is the partial unique index
@@ -105,12 +120,9 @@ export class DeliveryOrderService {
         );
       }
 
-      // 3. Get platform config for auto-accept setting
-      const config = await tx.deliveryPlatformConfig.findUnique({
-        where: { tenantId_platform: { tenantId, platform } },
-      });
-
-      const autoAccept = config?.isEnabled ? (config.autoAccept ?? false) : false;
+      // Config + autoAccept were resolved before the txn (iter-39) so
+      // the inside-txn decision and the outside-txn platform-accept
+      // decision agree on the same snapshot.
 
       // Generate order number
       const orderNumber = `${platform.substring(0, 3)}-${Date.now()}-${crypto.randomUUID().substring(0, 8)}`;
@@ -238,13 +250,9 @@ export class DeliveryOrderService {
       return null;
     }
 
-    // Get config for auto-accept (outside transaction)
-    const config = await this.prisma.deliveryPlatformConfig.findUnique({
-      where: { tenantId_platform: { tenantId, platform } },
-    });
-    const autoAccept = config?.isEnabled ? (config.autoAccept ?? false) : false;
-
-    // 5. If autoAccept, also accept on the platform side
+    // 5. If autoAccept, also accept on the platform side. Config +
+    // autoAccept were resolved once before the txn (iter-39) — same
+    // snapshot drove both `requiresApproval` and this branch.
     if (autoAccept && config) {
       try {
         const freshConfig = await this.authService.ensureValidToken(config.id);
@@ -277,6 +285,14 @@ export class DeliveryOrderService {
           error: error.message,
           nextRetryAt: new Date(Date.now() + 30_000),
         });
+
+        // Circuit-breaker parity with iter-38 (menu/status sync). A
+        // platform whose acceptOrder endpoint is permanently broken
+        // (wrong API version, dropped credentials) would otherwise
+        // loop forever — every webhook bumps the retry queue but the
+        // config never auto-disables at CIRCUIT_BREAKER_THRESHOLD.
+        await this.configService.recordError(config.id, `accept_order: ${error.message}`)
+          .catch((e) => this.logger.warn(`recordError failed: ${e.message}`));
       }
     }
 
