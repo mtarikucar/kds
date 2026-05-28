@@ -49,8 +49,16 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // In-memory last-activity cache to debounce writes to CustomerSession on
   // reconnect storms. Keyed by sessionId → epoch millis. A single-replica
   // optimization; acceptable to reset on restart.
+  //
+  // Iter-81: cleaned on disconnect + hard size cap so the map can't
+  // grow unboundedly. Pre-iter-81 every customer connect added a key
+  // and handleDisconnect was a pure logger — for 1000 sessions/day
+  // × 30 days that's 30K stale entries per replica, all carrying
+  // 32-byte sessionId keys plus a number. Small per-entry footprint
+  // but the leak was structural.
   private readonly customerActivityLastWrite = new Map<string, number>();
   private static readonly ACTIVITY_DEBOUNCE_MS = 60_000;
+  private static readonly ACTIVITY_MAP_HARD_CAP = 10_000;
 
   constructor(
     private jwtService: JwtService,
@@ -216,6 +224,18 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const now = Date.now();
     const lastWrite = this.customerActivityLastWrite.get(session.sessionId) ?? 0;
     if (now - lastWrite > KdsGateway.ACTIVITY_DEBOUNCE_MS) {
+      // Iter-81 cap-aware write. If the map is at the cap we evict the
+      // oldest insertion-ordered entry first — Maps preserve insertion
+      // order in JS, so the first key returned by keys() is the oldest
+      // session that wrote. handleDisconnect normally clears entries
+      // before they get here; this is the safety net for connect-only
+      // sockets (a customer that connects, does nothing for 60s, and
+      // disconnects without the gateway noticing — rare but possible
+      // on long mobile-network timeouts).
+      if (this.customerActivityLastWrite.size >= KdsGateway.ACTIVITY_MAP_HARD_CAP) {
+        const oldest = this.customerActivityLastWrite.keys().next().value;
+        if (oldest) this.customerActivityLastWrite.delete(oldest);
+      }
       this.customerActivityLastWrite.set(session.sessionId, now);
       this.prisma.customerSession
         .update({
@@ -236,6 +256,12 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   handleDisconnect(client: Socket) {
+    // Iter-81: free the per-session activity-debounce map entry on
+    // disconnect. Pre-iter-81 this was a pure logger and the map grew
+    // by one entry per customer connect across the lifetime of the
+    // replica.
+    const sessionId: string | undefined = client.data?.sessionId;
+    if (sessionId) this.customerActivityLastWrite.delete(sessionId);
     this.logger.log(`Client ${client.id} disconnected`);
   }
 
