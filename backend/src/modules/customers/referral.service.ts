@@ -213,20 +213,41 @@ export class ReferralService {
     });
     if (!customer) throw new BadRequestException('Customer not found');
 
-    const referrals = await this.prisma.customerReferral.findMany({
-      where: { referrerId: customerId, referrer: { tenantId } },
-      include: { referred: { select: { name: true } } },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    const totalPointsEarned = referrals
-      .filter((r) => r.rewardedAt)
-      .reduce((sum, r) => sum + r.referrerReward, 0);
+    // Iter-80: count + page-cap on the listing. totalReferrals is the
+    // canonical "how many" — it stays accurate via a separate count()
+    // even if the customer has more than the per-page cap. The list of
+    // rows the public profile renders is bounded so a super-engaged
+    // influencer customer with thousands of referrals doesn't pull
+    // every row through the QR-menu page in one response (each row
+    // carries the referred customer's name; over time that's a
+    // measurable payload).
+    const STATS_PAGE_HARD_CAP = 200;
+    const [referrals, totalReferrals, aggregate] = await this.prisma.$transaction([
+      this.prisma.customerReferral.findMany({
+        where: { referrerId: customerId, referrer: { tenantId } },
+        include: { referred: { select: { name: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: STATS_PAGE_HARD_CAP,
+      }),
+      this.prisma.customerReferral.count({
+        where: { referrerId: customerId, referrer: { tenantId } },
+      }),
+      // Sum across ALL rewarded referrals (not just the visible page)
+      // so totalPointsEarned stays canonical regardless of the page cap.
+      this.prisma.customerReferral.aggregate({
+        where: {
+          referrerId: customerId,
+          referrer: { tenantId },
+          rewardedAt: { not: null },
+        },
+        _sum: { referrerReward: true },
+      }),
+    ]);
 
     return {
       referralCode: customer.referralCode || '',
-      totalReferrals: referrals.length,
-      totalPointsEarned,
+      totalReferrals,
+      totalPointsEarned: aggregate._sum.referrerReward ?? 0,
       referrals: referrals.map((r) => ({
         id: r.id,
         customerName: r.referred.name,
@@ -238,14 +259,11 @@ export class ReferralService {
     };
   }
 
-  async getTenantReferrals(tenantId: string) {
-    return this.prisma.customerReferral.findMany({
-      where: { referrer: { tenantId } },
-      include: {
-        referrer: { select: { id: true, name: true, phone: true } },
-        referred: { select: { id: true, name: true, phone: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
+  // NOTE: a `getTenantReferrals(tenantId)` helper used to live here.
+  // It had no callers (no controller, no scheduler, no service) and
+  // would have returned an unbounded findMany including referrer +
+  // referred phone numbers (PII). Removed in iter-80 so a future
+  // change adding an admin route can't quietly resurrect the
+  // unbounded listing — a fresh implementation will be forced to add
+  // pagination + maskPhone + role-gating from scratch.
 }
