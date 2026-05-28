@@ -14,10 +14,8 @@ import { Throttle } from '@nestjs/throttler';
 import { ContactService } from './contact.service';
 import { CreateContactDto } from './dto/create-contact.dto';
 import { Public } from '../auth/decorators/public.decorator';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '../../common/constants/roles.enum';
+import { SuperAdminGuard } from '../superadmin/guards/superadmin.guard';
+import { SuperAdminRoute } from '../superadmin/decorators/superadmin.decorator';
 
 @ApiTags('contact')
 @Controller('contact')
@@ -36,11 +34,21 @@ export class ContactController {
     return this.contactService.create(createContactDto);
   }
 
+  // Admin moderation endpoints — SuperAdmin only.
+  //
+  // ContactMessage is a PLATFORM-LEVEL model (no tenantId; messages are
+  // addressed to HummyTummy itself via the marketing landing form, often
+  // about competitors, partnership requests, or platform billing). The
+  // earlier @Roles(UserRole.ADMIN) used the tenant-realm ADMIN role, so
+  // every restaurant tenant's admin could enumerate every contact-form
+  // submission to the platform — name, email, phone, message body. Same
+  // privilege issue iter-51 closed on PublicReview. Switch to
+  // SuperAdminGuard so only platform operators can read inbound mail.
+  @UseGuards(SuperAdminGuard)
+  @SuperAdminRoute()
   @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get paginated contact messages (Admin only)' })
+  @ApiOperation({ summary: 'Get paginated contact messages (SuperAdmin only)' })
   findAll(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
@@ -50,20 +58,20 @@ export class ContactController {
     return this.contactService.findAll(pageNum, limitNum);
   }
 
+  @UseGuards(SuperAdminGuard)
+  @SuperAdminRoute()
   @Get(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get a single contact message (Admin only)' })
+  @ApiOperation({ summary: 'Get a single contact message (SuperAdmin only)' })
   findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.contactService.findOne(id);
   }
 
+  @UseGuards(SuperAdminGuard)
+  @SuperAdminRoute()
   @Patch(':id/read')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Mark message as read (Admin only)' })
+  @ApiOperation({ summary: 'Mark message as read (SuperAdmin only)' })
   markAsRead(@Param('id', ParseUUIDPipe) id: string) {
     return this.contactService.markAsRead(id);
   }

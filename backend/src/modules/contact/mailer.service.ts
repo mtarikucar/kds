@@ -105,46 +105,16 @@ export class MailerService {
     }
   }
 
-  async sendUserConfirmation(data: {
-    name: string;
-    email: string;
-    message: string;
-  }): Promise<boolean> {
-    if (!this.transporter) {
-      this.logger.warn('Email transporter not configured. Skipping user confirmation.');
-      return false;
-    }
-
-    try {
-      const html = await this.loadTemplate('user-confirmation', data);
-
-      const mailOptions = {
-        from: process.env.EMAIL_FROM || 'noreply@hummytummy.com',
-        to: data.email,
-        subject: 'Thank You for Contacting HummyTummy',
-        html,
-      };
-
-      await this.transporter.sendMail(mailOptions);
-      this.logger.log(`Confirmation email sent to ${maskEmail(data.email)}`);
-      return true;
-    } catch (error) {
-      this.logger.error(`Failed to send user confirmation to ${maskEmail(data.email)}`, error as any);
-      return false;
-    }
-  }
-
-  async sendBothEmails(data: {
-    name: string;
-    email: string;
-    phone?: string;
-    message: string;
-  }): Promise<{ adminSent: boolean; userSent: boolean }> {
-    const [adminSent, userSent] = await Promise.all([
-      this.sendAdminNotification(data),
-      this.sendUserConfirmation(data),
-    ]);
-
-    return { adminSent, userSent };
-  }
+  // NOTE: a `sendUserConfirmation` / `sendBothEmails` helper used to
+  // live here. Both were deleted in iter-58.
+  //
+  // The user-confirmation flow sent an email TO the address the public
+  // contact form submitted. Since that address is attacker-controlled, an
+  // attacker posting `email = victim@x` turned the SMTP sender into a
+  // spam cannon that mailed `victim@x` on demand under the platform's
+  // From: identity (and counted against our deliverability reputation).
+  // contact.service.ts dropped the call in the iter-19 audit; the
+  // methods stayed behind as dead code, ready to be re-wired by a
+  // future change that didn't read the comment. Removed now so the
+  // primitive can't come back without re-implementing it.
 }
