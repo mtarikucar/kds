@@ -24,6 +24,12 @@ describe('PlanProjectorService.projectTenant', () => {
     prisma = mockPrismaClient();
     entitlements = {
       setGrantsForSource: jest.fn().mockResolvedValue(undefined),
+      // Iter-76 — projectTenant now does its writes via setGrantsForSourceTx
+      // inside a single $transaction so plan / override / addon writes
+      // share one visibility window. Tests inspect this mock's calls
+      // (args 1..3 are [tx, tenantId, source, grants]) the same way they
+      // used to read setGrantsForSource.
+      setGrantsForSourceTx: jest.fn().mockResolvedValue(undefined),
       revokeSource: jest.fn().mockResolvedValue(undefined),
       invalidate: jest.fn(),
       getForTenant: jest.fn(),
@@ -35,6 +41,11 @@ describe('PlanProjectorService.projectTenant', () => {
     // Default: stale-sources sweep is a no-op. The "switches plan" test
     // overrides this to assert the sweep + invalidate call happen.
     (prisma.featureEntitlement.deleteMany as any).mockResolvedValue({ count: 0 });
+    // Pass the inner callback through with the prisma mock as the tx
+    // client, so projectTenantInner's wrapping $transaction(async tx =>
+    // ...) lets the inner findMany / deleteMany / setGrantsForSourceTx
+    // calls still land on assertions below.
+    (prisma.$transaction as any).mockImplementation(async (fn: any) => fn(prisma));
   });
 
   it('projects PRO plan features and limits as grants under plan:PRO', async () => {
@@ -66,8 +77,9 @@ describe('PlanProjectorService.projectTenant', () => {
     await svc.projectTenant(TENANT);
 
     // First call writes plan:PRO grants. Second call writes override:admin (empty).
-    expect(entitlements.setGrantsForSource).toHaveBeenCalledTimes(2);
-    const [, source, grants] = entitlements.setGrantsForSource.mock.calls[0];
+    expect(entitlements.setGrantsForSourceTx).toHaveBeenCalledTimes(2);
+    // setGrantsForSourceTx signature: (tx, tenantId, source, grants)
+    const [, , source, grants] = entitlements.setGrantsForSourceTx.mock.calls[0];
     expect(source).toBe('plan:PRO');
 
     const featureKeys = grants.map((g) => g.key);
@@ -111,8 +123,9 @@ describe('PlanProjectorService.projectTenant', () => {
 
     await svc.projectTenant(TENANT);
 
-    const grants = entitlements.setGrantsForSource.mock.calls[0][2];
-    const max = grants.find((g) => g.key === 'limit.maxUsers');
+    // setGrantsForSourceTx args: (tx, tenantId, source, grants) → index 3
+    const grants = entitlements.setGrantsForSourceTx.mock.calls[0][3];
+    const max = grants.find((g: any) => g.key === 'limit.maxUsers');
     expect(max?.value).toBe(-1);
   });
 
@@ -144,16 +157,17 @@ describe('PlanProjectorService.projectTenant', () => {
 
     await svc.projectTenant(TENANT);
 
-    const [, overrideSource, overrideGrants] = entitlements.setGrantsForSource.mock.calls[1];
+    // setGrantsForSourceTx signature: (tx, tenantId, source, grants)
+    const [, , overrideSource, overrideGrants] = entitlements.setGrantsForSourceTx.mock.calls[1];
     expect(overrideSource).toBe('override:admin');
 
-    const branding = overrideGrants.find((g) => g.key === 'feature.customBranding');
+    const branding = overrideGrants.find((g: any) => g.key === 'feature.customBranding');
     expect(branding?.value).toEqual({ __replace: true });
 
-    const delivery = overrideGrants.find((g) => g.key === 'feature.deliveryIntegration');
+    const delivery = overrideGrants.find((g: any) => g.key === 'feature.deliveryIntegration');
     expect(delivery?.value).toEqual({ __replace: false });
 
-    const tables = overrideGrants.find((g) => g.key === 'limit.maxTables');
+    const tables = overrideGrants.find((g: any) => g.key === 'limit.maxTables');
     expect(tables?.value).toEqual({ __replace: 80 });
   });
 
@@ -209,7 +223,8 @@ describe('PlanProjectorService.projectTenant', () => {
 
     await svc.projectTenant(TENANT);
 
-    const [, source, grants] = entitlements.setGrantsForSource.mock.calls[0];
+    // setGrantsForSourceTx signature: (tx, tenantId, source, grants)
+    const [, , source, grants] = entitlements.setGrantsForSourceTx.mock.calls[0];
     expect(source).toBe('plan:NONE');
     expect(grants).toHaveLength(0);
   });

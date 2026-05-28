@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { fold } from './entitlement-engine';
 import {
@@ -196,22 +197,42 @@ export class EntitlementService implements OnModuleInit, OnModuleDestroy {
     grants: ReadonlyArray<Omit<EntitlementGrant, 'tenantId' | 'source'>>,
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
-      await tx.featureEntitlement.deleteMany({ where: { tenantId, source } });
-      if (grants.length === 0) return;
-      await tx.featureEntitlement.createMany({
-        data: grants.map((g) => ({
-          tenantId,
-          source,
-          scope: g.scope,
-          branchId: g.branchId,
-          key: g.key,
-          value: g.value as any,
-          validUntil: g.validUntil ?? null,
-        })),
-      });
+      await this.setGrantsForSourceTx(tx, tenantId, source, grants);
     });
     this.invalidate(tenantId);
     this.logger.debug(`Reprojected source=${source} tenant=${tenantId} grants=${grants.length}`);
+  }
+
+  /**
+   * Iter-76: transactional variant of setGrantsForSource. Same write
+   * contract, but runs inside a caller-supplied tx client and does NOT
+   * invalidate the cache (the caller does that after the outer txn
+   * commits). PlanProjectorService uses this to atomically replace
+   * multiple sources for one tenant — without sharing the txn boundary
+   * the projector's "delete stale plan:* / write new plan:X" pair
+   * leaves a window where BOTH the old and new plan's grants are
+   * visible. Limits SUM, so e.g. BASIC.maxUsers=5 + PRO.maxUsers=20
+   * briefly looks like 25 users allowed.
+   */
+  async setGrantsForSourceTx(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+    source: string,
+    grants: ReadonlyArray<Omit<EntitlementGrant, 'tenantId' | 'source'>>,
+  ): Promise<void> {
+    await tx.featureEntitlement.deleteMany({ where: { tenantId, source } });
+    if (grants.length === 0) return;
+    await tx.featureEntitlement.createMany({
+      data: grants.map((g) => ({
+        tenantId,
+        source,
+        scope: g.scope,
+        branchId: g.branchId,
+        key: g.key,
+        value: g.value as any,
+        validUntil: g.validUntil ?? null,
+      })),
+    });
   }
 
   /** Revoke every grant from one source. */

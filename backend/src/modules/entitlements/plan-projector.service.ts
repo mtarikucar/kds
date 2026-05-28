@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { withAdvisoryLock } from '../../common/scheduling/advisory-lock';
 import { EntitlementService } from './entitlement.service';
@@ -108,8 +109,6 @@ export class PlanProjectorService {
 
     if (tenant.currentPlan) {
       for (const col of PlanProjectorService.FEATURE_COLUMNS) {
-        // Surface only enabled features. Disabled features stay absent from
-        // the grant table — the engine treats absence as "not enabled".
         if ((tenant.currentPlan as any)[col]) {
           planGrants.push({
             scope: 'tenant',
@@ -134,25 +133,6 @@ export class PlanProjectorService {
       }
     }
 
-    await this.entitlements.setGrantsForSource(tenantId, planSource, planGrants);
-
-    // Clear any stale plan:* sources from prior plans (downgrade, switch).
-    // Single deleteMany covers all stale sources atomically — the previous
-    // per-source loop could leave a partial state if one revoke failed
-    // (downstream consumers would then see mixed grants from two plans).
-    const deletedStale = await this.prisma.featureEntitlement.deleteMany({
-      where: {
-        tenantId,
-        source: { startsWith: 'plan:', not: planSource },
-      },
-    });
-    if (deletedStale.count > 0) {
-      // Drop the in-process cache so the next read picks up the deletion.
-      this.entitlements.invalidate(tenantId);
-    }
-
-    // Overrides → admin source. Overrides REPLACE the plan value, so they
-    // use the engine's __replace wrapper. Empty objects emit no grants.
     const overrideGrants: Array<Omit<EntitlementGrant, 'tenantId' | 'source'>> = [];
     const featureOverrides = (tenant.featureOverrides as Record<string, boolean> | null) ?? null;
     const limitOverrides = (tenant.limitOverrides as Record<string, number> | null) ?? null;
@@ -178,29 +158,75 @@ export class PlanProjectorService {
         });
       }
     }
-    await this.entitlements.setGrantsForSource(tenantId, 'override:admin', overrideGrants);
 
-    await this.projectAddOns(tenantId);
+    // Iter-76: every write in one $transaction so no concurrent reader
+    // sees a half-projected state. The pre-fix shape did separate calls:
+    //
+    //   setGrantsForSource(planSource, ...)       // commits, txn 1
+    //   deleteMany(stale plan:* sources)          // commits, txn 2
+    //   setGrantsForSource('override:admin', ...) // commits, txn 3
+    //   projectAddOns(...)                        // N more txns
+    //
+    // Between txn 1 and txn 2 on a plan switch (BASIC → PRO), readers
+    // saw BOTH the old plan's `plan:BASIC` rows AND the new plan's
+    // `plan:PRO` rows. The engine's `limit.*` rule is SUM, so a tenant
+    // briefly got BASIC.maxUsers=5 + PRO.maxUsers=20 = 25 — short
+    // window, but the post-invalidate cache miss happens at exactly
+    // the wrong time (the projector calls invalidate after txn 1 but
+    // txn 2 hasn't fired yet) so it's a more reliable race than it
+    // looks. Same shape for projectAddOns' stale-source sweep.
+    //
+    // One outer txn collapses the visibility window to zero. The
+    // entitlement cache is invalidated ONCE at the end so peer
+    // replicas refresh atomically too.
+    await this.prisma.$transaction(async (tx) => {
+      await this.entitlements.setGrantsForSourceTx(tx, tenantId, planSource, planGrants);
+
+      // Clear stale plan:* sources from prior plans (downgrade, switch).
+      // Now inside the txn so the window where both plans' grants are
+      // visible doesn't exist for any external reader.
+      await tx.featureEntitlement.deleteMany({
+        where: {
+          tenantId,
+          source: { startsWith: 'plan:', not: planSource },
+        },
+      });
+
+      // Overrides → admin source. Overrides REPLACE the plan value via
+      // the engine's __replace wrapper. Empty objects emit no grants
+      // (which deletes any prior override:admin rows).
+      await this.entitlements.setGrantsForSourceTx(tx, tenantId, 'override:admin', overrideGrants);
+
+      await this.projectAddOnsTx(tx, tenantId);
+    });
+
+    // Single invalidate at the end so the next read picks up the
+    // fully-projected state. Bus fan-out goes to peer replicas too.
+    this.entitlements.invalidate(tenantId);
   }
 
   /**
    * Project this tenant's active add-ons into entitlement grants.
    *
+   * Transactional variant — iter-76 inlined into the outer projectTenant
+   * txn so add-on writes share the visibility window with plan writes
+   * and override writes. Caller owns cache invalidation.
+   *
    * Each TenantAddOn row produces one source `addon:<code>:<id>` whose grants
    * are derived from the catalog row's `grants` JSON, with numeric values
    * multiplied by `quantity` (capacity add-ons buy in bulk). Stale sources
    * (add-ons that were cancelled or expired since the last projection) are
-   * detected by diffing the current source list and revoked individually.
+   * detected by diffing the current source list and revoked atomically.
    */
-  private async projectAddOns(tenantId: string): Promise<void> {
-    const activeAddOns = await this.prisma.tenantAddOn.findMany({
+  private async projectAddOnsTx(
+    tx: Prisma.TransactionClient,
+    tenantId: string,
+  ): Promise<void> {
+    const activeAddOns = await tx.tenantAddOn.findMany({
       where: { tenantId, status: 'active' },
       include: { addOn: true },
     });
 
-    // Build the set of sources we expect after this projection runs. Anything
-    // currently tagged `addon:*` but missing from this set was cancelled or
-    // expired and gets revoked.
     const desiredSources = new Set<string>();
     for (const ta of activeAddOns) {
       const source = `addon:${ta.addOn.code}:${ta.id}`;
@@ -220,8 +246,6 @@ export class PlanProjectorService {
             validUntil,
           });
         } else if (key.startsWith('limit.')) {
-          // Numeric grants scale with quantity, EXCEPT for the unlimited
-          // sentinel -1 which always means unlimited regardless of count.
           const n = typeof raw === 'number' ? raw : 0;
           const scaled = n === -1 ? -1 : n * ta.quantity;
           grants.push({
@@ -244,27 +268,23 @@ export class PlanProjectorService {
         }
       }
 
-      await this.entitlements.setGrantsForSource(tenantId, source, grants);
+      await this.entitlements.setGrantsForSourceTx(tx, tenantId, source, grants);
     }
 
-    // Revoke stale add-on sources atomically. The projector is the only
-    // writer of `addon:*` sources, so anything not in `desiredSources` is
-    // by definition orphaned. Single deleteMany prevents the partial-revoke
-    // class of bug the prior per-source loop had: if one revoke failed,
-    // downstream consumers would see mixed grants from two add-on lifecycles.
+    // Revoke stale add-on sources. Now inside the outer projectTenant
+    // txn so the visibility window between "new addon source written"
+    // and "stale addon sources cleared" doesn't exist.
     if (desiredSources.size === 0) {
-      const swept = await this.prisma.featureEntitlement.deleteMany({
+      await tx.featureEntitlement.deleteMany({
         where: { tenantId, source: { startsWith: 'addon:' } },
       });
-      if (swept.count > 0) this.entitlements.invalidate(tenantId);
     } else {
-      const swept = await this.prisma.featureEntitlement.deleteMany({
+      await tx.featureEntitlement.deleteMany({
         where: {
           tenantId,
           source: { startsWith: 'addon:', notIn: Array.from(desiredSources) },
         },
       });
-      if (swept.count > 0) this.entitlements.invalidate(tenantId);
     }
   }
 
