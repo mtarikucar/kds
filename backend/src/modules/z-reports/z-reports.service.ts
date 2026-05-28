@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client';
 import { createHash } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from '../../common/services/email.service';
-import { getTenantDayBounds } from '../../common/helpers/timezone.helper';
+import { getTenantDayBounds, getTenantMidnight } from '../../common/helpers/timezone.helper';
 import { CreateZReportDto } from './dto/create-z-report.dto';
 import { paginated } from '../../common/pagination';
 import PDFDocument from 'pdfkit';
@@ -690,8 +690,22 @@ export class ZReportsService {
    * Generate and send Z-Report for a tenant (used by scheduler)
    */
   async generateAndSendReport(tenantId: string, userId: string): Promise<{ reportId: string; emailSent: boolean }> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Tenant timezone matters: a TR restaurant closing at 23:00 TR with
+    // the API pod in UTC needs "today" to mean "the TR calendar date
+    // we're currently in", not "the UTC calendar date the server is in".
+    // The earlier code used `today.setHours(0,0,0,0)` which gave SERVER-
+    // local midnight — for a UTC container with a TR tenant this saved
+    // reportDate as one UTC instant while the scheduler's "already
+    // sent?" check searched for a different (tenant-local-midnight)
+    // instant. Result: the scheduler re-entered generate every 15 min
+    // during the closing window, each time hitting the service's own
+    // dedup throw, polluting logs. Same getTenantMidnight helper the
+    // scheduler uses keeps the two sides in lockstep.
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+    });
+    const tz = tenant?.timezone || 'UTC';
+    const today = getTenantMidnight(new Date(), tz);
 
     // Check if report already exists for today
     const existing = await this.prisma.zReport.findFirst({
@@ -714,11 +728,6 @@ export class ZReportsService {
         notes: 'Auto-generated end-of-day report',
       });
     }
-
-    // Send email if configured
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-    });
 
     let emailSent = false;
 

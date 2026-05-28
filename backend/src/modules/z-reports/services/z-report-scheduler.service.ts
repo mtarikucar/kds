@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ZReportsService } from '../z-reports.service';
+import { getTenantMidnight } from '../../../common/helpers/timezone.helper';
 
 @Injectable()
 export class ZReportSchedulerService {
@@ -120,10 +121,12 @@ export class ZReportSchedulerService {
         // would then re-enter generateReport every 15min during the
         // closing window, each time throwing a BadRequestException that
         // polluted the error logs.
-        const tenantTzMidnight = this.getTenantMidnight(
-          now,
-          tenant.timezone || 'UTC',
-        );
+        // Shared helper — the service-side write path uses the same
+        // import (iter-35) so the dedup-read and the generate-and-
+        // send-write key off the same UTC instant for tenant-local
+        // midnight. Previously this class duplicated the function;
+        // keeping one source of truth prevents the two from drifting.
+        const tenantTzMidnight = getTenantMidnight(now, tenant.timezone || 'UTC');
 
         // Check `isFinalized` instead of `emailSent` only — if the report
         // was finalized but the email send failed, the previous filter
@@ -148,53 +151,6 @@ export class ZReportSchedulerService {
     }
 
     return matchingTenants;
-  }
-
-  /**
-   * UTC instant representing "today at 00:00" in the tenant's timezone.
-   * Mirrors ZReportsService.computeDayBoundsInTimezone so the scheduler's
-   * "already sent?" lookup hits the row that generateReport actually
-   * created. Uses Intl.DateTimeFormat + offset correction; falls back to
-   * server-local midnight on an unknown tz string.
-   */
-  private getTenantMidnight(now: Date, timezone: string): Date {
-    try {
-      const parts = new Intl.DateTimeFormat('en-CA', {
-        timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).formatToParts(now);
-      const y = parseInt(parts.find((p) => p.type === 'year')?.value ?? '1970', 10);
-      const m = parseInt(parts.find((p) => p.type === 'month')?.value ?? '1', 10);
-      const d = parseInt(parts.find((p) => p.type === 'day')?.value ?? '1', 10);
-      const approx = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
-      const probe = new Intl.DateTimeFormat('en-US', {
-        timeZone: timezone,
-        hour12: false,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      }).formatToParts(approx);
-      const get = (t: string) => parseInt(probe.find((p) => p.type === t)?.value ?? '0', 10);
-      const zonedAsUtc = Date.UTC(
-        get('year'),
-        get('month') - 1,
-        get('day'),
-        get('hour') % 24,
-        get('minute'),
-        get('second'),
-      );
-      const offset = zonedAsUtc - approx.getTime();
-      return new Date(approx.getTime() - offset);
-    } catch {
-      const fallback = new Date(now);
-      fallback.setHours(0, 0, 0, 0);
-      return fallback;
-    }
   }
 
   private getTimeInTimezone(date: Date, timezone: string): Date {
