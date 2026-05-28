@@ -1,9 +1,34 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
+import { withAdvisoryLock } from '../../common/scheduling/advisory-lock';
 
 @Injectable()
 export class CustomerSessionService {
+  private readonly logger = new Logger(CustomerSessionService.name);
+
+  /**
+   * Iter-77 — listing cap on getActiveSessions. The endpoint returns
+   * each session's linked customer.phone (PII), and an admin UI on a
+   * busy tenant (event night, 500+ concurrent QR-menu sessions) would
+   * otherwise pull every active session in one response. 200 covers
+   * realistic dashboard use; longer listings need pagination.
+   */
+  private static readonly ACTIVE_SESSIONS_HARD_CAP = 200;
+
+  /**
+   * Iter-77 — retention window for deleted sessions. Sessions older
+   * than this (by `lastActivity`) get hard-deleted by the cron sweep.
+   * 30 days is comfortably past the 4-hour TTL + 24-hour idle
+   * deactivation window the existing cleanup logic uses, but bounded
+   * enough that the table doesn't grow unboundedly across the lifetime
+   * of the tenant. Order.sessionId is a free-form string (not a
+   * relation), so deleting old session rows can't cascade into order
+   * loss — Order rows simply hold the historical session id forever.
+   */
+  private static readonly SESSION_DELETE_AFTER_MS = 30 * 24 * 60 * 60 * 1000;
+
   constructor(private prisma: PrismaService) {}
 
   async createSession(
@@ -142,6 +167,7 @@ export class CustomerSessionService {
         customer: { select: { id: true, name: true, phone: true } },
       },
       orderBy: { lastActivity: 'desc' },
+      take: CustomerSessionService.ACTIVE_SESSIONS_HARD_CAP,
     });
   }
 
@@ -187,5 +213,54 @@ export class CustomerSessionService {
     });
 
     return result.count;
+  }
+
+  /**
+   * Iter-77 — hard-delete old inactive sessions. Pre-iter-77 the only
+   * cleanup was `cleanupExpiredSessions` which flipped isActive=false
+   * but kept the row, and even that method had NO scheduled caller. So
+   * customer_sessions grew unboundedly across the lifetime of the tenant
+   * — each QR-menu scan, each table-side checkout creates a row that
+   * never gets reaped. For a popular restaurant doing 200 sessions/day
+   * over 3 years that's ~200K rows of useless history, all carrying
+   * IP + userAgent metadata.
+   *
+   * The retention window is 30 days past `lastActivity`, comfortably
+   * past the 4h TTL and the 24h idle-deactivation rule above. Order
+   * rows hold sessionId as a free-form string (no FK), so deleting
+   * historical session rows doesn't cascade.
+   */
+  async deleteOldSessions(): Promise<number> {
+    const cutoff = new Date(Date.now() - CustomerSessionService.SESSION_DELETE_AFTER_MS);
+    const result = await this.prisma.customerSession.deleteMany({
+      where: {
+        isActive: false,
+        lastActivity: { lt: cutoff },
+      },
+    });
+    return result.count;
+  }
+
+  /**
+   * Scheduled sweep. Runs every hour, advisory-locked so multiple
+   * replicas don't fan out the same updateMany/deleteMany pair (each
+   * would issue a write storm against the same row set).
+   */
+  @Cron(CronExpression.EVERY_HOUR)
+  async sweepSessions(): Promise<void> {
+    await withAdvisoryLock(
+      this.prisma,
+      'customer-sessions.sweep',
+      async () => {
+        const deactivated = await this.cleanupExpiredSessions();
+        const deleted = await this.deleteOldSessions();
+        if (deactivated > 0 || deleted > 0) {
+          this.logger.log(
+            `customer-session sweep: deactivated=${deactivated} hard-deleted=${deleted}`,
+          );
+        }
+      },
+      this.logger,
+    );
   }
 }
