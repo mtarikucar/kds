@@ -161,9 +161,49 @@ export class UsersService {
     });
   }
 
+  /**
+   * Iter-74: the search filter feeds Prisma's `contains` (ILIKE) directly.
+   * Without a length cap an admin (or a compromised admin token, or a
+   * naive script with a runaway loop) can post a 1MB search string and
+   * make Postgres do a full-scan ILIKE on every user row. 200 covers
+   * any realistic "find Mehmet" UI; longer needles aren't a legitimate
+   * use case here.
+   */
+  private static readonly USER_SEARCH_MAX_LEN = 200;
+  /**
+   * Allowed values for the status/role @Query filters. Matches the
+   * canonical roles.enum.ts + the User.status state machine. Unknown
+   * values used to fall through to Prisma and silently no-match —
+   * 400ing instead surfaces typos at the admin UI rather than leaving
+   * the operator wondering why the filter returned zero rows.
+   */
+  private static readonly USER_STATUS_ALLOW = new Set([
+    'ACTIVE',
+    'INACTIVE',
+    'PENDING',
+    'REJECTED',
+    'SUSPENDED',
+  ]);
+
   async findAll(tenantId: string, filters: UserListFilters = {}) {
     const page = Math.max(1, filters.page ?? 1);
     const limit = Math.min(100, Math.max(1, filters.limit ?? 50));
+
+    if (filters.status && !UsersService.USER_STATUS_ALLOW.has(filters.status)) {
+      throw new BadRequestException(
+        `status must be one of: ${[...UsersService.USER_STATUS_ALLOW].join(', ')}`,
+      );
+    }
+    if (filters.role && !Object.values(UserRole).includes(filters.role as UserRole)) {
+      throw new BadRequestException(
+        `role must be one of: ${Object.values(UserRole).join(', ')}`,
+      );
+    }
+    if (filters.search && filters.search.length > UsersService.USER_SEARCH_MAX_LEN) {
+      throw new BadRequestException(
+        `search must be ${UsersService.USER_SEARCH_MAX_LEN} chars or less`,
+      );
+    }
 
     const where: Prisma.UserWhereInput = { tenantId };
     if (filters.status) where.status = filters.status;
