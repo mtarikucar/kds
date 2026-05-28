@@ -104,4 +104,62 @@ describe('CommandQueueService', () => {
 
     await expect(svc.ack('dev', 'c-1', { status: 'done' })).rejects.toThrow(/concurrent/i);
   });
+
+  /**
+   * Iter-72 regression. The previous sweepStuck did
+   * findMany → for...await update — an N+1 round-trip pattern that
+   * held the DB connection for one serialised write per stale row.
+   * The new shape issues exactly two updateMany statements inside one
+   * $transaction (one per attempts-vs-MAX branch) regardless of how
+   * many rows are stuck.
+   */
+  describe('sweepStuck batching (iter-72)', () => {
+    it('issues exactly two updateMany calls inside one $transaction', async () => {
+      (prisma.$transaction as any).mockImplementation(async (ops: any[]) => {
+        // The test mock passes through each updateMany call so we can
+        // measure how many statements the service issued. In production
+        // Prisma runs them in a single round-trip.
+        return Promise.all(ops);
+      });
+      (prisma.deviceCommand.updateMany as any).mockResolvedValue({ count: 0 });
+
+      await svc.sweepStuck();
+
+      expect((prisma.$transaction as any).mock.calls.length).toBe(1);
+      // The first $transaction call's first arg is the array of two
+      // updateMany prismas — length must be 2 regardless of how many
+      // rows are stale.
+      const txArgs = (prisma.$transaction as any).mock.calls[0][0];
+      expect(Array.isArray(txArgs)).toBe(true);
+      expect(txArgs.length).toBe(2);
+      // findMany must NOT fire — that was the N+1 starting point.
+      expect((prisma.deviceCommand.findMany as any).mock.calls.length).toBe(0);
+    });
+
+    it('returns the combined requeue+fail count', async () => {
+      (prisma.$transaction as any).mockResolvedValue([{ count: 3 }, { count: 2 }]);
+
+      const total = await svc.sweepStuck();
+
+      expect(total).toBe(5);
+    });
+
+    it('predicate splits on attempts vs MAX_ATTEMPTS', async () => {
+      const captured: any[] = [];
+      (prisma.deviceCommand.updateMany as any).mockImplementation(async (args: any) => {
+        captured.push(args);
+        return { count: 0 };
+      });
+      (prisma.$transaction as any).mockImplementation(async (ops: any[]) => Promise.all(ops));
+
+      await svc.sweepStuck();
+
+      // First call requeues (status=queued, attempts < MAX).
+      expect(captured[0].data.status).toBe('queued');
+      expect(captured[0].where.attempts).toEqual({ lt: 5 });
+      // Second call fails (status=failed, attempts >= MAX).
+      expect(captured[1].data.status).toBe('failed');
+      expect(captured[1].where.attempts).toEqual({ gte: 5 });
+    });
+  });
 });

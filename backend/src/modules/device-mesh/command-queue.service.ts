@@ -176,34 +176,47 @@ export class CommandQueueService {
    * Sweeper for expired in-flight commands — devices that crashed mid-ack.
    * Flips inflight → queued so the next claim attempt can pick them up,
    * unless attempts >= MAX in which case they go to `failed`.
+   *
+   * The signal is "this command was last touched > 5min ago". `updatedAt`
+   * bumps on every status transition (queued → inflight → ...), so it's
+   * the correct proxy for "claimed and never ack'd". Using `createdAt`
+   * would sweep a slow-claim queue: a command created an hour ago that
+   * JUST went inflight 10s ago would be wrongly marked stuck.
+   *
+   * Implemented as two updateMany calls — one per attempts branch —
+   * rather than the previous findMany + per-row update loop. The old
+   * shape was an N+1 (one round-trip per stuck command), so a sweep
+   * with 10K stale rows held the connection for as many serialised
+   * writes; the new shape is two statements regardless of N and lets
+   * Postgres pick the index path it likes.
    */
   async sweepStuck(): Promise<number> {
-    // The signal is "this command was last touched > 5min ago". `updatedAt`
-    // bumps on every status transition (queued → inflight → ...), so it's
-    // the correct proxy for "claimed and never ack'd". Using `createdAt`
-    // would sweep a slow-claim queue: a command created an hour ago that
-    // JUST went inflight 10s ago would be wrongly marked stuck.
-    const stale = await this.prisma.deviceCommand.findMany({
-      where: {
-        status: 'inflight',
-        updatedAt: { lt: new Date(Date.now() - 5 * 60 * 1000) },
-      },
-      select: { id: true, attempts: true, tenantId: true, deviceId: true, kind: true },
-    });
-    let requeued = 0;
-    for (const c of stale) {
-      const nextStatus = c.attempts < CommandQueueService.MAX_ATTEMPTS ? 'queued' : 'failed';
-      await this.prisma.deviceCommand.update({
-        where: { id: c.id },
-        data: {
-          status: nextStatus,
-          error: nextStatus === 'failed' ? 'No ack received; giving up' : 'No ack received; requeued',
+    const cutoff = new Date(Date.now() - 5 * 60 * 1000);
+    const [requeue, fail] = await this.prisma.$transaction([
+      this.prisma.deviceCommand.updateMany({
+        where: {
+          status: 'inflight',
+          updatedAt: { lt: cutoff },
+          attempts: { lt: CommandQueueService.MAX_ATTEMPTS },
         },
-      });
-      requeued++;
+        data: { status: 'queued', error: 'No ack received; requeued' },
+      }),
+      this.prisma.deviceCommand.updateMany({
+        where: {
+          status: 'inflight',
+          updatedAt: { lt: cutoff },
+          attempts: { gte: CommandQueueService.MAX_ATTEMPTS },
+        },
+        data: { status: 'failed', error: 'No ack received; giving up' },
+      }),
+    ]);
+    const total = requeue.count + fail.count;
+    if (total > 0) {
+      this.logger.warn(
+        `Swept ${total} stuck device commands (requeued=${requeue.count} failed=${fail.count})`,
+      );
     }
-    if (requeued > 0) this.logger.warn(`Swept ${requeued} stuck device commands`);
-    return requeued;
+    return total;
   }
 
   async listForDevice(tenantId: string, deviceId: string, filters?: { status?: string; limit?: number }) {
