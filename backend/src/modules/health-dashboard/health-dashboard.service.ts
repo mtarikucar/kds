@@ -37,13 +37,25 @@ export class HealthDashboardService {
         where: { tenantId, branchId, status: { notIn: ['retired'] } },
         select: { status: true },
       }),
+      // Iter-65: scope by branch. FiscalReceipt has no direct branchId,
+      // so we go through fiscalDevice.branchId. Without this scope every
+      // branch in a tenant inherited the same fiscalAge value — a quiet
+      // branch's "no receipts in 6h" hid behind the busy HQ branch's
+      // 30-second-old receipt and the dashboard rendered all branches
+      // identical for this metric.
       this.prisma.fiscalReceipt.findFirst({
-        where: { tenantId, status: 'issued' },
+        where: {
+          tenantId,
+          status: 'issued',
+          fiscalDevice: { branchId },
+        },
         orderBy: { issuedAt: 'desc' },
         select: { issuedAt: true },
       }),
+      // Iter-65: Order has a direct branchId, just add it to the WHERE.
+      // Same misleading-aggregate concern as the fiscal lookup above.
       this.prisma.order.findFirst({
-        where: { tenantId },
+        where: { tenantId, branchId },
         orderBy: { createdAt: 'desc' },
         select: { createdAt: true },
       }),
