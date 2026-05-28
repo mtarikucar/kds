@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -38,10 +39,22 @@ import {
 import {
   CreateCameraDto,
   UpdateCameraDto,
+  DateRangeDto,
+  HeatmapQueryDto,
   InsightFilterDto,
   UpdateInsightStatusDto,
 } from './dto';
 import { HeatmapGranularity } from './enums/analytics.enum';
+
+// Iter-89: hard cap on the analytics date window. The heatmap, traffic,
+// dwell-time, and table-utilization queries scan AnalyticsEvent /
+// OccupancyMeasurement / Order rows inside [startDate, endDate]; without
+// a cap a single admin posting `startDate=1970-01-01&endDate=2100-01-01`
+// would scan years of telemetry per request. 366 days matches the iter-64
+// reports cap (covers calendar-year + leap year reporting needs) and keeps
+// per-call memory bounded.
+const ANALYTICS_MAX_RANGE_DAYS = 366;
+const MILLIS_PER_DAY = 24 * 60 * 60 * 1000;
 
 @ApiTags('analytics')
 @ApiBearerAuth()
@@ -56,6 +69,43 @@ export class AnalyticsController {
     private readonly cameraService: CameraService,
   ) {}
 
+  /**
+   * Iter-89: parse + validate a [startDate, endDate] window from a
+   * DateRangeDto (already through ValidationPipe + @IsDateString) and
+   * fall back to per-endpoint defaults when either side is omitted.
+   * Pre-iter-89 every analytics endpoint did `new Date(startDate)`
+   * directly — a malformed ISO produced `Invalid Date` (NaN) and every
+   * gte/lte downstream silently returned false, surfacing as a confusing
+   * empty heatmap instead of a 400 (same trap as iter-87 / iter-64).
+   */
+  private resolveRange(
+    query: DateRangeDto | undefined,
+    defaultStart: Date,
+    defaultEnd: Date,
+  ): { start: Date; end: Date } {
+    const start = query?.startDate ? new Date(query.startDate) : defaultStart;
+    const end = query?.endDate ? new Date(query.endDate) : defaultEnd;
+    // @IsDateString catches most bad shapes upstream; this is defence in
+    // depth (e.g. `2025-02-30T00:00:00Z` passes @IsDateString but constructs
+    // Invalid Date).
+    if (Number.isNaN(start.getTime())) {
+      throw new BadRequestException('startDate must be a valid ISO-8601 date');
+    }
+    if (Number.isNaN(end.getTime())) {
+      throw new BadRequestException('endDate must be a valid ISO-8601 date');
+    }
+    if (start > end) {
+      throw new BadRequestException('startDate must be before or equal to endDate');
+    }
+    const windowDays = (end.getTime() - start.getTime()) / MILLIS_PER_DAY;
+    if (windowDays > ANALYTICS_MAX_RANGE_DAYS) {
+      throw new BadRequestException(
+        `Date range cannot exceed ${ANALYTICS_MAX_RANGE_DAYS} days. Split the request into smaller windows.`,
+      );
+    }
+    return { start, end };
+  }
+
   // ==================== HEATMAP ENDPOINTS ====================
 
   @Get('heatmap/occupancy')
@@ -66,15 +116,16 @@ export class AnalyticsController {
   @ApiQuery({ name: 'endDate', required: false, description: 'End date (ISO format)' })
   @ApiQuery({ name: 'granularity', required: false, enum: HeatmapGranularity })
   @ApiResponse({ status: 200, description: 'Occupancy heatmap data' })
-  async getOccupancyHeatmap(
-    @Request() req,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query('granularity') granularity?: HeatmapGranularity,
-  ) {
-    const start = startDate ? new Date(startDate) : new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const end = endDate ? new Date(endDate) : new Date();
-    return this.heatmapService.getOccupancyHeatmap(req.tenantId, start, end, { granularity });
+  async getOccupancyHeatmap(@Request() req, @Query() query: HeatmapQueryDto) {
+    const now = new Date();
+    const { start, end } = this.resolveRange(
+      query,
+      new Date(now.getTime() - 24 * 60 * 60 * 1000),
+      now,
+    );
+    return this.heatmapService.getOccupancyHeatmap(req.tenantId, start, end, {
+      granularity: query.granularity,
+    });
   }
 
   @Get('heatmap/traffic')
@@ -85,15 +136,16 @@ export class AnalyticsController {
   @ApiQuery({ name: 'endDate', required: false, description: 'End date (ISO format)' })
   @ApiQuery({ name: 'granularity', required: false, enum: HeatmapGranularity })
   @ApiResponse({ status: 200, description: 'Traffic heatmap data' })
-  async getTrafficHeatmap(
-    @Request() req,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query('granularity') granularity?: HeatmapGranularity,
-  ) {
-    const start = startDate ? new Date(startDate) : new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const end = endDate ? new Date(endDate) : new Date();
-    return this.heatmapService.getTrafficHeatmap(req.tenantId, start, end, { granularity });
+  async getTrafficHeatmap(@Request() req, @Query() query: HeatmapQueryDto) {
+    const now = new Date();
+    const { start, end } = this.resolveRange(
+      query,
+      new Date(now.getTime() - 24 * 60 * 60 * 1000),
+      now,
+    );
+    return this.heatmapService.getTrafficHeatmap(req.tenantId, start, end, {
+      granularity: query.granularity,
+    });
   }
 
   @Get('heatmap/dwell-time')
@@ -104,15 +156,16 @@ export class AnalyticsController {
   @ApiQuery({ name: 'endDate', required: false, description: 'End date (ISO format)' })
   @ApiQuery({ name: 'granularity', required: false, enum: HeatmapGranularity })
   @ApiResponse({ status: 200, description: 'Dwell time heatmap data' })
-  async getDwellTimeHeatmap(
-    @Request() req,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query('granularity') granularity?: HeatmapGranularity,
-  ) {
-    const start = startDate ? new Date(startDate) : new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const end = endDate ? new Date(endDate) : new Date();
-    return this.heatmapService.getDwellTimeHeatmap(req.tenantId, start, end, { granularity });
+  async getDwellTimeHeatmap(@Request() req, @Query() query: HeatmapQueryDto) {
+    const now = new Date();
+    const { start, end } = this.resolveRange(
+      query,
+      new Date(now.getTime() - 24 * 60 * 60 * 1000),
+      now,
+    );
+    return this.heatmapService.getDwellTimeHeatmap(req.tenantId, start, end, {
+      granularity: query.granularity,
+    });
   }
 
   @Get('traffic/flow')
@@ -125,13 +178,20 @@ export class AnalyticsController {
   @ApiResponse({ status: 200, description: 'Traffic flow paths' })
   async getTrafficFlow(
     @Request() req,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
+    @Query() query: DateRangeDto,
     @Query('limit') limit?: string,
   ) {
-    const start = startDate ? new Date(startDate) : new Date(Date.now() - 60 * 60 * 1000);
-    const end = endDate ? new Date(endDate) : new Date();
-    const limitNum = limit ? parseInt(limit, 10) : 50;
+    const now = new Date();
+    const { start, end } = this.resolveRange(
+      query,
+      new Date(now.getTime() - 60 * 60 * 1000),
+      now,
+    );
+    // Cap limit at 500 so a hostile caller can't pull every flow path in
+    // one shot (each path carries a sequence of grid coordinates; large
+    // pulls are both memory- and DB-heavy).
+    const parsed = limit ? parseInt(limit, 10) : 50;
+    const limitNum = Number.isFinite(parsed) && parsed > 0 ? Math.min(parsed, 500) : 50;
     return this.heatmapService.getTrafficFlowPaths(req.tenantId, start, end, limitNum);
   }
 
@@ -142,13 +202,13 @@ export class AnalyticsController {
   @ApiQuery({ name: 'startDate', required: false, description: 'Start date (ISO format)' })
   @ApiQuery({ name: 'endDate', required: false, description: 'End date (ISO format)' })
   @ApiResponse({ status: 200, description: 'Congestion analysis' })
-  async getCongestionAnalysis(
-    @Request() req,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    const start = startDate ? new Date(startDate) : new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const end = endDate ? new Date(endDate) : new Date();
+  async getCongestionAnalysis(@Request() req, @Query() query: DateRangeDto) {
+    const now = new Date();
+    const { start, end } = this.resolveRange(
+      query,
+      new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+      now,
+    );
     return this.heatmapService.getCongestionAnalysis(req.tenantId, start, end);
   }
 
@@ -161,13 +221,13 @@ export class AnalyticsController {
   @ApiQuery({ name: 'startDate', required: false, description: 'Start date (ISO format)' })
   @ApiQuery({ name: 'endDate', required: false, description: 'End date (ISO format)' })
   @ApiResponse({ status: 200, description: 'Table utilization data' })
-  async getTableUtilization(
-    @Request() req,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    const end = endDate ? new Date(endDate) : new Date();
-    const start = startDate ? new Date(startDate) : new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
+  async getTableUtilization(@Request() req, @Query() query: DateRangeDto) {
+    const now = new Date();
+    const { start, end } = this.resolveRange(
+      query,
+      new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+      now,
+    );
     return this.tableAnalyticsService.getTableUtilization(req.tenantId, start, end);
   }
 
@@ -178,13 +238,13 @@ export class AnalyticsController {
   @ApiQuery({ name: 'startDate', required: false, description: 'Start date (ISO format)' })
   @ApiQuery({ name: 'endDate', required: false, description: 'End date (ISO format)' })
   @ApiResponse({ status: 200, description: 'Utilization trends' })
-  async getUtilizationTrends(
-    @Request() req,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    const end = endDate ? new Date(endDate) : new Date();
-    const start = startDate ? new Date(startDate) : new Date(end.getTime() - 30 * 24 * 60 * 60 * 1000);
+  async getUtilizationTrends(@Request() req, @Query() query: DateRangeDto) {
+    const now = new Date();
+    const { start, end } = this.resolveRange(
+      query,
+      new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000),
+      now,
+    );
     return this.tableAnalyticsService.getUtilizationTrends(req.tenantId, start, end);
   }
 
@@ -198,7 +258,12 @@ export class AnalyticsController {
     @Request() req,
     @Query('threshold') threshold?: string,
   ) {
-    const thresholdNum = threshold ? parseInt(threshold, 10) : 50;
+    // Threshold is a utilization-percentage cutoff (0-100). Clamp so a
+    // bad string (NaN) or out-of-range value doesn't propagate into the
+    // service's `where: { utilization: { lt: NaN } }` (which silently
+    // matches nothing — same empty-list trap as the date case above).
+    const parsed = threshold ? parseInt(threshold, 10) : 50;
+    const thresholdNum = Number.isFinite(parsed) ? Math.min(100, Math.max(0, parsed)) : 50;
     return this.tableAnalyticsService.getUnderutilizedTables(req.tenantId, thresholdNum);
   }
 
@@ -209,13 +274,13 @@ export class AnalyticsController {
   @ApiQuery({ name: 'startDate', required: false, description: 'Start date (ISO format)' })
   @ApiQuery({ name: 'endDate', required: false, description: 'End date (ISO format)' })
   @ApiResponse({ status: 200, description: 'Customer behavior data' })
-  async getCustomerBehavior(
-    @Request() req,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-  ) {
-    const end = endDate ? new Date(endDate) : new Date();
-    const start = startDate ? new Date(startDate) : new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
+  async getCustomerBehavior(@Request() req, @Query() query: DateRangeDto) {
+    const now = new Date();
+    const { start, end } = this.resolveRange(
+      query,
+      new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+      now,
+    );
     return this.tableAnalyticsService.getCustomerBehavior(req.tenantId, start, end);
   }
 
