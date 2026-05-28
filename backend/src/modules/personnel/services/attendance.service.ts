@@ -4,6 +4,7 @@ import { KdsGateway } from '../../kds/kds.gateway';
 import { AttendanceStatus } from '../constants/personnel.enum';
 import { AttendanceQueryDto, AttendanceSummaryQueryDto } from '../dto/attendance-query.dto';
 import { paginated } from '../../../common/pagination';
+import { getTenantMidnight } from '../../../common/helpers/timezone.helper';
 
 @Injectable()
 export class AttendanceService {
@@ -12,9 +13,24 @@ export class AttendanceService {
     private kdsGateway: KdsGateway,
   ) {}
 
+  /**
+   * Resolve the tenant-local-midnight UTC instant for "today". Same
+   * helper z-reports uses (iter-35). Without this, server-local
+   * midnight diverges from the tenant's "today" — a user clocking
+   * in at 02:00 TR on a UTC container gets stamped with the previous
+   * server date, which then breaks payroll-export day boundaries
+   * and the shift-late calculation against shiftTemplate.startTime.
+   */
+  private async tenantToday(tenantId: string): Promise<Date> {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { timezone: true },
+    });
+    return getTenantMidnight(new Date(), tenant?.timezone || 'UTC');
+  }
+
   async clockIn(tenantId: string, userId: string, notes?: string) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = await this.tenantToday(tenantId);
 
     // Check no existing active record for today
     const existing = await this.prisma.attendance.findFirst({
@@ -82,8 +98,7 @@ export class AttendanceService {
   }
 
   async clockOut(tenantId: string, userId: string) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = await this.tenantToday(tenantId);
 
     const attendance = await this.prisma.attendance.findFirst({
       where: { userId, date: today, tenantId },
@@ -151,8 +166,7 @@ export class AttendanceService {
   }
 
   async breakStart(tenantId: string, userId: string) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = await this.tenantToday(tenantId);
 
     const attendance = await this.prisma.attendance.findFirst({
       where: { userId, date: today, tenantId },
@@ -189,8 +203,7 @@ export class AttendanceService {
   }
 
   async breakEnd(tenantId: string, userId: string) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = await this.tenantToday(tenantId);
 
     const attendance = await this.prisma.attendance.findFirst({
       where: { userId, date: today, tenantId },
@@ -243,8 +256,7 @@ export class AttendanceService {
   }
 
   async getMyStatus(tenantId: string, userId: string) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = await this.tenantToday(tenantId);
 
     const attendance = await this.prisma.attendance.findFirst({
       where: { userId, date: today, tenantId },
@@ -258,8 +270,7 @@ export class AttendanceService {
   }
 
   async getTodayAttendance(tenantId: string) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = await this.tenantToday(tenantId);
 
     return this.prisma.attendance.findMany({
       where: { tenantId, date: today },
