@@ -14,6 +14,11 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagg
 import { IntegrationsService } from './integrations.service';
 import { CreateIntegrationDto } from './dto/create-integration.dto';
 import { UpdateIntegrationDto } from './dto/update-integration.dto';
+import {
+  ReportDeviceEventDto,
+  ToggleIntegrationStatusDto,
+  UpdateDeviceStatusDto,
+} from './dto/hardware-ops.dto';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../auth/guards/roles.guard';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
@@ -89,7 +94,7 @@ export class IntegrationsController {
   toggleStatus(
     @Request() req,
     @Param('id') id: string,
-    @Body() body: { isEnabled: boolean },
+    @Body() body: ToggleIntegrationStatusDto,
   ) {
     return this.integrationsService.toggleStatus(id, req.tenantId, body.isEnabled);
   }
@@ -125,12 +130,12 @@ export class HardwareConfigController {
   async updateDeviceStatus(
     @Request() req,
     @Param('deviceId') deviceId: string,
-    @Body() statusData: any,
+    @Body() body: UpdateDeviceStatusDto,
   ) {
     return this.integrationsService.updateDeviceStatus(
       deviceId,
       req.tenantId,
-      statusData,
+      body.status,
     );
   }
 
@@ -141,12 +146,12 @@ export class HardwareConfigController {
   async reportDeviceEvent(
     @Request() req,
     @Param('deviceId') deviceId: string,
-    @Body() eventData: any,
+    @Body() body: ReportDeviceEventDto,
   ) {
     return this.integrationsService.reportDeviceEvent(
       deviceId,
       req.tenantId,
-      eventData,
+      body,
     );
   }
 }

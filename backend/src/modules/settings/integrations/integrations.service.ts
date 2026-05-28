@@ -189,9 +189,16 @@ export class IntegrationsService {
         : (updateDto.config as any);
     }
 
-    const updated = await this.prisma.integrationSettings.update({
-      where: { id: integration.id },
+    // Compound WHERE (B41-B45 pattern, iter-31 onward). The findFirst
+    // above already proves ownership, but a future refactor that drops
+    // it shouldn't leak into a cross-tenant write.
+    const claim = await this.prisma.integrationSettings.updateMany({
+      where: { id: integration.id, tenantId },
       data,
+    });
+    if (claim.count === 0) throw new NotFoundException('Integration not found');
+    const updated = await this.prisma.integrationSettings.findFirstOrThrow({
+      where: { id: integration.id, tenantId },
     });
     return this.toPublicView(updated);
   }
@@ -286,20 +293,22 @@ export class IntegrationsService {
       },
     };
 
-    await this.prisma.integrationSettings.update({
-      where: { id: integration.id },
+    // Compound WHERE — same defence-in-depth pattern as update() above.
+    const claim = await this.prisma.integrationSettings.updateMany({
+      where: { id: integration.id, tenantId },
       data: {
         config: updatedConfig as any,
         lastSyncedAt: new Date(),
       },
     });
+    if (claim.count === 0) throw new NotFoundException('Integration not found');
     return { success: true };
   }
 
   async reportDeviceEvent(
     deviceId: string,
     tenantId: string,
-    eventData: Record<string, unknown>,
+    eventData: { event: string; data?: Record<string, unknown> },
   ) {
     const integration = await this.prisma.integrationSettings.findFirst({
       where: { id: deviceId, tenantId },
@@ -308,14 +317,17 @@ export class IntegrationsService {
 
     // Log at debug, redacted. Previously console.log dumped full event
     // payloads which often included PII (order detail, customer data).
+    const dataKeys = eventData.data ? Object.keys(eventData.data).length : 0;
     this.logger.debug(
-      `Hardware event for ${integration.provider}: ${Object.keys(eventData).length} fields`,
+      `Hardware event for ${integration.provider}: type=${eventData.event} (${dataKeys} data fields)`,
     );
 
-    await this.prisma.integrationSettings.update({
-      where: { id: integration.id },
+    // Compound WHERE — same defence-in-depth pattern as update() above.
+    const claim = await this.prisma.integrationSettings.updateMany({
+      where: { id: integration.id, tenantId },
       data: { lastSyncedAt: new Date() },
     });
+    if (claim.count === 0) throw new NotFoundException('Integration not found');
     return { success: true };
   }
 }
