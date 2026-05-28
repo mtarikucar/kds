@@ -19,6 +19,7 @@ import {
   Disable2FADto,
   RegenerateBackupCodesDto,
 } from '../dto/verify-2fa.dto';
+import { SuperAdminRefreshTokenDto } from '../dto/refresh-token.dto';
 import { SuperAdminGuard } from '../guards/superadmin.guard';
 import { SuperAdminPublic, SuperAdminRoute } from '../decorators/superadmin.decorator';
 import { CurrentSuperAdmin } from '../decorators/current-superadmin.decorator';
@@ -118,8 +119,8 @@ export class SuperAdminAuthController {
   @Throttle(REFRESH_THROTTLE)
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Refresh access token' })
-  async refresh(@Body('refreshToken') refreshToken: string) {
-    return this.authService.refreshToken(refreshToken);
+  async refresh(@Body() dto: SuperAdminRefreshTokenDto) {
+    return this.authService.refreshToken(dto.refreshToken);
   }
 
   @Get('me')

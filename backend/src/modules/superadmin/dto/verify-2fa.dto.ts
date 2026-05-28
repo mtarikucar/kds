@@ -1,10 +1,18 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, Length, MaxLength } from 'class-validator';
 
+// JWTs serialized by @nestjs/jwt are ~500-1000 chars in practice.
+// 4096 leaves plenty of headroom for future claim additions while
+// bounding the input — without this, a megabyte tempToken would be
+// JSON-parsed by the validation pipe and base64-decoded by
+// jwt.verify before the signature check fails.
+const JWT_MAX_LENGTH = 4096;
+
 export class Verify2FADto {
   @ApiProperty({ description: 'Temporary token from login' })
   @IsString()
   @IsNotEmpty()
+  @MaxLength(JWT_MAX_LENGTH)
   tempToken: string;
 
   /**
