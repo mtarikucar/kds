@@ -70,8 +70,20 @@ export class PaytrPaymentProvider implements PaymentProvider, OnModuleInit {
         `PayTR intent requires: ${missing.join(', ')}. Provide them at checkout — fraud-scoring needs real values.`,
       );
     }
+    // Currency safety gate (mirrors PaymentsService.createIntent +
+    // CustomerSelfPayService.createPayIntent). PayTR collects in TRY
+    // only; without this check a USD-priced cart would charge the same
+    // numeric amount in TL. The adapter rejects non-TRY too, but
+    // surfacing the error here gives the mixed-cart caller a clean
+    // 400 before any reservation rows are written.
+    if (req.currency !== 'TRY') {
+      throw new BadRequestException(
+        `PayTR yalnızca TRY ile tahsilat yapar. İstenen para birimi: ${req.currency}.`,
+      );
+    }
     const result = await this.paytr.getIframeToken({
       amount: req.amountCents / 100,
+      currency: req.currency,
       merchantOid: req.externalRef.slice(0, 64),
       email: buyer.email!,
       userName: buyer.name!,

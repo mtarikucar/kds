@@ -416,6 +416,25 @@ export class CustomerSelfPayService {
       }
     }
 
+    // Currency safety gate — PayTR collects in TRY only. The Order
+    // schema doesn't carry a per-order currency column today (line
+    // items inherit the tenant's currency setting from Tenant.currency),
+    // so we read the tenant row instead. A tenant operating in (e.g.)
+    // USD would otherwise have the customer see "$199" on the QR-menu
+    // bill while the adapter hardcodes wire-format currency=TL — same
+    // bug-shape iter-67 closes on the subscription path. The adapter
+    // throws on mismatch as defence in depth; this pre-check produces
+    // a clean structured error before the PendingSelfPayment row is
+    // reserved.
+    const tenantCurrency = tenant.currency || 'TRY';
+    if (tenantCurrency !== 'TRY') {
+      throw selfPayError(
+        'SELF_PAY_UNSUPPORTED_CURRENCY',
+        `Self-pay yalnızca TRY ile çalışan restoranlarda kullanılabilir (mevcut: ${tenantCurrency}).`,
+      );
+    }
+    const orderCurrency = tenantCurrency;
+
     // Defence-in-depth against the legacy-payment blind spot:
     // self-pay is disabled on any order that already has a Payment
     // row WITHOUT a matching OrderItemPayment allocation, because
@@ -579,6 +598,9 @@ export class CustomerSelfPayService {
       const result = await this.paytrAdapter.getIframeToken({
         merchantOid,
         amount: totalAmount,
+        // Validated above to be 'TRY'. Passed explicitly so the
+        // adapter's currency-gate fires as defence in depth.
+        currency: orderCurrency,
         email: safeEmail,
         userName: 'Müşteri',
         userAddress: 'Masa',
@@ -598,7 +620,12 @@ export class CustomerSelfPayService {
         merchantOid,
         paymentLink: result.paymentLink,
         amount: totalAmount.toFixed(2),
-        currency: 'TRY',
+        // Echo back the validated source currency. The pre-check above
+        // guarantees orderCurrency === 'TRY' for any path that reaches
+        // PayTR, but reading from the variable means a future relax of
+        // the gate (extra provider added) won't silently lie about what
+        // the customer was charged.
+        currency: orderCurrency,
       };
     } catch (err: any) {
       // PayTR couldn't issue a token — mark the intent failed so a

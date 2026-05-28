@@ -137,6 +137,22 @@ export class PaymentsService {
       );
     }
 
+    // Currency safety gate — PayTR collects in TRY only. A plan priced
+    // in USD/EUR would display as "$199" / "€199" on the storefront,
+    // but the adapter (until this iter) hardcoded `currency=TL` on the
+    // wire, so the customer would be charged 199 TL while seeing a USD
+    // total. Fail at the earliest possible point: BEFORE reserving the
+    // SubscriptionPayment row or pre-creating a PENDING Subscription.
+    // The adapter still self-validates as defence-in-depth.
+    if (plan.currency !== 'TRY') {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'Unsupported Currency',
+        code: 'PAYTR_ONLY_SUPPORTS_TRY',
+        message: `PayTR yalnızca TRY ile tahsilat yapar. Bu plan ${plan.currency} ile fiyatlandırılmış.`,
+      });
+    }
+
     // Legal consent gate — three required documents (KVKK + Mesafeli
     // Satış + İade) must be checked at the checkout step. ConsentService
     // verifies the ids point to the current `isCurrent=true` rows of
@@ -254,6 +270,7 @@ export class PaymentsService {
       token = await this.paytr.getIframeToken({
         merchantOid,
         amount,
+        currency: plan.currency,
         email: callingUser.email,
         userName:
           `${callingUser.firstName ?? ''} ${callingUser.lastName ?? ''}`.trim() ||

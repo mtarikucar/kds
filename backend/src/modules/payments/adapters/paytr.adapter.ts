@@ -1,9 +1,44 @@
-import { Injectable, Logger, BadGatewayException } from "@nestjs/common";
+import {
+  BadGatewayException,
+  BadRequestException,
+  Injectable,
+  Logger,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import * as crypto from "crypto";
 import axios from "axios";
 import { Prisma } from "@prisma/client";
 import { decryptString } from "../../../common/helpers/encryption.helper";
+
+/**
+ * PayTR's TR merchant account only supports collecting TRY. The adapter
+ * itself emits the wire-format string "TL" — PayTR's internal label —
+ * but every caller MUST pass "TRY" (or, for parity with PayTR's own
+ * label, "TL"). Anything else (USD, EUR, ...) would otherwise silently
+ * collect the same numeric amount in TL because PayTR ignores the
+ * currency field for non-TR accounts. The user-reported incident
+ * ("199 $ olan şey 199 TL olarak satın alınıyor") was exactly this
+ * shape: a plan priced in USD displayed as $199 on the storefront,
+ * adapter posted `payment_amount=19900 currency=TL`, customer paid
+ * 199 TL.
+ *
+ * Refuse the call here at the boundary — every higher-level caller
+ * (PaymentsService.createIntent, CustomerSelfPayService.createPayIntent,
+ * PaytrPaymentProvider.createIntent) now passes the source currency
+ * explicitly so the failure surfaces as a 400 before any SubscriptionPayment
+ * / PendingSelfPayment row is reserved.
+ */
+const PAYTR_SUPPORTED_CURRENCIES = new Set(['TRY', 'TL']);
+const PAYTR_WIRE_CURRENCY = 'TL';
+
+function assertPaytrCurrency(currency: string): void {
+  if (!PAYTR_SUPPORTED_CURRENCIES.has(currency)) {
+    throw new BadRequestException(
+      `PayTR yalnızca TRY desteklemektedir — istenen para birimi: ${currency}. ` +
+        'Planı/siparişi TRY ile fiyatlandırın veya başka bir ödeme sağlayıcısı seçin.',
+    );
+  }
+}
 
 /**
  * PayTR iFrame Token API adapter.
@@ -205,6 +240,14 @@ const PAYTR_INSTALLMENT_TABLE_ENDPOINT =
 export interface GetIframeTokenInput {
   merchantOid: string;
   amount: Prisma.Decimal | number | string;
+  /**
+   * Source currency code from the plan/order. Validated against PayTR's
+   * supported set at the adapter boundary — anything other than TRY/TL
+   * throws BadRequestException before the get-token HTTP call fires.
+   * Callers MUST pass the actual currency (do NOT hardcode 'TRY' just
+   * to satisfy this check — that recreates the original bug).
+   */
+  currency: string;
   email: string;
   userName: string;
   userAddress: string;
@@ -226,6 +269,8 @@ export interface GetIframeTokenResult {
 export interface ChargeRecurringInput {
   merchantOid: string;
   amount: Prisma.Decimal | number | string;
+  /** Source currency — same validation rules as GetIframeTokenInput.currency. */
+  currency: string;
   /**
    * Stored PayTR recurring token. Pass it as written to
    * `Tenant.paytrRecurringToken` (encrypted with `encryptString`); the
@@ -333,6 +378,11 @@ export class PaytrAdapter {
   async getIframeToken(
     input: GetIframeTokenInput,
   ): Promise<GetIframeTokenResult> {
+    // Fail loud + early: refuse non-TRY at the boundary so the higher-
+    // level caller never reserves a SubscriptionPayment / PendingSelfPayment
+    // row that the adapter then silently collects in TL.
+    assertPaytrCurrency(input.currency);
+
     const { merchantId, merchantKey, merchantSalt, testMode } =
       this.credentials;
 
@@ -435,6 +485,8 @@ export class PaytrAdapter {
   async chargeRecurring(
     input: ChargeRecurringInput,
   ): Promise<ChargeRecurringResult> {
+    assertPaytrCurrency(input.currency);
+
     const { merchantId, merchantKey, merchantSalt } = this.credentials;
     const total = amountToKurus(input.amount);
     // The token is stored encrypted at rest; the recurring API needs the
