@@ -73,6 +73,13 @@ export class NotificationsService {
   }
 
   async markAllAsRead(tenantId: string, userId: string) {
+    // Previously this issued an `upsert` per notification inside a single
+    // $transaction — for a long-lived tenant with thousands of legacy
+    // notifications that's thousands of round-trips holding one txn open
+    // (and the txn lock duration scales linearly with notification count).
+    // createMany + skipDuplicates collapses to one INSERT … ON CONFLICT DO
+    // NOTHING. We still scope the source select to (tenantId, userId or
+    // isGlobal) so we never mark cross-tenant rows as read.
     const notifications = await this.prisma.notification.findMany({
       where: { tenantId, OR: [{ userId }, { isGlobal: true }] },
       select: { id: true },
@@ -80,15 +87,10 @@ export class NotificationsService {
 
     if (notifications.length === 0) return;
 
-    await this.prisma.$transaction(
-      notifications.map((n) =>
-        this.prisma.userNotificationRead.upsert({
-          where: { notificationId_userId: { notificationId: n.id, userId } },
-          create: { notificationId: n.id, userId },
-          update: {},
-        }),
-      ),
-    );
+    await this.prisma.userNotificationRead.createMany({
+      data: notifications.map((n) => ({ notificationId: n.id, userId })),
+      skipDuplicates: true,
+    });
   }
 
   /**

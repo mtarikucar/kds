@@ -126,3 +126,80 @@ describe('NotificationsService.notifyAdmins (iter-8 fan-out race fix)', () => {
     );
   });
 });
+
+/**
+ * Regression spec for iter-53 markAllAsRead.
+ *
+ * Previous implementation did `$transaction([upsert × N])` — one
+ * round-trip per notification all sharing one open txn. For a tenant
+ * with 5k legacy notifications that's 5k statements blocking inside
+ * one Postgres txn. The fix swaps to a single `createMany` with
+ * `skipDuplicates: true`, which the @@unique([notificationId, userId])
+ * constraint on UserNotificationRead supports.
+ *
+ * Load-bearing assertions:
+ *  1. Tenant scope on the source select is preserved (no cross-tenant
+ *     mark-as-read).
+ *  2. The write path is `userNotificationRead.createMany` with
+ *     `skipDuplicates: true` — NOT `$transaction([...upserts])`.
+ *  3. Empty notification list short-circuits without a write.
+ */
+describe('NotificationsService.markAllAsRead (iter-53 createMany swap)', () => {
+  let prisma: MockPrismaClient;
+  let gateway: { sendNotificationToUser: jest.Mock };
+  let svc: NotificationsService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    gateway = { sendNotificationToUser: jest.fn() };
+    svc = new NotificationsService(prisma as any, gateway as any);
+  });
+
+  it('short-circuits without a write when the user has no notifications', async () => {
+    prisma.notification.findMany.mockResolvedValue([] as any);
+
+    await svc.markAllAsRead('t1', 'u1');
+
+    expect((prisma.userNotificationRead.createMany as any).mock.calls.length).toBe(0);
+    expect((prisma.$transaction as any).mock.calls.length).toBe(0);
+  });
+
+  it('scopes the source select to (tenantId, OR(userId | isGlobal))', async () => {
+    prisma.notification.findMany.mockResolvedValue([{ id: 'n1' }] as any);
+    (prisma.userNotificationRead.createMany as any).mockResolvedValue({ count: 1 });
+
+    await svc.markAllAsRead('t1', 'u1');
+
+    expect(prisma.notification.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { tenantId: 't1', OR: [{ userId: 'u1' }, { isGlobal: true }] },
+        select: { id: true },
+      }),
+    );
+  });
+
+  it('uses createMany + skipDuplicates instead of $transaction upserts', async () => {
+    prisma.notification.findMany.mockResolvedValue([
+      { id: 'n1' },
+      { id: 'n2' },
+      { id: 'n3' },
+    ] as any);
+    (prisma.userNotificationRead.createMany as any).mockResolvedValue({ count: 3 });
+
+    await svc.markAllAsRead('t1', 'u1');
+
+    expect(prisma.userNotificationRead.createMany).toHaveBeenCalledTimes(1);
+    expect(prisma.userNotificationRead.createMany).toHaveBeenCalledWith({
+      data: [
+        { notificationId: 'n1', userId: 'u1' },
+        { notificationId: 'n2', userId: 'u1' },
+        { notificationId: 'n3', userId: 'u1' },
+      ],
+      skipDuplicates: true,
+    });
+    // The pre-iter-53 path used $transaction with an array of upserts —
+    // this assertion locks in that we don't regress to it.
+    expect((prisma.$transaction as any).mock.calls.length).toBe(0);
+    expect((prisma.userNotificationRead.upsert as any).mock.calls.length).toBe(0);
+  });
+});
