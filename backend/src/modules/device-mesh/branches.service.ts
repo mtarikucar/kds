@@ -62,8 +62,15 @@ export class BranchesService {
     if (input.status && !['active', 'suspended', 'archived'].includes(input.status)) {
       throw new BadRequestException(`Invalid status: ${input.status}`);
     }
-    return this.prisma.branch.update({
-      where: { id },
+    // Compound WHERE (B41-B45 pattern, iter-31 onward). findOrThrow above
+    // already proves ownership, but the surrounding codebase enforces
+    // tenant scope at the query layer too so a future refactor that
+    // drops the pre-check can't leak into a cross-tenant rename, status
+    // flip, or timezone change. Surfacing count=0 as NotFoundException
+    // also closes a TOCTOU window where the row is archived between
+    // the findOrThrow read and the write.
+    const claim = await this.prisma.branch.updateMany({
+      where: { id, tenantId },
       data: {
         name: input.name,
         code: input.code,
@@ -72,6 +79,8 @@ export class BranchesService {
         status: input.status,
       },
     });
+    if (claim.count === 0) throw new NotFoundException('Branch not found');
+    return this.prisma.branch.findFirstOrThrow({ where: { id, tenantId } });
   }
 
   async archive(tenantId: string, id: string) {

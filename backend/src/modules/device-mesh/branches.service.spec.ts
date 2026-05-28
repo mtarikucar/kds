@@ -27,11 +27,42 @@ describe('BranchesService', () => {
   it('archive is a status update to archived', async () => {
     prisma.branch.findFirst.mockResolvedValue({ id: 'b-1', tenantId: 't1' } as any);
     let captured: any = null;
-    (prisma.branch.update as any).mockImplementation(async ({ data }: any) => {
+    (prisma.branch.updateMany as any).mockImplementation(async ({ data }: any) => {
       captured = data;
-      return { id: 'b-1', ...data };
+      return { count: 1 };
     });
+    (prisma.branch.findFirstOrThrow as any).mockResolvedValue({ id: 'b-1', tenantId: 't1', status: 'archived' });
     await svc.archive('t1', 'b-1');
     expect(captured.status).toBe('archived');
+  });
+
+  /**
+   * Iter-73 regression. update() previously did .update({where:{id}})
+   * without the tenantId compound, so a future refactor that drops
+   * the preceding findOrThrow could leak into a cross-tenant rename
+   * or status flip. Switched to updateMany + (id, tenantId) WHERE +
+   * count-check. The find-by-id portion of the old read is also gone
+   * (findOrThrow already did the tenant-scoped read).
+   */
+  describe('iter-73 compound-WHERE on update', () => {
+    it('writes via updateMany with (id, tenantId) WHERE', async () => {
+      prisma.branch.findFirst.mockResolvedValue({ id: 'b-1', tenantId: 't1' } as any);
+      let updateWhere: any = null;
+      (prisma.branch.updateMany as any).mockImplementation(async ({ where }: any) => {
+        updateWhere = where;
+        return { count: 1 };
+      });
+      (prisma.branch.findFirstOrThrow as any).mockResolvedValue({ id: 'b-1', tenantId: 't1' });
+
+      await svc.update('t1', 'b-1', { name: 'Renamed' });
+
+      expect(updateWhere).toEqual({ id: 'b-1', tenantId: 't1' });
+    });
+
+    it('count=0 surfaces NotFoundException (TOCTOU between findOrThrow and write)', async () => {
+      prisma.branch.findFirst.mockResolvedValue({ id: 'b-1', tenantId: 't1' } as any);
+      (prisma.branch.updateMany as any).mockResolvedValue({ count: 0 });
+      await expect(svc.update('t1', 'b-1', { name: 'Renamed' })).rejects.toThrow(/not found/i);
+    });
   });
 });
