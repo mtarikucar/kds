@@ -122,4 +122,52 @@ describe('TablesService (iter-9 defense-in-depth + active-order guards)', () => 
       await expect(svc.remove('tab-1', 't1')).rejects.toThrow(NotFoundException);
     });
   });
+
+  /**
+   * Iter-59 regression. unmergeTable was the odd one out — update() /
+   * updateStatus() / remove() all use compound (id, tenantId) WHEREs on
+   * the write to defend against a regression in the preceding
+   * tenant-scoped findFirst. unmergeTable was still doing
+   * `update({ where: { id } })` without the tenantId clause. iter-59
+   * switches it to updateMany with the compound WHERE plus a count check.
+   */
+  describe('unmergeTable (iter-59 compound WHERE)', () => {
+    beforeEach(() => {
+      const kdsGateway = { emitTableUnmerge: jest.fn() } as any;
+      svc = new TablesService(prisma as any, kdsGateway);
+    });
+
+    it('writes via updateMany with compound (id, tenantId) WHERE', async () => {
+      prisma.table.findFirst.mockResolvedValue({
+        id: 'tab-x',
+        tenantId: 't1',
+        number: '5',
+        groupId: 'g-1',
+      } as any);
+      let detachWhere: any = null;
+      (prisma.table.updateMany as any).mockImplementation(async ({ where }: any) => {
+        detachWhere = where;
+        return { count: 1 };
+      });
+      (prisma.table.count as any).mockResolvedValue(3);
+
+      await svc.unmergeTable({ tableId: 'tab-x' }, 't1');
+
+      expect(detachWhere).toEqual({ id: 'tab-x', tenantId: 't1' });
+    });
+
+    it('surfaces NotFoundException when the detach count is 0 (foreign-tenant or already gone)', async () => {
+      prisma.table.findFirst.mockResolvedValue({
+        id: 'tab-x',
+        tenantId: 't1',
+        number: '5',
+        groupId: 'g-1',
+      } as any);
+      (prisma.table.updateMany as any).mockResolvedValue({ count: 0 });
+
+      await expect(svc.unmergeTable({ tableId: 'tab-x' }, 't1')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
 });

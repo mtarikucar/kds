@@ -403,11 +403,19 @@ export class TablesService {
 
       const groupId = table.groupId;
 
-      // Remove this table from group
-      await tx.table.update({
-        where: { id: dto.tableId },
+      // Compound WHERE — IDOR guard (B41-B45 pattern, same shape as
+      // update() / updateStatus() / remove() above). The findFirst
+      // above already proves ownership, but a future refactor that
+      // hoists the early-return or condenses the txn shouldn't get to
+      // silently leak into a cross-tenant write. Switching to
+      // updateMany also gives us a count we can sanity-check.
+      const detach = await tx.table.updateMany({
+        where: { id: dto.tableId, tenantId },
         data: { groupId: null },
       });
+      if (detach.count === 0) {
+        throw new NotFoundException('Table not found');
+      }
 
       // Check remaining group members
       const remaining = await tx.table.count({
