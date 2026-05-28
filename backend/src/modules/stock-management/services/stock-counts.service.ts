@@ -16,7 +16,20 @@ export class StockCountsService {
 
   async findAll(tenantId: string, status?: string) {
     const where: any = { tenantId };
-    if (status) where.status = status;
+    if (status !== undefined) {
+      // Iter-94: allowlist the status filter. Pre-fix the controller
+      // accepted any string and forwarded it straight to Prisma; an
+      // unknown value (typo `?status=DONE`) would silently match no
+      // rows and the caller saw an empty list. Reject at the boundary
+      // with a clear 400.
+      const allowed = Object.values(StockCountStatus) as string[];
+      if (!allowed.includes(status)) {
+        throw new BadRequestException(
+          `status must be one of: ${allowed.join(', ')}`,
+        );
+      }
+      where.status = status;
+    }
 
     return this.prisma.stockCount.findMany({
       where,
@@ -133,11 +146,29 @@ export class StockCountsService {
     }
 
     return this.prisma.$transaction(async (tx) => {
+      // Iter-94: claim the count atomically by flipping IN_PROGRESS →
+      // COMPLETED *before* applying any per-item adjustment. Pre-fix
+      // the status flip lived at the END of the loop with no compound
+      // WHERE on the current status, so two concurrent finalize calls
+      // both passed the pre-check above and double-applied every
+      // adjustment. Claim-first means the second caller's updateMany
+      // returns count===0 and the txn aborts before any increment is
+      // emitted.
+      const claim = await tx.stockCount.updateMany({
+        where: { id, tenantId, status: StockCountStatus.IN_PROGRESS },
+        data: { status: StockCountStatus.COMPLETED, completedAt: new Date() },
+      });
+      if (claim.count === 0) {
+        throw new ConflictException(
+          'Stock count was finalized or cancelled concurrently — refresh and retry.',
+        );
+      }
+
       for (const item of count.items) {
         if (item.countedQty === null) continue;
         const countedQty = new Prisma.Decimal(item.countedQty);
 
-        // Tenant-scoped updateMany so a poisoned stockItemId from some
+        // Tenant-scoped lookup so a poisoned stockItemId from some
         // other tenant cannot be overwritten here.
         const current = await tx.stockItem.findFirst({
           where: { id: item.stockItemId, tenantId },
@@ -151,9 +182,18 @@ export class StockCountsService {
         const adjustment = countedQty.sub(current.currentStock);
         if (adjustment.isZero()) continue;
 
+        // Iter-94: write as a DELTA, not as an absolute set. Pre-fix
+        // the update set `currentStock: countedQty` outright — a
+        // concurrent order-deduction that committed between this txn's
+        // read above and write below was silently reversed (the count
+        // overwrote whatever currentStock the order had decremented
+        // to). With increment, the adjustment composes with concurrent
+        // changes: if 5 more units were sold mid-finalize, the final
+        // stock = (current - 5) + adjustment = countedQty - 5, which
+        // correctly reflects both events.
         await tx.stockItem.updateMany({
           where: { id: item.stockItemId, tenantId },
-          data: { currentStock: countedQty as any },
+          data: { currentStock: { increment: adjustment as any } },
         });
 
         await tx.ingredientMovement.create({
@@ -169,11 +209,6 @@ export class StockCountsService {
         });
       }
 
-      // Defence-in-depth IDOR — tenantId in the WHERE.
-      await tx.stockCount.updateMany({
-        where: { id, tenantId },
-        data: { status: StockCountStatus.COMPLETED, completedAt: new Date() },
-      });
       return tx.stockCount.findUnique({
         where: { id },
         include: {
