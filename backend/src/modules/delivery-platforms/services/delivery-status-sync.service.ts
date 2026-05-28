@@ -3,6 +3,7 @@ import { PrismaService } from '../../../prisma/prisma.service';
 import { AdapterFactory } from '../adapters/adapter-factory';
 import { DeliveryLogService } from './delivery-log.service';
 import { DeliveryAuthService } from './delivery-auth.service';
+import { DeliveryConfigService } from './delivery-config.service';
 import {
   SYNCABLE_STATUSES,
   STATUS_TO_PLATFORM_ACTION,
@@ -21,6 +22,7 @@ export class DeliveryStatusSyncService {
     private adapterFactory: AdapterFactory,
     private logService: DeliveryLogService,
     private authService: DeliveryAuthService,
+    private configService: DeliveryConfigService,
   ) {}
 
   /**
@@ -99,6 +101,15 @@ export class DeliveryStatusSyncService {
         statusCode: error.response?.status,
         nextRetryAt: new Date(Date.now() + 30_000),
       });
+
+      // Same circuit-breaker bump as delivery-menu-sync (iter-38). The
+      // retry-scheduler will keep firing against nextRetryAt — without
+      // the counter increment a permanently-broken status endpoint
+      // (wrong API version, dropped credentials, …) loops indefinitely
+      // and the config is never auto-disabled at the
+      // CIRCUIT_BREAKER_THRESHOLD (=10) tripwire.
+      await this.configService.recordError(config.id, `status_sync: ${error.message}`)
+        .catch((e) => this.logger.warn(`recordError failed: ${e.message}`));
     }
   }
 }
