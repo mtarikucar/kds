@@ -8,6 +8,9 @@ import { InstallationService } from './installation.service';
 import {
   CancelInstallationDto,
   CompleteInstallationDto,
+  CreateInstallationRequestDto,
+  CreateShipmentDto,
+  FileWarrantyClaimDto,
   ScheduleInstallationDto,
 } from './dto/installation-ops.dto';
 
@@ -19,7 +22,7 @@ export class InstallationController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  request(@Req() req: any, @Body() body: { branchId?: string; hwOrderId?: string; preferredDates?: string[]; notes?: string }) {
+  request(@Req() req: any, @Body() body: CreateInstallationRequestDto) {
     return this.installation.create(req.user.tenantId, {
       ...body,
       preferredDates: body.preferredDates?.map((d) => new Date(d)),
@@ -87,7 +90,7 @@ export class WarrantyController {
   file(
     @Req() req: any,
     @Param('id') id: string,
-    @Body() body: { issue: string; severity?: 'low' | 'medium' | 'high'; description?: string },
+    @Body() body: FileWarrantyClaimDto,
   ) {
     return this.warranty.fileClaim(req.user.tenantId, id, body);
   }
@@ -103,7 +106,7 @@ export class SuperadminShipmentsController {
   @Post(':orderId')
   create(
     @Param('orderId') orderId: string,
-    @Body() body: { carrier: string; trackingNo?: string; meta?: Record<string, unknown> },
+    @Body() body: CreateShipmentDto,
   ) {
     return this.shipment.createShipment(orderId, body);
   }

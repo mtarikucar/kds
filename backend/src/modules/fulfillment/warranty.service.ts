@@ -68,10 +68,19 @@ export class WarrantyService {
       description: input.description,
       status: 'open',
     };
-    const updated = await this.prisma.warranty.update({
-      where: { id: row.id },
+    // Compound WHERE (B41-B45 pattern). The findFirst above already
+    // proves ownership, but a future refactor that hoists the
+    // early-return or condenses the txn shouldn't get to silently leak
+    // into a cross-tenant claim push. updateMany with (id, tenantId)
+    // and an explicit count check guards the write surface too.
+    const updateRes = await this.prisma.warranty.updateMany({
+      where: { id: row.id, tenantId },
       data: { claims: { push: claim as any } },
     });
+    if (updateRes.count === 0) {
+      throw new NotFoundException('Warranty not found');
+    }
+    const updated = await this.prisma.warranty.findUniqueOrThrow({ where: { id: row.id } });
     await this.outbox
       .append({
         type: 'warranty.claim.filed.v1',
