@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import * as Twilio from 'twilio';
 import { SmsProvider, SmsSendResult } from './sms-provider.interface';
+import { maskPhone } from '../../../common/helpers/pii-mask.helper';
 
 export class TwilioProvider implements SmsProvider {
   readonly name = 'twilio';
@@ -33,7 +34,7 @@ export class TwilioProvider implements SmsProvider {
         to,
       });
 
-      this.logger.log(`SMS sent via Twilio to ${to} (SID: ${result.sid})`);
+      this.logger.log(`SMS sent via Twilio to ${maskPhone(to)} (SID: ${result.sid})`);
       return { success: true, messageId: result.sid };
     } catch (error) {
       // Non-retryable errors

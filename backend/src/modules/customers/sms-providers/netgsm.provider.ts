@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { SmsProvider, SmsSendResult } from './sms-provider.interface';
+import { maskPhone } from '../../../common/helpers/pii-mask.helper';
 
 export class NetGsmProvider implements SmsProvider {
   readonly name = 'netgsm';
@@ -57,7 +58,7 @@ export class NetGsmProvider implements SmsProvider {
       // NetGSM success codes: 00, 01, 02 mean queued/sent
       if (['00', '01', '02'].includes(resultCode)) {
         const messageId = responseText.trim().split(' ')[1] || resultCode;
-        this.logger.log(`SMS sent via NetGSM to ${normalizedPhone} (ID: ${messageId})`);
+        this.logger.log(`SMS sent via NetGSM to ${maskPhone(normalizedPhone)} (ID: ${messageId})`);
         return { success: true, messageId };
       }
 
@@ -74,7 +75,7 @@ export class NetGsmProvider implements SmsProvider {
       };
 
       const errorMsg = errorMap[resultCode] || `NetGSM error code: ${resultCode}`;
-      this.logger.error(`NetGSM SMS failed for ${normalizedPhone}: ${errorMsg}`);
+      this.logger.error(`NetGSM SMS failed for ${maskPhone(normalizedPhone)}: ${errorMsg}`);
 
       // Non-retryable errors
       if (['30', '40', '50', '51'].includes(resultCode)) {
