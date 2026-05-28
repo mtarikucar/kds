@@ -27,9 +27,14 @@ export class InvoicePdfService {
    * tenant before passing the id), but a future service-layer caller —
    * cron, internal job, gRPC — would have no controller to gate it.
    * Asserting here means any new caller has to be explicit about which
-   * tenant's invoice it is, or accept a ForbiddenException.
+   * tenant's invoice it is, or accept a NotFoundException.
+   *
+   * Iter-96: tenantId was previously typed optional and the IDOR check
+   * was gated on `if (tenantId)`. The type-system loophole meant a
+   * caller that omitted the arg silently bypassed the cross-tenant
+   * guard. Made required; the IDOR check always runs.
    */
-  async generateInvoicePdf(invoiceId: string, tenantId?: string): Promise<string> {
+  async generateInvoicePdf(invoiceId: string, tenantId: string): Promise<string> {
     const invoice = await this.prisma.invoice.findUnique({
       where: { id: invoiceId },
       include: {
@@ -37,10 +42,7 @@ export class InvoicePdfService {
         payment: true,
       },
     });
-    if (!invoice) {
-      throw new NotFoundException('Invoice not found');
-    }
-    if (tenantId && invoice.subscription?.tenantId !== tenantId) {
+    if (!invoice || invoice.subscription?.tenantId !== tenantId) {
       // Hidden behind NotFound rather than Forbidden — we don't want the
       // caller to be able to distinguish "wrong tenant" from "doesn't
       // exist", which would enable invoice-id probing.
@@ -52,10 +54,17 @@ export class InvoicePdfService {
 
     await this.writePdf(filepath, invoice);
 
-    await this.prisma.invoice.update({
-      where: { id: invoiceId },
+    // Iter-96: defence-in-depth on the metadata write — scope the
+    // update by both invoice id AND subscription.tenantId. If a future
+    // regression of the check above lets a wrong-tenant invoice through
+    // we still don't write to it.
+    const claim = await this.prisma.invoice.updateMany({
+      where: { id: invoiceId, subscription: { tenantId } },
       data: { pdfUrl: safeName },
     });
+    if (claim.count === 0) {
+      throw new NotFoundException('Invoice not found');
+    }
 
     this.logger.log(`Invoice PDF generated: ${safeName}`);
     return safeName;
