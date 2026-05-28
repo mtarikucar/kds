@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
+  ArrayMaxSize,
   IsArray,
   IsIn,
   IsInt,
@@ -9,6 +10,7 @@ import {
   IsString,
   Matches,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 
@@ -50,21 +52,29 @@ export class CreateHardwareProductDto {
   @ApiProperty({ example: 'Hugin Tiger T300 4G Yazarkasa POS' })
   @IsString()
   @IsNotEmpty()
+  @MaxLength(200)
   name: string;
 
   @ApiProperty({ required: false, example: 'Ingenico' })
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   brand?: string;
 
   @ApiProperty({ required: false, example: 'Lane 3000' })
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   model?: string;
 
+  // 5000 chars covers a paragraph-style product description (real
+  // entries are 100-500 chars). Without this, an admin could persist
+  // a multi-MB blob into the description column — every public-
+  // storefront load then serializes it on every request.
   @ApiProperty({ required: false, description: 'Plain-text product description' })
   @IsOptional()
   @IsString()
+  @MaxLength(5000)
   description?: string;
 
   @ApiProperty({ required: false, type: Object, description: 'Free-form spec sheet (display, ports, etc.)' })
@@ -107,9 +117,14 @@ export class CreateHardwareProductDto {
     required: false,
     type: [String],
     description: 'Product image URLs — absolute (https://...) or root-relative (/products/<sku>.webp)',
+    maxItems: 20,
   })
   @IsOptional()
   @IsArray()
+  // 20 covers the real product-gallery case (hero + detail shots + a
+  // few angle variants); without the cap an admin could persist a
+  // 10k-entry array on every product row.
+  @ArrayMaxSize(20)
   // Accept both absolute URLs (vendor CDN) and root-relative paths
   // (self-hosted under landing/public/products/). The previous IsUrl()
   // rejected the seed's own /products/<sku>.webp pattern; any admin
@@ -118,6 +133,9 @@ export class CreateHardwareProductDto {
     each: true,
     message: 'each image must be an absolute URL (https://...) or root-relative path (/...)',
   })
+  // Cap each URL at 2048 (RFC 9110-ish browser-friendly URL ceiling)
+  // so a hostile entry can't store a megabyte data: URI or similar.
+  @MaxLength(2048, { each: true })
   images?: string[];
 
   @ApiProperty({
