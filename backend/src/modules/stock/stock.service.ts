@@ -135,12 +135,22 @@ export class StockService {
     });
   }
 
+  /**
+   * Hard cap on a single getMovements page. A long-lived tenant can
+   * accumulate hundreds of thousands of stock movements; without this
+   * the unbounded findMany would happily try to serialise the whole
+   * table into one response and OOM the API process. 500 is generous
+   * for the "scroll back through recent activity" UI use case.
+   */
+  private static readonly MOVEMENTS_PAGE_HARD_CAP = 500;
+
   async getMovements(
     tenantId: string,
     productId?: string,
     type?: StockMovementType,
     startDate?: Date,
     endDate?: Date,
+    limit?: number,
   ) {
     const where: any = { tenantId };
 
@@ -161,6 +171,11 @@ export class StockService {
         where.createdAt.lte = endDate;
       }
     }
+
+    const safeTake = Math.min(
+      Math.max(Math.floor(limit ?? 100), 1),
+      StockService.MOVEMENTS_PAGE_HARD_CAP,
+    );
 
     return this.prisma.stockMovement.findMany({
       where,
@@ -186,6 +201,7 @@ export class StockService {
         },
       },
       orderBy: { createdAt: 'desc' },
+      take: safeTake,
     });
   }
 

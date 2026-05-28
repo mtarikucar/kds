@@ -3,6 +3,7 @@ import {
   Body,
   Controller,
   Get,
+  ParseUUIDPipe,
   Post,
   Query,
   Request,
@@ -48,14 +49,49 @@ export class StockController {
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
   getMovements(
     @Request() req,
-    @Query('productId') productId?: string,
-    @Query('type') type?: StockMovementType,
+    @Query('productId', new ParseUUIDPipe({ optional: true })) productId?: string,
+    @Query('type') type?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('limit') limit?: string,
   ) {
+    // Manually enum-validate `type` — @Query strings come through
+    // unchecked even when the parameter type is the enum, since TS
+    // types are erased at runtime. A bogus value like "ALL" used to
+    // land in Prisma's where.type and just match nothing; the cleaner
+    // surface is a 400 at the boundary.
+    if (type !== undefined && !Object.values(StockMovementType).includes(type as StockMovementType)) {
+      throw new BadRequestException(
+        `type must be one of: ${Object.values(StockMovementType).join(', ')}`,
+      );
+    }
+
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
-    return this.stockService.getMovements(req.tenantId, productId, type, start, end);
+    if (start && Number.isNaN(start.getTime())) {
+      throw new BadRequestException('startDate must be a valid ISO-8601 date string');
+    }
+    if (end && Number.isNaN(end.getTime())) {
+      throw new BadRequestException('endDate must be a valid ISO-8601 date string');
+    }
+
+    let limitNum: number | undefined;
+    if (limit !== undefined) {
+      const parsed = parseInt(limit, 10);
+      if (!Number.isFinite(parsed) || parsed < 1) {
+        throw new BadRequestException('limit must be a positive integer');
+      }
+      limitNum = parsed;
+    }
+
+    return this.stockService.getMovements(
+      req.tenantId,
+      productId,
+      type as StockMovementType | undefined,
+      start,
+      end,
+      limitNum,
+    );
   }
 
   @Get('alerts')
