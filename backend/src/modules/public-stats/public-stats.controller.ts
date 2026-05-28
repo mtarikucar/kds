@@ -20,10 +20,8 @@ import { CreateReviewDto } from './dto/create-review.dto';
 import { PublicStatsResponseDto, PublicReviewResponseDto } from './dto/public-stats-response.dto';
 import { Throttle } from '@nestjs/throttler';
 import { Public } from '../auth/decorators/public.decorator';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '../../common/constants/roles.enum';
+import { SuperAdminGuard } from '../superadmin/guards/superadmin.guard';
+import { SuperAdminRoute } from '../superadmin/decorators/superadmin.decorator';
 
 @ApiTags('public-stats')
 @Controller('public-stats')
@@ -89,30 +87,39 @@ export class PublicStatsController {
     return this.statsService.getApprovedReviews(Math.min(limit, 50));
   }
 
-  // Admin endpoints for review moderation
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  // Review moderation endpoints — SuperAdmin only.
+  //
+  // PublicReview is a PLATFORM-LEVEL model (it has no tenantId; reviews
+  // are about HummyTummy itself, surfaced on the marketing landing
+  // page's totalReviews / averageRating widget). The earlier
+  // @Roles(UserRole.ADMIN) gate used the tenant-realm ADMIN role —
+  // meaning ANY restaurant tenant's admin could approve fake glowing
+  // reviews of the platform OR reject genuine negative ones, distorting
+  // the public vanity stats. Switch to SuperAdminGuard so only platform
+  // operators can moderate platform-level content.
+  @UseGuards(SuperAdminGuard)
+  @SuperAdminRoute()
   @Get('admin/reviews/pending')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get pending reviews (Admin only)' })
+  @ApiOperation({ summary: 'Get pending reviews (SuperAdmin only)' })
   async getPendingReviews() {
     return this.statsService.getPendingReviews();
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @UseGuards(SuperAdminGuard)
+  @SuperAdminRoute()
   @Post('admin/reviews/:id/approve')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Approve a review (Admin only)' })
+  @ApiOperation({ summary: 'Approve a review (SuperAdmin only)' })
   async approveReview(@Param('id') id: string) {
     return this.statsService.approveReview(id);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @UseGuards(SuperAdminGuard)
+  @SuperAdminRoute()
   @Post('admin/reviews/:id/reject')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Reject a review (Admin only)' })
+  @ApiOperation({ summary: 'Reject a review (SuperAdmin only)' })
   async rejectReview(@Param('id') id: string) {
     return this.statsService.rejectReview(id);
   }
