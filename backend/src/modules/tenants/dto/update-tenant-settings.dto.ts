@@ -1,5 +1,52 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsOptional, IsIn, IsBoolean, IsArray, IsEmail, Matches, IsNumber, Min, Max, MaxLength, ValidateIf, IsNotIn, MinLength } from 'class-validator';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsBoolean,
+  IsEmail,
+  IsIn,
+  IsNotIn,
+  IsNumber,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+  Validate,
+  ValidateIf,
+  ValidatorConstraint,
+  ValidatorConstraintInterface,
+} from 'class-validator';
+
+/**
+ * Custom validator that accepts only IANA-named timezones (e.g.
+ * "Europe/Istanbul", "America/New_York"). The earlier @IsString gate
+ * let "/etc/passwd" or any garbage land in the DB and silently break
+ * downstream display; the z-report scheduler is fail-soft on invalid
+ * tz but the persisted bad value is still poor UX.
+ *
+ * Node 18+ exposes Intl.DateTimeFormat with timeZone option — it
+ * throws RangeError on unknown zones, which we treat as the
+ * rejection signal. Cheaper than maintaining our own allowlist.
+ */
+@ValidatorConstraint({ name: 'isIanaTimezone', async: false })
+class IsIanaTimezoneConstraint implements ValidatorConstraintInterface {
+  validate(value: unknown): boolean {
+    if (typeof value !== 'string' || !value) return false;
+    try {
+      // eslint-disable-next-line no-new
+      new Intl.DateTimeFormat('en-US', { timeZone: value });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  defaultMessage(): string {
+    return 'timezone must be a valid IANA timezone (e.g. "Europe/Istanbul")';
+  }
+}
 import {
   SUPPORTED_CURRENCIES,
   SupportedCurrency,
@@ -52,11 +99,12 @@ export class UpdateTenantSettingsDto {
   closingTime?: string;
 
   @ApiPropertyOptional({
-    description: 'Timezone for the tenant',
+    description: 'IANA timezone for the tenant (e.g. "Europe/Istanbul")',
     example: 'Europe/Istanbul',
   })
   @IsString()
   @IsOptional()
+  @Validate(IsIanaTimezoneConstraint)
   timezone?: string;
 
   @ApiPropertyOptional({
@@ -67,12 +115,20 @@ export class UpdateTenantSettingsDto {
   @IsOptional()
   reportEmailEnabled?: boolean;
 
+  // 20 covers the realistic "CC the whole leadership team" case while
+  // bounding the fan-out of the Z-report scheduler, which sends to
+  // every address in this list at the tenant's closing time. Without
+  // a cap, an admin could land a 10k-email list that turns into 10k
+  // SMTP sends per closing window — spam-amplification + provider
+  // cost / rate-limit risk.
   @ApiPropertyOptional({
-    description: 'Email addresses to send reports to',
+    description: 'Email addresses to send reports to (max 20 recipients)',
     example: ['admin@example.com'],
     type: [String],
+    maxItems: 20,
   })
   @IsArray()
+  @ArrayMaxSize(20)
   @IsEmail({}, { each: true })
   @IsOptional()
   reportEmails?: string[];
