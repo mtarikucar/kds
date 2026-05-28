@@ -114,55 +114,90 @@ export class LoyaltyService {
     orderNumber: string,
     orderAmount: number,
   ) {
-    // Idempotency: at most one EARNED row per (customer, order). Without
-    // this a retry of the payment flow would credit points twice for the
-    // same sale. Tenant-scoped via relation filter so a bogus orderId
-    // from another tenant can't skip the check.
-    const existing = await this.prisma.loyaltyTransaction.findFirst({
-      where: {
-        customerId,
-        orderId,
-        type: LoyaltyTransactionType.EARNED,
-        customer: { tenantId },
-      },
-    });
-    if (existing) {
-      return {
-        transaction: existing,
-        newBalance: (
-          await this.prisma.customer.findFirst({
-            where: { id: customerId, tenantId },
-            select: { loyaltyPoints: true },
-          })
-        )?.loyaltyPoints ?? 0,
-      };
-    }
-
     const points = Math.floor(orderAmount * LOYALTY_CONFIG.pointsPerCurrencyUnit);
-    if (points <= 0) {
-      return {
-        transaction: null,
-        newBalance: (
-          await this.prisma.customer.findFirst({
-            where: { id: customerId, tenantId },
-            select: { loyaltyPoints: true },
-          })
-        )?.loyaltyPoints ?? 0,
-      };
+
+    // Idempotency MUST happen inside the same Serializable txn that
+    // writes the credit — exactly the bug awardWelcomeBonus above was
+    // fixed for in iter-X. Two concurrent earnPointsFromOrder calls
+    // (the PayTR webhook racing with the recovery cron, or a fast
+    // settlement retry) both saw existing=null when the read was
+    // outside the txn, both fell through to awardPoints, and the
+    // customer got DOUBLE points for one sale. Wrapping the dedup
+    // read in the same Serializable txn makes the loser see the
+    // winner's INSERT and short-circuit.
+    const txResult = await this.prisma.$transaction(async (tx) => {
+      const existing = await tx.loyaltyTransaction.findFirst({
+        where: {
+          customerId,
+          orderId,
+          type: LoyaltyTransactionType.EARNED,
+          customer: { tenantId },
+        },
+      });
+      if (existing) {
+        const cust = await tx.customer.findFirst({
+          where: { id: customerId, tenantId },
+          select: { loyaltyPoints: true },
+        });
+        return { transaction: existing, newBalance: cust?.loyaltyPoints ?? 0, didCredit: false };
+      }
+      if (points <= 0) {
+        const cust = await tx.customer.findFirst({
+          where: { id: customerId, tenantId },
+          select: { loyaltyPoints: true },
+        });
+        return { transaction: null, newBalance: cust?.loyaltyPoints ?? 0, didCredit: false };
+      }
+
+      // Inline the awardPoints write path — calling out to it would
+      // start a nested $transaction, which Prisma handles but defeats
+      // the in-txn dedup guarantee above. Pre-iter-37 the outer
+      // findFirst was outside the txn AND awardPoints opened its own
+      // — the dedup never saw the winner.
+      const customer = await tx.customer.findFirst({
+        where: { id: customerId, tenantId },
+      });
+      if (!customer) throw new BadRequestException('Customer not found');
+      const balanceBefore = customer.loyaltyPoints;
+      const balanceAfter = balanceBefore + points;
+
+      await tx.customer.updateMany({
+        where: { id: customerId, tenantId },
+        data: { loyaltyPoints: { increment: points } },
+      });
+      const transaction = await tx.loyaltyTransaction.create({
+        data: {
+          tenantId,
+          customerId,
+          type: LoyaltyTransactionType.EARNED,
+          points,
+          description: `Earned ${points} points from order ${orderNumber}`,
+          orderId,
+          orderNumber,
+          orderAmount: orderAmount as any,
+          balanceBefore,
+          balanceAfter,
+        },
+      });
+      return { transaction, newBalance: balanceAfter, didCredit: true };
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+
+    // Tier promotion outside the txn — it only ever moves UPWARD
+    // (lifetimePoints is sum-of-positive entries; refunds/redemptions
+    // are negative so don't affect it), and the compound-WHERE
+    // updateMany inside checkAndUpgradeTier is its own race guard.
+    // Skipping when we didn't actually credit avoids an unnecessary
+    // aggregate query on idempotent retries.
+    let tierUpgrade: { upgraded: boolean; oldTier: LoyaltyTier; newTier: LoyaltyTier } | null = null;
+    if (txResult.didCredit) {
+      const tierResult = await this.checkAndUpgradeTier(customerId, tenantId).catch(() => null);
+      tierUpgrade = tierResult?.upgraded ? (tierResult as any) : null;
     }
-    const result = await this.awardPoints(
-      customerId,
-      tenantId,
-      points,
-      LoyaltyTransactionType.EARNED,
-      `Earned ${points} points from order ${orderNumber}`,
-      { orderId, orderNumber, orderAmount },
-    );
-    // Promote the customer's tier if this earn pushed them across a
-    // threshold. The check reads the lifetime EARNED total so it's
-    // idempotent — repeated calls converge on the same tier.
-    const tierResult = await this.checkAndUpgradeTier(customerId, tenantId).catch(() => null);
-    return { ...result, tierUpgrade: tierResult?.upgraded ? tierResult : null };
+    return {
+      transaction: txResult.transaction,
+      newBalance: txResult.newBalance,
+      tierUpgrade,
+    };
   }
 
   async redeemPoints(
@@ -402,6 +437,20 @@ export class LoyaltyService {
     metadata?: any;
   }) {
     const { customerId, tenantId, points, type, description, metadata } = params;
+
+    // The earlier `type as LoyaltyTransactionType` silently accepted
+    // any string and persisted it. The `type` column then carried
+    // typo'd or invented values (`"earnd"`, `"adjustment"` lowercase,
+    // anything an internal caller passed), breaking the audit-trail
+    // filters in checkAndUpgradeTier and getLoyaltyStats which group
+    // by the canonical enum names. Reject here so the wiring bug
+    // surfaces at the call site, not in the analytics aggregate.
+    if (!Object.values(LoyaltyTransactionType).includes(type as LoyaltyTransactionType)) {
+      throw new BadRequestException(
+        `Invalid loyalty transaction type "${type}". Expected one of: ${Object.values(LoyaltyTransactionType).join(', ')}`,
+      );
+    }
+
     const result = await this.awardPoints(
       customerId,
       tenantId,
