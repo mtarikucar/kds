@@ -10,7 +10,7 @@ import {
 import { PrismaService } from '../../prisma/prisma.service';
 import { OrderStatus } from '../../common/constants/order-status.enum';
 import { validateTransition } from '../../common/utils/order-state-machine';
-import { UpdateOrderItemStatusDto, OrderItemStatus } from './dto/update-order-item-status.dto';
+import { OrderItemStatus } from './dto/update-order-item-status.dto';
 import { KdsGateway } from './kds.gateway';
 import { DeliveryStatusSyncService } from '../delivery-platforms/services/delivery-status-sync.service';
 import { StockDeductionService } from '../stock-management/services/stock-deduction.service';
@@ -159,20 +159,23 @@ export class KdsService {
   }
 
   async updateOrderItemStatus(
-    id: string,
-    updateDto: UpdateOrderItemStatusDto,
+    itemId: string,
+    status: OrderItemStatus,
     tenantId: string,
   ) {
+    // Iter-91: itemId comes from the URL path; the body no longer carries
+    // a duplicate `orderItemId` field that could desync from the URL.
+    //
     // Scope the lookup by tenantId at the DB boundary rather than relying on
     // a post-fetch check — prevents cross-tenant probing via timing differences
     // and removes a TOCTOU window.
     const orderItem = await this.prisma.orderItem.findFirst({
-      where: { id: updateDto.orderItemId, order: { tenantId } },
+      where: { id: itemId, order: { tenantId } },
       include: { order: true },
     });
 
     if (!orderItem) {
-      throw new NotFoundException(`Order item with ID ${updateDto.orderItemId} not found`);
+      throw new NotFoundException(`Order item with ID ${itemId} not found`);
     }
 
     // Compound WHERE on the original status + tenantId — mirrors the
@@ -182,11 +185,11 @@ export class KdsService {
     // last wins silently. Defence-in-depth IDOR on tenantId too.
     const claim = await this.prisma.orderItem.updateMany({
       where: {
-        id: updateDto.orderItemId,
+        id: itemId,
         order: { tenantId },
         status: orderItem.status,
       },
-      data: { status: updateDto.status },
+      data: { status },
     });
     if (claim.count === 0) {
       throw new BadRequestException(
@@ -194,7 +197,7 @@ export class KdsService {
       );
     }
     const updatedOrderItem = await this.prisma.orderItem.findUniqueOrThrow({
-      where: { id: updateDto.orderItemId },
+      where: { id: itemId },
       include: {
         product: true,
         order: true,
@@ -213,11 +216,7 @@ export class KdsService {
       }
     }
 
-    this.kdsGateway.emitOrderItemStatusChange(
-      tenantId,
-      updateDto.orderItemId,
-      updateDto.status,
-    );
+    this.kdsGateway.emitOrderItemStatusChange(tenantId, itemId, status);
 
     return updatedOrderItem;
   }

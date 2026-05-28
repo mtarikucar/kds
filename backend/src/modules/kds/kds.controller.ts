@@ -58,7 +58,10 @@ export class KdsController {
     @Body() updateDto: UpdateOrderItemStatusDto,
     @Request() req,
   ) {
-    return this.kdsService.updateOrderItemStatus(id, updateDto, req.tenantId);
+    // Iter-91: the item id comes from the URL path, not the body — the
+    // previous DTO duplicated the field in both places and the service
+    // trusted the body, which let a client desync URL vs target item.
+    return this.kdsService.updateOrderItemStatus(id, updateDto.status, req.tenantId);
   }
 
   @Patch('orders/:id/cancel')
