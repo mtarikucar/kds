@@ -284,6 +284,24 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
         return { success: false, error: 'Tenant mismatch' };
       }
 
+      // Bind the data submission to the cameraId the device registered
+      // with — the tenant check above stops cross-tenant pollution, but
+      // a registered edge device for camera A could otherwise keep
+      // sending occupancy records tagged with camera B (still in same
+      // tenant), polluting B's heatmap + traffic-flow grid + dashboard.
+      // The register handler stored cameraId on client.data; everything
+      // since must match.
+      const registeredCameraId: string | undefined = client.data.cameraId;
+      if (!registeredCameraId) {
+        return { success: false, error: 'Device not registered to a camera' };
+      }
+      if (payload.cameraId !== registeredCameraId) {
+        this.logger.warn(
+          `Rejecting occupancy from ${client.id}: cameraId mismatch (payload=${payload.cameraId}, registered=${registeredCameraId})`,
+        );
+        return { success: false, error: 'Camera mismatch' };
+      }
+
       const timestamp = new Date(payload.timestamp);
 
       // Store occupancy records
@@ -329,10 +347,21 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
   ) {
     if (!this.tokenStillValid(client)) return { success: false, error: 'Token expired' };
     try {
-      const deviceId = client.data.deviceId || payload.deviceId;
-
+      // Use ONLY the registered deviceId. The earlier fallback to
+      // payload.deviceId let an authenticated-but-unregistered socket
+      // (or a registered socket lying about its identity) mark any
+      // EdgeDevice in its tenant as ONLINE — masking real outages and
+      // misrouting `sendCommandToDevice` calls to a dead unit. The
+      // explicit fail-closed branch surfaces the wiring mistake instead.
+      const deviceId: string | undefined = client.data.deviceId;
       if (!deviceId) {
-        return { success: false, error: 'Device not registered' };
+        return { success: false, error: 'Device not registered — send edge:register first' };
+      }
+      if (payload.deviceId && payload.deviceId !== deviceId) {
+        this.logger.warn(
+          `Rejecting heartbeat from ${client.id}: deviceId mismatch (payload=${payload.deviceId}, registered=${deviceId})`,
+        );
+        return { success: false, error: 'Device mismatch' };
       }
 
       const device = this.connectedDevices.get(
@@ -372,10 +401,17 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
   ) {
     if (!this.tokenStillValid(client)) return { success: false, error: 'Token expired' };
     try {
-      const deviceId = client.data.deviceId || payload.deviceId;
-
+      // Same identity-binding rule as edge:heartbeat — use only the
+      // registered deviceId, reject mismatches loudly.
+      const deviceId: string | undefined = client.data.deviceId;
       if (!deviceId) {
-        return { success: false, error: 'Device not registered' };
+        return { success: false, error: 'Device not registered — send edge:register first' };
+      }
+      if (payload.deviceId && payload.deviceId !== deviceId) {
+        this.logger.warn(
+          `Rejecting health status from ${client.id}: deviceId mismatch (payload=${payload.deviceId}, registered=${deviceId})`,
+        );
+        return { success: false, error: 'Device mismatch' };
       }
 
       await this.prisma.edgeDevice.updateMany({

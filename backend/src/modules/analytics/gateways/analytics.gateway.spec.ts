@@ -104,4 +104,79 @@ describe('AnalyticsGateway', () => {
       expect(config).toBeNull();
     });
   });
+
+  describe('iter-36 — bind cameraId/deviceId to the registered connection', () => {
+    function buildClient(data: Record<string, unknown>): any {
+      return {
+        id: 'sock-1',
+        connected: true,
+        data: { tokenExp: Math.floor(Date.now() / 1000) + 3600, ...data },
+        disconnect: jest.fn(),
+        emit: jest.fn(),
+        join: jest.fn(),
+      };
+    }
+
+    it('edge:occupancy rejects when payload.cameraId differs from the registered cameraId', async () => {
+      const client = buildClient({
+        tenantId: 'tenant-1',
+        deviceId: 'edge-1',
+        cameraId: 'cam-A',
+      });
+
+      const result: any = await gateway.handleOccupancyData(client, {
+        tenantId: 'tenant-1',
+        cameraId: 'cam-B', // <-- attacker-controlled
+        timestamp: new Date().toISOString(),
+        detections: [
+          { trackingId: 't1', positionX: 0, positionZ: 0, state: 'STANDING', confidence: 0.9, gridX: 0, gridZ: 0 } as any,
+        ],
+      } as any);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/Camera mismatch/i);
+      // Critical: NO occupancy rows written for the wrong camera.
+      expect((prisma.occupancyRecord.createMany as any).mock.calls.length).toBe(0);
+    });
+
+    it('edge:occupancy rejects when the connection has no registered camera', async () => {
+      const client = buildClient({ tenantId: 'tenant-1', deviceId: 'edge-1' });
+
+      const result: any = await gateway.handleOccupancyData(client, {
+        tenantId: 'tenant-1',
+        cameraId: 'cam-anything',
+        timestamp: new Date().toISOString(),
+        detections: [],
+      } as any);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/not registered to a camera/i);
+    });
+
+    it('edge:heartbeat rejects when payload.deviceId differs from the registered deviceId', async () => {
+      const client = buildClient({
+        tenantId: 'tenant-1',
+        deviceId: 'edge-1',
+      });
+
+      const result: any = await gateway.handleHeartbeat(client, {
+        deviceId: 'edge-OTHER',
+      } as any);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/Device mismatch/i);
+      expect((prisma.edgeDevice.updateMany as any).mock.calls.length).toBe(0);
+    });
+
+    it('edge:heartbeat rejects when the connection has no registered device', async () => {
+      const client = buildClient({ tenantId: 'tenant-1' });
+
+      const result: any = await gateway.handleHeartbeat(client, {
+        deviceId: 'whatever',
+      } as any);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toMatch(/not registered/i);
+    });
+  });
 });
