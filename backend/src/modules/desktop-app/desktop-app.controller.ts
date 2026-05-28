@@ -27,12 +27,10 @@ import { CreateReleaseDto } from './dto/create-release.dto';
 import { UpdateReleaseDto } from './dto/update-release.dto';
 import { UpdateManifestDto } from './dto/update-manifest.dto';
 import { DesktopRelease } from './entities/desktop-release.entity';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
 import { ApiKeyGuard } from '../auth/guards/api-key.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
 import { Public } from '../auth/decorators/public.decorator';
-import { UserRole } from '../../common/constants/roles.enum';
+import { SuperAdminGuard } from '../superadmin/guards/superadmin.guard';
+import { SuperAdminRoute } from '../superadmin/decorators/superadmin.decorator';
 
 @ApiTags('desktop-app')
 @Controller('desktop')
@@ -150,46 +148,59 @@ export class DesktopAppController {
   }
 
   // ===========================================
-  // ADMIN ENDPOINTS (Auth + Admin Role Required)
+  // ADMIN ENDPOINTS (SuperAdmin only) — iter-70
+  //
+  // DesktopRelease is a PLATFORM-LEVEL model (no tenantId column on
+  // the row). It's the global release catalog that the Tauri
+  // auto-updater on EVERY tenant's desktop pulls from. Before iter-70
+  // these routes were gated by tenant-realm @Roles(UserRole.ADMIN),
+  // meaning any restaurant tenant's admin could:
+  //   - publish a malicious release pointing at attacker-hosted
+  //     binaries (auto-updater fetches it for ALL restaurants);
+  //   - delete legitimate releases;
+  //   - flip windowsUrl / signatures to bypass code-signing checks.
+  //
+  // Same privilege issue iter-51 closed on PublicReview and iter-58
+  // closed on ContactMessage. Switch to SuperAdminGuard so only
+  // platform operators can manage the global installer catalog.
   // ===========================================
 
   /**
-   * Create a new release (admin only)
+   * Create a new release (SuperAdmin only)
    */
   @Post('releases')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @UseGuards(SuperAdminGuard)
+  @SuperAdminRoute()
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Create a new desktop release (Admin)' })
+  @ApiOperation({ summary: 'Create a new desktop release (SuperAdmin)' })
   @ApiResponse({ status: 201, description: 'Release created', type: DesktopRelease })
   @ApiResponse({ status: 400, description: 'Bad request - Version exists' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
   async createRelease(@Body() createReleaseDto: CreateReleaseDto): Promise<DesktopRelease> {
     return this.desktopAppService.create(createReleaseDto);
   }
 
   /**
-   * Get all releases including unpublished (admin only)
+   * Get all releases including unpublished (SuperAdmin only)
    */
   @Get('releases')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @UseGuards(SuperAdminGuard)
+  @SuperAdminRoute()
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get all releases including drafts (Admin)' })
+  @ApiOperation({ summary: 'Get all releases including drafts (SuperAdmin)' })
   @ApiResponse({ status: 200, description: 'List of all releases', type: [DesktopRelease] })
   async getAllReleases(): Promise<DesktopRelease[]> {
     return this.desktopAppService.findAll();
   }
 
   /**
-   * Get release by ID (admin only)
+   * Get release by ID (SuperAdmin only)
    */
   @Get('releases/:id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @UseGuards(SuperAdminGuard)
+  @SuperAdminRoute()
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get release by ID (Admin)' })
+  @ApiOperation({ summary: 'Get release by ID (SuperAdmin)' })
   @ApiResponse({ status: 200, description: 'Release found', type: DesktopRelease })
   @ApiResponse({ status: 404, description: 'Release not found' })
   async getReleaseById(@Param('id') id: string): Promise<DesktopRelease> {
@@ -197,13 +208,13 @@ export class DesktopAppController {
   }
 
   /**
-   * Update a release (admin only)
+   * Update a release (SuperAdmin only)
    */
   @Patch('releases/:id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @UseGuards(SuperAdminGuard)
+  @SuperAdminRoute()
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update a release (Admin)' })
+  @ApiOperation({ summary: 'Update a release (SuperAdmin)' })
   @ApiResponse({ status: 200, description: 'Release updated', type: DesktopRelease })
   @ApiResponse({ status: 404, description: 'Release not found' })
   async updateRelease(
@@ -214,13 +225,13 @@ export class DesktopAppController {
   }
 
   /**
-   * Publish a release (admin only)
+   * Publish a release (SuperAdmin only)
    */
   @Post('releases/:id/publish')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @UseGuards(SuperAdminGuard)
+  @SuperAdminRoute()
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Publish a release (Admin)' })
+  @ApiOperation({ summary: 'Publish a release (SuperAdmin)' })
   @ApiResponse({ status: 200, description: 'Release published', type: DesktopRelease })
   @ApiResponse({ status: 400, description: 'Already published' })
   @ApiResponse({ status: 404, description: 'Release not found' })
@@ -229,13 +240,13 @@ export class DesktopAppController {
   }
 
   /**
-   * Unpublish a release (admin only)
+   * Unpublish a release (SuperAdmin only)
    */
   @Post('releases/:id/unpublish')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @UseGuards(SuperAdminGuard)
+  @SuperAdminRoute()
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Unpublish a release (Admin)' })
+  @ApiOperation({ summary: 'Unpublish a release (SuperAdmin)' })
   @ApiResponse({ status: 200, description: 'Release unpublished', type: DesktopRelease })
   @ApiResponse({ status: 400, description: 'Not published' })
   @ApiResponse({ status: 404, description: 'Release not found' })
@@ -244,13 +255,13 @@ export class DesktopAppController {
   }
 
   /**
-   * Delete a release (admin only)
+   * Delete a release (SuperAdmin only)
    */
   @Delete('releases/:id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @UseGuards(SuperAdminGuard)
+  @SuperAdminRoute()
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Delete a release (Admin)' })
+  @ApiOperation({ summary: 'Delete a release (SuperAdmin)' })
   @ApiResponse({ status: 200, description: 'Release deleted' })
   @ApiResponse({ status: 404, description: 'Release not found' })
   async deleteRelease(@Param('id') id: string): Promise<{ message: string }> {
