@@ -72,17 +72,19 @@ describe('DeviceService pairing', () => {
     } as any);
 
     const captured: any = {};
-    (prisma.device.update as any).mockImplementation(async ({ data }: any) => {
+    (prisma.device.updateMany as any).mockImplementation(async ({ where, data }: any) => {
       Object.assign(captured, data);
-      return {
-        id: 'dev-1',
-        tenantId: 't1',
-        branchId: null,
-        kind: 'kds_screen',
-        capabilities: [],
-        ...data,
-      };
+      captured.__where = where;
+      return { count: 1 };
     });
+    (prisma.device.findUniqueOrThrow as any).mockImplementation(async () => ({
+      id: 'dev-1',
+      tenantId: 't1',
+      branchId: null,
+      kind: 'kds_screen',
+      capabilities: [],
+      ...captured,
+    }));
 
     const out = await svc.pair({ pairCode: 'ABCDEF' });
 
@@ -96,6 +98,70 @@ describe('DeviceService pairing', () => {
     expect(outbox.append).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'device.paired.v1' }),
     );
+  });
+
+  /**
+   * Iter-71 regression. Two devices typing the same 6-char pair code
+   * milliseconds apart would both have passed findUnique → validate
+   * → update, with the second writer overwriting the first's tokenHash.
+   * The "winning" device thinks it paired (got a token in the response)
+   * but the server has the LOSER's token stored, so the winner's
+   * authenticateToken silently fails hours later when the kiosk
+   * tries to heartbeat. The fix swaps the write to updateMany with
+   * a (pairCode, pairCodeExpiresAt > now) predicate so Postgres's
+   * single-row update atomicity serialises the writers.
+   */
+  it('pair refuses the second concurrent claim of the same code (count=0 → BadRequest)', async () => {
+    prisma.device.findUnique.mockResolvedValue({
+      id: 'dev-1',
+      tenantId: 't1',
+      pairCode: 'ABCDEF',
+      pairCodeExpiresAt: new Date(Date.now() + 60_000),
+      kind: 'kds_screen',
+      branchId: null,
+      capabilities: [],
+      model: null,
+      serial: null,
+    } as any);
+    // Simulate the LOSER: the first writer already flipped pairCode to
+    // NULL, so the second writer's updateMany predicate doesn't match.
+    (prisma.device.updateMany as any).mockResolvedValue({ count: 0 });
+
+    await expect(svc.pair({ pairCode: 'ABCDEF' })).rejects.toThrow(
+      /already claimed|expired/i,
+    );
+    // Critically: the loser must NOT have its outbox event fire (no
+    // half-paired side-effects).
+    expect(outbox.append).not.toHaveBeenCalled();
+  });
+
+  it('pair updateMany WHERE carries the pairCode + expiry predicate (load-bearing race guard)', async () => {
+    prisma.device.findUnique.mockResolvedValue({
+      id: 'dev-1',
+      tenantId: 't1',
+      pairCode: 'ABCDEF',
+      pairCodeExpiresAt: new Date(Date.now() + 60_000),
+      kind: 'kds_screen',
+      branchId: null,
+      capabilities: [],
+      model: null,
+      serial: null,
+    } as any);
+    let updateWhere: any = null;
+    (prisma.device.updateMany as any).mockImplementation(async ({ where }: any) => {
+      updateWhere = where;
+      return { count: 1 };
+    });
+    (prisma.device.findUniqueOrThrow as any).mockResolvedValue({
+      id: 'dev-1', tenantId: 't1', branchId: null, kind: 'kds_screen', capabilities: [],
+    } as any);
+
+    await svc.pair({ pairCode: 'ABCDEF' });
+
+    // WHERE must include the pairCode AND the expiry predicate. A
+    // refactor that drops either lets the race back through.
+    expect(updateWhere.pairCode).toBe('ABCDEF');
+    expect(updateWhere.pairCodeExpiresAt).toEqual(expect.objectContaining({ gt: expect.any(Date) }));
   });
 
   it('authenticateToken returns null when token is empty or unknown', async () => {

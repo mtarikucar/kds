@@ -138,21 +138,49 @@ export class DeviceService {
     const tokenHash = this.hashToken(token);
     const tokenExpiresAt = new Date(Date.now() + DeviceService.TOKEN_TTL_MS);
 
-    const updated = await this.prisma.device.update({
-      where: { id: row.id },
+    // Atomic single-use pair-code claim.
+    //
+    // The previous shape did findUnique → validate → update by id. Two
+    // physical devices typing the same 6-char code into their kiosks
+    // milliseconds apart both passed the validation and both ran
+    // update — the second overwrites the first's tokenHash, so the
+    // device that THOUGHT it paired earlier silently ends up with a
+    // token the server has forgotten. The user-visible failure is
+    // "your device randomly stopped working" hours later when the
+    // token fails authenticateToken and the kiosk falls back to the
+    // pair-code prompt — confusing both ops and the operator.
+    //
+    // updateMany with `pairCode = X AND pairCodeExpiresAt > now`
+    // serialises the writers at the row level: the first writer flips
+    // pairCode to NULL and the predicate stops matching for the second
+    // writer (Postgres single-row update is atomic). The loser sees
+    // count=0 and surfaces the same "already claimed" error PayTR's
+    // settlement race uses for symmetric clarity.
+    const now = new Date();
+    const claim = await this.prisma.device.updateMany({
+      where: {
+        id: row.id,
+        pairCode: input.pairCode,
+        pairCodeExpiresAt: { gt: now },
+      },
       data: {
         status: 'paired',
         tokenHash,
         tokenExpiresAt,
-        // Pair code is single-use.
         pairCode: null,
         pairCodeExpiresAt: null,
         model: input.model ?? row.model,
         serial: input.serial ?? row.serial,
         capabilities: input.capabilities ?? row.capabilities,
-        lastSeenAt: new Date(),
+        lastSeenAt: now,
       },
     });
+    if (claim.count === 0) {
+      throw new BadRequestException(
+        'Pair code already claimed by another device or expired — request a new one',
+      );
+    }
+    const updated = await this.prisma.device.findUniqueOrThrow({ where: { id: row.id } });
 
     await this.outbox
       .append({
@@ -231,9 +259,16 @@ export class DeviceService {
 
   async retire(tenantId: string, deviceId: string) {
     const row = await this.findOrThrow(tenantId, deviceId);
-    return this.prisma.device.update({
-      where: { id: row.id },
+    // Compound WHERE (B41-B45 pattern, iter-31 onward). findOrThrow
+    // above already proves ownership, but the write surface should
+    // carry tenantId itself so a future refactor that drops the
+    // pre-check can't leak into a cross-tenant retire that would
+    // null someone else's tokenHash and lock their device out.
+    const claim = await this.prisma.device.updateMany({
+      where: { id: row.id, tenantId },
       data: { status: 'retired', tokenHash: null },
     });
+    if (claim.count === 0) throw new NotFoundException('Device not found');
+    return this.prisma.device.findFirstOrThrow({ where: { id: row.id, tenantId } });
   }
 }
