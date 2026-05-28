@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { v7 as uuidv7 } from 'uuid';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OutboxService } from '../outbox/outbox.service';
@@ -24,6 +24,18 @@ export class CallerService {
   ) {}
 
   async ingest(tenantId: string, event: NormalisedCallerEvent) {
+    // CallerEvent.tenantId has no FK in the schema (denormalised for write
+    // throughput), so a malformed/unknown tenantId from the public webhook
+    // route would otherwise land a noise row that the UI feed renders.
+    // Validate before the create so attackers can't seed arbitrary tenants.
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { id: true },
+    });
+    if (!tenant) {
+      throw new NotFoundException('Unknown tenant');
+    }
+
     // Try a customer match by e164. Keeps the column denormalised so the UI
     // can render "returning customer" without a join.
     let customerId: string | null = null;
