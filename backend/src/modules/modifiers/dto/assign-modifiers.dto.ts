@@ -2,9 +2,8 @@ import {
   ArrayMaxSize,
   IsArray,
   IsInt,
-  IsNotEmpty,
   IsOptional,
-  IsString,
+  IsUUID,
   Min,
   ValidateNested,
 } from 'class-validator';
@@ -14,8 +13,7 @@ import { EmptyStringToNumber } from '../../../common/dto/transforms';
 
 export class AssignModifierGroupDto {
   @ApiProperty({ example: 'uuid-of-modifier-group' })
-  @IsString()
-  @IsNotEmpty()
+  @IsUUID()
   groupId: string;
 
   @ApiProperty({ example: 0, default: 0 })
