@@ -1,13 +1,49 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { CreateRecipeDto } from '../dto/create-recipe.dto';
+import { CreateRecipeDto, RecipeIngredientDto } from '../dto/create-recipe.dto';
 import { UpdateRecipeDto } from '../dto/update-recipe.dto';
+
+// Iter-93: pagination cap on recipes list. Most tenants have ~50 distinct
+// product recipes; large chains in our pipeline have ~500. 500 is a comfortable
+// per-page default that still keeps the nested ingredient + product payload
+// bounded.
+const RECIPES_DEFAULT_TAKE = 500;
+const RECIPES_HARD_MAX_TAKE = 2000;
+
+/**
+ * Iter-93: reject duplicate stockItemIds in the ingredients array.
+ * Pre-fix, the createMany call passed `ingredients` through unfiltered, so
+ * the same stock item appearing twice (e.g. `flour` listed twice with
+ * 200g + 100g instead of one 300g entry) created two RecipeIngredient
+ * rows. StockDeductionService then walked both rows on every order and
+ * double-deducted flour — silently turning a typo into stock drift.
+ *
+ * Throwing here is the right call: the UI should consolidate duplicates
+ * before submitting, and a silent rule (e.g. "keep the first") would
+ * mask the user's actual intent.
+ */
+function assertUniqueIngredients(ingredients: RecipeIngredientDto[]): void {
+  const seen = new Set<string>();
+  for (const i of ingredients) {
+    if (seen.has(i.stockItemId)) {
+      throw new BadRequestException(
+        `Duplicate ingredient ${i.stockItemId} — combine into one entry with the summed quantity`,
+      );
+    }
+    seen.add(i.stockItemId);
+  }
+}
 
 @Injectable()
 export class RecipesService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(tenantId: string) {
+  async findAll(
+    tenantId: string,
+    pagination?: { limit?: number; offset?: number },
+  ) {
+    const take = Math.min(pagination?.limit ?? RECIPES_DEFAULT_TAKE, RECIPES_HARD_MAX_TAKE);
+    const skip = pagination?.offset ?? 0;
     return this.prisma.recipe.findMany({
       where: { tenantId },
       include: {
@@ -17,6 +53,8 @@ export class RecipesService {
         },
       },
       orderBy: { createdAt: 'desc' },
+      take,
+      skip,
     });
   }
 
@@ -49,6 +87,10 @@ export class RecipesService {
   }
 
   async create(dto: CreateRecipeDto, tenantId: string) {
+    // Iter-93: reject duplicate ingredients up front — see
+    // assertUniqueIngredients comment for the double-deduction bug.
+    assertUniqueIngredients(dto.ingredients);
+
     // Verify product exists and belongs to tenant
     const product = await this.prisma.product.findFirst({
       where: { id: dto.productId, tenantId },
@@ -114,6 +156,9 @@ export class RecipesService {
 
       // Replace ingredients if provided
       if (dto.ingredients) {
+        // Iter-93: same dedup gate as create. Update can pass duplicates too.
+        assertUniqueIngredients(dto.ingredients);
+
         // Verify all stock items exist
         const stockItemIds = dto.ingredients.map((i) => i.stockItemId);
         const stockItems = await tx.stockItem.findMany({

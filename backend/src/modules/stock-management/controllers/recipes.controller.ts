@@ -23,8 +23,21 @@ export class RecipesController {
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN)
   @ApiOperation({ summary: 'Get all recipes' })
-  findAll(@Request() req) {
-    return this.service.findAll(req.tenantId);
+  findAll(
+    @Request() req,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    // Iter-93: parse pagination at the controller layer. parseInt with a
+    // non-numeric input gives NaN; the service-side clamp + default
+    // covers that, so a junk `?limit=banana` falls back to the default
+    // page without 500ing.
+    const parsedLimit = limit ? parseInt(limit, 10) : undefined;
+    const parsedOffset = offset ? parseInt(offset, 10) : undefined;
+    return this.service.findAll(req.tenantId, {
+      limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
+      offset: Number.isFinite(parsedOffset) ? parsedOffset : undefined,
+    });
   }
 
   @Get('by-product/:productId')
