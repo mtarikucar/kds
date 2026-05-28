@@ -23,6 +23,13 @@ import { EmptyStringToNumber, EmptyStringToUndefined } from '../../../common/dto
 
 const PHONE_REGEX = /^\+?[1-9]\d{7,14}$/;
 
+// Iter-85: customer-session token shape — 32 random bytes encoded as
+// hex = exactly 64 lower-hex chars (see customer-session.service.ts
+// createSession). The previous @Length(32, 128) slot accepted any
+// 32-128 char string and let malformed sessionIds through to the DB
+// lookup. Tight regex stops typos / spoof attempts at the DTO layer.
+const SESSION_ID_REGEX = /^[0-9a-f]{64}$/;
+
 export class OrderItemModifierDto {
   @ApiProperty({ example: 'uuid-of-modifier' })
   @IsUUID()
@@ -77,7 +84,8 @@ export class CreateCustomerOrderDto {
 
   @ApiProperty()
   @IsString()
-  @Length(32, 128)
+  @Length(64, 64)
+  @Matches(SESSION_ID_REGEX, { message: 'sessionId must be a 64-char lower-hex string' })
   sessionId: string;
 
   @ApiProperty({ required: false })

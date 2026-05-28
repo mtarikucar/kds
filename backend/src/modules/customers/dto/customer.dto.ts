@@ -10,6 +10,12 @@ import {
 } from 'class-validator';
 
 const PHONE_REGEX = /^\+?[1-9]\d{7,14}$/;
+// Iter-85: customer-session token shape. createSession emits
+// randomBytes(32).toString('hex') = exactly 64 lower-hex chars.
+// Pre-iter-85 the four sessionId fields below used @Length(32, 128)
+// which let malformed strings through to the DB lookup. Tight regex
+// stops typos / spoofing attempts at the DTO layer.
+const SESSION_ID_REGEX = /^[0-9a-f]{64}$/;
 
 export class CreateCustomerDto {
   @ApiProperty({ description: 'Customer full name' })
@@ -99,7 +105,8 @@ export class CreatePublicSessionDto {
 export class IdentifyCustomerDto {
   @ApiProperty()
   @IsString()
-  @Length(32, 128)
+  @Length(64, 64)
+  @Matches(SESSION_ID_REGEX, { message: 'sessionId must be a 64-char lower-hex string' })
   sessionId: string;
 
   @ApiProperty()
@@ -130,7 +137,8 @@ export class SendOTPDto {
 
   @ApiProperty()
   @IsString()
-  @Length(32, 128)
+  @Length(64, 64)
+  @Matches(SESSION_ID_REGEX, { message: 'sessionId must be a 64-char lower-hex string' })
   sessionId: string;
 }
 
@@ -148,14 +156,16 @@ export class VerifyOTPDto {
 
   @ApiProperty()
   @IsString()
-  @Length(32, 128)
+  @Length(64, 64)
+  @Matches(SESSION_ID_REGEX, { message: 'sessionId must be a 64-char lower-hex string' })
   sessionId: string;
 }
 
 export class ApplyReferralCodeDto {
   @ApiProperty()
   @IsString()
-  @Length(32, 128)
+  @Length(64, 64)
+  @Matches(SESSION_ID_REGEX, { message: 'sessionId must be a 64-char lower-hex string' })
   sessionId: string;
 
   @ApiProperty()

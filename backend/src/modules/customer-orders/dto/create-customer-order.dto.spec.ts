@@ -107,4 +107,50 @@ describe('CreateCustomerOrderDto (iter-84)', () => {
     const msgs = await errors(dto);
     expect(msgs.some((m) => /latitude/i.test(m))).toBe(true);
   });
+
+  /**
+   * Iter-85 regression. Pre-fix sessionId was @Length(32, 128) — any
+   * 32-128 char string passed. The actual session token shape is
+   * randomBytes(32).toString('hex') = exactly 64 lower-hex chars.
+   * Tight regex stops typos / spoofing at the DTO layer instead of
+   * letting them through to a DB lookup that no-matches.
+   */
+  describe('sessionId hex-shape gate (iter-85)', () => {
+    it('accepts a realistic 64-char lower-hex sessionId', async () => {
+      const dto = plainToInstance(CreateCustomerOrderDto, {
+        ...validBody,
+        sessionId: '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+      });
+      expect(await errors(dto)).toEqual([]);
+    });
+
+    it('rejects a 63-char string (one short of the canonical length)', async () => {
+      const dto = plainToInstance(CreateCustomerOrderDto, {
+        ...validBody,
+        sessionId: 'a'.repeat(63),
+      });
+      const msgs = await errors(dto);
+      expect(msgs.some((m) => /sessionId/i.test(m))).toBe(true);
+    });
+
+    it('rejects a 64-char string with non-hex chars (load-bearing shape gate)', async () => {
+      // Uppercase G is not in [0-9a-f]; pre-iter-85 this would have
+      // passed @Length(32, 128) and reached the DB lookup.
+      const dto = plainToInstance(CreateCustomerOrderDto, {
+        ...validBody,
+        sessionId: 'G'.repeat(64),
+      });
+      const msgs = await errors(dto);
+      expect(msgs.some((m) => /sessionId/i.test(m))).toBe(true);
+    });
+
+    it('rejects a 128-char string (the old loose upper bound)', async () => {
+      const dto = plainToInstance(CreateCustomerOrderDto, {
+        ...validBody,
+        sessionId: 'a'.repeat(128),
+      });
+      const msgs = await errors(dto);
+      expect(msgs.some((m) => /sessionId/i.test(m))).toBe(true);
+    });
+  });
 });
