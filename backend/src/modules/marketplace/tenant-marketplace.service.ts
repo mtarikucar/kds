@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OutboxService } from '../outbox/outbox.service';
 import { EventTypes } from '../outbox/event-types';
@@ -30,11 +31,19 @@ export class TenantMarketplaceService {
 
   async purchase(tenantId: string, input: { addOnCode: string; quantity?: number; branchId?: string; paymentRef?: string }) {
     const addOn = await this.catalog.findByCodeOrThrow(input.addOnCode);
-    if (addOn.status === 'archived') {
-      throw new BadRequestException('This add-on is no longer available for purchase');
-    }
-    if (addOn.status === 'draft') {
-      throw new BadRequestException('This add-on is not yet published');
+    // Default-deny: an add-on status the catalog UI doesn't know about
+    // (a new lifecycle state added later, a typo in a manual update)
+    // must NOT silently mint a TenantAddOn row. Previously the code
+    // only blocked 'archived' / 'draft' — anything else fell through
+    // to `create`. Allowlist published-only.
+    if (addOn.status !== 'published') {
+      throw new BadRequestException(
+        addOn.status === 'archived'
+          ? 'This add-on is no longer available for purchase'
+          : addOn.status === 'draft'
+            ? 'This add-on is not yet published'
+            : `Add-on is not available for purchase (status=${addOn.status})`,
+      );
     }
 
     // Verify deps are satisfied for this specific tenant. Catalog-level
@@ -72,54 +81,80 @@ export class TenantMarketplaceService {
     const qty = input.quantity ?? 1;
     const now = new Date();
 
-    // Idempotency: if this paymentRef has already been provisioned, return
-    // the existing row instead of double-granting. Without this, a webhook
-    // replay or a buyer double-clicking "Purchase" would mint two
-    // TenantAddOns and the projector would stack two entitlement grants
-    // — effectively doubling the limit increment for free.
-    if (input.paymentRef) {
-      const existing = await this.prisma.tenantAddOn.findFirst({
-        where: { tenantId, paymentRef: input.paymentRef },
-      });
-      if (existing) return existing;
-    }
-
-    // Block duplicate ACTIVE purchases of the same add-on for the same
-    // (tenant, branch) tuple. The marketplace UI only allows one active
-    // copy at a time per scope; bypassing via direct API call would
-    // double the entitlement grant and confuse cancellation.
-    const dup = await this.prisma.tenantAddOn.findFirst({
-      where: {
-        tenantId,
-        addOnId: addOn.id,
-        branchId: input.branchId ?? null,
-        status: 'active',
-      },
-    });
-    if (dup) {
-      throw new BadRequestException(
-        `Add-on "${addOn.code}" is already active for this ${input.branchId ? 'branch' : 'tenant'}. Cancel the existing subscription or change quantity instead.`,
-      );
-    }
-
     // Recurring add-ons project a 30-day window so the cancellation flow has
     // a meaningful `currentPeriodEnd`. Real billing cycles are aligned to
     // the parent Subscription cycle once Phase 5 checkout wires them up.
     const currentPeriodEnd = addOn.billing === 'oneTime' ? null : new Date(now.getTime() + 30 * 24 * 3600 * 1000);
 
-    const row = await this.prisma.tenantAddOn.create({
-      data: {
-        tenantId,
-        addOnId: addOn.id,
-        branchId: input.branchId,
-        quantity: qty,
-        status: 'active',
-        activatedAt: now,
-        currentPeriodStart: now,
-        currentPeriodEnd,
-        paymentRef: input.paymentRef ?? null,
-      },
-    });
+    // Wrap the idempotency-check, dup-check, and create in a SERIALIZABLE
+    // transaction. The TenantAddOn table has no partial unique index on
+    // (tenantId, addOnId, branchId) where status='active' — adding one
+    // requires a raw-SQL migration. Until then Serializable isolation is
+    // the only Prisma-level guard against the write-skew anomaly: two
+    // concurrent purchases both read empty on the dup-check, both write,
+    // and the entitlement projector stacks two grants — effectively
+    // doubling the capacity limit for free. Postgres detects the
+    // overlapping read/write predicate sets and aborts one transaction;
+    // the loser surfaces as a 409 the client can retry, which then sees
+    // the now-committed first purchase.
+    let row: Awaited<ReturnType<typeof this.prisma.tenantAddOn.create>>;
+    try {
+      row = await this.prisma.$transaction(
+        async (tx) => {
+          // Idempotency by paymentRef — same shape, inside the txn so a
+          // concurrent provisioner for the same paymentRef commits once.
+          if (input.paymentRef) {
+            const existing = await tx.tenantAddOn.findFirst({
+              where: { tenantId, paymentRef: input.paymentRef },
+            });
+            if (existing) return existing;
+          }
+
+          // Tenant-scope duplicate guard.
+          const dup = await tx.tenantAddOn.findFirst({
+            where: {
+              tenantId,
+              addOnId: addOn.id,
+              branchId: input.branchId ?? null,
+              status: 'active',
+            },
+          });
+          if (dup) {
+            throw new BadRequestException(
+              `Add-on "${addOn.code}" is already active for this ${input.branchId ? 'branch' : 'tenant'}. Cancel the existing subscription or change quantity instead.`,
+            );
+          }
+
+          return tx.tenantAddOn.create({
+            data: {
+              tenantId,
+              addOnId: addOn.id,
+              branchId: input.branchId,
+              quantity: qty,
+              status: 'active',
+              activatedAt: now,
+              currentPeriodStart: now,
+              currentPeriodEnd,
+              paymentRef: input.paymentRef ?? null,
+            },
+          });
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
+    } catch (err) {
+      // Postgres serialization-failure (40001 / P2034 in Prisma) when two
+      // concurrent purchases both pass the dup-check. Surface as 409 so
+      // the client retries cleanly and sees the now-committed winner.
+      if (
+        err instanceof Prisma.PrismaClientKnownRequestError &&
+        err.code === 'P2034'
+      ) {
+        throw new ConflictException(
+          'Concurrent purchase detected — please retry. Your request did not double-charge.',
+        );
+      }
+      throw err;
+    }
 
     await this.outbox
       .append({
@@ -146,11 +181,22 @@ export class TenantMarketplaceService {
     if (row.status !== 'active') throw new BadRequestException(`Cannot cancel — status is ${row.status}`);
 
     const now = new Date();
-    const updated = await this.prisma.tenantAddOn.update({
-      where: { id: tenantAddOnId },
+    // Compound WHERE (B41-B45 pattern, iter-31 onward) + status='active'
+    // gate so two concurrent cancel calls converge on a single
+    // transition. The previous shape (.update by id) accepted the
+    // second writer too and would double-emit the AddOnCancelled
+    // outbox event; the count check below makes the loser explicit.
+    const claim = await this.prisma.tenantAddOn.updateMany({
+      where: { id: tenantAddOnId, tenantId, status: 'active' },
       data: immediate
         ? { status: 'cancelled', cancelledAt: now, endedAt: now, cancelAtPeriodEnd: false }
         : { cancelAtPeriodEnd: true, cancelledAt: now },
+    });
+    if (claim.count === 0) {
+      throw new BadRequestException('Cancel raced with another request — refresh and retry');
+    }
+    const updated = await this.prisma.tenantAddOn.findFirstOrThrow({
+      where: { id: tenantAddOnId, tenantId },
     });
 
     // Immediate cancellation revokes entitlements right away. At-period-end
