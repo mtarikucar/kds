@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Controller,
   Get,
   Post,
@@ -97,19 +98,49 @@ export class OrdersController {
   @ApiResponse({ status: 200, description: 'Paginated list of orders' })
   findAll(
     @Request() req,
-    @Query('tableId') tableId?: string,
+    // Iter-87: ParseUUIDPipe rejects non-UUID tableId at the boundary
+    // so Prisma never sees a malformed value (the UUID column would
+    // throw P2023 and surface as a confusing 500).
+    @Query('tableId', new ParseUUIDPipe({ optional: true })) tableId?: string,
     @Query('status') status?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
+    // Iter-87: parse + validate each query param explicitly. Pre-fix
+    // status was `split(',').map(trim) as OrderStatus[]` — the cast
+    // bought zero runtime guard, so bogus values (e.g. `?status=ALL`)
+    // would no-match in Prisma and yield a confusing empty list. Dates
+    // weren't validated either, so a typo'd ISO string produced
+    // Date(NaN) which makes every gte/lte return false — same
+    // empty-list problem.
+    let statuses: OrderStatus[] | undefined;
+    if (status) {
+      const allowed = new Set<string>(Object.values(OrderStatus));
+      statuses = status
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean) as OrderStatus[];
+      const invalid = statuses.filter((s) => !allowed.has(s));
+      if (invalid.length > 0) {
+        throw new BadRequestException(
+          `status must be one of: ${[...allowed].join(', ')} (invalid: ${invalid.join(', ')})`,
+        );
+      }
+    }
+
     const start = startDate ? new Date(startDate) : undefined;
     const end = endDate ? new Date(endDate) : undefined;
-    const statuses = status ? status.split(',').map(s => s.trim()) as OrderStatus[] : undefined;
+    if (start && Number.isNaN(start.getTime())) {
+      throw new BadRequestException('startDate must be a valid ISO-8601 date string');
+    }
+    if (end && Number.isNaN(end.getTime())) {
+      throw new BadRequestException('endDate must be a valid ISO-8601 date string');
+    }
+
     const pageNum = page ? Math.max(1, parseInt(page, 10) || 1) : 1;
     const limitNum = limit ? parseInt(limit, 10) || 100 : 100;
-
     const take = limitNum;
     const skip = (pageNum - 1) * limitNum;
     return this.ordersService.findAll(req.tenantId, tableId, statuses, start, end, take, skip);
