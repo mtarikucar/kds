@@ -1,17 +1,47 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import { Injectable, CanActivate, ExecutionContext, ForbiddenException, Logger } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EntitlementService } from '../../modules/entitlements/entitlement.service';
 
 export interface LimitCheck {
   resource: 'users' | 'tables' | 'products' | 'categories' | 'monthlyOrders';
   action: 'create' | 'count';
 }
 
+// Maps the legacy `resource` enum to the engine's dotted limit keys.
+// Engine writes `limit.maxUsers`, `limit.maxTables`, etc.
+const ENGINE_LIMIT_KEY: Record<LimitCheck['resource'], string> = {
+  users: 'limit.maxUsers',
+  tables: 'limit.maxTables',
+  products: 'limit.maxProducts',
+  categories: 'limit.maxCategories',
+  monthlyOrders: 'limit.maxMonthlyOrders',
+};
+
+const PLAN_FIELD: Record<LimitCheck['resource'], string> = {
+  users: 'maxUsers',
+  tables: 'maxTables',
+  products: 'maxProducts',
+  categories: 'maxCategories',
+  monthlyOrders: 'maxMonthlyOrders',
+};
+
 @Injectable()
 export class SubscriptionLimitsGuard implements CanActivate {
+  private readonly logger = new Logger(SubscriptionLimitsGuard.name);
+
   constructor(
     private reflector: Reflector,
     private prisma: PrismaService,
+    // v2.8.90 — engine routing. Pre-v2.8.90 this guard read
+    // `plan.maxUsers` etc. directly, bypassing BOTH override
+    // (admin force-grant) AND add-on capacity grants (extra_branch,
+    // extra_kds_screen, etc.). A tenant who purchased 3× extra_branch
+    // (engine: `limit.maxBranches=4`) still got rejected at the 2nd
+    // because plan.maxBranches=1. Same gap PlanFeatureGuard.checkLimit
+    // closed in v2.8.90 — this guard's twin sister applied to
+    // UsersController.
+    private entitlements: EntitlementService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -46,95 +76,51 @@ export class SubscriptionLimitsGuard implements CanActivate {
 
     const plan = subscription.plan;
 
-    // Check limits based on resource type
-    switch (limitCheck.resource) {
-      case 'users': {
-        const maxUsers = plan.maxUsers;
-        if (maxUsers === -1) return true; // Unlimited
+    // v2.8.90 — resolve the limit via the engine. Falls back to plan-
+    // only if engine empty (projector race, new tenant).
+    const engineSet = await this.entitlements.getForTenant(tenantId, null);
+    const engineKey = ENGINE_LIMIT_KEY[limitCheck.resource];
+    const planField = PLAN_FIELD[limitCheck.resource];
+    const engineLimit = engineSet.limits[engineKey];
+    const limit: number =
+      typeof engineLimit === 'number'
+        ? engineLimit
+        : (plan as any)[planField];
 
+    if (limit === -1) return true; // Unlimited
+
+    let currentCount = 0;
+    switch (limitCheck.resource) {
+      case 'users':
         // Only count ACTIVE users (not INACTIVE or PENDING_APPROVAL)
-        const currentCount = await this.prisma.user.count({
+        currentCount = await this.prisma.user.count({
           where: { tenantId, status: 'ACTIVE' },
         });
-
-        if (currentCount >= maxUsers) {
-          throw new ForbiddenException(
-            `User limit reached (${maxUsers}). Upgrade your plan to add more users.`
-          );
-        }
         break;
-      }
-
-      case 'tables': {
-        const maxTables = plan.maxTables;
-        if (maxTables === -1) return true;
-
-        const currentCount = await this.prisma.table.count({
-          where: { tenantId },
-        });
-
-        if (currentCount >= maxTables) {
-          throw new ForbiddenException(
-            `Table limit reached (${maxTables}). Upgrade your plan to add more tables.`
-          );
-        }
+      case 'tables':
+        currentCount = await this.prisma.table.count({ where: { tenantId } });
         break;
-      }
-
-      case 'products': {
-        const maxProducts = plan.maxProducts;
-        if (maxProducts === -1) return true;
-
-        const currentCount = await this.prisma.product.count({
-          where: { tenantId },
-        });
-
-        if (currentCount >= maxProducts) {
-          throw new ForbiddenException(
-            `Product limit reached (${maxProducts}). Upgrade your plan to add more products.`
-          );
-        }
+      case 'products':
+        currentCount = await this.prisma.product.count({ where: { tenantId } });
         break;
-      }
-
-      case 'categories': {
-        const maxCategories = plan.maxCategories;
-        if (maxCategories === -1) return true;
-
-        const currentCount = await this.prisma.category.count({
-          where: { tenantId },
-        });
-
-        if (currentCount >= maxCategories) {
-          throw new ForbiddenException(
-            `Category limit reached (${maxCategories}). Upgrade your plan to add more categories.`
-          );
-        }
+      case 'categories':
+        currentCount = await this.prisma.category.count({ where: { tenantId } });
         break;
-      }
-
       case 'monthlyOrders': {
-        const maxMonthlyOrders = plan.maxMonthlyOrders;
-        if (maxMonthlyOrders === -1) return true;
-
         const startOfMonth = new Date();
         startOfMonth.setDate(1);
         startOfMonth.setHours(0, 0, 0, 0);
-
-        const currentCount = await this.prisma.order.count({
-          where: {
-            tenantId,
-            createdAt: { gte: startOfMonth },
-          },
+        currentCount = await this.prisma.order.count({
+          where: { tenantId, createdAt: { gte: startOfMonth } },
         });
-
-        if (currentCount >= maxMonthlyOrders) {
-          throw new ForbiddenException(
-            `Monthly order limit reached (${maxMonthlyOrders}). Upgrade your plan to process more orders.`
-          );
-        }
         break;
       }
+    }
+
+    if (currentCount >= limit) {
+      throw new ForbiddenException(
+        `${limitCheck.resource} limit reached (${currentCount}/${limit}). Upgrade your plan or buy a capacity add-on.`,
+      );
     }
 
     return true;

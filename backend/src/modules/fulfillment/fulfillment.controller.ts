@@ -5,6 +5,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
 import { SuperAdminGuard } from '../superadmin/guards/superadmin.guard';
+import { SuperAdminRoute } from '../superadmin/decorators/superadmin.decorator';
 import { ShipmentService } from './shipment.service';
 import { WarrantyService } from './warranty.service';
 import { InstallationService } from './installation.service';
@@ -47,8 +48,12 @@ export class InstallationController {
  * Tenant-side controller above only creates + lists their own; the
  * lifecycle transitions live here.
  */
+// v2.8.90 — @SuperAdminRoute() skips global tenant-realm guards;
+// SuperAdmin tokens are signed with a different key and don't carry
+// a tenantId.
 @ApiTags('SuperAdmin · Installation')
 @ApiBearerAuth()
+@SuperAdminRoute()
 @UseGuards(SuperAdminGuard)
 @Controller('v1/superadmin/installation')
 export class SuperadminInstallationController {
@@ -104,8 +109,10 @@ export class WarrantyController {
   }
 }
 
+// v2.8.90 — @SuperAdminRoute() (same reasoning as SuperadminInstallationController).
 @ApiTags('SuperAdmin · Shipments')
 @ApiBearerAuth()
+@SuperAdminRoute()
 @UseGuards(SuperAdminGuard)
 @Controller('v1/superadmin/shipments')
 export class SuperadminShipmentsController {

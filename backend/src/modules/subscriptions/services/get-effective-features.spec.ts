@@ -64,6 +64,13 @@ describe('SubscriptionService.getEffectiveFeatures (v2.8.88)', () => {
       subscriptionPlan: {
         findMany: jest.fn().mockResolvedValue([]),
       },
+      // v2.8.90: the engine-empty fallback now reads active TenantAddOn
+      // rows so add-on grants survive a projector race. Default: no
+      // add-ons (plan-only fallback). The new "adds an add-on" case
+      // overrides this mock.
+      tenantAddOn: {
+        findMany: jest.fn().mockResolvedValue([]),
+      },
     };
     entitlements = {
       getForTenant: jest.fn(),

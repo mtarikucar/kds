@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EntitlementService } from '../entitlements/entitlement.service';
 import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import { TenantStatus } from '../../common/constants/subscription.enum';
 import {
@@ -40,7 +41,15 @@ const SETTINGS_SELECT = {
 
 @Injectable()
 export class TenantsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    // v2.8.90: subdomain change permission now reads the engine's
+    // customBranding view so customBranding granted via add-on
+    // (`custom_branding_pack` or admin override) is honoured.
+    // Pre-v2.8.90 it read tenant.currentPlan.customBranding directly,
+    // missing both override and add-on paths.
+    private entitlements: EntitlementService,
+  ) {}
 
   async findAllPublic() {
     return this.prisma.tenant.findMany({
@@ -64,16 +73,24 @@ export class TenantsService {
     if (newSubdomain === currentSubdomain) return;
     if (!newSubdomain) return;
 
-    const tenantWithPlan = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-      include: { currentPlan: true },
-    });
-
-    const hasCustomBranding = tenantWithPlan?.currentPlan?.customBranding ?? false;
+    // v2.8.90 — engine-routed. Falls back to the plan column if the
+    // engine has no grants for this tenant yet (projector race).
+    const engineSet = await this.entitlements.getForTenant(tenantId, null);
+    const engineCustomBranding = engineSet.features['feature.customBranding'];
+    let hasCustomBranding: boolean;
+    if (typeof engineCustomBranding === 'boolean') {
+      hasCustomBranding = engineCustomBranding;
+    } else {
+      const tenantWithPlan = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        include: { currentPlan: true },
+      });
+      hasCustomBranding = tenantWithPlan?.currentPlan?.customBranding ?? false;
+    }
 
     if (!hasCustomBranding) {
       throw new ForbiddenException(
-        'Custom subdomain is a Pro feature. Upgrade your plan to set or change your subdomain.',
+        'Custom subdomain is a Pro feature. Upgrade your plan or buy the add-on to set or change your subdomain.',
       );
     }
   }

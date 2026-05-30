@@ -14,11 +14,18 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
+import { PlanFeatureGuard } from '../subscriptions/guards/plan-feature.guard';
+import { RequiresIntegration } from '../subscriptions/decorators/requires-integration.decorator';
 
+// v2.8.90 — SMS credential surface gated on integration. Provider
+// credentials (Netgsm API key, Twilio SID/token) are PII + money flow;
+// tenants without an `integration_sms` add-on (or plan that bundles
+// SMS) shouldn't see vendor connect endpoints.
 @ApiTags('sms-settings')
 @ApiBearerAuth()
 @Controller('sms-settings')
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@RequiresIntegration('sms')
 export class SmsSettingsController {
   constructor(private readonly smsSettingsService: SmsSettingsService) {}
 

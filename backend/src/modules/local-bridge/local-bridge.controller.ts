@@ -8,6 +8,9 @@ import { UserRole } from '../../common/constants/roles.enum';
 import { Public } from '../auth/decorators/public.decorator';
 import { LocalBridgeService } from './local-bridge.service';
 import { BridgeTokenGuard } from './bridge-token.guard';
+import { PlanFeatureGuard } from '../subscriptions/guards/plan-feature.guard';
+import { RequiresFeature } from '../subscriptions/decorators/requires-feature.decorator';
+import { PlanFeature } from '../../common/constants/subscription.enum';
 import {
   BridgeHeartbeatDto,
   ClaimBridgeDto,
@@ -34,8 +37,12 @@ export class LocalBridgeController {
     return this.bridges.list(req.user.tenantId, branchId);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  // v2.8.90 — provisioning a bridge implies multi-branch ops (the sidebar
+  // gates this entry on multiLocation). Pre-v2.8.90 the backend missed
+  // the feature gate so direct URL hits worked on FREE plans.
+  @UseGuards(JwtAuthGuard, RolesGuard, PlanFeatureGuard)
   @Roles(UserRole.ADMIN)
+  @RequiresFeature(PlanFeature.MULTI_LOCATION)
   @ApiBearerAuth()
   @Post()
   @ApiOperation({ summary: 'Provision a new bridge slot — returns provisioning token (shown once) (ADMIN only)' })

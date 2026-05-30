@@ -6,9 +6,10 @@ import { SalesInvoiceService } from './services/sales-invoice.service';
 import { AccountingSyncService } from './services/accounting-sync.service';
 import { AccountingSettingsController } from './controllers/accounting-settings.controller';
 import { SalesInvoiceController } from './controllers/sales-invoice.controller';
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, SubscriptionsModule],
   controllers: [AccountingSettingsController, SalesInvoiceController],
   providers: [TaxCalculationService, AccountingSettingsService, SalesInvoiceService, AccountingSyncService],
   exports: [TaxCalculationService, AccountingSettingsService, SalesInvoiceService, AccountingSyncService],

@@ -8,11 +8,17 @@ import { RolesGuard } from '../../auth/guards/roles.guard';
 import { TenantGuard } from '../../auth/guards/tenant.guard';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '../../../common/constants/roles.enum';
+import { PlanFeatureGuard } from '../../subscriptions/guards/plan-feature.guard';
+import { RequiresIntegration } from '../../subscriptions/decorators/requires-integration.decorator';
 
+// v2.8.90 — accounting credential surface gated on integration. Tenants
+// without any accounting add-on shouldn't see vendor connect / sync
+// endpoints; this gate mirrors the sidebar rule server-side.
 @ApiTags('accounting-settings')
 @ApiBearerAuth()
 @Controller('accounting-settings')
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@RequiresIntegration('accounting')
 export class AccountingSettingsController {
   constructor(
     private readonly service: AccountingSettingsService,

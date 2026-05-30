@@ -181,19 +181,51 @@ export class PlanFeatureGuard implements CanActivate {
 
     // Check usage limits (override takes precedence over plan)
     if (limitToCheck) {
-      await this.checkLimit(user.tenantId, currentPlan, limitToCheck, tenant.limitOverrides as Record<string, number> | null);
+      const set = await loadEngineSet();
+      await this.checkLimit(user.tenantId, currentPlan, limitToCheck, tenant.limitOverrides as Record<string, number> | null, set);
     }
 
     return true;
   }
 
   /**
-   * Check if usage limit has been reached
+   * Check if usage limit has been reached.
+   *
+   * v2.8.90 — engine-routed. Pre-v2.8.90 the limit branch read
+   * `plan[limitType]` directly, so capacity add-ons (extra_branch,
+   * extra_kds_screen, kds_extra_station, extra_tablet) were ignored:
+   * a tenant who bought 3× extra_branch (₺399/mo each, granting
+   * `limit.maxBranches += 1` per unit) saw the engine project
+   * `limit.maxBranches=4` but the guard still rejected the 4th branch
+   * because plan.maxBranches=1. Now the guard reads the engine's
+   * folded view (plan + add-on SUM + admin override REPLACE) when
+   * populated, falling back to the legacy plan-only path only when
+   * the engine has no grants for this tenant (mid-projector race).
    */
-  private async checkLimit(tenantId: string, plan: any, limitType: LimitType, limitOverrides?: Record<string, number> | null): Promise<void> {
-    const limit = limitOverrides?.[limitType] !== undefined
-      ? limitOverrides[limitType]
-      : plan[limitType];
+  private async checkLimit(
+    tenantId: string,
+    plan: any,
+    limitType: LimitType,
+    limitOverrides: Record<string, number> | null | undefined,
+    engineSet: Awaited<ReturnType<EntitlementService['getForTenant']>>,
+  ): Promise<void> {
+    const engineLimit = engineSet.limits[`limit.${limitType}`];
+    let limit: number;
+    if (typeof engineLimit === 'number') {
+      // Engine wins. The engine has already applied override REPLACE
+      // semantics and add-on SUM, so the legacy override-then-plan
+      // fallback would just re-do work the engine has finished.
+      limit = engineLimit;
+    } else {
+      // Engine empty for this key — fall back to plan-only. Same
+      // safety-net as PlanFeatureGuard.canActivate's feature branch.
+      limit = limitOverrides?.[limitType] !== undefined
+        ? limitOverrides[limitType]
+        : plan[limitType];
+      this.logger.debug(
+        `PlanFeatureGuard.checkLimit fell back to plan-only for tenant=${tenantId} limit=${limitType}`,
+      );
+    }
 
     // If unlimited, allow
     if (isUnlimited(limit)) {

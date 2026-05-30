@@ -17,6 +17,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
+import { PlanFeatureGuard } from '../subscriptions/guards/plan-feature.guard';
+import { RequiresIntegration } from '../subscriptions/decorators/requires-integration.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { CallerService } from './caller.service';
 import { MockCallerProvider } from './adapters/mock-caller.provider';
@@ -31,10 +33,14 @@ export class CallerController {
 
   // v2.8.88: ADMIN/MANAGER only. The caller feed exposes inbound phone
   // numbers + matched customer profiles — PII that should not be open
-  // to WAITER/KITCHEN. The provider webhook below stays @Public (it's
-  // HMAC-signed by the adapter).
-  @UseGuards(JwtAuthGuard, RolesGuard)
+  // to WAITER/KITCHEN. v2.8.90 adds @RequiresIntegration('caller') so
+  // tenants who never bought the caller_id_integration add-on don't
+  // see a sidebar entry advertising a feature they can't use, and the
+  // backend mirrors the gate (defence in depth). The provider webhook
+  // below stays @Public (it's HMAC-signed by the adapter).
+  @UseGuards(JwtAuthGuard, RolesGuard, PlanFeatureGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @RequiresIntegration('caller')
   @ApiBearerAuth()
   @Get('recent')
   @ApiOperation({ summary: 'Last N caller events for the tenant — drives the calls feed UI' })

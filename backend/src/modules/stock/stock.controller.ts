@@ -19,11 +19,19 @@ import { TenantGuard } from '../auth/guards/tenant.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
 import { StockMovementType } from '../../common/constants/order-status.enum';
+import { PlanFeatureGuard } from '../subscriptions/guards/plan-feature.guard';
+import { RequiresFeature } from '../subscriptions/decorators/requires-feature.decorator';
+import { PlanFeature } from '../../common/constants/subscription.enum';
 
+// v2.8.90 — legacy /stock surface lacked @RequiresFeature(INVENTORY_TRACKING)
+// so FREE plan tenants could create stock movements / query alerts that
+// the gated /stock-management module otherwise blocks. Same gate added
+// here so the legacy surface follows the same rules.
 @ApiTags('stock')
 @ApiBearerAuth()
 @Controller('stock')
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@RequiresFeature(PlanFeature.INVENTORY_TRACKING)
 export class StockController {
   constructor(private readonly stockService: StockService) {}
 

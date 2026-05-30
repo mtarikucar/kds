@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } f
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Public } from '../auth/decorators/public.decorator';
 import { SuperAdminGuard } from '../superadmin/guards/superadmin.guard';
+import { SuperAdminRoute } from '../superadmin/decorators/superadmin.decorator';
 import { CatalogService } from './catalog.service';
 import { CreateHardwareProductDto } from './dto/create-hardware-product.dto';
 import { UpdateHardwareProductDto } from './dto/update-hardware-product.dto';
@@ -31,8 +32,14 @@ export class CatalogController {
   }
 }
 
+// v2.8.90 — @SuperAdminRoute() tells the global JwtAuthGuard +
+// TenantGuard to skip; SuperAdmin tokens are minted with a different
+// signing key + don't carry a tenantId. Pre-v2.8.90 this class
+// returned 401 because the tenant-realm JwtAuthGuard couldn't verify
+// the SuperAdmin-signed JWT.
 @ApiTags('SuperAdmin · Hardware Catalog')
 @ApiBearerAuth()
+@SuperAdminRoute()
 @UseGuards(SuperAdminGuard)
 @Controller('v1/superadmin/catalog')
 export class SuperadminCatalogController {

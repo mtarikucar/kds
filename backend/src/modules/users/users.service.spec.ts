@@ -24,7 +24,22 @@ describe('UsersService.findAll filters (iter-74)', () => {
     prisma = mockPrismaClient();
     const config = { get: () => undefined } as any;
     const auth = {} as any;
-    svc = new UsersService(prisma as any, config, auth);
+    svc = new UsersService(
+      prisma as any,
+      config,
+      auth,
+      // v2.8.90: EntitlementService stub returns empty set → resolveMaxUsers
+      // falls back to plan.maxUsers, matching pre-v2.8.90 behaviour for
+      // tests that don't care about add-on capacity.
+      {
+        getForTenant: jest.fn().mockResolvedValue({
+          features: {},
+          limits: {},
+          integrations: {},
+          computedAt: new Date(0).toISOString(),
+        }),
+      } as any,
+    );
     (prisma.user.findMany as any).mockResolvedValue([]);
     (prisma.user.count as any).mockResolvedValue(0);
   });

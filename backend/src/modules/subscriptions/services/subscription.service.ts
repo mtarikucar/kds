@@ -1104,48 +1104,93 @@ export class SubscriptionService {
 
     if (!hasAnyEngineGrants) {
       // Engine empty — projector hasn't run for this tenant yet. Fall
-      // through to plan-only computation so the UI still renders.
-      // logged at debug because reconcileNightly catches this; not
-      // worth paging ops.
+      // through to plan + override + add-on fold computation so the UI
+      // still renders. v2.8.90 — the fold now reads active TenantAddOn
+      // rows so a tenant who purchased an add-on but hit a projector
+      // race sees their purchase reflected; pre-v2.8.90 this branch
+      // returned plan-only and the frontend showed locked features.
+      // reconcileNightly still catches the engine miss within 24h.
       this.logger.debug(
-        `getEffectiveFeatures fell back to plan-only for tenant=${tenantId} (engine returned empty set)`,
+        `getEffectiveFeatures fell back to plan + override + addon fold for tenant=${tenantId} (engine empty)`,
       );
       const featureOverrides =
         (tenant.featureOverrides as Record<string, boolean>) || null;
       const limitOverrides =
         (tenant.limitOverrides as Record<string, number>) || null;
-      const features = {
-        advancedReports:
-          featureOverrides?.advancedReports ?? plan.advancedReports,
-        multiLocation: featureOverrides?.multiLocation ?? plan.multiLocation,
-        customBranding:
-          featureOverrides?.customBranding ?? plan.customBranding,
-        apiAccess: featureOverrides?.apiAccess ?? plan.apiAccess,
-        prioritySupport:
-          featureOverrides?.prioritySupport ?? plan.prioritySupport,
-        inventoryTracking:
-          featureOverrides?.inventoryTracking ?? plan.inventoryTracking,
-        kdsIntegration:
-          featureOverrides?.kdsIntegration ?? plan.kdsIntegration,
-        reservationSystem:
-          featureOverrides?.reservationSystem ?? plan.reservationSystem,
-        personnelManagement:
-          featureOverrides?.personnelManagement ?? plan.personnelManagement,
-        deliveryIntegration:
-          featureOverrides?.deliveryIntegration ?? plan.deliveryIntegration,
+      const features: Record<string, boolean> = {
+        advancedReports: plan.advancedReports,
+        multiLocation: plan.multiLocation,
+        customBranding: plan.customBranding,
+        apiAccess: plan.apiAccess,
+        prioritySupport: plan.prioritySupport,
+        inventoryTracking: plan.inventoryTracking,
+        kdsIntegration: plan.kdsIntegration,
+        reservationSystem: plan.reservationSystem,
+        personnelManagement: plan.personnelManagement,
+        deliveryIntegration: plan.deliveryIntegration,
       };
-      const limits = {
-        maxUsers: limitOverrides?.maxUsers ?? plan.maxUsers,
-        maxTables: limitOverrides?.maxTables ?? plan.maxTables,
-        maxProducts: limitOverrides?.maxProducts ?? plan.maxProducts,
-        maxCategories: limitOverrides?.maxCategories ?? plan.maxCategories,
-        maxMonthlyOrders:
-          limitOverrides?.maxMonthlyOrders ?? plan.maxMonthlyOrders,
+      const limits: Record<string, number> = {
+        maxUsers: plan.maxUsers,
+        maxTables: plan.maxTables,
+        maxProducts: plan.maxProducts,
+        maxCategories: plan.maxCategories,
+        maxMonthlyOrders: plan.maxMonthlyOrders,
       };
+      const integrations: Record<string, string[]> = {};
+
+      // Fold active add-ons. Each TenantAddOn carries a snapshot of the
+      // MarketplaceAddOn.grants JSON applied at purchase time. The
+      // engine's projector uses the same shape — features OR-true,
+      // limits SUM, integrations array-union — so reproduce it here.
+      const activeAddOns = await this.prisma.tenantAddOn.findMany({
+        where: { tenantId, status: 'active' },
+        include: { addOn: { select: { grants: true } } },
+      });
+      for (const ta of activeAddOns) {
+        const grants = (ta.addOn?.grants ?? {}) as Record<string, unknown>;
+        for (const [k, v] of Object.entries(grants)) {
+          if (k.startsWith('feature.')) {
+            const name = k.slice('feature.'.length);
+            if (v === true && name in features) features[name] = true;
+          } else if (k.startsWith('limit.')) {
+            const name = k.slice('limit.'.length);
+            if (typeof v === 'number' && name in limits) {
+              // SUM by qty. Engine treats -1 as "unlimited"; preserve.
+              if (limits[name] === -1 || v === -1) {
+                limits[name] = -1;
+              } else {
+                limits[name] = limits[name] + v * (ta.quantity ?? 1);
+              }
+            }
+          } else if (k.startsWith('integration.')) {
+            const domain = k.slice('integration.'.length);
+            const vendors = Array.isArray(v) ? (v as string[]) : [];
+            if (!integrations[domain]) integrations[domain] = [];
+            for (const vendor of vendors) {
+              if (!integrations[domain].includes(vendor)) {
+                integrations[domain].push(vendor);
+              }
+            }
+          }
+        }
+      }
+
+      // Overrides win last (REPLACE semantics matching the engine).
+      if (featureOverrides) {
+        for (const [k, v] of Object.entries(featureOverrides)) {
+          if (k in features) features[k] = v;
+        }
+      }
+      if (limitOverrides) {
+        for (const [k, v] of Object.entries(limitOverrides)) {
+          if (k in limits) limits[k] = v;
+        }
+      }
+
       return {
         features,
         limits,
-        integrations: {} as Record<string, string[]>,
+        integrations,
         trialEligiblePlanIds,
       };
     }

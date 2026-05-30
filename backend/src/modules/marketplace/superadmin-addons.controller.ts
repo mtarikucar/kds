@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { SuperAdminGuard } from '../superadmin/guards/superadmin.guard';
+import { SuperAdminRoute } from '../superadmin/decorators/superadmin.decorator';
 import { AddOnCatalogService } from './addon-catalog.service';
 import { CreateAddOnDto, UpdateAddOnDto } from './dto/addon.dto';
 
@@ -19,9 +20,14 @@ import { CreateAddOnDto, UpdateAddOnDto } from './dto/addon.dto';
  * route prefix matches the existing super-admin convention. The
  * SuperAdminGuard owns both authentication AND authorisation for these
  * endpoints (super-admin is a separate principal, not a User role).
+ *
+ * v2.8.90 — @SuperAdminRoute() tells the global JwtAuthGuard +
+ * TenantGuard to skip; pre-v2.8.90 the class returned 401 because the
+ * tenant-realm JWT guard couldn't verify the SuperAdmin-signed JWT.
  */
 @ApiTags('SuperAdmin · Marketplace')
 @ApiBearerAuth()
+@SuperAdminRoute()
 @UseGuards(SuperAdminGuard)
 @Controller('v1/superadmin/marketplace/addons')
 export class SuperadminAddOnsController {

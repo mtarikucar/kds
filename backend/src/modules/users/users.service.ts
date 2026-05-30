@@ -18,6 +18,7 @@ import { UpdateProfileDto, UpdateEmailDto } from './dto/update-profile.dto';
 import { UpdateOnboardingDto } from './dto/update-onboarding.dto';
 import { AuthService } from '../auth/auth.service';
 import { UserRole } from '../../common/constants/roles.enum';
+import { EntitlementService } from '../entitlements/entitlement.service';
 
 const LIST_SELECT = {
   id: true,
@@ -55,7 +56,25 @@ export class UsersService {
     private configService: ConfigService,
     @Inject(forwardRef(() => AuthService))
     private authService: AuthService,
+    // v2.8.90: maxUsers cap reads now route through the entitlement
+    // engine so add-on capacity grants (extra users / kds seats) are
+    // honoured. Pre-v2.8.90 `subscription.plan.maxUsers` was read
+    // directly at three call sites (create, approve, reactivate),
+    // bypassing both override and add-on SUM.
+    private entitlements: EntitlementService,
   ) {}
+
+  /**
+   * v2.8.90 — resolve the effective maxUsers cap for this tenant.
+   * Engine wins when populated; falls back to the plan column on
+   * empty engine (projector race / brand-new tenant).
+   */
+  private async resolveMaxUsers(tenantId: string, planMaxUsers: number): Promise<number> {
+    const set = await this.entitlements.getForTenant(tenantId, null);
+    const engineLimit = set.limits['limit.maxUsers'];
+    if (typeof engineLimit === 'number') return engineLimit;
+    return planMaxUsers;
+  }
 
   private bcryptCost(): number {
     const raw = this.configService.get<string>('BCRYPT_COST');
@@ -133,14 +152,17 @@ export class UsersService {
         where: { tenantId, status: { in: ['ACTIVE', 'TRIALING', 'PAST_DUE'] } },
         include: { plan: true },
       });
-      if (subscription?.plan && subscription.plan.maxUsers !== -1) {
-        const activeCount = await tx.user.count({
-          where: { tenantId, status: 'ACTIVE' },
-        });
-        if (activeCount >= subscription.plan.maxUsers) {
-          throw new ForbiddenException(
-            `User limit reached (${subscription.plan.maxUsers}). Upgrade your plan to add more users.`,
-          );
+      if (subscription?.plan) {
+        const effectiveMax = await this.resolveMaxUsers(tenantId, subscription.plan.maxUsers);
+        if (effectiveMax !== -1) {
+          const activeCount = await tx.user.count({
+            where: { tenantId, status: 'ACTIVE' },
+          });
+          if (activeCount >= effectiveMax) {
+            throw new ForbiddenException(
+              `User limit reached (${effectiveMax}). Upgrade your plan or buy a capacity add-on.`,
+            );
+          }
         }
       }
 
@@ -592,13 +614,17 @@ export class UsersService {
         where: { tenantId, status: { in: ['ACTIVE', 'TRIALING', 'PAST_DUE'] } },
         include: { plan: true },
       });
-      if (subscription?.plan && subscription.plan.maxUsers !== -1) {
+      let effectiveMax: number | null = null;
+      if (subscription?.plan) {
+        effectiveMax = await this.resolveMaxUsers(tenantId, subscription.plan.maxUsers);
+      }
+      if (effectiveMax !== null && effectiveMax !== -1) {
         const activeCount = await tx.user.count({
           where: { tenantId, status: 'ACTIVE' },
         });
-        if (activeCount >= subscription.plan.maxUsers) {
+        if (activeCount >= effectiveMax) {
           throw new ForbiddenException(
-            `User limit reached (${subscription.plan.maxUsers}). Upgrade your plan or deactivate another user before approving.`,
+            `User limit reached (${effectiveMax}). Upgrade your plan or buy a capacity add-on, or deactivate another user before approving.`,
           );
         }
       }
@@ -651,13 +677,14 @@ export class UsersService {
       if (!subscription?.plan) {
         throw new ForbiddenException('No active subscription found');
       }
-      if (subscription.plan.maxUsers !== -1) {
+      const effectiveMax = await this.resolveMaxUsers(tenantId, subscription.plan.maxUsers);
+      if (effectiveMax !== -1) {
         const activeCount = await tx.user.count({
           where: { tenantId, status: 'ACTIVE' },
         });
-        if (activeCount >= subscription.plan.maxUsers) {
+        if (activeCount >= effectiveMax) {
           throw new ForbiddenException(
-            `User limit reached (${subscription.plan.maxUsers}). Upgrade your plan to add more users.`,
+            `User limit reached (${effectiveMax}). Upgrade your plan or buy a capacity add-on.`,
           );
         }
       }
