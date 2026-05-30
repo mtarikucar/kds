@@ -39,6 +39,12 @@ export const useGetPlans = () => {
 export const useGetEffectiveFeatures = () => {
   return useQuery({
     queryKey: subscriptionKeys.effectiveFeatures(),
+    // v2.8.91: explicit 30s staleTime matching the backend engine
+    // cache TTL. Pre-v2.8.91 this query inherited the global 5-minute
+    // staleTime so a tenant could wait minutes for a purchased add-on
+    // to unlock the UI even after refetch. 30s lines the SPA up with
+    // the engine's natural invalidation cadence.
+    staleTime: 30_000,
     queryFn: async (): Promise<EffectiveFeatures> => {
       const response = await api.get('/subscriptions/effective-features');
       return response.data;
@@ -161,16 +167,18 @@ export const useChangePlan = () => {
       return response.data;
     },
     onSuccess: (result, variables) => {
+      // v2.8.91: invalidate effective-features on EVERY branch. Pre-v2.8.91
+      // only the `downgrade` branch invalidated; an in-trial upgrade
+      // (no payment required) flipped status server-side but the UI
+      // kept showing the old entitlements until something else refetched.
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
+      queryClient.invalidateQueries({ queryKey: subscriptionKeys.effectiveFeatures() });
+
       if (result.type === 'downgrade') {
         // Downgrade is scheduled - refresh to show scheduled downgrade alert
         const date = result.scheduledFor ? new Date(result.scheduledFor).toLocaleDateString() : '';
         toast.success(i18n.t('common:notifications.downgradeScheduled', { date }));
         queryClient.invalidateQueries({ queryKey: subscriptionKeys.scheduledDowngrade(variables.id) });
-        queryClient.invalidateQueries({ queryKey: subscriptionKeys.current() });
-        // Scheduled downgrade doesn't change features yet (effective at
-        // period end), but the UI banner depends on the scheduled state
-        // visible via effective-features as well in some screens.
-        queryClient.invalidateQueries({ queryKey: subscriptionKeys.effectiveFeatures() });
       } else if (result.type === 'upgrade' && result.requiresPayment) {
         // Upgrade requires payment - will be redirected
         toast.info(i18n.t('common:notifications.redirectingToPayment'));

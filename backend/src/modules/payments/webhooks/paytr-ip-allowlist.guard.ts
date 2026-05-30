@@ -19,9 +19,35 @@ export class PaytrIpAllowlistGuard implements CanActivate {
 
   constructor(private readonly config: ConfigService) {
     const raw = config.get<string>('PAYTR_WEBHOOK_ALLOWED_IPS');
-    this.allowed = raw
-      ? new Set(raw.split(',').map((s) => s.trim()).filter(Boolean))
-      : null;
+    if (!raw) {
+      this.allowed = null;
+      return;
+    }
+    const entries = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    this.allowed = new Set(entries);
+    // v2.8.91: startup self-test. Pre-fix a misconfigured
+    // PAYTR_WEBHOOK_ALLOWED_IPS (typo, wrong format, accidental quotes)
+    // silently dropped every real PayTR webhook with a 200 OK so PayTR
+    // stopped retrying — invisible regression until the ops team saw
+    // settlement queues backing up. Now: validate each entry looks
+    // like an IPv4 or IPv6 address at boot. Invalid entries don't
+    // disable the guard, but the loud warning surfaces the misconfig.
+    const looksLikeIp = (s: string) =>
+      /^[0-9]{1,3}(\.[0-9]{1,3}){3}$/.test(s) || /^[0-9a-fA-F:]+$/.test(s);
+    const invalid = entries.filter((e) => !looksLikeIp(e));
+    if (invalid.length > 0) {
+      this.logger.error(
+        `PAYTR_WEBHOOK_ALLOWED_IPS contains ${invalid.length} entries that do not look like IP addresses: [${invalid.join(', ')}]. ` +
+        `Real PayTR callbacks may be silently dropped — fix the env to match the IPs published in the merchant panel.`,
+      );
+    }
+    if (entries.length === 0) {
+      this.logger.error(
+        'PAYTR_WEBHOOK_ALLOWED_IPS was set but resolved to an empty list after parsing. Every webhook will be rejected.',
+      );
+    } else {
+      this.logger.log(`PayTR webhook allowlist active with ${entries.length} entries`);
+    }
   }
 
   canActivate(context: ExecutionContext): boolean {

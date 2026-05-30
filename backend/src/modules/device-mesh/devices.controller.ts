@@ -9,6 +9,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -108,7 +109,13 @@ export class DevicesController {
 
   // -- Device-side (device-token auth) endpoints ---------------------------
 
+  // v2.8.91: tight throttle. Pre-fix /pair carried only @Public() with
+  // no rate limit, so an attacker could brute-force the 6-character
+  // alphanumeric pair code (~2 billion combinations) at HTTP speed.
+  // Sister bridge claim endpoint already uses 10/minute; mirror it here.
+  // A legitimate device pairs exactly once.
   @Public()
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('pair')
   @ApiOperation({ summary: 'Device pairs using the pair code shown in the admin UI' })
   pair(@Body() dto: PairDeviceDto) {

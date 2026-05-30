@@ -7,6 +7,7 @@ import { LoginRequest, RegisterRequest, AuthResponse, User } from '../../types';
 
 export const useLogin = () => {
   const login = useAuthStore((state) => state.login);
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (data: LoginRequest): Promise<AuthResponse> => {
@@ -14,6 +15,15 @@ export const useLogin = () => {
       return response.data;
     },
     onSuccess: (data) => {
+      // v2.8.91: clear React Query cache on every login so a previous
+      // tenant's entitlements / subscription / quotas don't bleed into
+      // the next session. Pre-v2.8.91 a tenant A login → logout →
+      // tenant B login on the same device kept tenant A's
+      // effective-features in cache for up to 30s (or longer for
+      // queries with 5min staleTime), which was both a privacy leak
+      // and a correctness bug (FeatureGate could grant access tenant
+      // B never paid for).
+      queryClient.clear();
       // refresh token is stored by the backend as an httpOnly cookie
       login(data.user, data.accessToken);
       toast.success(i18n.t('common:notifications.loginSuccessful'));

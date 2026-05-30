@@ -1,6 +1,7 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, OnModuleInit, Optional } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { EntitlementService } from '../../entitlements/entitlement.service';
+import { EntitlementInvalidationBus } from '../../entitlements/entitlement-invalidation.bus';
 
 /**
  * v2.8.88 — usage snapshot.
@@ -34,7 +35,7 @@ export interface UsageSnapshot {
 }
 
 @Injectable()
-export class UsageService {
+export class UsageService implements OnModuleInit {
   private readonly logger = new Logger(UsageService.name);
   private readonly cache = new Map<string, { snapshot: UsageSnapshot; expiresAt: number }>();
   private readonly cacheTtlMs = 60_000;
@@ -42,7 +43,19 @@ export class UsageService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly entitlements: EntitlementService,
+    // v2.8.91: subscribe to the entitlement invalidation bus so the
+    // usage snapshot drops alongside the engine cache on every
+    // subscription / addon / override mutation. Pre-v2.8.91 the
+    // invalidate() method existed but had no producer — a tenant who
+    // bought an add-on could see stale quotas for up to 60s.
+    @Optional() private readonly invalidationBus?: EntitlementInvalidationBus,
   ) {}
+
+  onModuleInit(): void {
+    // Same listener shape EntitlementService uses; the bus filters by
+    // senderId so we never re-publish to ourselves.
+    this.invalidationBus?.registerListener((tenantId) => this.invalidate(tenantId));
+  }
 
   async getSnapshot(tenantId: string): Promise<UsageSnapshot> {
     const cached = this.cache.get(tenantId);

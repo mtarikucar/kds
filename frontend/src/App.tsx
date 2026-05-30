@@ -247,13 +247,40 @@ function App() {
           <Route path="pos" element={<POSSettingsPage />} />
           <Route path="qr-menu" element={<QRMenuSettingsPage />} />
           <Route path="reports" element={<ReportsSettingsPage />} />
-          <Route path="branding" element={<BrandingSettingsPage />} />
+          <Route path="branding" element={
+            <FeatureGate feature="customBranding" fallback={<UpsellCard planName="PRO" />}>
+              <BrandingSettingsPage />
+            </FeatureGate>
+          } />
           <Route path="desktop" element={<DesktopAppSettingsPage />} />
-          <Route path="integrations" element={<IntegrationsSettingsPage />} />
-          <Route path="reservations" element={<ReservationSettingsPage />} />
-          <Route path="sms" element={<SmsSettingsPage />} />
-          <Route path="online-orders" element={<DeliveryPlatformsSettingsPage />} />
-          <Route path="accounting" element={<AccountingSettingsPage />} />
+          {/* v2.8.91: settings sub-pages now wrapped in FeatureGate so
+              direct URL hits show UpsellCard instead of an empty page +
+              403 toast on every backend call. */}
+          <Route path="integrations" element={
+            <FeatureGate feature="apiAccess" fallback={<UpsellCard addOnCode="api_access" planName="BUSINESS" />}>
+              <IntegrationsSettingsPage />
+            </FeatureGate>
+          } />
+          <Route path="reservations" element={
+            <FeatureGate feature="reservationSystem" fallback={<UpsellCard planName="PRO" />}>
+              <ReservationSettingsPage />
+            </FeatureGate>
+          } />
+          <Route path="sms" element={
+            <FeatureGate integration={{ domain: 'sms' }} fallback={<UpsellCard addOnCode="integration_sms" />}>
+              <SmsSettingsPage />
+            </FeatureGate>
+          } />
+          <Route path="online-orders" element={
+            <FeatureGate feature="deliveryIntegration" fallback={<UpsellCard addOnCode="delivery_yemeksepeti" planName="PRO" />}>
+              <DeliveryPlatformsSettingsPage />
+            </FeatureGate>
+          } />
+          <Route path="accounting" element={
+            <FeatureGate integration={{ domain: 'accounting' }} fallback={<UpsellCard addOnCode="integration_efatura" />}>
+              <AccountingSettingsPage />
+            </FeatureGate>
+          } />
         </Route>
 
         {/* Legacy redirects */}

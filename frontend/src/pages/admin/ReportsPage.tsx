@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { format, subDays } from 'date-fns';
 import { useSalesReport, useTopProducts } from '../../features/reports/reportsApi';
 import { useListBranches } from '../../features/branches/branchesApi';
+import { useSubscription } from '../../contexts/SubscriptionContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
@@ -62,14 +63,22 @@ const ReportsPage = () => {
     setDateRange(data);
   };
 
-  const tabs = [
-    { id: 'sales' as TabType, label: t('reports.sales'), icon: BarChart3 },
-    { id: 'hourly' as TabType, label: t('reports.hourlyBreakdown'), icon: Clock },
-    { id: 'customers' as TabType, label: t('customerAnalytics.title'), icon: Users },
-    { id: 'inventory' as TabType, label: t('inventoryReport.title'), icon: Package },
-    { id: 'staff' as TabType, label: t('staffPerformance.title'), icon: UserCog },
-    { id: 'zreports' as TabType, label: t('zReports.title', 'Z-Reports'), icon: FileText },
+  // v2.8.91: inventory + staff tabs are feature-gated server-side (the
+  // /reports/* endpoints carry @RequiresFeature(INVENTORY_TRACKING) or
+  // PERSONNEL_MANAGEMENT). Pre-v2.8.91 the tabs rendered for every
+  // tenant and clicking returned 403 with no warning. Now we hide the
+  // tab when the matching feature isn't granted. Sales/Hourly/Customers
+  // remain because they use advancedReports which gates the whole page.
+  const { hasFeature } = useSubscription();
+  const allTabs = [
+    { id: 'sales' as TabType, label: t('reports.sales'), icon: BarChart3, gate: undefined as keyof import('../../types').PlanFeatures | undefined },
+    { id: 'hourly' as TabType, label: t('reports.hourlyBreakdown'), icon: Clock, gate: undefined },
+    { id: 'customers' as TabType, label: t('customerAnalytics.title'), icon: Users, gate: undefined },
+    { id: 'inventory' as TabType, label: t('inventoryReport.title'), icon: Package, gate: 'inventoryTracking' as const },
+    { id: 'staff' as TabType, label: t('staffPerformance.title'), icon: UserCog, gate: 'personnelManagement' as const },
+    { id: 'zreports' as TabType, label: t('zReports.title', 'Z-Reports'), icon: FileText, gate: undefined },
   ];
+  const tabs = allTabs.filter((t) => !t.gate || hasFeature(t.gate));
 
   const StatCard = ({
     title,

@@ -108,9 +108,13 @@ export class IntegrationsController {
   }
 }
 
+// v2.8.91 — drop the `api/` prefix from @Controller. The global
+// setGlobalPrefix('api') already adds it, so prior decoration produced
+// `/api/api/hardware/config` instead of `/api/hardware/config`. Tauri
+// desktop app and any docs/links must use the corrected path.
 @ApiTags('hardware')
 @ApiBearerAuth()
-@Controller('api/hardware')
+@Controller('hardware')
 @UseGuards(JwtAuthGuard, TenantGuard)
 export class HardwareConfigController {
   constructor(private readonly integrationsService: IntegrationsService) {}

@@ -25,8 +25,13 @@ export class QrMenuController {
     @Param('subdomain') subdomain: string,
     @Query('tableId') tableId?: string,
   ) {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { subdomain },
+    // v2.8.91: filter inactive/suspended tenants. Pre-fix the by-subdomain
+    // lookup skipped the status check and returned a menu for a
+    // SUSPENDED/DELETED tenant — operationally wrong (suspended tenants
+    // should appear offline) and a small leak (the public QR menu
+    // proves the subdomain exists). Mirrors the by-tenantId path.
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { subdomain, status: 'ACTIVE' },
     });
 
     if (!tenant) {

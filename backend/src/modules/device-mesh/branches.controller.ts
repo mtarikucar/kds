@@ -17,14 +17,20 @@ import { PlanFeature } from '../../common/constants/subscription.enum';
 export class BranchesController {
   constructor(private readonly branches: BranchesService) {}
 
-  // List / one stay readable by any authenticated tenant user — staff
-  // need to see which branches exist (waiter assigns an order to one).
+  // v2.8.91: ADMIN/MANAGER only on list + detail. Pre-v2.8.91 the
+  // class-level guard chain lacked any @Roles on list/detail — every
+  // authenticated role could enumerate branches. WAITER needs the
+  // branch dropdown when assigning orders so they still see "their"
+  // branch via a different surface (POSPage reads it from auth context);
+  // the management-style list is admin scope.
   @Get()
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   list(@Req() req: any) {
     return this.branches.list(req.user.tenantId);
   }
 
   @Get(':id')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   one(@Req() req: any, @Param('id') id: string) {
     return this.branches.findOrThrow(req.user.tenantId, id);
   }
