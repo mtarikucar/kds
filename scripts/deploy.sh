@@ -291,10 +291,20 @@ run_migration_doctor() {
 run_migrations_in_existing_backend() {
   # Migration runs inside the OLD container (additive-only policy
   # ensures the old client tolerates the new schema). If the old
-  # container isn't up yet — first deploy ever — we skip and let the
-  # new container's startup migrate.
-  if ! docker ps --format '{{.Names}}' | grep -q "^${BACKEND_CONTAINER}$"; then
-    log "Existing backend container not running — migrations deferred to post-swap"
+  # container isn't usable — first deploy ever, OR it is crash-looping
+  # / unhealthy — we skip here and let swap_backend() migrate inside the
+  # freshly-started new container (it runs `prisma migrate deploy` too).
+  #
+  # NOTE: a crash-looping container still appears in `docker ps` with
+  # status "Restarting", so a name-match guard would pass and then the
+  # `docker exec` below would fail with "container is restarting, wait
+  # until the container is running" — aborting the deploy before the new
+  # image is ever swapped in, i.e. the deploy could not recover from a
+  # crash-looped backend. Gate on actual State.Status instead.
+  local status
+  status=$(docker inspect -f '{{.State.Status}}' "$BACKEND_CONTAINER" 2>/dev/null || echo "missing")
+  if [ "$status" != "running" ]; then
+    log "Existing backend status=$status (not cleanly running) — migrations deferred to post-swap"
     return 0
   fi
   log "Applying pending migrations inside running $BACKEND_CONTAINER"
