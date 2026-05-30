@@ -17,26 +17,34 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateProfileDto, UpdateEmailDto } from './dto/update-profile.dto';
 import { UpdateOnboardingDto } from './dto/update-onboarding.dto';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { SubscriptionLimitsGuard } from '../../common/guards/subscription-limits.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
-import { CheckLimit } from '../../common/decorators/check-limit.decorator';
+// v2.8.92: route user-limit checks through the canonical PlanFeatureGuard
+// + modern `@CheckLimit(LimitType.USERS)` pair. Pre-v2.8.92 this
+// controller used the legacy SubscriptionLimitsGuard + free-form
+// `@CheckLimit({ resource: 'users', ... })` shape — the third gating
+// path on top of @RequireEntitlement and @RequiresFeature. Both legacy
+// surfaces now resolve via the entitlement engine after v2.8.90, so
+// the legacy code path is dead-weight and has been deleted.
+import { PlanFeatureGuard } from '../subscriptions/guards/plan-feature.guard';
+import { CheckLimit, LimitType } from '../subscriptions/decorators/check-limit.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
 
 /**
  * JwtAuthGuard, TenantGuard, and RolesGuard are registered globally via
  * APP_GUARD in AuthModule — controller-level @UseGuards for them would
- * only cause the same guards to run twice.
+ * only cause the same guards to run twice. PlanFeatureGuard is NOT
+ * global, so it lives at the controller level here.
  */
 @ApiTags('users')
 @ApiBearerAuth()
 @Controller('users')
+@UseGuards(PlanFeatureGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @UseGuards(SubscriptionLimitsGuard)
-  @CheckLimit({ resource: 'users', action: 'create' })
+  @CheckLimit(LimitType.USERS)
   @ApiOperation({ summary: 'Create a new user (ADMIN, MANAGER)' })
   @ApiResponse({ status: 201, description: 'User successfully created' })
   @ApiResponse({ status: 409, description: 'Email already in use' })
@@ -145,8 +153,7 @@ export class UsersController {
 
   @Patch(':id/reactivate')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @UseGuards(SubscriptionLimitsGuard)
-  @CheckLimit({ resource: 'users', action: 'create' })
+  @CheckLimit(LimitType.USERS)
   @ApiOperation({ summary: 'Reactivate an inactive user (ADMIN, MANAGER)' })
   reactivateUser(
     @Param('id') id: string,

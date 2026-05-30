@@ -7,12 +7,18 @@ import { AuthModule } from '../auth/auth.module';
 // SUM-aware caps. EntitlementsModule is a leaf — no inbound deps —
 // so the import is cycle-safe.
 import { EntitlementsModule } from '../entitlements/entitlements.module';
+// v2.8.92: UsersController now uses PlanFeatureGuard (the canonical
+// guard) instead of the retired SubscriptionLimitsGuard. PlanFeatureGuard
+// is exported from SubscriptionsModule. SubscriptionsModule does NOT
+// import UsersModule directly, so this is cycle-safe.
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 
 @Module({
   imports: [
     PrismaModule,
     forwardRef(() => AuthModule),
     EntitlementsModule,
+    SubscriptionsModule,
   ],
   controllers: [UsersController],
   providers: [UsersService],

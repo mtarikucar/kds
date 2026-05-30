@@ -143,6 +143,13 @@ model Tenant {
   userActivities      UserActivity[]
   loyaltyTransactions LoyaltyTransaction[]
 
+  // v2.8.92: explicit FK + cascade for the entitlement engine. Pre-v2.8.92
+  // FeatureEntitlement.tenantId was a free-form String — no FK, no cascade.
+  // Deleting a tenant left orphan rows in feature_entitlements, and an
+  // accidental tenantId typo at write-time would silently succeed. The
+  // cascade aligns with how every other tenant-scoped table is wired.
+  featureEntitlements FeatureEntitlement[]
+
   @@index([currentPlanId])
   @@index([status])
   @@map("tenants")
@@ -3441,6 +3448,11 @@ model Consent {
 model FeatureEntitlement {
   id         String    @id @default(uuid())
   tenantId   String
+  // v2.8.92: explicit Tenant FK + cascade. Deletes from the tenant table
+  // now sweep the engine projection along with them, and writes against a
+  // bogus tenantId fail loudly at the DB instead of sitting around as
+  // orphan rows.
+  tenant     Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   // Scope: `tenant` (default), `branch` (future once branches are extracted),
   // `device` (future device-level licensing). Stored as plain string to stay
   // consistent with the project's "String + comment" enum convention.
