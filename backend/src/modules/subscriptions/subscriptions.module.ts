@@ -1,6 +1,5 @@
 import { Module, forwardRef } from "@nestjs/common";
 import { PrismaModule } from "../../prisma/prisma.module";
-import { PublicStatsModule } from "../public-stats/public-stats.module";
 import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
 import { PaytrSettlementModule } from "../payments/services/paytr-settlement.module";
 
@@ -22,7 +21,6 @@ import { PlanFeatureGuard } from "./guards/plan-feature.guard";
 @Module({
   imports: [
     PrismaModule,
-    PublicStatsModule,
     // Needed by SchedulerService to attempt PayTR recurring charges
     // on subscription renewal. Module is intentionally separate from
     // PaymentsModule to avoid a Payments ↔ Subscriptions cycle.
