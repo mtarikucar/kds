@@ -193,6 +193,31 @@ export class CheckoutService {
           nextAttemptAt: new Date(),
         },
       });
+
+      // 5. v2.8.86: surface a hardware-specific event when the cart minted
+      // a HardwareOrder. CheckoutNotificationsService listens for this
+      // and sends the order-placed email; physical-shipment downstreams
+      // (fulfilment dashboards, carrier batching) can hook in later
+      // without having to filter checkout.completed.v1 by payload shape.
+      if (hardwareOrderId) {
+        await tx.outboxEvent.create({
+          data: {
+            id: uuidv7(),
+            type: 'hardware.order.placed.v1',
+            tenantId,
+            payload: {
+              tenantId,
+              hardwareOrderId,
+              totalCents: hardwareLines.reduce((a, l) => a + l.subtotalCents, 0) + quote.shippingCents,
+              currency: quote.currency,
+              paymentRef,
+            } as any,
+            idempotencyKey: uuidv7(),
+            status: 'queued',
+            nextAttemptAt: new Date(),
+          },
+        });
+      }
     });
 
     return { quote, hardwareOrderId, addOnIds };

@@ -51,6 +51,7 @@ export const EventTypes = {
   InstallationCancelled: 'installation.cancelled.v1',
   WarrantyCreated: 'warranty.created.v1',
   WarrantyClaimFiled: 'warranty.claim.filed.v1',
+  HardwareOrderPlaced: 'hardware.order.placed.v1',
   HardwareOrderShipped: 'hardware.order.shipped.v1',
   HardwareOrderDelivered: 'hardware.order.delivered.v1',
 
@@ -111,4 +112,21 @@ export interface AddOnLifecyclePayload {
   addOnId: string;
   addOnCode: string;
   branchId?: string | null;
+}
+
+/**
+ * v2.8.86 — emitted by CheckoutService once a HardwareOrder has been
+ * minted (mixed-cart or hardware-only checkout). The consumer
+ * (CheckoutNotificationsService) reads it to send the order-placed
+ * email — payload is intentionally minimal so the consumer always
+ * re-reads order/tenant rows at send time. Keeping it tiny means a
+ * schema bump on HardwareOrder doesn't force an event-version bump
+ * here.
+ */
+export interface HardwareOrderPlacedPayload {
+  tenantId: string;
+  hardwareOrderId: string;
+  totalCents: number;
+  currency: string;
+  paymentRef: string | null;
 }
