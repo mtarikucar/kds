@@ -91,6 +91,37 @@ export class PaytrPaymentProvider implements PaymentProvider, OnModuleInit {
         `PayTR yalnızca TRY ile tahsilat yapar. İstenen para birimi: ${req.currency}.`,
       );
     }
+    // v2.8.85: prefer the caller-supplied multi-line basket. PayTR shows
+    // each entry verbatim on the iframe, so a checkout that bundles a
+    // subscription + an add-on + a yazarkasa needs to read as three lines
+    // instead of one opaque "checkout". Fall back to the legacy single
+    // line when the caller didn't bother (subscription billing, refunds-
+    // forward etc.). When a basket IS supplied, sum-check it against
+    // amountCents — PayTR rejects mismatched baskets and "amount silently
+    // truncated" failures are murder to debug after the fact.
+    let userBasket: Array<[string, string, number]>;
+    if (req.basket && req.basket.length > 0) {
+      const basketSumCents = req.basket.reduce(
+        (acc, line) => acc + line.priceCents * line.qty,
+        0,
+      );
+      if (basketSumCents !== req.amountCents) {
+        throw new BadRequestException(
+          `PayTR basket sum mismatch: lines total ${basketSumCents} kuruş but amountCents=${req.amountCents}. Repricing drift?`,
+        );
+      }
+      userBasket = req.basket.map((line) => [
+        // Sanitise line name: PayTR rejects baskets containing newlines, and
+        // gateway logs are easier to read with a length cap.
+        line.name.replace(/[\r\n\t]+/g, ' ').slice(0, 80),
+        // PayTR expects line subtotal as a decimal string in major units.
+        ((line.priceCents * line.qty) / 100).toFixed(2),
+        line.qty,
+      ]);
+    } else {
+      userBasket = [[req.purpose, (req.amountCents / 100).toFixed(2), 1]];
+    }
+
     const result = await this.paytr.getIframeToken({
       amount: req.amountCents / 100,
       currency: req.currency,
@@ -100,7 +131,7 @@ export class PaytrPaymentProvider implements PaymentProvider, OnModuleInit {
       userAddress: typeof buyer.address === 'string' ? buyer.address : 'N/A',
       userPhone: buyer.phone!,
       userIp: req.buyerIp!,
-      userBasket: [[req.purpose, String(req.amountCents / 100), 1]],
+      userBasket,
       okUrl: req.returnUrl ?? 'https://hummytummy.com/checkout/success',
       failUrl: req.returnUrl ?? 'https://hummytummy.com/checkout/failure',
     });

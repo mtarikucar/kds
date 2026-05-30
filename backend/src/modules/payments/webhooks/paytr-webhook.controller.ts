@@ -13,6 +13,7 @@ import { verifyCallbackHash } from "./paytr-hash.util";
 import { PaytrIpAllowlistGuard } from "./paytr-ip-allowlist.guard";
 import { CustomerSelfPayService } from "../../customer-orders/services/customer-self-pay.service";
 import { PaytrSettlementService } from "../services/paytr-settlement.service";
+import { CheckoutSettlementService } from "../../checkout/checkout-settlement.service";
 
 interface PaytrCallbackBody {
   merchant_oid?: string;
@@ -53,6 +54,8 @@ export class PaytrWebhookController {
     private readonly config: ConfigService,
     private readonly selfPay: CustomerSelfPayService,
     private readonly settlement: PaytrSettlementService,
+    // v2.8.85: "CK-" prefix lands here for the mixed-cart checkout flow.
+    private readonly checkoutSettlement: CheckoutSettlementService,
   ) {}
 
   @Post()
@@ -96,8 +99,10 @@ export class PaytrWebhookController {
       return "FAIL";
     }
 
-    // Dispatch by merchantOid prefix: "SP" → customer self-pay
-    // (QR-menu restaurant-order flow), default → subscription flow.
+    // Dispatch by merchantOid prefix:
+    //   "SP" → customer self-pay (QR-menu restaurant-order flow)
+    //   "CK-" → mixed-cart hardware/addon/plan checkout (v2.8.85)
+    //   default → subscription settlement (the original path)
     if (merchantOid.startsWith("SP")) {
       if (status === "success") {
         await this.selfPay.handleWebhookSuccess(merchantOid, body.payment_type);
@@ -105,6 +110,32 @@ export class PaytrWebhookController {
         await this.selfPay.handleWebhookFailure(
           merchantOid,
           body.failed_reason_msg ?? body.failed_reason_code,
+        );
+      }
+      return "OK";
+    }
+
+    if (merchantOid.startsWith("CK-")) {
+      try {
+        if (status === "success") {
+          await this.checkoutSettlement.handleSuccess(
+            merchantOid,
+            body.payment_type,
+          );
+        } else {
+          await this.checkoutSettlement.handleFailure(
+            merchantOid,
+            body.failed_reason_msg ?? body.failed_reason_code,
+          );
+        }
+      } catch (err) {
+        // Provisioning errors throw so a manual retry / sweeper can pick
+        // them up. PayTR still gets "OK" — if we returned "FAIL", PayTR
+        // would retry up to 4× and each retry would re-attempt
+        // provisioning. Better to surface a single failure in our logs
+        // than to feedback-loop the gateway.
+        this.logger.error(
+          `Checkout settlement raised for oid=${merchantOid}: ${(err as Error).message}`,
         );
       }
       return "OK";

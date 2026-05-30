@@ -31,7 +31,9 @@ export interface PaymentIntentRequest {
     name?: string;
     email?: string;
     phone?: string;
-    address?: Record<string, unknown>;
+    // Some providers (PayTR) want a single-line string; richer ones
+    // (Iyzico, Stripe) want a structured object. Adapter narrows.
+    address?: string | Record<string, unknown>;
     taxId?: string;
   };
   // Where to send the buyer for 3DS / success / failure pages.
@@ -41,6 +43,16 @@ export interface PaymentIntentRequest {
   // it; online-mode adapters MUST reject the intent when missing rather
   // than fall back to 0.0.0.0, which fraud-pollutes the payments log.
   buyerIp?: string;
+  // Optional multi-line basket. PayTR (and most gateway iframes) render the
+  // buyer-facing item list from this; without it, adapters fall back to a
+  // single line carrying `purpose` + total. v2.8.85 wired this for the
+  // mixed-cart checkout flow — a single line would have shown a vague
+  // "checkout" entry to the buyer regardless of what they actually ordered,
+  // breaking buyer trust at the highest-stakes screen of the funnel.
+  // Sum of (priceCents * qty) MUST equal amountCents — adapters that
+  // forward this verbatim rely on the equality, and PayTR rejects baskets
+  // that don't sum to the total.
+  basket?: Array<{ name: string; priceCents: number; qty: number }>;
   metadata?: Record<string, unknown>;
 }
 

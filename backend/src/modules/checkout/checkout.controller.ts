@@ -1,11 +1,13 @@
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Ip, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
 import { QuoteService } from './quote.service';
 import { CheckoutService } from './checkout.service';
+import { CheckoutIntentService } from './checkout-intent.service';
 import { CartDto, ConfirmCheckoutDto } from './dto/cart.dto';
+import { CreateCheckoutIntentDto } from './dto/create-intent.dto';
 import type { Cart } from './checkout.types';
 
 @ApiTags('Checkout')
@@ -16,6 +18,7 @@ export class CheckoutController {
   constructor(
     private readonly quoteSvc: QuoteService,
     private readonly checkoutSvc: CheckoutService,
+    private readonly intentSvc: CheckoutIntentService,
   ) {}
 
   // /quote is read-only: it prices a hypothetical cart, writes nothing.
@@ -47,14 +50,45 @@ export class CheckoutController {
     return this.quoteSvc.quote(cart as unknown as Cart);
   }
 
+  // v2.8.85: take a mixed cart and return a PayTR iframe token + paymentRef.
+  // The endpoint trades the cart for a server-stashed CheckoutIntent row so
+  // the asynchronous PayTR webhook (which only carries merchant_oid +
+  // total_amount) can recover the cart and run confirmAndProvision. The
+  // paymentRef the buyer's browser receives carries the "CK-" prefix; the
+  // PayTR webhook dispatcher routes that prefix to CheckoutSettlementService.
+  @Post('intent')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary:
+      'Start a paid checkout — returns PayTR iframe token + paymentRef (ADMIN, MANAGER).',
+  })
+  intent(
+    @Req() req: any,
+    @Ip() buyerIp: string,
+    @Body() body: CreateCheckoutIntentDto,
+  ) {
+    return this.intentSvc.createIntent({
+      tenantId: req.user.tenantId,
+      cart: body.cart as unknown as Cart,
+      buyer: body.buyer,
+      buyerIp,
+      returnUrl: body.returnUrl,
+    });
+  }
+
   // Iter-88: confirmAndProvision allocates stock, mints HardwareOrder rows,
   // and queues subscription.upgrade.requested events. Pre-iter-88 the
   // endpoint only required JwtAuthGuard, so a WAITER could replay a forged
   // paymentRef and provision hardware against their tenant. Restrict to
-  // ADMIN/MANAGER and validate the payload via ConfirmCheckoutDto. The
-  // gateway-side payment verification (matching paymentRef to a real
-  // SUCCEEDED SubscriptionPayment row) lands in v2.8.85 (#39) — for now the
-  // DTO+role guard close the broadest privilege gap.
+  // ADMIN/MANAGER and validate the payload via ConfirmCheckoutDto.
+  //
+  // v2.8.85: the production payment path is now /intent → PayTR iframe →
+  // PaytrWebhookController dispatches CK- prefix → CheckoutSettlementService
+  // → confirmAndProvision (so the user's browser never reaches /confirm
+  // with a free-text paymentRef). /confirm stays as the admin-comp /
+  // super-admin override path; the @Roles(ADMIN, MANAGER) gate keeps a
+  // forged paymentRef from a tenant user from succeeding because the
+  // matching CheckoutIntent row would not exist for arbitrary refs.
   @Post('confirm')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({

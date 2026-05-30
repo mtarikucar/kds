@@ -9,6 +9,7 @@ import { PaytrIpAllowlistGuard } from "./webhooks/paytr-ip-allowlist.guard";
 import { PaytrAdapterModule } from "./adapters/paytr-adapter.module";
 import { PaytrSettlementModule } from "./services/paytr-settlement.module";
 import { CustomerOrdersModule } from "../customer-orders/customer-orders.module";
+import { CheckoutModule } from "../checkout/checkout.module";
 
 @Module({
   imports: [
@@ -25,6 +26,9 @@ import { CustomerOrdersModule } from "../customer-orders/customer-orders.module"
     // PayTR webhook routes "SP" prefix merchantOids into
     // CustomerSelfPayService for the customer self-pay flow.
     forwardRef(() => CustomerOrdersModule),
+    // v2.8.85: "CK-" prefix → CheckoutSettlementService for the
+    // mixed-cart checkout flow.
+    forwardRef(() => CheckoutModule),
   ],
   controllers: [PaymentsController, PaytrWebhookController],
   providers: [PaymentsService, PaytrIpAllowlistGuard],
