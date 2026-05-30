@@ -50,7 +50,16 @@ describe('PaytrSettlementService — commission routing', () => {
     notifications = {
       sendSubscriptionActivated: jest.fn().mockResolvedValue(undefined),
     };
-    svc = new PaytrSettlementService(prisma as any, billing, notifications);
+    svc = new PaytrSettlementService(
+      prisma as any,
+      billing,
+      notifications,
+      // v2.8.89: OutboxService stub for SubscriptionActivated/Upgraded
+      // event emitted inside applySuccess. The mock prisma.$transaction
+      // passes prisma itself as `tx`, so we wire outboxEvent.create as
+      // a no-op there too.
+      { append: jest.fn().mockResolvedValue('outbox-id') } as any,
+    );
 
     prisma.subscriptionPayment.findUnique.mockResolvedValue(pendingPayment);
     prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
@@ -149,7 +158,12 @@ describe('PaytrSettlementService — idempotency', () => {
 
   beforeEach(() => {
     prisma = mockPrismaClient();
-    svc = new PaytrSettlementService(prisma as any, {} as any, {} as any);
+    svc = new PaytrSettlementService(
+      prisma as any,
+      {} as any,
+      {} as any,
+      { append: jest.fn().mockResolvedValue('outbox-id') } as any,
+    );
   });
 
   it('returns UNKNOWN_OID when no payment row matches', async () => {

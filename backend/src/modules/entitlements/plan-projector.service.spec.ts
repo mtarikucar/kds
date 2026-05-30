@@ -46,6 +46,15 @@ describe('PlanProjectorService.projectTenant', () => {
     // ...) lets the inner findMany / deleteMany / setGrantsForSourceTx
     // calls still land on assertions below.
     (prisma.$transaction as any).mockImplementation(async (fn: any) => fn(prisma));
+    // v2.8.89 — projectTenantInner now consults Subscription.status
+    // before projecting the paid plan. Default: pretend the tenant has
+    // an ACTIVE paid subscription so existing cases keep covering the
+    // "project current plan" path. The new lifecycle-status case
+    // overrides this to assert FREE fallback.
+    (prisma.subscription.findFirst as any).mockResolvedValue({
+      id: 'sub-1',
+      status: 'ACTIVE',
+    });
   });
 
   it('projects PRO plan features and limits as grants under plan:PRO', async () => {

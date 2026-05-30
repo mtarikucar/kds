@@ -10,6 +10,7 @@ import { PaytrSettlementService } from "../../payments/services/paytr-settlement
 import {
   PaymentStatus,
   SubscriptionStatus,
+  SubscriptionPlanType,
 } from "../../../common/constants/subscription.enum";
 import { OutboxService } from "../../outbox/outbox.service";
 import { EventTypes } from "../../outbox/event-types";
@@ -254,12 +255,31 @@ export class SubscriptionSchedulerService {
         return;
       }
       const ids = expiring.map((s) => s.id);
-      const result = await this.prisma.subscription.updateMany({
-        where: { id: { in: ids }, status: { not: SubscriptionStatus.CANCELLED } },
-        data: {
-          status: SubscriptionStatus.CANCELLED,
-          endedAt: now,
-        },
+      // v2.8.89 — atomic Tenant.currentPlanId → FREE alongside the
+      // status flip. Pre-v2.8.89 only Subscription.status was updated,
+      // so the projector kept re-projecting the paid plan's grants on
+      // every SubscriptionCancelled event (it reads tenant.currentPlan
+      // directly). Wrap both writes in one txn so an interrupted cron
+      // never leaves (status=CANCELLED, currentPlanId=PAID) on disk.
+      const freePlan = await this.prisma.subscriptionPlan.findUnique({
+        where: { name: SubscriptionPlanType.FREE },
+        select: { id: true },
+      });
+      const result = await this.prisma.$transaction(async (tx) => {
+        const r = await tx.subscription.updateMany({
+          where: { id: { in: ids }, status: { not: SubscriptionStatus.CANCELLED } },
+          data: {
+            status: SubscriptionStatus.CANCELLED,
+            endedAt: now,
+          },
+        });
+        if (freePlan && r.count > 0) {
+          await tx.tenant.updateMany({
+            where: { id: { in: expiring.map((s) => s.tenantId) } },
+            data: { currentPlanId: freePlan.id },
+          });
+        }
+        return r;
       });
       for (const sub of expiring) {
         await this.outbox
@@ -307,9 +327,28 @@ export class SubscriptionSchedulerService {
       }
       const now = new Date();
       const ids = expiring.map((s) => s.id);
-      const updated = await this.prisma.subscription.updateMany({
-        where: { id: { in: ids }, status: SubscriptionStatus.PAST_DUE },
-        data: { status: SubscriptionStatus.EXPIRED, endedAt: now },
+      // v2.8.89 — atomic Tenant.currentPlanId → FREE alongside the
+      // status flip. Same fix pattern as handlePendingCancellations:
+      // pre-v2.8.89 EXPIRED tenants kept their paid plan grants
+      // because the projector re-projected currentPlan unchanged on
+      // every event. With currentPlanId now flipped in the same txn,
+      // the projector projects FREE grants on commit.
+      const freePlan = await this.prisma.subscriptionPlan.findUnique({
+        where: { name: SubscriptionPlanType.FREE },
+        select: { id: true },
+      });
+      const updated = await this.prisma.$transaction(async (tx) => {
+        const u = await tx.subscription.updateMany({
+          where: { id: { in: ids }, status: SubscriptionStatus.PAST_DUE },
+          data: { status: SubscriptionStatus.EXPIRED, endedAt: now },
+        });
+        if (freePlan && u.count > 0) {
+          await tx.tenant.updateMany({
+            where: { id: { in: expiring.map((s) => s.tenantId) } },
+            data: { currentPlanId: freePlan.id },
+          });
+        }
+        return u;
       });
       for (const sub of expiring) {
         await this.outbox

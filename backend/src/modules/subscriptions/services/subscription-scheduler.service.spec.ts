@@ -339,6 +339,12 @@ describe('SubscriptionSchedulerService.handlePendingCancellations', () => {
     prisma = mockPrismaClient();
     outbox = { append: jest.fn().mockResolvedValue('outbox-id') };
     svc = buildSvc(prisma, {}, {}, undefined, outbox);
+    // v2.8.89: handlePendingCancellations now wraps the updateMany +
+    // tenant.updateMany in $transaction. Pass-through callback so the
+    // inner result flows out.
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({ id: 'free-plan' } as any);
+    prisma.tenant.updateMany.mockResolvedValue({ count: 1 } as any);
   });
 
   it('emits subscription.cancelled.v1 with reason=period_end_cancel for each expiring row', async () => {

@@ -5,6 +5,8 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { BillingService } from "../../subscriptions/services/billing.service";
 import { NotificationService } from "../../subscriptions/services/notification.service";
 import { captureException } from "../../../sentry.config";
+import { OutboxService } from "../../outbox/outbox.service";
+import { EventTypes } from "../../outbox/event-types";
 import {
   BillingCycle,
   PaymentProvider,
@@ -75,6 +77,14 @@ export class PaytrSettlementService {
     private readonly prisma: PrismaService,
     private readonly billing: BillingService,
     private readonly notifications: NotificationService,
+    // v2.8.89: emit SubscriptionActivated / SubscriptionUpgraded after
+    // applySuccess so the entitlement projector reprojects. Pre-v2.8.89
+    // applySuccess wrote currentPlanId in a Prisma txn but skipped the
+    // outbox event, so the projector — which subscribes to
+    // SubscriptionActivated/Upgraded — never ran. Paid upgrades stayed
+    // stuck on the old plan's grants for up to 24h (until
+    // reconcileNightly).
+    private readonly outbox: OutboxService,
   ) {}
 
   async settlePayment(
@@ -281,6 +291,32 @@ export class PaytrSettlementService {
         if (upgrade) {
           await tx.pendingPlanChange.delete({ where: { id: upgrade.id } });
         }
+
+        // v2.8.89: emit subscription lifecycle event inside the same txn
+        // so the entitlement projector reprojects on commit. Pre-v2.8.89
+        // applySuccess updated currentPlanId but never told the projector,
+        // so paid upgrades stayed stuck on the old plan's grants for up
+        // to 24h (until reconcileNightly). The event type discriminates
+        // between fresh activation, plan upgrade, and renewal so
+        // downstream consumers (marketing commission, audit log) can
+        // route correctly.
+        const lifecycleType = upgrade
+          ? EventTypes.SubscriptionUpgraded
+          : EventTypes.SubscriptionActivated;
+        await this.outbox.append(
+          {
+            type: lifecycleType,
+            tenantId: subscription.tenantId,
+            payload: {
+              tenantId: subscription.tenantId,
+              subscriptionId: subscription.id,
+              planCode: upgrade ? upgrade.targetPlan.name : subscription.plan.name,
+              currentPeriodStart: now.toISOString(),
+              currentPeriodEnd: periodEnd.toISOString(),
+            },
+          },
+          tx as any,
+        );
       });
 
       this.logger.log(

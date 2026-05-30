@@ -806,26 +806,40 @@ export class SubscriptionService {
           cancellationReason: reason,
         };
 
-    // Manual-renewal model: no PayTR-side token to revoke (we never
-    // store one), no auto-renew flag to flip off. Cancellation is now
-    // a single subscription update.
-    //
-    // Compound WHERE: tenantId IDOR defence-in-depth + status not
-    // already CANCELLED. Without the status guard, two admins clicking
-    // "Cancel immediate" and "Cancel at period end" within the same
-    // millisecond both pass the status check above, then one writes
-    // status=CANCELLED + endedAt and the other writes
-    // cancelAtPeriodEnd=true on the now-CANCELLED row — landing the
-    // subscription with cancelAtPeriodEnd=true AND status=CANCELLED,
-    // which the period-end cron then re-cancels at period boundary,
-    // sending a confusing follow-up email.
-    const claim = await this.prisma.subscription.updateMany({
-      where: {
-        id: subscriptionId,
-        tenantId,
-        status: { not: SubscriptionStatus.CANCELLED },
-      },
-      data,
+    // v2.8.89 — atomic currentPlanId flip on immediate cancel.
+    // Pre-v2.8.89: status → CANCELLED but Tenant.currentPlanId was left
+    // pointing at the paid plan. The entitlement projector then re-
+    // projected `plan:BUSINESS` grants on every subsequent
+    // SubscriptionCancelled / TenantOverridesChanged event, leaking
+    // paid feature access until the nightly reconcile cron caught up.
+    // The new projector (plan-projector.service.ts v2.8.89) defends
+    // against this by reading Subscription.status alongside
+    // currentPlanId, but we still flip currentPlanId here so the
+    // tenant row stays honest with the access reality. Wrap in a txn
+    // so an interrupted cancellation never leaves
+    // (status=CANCELLED, currentPlanId=PAID) on disk.
+    const freePlan = immediate
+      ? await this.prisma.subscriptionPlan.findUnique({
+          where: { name: SubscriptionPlanType.FREE },
+          select: { id: true },
+        })
+      : null;
+    const claim = await this.prisma.$transaction(async (tx) => {
+      const c = await tx.subscription.updateMany({
+        where: {
+          id: subscriptionId,
+          tenantId,
+          status: { not: SubscriptionStatus.CANCELLED },
+        },
+        data,
+      });
+      if (c.count > 0 && immediate && freePlan) {
+        await tx.tenant.update({
+          where: { id: tenantId },
+          data: { currentPlanId: freePlan.id },
+        });
+      }
+      return c;
     });
     if (claim.count === 0) {
       throw new BadRequestException(

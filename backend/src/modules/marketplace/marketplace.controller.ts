@@ -11,6 +11,9 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../../common/constants/roles.enum';
 import { Public } from '../auth/decorators/public.decorator';
 import { AddOnCatalogService } from './addon-catalog.service';
 import { TenantMarketplaceService } from './tenant-marketplace.service';
@@ -35,18 +38,27 @@ export class MarketplaceController {
     );
   }
 
-  @UseGuards(JwtAuthGuard)
+  // v2.8.89 — money flow lockdown. Pre-v2.8.89 purchase + cancel carried
+  // only @UseGuards(JwtAuthGuard) → any role (WAITER/KITCHEN/COURIER)
+  // could buy a ₺7500 onsite_install_full add-on and saddle the tenant
+  // with the charge, or cancel an active integration. The frontend
+  // sidebar restricts to ADMIN/MANAGER but that's UX gating, not
+  // defence. mine (read) → ADMIN/MANAGER; purchase + cancel → ADMIN-
+  // only since they're subscription-level billing decisions.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiBearerAuth()
   @Get('addons/mine')
-  @ApiOperation({ summary: 'List add-ons currently held by the authenticated tenant' })
+  @ApiOperation({ summary: 'List add-ons currently held by the authenticated tenant (ADMIN/MANAGER)' })
   mine(@Req() req: any) {
     return this.tenant.listMine(req.user.tenantId);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   @Post('addons/purchase')
-  @ApiOperation({ summary: 'Purchase / activate an add-on for the authenticated tenant' })
+  @ApiOperation({ summary: 'Purchase / activate an add-on (ADMIN only — billing event)' })
   purchase(@Req() req: any, @Body() dto: PurchaseAddOnDto) {
     return this.tenant.purchase(req.user.tenantId, {
       addOnCode: dto.addOnCode,
@@ -55,10 +67,11 @@ export class MarketplaceController {
     });
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   @Delete('addons/:tenantAddOnId')
-  @ApiOperation({ summary: 'Cancel a held add-on (at period end by default)' })
+  @ApiOperation({ summary: 'Cancel a held add-on (ADMIN only — billing event)' })
   cancel(
     @Req() req: any,
     @Param('tenantAddOnId') id: string,

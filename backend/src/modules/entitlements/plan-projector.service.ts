@@ -78,6 +78,27 @@ export class PlanProjectorService {
    */
   private readonly tenantLocks = new Map<string, Promise<void>>();
 
+  // v2.8.89: cache the FREE plan row for ~5 minutes so the projector
+  // doesn't issue a separate findUnique on every projection. Looked up
+  // by name (the seed contract — `SubscriptionPlanType.FREE`). On miss
+  // we fall through to plan:NONE which projects no grants — same
+  // behavior as a tenant without `currentPlanId` today.
+  private freePlanCache: { plan: any; expiresAt: number } | null = null;
+
+  private async resolveFreePlan(): Promise<any | null> {
+    const now = Date.now();
+    if (this.freePlanCache && this.freePlanCache.expiresAt > now) {
+      return this.freePlanCache.plan;
+    }
+    const plan = await this.prisma.subscriptionPlan.findUnique({
+      where: { name: 'FREE' as any },
+    });
+    if (plan) {
+      this.freePlanCache = { plan, expiresAt: now + 5 * 60_000 };
+    }
+    return plan;
+  }
+
   /** Project one tenant. Call after any subscription/override mutation. */
   async projectTenant(tenantId: string): Promise<void> {
     // Chain onto the existing in-flight projection for this tenant. Each
@@ -104,12 +125,44 @@ export class PlanProjectorService {
     });
     if (!tenant) return;
 
-    const planSource = tenant.currentPlan ? `plan:${tenant.currentPlan.name}` : 'plan:NONE';
+    // v2.8.89: subscription-status-aware projection (the belt half of
+    // "belt + suspenders" for the 4 critical lifecycle bugs the v2.8.88
+    // audit surfaced). Pre-v2.8.89 the projector read tenant.currentPlan
+    // directly and never looked at Subscription.status. Cancel/expire
+    // flows that flipped status without also flipping currentPlanId
+    // (cancelSubscription immediate, period-end cron, past-due cron,
+    // PayTR settlement) caused the projector to KEEP re-writing the
+    // paid plan grants every time a SubscriptionCancelled event fired
+    // (or worse: never fire at all when currentPlanId mutation went
+    // unaccompanied by a lifecycle event, as in PayTR settlement). The
+    // EXPIRED tenant therefore retained full paid entitlements until
+    // the nightly reconcile cron ran 24h later.
+    //
+    // The suspenders are explicit currentPlanId flips in the lifecycle
+    // services; the belt is here. If the active subscription row is
+    // not ACTIVE/TRIALING we project FREE plan grants regardless of
+    // what currentPlanId points at. Any lifecycle flow that forgets to
+    // update currentPlanId degrades gracefully — the engine surfaces
+    // exactly the access the tenant has paid for at that moment.
+    const activeSub = await this.prisma.subscription.findFirst({
+      where: {
+        tenantId,
+        status: { in: ['ACTIVE', 'TRIALING'] },
+      },
+      select: { id: true, status: true },
+      orderBy: { updatedAt: 'desc' },
+    });
+    const isAccessPaid = activeSub != null;
+    const effectivePlan = isAccessPaid
+      ? tenant.currentPlan
+      : await this.resolveFreePlan();
+
+    const planSource = effectivePlan ? `plan:${effectivePlan.name}` : 'plan:NONE';
     const planGrants: Array<Omit<EntitlementGrant, 'tenantId' | 'source'>> = [];
 
-    if (tenant.currentPlan) {
+    if (effectivePlan) {
       for (const col of PlanProjectorService.FEATURE_COLUMNS) {
-        if ((tenant.currentPlan as any)[col]) {
+        if ((effectivePlan as any)[col]) {
           planGrants.push({
             scope: 'tenant',
             branchId: null,
@@ -120,7 +173,7 @@ export class PlanProjectorService {
         }
       }
       for (const col of PlanProjectorService.LIMIT_COLUMNS) {
-        const v = (tenant.currentPlan as any)[col];
+        const v = (effectivePlan as any)[col];
         if (typeof v === 'number') {
           planGrants.push({
             scope: 'tenant',

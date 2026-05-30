@@ -1,6 +1,9 @@
 import { Body, Controller, Get, Param, Patch, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../../common/constants/roles.enum';
 import { SuperAdminGuard } from '../superadmin/guards/superadmin.guard';
 import { ShipmentService } from './shipment.service';
 import { WarrantyService } from './warranty.service';
@@ -14,13 +17,16 @@ import {
   ScheduleInstallationDto,
 } from './dto/installation-ops.dto';
 
+// v2.8.89 — installation request creates a scheduling obligation +
+// exposes tenant address + contact data. ADMIN/MANAGER only.
 @ApiTags('Fulfillment · Installation')
 @ApiBearerAuth()
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN, UserRole.MANAGER)
 @Controller('v1/installation')
 export class InstallationController {
   constructor(private readonly installation: InstallationService) {}
 
-  @UseGuards(JwtAuthGuard)
   @Post()
   request(@Req() req: any, @Body() body: CreateInstallationRequestDto) {
     return this.installation.create(req.user.tenantId, {
@@ -29,7 +35,6 @@ export class InstallationController {
     });
   }
 
-  @UseGuards(JwtAuthGuard)
   @Get()
   list(@Req() req: any, @Query('status') status?: string) {
     return this.installation.list(req.user.tenantId, status);
@@ -78,15 +83,18 @@ export class SuperadminInstallationController {
   }
 }
 
+// v2.8.89 — warranty claim asserts a tenant defect against a serial;
+// ADMIN/MANAGER only (sets a financial/SLA expectation on us).
 @ApiTags('Fulfillment · Warranty')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN, UserRole.MANAGER)
 @Controller('v1/warranties')
 export class WarrantyController {
   constructor(private readonly warranty: WarrantyService) {}
 
   @Post(':id/claims')
-  @ApiOperation({ summary: 'File a warranty claim against a serial' })
+  @ApiOperation({ summary: 'File a warranty claim against a serial (ADMIN/MANAGER)' })
   file(
     @Req() req: any,
     @Param('id') id: string,
