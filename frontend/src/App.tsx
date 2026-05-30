@@ -100,6 +100,7 @@ import MarketplacePage from './features/marketplace/MarketplacePage';
 import StorePage from './features/hardware-store/StorePage';
 import HardwareOrdersListPage from './features/hardware-store/HardwareOrdersListPage';
 import HardwareOrderDetailPage from './features/hardware-store/HardwareOrderDetailPage';
+import ProductDetailPage from './features/hardware-store/ProductDetailPage';
 import BranchesPage from './features/branches/BranchesPage';
 import HealthPage from './features/health/HealthPage';
 import WebhooksPage from './features/webhooks/WebhooksPage';
@@ -248,6 +249,8 @@ function App() {
         <Route path="/admin/devices" element={<DevicesPage />} />
         <Route path="/admin/marketplace" element={<MarketplacePage />} />
         <Route path="/admin/store" element={<StorePage />} />
+        {/* v2.8.87: rich product/service detail page (real route, not modal). */}
+        <Route path="/admin/store/:sku" element={<ProductDetailPage />} />
         {/* v2.8.84: tenant order history + detail. */}
         <Route path="/admin/hardware-orders" element={<HardwareOrdersListPage />} />
         <Route path="/admin/hardware-orders/:id" element={<HardwareOrderDetailPage />} />

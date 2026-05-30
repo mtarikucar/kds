@@ -87,6 +87,46 @@ export class CreateHardwareProductDto {
   @IsObject()
   compat?: Record<string, unknown>;
 
+  // v2.8.87 — structured rich detail used by the product/service detail
+  // page. Shape:
+  //   {
+  //     includes?: string[],        // "Neler dahil" bullet list
+  //     requirements?: string[],    // pre-arrival requirements
+  //     faq?: { q: string; a: string }[],
+  //     steps?: { title: string; body: string }[],
+  //     videoUrl?: string,
+  //     gallery?: string[]          // extra images beyond `images[]`
+  //   }
+  // Per-locale variants supported via { tr: {...}, en: {...} } — the
+  // client selects the current locale at render-time, falls back to `tr`.
+  // Empty/null is fine: the detail page renders only the spec tab.
+  @ApiProperty({
+    required: false,
+    type: Object,
+    description: 'Rich detail for the product/service detail page (includes, requirements, faq, steps, videoUrl)',
+  })
+  @IsOptional()
+  @IsObject()
+  details?: Record<string, unknown>;
+
+  // v2.8.87 — service-only metadata. Shape:
+  //   {
+  //     durationHours?: number,
+  //     geoCoverage?: string[],            // ["İstanbul", "Ankara", ...]
+  //     requiresBranch?: boolean,          // forces branch picker at order time
+  //     serviceType: 'onsite'|'remote'|'consultation'
+  //   }
+  // CheckoutService reads serviceType to decide whether to mint an
+  // InstallationRequest at provision-time (`onsite` only).
+  @ApiProperty({
+    required: false,
+    type: Object,
+    description: 'Service-only metadata (durationHours, geoCoverage, requiresBranch, serviceType)',
+  })
+  @IsOptional()
+  @IsObject()
+  serviceMeta?: Record<string, unknown>;
+
   @ApiProperty({ example: 1299900, description: 'Sale price in minor units (kuruş)' })
   @IsInt()
   @Min(0)

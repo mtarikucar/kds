@@ -2,6 +2,7 @@ import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsDateString,
   IsIn,
   IsInt,
   IsNotEmpty,
@@ -89,6 +90,26 @@ export class CartItemDto {
   @IsOptional()
   @IsIn(['sell', 'rent'])
   acquisition?: 'sell' | 'rent';
+
+  // v2.8.87: service-order scheduling intent. Optional (only meaningful
+  // for service items; ignored for hardware/addon/plan). 1-3 dates so a
+  // buyer can offer alternates without spamming the technician schedule.
+  // CheckoutService reads these to populate InstallationRequest.preferredDates.
+  @ApiPropertyOptional({ type: [String], format: 'date', maxItems: 3 })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(3)
+  @IsDateString({}, { each: true })
+  preferredDates?: string[];
+
+  // v2.8.87: free-form buyer note carried into InstallationRequest.notes
+  // (delivery instructions, contact person at venue, parking guidance).
+  // 500 chars caps logging + storage footprint.
+  @ApiPropertyOptional({ maxLength: 500 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  notes?: string;
 }
 
 export class CartDto {

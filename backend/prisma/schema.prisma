@@ -3779,15 +3779,35 @@ model LocalBridgeAgent {
 model HardwareProduct {
   id              String   @id @default(uuid())
   sku             String   @unique
-  category        String   // tablet|kds_screen|pos_terminal|printer|yazarkasa|bridge|scanner|caller_id|other
+  // tablet|kds_screen|pos_terminal|printer|yazarkasa|bridge|scanner|caller_id|cash_drawer|other|service
+  // 'service' is v2.8.87 — extends the model to carry installation/integration
+  // service offerings (one-time labour). Service rows ignore rentalMonthlyCents,
+  // serials, warrantyMonths; their meaning lives in `serviceMeta`.
+  category        String
   name            String
   brand           String?
   model           String?
   description     String?  @db.Text
   // Free-form specs: dimensions, ports, OS, etc.
+  // Convention since v2.8.87: include `headlineSpecs: string[]` (max 3) for
+  // the chip row on the storefront card. Storefront card reads
+  // specs.headlineSpecs; falls back to nothing if absent.
   specs           Json?
   // Compat: { capabilities: ["print_80mm"], requiredPlan: ["PRO"], requiredAddOn: ["fiscal_hugin"] }
   compat          Json?
+  // v2.8.87 — structured rich detail used by the product/service detail page.
+  // Shape: { includes: string[], requirements: string[], faq: {q,a}[],
+  //         steps: {title,body}[], videoUrl?, gallery?: string[] }
+  // Per-locale variants supported via { tr: {...}, en: {...} } — the client
+  // selects current locale, falls back to `tr`. Empty/null is fine: the
+  // detail page degrades to spec-only.
+  details         Json?
+  // v2.8.87 — service-only metadata. Shape:
+  //   { durationHours?: number, geoCoverage?: string[],
+  //     requiresBranch?: boolean, serviceType: 'onsite'|'remote'|'consultation' }
+  // CheckoutService reads serviceType to decide whether to mint an
+  // InstallationRequest at provision-time (`onsite` only).
+  serviceMeta     Json?
   priceCents      Int
   // For rental SKUs (e.g. HummyBox-Lite); null for sale-only.
   rentalMonthlyCents Int?

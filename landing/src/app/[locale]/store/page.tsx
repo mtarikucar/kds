@@ -41,6 +41,14 @@ interface HardwareProduct {
   //   - sourceUrl: string    — public manufacturer/reseller URL so customers
   //                            can verify the device exists.
   compat: Record<string, unknown> | null;
+  // v2.8.87: free-form specs JSON; we surface `specs.headlineSpecs` as
+  // a 1-3 chip strip on the card.
+  specs: Record<string, unknown> | null;
+  // v2.8.87: service-only metadata; rendered as inline chips on service
+  // cards (durationHours + serviceType).
+  serviceMeta: Record<string, unknown> | null;
+  // v2.8.87: low-stock badge ("Son N adet") uses this.
+  available: number;
 }
 
 async function fetchProducts(): Promise<HardwareProduct[]> {
@@ -91,6 +99,28 @@ function gibCertified(p: HardwareProduct): boolean {
 function sourceUrl(p: HardwareProduct): string | null {
   const url = p.compat && (p.compat as { sourceUrl?: string }).sourceUrl;
   return typeof url === 'string' ? url : null;
+}
+
+function headlineSpecs(p: HardwareProduct): string[] {
+  // Cap at 3 — anything more clutters the card. The admin chooses which
+  // 3 to surface by ordering them in the specs.headlineSpecs array.
+  const hs = p.specs && (p.specs as { headlineSpecs?: unknown[] }).headlineSpecs;
+  if (!Array.isArray(hs)) return [];
+  return hs
+    .filter((s): s is string => typeof s === 'string')
+    .slice(0, 3);
+}
+
+function serviceTypeChip(p: HardwareProduct): string | null {
+  if (p.category !== 'service') return null;
+  const meta = p.serviceMeta as { serviceType?: string } | null;
+  if (!meta?.serviceType) return null;
+  return meta.serviceType;
+}
+
+function durationHours(p: HardwareProduct): number | null {
+  const meta = p.serviceMeta as { durationHours?: number } | null;
+  return typeof meta?.durationHours === 'number' ? meta.durationHours : null;
 }
 
 export default async function StorePage() {
@@ -159,114 +189,45 @@ export default async function StorePage() {
               {t('loadError')}
             </div>
           ) : (
-            orderedCategories.map((category) => {
-              const items = byCategory[category];
-              return (
-                <section key={category} id={`cat-${category}`} className="mb-16 scroll-mt-32">
-                  <h2 className="mb-6 text-2xl font-semibold text-slate-900">
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    {(t as any)(`categories.${category}`) || category.replace(/_/g, ' ')}
+            <>
+              {/* v2.8.87: services get a dedicated section above the hardware
+                  grid so buyers immediately see that installation/integration
+                  is something we sell, not an afterthought tucked at the end. */}
+              {byCategory['service'] && byCategory['service'].length > 0 && (
+                <section id="cat-service" className="mb-16 scroll-mt-32">
+                  <h2 className="mb-2 text-2xl font-semibold text-slate-900">
+                    {t('services.sectionTitle')}
                   </h2>
+                  <p className="mb-6 max-w-3xl text-sm text-slate-600">
+                    {t('services.sectionSubtitle')}
+                  </p>
                   <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {items.map((p) => {
-                      const isOos = p.stockStatus === 'out_of_stock' || p.stockStatus === 'discontinued';
-                      const src = sourceUrl(p);
-                      const showGibBadge = gibCertified(p);
-                      const stockLabel =
-                        p.stockStatus === 'out_of_stock'
-                          ? t('outOfStock')
-                          : p.stockStatus === 'discontinued'
-                            ? t('discontinued')
-                            : p.stockStatus === 'preorder'
-                              ? t('preorder')
-                              : null;
-                      return (
-                        <article
-                          key={p.id}
-                          className="flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white transition-shadow hover:shadow-lg"
-                        >
-                          {p.images?.[0] && (
-                            // Client component so a 404 on the photo file
-                            // hides the slot cleanly instead of showing the
-                            // browser's broken-image icon. Until every SKU
-                            // has a real photo in landing/public/products/,
-                            // some slots will fall back to the text-only
-                            // card layout.
-                            <ProductImage src={p.images[0]} alt={p.name} />
-                          )}
-                          <div className="flex flex-col grow p-5">
-                            <div className="mb-2 flex items-center gap-2 flex-wrap">
-                              <span className="text-xs uppercase tracking-wide text-slate-500">
-                                {p.brand}
-                              </span>
-                              {showGibBadge && (
-                                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-                                  {t('gibCertified')}
-                                </span>
-                              )}
-                              {stockLabel && (
-                                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
-                                  {stockLabel}
-                                </span>
-                              )}
-                            </div>
-                            <h3 className="mb-2 text-lg font-semibold text-slate-900">{p.name}</h3>
-                            {p.description && (
-                              <p className="mb-4 line-clamp-4 text-sm text-slate-600">{p.description}</p>
-                            )}
-                            <div className="mt-auto">
-                              <div className="mb-1 text-xl font-medium text-slate-900">
-                                {formatPrice(p.priceCents, p.currency)}
-                              </div>
-                              {p.rentalMonthlyCents ? (
-                                <div className="mb-2 text-xs text-slate-500">
-                                  {t('rentalFrom', {
-                                    currency: '',
-                                    amount: formatPrice(p.rentalMonthlyCents, p.currency),
-                                  })}
-                                </div>
-                              ) : null}
-                              <div className="mb-3 text-xs text-slate-500">
-                                {t('warrantyMonths', { months: p.warrantyMonths })}
-                              </div>
-                              <div className="flex items-center justify-between gap-2">
-                                {/* The SPA picks up the sku query param on
-                                    /admin/store and auto-adds to cart.
-                                    Plain <a> here so the URL is rendered
-                                    verbatim (next-intl Link would prefix
-                                    the locale; we don't want that for /app). */}
-                                <a
-                                  href={`/app/admin/store?sku=${encodeURIComponent(p.sku)}`}
-                                  className={`flex-1 rounded-md px-3 py-2 text-center text-sm font-medium text-white transition-colors ${
-                                    isOos
-                                      ? 'cursor-not-allowed bg-slate-300'
-                                      : 'bg-slate-900 hover:bg-slate-800'
-                                  }`}
-                                  aria-disabled={isOos}
-                                  onClick={isOos ? (e) => e.preventDefault() : undefined}
-                                >
-                                  {t('buy')}
-                                </a>
-                                {src && (
-                                  <a
-                                    href={src}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="rounded-md border border-slate-200 px-3 py-2 text-xs text-slate-500 hover:bg-slate-50"
-                                  >
-                                    ↗
-                                  </a>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </article>
-                      );
-                    })}
+                    {byCategory['service'].map((p) => (
+                      <ServiceCard key={p.id} p={p} t={t} />
+                    ))}
                   </div>
                 </section>
-              );
-            })
+              )}
+
+              {orderedCategories
+                .filter((c) => c !== 'service')
+                .map((category) => {
+                  const items = byCategory[category];
+                  return (
+                    <section key={category} id={`cat-${category}`} className="mb-16 scroll-mt-32">
+                      <h2 className="mb-6 text-2xl font-semibold text-slate-900">
+                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                        {(t as any)(`categories.${category}`) || category.replace(/_/g, ' ')}
+                      </h2>
+                      <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                        {items.map((p) => (
+                          <HardwareCard key={p.id} p={p} t={t} />
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })}
+            </>
           )}
 
           {/* BYO (bring-your-own) disclaimer. Important trust signal for
@@ -289,5 +250,161 @@ export default async function StorePage() {
       </main>
       <Footer />
     </>
+  );
+}
+
+// v2.8.87 — extracted card components so the JSX inside StorePage stays
+// scannable. Both call the same translation map; passing `t` as a prop
+// instead of re-importing keeps the type narrowing of next-intl intact.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function HardwareCard({ p, t }: { p: HardwareProduct; t: any }) {
+  const isOos = p.stockStatus === 'out_of_stock' || p.stockStatus === 'discontinued';
+  const src = sourceUrl(p);
+  const showGibBadge = gibCertified(p);
+  const headline = headlineSpecs(p);
+  const stockLabel =
+    p.stockStatus === 'out_of_stock'
+      ? t('outOfStock')
+      : p.stockStatus === 'discontinued'
+        ? t('discontinued')
+        : p.stockStatus === 'preorder'
+          ? t('preorder')
+          : null;
+  const showLowStock = p.available > 0 && p.available <= 5;
+  return (
+    <article className="flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-white transition-shadow hover:shadow-lg">
+      {p.images?.[0] && <ProductImage src={p.images[0]} alt={p.name} />}
+      <div className="flex flex-col grow p-5">
+        <div className="mb-2 flex items-center gap-2 flex-wrap">
+          <span className="text-xs uppercase tracking-wide text-slate-500">{p.brand}</span>
+          {showGibBadge && (
+            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+              {t('gibCertified')}
+            </span>
+          )}
+          {stockLabel && (
+            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+              {stockLabel}
+            </span>
+          )}
+          {showLowStock && (
+            <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700">
+              {t('detail.lowStock', { n: p.available })}
+            </span>
+          )}
+        </div>
+        <h3 className="mb-2 text-lg font-semibold text-slate-900">{p.name}</h3>
+        {headline.length > 0 && (
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {headline.map((h, i) => (
+              <span
+                key={i}
+                className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-700"
+              >
+                {h}
+              </span>
+            ))}
+          </div>
+        )}
+        {p.description && (
+          <p className="mb-4 line-clamp-3 text-sm text-slate-600">{p.description}</p>
+        )}
+        <div className="mt-auto">
+          <div className="mb-1 text-xl font-medium text-slate-900">
+            {formatPrice(p.priceCents, p.currency)}
+          </div>
+          {p.rentalMonthlyCents ? (
+            <div className="mb-2 text-xs text-slate-500">
+              {t('rentalFrom', {
+                currency: '',
+                amount: formatPrice(p.rentalMonthlyCents, p.currency),
+              })}
+            </div>
+          ) : null}
+          <div className="mb-3 text-xs text-slate-500">
+            {t('warrantyMonths', { months: p.warrantyMonths })}
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <a
+              href={`/app/admin/store?sku=${encodeURIComponent(p.sku)}`}
+              className={`flex-1 rounded-md px-3 py-2 text-center text-sm font-medium text-white transition-colors ${
+                isOos ? 'cursor-not-allowed bg-slate-300' : 'bg-slate-900 hover:bg-slate-800'
+              }`}
+              aria-disabled={isOos}
+            >
+              {t('buy')}
+            </a>
+            {src && (
+              <a
+                href={src}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-md border border-slate-200 px-3 py-2 text-xs text-slate-500 hover:bg-slate-50"
+              >
+                ↗
+              </a>
+            )}
+          </div>
+          {/* v2.8.87: Detaylar link to the new detail page. Uses
+              next-intl's Link so locale prefix is preserved. */}
+          <Link
+            href={`/store/${p.sku}` as any}
+            className="mt-2 block text-center text-xs font-medium text-slate-500 hover:text-slate-900"
+          >
+            {t('viewDetails')} →
+          </Link>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function ServiceCard({ p, t }: { p: HardwareProduct; t: any }) {
+  const stype = serviceTypeChip(p);
+  const hours = durationHours(p);
+  // Service cards are intentionally lighter — no manufacturer link,
+  // no rental, no warranty months. The chips communicate everything
+  // structural; clicking the card opens the detail page.
+  return (
+    <article className="flex flex-col overflow-hidden rounded-lg border border-slate-200 bg-gradient-to-br from-blue-50/50 to-white transition-shadow hover:shadow-lg">
+      <div className="flex flex-col grow p-5">
+        <div className="mb-3 flex items-center gap-2 flex-wrap">
+          {stype && (
+            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
+              {t(`detail.${stype}`)}
+            </span>
+          )}
+          {hours !== null && (
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700">
+              {hours} saat
+            </span>
+          )}
+        </div>
+        <h3 className="mb-2 text-lg font-semibold text-slate-900">{p.name}</h3>
+        {p.description && (
+          <p className="mb-4 line-clamp-4 text-sm text-slate-600">{p.description}</p>
+        )}
+        <div className="mt-auto">
+          <div className="mb-3 text-xl font-medium text-slate-900">
+            {formatPrice(p.priceCents, p.currency)}
+          </div>
+          <div className="flex items-center gap-2">
+            <a
+              href={`/app/admin/store?sku=${encodeURIComponent(p.sku)}`}
+              className="flex-1 rounded-md bg-slate-900 px-3 py-2 text-center text-sm font-medium text-white hover:bg-slate-800"
+            >
+              {t('buy')}
+            </a>
+          </div>
+          <Link
+            href={`/store/${p.sku}` as any}
+            className="mt-2 block text-center text-xs font-medium text-slate-500 hover:text-slate-900"
+          >
+            {t('viewDetails')} →
+          </Link>
+        </div>
+      </div>
+    </article>
   );
 }

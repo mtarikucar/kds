@@ -468,7 +468,35 @@
       "body": "We can integrate your existing fiscal POS, thermal printer, KDS screen, or barcode scanner into the platform — you don't have to buy new hardware. After you sign up, share the brand and model with our support team and we'll confirm compatibility together.",
       "cta": "Talk to support"
     },
-    "gibFootnote": "Turkey's Next-Generation Fiscal POS (YN ÖKC) devices must appear on the GİB approved list and be activated through an authorized dealer. Orders placed via HummyTummy automatically open an activation request. Full list at ynokc.gib.gov.tr."
+    "gibFootnote": "Turkey's Next-Generation Fiscal POS (YN ÖKC) devices must appear on the GİB approved list and be activated through an authorized dealer. Orders placed via HummyTummy automatically open an activation request. Full list at ynokc.gib.gov.tr.",
+    "viewDetails": "Details",
+    "services": {
+      "sectionTitle": "Installation & Integration Services",
+      "sectionSubtitle": "Hardware install, GİB registration, Yemeksepeti/Trendyol integration, menu migration — whether we come on-site or work remotely, every package is transparent."
+    },
+    "detail": {
+      "backToStore": "Back to store",
+      "buy": "Order",
+      "duration": "Duration",
+      "coverage": "Service areas",
+      "onsite": "On-site",
+      "remote": "Remote",
+      "consultation": "Consultation",
+      "requiresBranch": "Branch required",
+      "lowStock": "Only {n} left",
+      "warrantyMonthsLabel": "{months}-month manufacturer warranty",
+      "noDetailsAuthored": "Detailed information for this product has not been authored yet. Reach out to support with questions.",
+      "empty": "No information.",
+      "tabs": {
+        "description": "Description",
+        "specs": "Specs",
+        "compat": "Compatibility",
+        "requirements": "Requirements",
+        "faq": "FAQ",
+        "includes": "What's included",
+        "steps": "Process"
+      }
+    }
   },
   "contact": {
     "title": "Contact",

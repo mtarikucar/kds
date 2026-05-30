@@ -20,7 +20,11 @@ import { Cart, CartQuote, PricedLine } from './checkout.types';
  * land.
  */
 const TR_KDV_RATE = 0.20;
-const SERVICE_PRICES_CENTS: Record<string, { name: string; priceCents: number }> = {
+// Legacy hardcoded service codes — kept ONLY as a fallback for spec
+// stability. Production service catalog lives in HardwareProduct
+// (category: 'service') since v2.8.87. Adding a new service means
+// upserting a HardwareProduct row, not extending this map.
+const LEGACY_SERVICE_PRICES_CENTS: Record<string, { name: string; priceCents: number }> = {
   onsite_install_kds: { name: 'On-site KDS installation', priceCents: 250000 },
   training_4h: { name: '4-hour staff training', priceCents: 150000 },
 };
@@ -104,20 +108,58 @@ export class QuoteService {
           meta: { productId: product.id, acquisition, warrantyMonths: product.warrantyMonths },
         });
       } else if (item.type === 'service') {
-        const svc = SERVICE_PRICES_CENTS[item.code];
-        if (!svc) {
+        // v2.8.87: services live in HardwareProduct (category: 'service').
+        // The cart-line `code` IS the SKU. Look up the catalog row first;
+        // fall back to the 2 legacy in-memory codes only if the row isn't
+        // present (keeps spec stability for fixtures that don't seed the
+        // service catalog).
+        let resolved: { name: string; priceCents: number; currency: string; serviceMeta?: any } | null = null;
+        try {
+          const product = await this.catalog.findBySkuOrThrow(item.code);
+          if (product.category !== 'service' || product.status !== 'published') {
+            warnings.push(`Not purchasable as service: ${item.code}`);
+            continue;
+          }
+          resolved = {
+            name: product.name,
+            priceCents: product.priceCents,
+            currency: product.currency,
+            serviceMeta: product.serviceMeta,
+          };
+        } catch {
+          const legacy = LEGACY_SERVICE_PRICES_CENTS[item.code];
+          if (legacy) {
+            resolved = {
+              name: legacy.name,
+              priceCents: legacy.priceCents,
+              currency: 'TRY',
+              serviceMeta: undefined,
+            };
+          }
+        }
+        if (!resolved) {
           warnings.push(`Unknown service: ${item.code}`);
           continue;
         }
+        currency = resolved.currency;
         lines.push({
           type: 'service',
           code: item.code,
-          name: svc.name,
+          name: resolved.name,
           qty,
-          unitCents: svc.priceCents,
-          subtotalCents: svc.priceCents * qty,
+          unitCents: resolved.priceCents,
+          subtotalCents: resolved.priceCents * qty,
           cadence: 'oneTime',
-          meta: { branchId: item.branchId },
+          meta: {
+            branchId: item.branchId,
+            // Forward service-order context from the cart line so
+            // CheckoutService can read serviceType (for install-trigger)
+            // and preferredDates/notes (for InstallationRequest) without
+            // re-fetching the product row.
+            serviceMeta: resolved.serviceMeta,
+            preferredDates: item.preferredDates,
+            notes: item.notes,
+          },
         });
       }
     }

@@ -27,10 +27,21 @@ export interface CartItemHardware {
 
 export interface CartItemService {
   type: 'service';
-  // Service codes are simple identifiers: 'onsite_install_kds', 'training_4h', ...
+  // v2.8.87: the `code` IS the SKU of a HardwareProduct row with
+  // category: 'service'. The 2 hardcoded legacy codes
+  // ('onsite_install_kds', 'training_4h') still resolve via the legacy
+  // fallback for spec stability.
   code: string;
   qty?: number;
   branchId?: string;
+  // v2.8.87: cart-time scheduling intent for on-site services.
+  // CheckoutService reads these to populate InstallationRequest.
+  // ISO date strings (YYYY-MM-DD), 1-3 entries. Optional — remote /
+  // consultation services don't need them.
+  preferredDates?: string[];
+  // Free-form note from the buyer (delivery instructions, contact
+  // person at the venue, etc.). Forwarded to InstallationRequest.notes.
+  notes?: string;
 }
 
 export type CartItem = CartItemPlan | CartItemAddOn | CartItemHardware | CartItemService;

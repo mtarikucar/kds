@@ -468,7 +468,35 @@
       "body": "Elinizdeki yazarkasa POS, termal yazıcı, KDS ekranı veya barkod okuyucuyu da sistemimize entegre edebiliriz — yeni cihaz almak zorunda değilsiniz. Mevcut ekipmanınızın markası ve modelini kayıt sonrası destek ekibimizle paylaşmanız yeterli; uyumluluğu birlikte doğrularız.",
       "cta": "Destek ile iletişime geç"
     },
-    "gibFootnote": "Yeni Nesil Yazarkasa POS (YN ÖKC) cihazları GİB onay listesinde olmak zorundadır ve aktivasyon yetkili bayi kanalı üzerinden yapılır. HummyTummy üzerinden sipariş ettiğinizde aktivasyon talebi otomatik açılır. Detaylı liste: ynokc.gib.gov.tr."
+    "gibFootnote": "Yeni Nesil Yazarkasa POS (YN ÖKC) cihazları GİB onay listesinde olmak zorundadır ve aktivasyon yetkili bayi kanalı üzerinden yapılır. HummyTummy üzerinden sipariş ettiğinizde aktivasyon talebi otomatik açılır. Detaylı liste: ynokc.gib.gov.tr.",
+    "viewDetails": "Detaylar",
+    "services": {
+      "sectionTitle": "Kurulum & Entegrasyon Hizmetleri",
+      "sectionSubtitle": "Donanım kurulumu, GİB kaydı, Yemeksepeti/Trendyol entegrasyonu, menü migrasyonu — sahaya gelmemiz veya uzaktan destek vermemiz fark etmeksizin paketler şeffaftır."
+    },
+    "detail": {
+      "backToStore": "Mağazaya dön",
+      "buy": "Sipariş ver",
+      "duration": "Süre",
+      "coverage": "Hizmet bölgeleri",
+      "onsite": "Sahada",
+      "remote": "Uzaktan",
+      "consultation": "Danışmanlık",
+      "requiresBranch": "Şube gerekli",
+      "lowStock": "Son {n} adet",
+      "warrantyMonthsLabel": "{months} ay üretici garantisi",
+      "noDetailsAuthored": "Bu ürün için detaylı bilgi henüz girilmedi. Sorularınız için destek ekibimize ulaşabilirsiniz.",
+      "empty": "Bilgi yok.",
+      "tabs": {
+        "description": "Açıklama",
+        "specs": "Özellikler",
+        "compat": "Uyumluluk",
+        "requirements": "Gereklilikler",
+        "faq": "SSS",
+        "includes": "Neler dahil",
+        "steps": "Süreç"
+      }
+    }
   },
   "contact": {
     "title": "İletişim",

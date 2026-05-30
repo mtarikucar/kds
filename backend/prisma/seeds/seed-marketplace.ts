@@ -451,6 +451,365 @@ const PRODUCTS = [
   },
 ];
 
+// ---- Installation & integration services ------------------------------
+//
+// v2.8.87 — services live as HardwareProduct rows (category: 'service')
+// rather than a separate ServiceOffering model. This reuses the cart /
+// quote / checkout pipeline (CartItemService.code === HardwareProduct.sku)
+// and lets the storefront grid render them with the same card scaffold.
+//
+// CheckoutService reads `serviceMeta.serviceType`:
+//   - 'onsite'       → mints an InstallationRequest with branchId +
+//                      preferredDates + notes from the cart line meta.
+//   - 'remote'       → no scheduling row; the service line stays on
+//                      HardwareOrder for invoicing. Fulfilment is async
+//                      (e.g. our integrations team schedules outside the
+//                      app for now; later v2.9.x adds a remote work queue).
+//   - 'consultation' → same as remote; intended for high-touch advisory.
+//
+// `requiresBranch` forces the buyer to pick a branch at the SPA detail
+// page before "Add to cart" enables.
+
+const SERVICES = [
+  {
+    sku: 'install-yazarkasa-gib',
+    category: 'service',
+    name: 'Yazarkasa kurulum + GİB kaydı yardımı',
+    description:
+      'Yeni nesil yazarkasa POS kurulumu, GİB başvuru evraklarının hazırlanması, ilk fiş kesimine kadar yerinde teknik destek. 4 saatlik tek seans.',
+    priceCents: 350_000,
+    images: ['/products/_fallback-service.svg'],
+    serviceMeta: { serviceType: 'onsite', durationHours: 4, requiresBranch: true, geoCoverage: ['İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Antalya'] },
+    details: {
+      includes: [
+        'Kurulum öncesi 15 dk telefon görüşmesi',
+        'Sahada teknisyen ziyareti (4 saat)',
+        'GİB bayisi üzerinden aktivasyon takibi',
+        'İlk fiş kesimine kadar yerinde yardım',
+        '30 gün e-posta üzerinden öncelikli destek',
+      ],
+      requirements: [
+        'Cihazın size ulaşmış olması (kargo + paket açma)',
+        'Sürekli AC güç',
+        'WiFi en az 10 Mbps (4G modeli için isteğe bağlı)',
+        'GİB e-Devlet şifresi (sahada teyit için)',
+      ],
+      steps: [
+        { title: '1. Randevu', body: 'Sipariş sonrası 24 saat içinde sizi arayıp şubeniz için en uygun günü belirleriz.' },
+        { title: '2. Teknisyen ziyareti', body: 'Belirlenen günde teknisyenimiz şubeye gelir, cihaz kurulumunu yapar, GİB aktivasyonunu başlatır.' },
+        { title: '3. Test fişi', body: 'İlk gerçek satışınızla birlikte test fişi kesilir, doğrulama tamamlanır.' },
+        { title: '4. Devir', body: 'Personelinize temel kullanım anlatılır, 30 günlük destek başlar.' },
+      ],
+      faq: [
+        { q: 'Hangi şehirlerde sahaya geliyorsunuz?', a: 'İstanbul, Ankara, İzmir, Bursa ve Antalya merkez ilçeler. Diğer iller için ekstra yol bedeli alınır — bizimle iletişime geçin.' },
+        { q: 'Kurulum kaç saat sürer?', a: 'Standart tek cihaz için ortalama 4 saat. Kargo geç gelirse veya GİB tarafında bekleme olursa süre uzayabilir.' },
+        { q: 'GİB başvurusu ne kadar sürer?', a: 'Bayi-kanalı üzerinden 3-7 iş günü. Kurulum gününde başvuruyu başlatırız, takibini biz yaparız.' },
+      ],
+    },
+  },
+  {
+    sku: 'install-full-pos',
+    category: 'service',
+    name: 'Tam POS kurulumu (yazarkasa + printer + KDS eşleme)',
+    description:
+      'Yazarkasa POS + termal fiş yazıcı + mutfak KDS ekranlarının yerinde kurulumu, eşlemesi ve test edilmesi. 8 saatlik kapsamlı paket.',
+    priceCents: 750_000,
+    images: ['/products/_fallback-service.svg'],
+    serviceMeta: { serviceType: 'onsite', durationHours: 8, requiresBranch: true, geoCoverage: ['İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Antalya'] },
+    details: {
+      includes: [
+        'Kurulum öncesi şube krokisi + ağ planı incelemesi',
+        'Sahada 2 teknisyen (8 saat)',
+        'Yazarkasa + 2 yazıcı + 2 KDS eşlemesi',
+        'Personel eğitim oturumu (1 saat)',
+        '60 gün öncelikli destek',
+      ],
+      requirements: [
+        'Tüm donanımın şubeye ulaşmış olması',
+        'WiFi en az 50 Mbps',
+        'Switch / router yönetici erişimi',
+        'Mutfak + ön salon arası kablolu hat (KDS için, en az CAT5)',
+        'En az 1 personel kurulum gününde hazır',
+      ],
+      steps: [
+        { title: '1. Şube incelemesi', body: 'Kurulumdan 3-5 gün önce şube krokinizi + mevcut ağ yapısını gözden geçiririz.' },
+        { title: '2. Saha günü', body: '08:30-17:30 arası 2 teknisyen şubede çalışır. Tüm cihazlar test edilerek devreye alınır.' },
+        { title: '3. Eğitim', body: 'Kurulum bitince 1 saatlik personel oturumu — yazarkasa + KDS akışı uçtan uca gösterilir.' },
+        { title: '4. Stabilizasyon', body: 'İlk 7 gün boyunca size atanmış teknisyen WhatsApp destek hattında olur.' },
+      ],
+      faq: [
+        { q: 'KDS ekranlarımız yoksa kuruluma dahil mi?', a: 'Hayır, bu hizmet kurulum ücreti — donanımlar ayrı satılır. Mağazadan tüm setin "Add to cart" ile alabilirsiniz.' },
+        { q: 'Halihazırda bizde printer var, sadece eşleme yapabilir misiniz?', a: 'Evet, BYO (bring your own) senaryosunu uyumlu donanım listesinde olduğu sürece destekliyoruz.' },
+      ],
+    },
+  },
+  {
+    sku: 'install-kds-only',
+    category: 'service',
+    name: 'KDS ekran kurulumu',
+    description:
+      'Mutfak KDS ekranlarının kurulumu, route rule yapılandırması ve uçtan uca test. 3 saatlik tek seans.',
+    priceCents: 250_000,
+    images: ['/products/_fallback-service.svg'],
+    serviceMeta: { serviceType: 'onsite', durationHours: 3, requiresBranch: true, geoCoverage: ['İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Antalya'] },
+    details: {
+      includes: [
+        'Sahada teknisyen (3 saat)',
+        '1-3 KDS ekran kurulum + sabitleme',
+        'Sipariş yönlendirme kurallarının yapılandırılması',
+        'Yemek hazır iş akışı testi',
+      ],
+      requirements: ['KDS donanımının şubeye ulaşmış olması', 'WiFi en az 20 Mbps', 'Mutfakta ekran montajı için duvar'],
+    },
+  },
+  {
+    sku: 'training-basic-4h',
+    category: 'service',
+    name: 'Temel personel eğitimi (4 saat)',
+    description:
+      'Garson + kasa + mutfak ekibi için 4 saatlik temel sistem eğitimi. Sipariş alma, fiş kesme, KDS akışı, raporlar.',
+    priceCents: 150_000,
+    images: ['/products/_fallback-service.svg'],
+    serviceMeta: { serviceType: 'onsite', durationHours: 4, requiresBranch: true, geoCoverage: ['İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Antalya'] },
+    details: {
+      includes: ['Sahada eğitmen (4 saat)', 'Garson + kasa + mutfak rolleri', 'Uygulamalı sipariş simülasyonu', 'PDF eğitim dokümanı'],
+      requirements: ['Sistem kurulu olmalı', 'En az 4 personel ayrılabilmeli'],
+    },
+  },
+  {
+    sku: 'training-advanced-8h',
+    category: 'service',
+    name: 'İleri seviye personel eğitimi (8 saat)',
+    description:
+      'Yönetici + müdür ekibi için 8 saatlik ileri eğitim. Raporlama, stok, müşteri sadakat programı, çoklu şube yönetimi.',
+    priceCents: 280_000,
+    images: ['/products/_fallback-service.svg'],
+    serviceMeta: { serviceType: 'onsite', durationHours: 8, requiresBranch: true, geoCoverage: ['İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Antalya'] },
+    details: {
+      includes: [
+        'Sahada eğitmen (8 saat, 2 oturum)',
+        'Yönetici raporları (Z-raporu, ciro analizi, ürün karlılığı)',
+        'Stok takibi + tedarikçi yönetimi',
+        'Müşteri sadakat programı kurgu',
+        'Çoklu şube yönetimi (mevcutsa)',
+      ],
+    },
+  },
+  {
+    sku: 'integration-yemeksepeti',
+    category: 'service',
+    name: 'Yemeksepeti entegrasyon kurulumu + menü eşleme',
+    description:
+      'Yemeksepeti API anahtarınızı sisteme tanımlar, menünüzü Yemeksepeti tarafıyla eşleriz. Tamamen uzaktan, 2-3 iş günü sürer.',
+    priceCents: 250_000,
+    images: ['/products/_fallback-service.svg'],
+    serviceMeta: { serviceType: 'remote', requiresBranch: false },
+    details: {
+      includes: [
+        'Yemeksepeti satıcı paneli üzerinden API key/credentials kurulumu',
+        'Menü kategorileri + ürün eşleme',
+        '2 örnek sipariş ile uçtan uca test',
+        'Sürekli sipariş akışı doğrulaması (24 saat izleme)',
+      ],
+      requirements: ['Yemeksepeti satıcı hesabı + bayi yöneticisi onayı', 'Menünüzün HummyTummy tarafında girilmiş olması'],
+    },
+  },
+  {
+    sku: 'integration-trendyol-yemek',
+    category: 'service',
+    name: 'Trendyol Yemek entegrasyon kurulumu',
+    description:
+      'Trendyol Yemek partner API kurulumu + menü eşleme. Tamamen uzaktan.',
+    priceCents: 250_000,
+    images: ['/products/_fallback-service.svg'],
+    serviceMeta: { serviceType: 'remote', requiresBranch: false },
+    details: {
+      includes: ['Trendyol partner API kurulumu', 'Menü eşleme', 'Test siparişi'],
+      requirements: ['Trendyol Yemek partner hesabı'],
+    },
+  },
+  {
+    sku: 'integration-efatura-setup',
+    category: 'service',
+    name: 'e-Fatura sağlayıcı kurulumu + ilk fatura testi',
+    description:
+      'Anlaşmalı e-Fatura entegratörünüzün API anahtarlarını sistemde tanımlar, GİB özel entegratör ayarlarını test eder, ilk e-Faturanın başarıyla iletildiğini doğrularız.',
+    priceCents: 350_000,
+    images: ['/products/_fallback-service.svg'],
+    serviceMeta: { serviceType: 'remote', requiresBranch: true },
+    details: {
+      includes: [
+        'e-Fatura sağlayıcı kimlik bilgilerinin tanımlanması',
+        'GİB özel entegratör test ortamı doğrulaması',
+        '1 örnek e-Fatura uçtan uca testi (test + gerçek)',
+        'Hata yönetim akışı kontrolü',
+      ],
+      requirements: ['e-Fatura sağlayıcısı (Foriba, Mali İdare, vb.) ile mevcut sözleşme', 'GİB e-Fatura mükellef kaydı'],
+    },
+  },
+  {
+    sku: 'menu-migration',
+    category: 'service',
+    name: 'Eski POS\'tan menü migrasyonu (şube başı)',
+    description:
+      'Eski POS sisteminizdeki menüyü Excel/CSV/API üzerinden alır, HummyTummy formatına dönüştürür, kategorileri + modifiyeleri + alerjenleri eşleriz. Şube başına fiyatlandırılır.',
+    priceCents: 200_000,
+    images: ['/products/_fallback-service.svg'],
+    serviceMeta: { serviceType: 'remote', requiresBranch: true },
+    details: {
+      includes: [
+        'Eski POS export\'unun (Excel/CSV/JSON) alınması',
+        '200 ürüne kadar otomatik dönüşüm',
+        'Kategori + modifiye + alerjen eşleme',
+        'Yüklenen menü için sizin onayınızla yayına alma',
+      ],
+      requirements: ['Eski sistemden veri export imkanı (kullanıcı veya bayi panel erişimi)'],
+    },
+  },
+  {
+    sku: 'wifi-site-survey',
+    category: 'service',
+    name: 'WiFi/ağ site survey (şube başı)',
+    description:
+      'KDS + tablet + yazarkasa\'nın stabil çalışacağı bir ağ için şubenizde WiFi sinyal haritalama, switch/router önerisi, kablolu hat planı.',
+    priceCents: 150_000,
+    images: ['/products/_fallback-service.svg'],
+    serviceMeta: { serviceType: 'onsite', durationHours: 2, requiresBranch: true, geoCoverage: ['İstanbul', 'Ankara', 'İzmir', 'Bursa', 'Antalya'] },
+    details: {
+      includes: [
+        'Sahada teknisyen (2 saat)',
+        'WiFi sinyal harita raporu (PDF)',
+        'Cihaz başına önerilen bağlantı tipi (WiFi / Ethernet / 4G)',
+        'Tedarik edilmesi gereken switch/AP listesi',
+      ],
+      requirements: ['Şubeye fiziksel erişim'],
+    },
+  },
+  {
+    sku: 'multibranch-rollout',
+    category: 'service',
+    name: 'Çoklu şube rollout danışmanlığı',
+    description:
+      '3+ şubeli işletmeler için kurulum sıralaması, eğitim takvimi, kademeli geçiş planı oluşturma danışmanlığı. Uzaktan, video çağrı bazlı.',
+    priceCents: 500_000,
+    images: ['/products/_fallback-service.svg'],
+    serviceMeta: { serviceType: 'consultation', requiresBranch: false },
+    details: {
+      includes: [
+        '2 saatlik keşif video çağrısı',
+        'Şube önceliklendirme matrisi',
+        'Pilot şube + kademeli rollout planı (PDF)',
+        '4 hafta boyunca haftalık 30 dk durum takibi çağrısı',
+      ],
+      requirements: ['3 veya daha fazla aktif şube'],
+    },
+  },
+];
+
+// ---- Rich details for top-priority hardware SKUs ----------------------
+//
+// v2.8.87 — overlays `details` JSON onto specific SKUs in PRODUCTS at
+// runtime so we can keep the original PRODUCTS table flat. The detail
+// page renders graceful-degraded for SKUs not in this map (spec tab
+// only).
+
+const HARDWARE_DETAILS: Record<string, { details: any; specs?: any }> = {
+  'yazarkasa-hugin-tiger-t300': {
+    specs: {
+      headlineSpecs: ['5.5″', '4G', 'GİB onaylı', '360g'],
+      display: '5.5″ HD dokunmatik',
+      connectivity: 'WiFi 802.11 + 4G LTE',
+      printer: 'Entegre 58mm termal',
+      battery: '5000 mAh, ~8 saat aktif kullanım',
+      weight: '360g',
+      os: 'Android 11 (PayTR sertifikalı yazılım)',
+    },
+    details: {
+      includes: [
+        'Hugin Tiger T300 4G cihazı',
+        'Şarj kablosu + adaptör',
+        'Hızlı başlangıç kılavuzu (TR)',
+        '24 ay üretici garantisi',
+        'GİB aktivasyonu için bayi kanalı yönlendirmesi',
+      ],
+      requirements: ['GİB e-Devlet şifresi', '4G SIM (cihaz üzerinden veya kendi hattınız)', 'WiFi (opsiyonel, 4G yedeği)'],
+      faq: [
+        { q: 'GİB aktivasyonu kim yapıyor?', a: 'Hugin bayisi yapar. Sipariş sonrası süreci sizin adınıza başlatırız.' },
+        { q: 'Pay-at-table yapabilir miyim?', a: 'Evet. Tigers T300 mobil bir cihaz, masa-yanı tahsilat için ideal.' },
+        { q: 'Yemeksepeti otomatik sipariş çekebilir mi?', a: 'Sadece HummyTummy yazılımı üzerinden (entegrasyon ayrı satılır). Cihaz tek başına Yemeksepeti API\'sine bağlanmaz.' },
+      ],
+    },
+  },
+  'yazarkasa-beko-300tr': {
+    specs: {
+      headlineSpecs: ['5″', 'Android', 'GİB onaylı', 'WiFi + 4G'],
+      display: '5″ kapasitif dokunmatik',
+      connectivity: 'WiFi + 4G dahili SIM yuvası',
+      printer: 'Entegre 58mm termal',
+      os: 'Android 10',
+    },
+    details: {
+      includes: ['Beko 300TR cihazı', 'Şarj kablosu + adaptör', 'Türkçe hızlı başlangıç kılavuzu', '24 ay üretici garantisi'],
+      requirements: ['GİB e-Devlet şifresi', 'WiFi (4G isteğe bağlı)'],
+    },
+  },
+  'yazarkasa-ingenico-move5000f': {
+    specs: {
+      headlineSpecs: ['Premium', '4G + LAN', 'EMV L1/L2', 'PCI PTS 5.x'],
+      display: '4.3″ renkli dokunmatik',
+      connectivity: '4G + Ethernet + WiFi',
+      printer: 'Entegre yüksek hızlı termal',
+      security: 'EMV L1/L2, PCI PTS 5.x',
+    },
+    details: {
+      includes: ['Ingenico Move/5000F cihazı', 'Tüm kablo seti', '24 ay garanti', 'PCI sertifikalı yazılım önyüklemesi'],
+      requirements: ['GİB e-Devlet şifresi', 'WiFi veya Ethernet'],
+      faq: [
+        { q: 'Hangi banka işyerlerine uygun?', a: 'Tüm major TR bankaları (Garanti BBVA, İş Bankası, Akbank, Yapı Kredi, vb.). Banka entegrasyonunu kurulum sırasında biz tamamlarız.' },
+      ],
+    },
+  },
+  'printer-epson-tm-t20iii-lan': {
+    specs: {
+      headlineSpecs: ['80mm', 'LAN', 'Auto-cutter', '250mm/s'],
+      width: '80mm',
+      interface: 'Ethernet (LAN)',
+      speed: '250 mm/saniye',
+      autoCutter: 'Evet (1.5 milyon kesim ömrü)',
+      protocol: 'ESC/POS',
+    },
+    details: {
+      includes: ['Epson TM-T20III yazıcı', 'Güç adaptörü', 'Örnek termal rulo'],
+      requirements: ['Statik IP veya DHCP destekli LAN portu', 'POS yazılımınızda 80mm ESC/POS desteği'],
+    },
+  },
+  'kds-sunmi-d2s': {
+    specs: {
+      headlineSpecs: ['15.6″', 'Android', 'Geniş açı', 'Duvar montajı'],
+      display: '15.6″ FHD IPS, geniş açı',
+      mount: 'VESA 100x100 duvar veya tezgah ayağı',
+      os: 'Android 11 (Sunmi-locked)',
+    },
+    details: {
+      includes: ['Sunmi D2s ekran', 'VESA duvar montajı', 'HDMI + USB-C kablo', '12 ay üretici garantisi'],
+      requirements: ['WiFi en az 10 Mbps', 'Mutfakta duvar veya tezgah sabitleme imkanı', 'Sürekli AC güç'],
+    },
+  },
+  'tablet-sunmi-v2-pro': {
+    specs: {
+      headlineSpecs: ['5.5″', '4G', 'Termal printer', 'Garson tableti'],
+      display: '5.5″ HD dokunmatik',
+      connectivity: 'WiFi + 4G',
+      printer: 'Entegre 58mm termal yazıcı',
+      battery: '4000 mAh',
+    },
+    details: {
+      includes: ['Sunmi V2 Pro cihazı', 'Şarj kablosu', '12 ay garanti'],
+      requirements: ['WiFi en az 10 Mbps', '4G için SIM kart (isteğe bağlı)'],
+    },
+  },
+};
+
 // ---- Integration providers --------------------------------------------
 
 const PROVIDERS = [
@@ -499,47 +858,52 @@ async function main() {
   }
   console.log(`[seed-marketplace] add-ons: ${ADDONS.length}`);
 
-  for (const p of PRODUCTS) {
+  // v2.8.87: PRODUCTS + SERVICES go through the same upsert path; SERVICES
+  // are HardwareProduct rows with category='service'. The shared helper
+  // also passes through specs/details/serviceMeta if present on the entry.
+  const ALL_CATALOG_ENTRIES = [...PRODUCTS, ...SERVICES];
+  for (const p of ALL_CATALOG_ENTRIES) {
+    // Overlay the rich-detail JSON for the top-6 hardware SKUs (the
+    // services already carry details inline). Lets us keep the PRODUCTS
+    // array shape unchanged while still seeding `details` + headlineSpecs.
+    const overlay = HARDWARE_DETAILS[p.sku];
+    const sharedData = {
+      category: p.category,
+      name: p.name,
+      brand: (p as any).brand ?? null,
+      model: (p as any).model ?? null,
+      description: p.description,
+      priceCents: p.priceCents,
+      rentalMonthlyCents: (p as any).rentalMonthlyCents ?? null,
+      warrantyMonths: (p as any).warrantyMonths ?? 0,
+      images: (p as any).images ?? [],
+      stockStatus: (p as any).stockStatus ?? 'in_stock',
+      compat: (p as any).compat ?? null,
+      specs: overlay?.specs ?? (p as any).specs ?? null,
+      details: overlay?.details ?? (p as any).details ?? null,
+      serviceMeta: (p as any).serviceMeta ?? null,
+      status: 'published',
+    };
     const product = await prisma.hardwareProduct.upsert({
       where: { sku: p.sku },
-      update: {
-        category: p.category,
-        name: p.name,
-        brand: p.brand,
-        model: p.model,
-        description: p.description,
-        priceCents: p.priceCents,
-        rentalMonthlyCents: (p as any).rentalMonthlyCents ?? null,
-        warrantyMonths: p.warrantyMonths,
-        images: p.images,
-        stockStatus: p.stockStatus,
-        compat: (p as any).compat ?? null,
-        status: 'published',
-      },
+      update: sharedData,
       create: {
         sku: p.sku,
-        category: p.category,
-        name: p.name,
-        brand: p.brand,
-        model: p.model,
-        description: p.description,
-        priceCents: p.priceCents,
-        rentalMonthlyCents: (p as any).rentalMonthlyCents ?? null,
-        warrantyMonths: p.warrantyMonths,
-        images: p.images,
-        stockStatus: p.stockStatus,
-        compat: (p as any).compat ?? null,
-        status: 'published',
+        ...sharedData,
       },
     });
-    // Ensure inventory row exists.
+    // Ensure inventory row exists. Services skip stock tracking; the row
+    // is harmless to create (available stays 0; quote/checkout for
+    // category='service' bypasses CatalogService.allocate).
     await prisma.hardwareInventory.upsert({
       where: { productId: product.id },
       update: {},
       create: { productId: product.id },
     });
   }
-  console.log(`[seed-marketplace] hardware SKUs: ${PRODUCTS.length}`);
+  console.log(
+    `[seed-marketplace] catalog: ${PRODUCTS.length} hardware + ${SERVICES.length} service SKUs`,
+  );
 
   for (const ip of PROVIDERS) {
     await prisma.integrationProviderDef.upsert({

@@ -71,10 +71,21 @@ describe('QuoteService', () => {
       code: 'kds_extra_screen', name: 'Extra KDS screen', status: 'published',
       billing: 'recurring', priceCents: 5000, currency: 'TRY', id: 'a-1', kind: 'capacity',
     } as any);
-    catalog.findBySkuOrThrow.mockResolvedValue({
-      sku: 'kds-21in', name: '21" KDS Screen', status: 'published',
-      priceCents: 75000, rentalMonthlyCents: null, currency: 'TRY', id: 'h-1', warrantyMonths: 12,
-    } as any);
+    // v2.8.87: catalog.findBySkuOrThrow is now hit for BOTH hardware and
+    // service items (services live as HardwareProduct rows with
+    // category='service'). Mock by-SKU so each path resolves correctly.
+    // 'onsite_install_kds' is a LEGACY service code that no longer has a
+    // catalog row — the implementation falls back to the in-memory map
+    // for spec stability, so the mock throws for that SKU.
+    catalog.findBySkuOrThrow.mockImplementation(async (sku: string) => {
+      if (sku === 'kds-21in') {
+        return {
+          sku: 'kds-21in', name: '21" KDS Screen', status: 'published', category: 'kds_screen',
+          priceCents: 75000, rentalMonthlyCents: null, currency: 'TRY', id: 'h-1', warrantyMonths: 12,
+        } as any;
+      }
+      throw new Error(`SKU not in fixture: ${sku}`);
+    });
 
     const q = await svc.quote({
       items: [

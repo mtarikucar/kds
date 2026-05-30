@@ -468,7 +468,35 @@
       "body": "يمكننا دمج جهاز نقاط البيع الضريبي أو الطابعة الحرارية أو شاشة المطبخ أو ماسح الباركود الذي تملكه بالفعل — لست مضطراً لشراء أجهزة جديدة. بعد التسجيل، شارك العلامة التجارية والطراز مع فريق الدعم لدينا.",
       "cta": "تواصل مع الدعم"
     },
-    "gibFootnote": "أجهزة نقاط البيع الضريبية في تركيا (YN ÖKC) يجب أن تكون مدرجة في قائمة GİB وأن يتم تفعيلها عبر وكيل مرخّص. عند الطلب من خلال HummyTummy يُفتح طلب التفعيل تلقائياً."
+    "gibFootnote": "أجهزة نقاط البيع الضريبية في تركيا (YN ÖKC) يجب أن تكون مدرجة في قائمة GİB وأن يتم تفعيلها عبر وكيل مرخّص. عند الطلب من خلال HummyTummy يُفتح طلب التفعيل تلقائياً.",
+    "viewDetails": "Details",
+    "services": {
+      "sectionTitle": "Installation & Integration Services",
+      "sectionSubtitle": "Hardware install, GİB registration, integration, menu migration — every package is transparent."
+    },
+    "detail": {
+      "backToStore": "Back to store",
+      "buy": "Order",
+      "duration": "Duration",
+      "coverage": "Service areas",
+      "onsite": "On-site",
+      "remote": "Remote",
+      "consultation": "Consultation",
+      "requiresBranch": "Branch required",
+      "lowStock": "Only {n} left",
+      "warrantyMonthsLabel": "{months}-month warranty",
+      "noDetailsAuthored": "Detailed information is not yet authored.",
+      "empty": "No information.",
+      "tabs": {
+        "description": "Description",
+        "specs": "Specs",
+        "compat": "Compatibility",
+        "requirements": "Requirements",
+        "faq": "FAQ",
+        "includes": "What's included",
+        "steps": "Process"
+      }
+    }
   },
   "contact": {
     "title": "تواصل معنا",

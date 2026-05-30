@@ -5,6 +5,8 @@ import { api } from '../../lib/api';
 export interface HardwareProduct {
   id: string;
   sku: string;
+  // 'service' added in v2.8.87 — installation/integration offerings live
+  // alongside hardware so the cart/checkout pipeline stays unified.
   category: string;
   name: string;
   brand: string | null;
@@ -12,12 +14,24 @@ export interface HardwareProduct {
   description: string | null;
   specs?: Record<string, unknown>;
   compat?: Record<string, unknown>;
+  // v2.8.87 — rich detail JSON consumed by ProductDetailPage. Shape:
+  //   { includes?: string[], requirements?: string[], faq?: {q,a}[],
+  //     steps?: {title,body}[], videoUrl?, gallery?: string[] }
+  // Per-locale variants supported via { tr: {...}, en: {...} }.
+  details?: Record<string, unknown> | null;
+  // v2.8.87 — service-only metadata. Shape:
+  //   { durationHours?, geoCoverage?: string[], requiresBranch?: boolean,
+  //     serviceType: 'onsite'|'remote'|'consultation' }
+  serviceMeta?: Record<string, unknown> | null;
   priceCents: number;
   rentalMonthlyCents: number | null;
   currency: string;
   warrantyMonths: number;
   images: string[];
   stockStatus: 'in_stock' | 'preorder' | 'out_of_stock' | 'discontinued';
+  // v2.8.87 — public view exposes this scalar so cards can show
+  // "Son N adet" low-stock badge without leaking allocated/serials.
+  available?: number;
 }
 
 export interface CartItem {
@@ -28,6 +42,10 @@ export interface CartItem {
   billingCycle?: 'MONTHLY' | 'YEARLY';
   branchId?: string;
   acquisition?: 'sell' | 'rent';
+  // v2.8.87: only meaningful for `service` items; forwarded to
+  // InstallationRequest by the backend checkout pipeline.
+  preferredDates?: string[]; // ISO YYYY-MM-DD, max 3
+  notes?: string;            // max 500 chars
 }
 
 export interface PricedLine {
@@ -63,6 +81,17 @@ export const useListProducts = (category?: string) =>
       const r = await api.get('/v1/catalog/products', { params: category ? { category } : {} });
       return r.data;
     },
+  });
+
+// v2.8.87 — single-product fetch for /admin/store/:sku detail page.
+export const useGetProductBySku = (sku: string | undefined) =>
+  useQuery({
+    queryKey: ['hardware-store', 'product', sku] as const,
+    queryFn: async (): Promise<HardwareProduct> => {
+      const r = await api.get(`/v1/catalog/products/sku/${encodeURIComponent(sku!)}`);
+      return r.data;
+    },
+    enabled: Boolean(sku),
   });
 
 export const useQuoteCart = () => {

@@ -468,7 +468,35 @@
       "body": "Mavjud fiskal POS, termal printer, KDS ekrani yoki shtrix-kod skaneringizni tizimimizga integratsiya qila olamiz — yangi jihoz sotib olish shart emas. Ro'yxatdan o'tgandan keyin brend va modelni qo'llab-quvvatlash jamoamizga ayting.",
       "cta": "Qo'llab-quvvatlash bilan bog'lanish"
     },
-    "gibFootnote": "Turkiya yangi avlod fiskal POS qurilmalari (YN ÖKC) GİB ro'yxatida bo'lishi va vakolatli diler orqali faollashtirilishi shart. HummyTummy orqali buyurtma bersangiz, faollashtirish so'rovi avtomatik ochiladi."
+    "gibFootnote": "Turkiya yangi avlod fiskal POS qurilmalari (YN ÖKC) GİB ro'yxatida bo'lishi va vakolatli diler orqali faollashtirilishi shart. HummyTummy orqali buyurtma bersangiz, faollashtirish so'rovi avtomatik ochiladi.",
+    "viewDetails": "Tafsilotlar",
+    "services": {
+      "sectionTitle": "O'rnatish va integratsiya xizmatlari",
+      "sectionSubtitle": "Uskuna o'rnatish, GİB ro'yxatga olish, Yemeksepeti/Trendyol integratsiyasi, menyu ko'chirish — joyda yoki masofadan, har bir paket shaffof."
+    },
+    "detail": {
+      "backToStore": "Do'konga qaytish",
+      "buy": "Buyurtma",
+      "duration": "Davomiyligi",
+      "coverage": "Xizmat hududlari",
+      "onsite": "Joyida",
+      "remote": "Masofadan",
+      "consultation": "Konsultatsiya",
+      "requiresBranch": "Filial kerak",
+      "lowStock": "Faqat {n} qoldi",
+      "warrantyMonthsLabel": "{months} oy kafolat",
+      "noDetailsAuthored": "Batafsil ma'lumot hali kiritilmagan.",
+      "empty": "Ma'lumot yo'q.",
+      "tabs": {
+        "description": "Tavsif",
+        "specs": "Xususiyatlar",
+        "compat": "Mosligi",
+        "requirements": "Talablar",
+        "faq": "Savol-javob",
+        "includes": "Kiritilgan",
+        "steps": "Jarayon"
+      }
+    }
   },
   "contact": {
     "title": "Aloqa",

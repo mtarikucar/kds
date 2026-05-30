@@ -12,10 +12,52 @@ export class CatalogService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listPublic(filters?: { category?: string }) {
-    return this.prisma.hardwareProduct.findMany({
+    const rows = await this.prisma.hardwareProduct.findMany({
       where: { status: 'published', ...(filters?.category ? { category: filters.category } : {}) },
+      include: { inventory: { select: { available: true } } },
       orderBy: [{ category: 'asc' }, { name: 'asc' }],
     });
+    return rows.map((r) => this.toPublicView(r));
+  }
+
+  /**
+   * Public lookup by SKU. Same row as findBySkuOrThrow but stripped of
+   * private inventory fields (allocated, shipped, serialsAvailable).
+   * Internal callers (CheckoutService quote/provision path) should keep
+   * using findBySkuOrThrow directly — they need the serials column.
+   */
+  async findBySkuPublicOrThrow(sku: string) {
+    const row = await this.prisma.hardwareProduct.findUnique({
+      where: { sku },
+      include: { inventory: { select: { available: true } } },
+    });
+    if (!row || row.status !== 'published') {
+      // Don't leak whether a draft/archived row exists — same NotFound
+      // for both "doesn't exist" and "not for sale".
+      throw new NotFoundException(`SKU not found: ${sku}`);
+    }
+    return this.toPublicView(row);
+  }
+
+  /**
+   * Strip private inventory fields and expose only what the storefront
+   * needs. `available` lets the card render the "Son N adet" low-stock
+   * chip without revealing how many we've allocated or which serials
+   * are queued. v2.8.87 introduced this helper alongside the
+   * details/serviceMeta detail-page wiring.
+   *
+   * The shape returned here is the contract the SPA + landing storefronts
+   * consume — adding a private field to HardwareProduct/HardwareInventory
+   * does NOT bleed into the public payload unless explicitly listed here.
+   */
+  private toPublicView(row: any) {
+    const available = Array.isArray(row.inventory) && row.inventory.length > 0
+      ? row.inventory.reduce((acc: number, inv: any) => acc + (inv.available ?? 0), 0)
+      : 0;
+    // Strip the inventory relation entirely from the public payload —
+    // we replace it with a single scalar `available` field.
+    const { inventory: _omitted, ...rest } = row;
+    return { ...rest, available };
   }
 
   async listAdmin(filters?: { status?: string; category?: string }) {
@@ -56,6 +98,8 @@ export class CatalogService {
     description?: string;
     specs?: Record<string, unknown>;
     compat?: Record<string, unknown>;
+    details?: Record<string, unknown>;
+    serviceMeta?: Record<string, unknown>;
     priceCents: number;
     rentalMonthlyCents?: number;
     currency?: string;
@@ -76,6 +120,8 @@ export class CatalogService {
             description: input.description,
             specs: input.specs as any,
             compat: input.compat as any,
+            details: input.details as any,
+            serviceMeta: input.serviceMeta as any,
             priceCents: input.priceCents,
             rentalMonthlyCents: input.rentalMonthlyCents,
             currency: input.currency ?? 'TRY',
@@ -109,6 +155,8 @@ export class CatalogService {
         description: input.description,
         specs: input.specs as any,
         compat: input.compat as any,
+        details: input.details as any,
+        serviceMeta: input.serviceMeta as any,
         priceCents: input.priceCents,
         rentalMonthlyCents: input.rentalMonthlyCents,
         currency: input.currency,

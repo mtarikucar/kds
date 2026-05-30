@@ -23,7 +23,11 @@ export class CatalogController {
   @Get('products/sku/:sku')
   @ApiOperation({ summary: 'Public product lookup by SKU' })
   bySku(@Param('sku') sku: string) {
-    return this.catalog.findBySkuOrThrow(sku);
+    // v2.8.87: route through the public-view helper so the detail page
+    // payload doesn't leak `allocated` / `serialsAvailable`. Internal
+    // callers (CheckoutService quote/provision path) use
+    // findBySkuOrThrow directly when they need the serials column.
+    return this.catalog.findBySkuPublicOrThrow(sku);
   }
 }
 

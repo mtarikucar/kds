@@ -81,6 +81,21 @@ export class CheckoutService {
       // companion hardware so the customer sees one invoice for the
       // physical shipment + installation bundle.
       if (hardwareLines.length > 0) {
+        // v2.8.87: any on-site service triggers the order-level
+        // `installation: requested` flag (so the SuperAdmin fulfilment
+        // dashboard surfaces it). Previously this matched only on the
+        // legacy 'onsite_install' code prefix; now we read
+        // serviceMeta.serviceType set on each service line. Each on-site
+        // line also mints its OWN InstallationRequest below — the
+        // order-level flag is just a quick filter.
+        const onsiteServiceLines = hardwareLines.filter(
+          (l) =>
+            l.type === 'service' &&
+            ((l.meta as any)?.serviceMeta?.serviceType === 'onsite' ||
+              // Legacy fallback (the 2 hardcoded codes don't carry
+              // serviceMeta from the catalog).
+              l.code.startsWith('onsite_install')),
+        );
         const order = await tx.hardwareOrder.create({
           data: {
             tenantId,
@@ -97,9 +112,7 @@ export class CheckoutService {
             currency: quote.currency,
             shippingAddress: cart.shippingAddress as any,
             billingAddress: cart.billingAddress as any,
-            installation: hardwareLines.some((l) => l.type === 'service' && l.code.startsWith('onsite_install'))
-              ? 'requested'
-              : null,
+            installation: onsiteServiceLines.length > 0 ? 'requested' : null,
             paymentRef,
           },
         });
@@ -125,14 +138,27 @@ export class CheckoutService {
           });
         }
 
-        if (order.installation === 'requested') {
+        // v2.8.87: one InstallationRequest per on-site service line so
+        // each can be scheduled independently (a tenant may buy KDS
+        // install for branch A + WiFi survey for branch B in one cart).
+        // branchId / preferredDates / notes come from the cart line meta
+        // populated at quote time.
+        for (const l of onsiteServiceLines) {
+          const meta = (l.meta ?? {}) as Record<string, unknown>;
           await tx.installationRequest.create({
             data: {
               id: uuidv7(),
               tenantId,
               hwOrderId: order.id,
+              branchId: (meta.branchId as string) ?? null,
               status: 'requested',
-              notes: 'Auto-created from checkout',
+              preferredDates:
+                Array.isArray(meta.preferredDates) && meta.preferredDates.length > 0
+                  ? (meta.preferredDates as string[]).map((d) => new Date(d))
+                  : [],
+              notes:
+                (meta.notes as string) ??
+                `Auto-created from checkout (service: ${l.code})`,
             },
           });
         }

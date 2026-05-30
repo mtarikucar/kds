@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
-  type CartItem,
   useListProducts,
   useQuoteCart,
   useCreateCheckoutIntent,
@@ -9,6 +8,7 @@ import {
   type CartQuote,
   type ShippingAddress,
 } from './storeApi';
+import { useCartStore, toCartItems } from './cartStore';
 import ShippingAddressForm from './ShippingAddressForm';
 import { useAuthStore } from '../../store/authStore';
 
@@ -56,6 +56,8 @@ function ProductImage({ src, alt }: { src: string; alt: string }) {
 
 // Categories must match the backend CreateHardwareProductDto enum
 // (see backend/src/modules/catalog/dto/create-hardware-product.dto.ts).
+// 'service' filters the storefront down to hizmetler — also rendered
+// in its own dedicated section above the hardware grid (v2.8.87).
 const CATEGORIES = [
   'all',
   'yazarkasa',
@@ -87,26 +89,31 @@ const CATEGORY_LABELS_TR: Record<string, string> = {
   scale: 'Tartı',
   cable: 'Kablo',
   accessory: 'Aksesuar',
-  service: 'Hizmet',
+  service: 'Kurulum & Hizmet',
 };
 
 // LocalStorage key for the BYO disclaimer dismiss state. Versioned in case
 // we update the copy later — bumping the suffix re-shows the banner.
 const BYO_DISMISS_KEY = 'hardware-store-byo-dismiss-v1';
 
-interface LocalCartLine {
-  product: HardwareProduct;
-  qty: number;
-}
-
 function gibCertified(p: HardwareProduct): boolean {
   return Boolean(p.compat && (p.compat as { gibCertified?: boolean }).gibCertified === true);
+}
+
+function headlineSpecs(p: HardwareProduct): string[] {
+  const hs = p.specs && (p.specs as { headlineSpecs?: unknown[] }).headlineSpecs;
+  if (!Array.isArray(hs)) return [];
+  return hs.filter((s): s is string => typeof s === 'string').slice(0, 3);
 }
 
 export default function StorePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [category, setCategory] = useState<string>('all');
-  const [cart, setCart] = useState<LocalCartLine[]>([]);
+  // v2.8.87: cart lives in the shared Zustand store so navigating to a
+  // detail page and back doesn't drop the cart.
+  const lines = useCartStore((s) => s.lines);
+  const addHardware = useCartStore((s) => s.addHardware);
+  const removeFromCart = useCartStore((s) => s.remove);
   const [byoDismissed, setByoDismissed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return window.localStorage.getItem(BYO_DISMISS_KEY) === '1';
@@ -134,72 +141,57 @@ export default function StorePage() {
     if (!sku || allProducts.length === 0) return;
     const product = allProducts.find((p) => p.sku === sku);
     if (!product) {
-      // Strip the param even if we couldn't resolve the sku — otherwise
-      // every re-render tries again as the catalogue list shuffles.
       const next = new URLSearchParams(searchParams);
       next.delete('sku');
       setSearchParams(next, { replace: true });
       return;
     }
-    setCart((c) => {
-      if (c.some((l) => l.product.id === product.id)) return c;
-      return [...c, { product, qty: 1 }];
-    });
+    // Services need a branch picker + dates; we send the buyer to the
+    // detail page rather than auto-add. Hardware idempotently lands
+    // in the cart.
+    if (product.category === 'service') {
+      const next = new URLSearchParams(searchParams);
+      next.delete('sku');
+      setSearchParams(next, { replace: true });
+      // Use replace so back button returns to the source, not the bare
+      // /admin/store.
+      window.history.replaceState(null, '', `/admin/store/${encodeURIComponent(sku)}`);
+      window.location.assign(`/admin/store/${encodeURIComponent(sku)}`);
+      return;
+    }
+    const already = lines.some((l) => l.product.id === product.id);
+    if (!already) {
+      addHardware(product, { qty: 1, acquisition: 'sell' });
+    }
     const next = new URLSearchParams(searchParams);
     next.delete('sku');
     setSearchParams(next, { replace: true });
-  }, [searchParams, allProducts, setSearchParams]);
+  }, [searchParams, allProducts, setSearchParams, addHardware, lines]);
 
-  const cartItems: CartItem[] = useMemo(
-    () => cart.map((l) => ({ type: 'hardware' as const, sku: l.product.sku, qty: l.qty })),
-    [cart],
-  );
+  const cartItems = useMemo(() => toCartItems(lines), [lines]);
 
   function add(product: HardwareProduct) {
-    setCart((c) => {
-      const idx = c.findIndex((l) => l.product.id === product.id);
-      if (idx >= 0) {
-        const next = [...c];
-        next[idx] = { ...next[idx], qty: next[idx].qty + 1 };
-        return next;
-      }
-      return [...c, { product, qty: 1 }];
-    });
-  }
-
-  function remove(productId: string) {
-    setCart((c) => c.filter((l) => l.product.id !== productId));
+    addHardware(product, { qty: 1, acquisition: 'sell' });
   }
 
   async function refreshQuote() {
-    if (cart.length === 0) return null;
+    if (lines.length === 0) return null;
     return quote.mutateAsync({ items: cartItems });
   }
 
   async function startCheckout(address: ShippingAddress) {
-    if (cart.length === 0 || !user) return;
-    // v2.8.84/85: POST /v1/checkout/intent — server re-prices, persists a
-    // CheckoutIntent row, asks PayTR for an iframe token, returns the
-    // paymentLink we redirect to. The webhook side (CheckoutSettlement
-    // Service) provisions the order once PayTR confirms.
+    if (lines.length === 0 || !user) return;
     setShippingAddress(address);
     const result = await intent.mutateAsync({
       cart: { items: cartItems, shippingAddress: address },
       buyer: {
         email: user.email,
         name: `${user.firstName} ${user.lastName}`.trim() || user.email,
-        // The phone-prompt flow (#71) makes phone reliably present on the
-        // user record. Fall back to a placeholder ONLY for legacy admins
-        // whose record predates the prompt — the backend DTO will reject
-        // empty/invalid phones at the boundary.
         phone: (user as any).phone ?? '',
         address: `${address.line1}${address.line2 ? ', ' + address.line2 : ''}, ${address.city}`,
       },
       returnUrl: `${window.location.origin}/admin/hardware-orders`,
     });
-    // Redirect to the PayTR-hosted iframe. We use top-level navigation
-    // rather than a popup so the iframe lifecycle is browser-native and
-    // 3DS / OTP flows don't get blocked by popup blockers.
     if (result.paymentLink) {
       window.location.assign(result.paymentLink);
     }
@@ -260,71 +252,95 @@ export default function StorePage() {
               Bu kategoride ürün yok.
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {products.map((p) => {
-                const showGibBadge = gibCertified(p);
-                const isOos = p.stockStatus === 'out_of_stock' || p.stockStatus === 'discontinued';
-                return (
-                  <article key={p.id} className="overflow-hidden rounded-lg border bg-white">
-                    {p.images?.[0] && <ProductImage src={p.images[0]} alt={p.name} />}
-                    <div className="p-4">
-                      <div className="flex items-center gap-2 flex-wrap text-xs text-gray-500">
-                        <span>{p.brand} · {p.category.replace(/_/g, ' ')}</span>
-                        {showGibBadge && (
-                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
-                            GİB onaylı
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="font-semibold mt-1">{p.name}</h3>
-                      <p className="mt-1 line-clamp-2 text-sm text-gray-600">{p.description}</p>
-                      <div className="mt-3 flex items-center justify-between">
-                        <span className="text-lg font-medium">
-                          {(p.priceCents / 100).toLocaleString('tr-TR', { style: 'currency', currency: p.currency })}
-                        </span>
-                        <button
-                          className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                          disabled={isOos}
-                          onClick={() => add(p)}
-                        >
-                          {p.stockStatus === 'out_of_stock'
-                            ? 'Stokta yok'
-                            : p.stockStatus === 'discontinued'
-                              ? 'Üretimden kaldırıldı'
-                              : 'Sepete ekle'}
-                        </button>
-                      </div>
-                      <div className="mt-2 text-xs text-gray-500">{p.warrantyMonths} ay garanti</div>
+            <>
+              {/* v2.8.87: services rendered in a dedicated section above
+                  hardware (only when the filter is 'all' or 'service'). */}
+              {(category === 'all' || category === 'service') &&
+                products.some((p) => p.category === 'service') && (
+                  <section className="space-y-3">
+                    <div>
+                      <h2 className="text-base font-semibold text-gray-900">
+                        Kurulum & Entegrasyon Hizmetleri
+                      </h2>
+                      <p className="text-xs text-gray-600">
+                        Sahaya geliyoruz veya uzaktan kuruyoruz. Tüm paketler şeffaf.
+                      </p>
                     </div>
-                  </article>
-                );
-              })}
-            </div>
+                    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                      {products
+                        .filter((p) => p.category === 'service')
+                        .map((p) => (
+                          <ServiceCard key={p.id} p={p} />
+                        ))}
+                    </div>
+                  </section>
+                )}
+
+              {/* Hardware grid — excludes service rows since they have their
+                  own section. */}
+              {products.some((p) => p.category !== 'service') && (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {products
+                    .filter((p) => p.category !== 'service')
+                    .map((p) => (
+                      <HardwareCard
+                        key={p.id}
+                        p={p}
+                        onAdd={() => add(p)}
+                      />
+                    ))}
+                </div>
+              )}
+            </>
           )}
         </div>
 
         <aside className="space-y-4 rounded-lg border bg-white p-4 lg:sticky lg:top-6 lg:self-start">
           <h2 className="text-lg font-semibold">Sepet</h2>
-          {cart.length === 0 ? (
+          {lines.length === 0 ? (
             <p className="text-sm text-gray-500">Sepetiniz boş.</p>
           ) : (
             <>
               <ul className="space-y-2">
-                {cart.map((l) => (
-                  <li key={l.product.id} className="flex items-center justify-between text-sm">
-                    <span>
-                      {l.product.name} <span className="text-gray-500">× {l.qty}</span>
-                    </span>
-                    <div className="flex items-center gap-2">
-                      <span>
-                        {((l.product.priceCents * l.qty) / 100).toLocaleString('tr-TR', { style: 'currency', currency: l.product.currency })}
-                      </span>
-                      <button className="text-xs text-red-600 hover:underline" onClick={() => remove(l.product.id)}>
-                        Çıkar
-                      </button>
-                    </div>
-                  </li>
-                ))}
+                {lines.map((l) => {
+                  const lineCents =
+                    l.type === 'hardware' && l.acquisition === 'rent' && l.product.rentalMonthlyCents
+                      ? l.product.rentalMonthlyCents * l.qty
+                      : l.product.priceCents * l.qty;
+                  return (
+                    <li key={`${l.product.id}-${l.type === 'service' ? l.branchId ?? '_' : l.acquisition}`} className="flex items-start justify-between gap-2 text-sm">
+                      <div className="flex-1 min-w-0">
+                        <div className="truncate">
+                          {l.product.name}{' '}
+                          <span className="text-gray-500">× {l.qty}</span>
+                        </div>
+                        {l.type === 'hardware' && l.acquisition === 'rent' && (
+                          <div className="text-[11px] text-gray-500">Kira (aylık)</div>
+                        )}
+                        {l.type === 'service' && (
+                          <div className="text-[11px] text-gray-500">
+                            Hizmet
+                            {l.branchId ? ` · şube atanmış` : ''}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="whitespace-nowrap">
+                          {(lineCents / 100).toLocaleString('tr-TR', {
+                            style: 'currency',
+                            currency: l.product.currency,
+                          })}
+                        </span>
+                        <button
+                          className="text-xs text-red-600 hover:underline"
+                          onClick={() => removeFromCart(l.product.id)}
+                        >
+                          Çıkar
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
               <button
                 className="w-full rounded border px-3 py-1.5 text-sm hover:bg-gray-50"
@@ -344,11 +360,7 @@ export default function StorePage() {
               <button
                 className="w-full rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 onClick={() => setCheckoutOpen(true)}
-                // Block clicks when there's nothing to provision or while a
-                // confirm is mid-flight. Without the cart.length guard, the
-                // button silently no-ops and operators re-click thinking the
-                // page is frozen.
-                disabled={intent.isPending || cart.length === 0}
+                disabled={intent.isPending || lines.length === 0}
               >
                 {intent.isPending ? 'Yönlendiriliyor…' : 'Ödemeye geç'}
               </button>
@@ -409,5 +421,113 @@ function Row({ label, cents, currency, bold }: { label: string; cents: number; c
       <span>{label}</span>
       <span>{(cents / 100).toLocaleString('tr-TR', { style: 'currency', currency })}</span>
     </div>
+  );
+}
+
+// v2.8.87 — extracted card components. The hardware card carries the
+// quick-add CTA + headline specs + low-stock chip. The service card is
+// CTA-light (must hit detail page to fill branch + dates).
+
+function HardwareCard({ p, onAdd }: { p: HardwareProduct; onAdd: () => void }) {
+  const showGib = gibCertified(p);
+  const isOos = p.stockStatus === 'out_of_stock' || p.stockStatus === 'discontinued';
+  const headline = headlineSpecs(p);
+  const showLowStock = (p.available ?? 0) > 0 && (p.available ?? 0) <= 5;
+  return (
+    <article className="overflow-hidden rounded-lg border bg-white">
+      {p.images?.[0] && <ProductImage src={p.images[0]} alt={p.name} />}
+      <div className="p-4">
+        <div className="flex items-center gap-2 flex-wrap text-xs text-gray-500">
+          <span>
+            {p.brand} · {p.category.replace(/_/g, ' ')}
+          </span>
+          {showGib && (
+            <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+              GİB onaylı
+            </span>
+          )}
+          {showLowStock && (
+            <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700">
+              Son {p.available} adet
+            </span>
+          )}
+        </div>
+        <h3 className="font-semibold mt-1">{p.name}</h3>
+        {headline.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {headline.map((h, i) => (
+              <span
+                key={i}
+                className="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-700"
+              >
+                {h}
+              </span>
+            ))}
+          </div>
+        )}
+        <p className="mt-1 line-clamp-2 text-sm text-gray-600">{p.description}</p>
+        <div className="mt-3 flex items-center justify-between">
+          <span className="text-lg font-medium">
+            {(p.priceCents / 100).toLocaleString('tr-TR', { style: 'currency', currency: p.currency })}
+          </span>
+          <button
+            className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isOos}
+            onClick={onAdd}
+          >
+            {p.stockStatus === 'out_of_stock'
+              ? 'Stokta yok'
+              : p.stockStatus === 'discontinued'
+                ? 'Üretimden kaldırıldı'
+                : 'Sepete ekle'}
+          </button>
+        </div>
+        <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
+          <span>{p.warrantyMonths} ay garanti</span>
+          <Link to={`/admin/store/${encodeURIComponent(p.sku)}`} className="text-blue-600 hover:underline">
+            Detaylar →
+          </Link>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function ServiceCard({ p }: { p: HardwareProduct }) {
+  const meta = (p.serviceMeta ?? {}) as { serviceType?: string; durationHours?: number };
+  const serviceLabel =
+    meta.serviceType === 'remote'
+      ? 'Uzaktan'
+      : meta.serviceType === 'consultation'
+        ? 'Danışmanlık'
+        : 'Sahada';
+  return (
+    <article className="overflow-hidden rounded-lg border bg-gradient-to-br from-blue-50/50 to-white">
+      <div className="p-4">
+        <div className="flex items-center gap-2 flex-wrap text-xs text-gray-500">
+          <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-blue-700">
+            {serviceLabel}
+          </span>
+          {meta.durationHours && (
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700">
+              {meta.durationHours} saat
+            </span>
+          )}
+        </div>
+        <h3 className="font-semibold mt-1">{p.name}</h3>
+        <p className="mt-1 line-clamp-3 text-sm text-gray-600">{p.description}</p>
+        <div className="mt-3 flex items-center justify-between">
+          <span className="text-lg font-medium">
+            {(p.priceCents / 100).toLocaleString('tr-TR', { style: 'currency', currency: p.currency })}
+          </span>
+          <Link
+            to={`/admin/store/${encodeURIComponent(p.sku)}`}
+            className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700"
+          >
+            Detaylar
+          </Link>
+        </div>
+      </div>
+    </article>
   );
 }
