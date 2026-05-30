@@ -107,6 +107,9 @@ import WebhooksPage from './features/webhooks/WebhooksPage';
 import BridgesPage from './features/bridges/BridgesPage';
 import FiscalRecoveryPage from './features/fiscal/FiscalRecoveryPage';
 import CallerFeedPage from './features/caller/CallerFeedPage';
+import PlanAndAccessPage from './features/plan/PlanAndAccessPage';
+import FeatureGate from './components/subscriptions/FeatureGate';
+import UpsellCard from './components/subscriptions/UpsellCard';
 import { UpdateDialog } from './components/UpdateDialog';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
 import { useNotificationSocket } from './features/notifications/notificationsApi';
@@ -207,11 +210,34 @@ function App() {
         <Route path="/admin/tables" element={<TableManagementPage />} />
         <Route path="/admin/users" element={<UserManagementPage />} />
         <Route path="/admin/qr-codes" element={<QRManagementPage />} />
-        <Route path="/admin/reports" element={<ReportsPage />} />
-        <Route path="/admin/analytics" element={<AnalyticsPage />} />
-        <Route path="/admin/reservations" element={<ReservationsPage />} />
-        <Route path="/admin/personnel" element={<PersonnelManagementPage />} />
-        <Route path="/admin/stock" element={<StockManagementPage />} />
+        {/* v2.8.88 page-root FeatureGate: direct URL access shows an
+            upsell instead of 403. Each fallback links to the matching
+            marketplace add-on. */}
+        <Route path="/admin/reports" element={
+          <FeatureGate feature="advancedReports" fallback={<UpsellCard addOnCode="advanced_reports" />}>
+            <ReportsPage />
+          </FeatureGate>
+        } />
+        <Route path="/admin/analytics" element={
+          <FeatureGate feature="advancedReports" fallback={<UpsellCard addOnCode="advanced_reports" />}>
+            <AnalyticsPage />
+          </FeatureGate>
+        } />
+        <Route path="/admin/reservations" element={
+          <FeatureGate feature="reservationSystem" fallback={<UpsellCard planName="PRO" />}>
+            <ReservationsPage />
+          </FeatureGate>
+        } />
+        <Route path="/admin/personnel" element={
+          <FeatureGate feature="personnelManagement" fallback={<UpsellCard planName="PRO" />}>
+            <PersonnelManagementPage />
+          </FeatureGate>
+        } />
+        <Route path="/admin/stock" element={
+          <FeatureGate feature="inventoryTracking" fallback={<UpsellCard planName="BASIC" />}>
+            <StockManagementPage />
+          </FeatureGate>
+        } />
         <Route path="/admin/invoices" element={<InvoicesPage />} />
 
         {/* Settings Routes - Nested */}
@@ -254,12 +280,30 @@ function App() {
         {/* v2.8.84: tenant order history + detail. */}
         <Route path="/admin/hardware-orders" element={<HardwareOrdersListPage />} />
         <Route path="/admin/hardware-orders/:id" element={<HardwareOrderDetailPage />} />
-        <Route path="/admin/branches" element={<BranchesPage />} />
+        <Route path="/admin/branches" element={
+          <FeatureGate feature="multiLocation" fallback={<UpsellCard addOnCode="extra_branch" planName="PRO" />}>
+            <BranchesPage />
+          </FeatureGate>
+        } />
         <Route path="/admin/health" element={<HealthPage />} />
         <Route path="/admin/bridges" element={<BridgesPage />} />
-        <Route path="/admin/webhooks" element={<WebhooksPage />} />
-        <Route path="/admin/fiscal-recovery" element={<FiscalRecoveryPage />} />
-        <Route path="/admin/caller-feed" element={<CallerFeedPage />} />
+        <Route path="/admin/webhooks" element={
+          <FeatureGate feature="apiAccess" fallback={<UpsellCard addOnCode="api_access" planName="BUSINESS" />}>
+            <WebhooksPage />
+          </FeatureGate>
+        } />
+        <Route path="/admin/fiscal-recovery" element={
+          <FeatureGate integration={{ domain: 'fiscal' }} fallback={<UpsellCard addOnCode="fiscal_hugin" />}>
+            <FiscalRecoveryPage />
+          </FeatureGate>
+        } />
+        <Route path="/admin/caller-feed" element={
+          <FeatureGate integration={{ domain: 'caller' }} fallback={<UpsellCard addOnCode="caller_id_integration" />}>
+            <CallerFeedPage />
+          </FeatureGate>
+        } />
+        {/* v2.8.88: top-level Plan & Erişim page — plan + quota + active add-ons. */}
+        <Route path="/admin/plan" element={<PlanAndAccessPage />} />
       </Route>
 
       {/* SuperAdmin Routes */}

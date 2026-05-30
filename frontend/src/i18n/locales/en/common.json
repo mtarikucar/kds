@@ -67,6 +67,16 @@
     "webhooks": "Webhooks",
     "fiscalRecovery": "Fiscal Recovery",
     "callerFeed": "Phone Calls",
+    "hardwareOrders": "My Hardware Orders",
+    "planAndAccess": "Plan & Access",
+    "sections": {
+      "business": "Operations",
+      "menuAndTables": "Menu & Tables",
+      "operation": "Back Office",
+      "multiBranch": "Multi-Branch",
+      "marketplace": "Marketplace",
+      "planAndAccess": "Settings & Access"
+    },
     "expandSidebar": "Expand Sidebar",
     "collapseSidebar": "Collapse Sidebar"
   },

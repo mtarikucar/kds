@@ -21,6 +21,20 @@ interface SubscriptionContextType {
   isLoading: boolean;
   hasFeature: (feature: keyof PlanFeatures) => boolean;
   checkLimit: (resource: keyof PlanLimits, currentCount: number) => LimitCheckResult;
+  /**
+   * v2.8.88 — integration grants from the entitlement engine (plan +
+   * TenantAddOn). Domains like `delivery`, `fiscal`, `caller`; values
+   * are vendor lists (`['yemeksepeti', 'getir']`).
+   *
+   * `vendor` undefined → "any vendor in this domain present?"
+   * `vendor` given     → "is this exact vendor in the domain?"
+   *
+   * Pre-v2.8.88 this concept didn't exist on the frontend at all —
+   * the only signal was the flat `feature.deliveryIntegration: true`
+   * boolean, which couldn't distinguish "tenant has yemeksepeti" from
+   * "tenant has getir". The integrations map enables per-vendor UI.
+   */
+  hasIntegration: (domain: string, vendor?: string) => boolean;
   /** ACTIVE or TRIALING — full paid access. */
   isSubscriptionActive: boolean;
   /**
@@ -38,6 +52,7 @@ const SubscriptionContext = createContext<SubscriptionContextType>({
   isLoading: true,
   hasFeature: () => false,
   checkLimit: () => ({ allowed: false, current: 0, limit: 0, remaining: 0 }),
+  hasIntegration: () => false,
   isSubscriptionActive: false,
   isInGracePeriod: false,
 });
@@ -93,6 +108,18 @@ export const SubscriptionProvider = ({ children }: SubscriptionProviderProps) =>
     return { allowed, current: currentCount, limit, remaining };
   };
 
+  // v2.8.88 — integration grants. Engine surfaces them as
+  // `effectiveFeatures.integrations.<domain> = [...vendors]`.
+  const hasIntegration = (domain: string, vendor?: string): boolean => {
+    const integrations = (effectiveFeatures as any)?.integrations as
+      | Record<string, string[]>
+      | undefined;
+    const vendors = integrations?.[domain];
+    if (!Array.isArray(vendors) || vendors.length === 0) return false;
+    if (!vendor) return true;
+    return vendors.includes(vendor);
+  };
+
   // Check if subscription is active (ACTIVE or TRIALING status)
   const isSubscriptionActive = useMemo(() => {
     if (!subscription) return false;
@@ -112,6 +139,7 @@ export const SubscriptionProvider = ({ children }: SubscriptionProviderProps) =>
       isLoading,
       hasFeature,
       checkLimit,
+      hasIntegration,
       isSubscriptionActive,
       isInGracePeriod,
     }),

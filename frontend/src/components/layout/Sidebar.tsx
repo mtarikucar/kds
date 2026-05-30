@@ -14,6 +14,7 @@ import {
   UserCircle,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
   X,
   Code,
   CalendarCheck,
@@ -22,6 +23,17 @@ import {
   Receipt,
   LogOut,
   User,
+  Cpu,
+  Stethoscope,
+  Network,
+  PhoneIncoming,
+  Webhook,
+  FileWarning,
+  Store,
+  ShoppingBag,
+  Truck,
+  CreditCard,
+  Building2,
 } from 'lucide-react';
 import { UserRole, PlanFeatures } from '../../types';
 import { useAuthStore } from '../../store/authStore';
@@ -29,6 +41,259 @@ import { useUiStore } from '../../store/uiStore';
 import { useSubscription } from '../../contexts/SubscriptionContext';
 import { useLogout } from '../../features/auth/authApi';
 import { RTL_LANGUAGES } from '../../i18n/config';
+
+/**
+ * v2.8.88 — typed grouped sidebar.
+ *
+ * Pre-v2.8.88 Sidebar.tsx rendered 25 flat nav items in a single list.
+ * It worked when there were 8; at 25 it's tiring to scan and the
+ * Activity / Package icons repeat enough to defeat their cue value.
+ *
+ * Now: 6 named sections, each with a collapse chevron, persisted per
+ * section in `uiStore.collapsedSections`. Rail mode
+ * (`isSidebarCollapsed=true`) hides section headers entirely — icons
+ * stack with the icon-only style they had before.
+ *
+ * Gating: each item carries `roles?` and `gate?: { feature?,
+ * integration?: { domain, vendor? } }`. The filter hides — never
+ * 403s. If every item in a section is hidden, the section header
+ * doesn't render either.
+ */
+
+interface NavItem {
+  to: string;
+  icon: React.ComponentType<{ className?: string }>;
+  labelKey: string;
+  labelFallback?: string;
+  roles: UserRole[];
+  gate?: {
+    feature?: keyof PlanFeatures;
+    integration?: { domain: string; vendor?: string };
+  };
+}
+
+interface NavSection {
+  id: string;
+  labelKey: string;
+  labelFallback: string;
+  items: NavItem[];
+  /** Reserved for sections that should never collapse (e.g. İşletme). */
+  alwaysOpen?: boolean;
+}
+
+const SECTIONS: NavSection[] = [
+  {
+    id: 'business',
+    labelKey: 'navigation.sections.business',
+    labelFallback: 'İşletme',
+    alwaysOpen: true,
+    items: [
+      {
+        to: '/dashboard',
+        icon: LayoutDashboard,
+        labelKey: 'navigation.dashboard',
+        roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER, UserRole.KITCHEN, UserRole.COURIER],
+      },
+      {
+        to: '/pos',
+        icon: ShoppingCart,
+        labelKey: 'navigation.pos',
+        roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER],
+      },
+      {
+        to: '/kitchen',
+        icon: ChefHat,
+        labelKey: 'navigation.kitchen',
+        roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN],
+      },
+      {
+        to: '/customers',
+        icon: UserCircle,
+        labelKey: 'navigation.customers',
+        roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER],
+      },
+    ],
+  },
+  {
+    id: 'menuAndTables',
+    labelKey: 'navigation.sections.menuAndTables',
+    labelFallback: 'Menü & Masa',
+    items: [
+      {
+        to: '/admin/menu',
+        icon: UtensilsCrossed,
+        labelKey: 'navigation.menu',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+      {
+        to: '/admin/tables',
+        icon: Table,
+        labelKey: 'navigation.tables',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+      {
+        to: '/admin/qr-codes',
+        icon: QrCode,
+        labelKey: 'navigation.qrCodes',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+      {
+        to: '/admin/reservations',
+        icon: CalendarCheck,
+        labelKey: 'navigation.reservations',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+        gate: { feature: 'reservationSystem' },
+      },
+    ],
+  },
+  {
+    id: 'operation',
+    labelKey: 'navigation.sections.operation',
+    labelFallback: 'Operasyon',
+    items: [
+      {
+        to: '/admin/users',
+        icon: Users,
+        labelKey: 'navigation.users',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+      {
+        to: '/admin/personnel',
+        icon: UserCog,
+        labelKey: 'navigation.personnel',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+        gate: { feature: 'personnelManagement' },
+      },
+      {
+        to: '/admin/stock',
+        icon: Package,
+        labelKey: 'navigation.stock',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+        gate: { feature: 'inventoryTracking' },
+      },
+      {
+        to: '/admin/reports',
+        icon: BarChart3,
+        labelKey: 'navigation.reports',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+        gate: { feature: 'advancedReports' },
+      },
+      {
+        to: '/admin/analytics',
+        icon: Activity,
+        labelKey: 'navigation.analytics',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+        gate: { feature: 'advancedReports' },
+      },
+      {
+        to: '/admin/invoices',
+        icon: Receipt,
+        labelKey: 'navigation.invoices',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+    ],
+  },
+  {
+    id: 'multiBranch',
+    labelKey: 'navigation.sections.multiBranch',
+    labelFallback: 'Çoklu Şube',
+    items: [
+      {
+        to: '/admin/branches',
+        icon: Building2,
+        labelKey: 'navigation.branches',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+        gate: { feature: 'multiLocation' },
+      },
+      {
+        to: '/admin/devices',
+        icon: Cpu,
+        labelKey: 'navigation.devices',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+      {
+        to: '/admin/bridges',
+        icon: Network,
+        labelKey: 'navigation.bridges',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+        gate: { feature: 'multiLocation' },
+      },
+      {
+        to: '/admin/health',
+        icon: Stethoscope,
+        labelKey: 'navigation.health',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+    ],
+  },
+  {
+    id: 'marketplace',
+    labelKey: 'navigation.sections.marketplace',
+    labelFallback: 'Pazaryeri',
+    items: [
+      {
+        to: '/admin/marketplace',
+        icon: Store,
+        labelKey: 'navigation.marketplace',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+      {
+        to: '/admin/store',
+        icon: ShoppingBag,
+        labelKey: 'navigation.store',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+      {
+        to: '/admin/hardware-orders',
+        icon: Truck,
+        labelKey: 'navigation.hardwareOrders',
+        labelFallback: 'Donanım Siparişlerim',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+    ],
+  },
+  {
+    id: 'planAndAccess',
+    labelKey: 'navigation.sections.planAndAccess',
+    labelFallback: 'Ayarlar & Erişim',
+    items: [
+      {
+        to: '/admin/plan',
+        icon: CreditCard,
+        labelKey: 'navigation.planAndAccess',
+        labelFallback: 'Plan & Erişim',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+      {
+        to: '/admin/settings',
+        icon: Settings,
+        labelKey: 'navigation.settings',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+      },
+      {
+        to: '/admin/webhooks',
+        icon: Webhook,
+        labelKey: 'navigation.webhooks',
+        roles: [UserRole.ADMIN],
+        gate: { feature: 'apiAccess' },
+      },
+      {
+        to: '/admin/fiscal-recovery',
+        icon: FileWarning,
+        labelKey: 'navigation.fiscalRecovery',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+        gate: { integration: { domain: 'fiscal' } },
+      },
+      {
+        to: '/admin/caller-feed',
+        icon: PhoneIncoming,
+        labelKey: 'navigation.callerFeed',
+        roles: [UserRole.ADMIN, UserRole.MANAGER],
+        gate: { integration: { domain: 'caller' } },
+      },
+    ],
+  },
+];
 
 interface SidebarProps {
   isOpen: boolean;
@@ -39,8 +304,13 @@ interface SidebarProps {
 const Sidebar = ({ isOpen, onClose, isRTL: isRTLProp }: SidebarProps) => {
   const { t, i18n } = useTranslation('common');
   const user = useAuthStore((state) => state.user);
-  const { isSidebarCollapsed, toggleSidebar } = useUiStore();
-  const { hasFeature } = useSubscription();
+  const {
+    isSidebarCollapsed,
+    toggleSidebar,
+    collapsedSections,
+    toggleSection,
+  } = useUiStore();
+  const { hasFeature, hasIntegration } = useSubscription();
   const { mutate: logout, isPending: isLoggingOut } = useLogout();
   const isRTL = isRTLProp ?? RTL_LANGUAGES.includes(i18n.language);
 
@@ -57,176 +327,24 @@ const Sidebar = ({ isOpen, onClose, isRTL: isRTLProp }: SidebarProps) => {
     }
   };
 
-  const navItems = [
-    {
-      to: '/dashboard',
-      icon: LayoutDashboard,
-      label: t('navigation.dashboard'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER, UserRole.KITCHEN, UserRole.COURIER],
-    },
-    {
-      to: '/pos',
-      icon: ShoppingCart,
-      label: t('navigation.pos'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER],
-    },
-    {
-      to: '/kitchen',
-      icon: ChefHat,
-      label: t('navigation.kitchen'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.KITCHEN],
-    },
-    {
-      to: '/admin/menu',
-      icon: UtensilsCrossed,
-      label: t('navigation.menu'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-    },
-    {
-      to: '/admin/tables',
-      icon: Table,
-      label: t('navigation.tables'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-    },
-    {
-      to: '/admin/users',
-      icon: Users,
-      label: t('navigation.users'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-    },
-    {
-      to: '/customers',
-      icon: UserCircle,
-      label: t('navigation.customers'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER],
-    },
-    {
-      to: '/admin/qr-codes',
-      icon: QrCode,
-      label: t('navigation.qrCodes'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-    },
-    {
-      to: '/admin/reservations',
-      icon: CalendarCheck,
-      label: t('navigation.reservations'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-      requiredFeature: 'reservationSystem' as keyof PlanFeatures,
-    },
-    {
-      to: '/admin/personnel',
-      icon: UserCog,
-      label: t('navigation.personnel'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-      requiredFeature: 'personnelManagement' as keyof PlanFeatures,
-    },
-    {
-      to: '/admin/stock',
-      icon: Package,
-      label: t('navigation.stock'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-      requiredFeature: 'inventoryTracking' as keyof PlanFeatures,
-    },
-    {
-      to: '/admin/reports',
-      icon: BarChart3,
-      label: t('navigation.reports'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-      requiredFeature: 'advancedReports' as keyof PlanFeatures,
-    },
-    {
-      to: '/admin/invoices',
-      icon: Receipt,
-      label: t('navigation.invoices'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-    },
-    {
-      to: '/admin/analytics',
-      icon: Activity,
-      label: t('navigation.analytics'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-    },
-    {
-      to: '/admin/settings',
-      icon: Settings,
-      label: t('navigation.settings'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-    },
-    // HummyTummy Phase 3-12 additions. Ordered by typical use:
-    // operational (devices, branches, health) before commercial
-    // (marketplace, store).
-    {
-      to: '/admin/devices',
-      icon: Activity,
-      label: t('navigation.devices'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-    },
-    {
-      to: '/admin/branches',
-      icon: Receipt,
-      label: t('navigation.branches'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-    },
-    {
-      to: '/admin/health',
-      icon: Activity,
-      label: t('navigation.health'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-    },
-    {
-      to: '/admin/marketplace',
-      icon: Package,
-      label: t('navigation.marketplace'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-    },
-    {
-      to: '/admin/store',
-      icon: Package,
-      label: t('navigation.store'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-    },
-    {
-      to: '/admin/hardware-orders',
-      icon: Package,
-      label: t('navigation.hardwareOrders', { defaultValue: 'Donanım Siparişlerim' }),
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-    },
-    // Operasyonel ek sayfalar — admin için.
-    {
-      to: '/admin/bridges',
-      icon: Activity,
-      label: t('navigation.bridges'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-    },
-    {
-      to: '/admin/webhooks',
-      icon: Activity,
-      label: t('navigation.webhooks'),
-      roles: [UserRole.ADMIN],
-    },
-    {
-      to: '/admin/fiscal-recovery',
-      icon: Receipt,
-      label: t('navigation.fiscalRecovery'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-    },
-    {
-      to: '/admin/caller-feed',
-      icon: Activity,
-      label: t('navigation.callerFeed'),
-      roles: [UserRole.ADMIN, UserRole.MANAGER],
-    },
-  ];
-
-  const filteredNavItems = navItems.filter((item) => {
-    if (!user?.role || !item.roles.includes(user.role as UserRole)) {
-      return false;
-    }
-    if (item.requiredFeature && !hasFeature(item.requiredFeature)) {
+  function itemVisible(item: NavItem): boolean {
+    if (!user?.role || !item.roles.includes(user.role as UserRole)) return false;
+    if (item.gate?.feature && !hasFeature(item.gate.feature)) return false;
+    if (
+      item.gate?.integration &&
+      !hasIntegration(item.gate.integration.domain, item.gate.integration.vendor)
+    ) {
       return false;
     }
     return true;
-  });
+  }
+
+  // Filter every section's items, then drop sections that have nothing
+  // left. This collapses-by-hide rather than 403'ing on click.
+  const visibleSections = SECTIONS.map((section) => ({
+    ...section,
+    visibleItems: section.items.filter(itemVisible),
+  })).filter((section) => section.visibleItems.length > 0);
 
   return (
     <aside
@@ -272,25 +390,63 @@ const Sidebar = ({ isOpen, onClose, isRTL: isRTLProp }: SidebarProps) => {
 
       {/* Navigation */}
       <nav className="px-3 py-4 flex-1 overflow-y-auto">
-        <div className="space-y-1">
-          {filteredNavItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              onClick={handleNavClick}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 ${
-                  isActive
-                    ? 'bg-white/10 text-white font-medium'
-                    : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
-                } ${isSidebarCollapsed ? 'md:justify-center' : ''}`
-              }
-              title={isSidebarCollapsed ? item.label : undefined}
-            >
-              <item.icon className="h-5 w-5 flex-shrink-0" />
-              <span className={`text-sm ${isSidebarCollapsed ? 'md:hidden' : ''}`}>{item.label}</span>
-            </NavLink>
-          ))}
+        <div className="space-y-4">
+          {visibleSections.map((section) => {
+            const isCollapsed =
+              !section.alwaysOpen && !isSidebarCollapsed && collapsedSections[section.id];
+            const showHeader = !isSidebarCollapsed && !section.alwaysOpen;
+
+            return (
+              <div key={section.id} className="space-y-1">
+                {showHeader && (
+                  <button
+                    type="button"
+                    onClick={() => toggleSection(section.id)}
+                    className="w-full flex items-center justify-between px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 hover:text-slate-300 transition-colors"
+                    aria-expanded={!isCollapsed}
+                  >
+                    <span>
+                      {t(section.labelKey, { defaultValue: section.labelFallback })}
+                    </span>
+                    <ChevronDown
+                      className={`h-3 w-3 transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
+                    />
+                  </button>
+                )}
+                {!isCollapsed && (
+                  <div className="space-y-1">
+                    {section.visibleItems.map((item) => {
+                      const label = t(item.labelKey, {
+                        defaultValue: item.labelFallback ?? item.labelKey,
+                      });
+                      return (
+                        <NavLink
+                          key={item.to}
+                          to={item.to}
+                          onClick={handleNavClick}
+                          className={({ isActive }) =>
+                            `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 ${
+                              isActive
+                                ? 'bg-white/10 text-white font-medium'
+                                : 'text-slate-400 hover:bg-white/5 hover:text-slate-200'
+                            } ${isSidebarCollapsed ? 'md:justify-center' : ''}`
+                          }
+                          title={isSidebarCollapsed ? label : undefined}
+                        >
+                          <item.icon className="h-5 w-5 flex-shrink-0" />
+                          <span
+                            className={`text-sm ${isSidebarCollapsed ? 'md:hidden' : ''}`}
+                          >
+                            {label}
+                          </span>
+                        </NavLink>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
         {/* Development section - only visible in dev mode for ADMIN */}

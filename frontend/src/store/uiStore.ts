@@ -18,6 +18,20 @@ interface UiState {
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
 
+  // v2.8.88 — sidebar section collapse state. Per section id; default
+  // is "expanded". Rail mode (isSidebarCollapsed=true) hides section
+  // headers entirely regardless of this map.
+  collapsedSections: Record<string, boolean>;
+  toggleSection: (sectionId: string) => void;
+  setSectionCollapsed: (sectionId: string, collapsed: boolean) => void;
+
+  // v2.8.88 — global active branch picker. UI-only in this PR; no
+  // query plumbing yet. `null` means "all branches" (default). Persists
+  // across refresh so a tenant who picked their main branch yesterday
+  // lands on it today.
+  activeBranchId: string | null;
+  setActiveBranchId: (branchId: string | null) => void;
+
   // Onboarding state
   onboarding: OnboardingState;
   setHasSeenWelcome: (seen: boolean) => void;
@@ -59,6 +73,28 @@ export const useUiStore = create<UiState>()(
 
       setSidebarCollapsed: (collapsed: boolean) => {
         set({ isSidebarCollapsed: collapsed });
+      },
+
+      // v2.8.88 — section collapse
+      collapsedSections: {},
+      toggleSection: (sectionId: string) => {
+        set((state) => ({
+          collapsedSections: {
+            ...state.collapsedSections,
+            [sectionId]: !state.collapsedSections[sectionId],
+          },
+        }));
+      },
+      setSectionCollapsed: (sectionId: string, collapsed: boolean) => {
+        set((state) => ({
+          collapsedSections: { ...state.collapsedSections, [sectionId]: collapsed },
+        }));
+      },
+
+      // v2.8.88 — active branch picker (UI shell)
+      activeBranchId: null,
+      setActiveBranchId: (branchId: string | null) => {
+        set({ activeBranchId: branchId });
       },
 
       // Onboarding state
@@ -133,6 +169,8 @@ export const useUiStore = create<UiState>()(
       name: 'ui-storage',
       partialize: (state) => ({
         isSidebarCollapsed: state.isSidebarCollapsed,
+        collapsedSections: state.collapsedSections,
+        activeBranchId: state.activeBranchId,
         onboarding: state.onboarding,
         defaultReceiptPrinterId: state.defaultReceiptPrinterId,
         defaultKitchenPrinterId: state.defaultKitchenPrinterId,

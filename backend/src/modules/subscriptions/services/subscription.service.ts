@@ -12,6 +12,7 @@ import { BillingService } from "./billing.service";
 import { NotificationService } from "./notification.service";
 import { OutboxService } from "../../outbox/outbox.service";
 import { EventTypes } from "../../outbox/event-types";
+import { EntitlementService } from "../../entitlements/entitlement.service";
 import {
   SubscriptionStatus,
   BillingCycle,
@@ -35,6 +36,12 @@ export class SubscriptionService {
     // for the entitlement projector and any later consumers (audit,
     // marketing automation, support tickets) to react to.
     private readonly outbox: OutboxService,
+    // v2.8.88: getEffectiveFeatures now routes through the engine's
+    // resolved view so add-on grants (TenantAddOn → projector → engine)
+    // reach the frontend. Pre-v2.8.88 this endpoint read plan rows +
+    // overrides only — buying integration_yemeksepeti updated the engine
+    // table but the UI never saw the change (it pulls from this method).
+    private readonly entitlements: EntitlementService,
   ) {}
 
   /**
@@ -1023,6 +1030,32 @@ export class SubscriptionService {
     });
   }
 
+  /**
+   * v2.8.88 — engine-routed effective features.
+   *
+   * Pre-v2.8.88 this method read `tenant.currentPlan + featureOverrides +
+   * limitOverrides` and returned a static plan-only snapshot. The
+   * entitlement engine had been populating `feature.*`, `limit.*`,
+   * `integration.*` rows from plan + add-on + override sources for
+   * months — but the frontend's `useGetEffectiveFeatures` hook (the
+   * single source for `hasFeature` / `checkLimit` across the entire UI)
+   * never consumed them. Result: a tenant who purchased
+   * `integration_yemeksepeti` (₺249/mo) got a successful charge, a
+   * projection event, an engine grant, AND no visible effect on their
+   * UI. Their entitlement row sat in the DB doing nothing.
+   *
+   * Now: pull the resolved set from the engine and translate the
+   * dotted keys to the camelCase / unprefixed shape the frontend
+   * already consumes. Result shape is additive — adds `integrations`
+   * — so old frontends keep working.
+   *
+   * Fallback: if the engine returns an empty set (a tenant whose
+   * projector hasn't run yet — e.g. mid-signup race, or a tenant
+   * created before reconcileNightly's first pass), we fall through to
+   * the legacy plan-only computation so the UI still has SOMETHING to
+   * render rather than a blank loading state. Reconcile-nightly catches
+   * this within 24h; the projector also reprojects on next mutation.
+   */
   async getEffectiveFeatures(tenantId: string) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
@@ -1032,10 +1065,6 @@ export class SubscriptionService {
       throw new NotFoundException("Tenant or plan not found");
     }
     const plan = tenant.currentPlan;
-    const featureOverrides =
-      (tenant.featureOverrides as Record<string, boolean>) || null;
-    const limitOverrides =
-      (tenant.limitOverrides as Record<string, number>) || null;
 
     // Per-plan trial eligibility — the UI uses this to surface a
     // "14 gün ücretsiz dene" CTA on each plan card the tenant hasn't
@@ -1049,33 +1078,91 @@ export class SubscriptionService {
       .filter((p) => p.trialDays > 0 && !usedTrialPlanIds.includes(p.id))
       .map((p) => p.id);
 
-    const features = {
-      advancedReports:
-        featureOverrides?.advancedReports ?? plan.advancedReports,
-      multiLocation: featureOverrides?.multiLocation ?? plan.multiLocation,
-      customBranding: featureOverrides?.customBranding ?? plan.customBranding,
-      apiAccess: featureOverrides?.apiAccess ?? plan.apiAccess,
-      prioritySupport:
-        featureOverrides?.prioritySupport ?? plan.prioritySupport,
-      inventoryTracking:
-        featureOverrides?.inventoryTracking ?? plan.inventoryTracking,
-      kdsIntegration: featureOverrides?.kdsIntegration ?? plan.kdsIntegration,
-      reservationSystem:
-        featureOverrides?.reservationSystem ?? plan.reservationSystem,
-      personnelManagement:
-        featureOverrides?.personnelManagement ?? plan.personnelManagement,
-      deliveryIntegration:
-        featureOverrides?.deliveryIntegration ?? plan.deliveryIntegration,
-    };
-    const limits = {
-      maxUsers: limitOverrides?.maxUsers ?? plan.maxUsers,
-      maxTables: limitOverrides?.maxTables ?? plan.maxTables,
-      maxProducts: limitOverrides?.maxProducts ?? plan.maxProducts,
-      maxCategories: limitOverrides?.maxCategories ?? plan.maxCategories,
-      maxMonthlyOrders:
-        limitOverrides?.maxMonthlyOrders ?? plan.maxMonthlyOrders,
-    };
-    return { features, limits, trialEligiblePlanIds };
+    // Pull the engine-resolved view. tenant-scoped (branchId=null);
+    // per-branch entitlements would surface here when a future caller
+    // asks for them, but the existing `useGetEffectiveFeatures` is a
+    // tenant-level hook so tenant scope is correct.
+    const engineSet = await this.entitlements.getForTenant(tenantId, null);
+    const hasAnyEngineGrants =
+      Object.keys(engineSet.features).length > 0 ||
+      Object.keys(engineSet.limits).length > 0 ||
+      Object.keys(engineSet.integrations).length > 0;
+
+    if (!hasAnyEngineGrants) {
+      // Engine empty — projector hasn't run for this tenant yet. Fall
+      // through to plan-only computation so the UI still renders.
+      // logged at debug because reconcileNightly catches this; not
+      // worth paging ops.
+      this.logger.debug(
+        `getEffectiveFeatures fell back to plan-only for tenant=${tenantId} (engine returned empty set)`,
+      );
+      const featureOverrides =
+        (tenant.featureOverrides as Record<string, boolean>) || null;
+      const limitOverrides =
+        (tenant.limitOverrides as Record<string, number>) || null;
+      const features = {
+        advancedReports:
+          featureOverrides?.advancedReports ?? plan.advancedReports,
+        multiLocation: featureOverrides?.multiLocation ?? plan.multiLocation,
+        customBranding:
+          featureOverrides?.customBranding ?? plan.customBranding,
+        apiAccess: featureOverrides?.apiAccess ?? plan.apiAccess,
+        prioritySupport:
+          featureOverrides?.prioritySupport ?? plan.prioritySupport,
+        inventoryTracking:
+          featureOverrides?.inventoryTracking ?? plan.inventoryTracking,
+        kdsIntegration:
+          featureOverrides?.kdsIntegration ?? plan.kdsIntegration,
+        reservationSystem:
+          featureOverrides?.reservationSystem ?? plan.reservationSystem,
+        personnelManagement:
+          featureOverrides?.personnelManagement ?? plan.personnelManagement,
+        deliveryIntegration:
+          featureOverrides?.deliveryIntegration ?? plan.deliveryIntegration,
+      };
+      const limits = {
+        maxUsers: limitOverrides?.maxUsers ?? plan.maxUsers,
+        maxTables: limitOverrides?.maxTables ?? plan.maxTables,
+        maxProducts: limitOverrides?.maxProducts ?? plan.maxProducts,
+        maxCategories: limitOverrides?.maxCategories ?? plan.maxCategories,
+        maxMonthlyOrders:
+          limitOverrides?.maxMonthlyOrders ?? plan.maxMonthlyOrders,
+      };
+      return {
+        features,
+        limits,
+        integrations: {} as Record<string, string[]>,
+        trialEligiblePlanIds,
+      };
+    }
+
+    // Engine-resolved path: strip the `feature.` / `limit.` /
+    // `integration.` prefixes to match the frontend's shape. Engine
+    // keys are dotted ("feature.multiLocation", "limit.maxTables",
+    // "integration.delivery"); the response shape this method has
+    // shipped for ~6 months is flat camelCase ({ features: {
+    // multiLocation }, limits: { maxTables }, integrations: { delivery
+    // } }). The unprefix step keeps backwards compat for every
+    // existing consumer.
+    const features: Record<string, boolean> = {};
+    for (const [k, v] of Object.entries(engineSet.features)) {
+      const unprefixed = k.startsWith("feature.") ? k.slice("feature.".length) : k;
+      features[unprefixed] = v;
+    }
+    const limits: Record<string, number> = {};
+    for (const [k, v] of Object.entries(engineSet.limits)) {
+      const unprefixed = k.startsWith("limit.") ? k.slice("limit.".length) : k;
+      limits[unprefixed] = v;
+    }
+    const integrations: Record<string, string[]> = {};
+    for (const [k, v] of Object.entries(engineSet.integrations)) {
+      const unprefixed = k.startsWith("integration.")
+        ? k.slice("integration.".length)
+        : k;
+      integrations[unprefixed] = v;
+    }
+
+    return { features, limits, integrations, trialEligiblePlanIds };
   }
 
   async getPlanByName(name: SubscriptionPlanType) {

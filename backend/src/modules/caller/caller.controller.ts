@@ -14,6 +14,9 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../../common/constants/roles.enum';
 import { Public } from '../auth/decorators/public.decorator';
 import { CallerService } from './caller.service';
 import { MockCallerProvider } from './adapters/mock-caller.provider';
@@ -26,7 +29,12 @@ export class CallerController {
     private readonly mockProvider: MockCallerProvider,
   ) {}
 
-  @UseGuards(JwtAuthGuard)
+  // v2.8.88: ADMIN/MANAGER only. The caller feed exposes inbound phone
+  // numbers + matched customer profiles — PII that should not be open
+  // to WAITER/KITCHEN. The provider webhook below stays @Public (it's
+  // HMAC-signed by the adapter).
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiBearerAuth()
   @Get('recent')
   @ApiOperation({ summary: 'Last N caller events for the tenant — drives the calls feed UI' })

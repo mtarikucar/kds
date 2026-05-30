@@ -5,6 +5,9 @@ import { FiscalService } from './fiscal.service';
 import { MockFiscalProvider } from './adapters/mock-fiscal-provider';
 import { EfaturaFiscalProvider } from './adapters/efatura-fiscal-provider';
 import { FiscalController } from './fiscal.controller';
+// v2.8.88: FiscalController gates on `@RequiresIntegration('fiscal')`
+// via PlanFeatureGuard.
+import { SubscriptionsModule } from '../subscriptions/subscriptions.module';
 
 /**
  * Fiscal-core module. Vendor-neutral receipt issuance, day-close, and
@@ -13,7 +16,7 @@ import { FiscalController } from './fiscal.controller';
  */
 @Global()
 @Module({
-  imports: [PrismaModule],
+  imports: [PrismaModule, SubscriptionsModule],
   controllers: [FiscalController],
   providers: [FiscalProviderRegistry, FiscalService, MockFiscalProvider, EfaturaFiscalProvider],
   exports: [FiscalProviderRegistry, FiscalService],

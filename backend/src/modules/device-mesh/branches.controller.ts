@@ -6,10 +6,13 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
 import { BranchesService } from './branches.service';
 import { CreateBranchDto, UpdateBranchDto } from './dto/branch.dto';
+import { PlanFeatureGuard } from '../subscriptions/guards/plan-feature.guard';
+import { RequiresFeature } from '../subscriptions/decorators/requires-feature.decorator';
+import { PlanFeature } from '../../common/constants/subscription.enum';
 
 @ApiTags('Branches')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, PlanFeatureGuard)
 @Controller('v1/branches')
 export class BranchesController {
   constructor(private readonly branches: BranchesService) {}
@@ -26,26 +29,31 @@ export class BranchesController {
     return this.branches.findOrThrow(req.user.tenantId, id);
   }
 
-  // Create / update / archive are ADMIN-only. Before iter-73 the
-  // controller only carried JwtAuthGuard, so any authenticated
-  // role (WAITER, KITCHEN, CASHIER) could spin up new branches —
-  // a privilege gap on what is effectively a top-level resource
-  // (every Order / Device / Table FK-references a Branch).
+  // Create / update / archive are ADMIN-only AND require the
+  // MULTI_LOCATION feature (v2.8.88). Pre-v2.8.88 a FREE-plan tenant
+  // could spin up unlimited branches via POST — the plan limit
+  // (`maxBranches: 1`) was implicit and unenforced. The feature gate
+  // routes through the engine, so an `extra_branch` add-on or PRO+
+  // plan unlocks. Reads stay open for everyone (staff need to see
+  // which branches exist to route orders).
   @Post()
   @Roles(UserRole.ADMIN)
-  @ApiOperation({ summary: 'Create a new branch (ADMIN only)' })
+  @RequiresFeature(PlanFeature.MULTI_LOCATION)
+  @ApiOperation({ summary: 'Create a new branch (ADMIN only, MULTI_LOCATION feature)' })
   create(@Req() req: any, @Body() body: CreateBranchDto) {
     return this.branches.create(req.user.tenantId, body);
   }
 
   @Patch(':id')
   @Roles(UserRole.ADMIN)
+  @RequiresFeature(PlanFeature.MULTI_LOCATION)
   update(@Req() req: any, @Param('id') id: string, @Body() body: UpdateBranchDto) {
     return this.branches.update(req.user.tenantId, id, body);
   }
 
   @Delete(':id')
   @Roles(UserRole.ADMIN)
+  @RequiresFeature(PlanFeature.MULTI_LOCATION)
   archive(@Req() req: any, @Param('id') id: string) {
     return this.branches.archive(req.user.tenantId, id);
   }

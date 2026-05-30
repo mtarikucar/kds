@@ -2,6 +2,9 @@ import { Body, Controller, Delete, Get, Param, Post, Query, Req, UseGuards } fro
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../../common/constants/roles.enum';
 import { Public } from '../auth/decorators/public.decorator';
 import { LocalBridgeService } from './local-bridge.service';
 import { BridgeTokenGuard } from './bridge-token.guard';
@@ -17,23 +20,31 @@ export class LocalBridgeController {
   constructor(private readonly bridges: LocalBridgeService) {}
 
   // -- Admin (user-auth) endpoints -----------------------------------------
+  //
+  // v2.8.88: ADMIN/MANAGER only. Pre-v2.8.88 any role could list and
+  // any authenticated user could provision a bridge — bridges hold a
+  // long-lived bearer token that talks to the tenant's POS/yazarkasa,
+  // so privilege escalation here is high-impact.
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiBearerAuth()
   @Get()
   list(@Req() req: any, @Query('branchId') branchId?: string) {
     return this.bridges.list(req.user.tenantId, branchId);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   @Post()
-  @ApiOperation({ summary: 'Provision a new bridge slot — returns provisioning token (shown once)' })
+  @ApiOperation({ summary: 'Provision a new bridge slot — returns provisioning token (shown once) (ADMIN only)' })
   createSlot(@Req() req: any, @Body() body: CreateBridgeSlotDto) {
     return this.bridges.createSlot(req.user.tenantId, body);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   @Delete(':id')
   retire(@Req() req: any, @Param('id') id: string) {

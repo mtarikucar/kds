@@ -22,6 +22,7 @@ import enPersonnel from './locales/en/personnel.json';
 import enStock from './locales/en/stock.json';
 import enHelp from './locales/en/help.json';
 import enMarketing from './locales/en/marketing.json';
+import enPlan from './locales/en/plan.json';
 
 import trCommon from './locales/tr/common.json';
 import trAuth from './locales/tr/auth.json';
@@ -41,6 +42,7 @@ import trPersonnel from './locales/tr/personnel.json';
 import trStock from './locales/tr/stock.json';
 import trHelp from './locales/tr/help.json';
 import trMarketing from './locales/tr/marketing.json';
+import trPlan from './locales/tr/plan.json';
 
 import ruCommon from './locales/ru/common.json';
 import ruAuth from './locales/ru/auth.json';
@@ -60,6 +62,7 @@ import ruPersonnel from './locales/ru/personnel.json';
 import ruStock from './locales/ru/stock.json';
 import ruHelp from './locales/ru/help.json';
 import ruMarketing from './locales/ru/marketing.json';
+import ruPlan from './locales/ru/plan.json';
 
 import uzCommon from './locales/uz/common.json';
 import uzAuth from './locales/uz/auth.json';
@@ -79,6 +82,7 @@ import uzPersonnel from './locales/uz/personnel.json';
 import uzStock from './locales/uz/stock.json';
 import uzHelp from './locales/uz/help.json';
 import uzMarketing from './locales/uz/marketing.json';
+import uzPlan from './locales/uz/plan.json';
 
 import arCommon from './locales/ar/common.json';
 import arAuth from './locales/ar/auth.json';
@@ -98,6 +102,7 @@ import arPersonnel from './locales/ar/personnel.json';
 import arStock from './locales/ar/stock.json';
 import arHelp from './locales/ar/help.json';
 import arMarketing from './locales/ar/marketing.json';
+import arPlan from './locales/ar/plan.json';
 
 // Define resources
 const resources = {
@@ -120,6 +125,7 @@ const resources = {
     stock: enStock,
     help: enHelp,
     marketing: enMarketing,
+    plan: enPlan,
   },
   tr: {
     common: trCommon,
@@ -140,6 +146,7 @@ const resources = {
     stock: trStock,
     help: trHelp,
     marketing: trMarketing,
+    plan: trPlan,
   },
   ru: {
     common: ruCommon,
@@ -160,6 +167,7 @@ const resources = {
     stock: ruStock,
     help: ruHelp,
     marketing: ruMarketing,
+    plan: ruPlan,
   },
   uz: {
     common: uzCommon,
@@ -180,6 +188,7 @@ const resources = {
     stock: uzStock,
     help: uzHelp,
     marketing: uzMarketing,
+    plan: uzPlan,
   },
   ar: {
     common: arCommon,
@@ -200,6 +209,7 @@ const resources = {
     stock: arStock,
     help: arHelp,
     marketing: arMarketing,
+    plan: arPlan,
   },
 };
 

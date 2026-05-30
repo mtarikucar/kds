@@ -44,6 +44,17 @@ describe('SubscriptionService.startTrialFromIntent', () => {
       billing,
       notifications,
       { append: jest.fn().mockResolvedValue('outbox-id') } as any,
+      // v2.8.88: EntitlementService stub. Default returns an empty set
+      // so existing tests (which don't care about engine routing)
+      // continue to hit the plan-only fallback branch.
+      {
+        getForTenant: jest.fn().mockResolvedValue({
+          features: {},
+          limits: {},
+          integrations: {},
+          computedAt: new Date(0).toISOString(),
+        }),
+      } as any,
     );
 
     // Sensible defaults — individual tests override.
@@ -314,6 +325,17 @@ describe('SubscriptionService.cancelSubscription', () => {
       billing,
       notifications,
       { append: jest.fn().mockResolvedValue('outbox-id') } as any,
+      // v2.8.88: EntitlementService stub. Default returns an empty set
+      // so existing tests (which don't care about engine routing)
+      // continue to hit the plan-only fallback branch.
+      {
+        getForTenant: jest.fn().mockResolvedValue({
+          features: {},
+          limits: {},
+          integrations: {},
+          computedAt: new Date(0).toISOString(),
+        }),
+      } as any,
     );
 
     // getSubscriptionById uses findUnique({ id })

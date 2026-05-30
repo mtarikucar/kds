@@ -67,6 +67,16 @@
     "webhooks": "Webhook'lar",
     "fiscalRecovery": "Fiş Kurtarma",
     "callerFeed": "Çağrı Akışı",
+    "hardwareOrders": "Donanım Siparişlerim",
+    "planAndAccess": "Plan & Erişim",
+    "sections": {
+      "business": "İşletme",
+      "menuAndTables": "Menü & Masa",
+      "operation": "Operasyon",
+      "multiBranch": "Çoklu Şube",
+      "marketplace": "Pazaryeri",
+      "planAndAccess": "Ayarlar & Erişim"
+    },
     "expandSidebar": "Kenar Çubuğunu Genişlet",
     "collapseSidebar": "Kenar Çubuğunu Daralt"
   },

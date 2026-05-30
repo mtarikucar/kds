@@ -1,0 +1,46 @@
+{
+  "page": {
+    "title": "Plan & Erişim",
+    "subtitle": "Mevcut planınız, kullanım kotalarınız ve aktif eklentilerinizi buradan yönetin."
+  },
+  "plan": {
+    "current": "Mevcut plan",
+    "nextBilling": "Sonraki tahsilat: {{date}}",
+    "trialEnds": "Deneme bitiş: {{date}}",
+    "changePlanCta": "Planı değiştir"
+  },
+  "quota": {
+    "title": "Kullanım kotaları",
+    "users": "Kullanıcılar",
+    "branches": "Şubeler",
+    "products": "Ürünler",
+    "monthlyOrders": "Aylık siparişler"
+  },
+  "activeAddOns": {
+    "title": "Aktif eklentiler",
+    "empty": "Henüz eklentiniz yok. Aşağıdan önerilen eklentilere göz atabilirsiniz.",
+    "col": {
+      "name": "Eklenti",
+      "price": "Fiyat",
+      "renewal": "Yenileme"
+    },
+    "scheduledToCancel": "Dönem sonu iptal",
+    "cancelCta": "İptal et"
+  },
+  "suggested": {
+    "title": "Önerilen eklentiler",
+    "viewAll": "Tüm pazaryeri"
+  },
+  "upsell": {
+    "defaultTitle": "Bu özellik aboneliğinizde yok",
+    "defaultDescription": "Bu sayfayı görüntülemek için planınızı yükseltmeniz veya ilgili eklentiyi satın almanız gerekir.",
+    "upgradePlanCta": "Pakete Geç",
+    "viewAddOnCta": "Eklentiyi Gör",
+    "helpHint": "Sorularınız için destek ekibimizle iletişime geçebilirsiniz."
+  },
+  "branchPicker": {
+    "allBranches": "Tüm şubeler",
+    "comingSoon": "Şube filtresi yakında raporlara ve sipariş listelerine eklenecek.",
+    "comingSoonHint": "Şube filtresi yakında — şu an raporlar ve sipariş listeleri tüm şubeleri gösteriyor."
+  }
+}

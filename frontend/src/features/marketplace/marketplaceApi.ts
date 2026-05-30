@@ -60,6 +60,12 @@ export const usePurchaseAddOn = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: marketplaceKeys.mine });
       qc.invalidateQueries({ queryKey: entitlementKeys.me });
+      // v2.8.88: effective-features is the source of truth for the
+      // SubscriptionContext (hasFeature/hasIntegration). Without this
+      // invalidation a buyer waits up to 30s for the cached snapshot
+      // to expire — they'd click "purchase" and see no UI change
+      // until they hard-refresh.
+      qc.invalidateQueries({ queryKey: ['subscriptions', 'effective-features'] });
       toast.success('Add-on purchased.');
     },
     onError: (e: any) => toast.error(e.response?.data?.message ?? 'Purchase failed'),
@@ -76,6 +82,7 @@ export const useCancelAddOn = () => {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: marketplaceKeys.mine });
       qc.invalidateQueries({ queryKey: entitlementKeys.me });
+      qc.invalidateQueries({ queryKey: ['subscriptions', 'effective-features'] });
       toast.success('Add-on cancelled.');
     },
   });

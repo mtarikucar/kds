@@ -12,6 +12,7 @@ import {
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 import { SubscriptionService } from '../services/subscription.service';
 import { BillingService } from '../services/billing.service';
+import { UsageService } from '../services/usage.service';
 import { Public } from '../../auth/decorators/public.decorator';
 import { Roles } from '../../auth/decorators/roles.decorator';
 import { UserRole } from '../../../common/constants/roles.enum';
@@ -33,6 +34,7 @@ export class SubscriptionController {
   constructor(
     private readonly subscriptionService: SubscriptionService,
     private readonly billingService: BillingService,
+    private readonly usageService: UsageService,
   ) {}
 
   @Public()
@@ -45,6 +47,15 @@ export class SubscriptionController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getEffectiveFeatures(@Request() req) {
     return this.subscriptionService.getEffectiveFeatures(req.user.tenantId);
+  }
+
+  // v2.8.88 — usage snapshot feeds the Plan & Erişim page kotalar grid
+  // + dashboard quota mini-cards. 60s cached per tenant; safe to call
+  // on every render.
+  @Get('usage/snapshot')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  async getUsageSnapshot(@Request() req) {
+    return this.usageService.getSnapshot(req.user.tenantId);
   }
 
   @Get('current')

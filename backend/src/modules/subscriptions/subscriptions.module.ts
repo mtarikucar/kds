@@ -2,6 +2,11 @@ import { Module, forwardRef } from "@nestjs/common";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
 import { PaytrSettlementModule } from "../payments/services/paytr-settlement.module";
+// v2.8.88: SubscriptionService.getEffectiveFeatures now routes through
+// the entitlement engine so add-on grants (TenantAddOn) reach the
+// frontend. Previously this read tenant.currentPlan + overrides only,
+// invisibly bypassing every TenantAddOn purchase.
+import { EntitlementsModule } from "../entitlements/entitlements.module";
 
 // Services
 import { SubscriptionService } from "./services/subscription.service";
@@ -9,6 +14,7 @@ import { BillingService } from "./services/billing.service";
 import { SubscriptionSchedulerService } from "./services/subscription-scheduler.service";
 import { NotificationService } from "./services/notification.service";
 import { InvoicePdfService } from "./services/invoice-pdf.service";
+import { UsageService } from "./services/usage.service";
 
 // Controllers
 import { SubscriptionController } from "./controllers/subscription.controller";
@@ -31,6 +37,9 @@ import { PlanFeatureGuard } from "./guards/plan-feature.guard";
     // Billing+Notification (exported from this module), this module
     // needs settlement.
     forwardRef(() => PaytrSettlementModule),
+    // EntitlementsModule is a leaf — no inbound deps — so this import
+    // is safe (no cycle).
+    EntitlementsModule,
   ],
   controllers: [SubscriptionController, InvoiceController],
   providers: [
@@ -40,6 +49,7 @@ import { PlanFeatureGuard } from "./guards/plan-feature.guard";
     NotificationService,
     InvoicePdfService,
     SubscriptionSchedulerService,
+    UsageService,
 
     // Guards
     SubscriptionGuard,
@@ -56,6 +66,7 @@ import { PlanFeatureGuard } from "./guards/plan-feature.guard";
     // SuperAdmin manual-trigger endpoints (sweep-period-end,
     // send-expiry-reminders) call into the scheduler directly.
     SubscriptionSchedulerService,
+    UsageService,
   ],
 })
 export class SubscriptionsModule {}

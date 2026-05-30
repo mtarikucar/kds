@@ -11,6 +11,9 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../../common/constants/roles.enum';
 import { Public } from '../auth/decorators/public.decorator';
 import { DeviceService } from './device.service';
 import { CommandQueueService } from './command-queue.service';
@@ -41,7 +44,8 @@ export class DevicesController {
 
   // -- Admin (user-auth) endpoints -----------------------------------------
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiBearerAuth()
   @Get()
   @ApiOperation({ summary: 'List devices for the authenticated tenant' })
@@ -54,7 +58,8 @@ export class DevicesController {
     return this.devices.list(req.user.tenantId, { branchId, kind, status });
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiBearerAuth()
   @Post()
   @ApiOperation({ summary: 'Create a device slot — returns a pair code to type into the device' })
@@ -62,15 +67,17 @@ export class DevicesController {
     return this.devices.createSlot(req.user.tenantId, dto);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
   @Delete(':id')
-  @ApiOperation({ summary: 'Retire a device' })
+  @ApiOperation({ summary: 'Retire a device (ADMIN only)' })
   retire(@Req() req: any, @Param('id') id: string) {
     return this.devices.retire(req.user.tenantId, id);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiBearerAuth()
   @Post(':id/commands')
   @ApiOperation({ summary: 'Enqueue a command to a device' })
@@ -82,7 +89,8 @@ export class DevicesController {
     return this.queue.enqueue(req.user.tenantId, id, dto);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiBearerAuth()
   @Get(':id/commands')
   @ApiOperation({ summary: 'Inspect a device command queue (admin view)' })
