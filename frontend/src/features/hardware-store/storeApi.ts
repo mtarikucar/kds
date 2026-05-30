@@ -88,3 +88,137 @@ export const useConfirmCheckout = () => {
     onError: (e: any) => toast.error(e.response?.data?.message ?? 'Checkout failed'),
   });
 };
+
+/* ---------------------------------------------------------------------------
+ * v2.8.84 — shipping address + order history.
+ *
+ * v2.8.85 added POST /v1/checkout/intent which trades a cart for a PayTR
+ * iframe token + persisted CheckoutIntent row. The webhook callback runs
+ * confirmAndProvision against the persisted cart. The frontend's job:
+ *   1. Collect shippingAddress + buyer info + cart, POST to /intent.
+ *   2. Send the buyer to result.paymentLink (PayTR-hosted page).
+ *   3. After the PayTR success page bounces them back, /hardware-orders
+ *      shows the resulting order.
+ * ------------------------------------------------------------------------- */
+
+export interface ShippingAddress {
+  recipientName: string;
+  phone: string;
+  line1: string;
+  line2?: string;
+  district?: string;
+  city: string;
+  postalCode?: string;
+  country: string;
+}
+
+export interface CheckoutBuyer {
+  email: string;
+  name: string;
+  phone: string;
+  address?: string;
+}
+
+export interface CheckoutIntentResponse {
+  paymentRef: string;
+  iframeToken: string;
+  paymentLink: string;
+  amountCents: number;
+  currency: string;
+  quote: CartQuote;
+}
+
+export const useCreateCheckoutIntent = () => {
+  return useMutation({
+    mutationFn: async (args: {
+      cart: { items: CartItem[]; shippingAddress?: ShippingAddress; billingAddress?: ShippingAddress };
+      buyer: CheckoutBuyer;
+      returnUrl?: string;
+    }): Promise<CheckoutIntentResponse> => {
+      const r = await api.post('/v1/checkout/intent', args);
+      return r.data;
+    },
+    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Ödeme başlatılamadı'),
+  });
+};
+
+/* --------------------- Hardware orders (read-only) ----------------------- */
+
+export interface HardwareOrderItem {
+  id: string;
+  productId: string;
+  sku: string;
+  name: string;
+  qty: number;
+  unitCents: number;
+  serials: string[];
+  acquisition: 'sell' | 'rent';
+}
+
+export interface HardwareOrderShipment {
+  id: string;
+  carrier: string;
+  trackingNo: string | null;
+  status: string;
+  shippedAt: string | null;
+  deliveredAt: string | null;
+}
+
+export interface HardwareOrderInstallation {
+  id: string;
+  status: string;
+  scheduledAt: string | null;
+  completedAt: string | null;
+  notes: string | null;
+}
+
+export interface HardwareOrderSummary {
+  id: string;
+  status: string;
+  subtotalCents: number;
+  taxCents: number;
+  shippingCents: number;
+  totalCents: number;
+  currency: string;
+  installation: string | null;
+  paymentRef: string | null;
+  createdAt: string;
+  updatedAt: string;
+  itemCount: number;
+}
+
+export interface HardwareOrderDetail extends HardwareOrderSummary {
+  branchId: string | null;
+  shippingAddress: ShippingAddress | string | null;
+  billingAddress: ShippingAddress | string | null;
+  notes: string | null;
+  items: HardwareOrderItem[];
+  shipments: HardwareOrderShipment[];
+  installations: HardwareOrderInstallation[];
+}
+
+export const hardwareOrderKeys = {
+  list: (status?: string) => ['hardware-orders', 'list', status] as const,
+  detail: (id: string) => ['hardware-orders', 'detail', id] as const,
+};
+
+export const useListHardwareOrders = (status?: string) =>
+  useQuery({
+    queryKey: hardwareOrderKeys.list(status),
+    queryFn: async (): Promise<HardwareOrderSummary[]> => {
+      const r = await api.get('/v1/hardware-orders', {
+        params: status ? { status } : {},
+      });
+      return r.data;
+    },
+  });
+
+export const useGetHardwareOrder = (id: string | undefined) =>
+  useQuery({
+    queryKey: hardwareOrderKeys.detail(id ?? ''),
+    queryFn: async (): Promise<HardwareOrderDetail> => {
+      const r = await api.get(`/v1/hardware-orders/${id}`);
+      return r.data;
+    },
+    enabled: Boolean(id),
+  });

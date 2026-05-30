@@ -185,6 +185,12 @@ const Sidebar = ({ isOpen, onClose, isRTL: isRTLProp }: SidebarProps) => {
       label: t('navigation.store'),
       roles: [UserRole.ADMIN, UserRole.MANAGER],
     },
+    {
+      to: '/admin/hardware-orders',
+      icon: Package,
+      label: t('navigation.hardwareOrders', { defaultValue: 'Donanım Siparişlerim' }),
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
+    },
     // Operasyonel ek sayfalar — admin için.
     {
       to: '/admin/bridges',

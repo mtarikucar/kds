@@ -1,6 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { type CartItem, useListProducts, useQuoteCart, useConfirmCheckout, type HardwareProduct, type CartQuote } from './storeApi';
+import { Link, useSearchParams } from 'react-router-dom';
+import {
+  type CartItem,
+  useListProducts,
+  useQuoteCart,
+  useCreateCheckoutIntent,
+  type HardwareProduct,
+  type CartQuote,
+  type ShippingAddress,
+} from './storeApi';
+import ShippingAddressForm from './ShippingAddressForm';
+import { useAuthStore } from '../../store/authStore';
 
 /**
  * Renders a product image but hides itself when the file is missing (404).
@@ -107,7 +117,14 @@ export default function StorePage() {
   const { data: products = [], isLoading } = useListProducts(category === 'all' ? undefined : category);
   const { data: allProducts = [] } = useListProducts(undefined);
   const quote = useQuoteCart();
-  const confirm = useConfirmCheckout();
+  const intent = useCreateCheckoutIntent();
+  const user = useAuthStore((s) => s.user);
+
+  // v2.8.84: checkout is a two-step modal — shipping address first, then
+  // PayTR redirect. shippingAddress is held in component state so a user
+  // tweaking the cart after entering the address doesn't lose their typing.
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const [shippingAddress, setShippingAddress] = useState<ShippingAddress | null>(null);
 
   // Auto-add the ?sku=<sku> product on mount. Guarded with `processed` so
   // re-renders + state changes don't keep adding. Once it's processed we
@@ -159,12 +176,33 @@ export default function StorePage() {
     return quote.mutateAsync({ items: cartItems });
   }
 
-  async function placeOrder() {
-    if (cart.length === 0) return;
-    // MVP: paymentRef placeholder. Real PayTR/Stripe redirect plugs in here.
-    const paymentRef = `manual-${Date.now()}`;
-    await confirm.mutateAsync({ cart: { items: cartItems }, paymentRef });
-    setCart([]);
+  async function startCheckout(address: ShippingAddress) {
+    if (cart.length === 0 || !user) return;
+    // v2.8.84/85: POST /v1/checkout/intent — server re-prices, persists a
+    // CheckoutIntent row, asks PayTR for an iframe token, returns the
+    // paymentLink we redirect to. The webhook side (CheckoutSettlement
+    // Service) provisions the order once PayTR confirms.
+    setShippingAddress(address);
+    const result = await intent.mutateAsync({
+      cart: { items: cartItems, shippingAddress: address },
+      buyer: {
+        email: user.email,
+        name: `${user.firstName} ${user.lastName}`.trim() || user.email,
+        // The phone-prompt flow (#71) makes phone reliably present on the
+        // user record. Fall back to a placeholder ONLY for legacy admins
+        // whose record predates the prompt — the backend DTO will reject
+        // empty/invalid phones at the boundary.
+        phone: (user as any).phone ?? '',
+        address: `${address.line1}${address.line2 ? ', ' + address.line2 : ''}, ${address.city}`,
+      },
+      returnUrl: `${window.location.origin}/admin/hardware-orders`,
+    });
+    // Redirect to the PayTR-hosted iframe. We use top-level navigation
+    // rather than a popup so the iframe lifecycle is browser-native and
+    // 3DS / OTP flows don't get blocked by popup blockers.
+    if (result.paymentLink) {
+      window.location.assign(result.paymentLink);
+    }
   }
 
   function dismissByo() {
@@ -305,19 +343,58 @@ export default function StorePage() {
               )}
               <button
                 className="w-full rounded bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={placeOrder}
+                onClick={() => setCheckoutOpen(true)}
                 // Block clicks when there's nothing to provision or while a
                 // confirm is mid-flight. Without the cart.length guard, the
                 // button silently no-ops and operators re-click thinking the
                 // page is frozen.
-                disabled={confirm.isPending || cart.length === 0}
+                disabled={intent.isPending || cart.length === 0}
               >
-                {confirm.isPending ? 'Sipariş veriliyor…' : 'Siparişi tamamla'}
+                {intent.isPending ? 'Yönlendiriliyor…' : 'Ödemeye geç'}
               </button>
+              <Link
+                to="/admin/hardware-orders"
+                className="block w-full text-center text-xs text-blue-600 hover:underline"
+              >
+                Geçmiş siparişlerim →
+              </Link>
             </>
           )}
         </aside>
       </div>
+
+      {/* v2.8.84: checkout modal — collects shipping address, then
+          POST /v1/checkout/intent → redirect to PayTR. */}
+      {checkoutOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Teslimat bilgileri</h2>
+              <button
+                type="button"
+                onClick={() => setCheckoutOpen(false)}
+                className="text-sm text-gray-500 hover:text-gray-700"
+                aria-label="Kapat"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="mt-1 mb-4 text-xs text-gray-500">
+              Donanımınız bu adrese kargolanacak. Bilgiler güvenli PayTR ödeme sayfasına aktarılacaktır.
+            </p>
+            <ShippingAddressForm
+              initial={shippingAddress ?? undefined}
+              onSubmit={startCheckout}
+              submitting={intent.isPending}
+              submitLabel="PayTR ile öde"
+            />
+            <p className="mt-3 text-[11px] text-gray-500">
+              Ödeme işlemi PayTR tarafından güvenli olarak gerçekleştirilir.
+              Kart bilgileriniz HummyTummy ile paylaşılmaz.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
