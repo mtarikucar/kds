@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 import { Transporter } from 'nodemailer';
-import * as fs from 'fs';
+import * as fsp from 'fs/promises';
 import * as path from 'path';
 import * as Handlebars from 'handlebars';
 import { maskEmail } from '../helpers/pii-mask.helper';
@@ -22,6 +22,15 @@ export class EmailService {
   private transporter: Transporter;
   private readonly logger = new Logger(EmailService.name);
   private readonly templatesPath: string;
+  // Iter-98: cache compiled handlebars templates for the process
+  // lifetime. Same reasoning as iter-97 (NotificationService): pre-fix
+  // every sendEmail call re-read the .hbs from disk (sync, blocking the
+  // event loop) and re-ran Handlebars.compile. EmailService sits on the
+  // hot path for cron z-report mailings and auth verification bursts.
+  // Misses are NOT cached — compileTemplate throws on a missing
+  // template (auth needs to surface that loudly); we don't want a
+  // failure entry to outlive the missing-file condition.
+  private readonly templateCache = new Map<string, HandlebarsTemplateDelegate>();
 
   constructor(private configService: ConfigService) {
     // Use process.cwd() instead of __dirname for bundled production builds
@@ -132,21 +141,31 @@ export class EmailService {
   }
 
   /**
-   * Compile Handlebars template
+   * Compile Handlebars template. Iter-98: first call per templateName
+   * compiles + caches; subsequent calls skip the disk read and the
+   * compile. Misses still throw — auth flows depend on the loud error.
    */
   private async compileTemplate(
     templateName: string,
     context: Record<string, any>,
   ): Promise<string> {
     try {
-      const templatePath = path.join(this.templatesPath, `${templateName}.hbs`);
-      const templateSource = fs.readFileSync(templatePath, 'utf-8');
-      const template = Handlebars.compile(templateSource);
+      const template = await this.loadTemplate(templateName);
       return template(context);
     } catch (error) {
       this.logger.error(`Failed to compile template ${templateName}:`, error);
       throw new Error(`Email template ${templateName} not found or invalid`);
     }
+  }
+
+  private async loadTemplate(templateName: string): Promise<HandlebarsTemplateDelegate> {
+    const cached = this.templateCache.get(templateName);
+    if (cached) return cached;
+    const templatePath = path.join(this.templatesPath, `${templateName}.hbs`);
+    const source = await fsp.readFile(templatePath, 'utf-8');
+    const compiled = Handlebars.compile(source);
+    this.templateCache.set(templateName, compiled);
+    return compiled;
   }
 
   /**
