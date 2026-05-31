@@ -55,12 +55,16 @@ const nextConfig: NextConfig = {
       "base-uri 'self'",
       "form-action 'self'",
       "object-src 'none'",
-      // v2.8.97 — Trusted Types and report-uri additions move the bar
-      // again for any future inline-script regression: any script that
-      // doesn't go through trustedTypes.createPolicy will be blocked
-      // (no policy declared yet → fully strict in browsers that
-      // support it; ignored by others, so backwards-compat-safe).
-      "require-trusted-types-for 'script'",
+      // v2.8.99.2 — `require-trusted-types-for 'script'` added in v2.8.97 P2d
+      // is dropped. It blocked Next.js 16 / React 19 hydration scripts
+      // (Next's internal RSC bootstrap doesn't declare a Trusted Types
+      // policy), so SSR rendered fine but the page exploded on the
+      // client and fell through to error.tsx with "Something went
+      // wrong". A future migration would have to: (a) define a
+      // trustedTypes.createPolicy('next-react#__internal__'), (b)
+      // verify Sentry's instrumentation also opts into the policy,
+      // (c) add a CSP report-only stage to catch any straggler before
+      // re-introducing the directive enforced.
     ].join('; ');
 
     return [
