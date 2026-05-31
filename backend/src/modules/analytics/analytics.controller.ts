@@ -26,6 +26,8 @@ import { TenantGuard } from '../auth/guards/tenant.guard';
 import { PlanFeatureGuard } from '../subscriptions/guards/plan-feature.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { RequiresFeature } from '../subscriptions/decorators/requires-feature.decorator';
+import { CurrentScope } from '../auth/decorators/current-scope.decorator';
+import { BranchScope } from '../../common/scoping/branch-scope';
 import { UserRole } from '../../common/constants/roles.enum';
 import { PlanFeature } from '../../common/constants/subscription.enum';
 
@@ -116,16 +118,24 @@ export class AnalyticsController {
   @ApiQuery({ name: 'endDate', required: false, description: 'End date (ISO format)' })
   @ApiQuery({ name: 'granularity', required: false, enum: HeatmapGranularity })
   @ApiResponse({ status: 200, description: 'Occupancy heatmap data' })
-  async getOccupancyHeatmap(@Request() req, @Query() query: HeatmapQueryDto) {
+  async getOccupancyHeatmap(
+    @Request() req,
+    @CurrentScope() scope: BranchScope,
+    @Query() query: HeatmapQueryDto,
+  ) {
     const now = new Date();
     const { start, end } = this.resolveRange(
       query,
       new Date(now.getTime() - 24 * 60 * 60 * 1000),
       now,
     );
-    return this.heatmapService.getOccupancyHeatmap(req.tenantId, start, end, {
-      granularity: query.granularity,
-    });
+    return this.heatmapService.getOccupancyHeatmap(
+      req.tenantId,
+      scope.branchId,
+      start,
+      end,
+      { granularity: query.granularity },
+    );
   }
 
   @Get('heatmap/traffic')
@@ -136,16 +146,24 @@ export class AnalyticsController {
   @ApiQuery({ name: 'endDate', required: false, description: 'End date (ISO format)' })
   @ApiQuery({ name: 'granularity', required: false, enum: HeatmapGranularity })
   @ApiResponse({ status: 200, description: 'Traffic heatmap data' })
-  async getTrafficHeatmap(@Request() req, @Query() query: HeatmapQueryDto) {
+  async getTrafficHeatmap(
+    @Request() req,
+    @CurrentScope() scope: BranchScope,
+    @Query() query: HeatmapQueryDto,
+  ) {
     const now = new Date();
     const { start, end } = this.resolveRange(
       query,
       new Date(now.getTime() - 24 * 60 * 60 * 1000),
       now,
     );
-    return this.heatmapService.getTrafficHeatmap(req.tenantId, start, end, {
-      granularity: query.granularity,
-    });
+    return this.heatmapService.getTrafficHeatmap(
+      req.tenantId,
+      scope.branchId,
+      start,
+      end,
+      { granularity: query.granularity },
+    );
   }
 
   @Get('heatmap/dwell-time')
@@ -342,8 +360,8 @@ export class AnalyticsController {
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
   @ApiOperation({ summary: 'Manually trigger insight generation' })
   @ApiResponse({ status: 200, description: 'Number of insights generated' })
-  async generateInsights(@Request() req) {
-    const count = await this.insightsService.generateInsights(req.tenantId);
+  async generateInsights(@Request() req, @CurrentScope() scope: BranchScope) {
+    const count = await this.insightsService.generateInsights(req.tenantId, scope.branchId);
     return { generated: count };
   }
 
@@ -443,11 +461,12 @@ export class AnalyticsController {
   @ApiResponse({ status: 200, description: 'Mock data generation results' })
   async generateMockData(
     @Request() req,
+    @CurrentScope() scope: BranchScope,
     @Query('days') days?: string,
   ) {
     this.assertNotProduction();
     const daysNum = days ? parseInt(days, 10) : 7;
-    return this.mockDataService.generateAllMockData(req.tenantId, daysNum);
+    return this.mockDataService.generateAllMockData(req.tenantId, scope.branchId, daysNum);
   }
 
   @Delete('mock-data')
@@ -455,9 +474,9 @@ export class AnalyticsController {
   @RequiresFeature(PlanFeature.ADVANCED_REPORTS)
   @ApiOperation({ summary: 'Clear all analytics data (development only)' })
   @ApiResponse({ status: 200, description: 'Data cleared' })
-  async clearMockData(@Request() req) {
+  async clearMockData(@Request() req, @CurrentScope() scope: BranchScope) {
     this.assertNotProduction();
-    await this.mockDataService.clearAnalyticsData(req.tenantId);
+    await this.mockDataService.clearAnalyticsData(req.tenantId, scope.branchId);
     return { success: true };
   }
 }

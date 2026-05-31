@@ -130,6 +130,7 @@ export class IngredientMovementsService {
           notes: dto.notes,
           stockItemId: dto.stockItemId,
           tenantId,
+          branchId: stockItem.branchId,
         },
         include: { stockItem: { select: { id: true, name: true, unit: true } } },
       });

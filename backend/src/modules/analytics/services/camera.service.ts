@@ -43,9 +43,23 @@ export class CameraService {
       throw new ConflictException(`Camera with name "${dto.name}" already exists`);
     }
 
+    // v3.0.0 — every operational row carries branchId. Derive from the
+    // referenced edge device so a camera always lives in the same
+    // branch as its host device.
+    const edgeDevice = await this.prisma.edgeDevice.findFirst({
+      where: { id: dto.edgeDeviceId, tenantId },
+      select: { branchId: true },
+    });
+    if (!edgeDevice) {
+      throw new NotFoundException(
+        `Edge device with ID ${dto.edgeDeviceId} not found`,
+      );
+    }
+
     const camera = await this.prisma.camera.create({
       data: {
         tenantId,
+        branchId: edgeDevice.branchId,
         name: dto.name,
         description: dto.description,
         // Encrypted at rest; the edge device's config fetch decrypts on

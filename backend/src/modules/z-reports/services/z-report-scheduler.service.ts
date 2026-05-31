@@ -191,7 +191,13 @@ export class ZReportSchedulerService {
   }
 
   /**
-   * Process end-of-day report for a tenant
+   * Process end-of-day report for a tenant.
+   *
+   * v3.0.0: Z-Reports are branch-scoped. The scheduler iterates every
+   * active branch under the tenant and generates one report per branch —
+   * each branch closes independently for fiscal purposes. The admin user's
+   * primary branch is used only as a fallback when a tenant has a single
+   * active branch.
    */
   private async processEndOfDayReport(tenant: { id: string; name: string }) {
     this.logger.log(`Processing end-of-day report for tenant: ${tenant.name}`);
@@ -203,7 +209,7 @@ export class ZReportSchedulerService {
           tenantId: tenant.id,
           role: 'ADMIN',
         },
-        select: { id: true },
+        select: { id: true, primaryBranchId: true },
       });
 
       if (!adminUser) {
@@ -211,8 +217,42 @@ export class ZReportSchedulerService {
         return;
       }
 
-      // Generate and send report
-      const result = await this.zReportsService.generateAndSendReport(tenant.id, adminUser.id);
+      // Resolve the branches to close. Prefer all active branches; fall
+      // back to the admin's primary branch when listing branches yields
+      // nothing (e.g. legacy single-branch tenants whose only branch is
+      // referenced solely via User.primaryBranchId).
+      const branches = await this.prisma.branch.findMany({
+        where: { tenantId: tenant.id, status: 'active' },
+        select: { id: true },
+      });
+      const branchIds = branches.length
+        ? branches.map((b) => b.id)
+        : adminUser.primaryBranchId
+          ? [adminUser.primaryBranchId]
+          : [];
+
+      if (branchIds.length === 0) {
+        this.logger.warn(`No branches resolved for tenant ${tenant.name}, skipping`);
+        return;
+      }
+
+      // Generate and send report for each branch
+      for (const branchId of branchIds) {
+        await this.runForBranch(tenant, branchId, adminUser.id);
+      }
+      return;
+    } catch (error) {
+      this.logger.error(`Failed to process report for tenant ${tenant.name}: ${error.message}`);
+    }
+  }
+
+  private async runForBranch(
+    tenant: { id: string; name: string },
+    branchId: string,
+    userId: string,
+  ) {
+    try {
+      const result = await this.zReportsService.generateAndSendReport(tenant.id, branchId, userId);
 
       if (result.emailSent) {
         this.logger.log(`Successfully sent Z-Report email for tenant ${tenant.name}`);

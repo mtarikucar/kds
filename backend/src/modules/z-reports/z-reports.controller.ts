@@ -20,6 +20,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentScope } from '../auth/decorators/current-scope.decorator';
+import { BranchScope } from '../../common/scoping/branch-scope';
 import { UserRole } from '../../common/constants/roles.enum';
 
 @ApiTags('z-reports')
@@ -32,8 +34,17 @@ export class ZReportsController {
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Generate a new Z-Report' })
-  async generate(@Req() req, @Body() createDto: CreateZReportDto) {
-    return this.zReportsService.generateReport(req.user.tenantId, req.user.id, createDto);
+  async generate(
+    @CurrentScope() scope: BranchScope,
+    @Req() req,
+    @Body() createDto: CreateZReportDto,
+  ) {
+    return this.zReportsService.generateReport(
+      scope.tenantId,
+      scope.branchId,
+      scope.userId ?? req.user.id,
+      createDto,
+    );
   }
 
   @Get()

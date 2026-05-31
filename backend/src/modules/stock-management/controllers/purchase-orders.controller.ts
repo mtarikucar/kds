@@ -11,6 +11,8 @@ import { PlanFeature } from '../../../common/constants/subscription.enum';
 import { PurchaseOrdersService } from '../services/purchase-orders.service';
 import { CreatePurchaseOrderDto } from '../dto/create-purchase-order.dto';
 import { ReceivePurchaseOrderDto } from '../dto/receive-purchase-order.dto';
+import { CurrentScope } from '../../auth/decorators/current-scope.decorator';
+import { BranchScope } from '../../../common/scoping/branch-scope';
 
 @ApiTags('stock-management/purchase-orders')
 @ApiBearerAuth()
@@ -38,8 +40,12 @@ export class PurchaseOrdersController {
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Create a purchase order' })
-  create(@Body() dto: CreatePurchaseOrderDto, @Request() req) {
-    return this.service.create(dto, req.tenantId, req.user?.id);
+  create(
+    @Body() dto: CreatePurchaseOrderDto,
+    @CurrentScope() scope: BranchScope,
+    @Request() req,
+  ) {
+    return this.service.create(dto, scope.tenantId, scope.branchId, req.user?.id);
   }
 
   @Post(':id/submit')

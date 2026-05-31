@@ -74,7 +74,7 @@ export class PaymentsService {
     if (!this.kdsGateway) return;
     try {
       this.kdsGateway.emitPaymentSuccess(
-        tenantId,
+        tenantId, payment.branchId,
         {
           id: payment.id,
           orderId: payment.orderId,
@@ -555,7 +555,7 @@ export class PaymentsService {
           // legacy "pay anytime" behaviour.
           if (order.type === 'DINE_IN' && order.status !== OrderStatus.SERVED) {
             const posSettings = await tx.posSettings.findUnique({
-              where: { tenantId },
+              where: { tenantId_branchId: { tenantId, branchId: null } },
               select: { requireServedForDineInPayment: true },
             });
             if (posSettings?.requireServedForDineInPayment) {
@@ -605,6 +605,11 @@ export class PaymentsService {
               notes: createPaymentDto.notes,
               orderId,
               tenantId,
+              // v3.0.0 — branchId is now required (NOT NULL on Payment).
+              // Derive from the order being paid so the payment stays in the
+              // same branch as the order — staff at branch B can never book
+              // a payment that lands on a foreign branch's books.
+              branchId: order.branchId,
               paidAt: new Date(),
               // Persist external gateway reference + client-provided idempotency
               // key so retries of the same request return the same payment row
@@ -1055,6 +1060,10 @@ export class PaymentsService {
               notes: entry.label || null,
               orderId: orderId,
               tenantId,
+              // v3.0.0 — required branchId, derived from the order so every
+              // split entry settles in the order's branch (no cross-branch
+              // leak even if a stray request reached the wrong terminal).
+              branchId: order.branchId,
               paidAt: new Date(),
               idempotencyKey: key,
               receiptSnapshot,
@@ -1457,6 +1466,10 @@ export class PaymentsService {
                   notes: dto.notes,
                   orderId,
                   tenantId,
+                  // v3.0.0 — required branchId. Order is the authoritative
+                  // source of branch scope for every payment that closes it
+                  // (waiter cash, customer self-pay via PayTR webhook etc.).
+                  branchId: order.branchId,
                   paidAt: new Date(),
                   transactionId: dto.transactionId,
                   idempotencyKey: dto.idempotencyKey,
@@ -1502,6 +1515,11 @@ export class PaymentsService {
                 quantity: row.quantity,
                 amount: row.amount,
                 tenantId,
+                // v3.0.0 — branchId required on the join row too so
+                // per-branch revenue queries on OrderItemPayment don't
+                // need a join through Payment. Derived from the order
+                // (same branch as the parent Payment by construction).
+                branchId: order.branchId,
               })),
             });
 
@@ -1725,6 +1743,11 @@ export class PaymentsService {
                 notes: dto.reason ?? 'House write-off',
                 orderId,
                 tenantId,
+                // v3.0.0 — required branchId. HOUSE write-offs still need
+                // a branch (manager at branch A absorbing a no-show on an
+                // order opened at branch A); deriving from the order keeps
+                // that consistent regardless of where the manager logs in.
+                branchId: order.branchId,
                 paidAt: new Date(),
                 idempotencyKey: idemKey,
                 receiptSnapshot,

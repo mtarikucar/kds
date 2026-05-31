@@ -12,6 +12,8 @@ import { StockItemsService } from '../services/stock-items.service';
 import { CreateStockItemDto } from '../dto/create-stock-item.dto';
 import { UpdateStockItemDto } from '../dto/update-stock-item.dto';
 import { StockItemQueryDto } from '../dto/stock-item-query.dto';
+import { CurrentScope } from '../../auth/decorators/current-scope.decorator';
+import { BranchScope } from '../../../common/scoping/branch-scope';
 
 @ApiTags('stock-management/items')
 @ApiBearerAuth()
@@ -53,8 +55,8 @@ export class StockItemsController {
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Create a stock item' })
-  create(@Body() dto: CreateStockItemDto, @Request() req) {
-    return this.service.create(dto, req.tenantId);
+  create(@Body() dto: CreateStockItemDto, @Request() req, @CurrentScope() scope: BranchScope) {
+    return this.service.create(dto, req.tenantId, scope.branchId);
   }
 
   @Patch(':id')

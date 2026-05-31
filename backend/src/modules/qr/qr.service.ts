@@ -22,7 +22,7 @@ export class QrService {
 
   async getSettings(tenantId: string) {
     let settings = await this.prisma.qrMenuSettings.findUnique({
-      where: { tenantId },
+      where: { tenantId_branchId: { tenantId, branchId: null } },
     });
 
     // Create default settings if they don't exist
@@ -37,7 +37,7 @@ export class QrService {
 
   async createSettings(tenantId: string, dto: CreateQrSettingsDto) {
     const existingSettings = await this.prisma.qrMenuSettings.findUnique({
-      where: { tenantId },
+      where: { tenantId_branchId: { tenantId, branchId: null } },
     });
 
     if (existingSettings) {
@@ -58,14 +58,14 @@ export class QrService {
     await this.getSettings(tenantId);
 
     return this.prisma.qrMenuSettings.update({
-      where: { tenantId },
+      where: { tenantId_branchId: { tenantId, branchId: null } },
       data: dto,
     });
   }
 
   async deleteSettings(tenantId: string) {
     const settings = await this.prisma.qrMenuSettings.findUnique({
-      where: { tenantId },
+      where: { tenantId_branchId: { tenantId, branchId: null } },
     });
 
     if (!settings) {
@@ -73,7 +73,7 @@ export class QrService {
     }
 
     return this.prisma.qrMenuSettings.delete({
-      where: { tenantId },
+      where: { tenantId_branchId: { tenantId, branchId: null } },
     });
   }
 

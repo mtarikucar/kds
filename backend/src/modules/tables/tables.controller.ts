@@ -24,6 +24,8 @@ import { TenantGuard } from '../auth/guards/tenant.guard';
 import { PlanFeatureGuard } from '../subscriptions/guards/plan-feature.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Public } from '../auth/decorators/public.decorator';
+import { CurrentScope } from '../auth/decorators/current-scope.decorator';
+import { BranchScope } from '../../common/scoping/branch-scope';
 import { CheckLimit, LimitType } from '../subscriptions/decorators/check-limit.decorator';
 import { UserRole } from '../../common/constants/roles.enum';
 
@@ -41,8 +43,12 @@ export class TablesController {
   @ApiResponse({ status: 201, description: 'Table successfully created' })
   @ApiResponse({ status: 409, description: 'Table number already exists' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
-  create(@Body() createTableDto: CreateTableDto, @Request() req) {
-    return this.tablesService.create(createTableDto, req.tenantId);
+  create(
+    @Body() createTableDto: CreateTableDto,
+    @Request() req,
+    @CurrentScope() scope: BranchScope,
+  ) {
+    return this.tablesService.create(createTableDto, req.tenantId, scope.branchId);
   }
 
   // ========================================

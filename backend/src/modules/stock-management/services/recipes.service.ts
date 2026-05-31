@@ -86,7 +86,7 @@ export class RecipesService {
     return recipe;
   }
 
-  async create(dto: CreateRecipeDto, tenantId: string) {
+  async create(dto: CreateRecipeDto, tenantId: string, branchId: string) {
     // Iter-93: reject duplicate ingredients up front — see
     // assertUniqueIngredients comment for the double-deduction bug.
     assertUniqueIngredients(dto.ingredients);
@@ -119,6 +119,7 @@ export class RecipesService {
         yield: dto.yield || 1,
         productId: dto.productId,
         tenantId,
+        branchId,
         ingredients: {
           create: dto.ingredients.map((i) => ({
             stockItemId: i.stockItemId,

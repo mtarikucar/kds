@@ -49,6 +49,25 @@ export class DeliveryOrderService {
     });
     const autoAccept = config?.isEnabled ? (config.autoAccept ?? false) : false;
 
+    // v3.0.0 — branchId is now NOT NULL on Order. Delivery orders come
+    // from an external platform without an inherent branch, so we resolve
+    // to the tenant's first active branch (ordered by creation) as a
+    // deterministic fallback. Multi-branch tenants that want platform
+    // orders routed elsewhere will need a per-platform branch mapping in
+    // a future iteration.
+    const fallbackBranch = await this.prisma.branch.findFirst({
+      where: { tenantId, status: 'active' },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    if (!fallbackBranch) {
+      this.logger.warn(
+        `No active branch for tenant ${tenantId} — cannot persist ${platform} order ${externalOrderId}`,
+      );
+      return null;
+    }
+    const branchId = fallbackBranch.id;
+
     // 1-4. Deduplicate + map items + create order in a transaction.
     // Final dedup guarantee is the partial unique index
     // orders(tenantId, source, externalOrderId) — the findFirst below is
@@ -197,6 +216,7 @@ export class DeliveryOrderService {
           customerName: normalizedOrder.customerName,
           customerPhone: normalizedOrder.customerPhone,
           tenantId,
+          branchId,
           orderItems: {
             create: validItems.map((item) => ({
               productId: item.productId!,
@@ -297,7 +317,7 @@ export class DeliveryOrderService {
     }
 
     // 6. Emit via KDS WebSocket
-    this.kdsGateway.emitNewOrder(tenantId, createdOrder);
+    this.kdsGateway.emitNewOrder(tenantId, createdOrder.branchId, createdOrder);
 
     // 7. Log the inbound order
     await this.logService.log({
@@ -387,7 +407,7 @@ export class DeliveryOrderService {
       where: { tenantId, source: platform, externalOrderId: remoteOrderId },
     });
     if (order) {
-      this.kdsGateway.emitNewOrder(tenantId, order);
+      this.kdsGateway.emitNewOrder(tenantId, order.branchId, order);
     }
 
     await this.logService.log({

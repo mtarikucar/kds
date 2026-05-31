@@ -92,6 +92,7 @@ export class StockDeductionService {
           await this.applyDeduction(
             tx,
             tenantId,
+            order.branchId,
             order.orderNumber,
             orderId,
             deduction,
@@ -137,6 +138,7 @@ export class StockDeductionService {
   private async applyDeduction(
     tx: Tx,
     tenantId: string,
+    branchId: string,
     orderNumber: string,
     orderId: string,
     deduction: Deduction,
@@ -264,6 +266,7 @@ export class StockDeductionService {
         referenceId: orderId,
         stockItemId: deduction.stockItemId,
         tenantId,
+        branchId,
         createdById: userId,
       },
     });
@@ -342,6 +345,7 @@ export class StockDeductionService {
               referenceId: orderId,
               stockItemId: movement.stockItemId,
               tenantId,
+              branchId: movement.branchId,
               createdById: userId,
             },
           });

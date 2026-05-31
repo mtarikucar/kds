@@ -11,6 +11,8 @@ import { PlanFeature } from '../../../common/constants/subscription.enum';
 import { RecipesService } from '../services/recipes.service';
 import { CreateRecipeDto } from '../dto/create-recipe.dto';
 import { UpdateRecipeDto } from '../dto/update-recipe.dto';
+import { CurrentScope } from '../../auth/decorators/current-scope.decorator';
+import { BranchScope } from '../../../common/scoping/branch-scope';
 
 @ApiTags('stock-management/recipes')
 @ApiBearerAuth()
@@ -57,8 +59,8 @@ export class RecipesController {
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Create a recipe' })
-  create(@Body() dto: CreateRecipeDto, @Request() req) {
-    return this.service.create(dto, req.tenantId);
+  create(@Body() dto: CreateRecipeDto, @Request() req, @CurrentScope() scope: BranchScope) {
+    return this.service.create(dto, req.tenantId, scope.branchId);
   }
 
   @Post(':id/check-stock')

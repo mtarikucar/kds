@@ -67,6 +67,15 @@ export class CreateNotificationDto {
   tenantId: string;
 
   @ApiPropertyOptional({
+    description:
+      'Branch ID (v3.0.0 — required by schema). If omitted, the service falls back to the tenant\'s first active branch for system-wide notifications.',
+    example: 'uuid',
+  })
+  @IsOptional()
+  @IsUUID()
+  branchId?: string;
+
+  @ApiPropertyOptional({
     description: 'User ID (if notification is for a specific user)',
     example: 'uuid',
   })

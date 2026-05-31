@@ -137,7 +137,7 @@ export class KdsService {
       try {
         const result = await this.stockDeductionService.deductForOrder(id, tenantId, status);
         if (result?.lowStockAlerts?.length) {
-          this.kdsGateway.emitLowStockAlert(tenantId, result.lowStockAlerts);
+          this.kdsGateway.emitLowStockAlert(tenantId, order.branchId, result.lowStockAlerts);
         }
       } catch (error: any) {
         this.logger.error(
@@ -148,7 +148,7 @@ export class KdsService {
     }
 
     // Emit status change via WebSocket
-    this.kdsGateway.emitOrderStatusChange(tenantId, id, status);
+    this.kdsGateway.emitOrderStatusChange(tenantId, order.branchId, id, status);
 
     // Sync status to delivery platform (if applicable)
     this.deliveryStatusSync?.syncStatusToPlatform(id, status).catch((err) => {
@@ -216,7 +216,7 @@ export class KdsService {
       }
     }
 
-    this.kdsGateway.emitOrderItemStatusChange(tenantId, itemId, status);
+    this.kdsGateway.emitOrderItemStatusChange(tenantId, updatedOrderItem.order.branchId, itemId, status);
 
     return updatedOrderItem;
   }
@@ -276,7 +276,7 @@ export class KdsService {
     }
 
     // Emit status change via WebSocket
-    this.kdsGateway.emitOrderStatusChange(tenantId, id, OrderStatus.CANCELLED);
+    this.kdsGateway.emitOrderStatusChange(tenantId, order.branchId, id, OrderStatus.CANCELLED);
 
     // Sync cancellation to delivery platform (if applicable)
     this.deliveryStatusSync?.syncStatusToPlatform(id, OrderStatus.CANCELLED).catch((err) => {

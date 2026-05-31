@@ -43,7 +43,7 @@ export class StockCountsService {
       where: { id, tenantId },
       include: {
         items: {
-          include: { stockItem: { select: { id: true, name: true, unit: true, currentStock: true } } },
+          include: { stockItem: { select: { id: true, name: true, unit: true, currentStock: true, branchId: true } } },
         },
       },
     });
@@ -51,7 +51,7 @@ export class StockCountsService {
     return count;
   }
 
-  async create(dto: CreateStockCountDto, tenantId: string, userId?: string) {
+  async create(dto: CreateStockCountDto, tenantId: string, branchId: string, userId?: string) {
     const itemsWhere: Prisma.StockItemWhereInput = { tenantId, isActive: true };
     if (dto.stockItemIds?.length) {
       itemsWhere.id = { in: dto.stockItemIds };
@@ -87,6 +87,7 @@ export class StockCountsService {
         name: dto.name,
         notes: dto.notes,
         tenantId,
+        branchId,
         createdById: userId,
         items: {
           create: stockItems.map((item) => ({
@@ -127,7 +128,7 @@ export class StockCountsService {
     }
     return this.prisma.stockCountItem.findUnique({
       where: { id: itemId },
-      include: { stockItem: { select: { id: true, name: true, unit: true } } },
+      include: { stockItem: { select: { id: true, name: true, unit: true, branchId: true } } },
     });
   }
 
@@ -204,6 +205,7 @@ export class StockCountsService {
             referenceType: 'STOCK_COUNT',
             referenceId: count.id,
             stockItemId: item.stockItemId,
+            branchId: item.stockItem.branchId,
             tenantId,
           },
         });

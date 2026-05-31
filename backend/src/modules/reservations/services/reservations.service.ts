@@ -145,7 +145,9 @@ export class ReservationsService {
       throw new BadRequestException(`Maximum guests per reservation is ${settings.maxGuestsPerReservation}`);
     }
 
-    // Check table capacity if tableId provided
+    // Check table capacity if tableId provided. We also load the table's
+    // branchId so the new reservation row can inherit it (v3.0.0 strict).
+    let resolvedBranchId: string | null = null;
     if (dto.tableId) {
       const table = await this.prisma.table.findFirst({
         where: { id: dto.tableId, tenantId },
@@ -156,6 +158,24 @@ export class ReservationsService {
       if (dto.guestCount > table.capacity) {
         throw new BadRequestException(`Table capacity is ${table.capacity}`);
       }
+      resolvedBranchId = table.branchId;
+    }
+
+    // Walk-in / no-table reservations still need a branchId (v3.0.0 strict
+    // schema). This endpoint is @Public(), so there's no @CurrentScope —
+    // fall back to the tenant's first branch (the "Main" branch created
+    // at tenant bootstrap). Multi-branch tenants that want a specific
+    // branch should pass tableId.
+    if (!resolvedBranchId) {
+      const defaultBranch = await this.prisma.branch.findFirst({
+        where: { tenantId },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      if (!defaultBranch) {
+        throw new BadRequestException('No branch configured for this tenant');
+      }
+      resolvedBranchId = defaultBranch.id;
     }
 
     const status = settings.requireApproval ? ReservationStatus.PENDING : ReservationStatus.CONFIRMED;
@@ -264,6 +284,10 @@ export class ReservationsService {
                 notes: dto.notes,
                 tableId: dto.tableId,
                 tenantId,
+                // v3.0.0 — strict branch scope. Derived from the assigned
+                // table when present, else falls back to the tenant's
+                // default (first-created) branch.
+                branchId: resolvedBranchId!,
                 status,
                 confirmedAt,
               },

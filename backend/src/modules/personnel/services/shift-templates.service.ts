@@ -15,12 +15,13 @@ export class ShiftTemplatesService {
     }
   }
 
-  async create(tenantId: string, dto: CreateShiftTemplateDto) {
+  async create(tenantId: string, branchId: string, dto: CreateShiftTemplateDto) {
     this.assertDistinctTimes(dto.startTime, dto.endTime);
     return this.prisma.shiftTemplate.create({
       data: {
         ...dto,
         tenantId,
+        branchId,
       },
     });
   }

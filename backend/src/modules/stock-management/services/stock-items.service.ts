@@ -48,11 +48,11 @@ export class StockItemsService {
     return item;
   }
 
-  async create(dto: CreateStockItemDto, tenantId: string) {
+  async create(dto: CreateStockItemDto, tenantId: string, branchId: string) {
     return this.prisma.stockItem.create({
       // Empty-string SKU collides on the @@unique([tenantId, sku])
       // constraint while null is allowed to repeat. Normalise here.
-      data: { ...dto, sku: dto.sku ? dto.sku : null, tenantId },
+      data: { ...dto, sku: dto.sku ? dto.sku : null, tenantId, branchId },
       include: { category: true },
     });
   }

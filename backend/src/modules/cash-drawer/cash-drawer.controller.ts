@@ -14,6 +14,8 @@ import { UserRole } from '../../common/constants/roles.enum';
 import { CashDrawerService } from './cash-drawer.service';
 import { CreateCashDrawerMovementDto } from './dto/create-cash-drawer-movement.dto';
 import { RejectCashDrawerMovementDto } from './dto/reject-cash-drawer-movement.dto';
+import { CurrentScope } from '../auth/decorators/current-scope.decorator';
+import { BranchScope } from '../../common/scoping/branch-scope';
 
 /**
  * v2.8.99 — cash drawer movement controller.
@@ -32,8 +34,11 @@ export class CashDrawerController {
   @Post('movements')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER)
   @ApiOperation({ summary: 'Create a cash drawer movement (DRAFT or APPROVED depending on type)' })
-  create(@Req() req: any, @Body() dto: CreateCashDrawerMovementDto) {
-    return this.svc.create(req.user.tenantId, req.user.id, dto);
+  create(
+    @CurrentScope() scope: BranchScope,
+    @Body() dto: CreateCashDrawerMovementDto,
+  ) {
+    return this.svc.create(scope.tenantId, scope.branchId, scope.userId, dto);
   }
 
   @Get('movements/pending')

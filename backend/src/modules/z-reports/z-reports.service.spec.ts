@@ -42,7 +42,7 @@ describe('ZReportsService.generateAndSendReport (iter-35)', () => {
       reportDate: expectedMidnight,
     } as any);
 
-    const out = await svc.generateAndSendReport('t1', 'user-1');
+    const out = await svc.generateAndSendReport('t1', 'b1', 'user-1');
 
     expect(out.reportId).toBe('zr-existing');
 
@@ -52,6 +52,7 @@ describe('ZReportsService.generateAndSendReport (iter-35)', () => {
     // this fails for any non-UTC tenant.
     const where = (prisma.zReport.findFirst as any).mock.calls[0][0].where;
     expect(where.tenantId).toBe('t1');
+    expect(where.branchId).toBe('b1');
     expect(where.reportDate.getTime()).toBe(expectedMidnight.getTime());
   });
 
@@ -65,7 +66,7 @@ describe('ZReportsService.generateAndSendReport (iter-35)', () => {
     const expectedMidnight = getTenantMidnight(new Date(), 'UTC');
     prisma.zReport.findFirst.mockResolvedValue({ id: 'zr-utc' } as any);
 
-    await svc.generateAndSendReport('t1', 'user-1');
+    await svc.generateAndSendReport('t1', 'b1', 'user-1');
 
     const where = (prisma.zReport.findFirst as any).mock.calls[0][0].where;
     expect(where.reportDate.getTime()).toBe(expectedMidnight.getTime());

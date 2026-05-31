@@ -166,6 +166,7 @@ export class WasteLogsService {
           cost: cost ? (cost as any) : undefined,
           stockItemId: dto.stockItemId,
           tenantId,
+          branchId: stockItem.branchId,
           createdById: userId,
         },
         include: { stockItem: { select: { id: true, name: true, unit: true } } },
@@ -181,6 +182,7 @@ export class WasteLogsService {
           referenceId: wasteLog.id,
           stockItemId: dto.stockItemId,
           tenantId,
+          branchId: stockItem.branchId,
           createdById: userId,
         },
       });

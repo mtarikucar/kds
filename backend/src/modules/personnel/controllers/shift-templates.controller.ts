@@ -17,6 +17,8 @@ import { PlanFeatureGuard } from '../../subscriptions/guards/plan-feature.guard'
 import { RequiresFeature } from '../../subscriptions/decorators/requires-feature.decorator';
 import { PlanFeature } from '../../../common/constants/subscription.enum';
 import { Roles } from '../../auth/decorators/roles.decorator';
+import { CurrentScope } from '../../auth/decorators/current-scope.decorator';
+import { BranchScope } from '../../../common/scoping/branch-scope';
 import { UserRole } from '../../../common/constants/roles.enum';
 import { ShiftTemplatesService } from '../services/shift-templates.service';
 import { CreateShiftTemplateDto } from '../dto/create-shift-template.dto';
@@ -33,8 +35,12 @@ export class ShiftTemplatesController {
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Create shift template' })
-  create(@Request() req, @Body() dto: CreateShiftTemplateDto) {
-    return this.shiftTemplatesService.create(req.tenantId, dto);
+  create(
+    @Request() req,
+    @CurrentScope() scope: BranchScope,
+    @Body() dto: CreateShiftTemplateDto,
+  ) {
+    return this.shiftTemplatesService.create(req.tenantId, scope.branchId, dto);
   }
 
   @Get()

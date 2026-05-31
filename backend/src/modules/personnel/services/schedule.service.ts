@@ -60,6 +60,7 @@ export class ScheduleService {
           date,
           notes: dto.notes,
           tenantId,
+          branchId: template.branchId,
         },
         include: {
           user: { select: { id: true, firstName: true, lastName: true, role: true } },

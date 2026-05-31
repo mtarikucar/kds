@@ -29,15 +29,21 @@ export class ZReportsService {
   ) {}
 
   /**
-   * Generate a Z-Report for end-of-day reconciliation
+   * Generate a Z-Report for end-of-day reconciliation.
+   *
+   * v3.0.0: `branchId` is now a NOT-NULL column on ZReport (schema-strict
+   * branch scoping). The controller passes `scope.branchId` from
+   * `@CurrentScope()`; the scheduler resolves it from the tenant's first
+   * active branch (or the acting admin's primary branch) before calling.
    */
-  async generateReport(tenantId: string, userId: string, createDto: CreateZReportDto) {
+  async generateReport(tenantId: string, branchId: string, userId: string, createDto: CreateZReportDto) {
     const { reportDate, cashDrawerOpening, cashDrawerClosing, notes } = createDto;
 
     // Check if report already exists for this date
     const existing = await this.prisma.zReport.findFirst({
       where: {
         tenantId,
+        branchId,
         reportDate: new Date(reportDate),
       },
     });
@@ -319,6 +325,7 @@ export class ZReportsService {
       report = await this.prisma.zReport.create({
       data: {
         tenantId,
+        branchId,
         reportDate: new Date(reportDate),
         reportNumber: `Z-${new Date(reportDate).toISOString().slice(0, 10).replace(/-/g, '')}`,
         closedById: userId,
@@ -734,9 +741,13 @@ export class ZReportsService {
   }
 
   /**
-   * Generate and send Z-Report for a tenant (used by scheduler)
+   * Generate and send Z-Report for a tenant (used by scheduler).
+   *
+   * v3.0.0: `branchId` is required — the scheduler resolves it per
+   * tenant before invoking (each branch closes independently for fiscal
+   * purposes, so the scheduler iterates branches, not just tenants).
    */
-  async generateAndSendReport(tenantId: string, userId: string): Promise<{ reportId: string; emailSent: boolean }> {
+  async generateAndSendReport(tenantId: string, branchId: string, userId: string): Promise<{ reportId: string; emailSent: boolean }> {
     // Tenant timezone matters: a TR restaurant closing at 23:00 TR with
     // the API pod in UTC needs "today" to mean "the TR calendar date
     // we're currently in", not "the UTC calendar date the server is in".
@@ -758,6 +769,7 @@ export class ZReportsService {
     const existing = await this.prisma.zReport.findFirst({
       where: {
         tenantId,
+        branchId,
         reportDate: today,
       },
     });
@@ -768,7 +780,7 @@ export class ZReportsService {
       report = existing;
     } else {
       // Generate report for today with default values
-      report = await this.generateReport(tenantId, userId, {
+      report = await this.generateReport(tenantId, branchId, userId, {
         reportDate: today.toISOString(),
         cashDrawerOpening: 0,
         cashDrawerClosing: 0,

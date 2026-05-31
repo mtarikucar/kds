@@ -20,7 +20,7 @@ describe('CashDrawerService', () => {
   for (const autoApproved of ['OPENING', 'CLOSING', 'CASH_IN']) {
     it(`auto-APPROVES on ${autoApproved}`, async () => {
       (prisma.cashDrawerMovement.create as any).mockResolvedValue({ id: 'm-1' });
-      await svc.create('t-1', 'u-1', { type: autoApproved as any, amount: 250 });
+      await svc.create('t-1', 'b-1', 'u-1', { type: autoApproved as any, amount: 250 });
       const args = (prisma.cashDrawerMovement.create as any).mock.calls[0][0];
       expect(args.data.approvalStatus).toBe('APPROVED');
       expect(args.data.approvedById).toBe('u-1');
@@ -31,7 +31,7 @@ describe('CashDrawerService', () => {
   for (const reviewType of ['CASH_OUT', 'ADJUSTMENT']) {
     it(`lands ${reviewType} as DRAFT awaiting manager approval`, async () => {
       (prisma.cashDrawerMovement.create as any).mockResolvedValue({ id: 'm-2' });
-      await svc.create('t-1', 'u-1', { type: reviewType as any, amount: 100 });
+      await svc.create('t-1', 'b-1', 'u-1', { type: reviewType as any, amount: 100 });
       const args = (prisma.cashDrawerMovement.create as any).mock.calls[0][0];
       expect(args.data.approvalStatus).toBe('DRAFT');
       expect(args.data.approvedById).toBeNull();
@@ -41,7 +41,7 @@ describe('CashDrawerService', () => {
 
   it('rejects unknown type with 400', async () => {
     await expect(
-      svc.create('t-1', 'u-1', { type: 'XYZ' as any, amount: 1 }),
+      svc.create('t-1', 'b-1', 'u-1', { type: 'XYZ' as any, amount: 1 }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 

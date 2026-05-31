@@ -11,6 +11,8 @@ import { PlanFeature } from '../../../common/constants/subscription.enum';
 import { StockCountsService } from '../services/stock-counts.service';
 import { CreateStockCountDto } from '../dto/create-stock-count.dto';
 import { UpdateStockCountItemDto } from '../dto/update-stock-count-item.dto';
+import { CurrentScope } from '../../auth/decorators/current-scope.decorator';
+import { BranchScope } from '../../../common/scoping/branch-scope';
 
 @ApiTags('stock-management/stock-counts')
 @ApiBearerAuth()
@@ -38,8 +40,12 @@ export class StockCountsController {
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @ApiOperation({ summary: 'Start a new stock count session' })
-  create(@Body() dto: CreateStockCountDto, @Request() req) {
-    return this.service.create(dto, req.tenantId, req.user?.id);
+  create(
+    @Body() dto: CreateStockCountDto,
+    @Request() req,
+    @CurrentScope() scope: BranchScope,
+  ) {
+    return this.service.create(dto, req.tenantId, scope.branchId, req.user?.id);
   }
 
   @Patch(':id/items/:itemId')

@@ -3,6 +3,9 @@ import {
   WebSocketServer,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  SubscribeMessage,
+  ConnectedSocket,
+  MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { Injectable, Logger } from '@nestjs/common';
@@ -10,21 +13,32 @@ import { JwtService } from '@nestjs/jwt';
 import * as Sentry from '@sentry/node';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserRole } from '../../common/constants/roles.enum';
+import { BranchGuard } from '../auth/guards/branch.guard';
 
 /**
  * Single realtime bus for kitchen, POS, personnel and customer events.
  *
- * Room layout (per tenantId):
- * - kitchen-${tenantId}   — KITCHEN, ADMIN, MANAGER
- * - pos-${tenantId}       — WAITER, COURIER, ADMIN, MANAGER
- * - personnel-${tenantId} — ADMIN, MANAGER (attendance / swap requests)
- * - customer-session-${sessionId} — one customer per room
+ * v3.0.0 room layout (per tenantId, per branchId):
+ * - kitchen-${tenantId}-${branchId}   — KITCHEN, ADMIN, MANAGER on the active branch
+ * - pos-${tenantId}-${branchId}       — WAITER, COURIER, ADMIN, MANAGER on the active branch
+ * - personnel-${tenantId}-${branchId} — ADMIN, MANAGER attendance/swap on the active branch
+ * - customer-session-${sessionId}     — one customer per room
  *
- * Staff sockets must present a `type: 'user'` main-app JWT (HS256). Marketing
- * and superadmin tokens are deliberately rejected by the type check, matching
- * JwtStrategy's policy. Customer sockets present a session id bound to a live
- * CustomerSession row. The two auth flows are mutually exclusive — a staff
- * socket never joins customer rooms and vice versa.
+ * Branch isolation is load-bearing. A WAITER pinned to branch A who
+ * receives a kitchen event for branch B is a leakage — the audit's
+ * High finding #3. Every emit is scoped to (tenantId, branchId), and
+ * the connection handshake reads `auth.branchId` and validates it
+ * with the same `BranchGuard.canAccessBranchStatic` predicate the HTTP
+ * layer uses.
+ *
+ * ADMIN/MANAGER may emit a `switchBranch` event to move rooms without
+ * reconnecting. WAITER/KITCHEN/COURIER are pinned to their primary
+ * branch and any switch attempt is refused.
+ *
+ * Staff sockets must present a `type: 'user'` main-app JWT (HS256).
+ * Marketing and superadmin tokens are rejected by the type check,
+ * matching JwtStrategy's policy. Customer sockets present a session
+ * id bound to a live CustomerSession row.
  */
 @Injectable()
 @WebSocketGateway({
@@ -128,8 +142,41 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return false;
     }
 
+    // v3.0.0 — branch identity is required for staff sockets. The
+    // client passes `auth.branchId` at connect time (set by
+    // frontend/src/lib/socket.ts from useBranchScopeStore). We
+    // validate against the JWT's primaryBranchId/allowedBranchIds
+    // using the same predicate BranchGuard uses for HTTP — so a
+    // WAITER who tries to listen for branch B's kitchen feed gets
+    // refused at the same layer as their HTTP attempt would be.
+    const branchId =
+      typeof client.handshake.auth?.branchId === 'string'
+        ? client.handshake.auth.branchId
+        : '';
+    const primaryBranchId: string | null = payload.primaryBranchId ?? null;
+    const allowedBranchIds: string[] = Array.isArray(payload.allowedBranchIds)
+      ? payload.allowedBranchIds
+      : [];
+    if (
+      !branchId ||
+      !BranchGuard.canAccessBranchStatic(
+        role,
+        branchId,
+        primaryBranchId,
+        allowedBranchIds,
+      )
+    ) {
+      this.logger.warn(
+        `Staff JWT rejected for ${client.id}: missing or unauthorized branchId (role=${role}, requested=${branchId})`,
+      );
+      return false;
+    }
+
     client.data.userId = payload.sub;
     client.data.tenantId = tenantId;
+    client.data.branchId = branchId;
+    client.data.primaryBranchId = primaryBranchId;
+    client.data.allowedBranchIds = allowedBranchIds;
     client.data.role = role;
     client.data.userType = 'staff';
     client.data.tokenExp = payload.exp;
@@ -156,19 +203,84 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const isManagerRole = role === UserRole.ADMIN || role === UserRole.MANAGER;
 
     if (isKitchenRole || isManagerRole) {
-      client.join(`kitchen-${tenantId}`);
+      client.join(`kitchen-${tenantId}-${branchId}`);
     }
     if (isPosRole || isManagerRole) {
-      client.join(`pos-${tenantId}`);
+      client.join(`pos-${tenantId}-${branchId}`);
     }
     if (isManagerRole) {
-      client.join(`personnel-${tenantId}`);
+      client.join(`personnel-${tenantId}-${branchId}`);
     }
 
     this.logger.log(
-      `Staff ${client.id} connected (user=${payload.sub}, role=${role}, tenant=${tenantId})`,
+      `Staff ${client.id} connected (user=${payload.sub}, role=${role}, tenant=${tenantId}, branch=${branchId})`,
     );
     return true;
+  }
+
+  /**
+   * Switch the active branch on a live staff socket.
+   *
+   * The SPA emits `switchBranch` when the BranchPicker mutates
+   * useBranchScopeStore.branchId. The server validates against the
+   * JWT's allow-list (same predicate as connect-time) and atomically
+   * moves the socket between rooms. Returning {ok:false} lets the
+   * client surface a UX error without reconnecting; an ok=true ack
+   * tells the SPA the cache invalidation it kicked off in parallel
+   * will see fresh data on the next mount.
+   */
+  @SubscribeMessage('switchBranch')
+  async handleSwitchBranch(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: { branchId?: string },
+  ): Promise<{ ok: boolean; code?: string }> {
+    const target = String(payload?.branchId ?? '');
+    if (client.data?.userType !== 'staff') {
+      return { ok: false, code: 'NOT_STAFF' };
+    }
+    const role = client.data.role as UserRole;
+    const tenantId = client.data.tenantId as string;
+    const primaryBranchId = (client.data.primaryBranchId ?? null) as
+      | string
+      | null;
+    const allowedBranchIds = (client.data.allowedBranchIds ?? []) as string[];
+    if (
+      !BranchGuard.canAccessBranchStatic(
+        role,
+        target,
+        primaryBranchId,
+        allowedBranchIds,
+      )
+    ) {
+      return { ok: false, code: 'FORBIDDEN' };
+    }
+
+    const prev = client.data.branchId as string;
+    if (prev === target) return { ok: true };
+
+    // Move rooms — leave the previous (tenantId, prev) trio, join the
+    // new (tenantId, target) trio. Role-based membership stays the
+    // same; only the branch suffix changes.
+    const isKitchenRole = role === UserRole.KITCHEN;
+    const isPosRole = role === UserRole.WAITER || role === UserRole.COURIER;
+    const isManagerRole = role === UserRole.ADMIN || role === UserRole.MANAGER;
+    if (isKitchenRole || isManagerRole) {
+      client.leave(`kitchen-${tenantId}-${prev}`);
+      client.join(`kitchen-${tenantId}-${target}`);
+    }
+    if (isPosRole || isManagerRole) {
+      client.leave(`pos-${tenantId}-${prev}`);
+      client.join(`pos-${tenantId}-${target}`);
+    }
+    if (isManagerRole) {
+      client.leave(`personnel-${tenantId}-${prev}`);
+      client.join(`personnel-${tenantId}-${target}`);
+    }
+    client.data.branchId = target;
+    this.logger.log(
+      `Staff ${client.id} switched branch ${prev} → ${target} (tenant=${tenantId})`,
+    );
+    return { ok: true };
   }
 
   private async tryCustomerAuth(client: Socket, sessionId: string): Promise<boolean> {
@@ -305,18 +417,18 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     };
   }
 
-  emitNewOrder(tenantId: string, order: any) {
+  emitNewOrder(tenantId: string, branchId: string, order: any) {
     this.server
-      .to(`kitchen-${tenantId}`)
-      .to(`pos-${tenantId}`)
+      .to(`kitchen-${tenantId}-${branchId}`)
+      .to(`pos-${tenantId}-${branchId}`)
       .emit('order:new', this.toOrderEvent(order));
     this.logger.debug(`order:new ${order.orderNumber} → kitchen/pos-${tenantId}`);
   }
 
-  emitOrderUpdated(tenantId: string, order: any) {
+  emitOrderUpdated(tenantId: string, branchId: string, order: any) {
     this.server
-      .to(`kitchen-${tenantId}`)
-      .to(`pos-${tenantId}`)
+      .to(`kitchen-${tenantId}-${branchId}`)
+      .to(`pos-${tenantId}-${branchId}`)
       .emit('order:updated', this.toOrderEvent(order));
     this.logger.debug(`order:updated ${order.orderNumber} → kitchen/pos-${tenantId}`);
   }
@@ -335,6 +447,7 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
    */
   emitPaymentSuccess(
     tenantId: string,
+    branchId: string,
     payment: {
       id: string;
       orderId: string;
@@ -345,7 +458,7 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     initiatedByUserId?: string | null,
   ) {
     this.server
-      .to(`pos-${tenantId}`)
+      .to(`pos-${tenantId}-${branchId}`)
       .emit('payment:success', {
         paymentId: payment.id,
         orderId: payment.orderId,
@@ -363,34 +476,34 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.logger.debug(`payment:success ${payment.id} → pos-${tenantId}`);
   }
 
-  emitOrderStatusChange(tenantId: string, orderId: string, status: string) {
+  emitOrderStatusChange(tenantId: string, branchId: string, orderId: string, status: string) {
     this.server
-      .to(`kitchen-${tenantId}`)
-      .to(`pos-${tenantId}`)
+      .to(`kitchen-${tenantId}-${branchId}`)
+      .to(`pos-${tenantId}-${branchId}`)
       .emit('order:status-changed', { orderId, status, timestamp: new Date() });
     this.logger.debug(`order:status-changed ${orderId} → ${status}`);
   }
 
-  emitOrderItemStatusChange(tenantId: string, orderItemId: string, status: string) {
+  emitOrderItemStatusChange(tenantId: string, branchId: string, orderItemId: string, status: string) {
     this.server
-      .to(`kitchen-${tenantId}`)
-      .to(`pos-${tenantId}`)
+      .to(`kitchen-${tenantId}-${branchId}`)
+      .to(`pos-${tenantId}-${branchId}`)
       .emit('order:item-status-changed', { orderItemId, status, timestamp: new Date() });
     this.logger.debug(`order:item-status-changed ${orderItemId} → ${status}`);
   }
 
-  emitTableMerge(tenantId: string, payload: { groupId: string; tableNumbers: any[] }) {
+  emitTableMerge(tenantId: string, branchId: string, payload: { groupId: string; tableNumbers: any[] }) {
     this.server
-      .to(`kitchen-${tenantId}`)
-      .to(`pos-${tenantId}`)
+      .to(`kitchen-${tenantId}-${branchId}`)
+      .to(`pos-${tenantId}-${branchId}`)
       .emit('table:merged', payload);
     this.logger.debug(`table:merged group=${payload.groupId} → kitchen/pos-${tenantId}`);
   }
 
-  emitTableUnmerge(tenantId: string, payload: { tableNumber: any; groupId: string }) {
+  emitTableUnmerge(tenantId: string, branchId: string, payload: { tableNumber: any; groupId: string }) {
     this.server
-      .to(`kitchen-${tenantId}`)
-      .to(`pos-${tenantId}`)
+      .to(`kitchen-${tenantId}-${branchId}`)
+      .to(`pos-${tenantId}-${branchId}`)
       .emit('table:unmerged', payload);
     this.logger.debug(`table:unmerged table=${payload.tableNumber} → kitchen/pos-${tenantId}`);
   }
@@ -444,18 +557,19 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
-  emitNewOrderWithCustomer(tenantId: string, order: any, sessionId?: string) {
-    this.emitNewOrder(tenantId, order);
+  emitNewOrderWithCustomer(tenantId: string, branchId: string, order: any, sessionId?: string) {
+    this.emitNewOrder(tenantId, branchId, order);
     if (sessionId) this.emitCustomerOrderCreated(sessionId, order);
   }
 
   emitOrderStatusChangeWithCustomer(
     tenantId: string,
+    branchId: string,
     orderId: string,
     status: string,
     sessionId?: string,
   ) {
-    this.emitOrderStatusChange(tenantId, orderId, status);
+    this.emitOrderStatusChange(tenantId, branchId, orderId, status);
     if (sessionId) {
       this.emitToCustomerSession(sessionId, 'customer:order-status-updated', {
         orderId,
@@ -471,6 +585,7 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   emitTableTransfer(
     tenantId: string,
+    branchId: string,
     data: {
       sourceTableId: string;
       targetTableId: string;
@@ -481,8 +596,8 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     },
   ) {
     this.server
-      .to(`kitchen-${tenantId}`)
-      .to(`pos-${tenantId}`)
+      .to(`kitchen-${tenantId}-${branchId}`)
+      .to(`pos-${tenantId}-${branchId}`)
       .emit('table:orders-transferred', { ...data, timestamp: new Date() });
     this.logger.debug(
       `table:orders-transferred ${data.transferredCount} order(s) ${data.sourceTableNumber}->${data.targetTableNumber}`,
@@ -493,8 +608,8 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // BILL REQUEST EVENTS (POS only)
   // ========================================
 
-  emitBillRequest(tenantId: string, billRequest: any) {
-    this.server.to(`pos-${tenantId}`).emit('bill-request:new', {
+  emitBillRequest(tenantId: string, branchId: string, billRequest: any) {
+    this.server.to(`pos-${tenantId}-${branchId}`).emit('bill-request:new', {
       id: billRequest.id,
       tableId: billRequest.tableId,
       table: billRequest.table,
@@ -505,8 +620,8 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
-  emitBillRequestUpdated(tenantId: string, billRequest: any) {
-    this.server.to(`pos-${tenantId}`).emit('bill-request:updated', {
+  emitBillRequestUpdated(tenantId: string, branchId: string, billRequest: any) {
+    this.server.to(`pos-${tenantId}-${branchId}`).emit('bill-request:updated', {
       id: billRequest.id,
       tableId: billRequest.tableId,
       table: billRequest.table,
@@ -525,8 +640,8 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // WAITER REQUEST EVENTS (POS only)
   // ========================================
 
-  emitWaiterRequest(tenantId: string, waiterRequest: any) {
-    this.server.to(`pos-${tenantId}`).emit('waiter-request:new', {
+  emitWaiterRequest(tenantId: string, branchId: string, waiterRequest: any) {
+    this.server.to(`pos-${tenantId}-${branchId}`).emit('waiter-request:new', {
       id: waiterRequest.id,
       tableId: waiterRequest.tableId,
       table: waiterRequest.table,
@@ -538,8 +653,8 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
-  emitWaiterRequestUpdated(tenantId: string, waiterRequest: any) {
-    this.server.to(`pos-${tenantId}`).emit('waiter-request:updated', {
+  emitWaiterRequestUpdated(tenantId: string, branchId: string, waiterRequest: any) {
+    this.server.to(`pos-${tenantId}-${branchId}`).emit('waiter-request:updated', {
       id: waiterRequest.id,
       tableId: waiterRequest.tableId,
       table: waiterRequest.table,
@@ -559,15 +674,15 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // PERSONNEL MANAGEMENT EVENTS (ADMIN/MANAGER only)
   // ========================================
 
-  emitAttendanceUpdate(tenantId: string, data: any) {
+  emitAttendanceUpdate(tenantId: string, branchId: string, data: any) {
     this.server
-      .to(`personnel-${tenantId}`)
+      .to(`personnel-${tenantId}-${branchId}`)
       .emit('personnel:attendance-update', { ...data, timestamp: new Date() });
   }
 
-  emitSwapRequestUpdate(tenantId: string, data: any) {
+  emitSwapRequestUpdate(tenantId: string, branchId: string, data: any) {
     this.server
-      .to(`personnel-${tenantId}`)
+      .to(`personnel-${tenantId}-${branchId}`)
       .emit('personnel:swap-request-update', { ...data, timestamp: new Date() });
   }
 
@@ -575,10 +690,10 @@ export class KdsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   // STOCK ALERT EVENTS
   // ========================================
 
-  emitLowStockAlert(tenantId: string, items: string[]) {
+  emitLowStockAlert(tenantId: string, branchId: string, items: string[]) {
     this.server
-      .to(`kitchen-${tenantId}`)
-      .to(`pos-${tenantId}`)
+      .to(`kitchen-${tenantId}-${branchId}`)
+      .to(`pos-${tenantId}-${branchId}`)
       .emit('stock:low-stock-alert', { items, timestamp: new Date() });
     this.logger.debug(`stock:low-stock-alert ${items.length} items → kitchen/pos-${tenantId}`);
   }

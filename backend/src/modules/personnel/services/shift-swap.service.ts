@@ -58,6 +58,13 @@ export class ShiftSwapService {
       throw new BadRequestException('Target assignment has already been swapped');
     }
 
+    // v3.0.0: branchId is required and must match across both assignments —
+    // cross-branch swaps are not a supported operation.
+    if (requesterAssignment.branchId !== targetAssignment.branchId) {
+      throw new BadRequestException('Cannot swap shifts across branches');
+    }
+    const branchId = requesterAssignment.branchId;
+
     const result = await this.prisma.shiftSwapRequest.create({
       data: {
         requesterId,
@@ -66,6 +73,7 @@ export class ShiftSwapService {
         targetAssignmentId: dto.targetAssignmentId,
         reason: dto.reason,
         tenantId,
+        branchId,
       },
       include: {
         requester: { select: { id: true, firstName: true, lastName: true } },
@@ -74,7 +82,7 @@ export class ShiftSwapService {
       },
     });
 
-    this.kdsGateway.emitSwapRequestUpdate(tenantId, result);
+    this.kdsGateway.emitSwapRequestUpdate(tenantId, result.branchId, result);
     return result;
   }
 
@@ -124,7 +132,7 @@ export class ShiftSwapService {
         target: { select: { id: true, firstName: true, lastName: true } },
       },
     });
-    this.kdsGateway.emitSwapRequestUpdate(tenantId, updated);
+    this.kdsGateway.emitSwapRequestUpdate(tenantId, updated.branchId, updated);
     return updated;
   }
 
@@ -239,7 +247,7 @@ export class ShiftSwapService {
       return updatedRequest;
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
 
-    this.kdsGateway.emitSwapRequestUpdate(tenantId, result);
+    this.kdsGateway.emitSwapRequestUpdate(tenantId, result.branchId, result);
     return result;
   }
 
@@ -286,7 +294,7 @@ export class ShiftSwapService {
       },
     });
 
-    this.kdsGateway.emitSwapRequestUpdate(tenantId, result);
+    this.kdsGateway.emitSwapRequestUpdate(tenantId, result.branchId, result);
     return result;
   }
 

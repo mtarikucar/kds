@@ -13,7 +13,7 @@ export class PosSettingsService {
     // create and hit P2002. The update branch is a no-op when the row
     // already exists — just returns it.
     return this.prisma.posSettings.upsert({
-      where: { tenantId },
+      where: { tenantId_branchId: { tenantId, branchId: null } },
       update: {},
       create: {
         tenantId,
@@ -42,7 +42,7 @@ export class PosSettingsService {
     //      both writes in one txn makes them succeed/fail together.
     let cancelledSelfPayIntents = 0;
     const settings = await this.prisma.$transaction(async (tx) => {
-      const existing = await tx.posSettings.findUnique({ where: { tenantId } });
+      const existing = await tx.posSettings.findUnique({ where: { tenantId_branchId: { tenantId, branchId: null } } });
 
       // Note: Tableless mode and customer ordering can now work together
       // - With tableId: DINE_IN order (customer scans table QR)
@@ -101,7 +101,7 @@ export class PosSettingsService {
       // two concurrent "first update" calls converge on a single row
       // instead of one hitting P2002.
       return tx.posSettings.upsert({
-        where: { tenantId },
+        where: { tenantId_branchId: { tenantId, branchId: null } },
         update: updateDto,
         create: {
           tenantId,

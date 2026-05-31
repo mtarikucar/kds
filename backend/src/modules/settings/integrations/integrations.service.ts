@@ -144,8 +144,16 @@ export class IntegrationsService {
   async create(tenantId: string, createDto: CreateIntegrationDto) {
     const existing = await this.prisma.integrationSettings.findUnique({
       where: {
-        tenantId_integrationType_provider: {
+        // v3.0.0 — IntegrationSettings now compounds branchId into
+        // its uniqueness invariant so a per-branch override can
+        // co-exist with the tenant-default row of the same provider.
+        // The IntegrationsService is currently the tenant-level
+        // surface (CRUD lives at /v1/integrations, not under a
+        // /v1/branches/:id/integrations route yet); branchId=null is
+        // the tenant-default address.
+        tenantId_branchId_integrationType_provider: {
           tenantId,
+          branchId: null,
           integrationType: createDto.integrationType,
           provider: createDto.provider,
         },

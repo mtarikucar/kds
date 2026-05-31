@@ -70,6 +70,22 @@ export class AttendanceService {
       }
     }
 
+    // v3.0.0: every operational row carries a branchId. For attendance,
+    // the row belongs to the user's primary branch — payroll/scheduling
+    // joins are per-branch, so writing it tenant-wide would break the
+    // branch-scoped views. Falls back to the shift assignment's branch
+    // when the user has no primaryBranchId yet (e.g. fresh onboarding).
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { primaryBranchId: true },
+    });
+    const branchId = user?.primaryBranchId ?? shiftAssignment?.branchId;
+    if (!branchId) {
+      throw new BadRequestException(
+        'Cannot clock in: user has no primary branch assigned',
+      );
+    }
+
     try {
       const result = await this.prisma.attendance.create({
         data: {
@@ -82,11 +98,12 @@ export class AttendanceService {
           shiftAssignmentId: shiftAssignment?.id,
           userId,
           tenantId,
+          branchId,
         },
         include: { user: { select: { id: true, firstName: true, lastName: true, role: true } } },
       });
 
-      this.kdsGateway.emitAttendanceUpdate(tenantId, result);
+      this.kdsGateway.emitAttendanceUpdate(tenantId, result.branchId, result);
       return result;
     } catch (error: any) {
       // Handle unique constraint violation (concurrent clock-in)
@@ -161,7 +178,7 @@ export class AttendanceService {
       include: { user: { select: { id: true, firstName: true, lastName: true, role: true } } },
     });
 
-    this.kdsGateway.emitAttendanceUpdate(tenantId, result);
+    this.kdsGateway.emitAttendanceUpdate(tenantId, result.branchId, result);
     return result;
   }
 
@@ -198,7 +215,7 @@ export class AttendanceService {
       include: { user: { select: { id: true, firstName: true, lastName: true, role: true } } },
     });
 
-    this.kdsGateway.emitAttendanceUpdate(tenantId, result);
+    this.kdsGateway.emitAttendanceUpdate(tenantId, result.branchId, result);
     return result;
   }
 
@@ -251,7 +268,7 @@ export class AttendanceService {
       include: { user: { select: { id: true, firstName: true, lastName: true, role: true } } },
     });
 
-    this.kdsGateway.emitAttendanceUpdate(tenantId, result);
+    this.kdsGateway.emitAttendanceUpdate(tenantId, result.branchId, result);
     return result;
   }
 

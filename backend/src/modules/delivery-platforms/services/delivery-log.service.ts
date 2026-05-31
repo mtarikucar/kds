@@ -4,6 +4,7 @@ import { PlatformLogDirection, PlatformLogAction } from '../constants/platform.e
 
 export interface LogEntry {
   tenantId: string;
+  branchId?: string;
   platform: string;
   direction: string;
   action: string;
@@ -32,9 +33,26 @@ export class DeliveryLogService {
    */
   async log(entry: LogEntry) {
     try {
+      // v3.0.0: branchId is NOT NULL on DeliveryPlatformLog. Derive from the
+      // referenced order when possible; fall back to caller-provided branchId.
+      let branchId = entry.branchId;
+      if (!branchId && entry.orderId) {
+        const order = await this.prisma.order.findUnique({
+          where: { id: entry.orderId },
+          select: { branchId: true },
+        });
+        branchId = order?.branchId ?? undefined;
+      }
+      if (!branchId) {
+        this.logger.warn(
+          `Cannot create delivery log without branchId (tenant=${entry.tenantId}, order=${entry.orderId ?? 'n/a'})`,
+        );
+        return null;
+      }
       return await this.prisma.deliveryPlatformLog.create({
         data: {
           tenantId: entry.tenantId,
+          branchId,
           platform: entry.platform,
           direction: entry.direction,
           action: entry.action,

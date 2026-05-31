@@ -209,6 +209,23 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
         },
       );
 
+      // v3.0.0 — EdgeDevice now requires branchId. The edge device
+      // registers via WS with only tenantId in its JWT (it doesn't yet
+      // know which branch it belongs to), so we default to the tenant's
+      // first active branch as the registration branch. Operators can
+      // move the device later via the admin UI.
+      const defaultBranch = await this.prisma.branch.findFirst({
+        where: { tenantId: payload.tenantId, status: 'active' },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      if (!defaultBranch) {
+        this.logger.warn(
+          `Edge device ${payload.deviceId} registration rejected: tenant ${payload.tenantId} has no active branch`,
+        );
+        return { success: false, error: 'No active branch for tenant' };
+      }
+
       // Update or create edge device in database
       await this.prisma.edgeDevice.upsert({
         where: {
@@ -221,6 +238,7 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
           deviceId: payload.deviceId,
           name: `Edge Device ${payload.deviceId}`,
           tenantId: payload.tenantId,
+          branchId: defaultBranch.id,
           status: 'ONLINE',
           lastSeenAt: new Date(),
           lastHeartbeat: new Date(),
@@ -306,9 +324,24 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
 
       // Store occupancy records
       if (payload.detections.length > 0) {
+        // v3.0.0 — load the source camera's branchId once and propagate
+        // it to both the OccupancyRecord rows and the TrafficFlowRecord
+        // aggregation. OccupancyRecord/TrafficFlowRecord both now require
+        // branchId (NOT NULL, Restrict), and the source-of-truth for the
+        // branch is the camera entity, not the edge device JWT.
+        const camera = await this.prisma.camera.findFirst({
+          where: { id: payload.cameraId, tenantId },
+          select: { branchId: true },
+        });
+        if (!camera) {
+          return { success: false, error: 'Camera not found for tenant' };
+        }
+        const branchId = camera.branchId;
+
         await this.prisma.occupancyRecord.createMany({
           data: payload.detections.map((detection) => ({
             tenantId,
+            branchId,
             cameraId: payload.cameraId,
             trackingId: detection.trackingId,
             positionX: detection.positionX,
@@ -321,7 +354,7 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
         });
 
         // Update traffic flow aggregation (async, don't wait)
-        this.updateTrafficFlow(tenantId, payload.detections, timestamp).catch((err) => {
+        this.updateTrafficFlow(tenantId, branchId, payload.detections, timestamp).catch((err) => {
           this.logger.error(`Traffic flow update failed: ${err.message}`);
         });
 
@@ -565,6 +598,7 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
 
   private async updateTrafficFlow(
     tenantId: string,
+    branchId: string,
     detections: EdgeOccupancyDataDto['detections'],
     timestamp: Date,
   ) {
@@ -594,6 +628,7 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
         },
         create: {
           tenantId,
+          branchId,
           hourBucket,
           cellX,
           cellZ,

@@ -47,6 +47,7 @@ export class CashDrawerService {
 
   async create(
     tenantId: string,
+    branchId: string,
     userId: string,
     dto: CreateCashDrawerMovementDto,
   ) {
@@ -62,6 +63,7 @@ export class CashDrawerService {
     return this.prisma.cashDrawerMovement.create({
       data: {
         tenantId,
+        branchId,
         userId,
         type: dto.type,
         amount: new Prisma.Decimal(dto.amount),

@@ -96,14 +96,21 @@ export class CustomerOrdersService {
       }
     }
 
+    // v3.0.0 — every Order is branch-scoped. With a tableId we read
+    // table.branchId; for tableless mode we fall back to the tenant's
+    // first active branch (the "main counter" for single-branch
+    // tenants; multi-branch tenants who enable tableless mode in
+    // practice configure one specific branch per QR menu URL).
     let orderType: OrderType;
+    let branchId: string;
     if (dto.tableId) {
       const table = await this.prisma.table.findFirst({
         where: { id: dto.tableId, tenantId },
-        select: { id: true },
+        select: { id: true, branchId: true },
       });
       if (!table) throw new NotFoundException('Table not found');
       orderType = dto.type || OrderType.DINE_IN;
+      branchId = table.branchId;
     } else {
       if (!posSettings.enableTablelessMode) {
         throw new BadRequestException(
@@ -111,6 +118,17 @@ export class CustomerOrdersService {
         );
       }
       orderType = dto.type || OrderType.COUNTER;
+      const mainBranch = await this.prisma.branch.findFirst({
+        where: { tenantId, status: 'active' },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      if (!mainBranch) {
+        throw new BadRequestException(
+          'Tenant has no active branch — cannot accept tableless orders.',
+        );
+      }
+      branchId = mainBranch.id;
     }
 
     const validatedItems = await this.validateAndCalculateItems(dto.items, tenantId);
@@ -141,6 +159,7 @@ export class CustomerOrdersService {
           data: {
             orderNumber,
             tenantId,
+            branchId,
             tableId: dto.tableId || null,
             sessionId: dto.sessionId,
             customerPhone: dto.customerPhone,
@@ -215,7 +234,7 @@ export class CustomerOrdersService {
           OrderStatus.PENDING_APPROVAL,
         );
         if (deductResult?.lowStockAlerts?.length) {
-          this.kdsGateway.emitLowStockAlert(tenantId, deductResult.lowStockAlerts);
+          this.kdsGateway.emitLowStockAlert(tenantId, branchId, deductResult.lowStockAlerts);
         }
       } catch (err: any) {
         this.logger.error(
@@ -273,12 +292,23 @@ export class CustomerOrdersService {
     const session = await this.customerSessionService.requireSession(dto.sessionId);
     const tenantId = session.tenantId;
 
+    // v3.0.0 — derive branchId from the table the request is bound
+    // to (always set in the QR-scan flow). If a future caller lands
+    // here without a tableId the request would be ambiguous between
+    // multiple branches, so we refuse rather than silently picking
+    // one — keeps the WaiterRequest stream branch-correct.
+    let branchId: string;
     if (dto.tableId) {
       const table = await this.prisma.table.findFirst({
         where: { id: dto.tableId, tenantId },
-        select: { id: true },
+        select: { id: true, branchId: true },
       });
       if (!table) throw new NotFoundException('Table not found');
+      branchId = table.branchId;
+    } else {
+      throw new BadRequestException(
+        'tableId is required to call a waiter — request is otherwise ambiguous across branches.',
+      );
     }
 
     // Dedup. The earlier version ANDed `status active` with `createdAt
@@ -317,6 +347,7 @@ export class CustomerOrdersService {
       waiterRequest = await this.prisma.waiterRequest.create({
         data: {
           tenantId,
+          branchId,
           tableId: dto.tableId || null,
           sessionId: dto.sessionId,
           message: dto.message,
@@ -335,7 +366,7 @@ export class CustomerOrdersService {
       throw err;
     }
 
-    this.kdsGateway.emitWaiterRequest(tenantId, waiterRequest);
+    this.kdsGateway.emitWaiterRequest(tenantId, waiterRequest.branchId, waiterRequest);
     return waiterRequest;
   }
 
@@ -387,7 +418,7 @@ export class CustomerOrdersService {
         acknowledgedBy: { select: { id: true, firstName: true, lastName: true } },
       },
     });
-    this.kdsGateway.emitWaiterRequestUpdated(tenantId, updated);
+    this.kdsGateway.emitWaiterRequestUpdated(tenantId, updated.branchId, updated);
     return updated;
   }
 
@@ -451,7 +482,7 @@ export class CustomerOrdersService {
         acknowledgedBy: { select: { id: true, firstName: true, lastName: true } },
       },
     });
-    this.kdsGateway.emitWaiterRequestUpdated(tenantId, updated);
+    this.kdsGateway.emitWaiterRequestUpdated(tenantId, updated.branchId, updated);
     return updated;
   }
 
@@ -463,12 +494,18 @@ export class CustomerOrdersService {
     const session = await this.customerSessionService.requireSession(dto.sessionId);
     const tenantId = session.tenantId;
 
+    let branchId: string;
     if (dto.tableId) {
       const table = await this.prisma.table.findFirst({
         where: { id: dto.tableId, tenantId },
-        select: { id: true },
+        select: { id: true, branchId: true },
       });
       if (!table) throw new NotFoundException('Table not found');
+      branchId = table.branchId;
+    } else {
+      throw new BadRequestException(
+        'tableId is required to request the bill — request is otherwise ambiguous across branches.',
+      );
     }
 
     // Coalesce: returning a PENDING/ACKNOWLEDGED row covers the common
@@ -499,6 +536,7 @@ export class CustomerOrdersService {
       billRequest = await this.prisma.billRequest.create({
         data: {
           tenantId,
+          branchId,
           tableId: dto.tableId || null,
           sessionId: dto.sessionId,
           status: 'PENDING',
@@ -516,7 +554,7 @@ export class CustomerOrdersService {
       throw err;
     }
 
-    this.kdsGateway.emitBillRequest(tenantId, billRequest);
+    this.kdsGateway.emitBillRequest(tenantId, billRequest.branchId, billRequest);
     return billRequest;
   }
 
@@ -565,7 +603,7 @@ export class CustomerOrdersService {
         acknowledgedBy: { select: { id: true, firstName: true, lastName: true } },
       },
     });
-    this.kdsGateway.emitBillRequestUpdated(tenantId, updated);
+    this.kdsGateway.emitBillRequestUpdated(tenantId, updated.branchId, updated);
     return updated;
   }
 
@@ -610,7 +648,7 @@ export class CustomerOrdersService {
         acknowledgedBy: { select: { id: true, firstName: true, lastName: true } },
       },
     });
-    this.kdsGateway.emitBillRequestUpdated(tenantId, updated);
+    this.kdsGateway.emitBillRequestUpdated(tenantId, updated.branchId, updated);
     return updated;
   }
 

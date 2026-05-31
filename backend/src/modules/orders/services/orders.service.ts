@@ -561,14 +561,14 @@ export class OrdersService {
         }
 
         // Emit new order to kitchen via WebSocket
-        this.kdsGateway.emitNewOrder(tenantId, createdOrder);
+        this.kdsGateway.emitNewOrder(tenantId, createdOrder.branchId, createdOrder);
 
         // Auto-deduct ingredients if configured (respects deductOnStatus setting)
         if (this.stockDeductionService) {
           try {
             const deductResult = await this.stockDeductionService.deductForOrder(createdOrder.id, tenantId, OrderStatus.PENDING);
             if (deductResult?.lowStockAlerts?.length > 0) {
-              this.kdsGateway.emitLowStockAlert(tenantId, deductResult.lowStockAlerts);
+              this.kdsGateway.emitLowStockAlert(tenantId, createdOrder.branchId, deductResult.lowStockAlerts);
             }
           } catch (error: any) {
             this.logger.error(
@@ -995,7 +995,7 @@ export class OrdersService {
 
     // Always emit to kitchen via WebSocket when order is updated
     // This ensures KDS updates even when only discount/notes/customerName change
-    this.kdsGateway.emitOrderUpdated(tenantId, updatedOrder);
+    this.kdsGateway.emitOrderUpdated(tenantId, updatedOrder.branchId, updatedOrder);
 
     // Mesh-side consumers (kds-routing, webhooks-outbound) see the change via
     // the outbox. Distinct event type so consumers can opt into "any update"
@@ -1120,7 +1120,7 @@ export class OrdersService {
           `CRITICAL: Stock reversal failed for cancelled order ${id}. Manual stock adjustment may be needed. Error: ${error.message}`,
           error.stack,
         );
-        this.kdsGateway.emitLowStockAlert(tenantId, [`Stock reversal failed for order ${updatedOrder.orderNumber}. Please verify inventory.`]);
+        this.kdsGateway.emitLowStockAlert(tenantId, updatedOrder.branchId, [`Stock reversal failed for order ${updatedOrder.orderNumber}. Please verify inventory.`]);
       }
     }
 
@@ -1129,7 +1129,7 @@ export class OrdersService {
       try {
         const deductResult = await this.stockDeductionService.deductForOrder(id, tenantId, updateStatusDto.status);
         if (deductResult?.lowStockAlerts?.length > 0) {
-          this.kdsGateway.emitLowStockAlert(tenantId, deductResult.lowStockAlerts);
+          this.kdsGateway.emitLowStockAlert(tenantId, updatedOrder.branchId, deductResult.lowStockAlerts);
         }
       } catch (error: any) {
         this.logger.error(
@@ -1140,7 +1140,7 @@ export class OrdersService {
     }
 
     // Emit status change via WebSocket
-    this.kdsGateway.emitOrderStatusChange(tenantId, id, updateStatusDto.status);
+    this.kdsGateway.emitOrderStatusChange(tenantId, updatedOrder.branchId, id, updateStatusDto.status);
 
     // Sync status to delivery platform (if applicable)
     this.deliveryStatusSync?.syncStatusToPlatform(id, updateStatusDto.status).catch((err) => {
@@ -1338,6 +1338,9 @@ export class OrdersService {
           });
 
           // Create stock movement record
+          // v3.0.0 — branchId is NOT NULL on StockMovement; inherit from
+          // the originating order so the movement lives in the same
+          // branch scope as the sale that triggered it.
           await tx.stockMovement.create({
             data: {
               type: StockMovementType.OUT,
@@ -1346,6 +1349,7 @@ export class OrdersService {
               productId: product.id,
               userId: order.userId,
               tenantId: order.tenantId,
+              branchId: order.branchId,
             },
           });
         }
@@ -1440,9 +1444,9 @@ export class OrdersService {
 
     // Emit WebSocket events for real-time updates
     // Emit as new order for kitchen and POS systems
-    this.kdsGateway.emitNewOrder(tenantId, updatedOrder);
+    this.kdsGateway.emitNewOrder(tenantId, updatedOrder.branchId, updatedOrder);
     // Also emit update event for any listening clients
-    this.kdsGateway.emitOrderUpdated(tenantId, updatedOrder);
+    this.kdsGateway.emitOrderUpdated(tenantId, updatedOrder.branchId, updatedOrder);
 
     // CRITICAL: Notify customer if this is a QR menu order
     if (updatedOrder.sessionId) {
@@ -1633,7 +1637,7 @@ export class OrdersService {
     });
 
     // Emit WebSocket event for table transfer
-    this.kdsGateway.emitTableTransfer(tenantId, {
+    this.kdsGateway.emitTableTransfer(tenantId, sourceTable.branchId, {
       sourceTableId,
       targetTableId,
       sourceTableNumber: sourceTable.number,

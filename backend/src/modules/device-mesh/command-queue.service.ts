@@ -33,7 +33,7 @@ export class CommandQueueService {
   ) {
     const device = await this.prisma.device.findFirst({
       where: { id: deviceId, tenantId },
-      select: { id: true, status: true },
+      select: { id: true, status: true, branchId: true },
     });
     if (!device) throw new NotFoundException('Device not found');
     if (device.status === 'retired') throw new BadRequestException('Device retired');
@@ -44,6 +44,7 @@ export class CommandQueueService {
         data: {
           id: uuidv7(),
           tenantId,
+          branchId: device.branchId,
           deviceId,
           kind: input.kind,
           payload: input.payload as any,

@@ -182,7 +182,7 @@ export class CustomerSelfPayService {
     // in. The createPayIntent path will also enforce it server-side
     // — this is a UX-layer convenience.
     const posSettings = await this.prisma.posSettings.findUnique({
-      where: { tenantId: session.tenantId },
+      where: { tenantId_branchId: { tenantId: session.tenantId, branchId: null } },
       select: { enableCustomerSelfPay: true },
     });
     const selfPayEnabled = !!posSettings?.enableCustomerSelfPay;
@@ -424,7 +424,7 @@ export class CustomerSelfPayService {
     // is a deliberate guard so a restaurant without a PayTR merchant
     // account doesn't surface a button that will only ever fail.
     const posSettings = await this.prisma.posSettings.findUnique({
-      where: { tenantId: session.tenantId },
+      where: { tenantId_branchId: { tenantId: session.tenantId, branchId: null } },
       select: { enableCustomerSelfPay: true },
     });
     if (!posSettings?.enableCustomerSelfPay) {
@@ -507,6 +507,12 @@ export class CustomerSelfPayService {
       where: { id: { in: orderIdsTouched }, tenantId: session.tenantId },
       select: {
         id: true,
+        // v3.0.0 — every order's branchId rides through to the
+        // PendingSelfPayment row created below. A multi-order intent
+        // must span only one branch (a single self-pay can't straddle
+        // two physical kitchens); we assert this just before the
+        // create.
+        branchId: true,
         finalAmount: true,
         payments: {
           where: { status: PaymentStatus.COMPLETED },
@@ -690,11 +696,26 @@ export class CustomerSelfPayService {
           );
         }
       }
+      // v3.0.0 — assert all touched orders share a branchId before
+      // we mint the PendingSelfPayment row. Cross-branch intents are
+      // a UX bug that should never reach the DB FK Restrict; this
+      // catches it with a clearer error first.
+      const distinctBranches = Array.from(
+        new Set(guardedOrders.map((o) => o.branchId)),
+      );
+      if (distinctBranches.length !== 1) {
+        throw new BadRequestException(
+          'Self-pay intent spans multiple branches — split into separate intents.',
+        );
+      }
+      const intentBranchId = distinctBranches[0];
+
       return tx.pendingSelfPayment.create({
         data: {
           merchantOid,
           sessionId,
           tenantId: session.tenantId,
+          branchId: intentBranchId,
           itemsByOrder: Array.from(itemsByOrder.values()) as any,
           amount: totalAmount,
           status: 'PENDING',

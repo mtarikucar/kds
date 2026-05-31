@@ -29,7 +29,7 @@ export class PurchaseOrdersService {
    */
   private async allocatePoNumber(tx: Tx, tenantId: string): Promise<string> {
     const settings = await tx.stockSettings.upsert({
-      where: { tenantId },
+      where: { tenantId_branchId: { tenantId, branchId: null } },
       create: { tenantId, poSequence: 1 },
       update: { poSequence: { increment: 1 } },
     });
@@ -59,7 +59,7 @@ export class PurchaseOrdersService {
       include: {
         supplier: true,
         items: {
-          include: { stockItem: { select: { id: true, name: true, unit: true } } },
+          include: { stockItem: { select: { id: true, name: true, unit: true, branchId: true } } },
         },
       },
     });
@@ -67,7 +67,12 @@ export class PurchaseOrdersService {
     return po;
   }
 
-  async create(dto: CreatePurchaseOrderDto, tenantId: string, userId?: string) {
+  async create(
+    dto: CreatePurchaseOrderDto,
+    tenantId: string,
+    branchId: string,
+    userId?: string,
+  ) {
     const supplier = await this.prisma.supplier.findFirst({
       where: { id: dto.supplierId, tenantId },
     });
@@ -80,6 +85,15 @@ export class PurchaseOrdersService {
     if (stockItems.length !== stockItemIds.length) {
       throw new BadRequestException('One or more stock items not found');
     }
+    // v3.0.0 strict branch-scope: a PO is a single-branch document. If
+    // the caller's scope doesn't match every referenced stock item's
+    // branchId, refuse — the alternative is silently writing a PO into
+    // one branch that decrements another branch's stock on receive.
+    if (stockItems.some((si) => si.branchId !== branchId)) {
+      throw new BadRequestException(
+        'All stock items must belong to the current branch',
+      );
+    }
 
     return this.prisma.$transaction(async (tx) => {
       const orderNumber = await this.allocatePoNumber(tx, tenantId);
@@ -90,6 +104,7 @@ export class PurchaseOrdersService {
           notes: dto.notes,
           expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : undefined,
           tenantId,
+          branchId,
           createdById: userId,
           items: {
             create: dto.items.map((item) => ({
@@ -130,7 +145,7 @@ export class PurchaseOrdersService {
       where: { id },
       include: {
         supplier: { select: { id: true, name: true } },
-        items: { include: { stockItem: { select: { id: true, name: true, unit: true } } } },
+        items: { include: { stockItem: { select: { id: true, name: true, unit: true, branchId: true } } } },
       },
     });
   }
@@ -170,7 +185,7 @@ export class PurchaseOrdersService {
               id: lineItem.purchaseOrderItemId,
               purchaseOrderId: id,
             },
-            include: { stockItem: { select: { name: true } } },
+            include: { stockItem: { select: { name: true, branchId: true } } },
           });
           if (!poItem) {
             throw new BadRequestException(
@@ -249,6 +264,7 @@ export class PurchaseOrdersService {
             stockItemId: poItem.stockItemId,
             purchaseOrderItemId: poItem.id,
             tenantId,
+            branchId: poItem.stockItem.branchId,
           },
         });
 
@@ -261,6 +277,7 @@ export class PurchaseOrdersService {
             referenceType: 'PURCHASE_ORDER',
             referenceId: po.id,
             stockItemId: poItem.stockItemId,
+            branchId: poItem.stockItem.branchId,
             tenantId,
             createdById: userId,
           },
@@ -292,7 +309,7 @@ export class PurchaseOrdersService {
         include: {
           supplier: { select: { id: true, name: true } },
           items: {
-            include: { stockItem: { select: { id: true, name: true, unit: true } } },
+            include: { stockItem: { select: { id: true, name: true, unit: true, branchId: true } } },
           },
         },
       });
@@ -346,6 +363,7 @@ export class PurchaseOrdersService {
             referenceType: 'PURCHASE_ORDER',
             referenceId: po.id,
             stockItemId: item.stockItemId,
+            branchId: item.stockItem.branchId,
             tenantId,
             createdById: userId,
           },

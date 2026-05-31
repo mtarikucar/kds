@@ -48,7 +48,7 @@ export class TablesService {
     private kdsGateway: KdsGateway,
   ) {}
 
-  async create(createTableDto: CreateTableDto, tenantId: string) {
+  async create(createTableDto: CreateTableDto, tenantId: string, branchId: string) {
     // Check if table number already exists for this tenant
     const existingTable = await this.prisma.table.findUnique({
       where: {
@@ -65,6 +65,10 @@ export class TablesService {
       );
     }
 
+    // v3.0.0 strict: every Table now requires a branchId (Restrict on
+    // delete). Sourced from @CurrentScope() in the controller — the
+    // table physically belongs to one branch and OrdersService.create
+    // copies this onto each order.
     return this.prisma.table.create({
       data: {
         number: createTableDto.number,
@@ -72,6 +76,7 @@ export class TablesService {
         section: createTableDto.section,
         status: createTableDto.status || TableStatus.AVAILABLE,
         tenantId,
+        branchId,
       },
     });
   }
@@ -131,7 +136,7 @@ export class TablesService {
     // Per-tenant pre-start hold window. Single row lookup — keep it
     // unwrapped here rather than passing through every call site.
     const settings = await this.prisma.reservationSettings.findUnique({
-      where: { tenantId },
+      where: { tenantId_branchId: { tenantId, branchId: null } },
       select: { holdOffsetMinutes: true },
     });
     const holdOffsetMin = settings?.holdOffsetMinutes ?? DEFAULT_HOLD_OFFSET_MINUTES;
@@ -380,9 +385,9 @@ export class TablesService {
         data: { groupId },
       });
 
-      return { groupId, tableNumbers: tables.map(t => t.number) };
-    }).then(({ groupId, tableNumbers }) => {
-      this.kdsGateway.emitTableMerge(tenantId, { groupId, tableNumbers });
+      return { groupId, tableNumbers: tables.map(t => t.number), branchId: tables[0].branchId };
+    }).then(({ groupId, tableNumbers, branchId }) => {
+      this.kdsGateway.emitTableMerge(tenantId, branchId, { groupId, tableNumbers });
       return this.getTableGroup(groupId, tenantId);
     });
   }
@@ -430,16 +435,16 @@ export class TablesService {
         });
       }
 
-      return { message: 'Table unmerged successfully', tableId: dto.tableId, tableNumber: table.number, groupId };
+      return { message: 'Table unmerged successfully', tableId: dto.tableId, tableNumber: table.number, groupId, branchId: table.branchId };
     }).then((result) => {
-      this.kdsGateway.emitTableUnmerge(tenantId, { tableNumber: result.tableNumber, groupId: result.groupId });
+      this.kdsGateway.emitTableUnmerge(tenantId, result.branchId, { tableNumber: result.tableNumber, groupId: result.groupId });
       return { message: result.message, tableId: result.tableId };
     });
   }
 
   async unmergeAll(groupId: string, tenantId: string) {
     return this.prisma.$transaction(async (tx) => {
-      const count = await tx.table.count({
+      const sampleTable = await tx.table.findFirst({ where: { groupId, tenantId }, select: { branchId: true } }); const count = await tx.table.count({
         where: { groupId, tenantId },
       });
 
@@ -452,9 +457,9 @@ export class TablesService {
         data: { groupId: null },
       });
 
-      return { message: 'All tables unmerged successfully' };
+      return { message: 'All tables unmerged successfully', branchId: sampleTable?.branchId ?? '' };
     }).then((result) => {
-      this.kdsGateway.emitTableUnmerge(tenantId, { tableNumber: 'all', groupId });
+      this.kdsGateway.emitTableUnmerge(tenantId, result.branchId, { tableNumber: "all", groupId });
       return result;
     });
   }

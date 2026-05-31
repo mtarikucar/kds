@@ -241,7 +241,7 @@ export class InsightsService {
    * Generate new insights based on analytics data
    * This is called periodically or on-demand to refresh insights
    */
-  async generateInsights(tenantId: string): Promise<number> {
+  async generateInsights(tenantId: string, branchId: string): Promise<number> {
     const now = new Date();
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -262,6 +262,11 @@ export class InsightsService {
       validFrom: Date;
       validUntil: Date;
       tenantId: string;
+      // v3.0.0: insights are per-branch — derived from the
+      // camera/edgeDevice context that generated the upstream
+      // tableAnalytics / trafficFlowRecord rows, propagated from the
+      // calling controller via @CurrentScope().branchId.
+      branchId: string;
     }> = [];
 
     // Check for underutilized tables
@@ -329,6 +334,7 @@ export class InsightsService {
             validFrom: now,
             validUntil: oneWeekFromNow,
             tenantId,
+            branchId,
           });
         }
       }
@@ -411,6 +417,7 @@ export class InsightsService {
             validFrom: now,
             validUntil: oneWeekFromNow,
             tenantId,
+            branchId,
           });
           break; // Only one traffic insight at a time
         }

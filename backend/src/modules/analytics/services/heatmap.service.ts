@@ -39,6 +39,7 @@ export class HeatmapService {
    */
   async getOccupancyHeatmap(
     tenantId: string,
+    branchId: string,
     startDate: Date,
     endDate: Date,
     options: HeatmapOptions = {}
@@ -57,6 +58,7 @@ export class HeatmapService {
     // Check cache first
     const cached = await this.getCachedHeatmap(
       tenantId,
+      branchId,
       startDate,
       endDate,
       HeatmapMetric.OCCUPANCY,
@@ -118,7 +120,7 @@ export class HeatmapService {
     };
 
     // Cache the result
-    await this.cacheHeatmap(tenantId, response, granularity);
+    await this.cacheHeatmap(tenantId, branchId, response, granularity);
 
     return response;
   }
@@ -128,6 +130,7 @@ export class HeatmapService {
    */
   async getTrafficHeatmap(
     tenantId: string,
+    branchId: string,
     startDate: Date,
     endDate: Date,
     options: HeatmapOptions = {}
@@ -146,6 +149,7 @@ export class HeatmapService {
     // Check cache first
     const cached = await this.getCachedHeatmap(
       tenantId,
+      branchId,
       startDate,
       endDate,
       HeatmapMetric.TRAFFIC,
@@ -202,7 +206,7 @@ export class HeatmapService {
     };
 
     // Cache the result
-    await this.cacheHeatmap(tenantId, response, granularity);
+    await this.cacheHeatmap(tenantId, branchId, response, granularity);
 
     return response;
   }
@@ -544,20 +548,22 @@ export class HeatmapService {
 
   private async getCachedHeatmap(
     tenantId: string,
+    branchId: string,
     startTime: Date,
     endTime: Date,
     metric: HeatmapMetric,
     granularity: HeatmapGranularity
   ): Promise<HeatmapResponseDto | null> {
-    const cached = await this.prisma.analyticsHeatmapCache.findUnique({
+    // v3.0.0 — branchId is not part of the @@unique key, so we filter by
+    // findFirst (per-branch) to avoid cross-branch cache collisions.
+    const cached = await this.prisma.analyticsHeatmapCache.findFirst({
       where: {
-        tenantId_startTime_endTime_granularity_metric: {
-          tenantId,
-          startTime,
-          endTime,
-          granularity,
-          metric,
-        },
+        tenantId,
+        branchId,
+        startTime,
+        endTime,
+        granularity,
+        metric,
       },
     });
 
@@ -581,6 +587,7 @@ export class HeatmapService {
 
   private async cacheHeatmap(
     tenantId: string,
+    branchId: string,
     heatmap: HeatmapResponseDto,
     granularity: HeatmapGranularity
   ): Promise<void> {
@@ -589,36 +596,50 @@ export class HeatmapService {
 
     const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
 
-    await this.prisma.analyticsHeatmapCache.upsert({
+    // v3.0.0 — branchId is not part of the @@unique composite, so an
+    // upsert keyed on (tenantId, startTime, endTime, granularity, metric)
+    // would collide across branches. Use findFirst + update/create so
+    // each branch keeps its own cache row.
+    const existing = await this.prisma.analyticsHeatmapCache.findFirst({
       where: {
-        tenantId_startTime_endTime_granularity_metric: {
-          tenantId,
-          startTime: heatmap.startTime,
-          endTime: heatmap.endTime,
-          granularity: heatmap.granularity,
-          metric: heatmap.metric,
-        },
-      },
-      update: {
-        heatmapData: heatmap.data,
-        maxValue: heatmap.maxValue,
-        minValue: heatmap.minValue,
-        expiresAt,
-      },
-      create: {
         tenantId,
+        branchId,
         startTime: heatmap.startTime,
         endTime: heatmap.endTime,
         granularity: heatmap.granularity,
         metric: heatmap.metric,
-        gridWidth: heatmap.gridWidth,
-        gridDepth: heatmap.gridDepth,
-        cellSize: heatmap.cellSize,
-        heatmapData: heatmap.data,
-        maxValue: heatmap.maxValue,
-        minValue: heatmap.minValue,
-        expiresAt,
       },
+      select: { id: true },
     });
+
+    if (existing) {
+      await this.prisma.analyticsHeatmapCache.update({
+        where: { id: existing.id },
+        data: {
+          heatmapData: heatmap.data,
+          maxValue: heatmap.maxValue,
+          minValue: heatmap.minValue,
+          expiresAt,
+        },
+      });
+    } else {
+      await this.prisma.analyticsHeatmapCache.create({
+        data: {
+          tenantId,
+          branchId,
+          startTime: heatmap.startTime,
+          endTime: heatmap.endTime,
+          granularity: heatmap.granularity,
+          metric: heatmap.metric,
+          gridWidth: heatmap.gridWidth,
+          gridDepth: heatmap.gridDepth,
+          cellSize: heatmap.cellSize,
+          heatmapData: heatmap.data,
+          maxValue: heatmap.maxValue,
+          minValue: heatmap.minValue,
+          expiresAt,
+        },
+      });
+    }
   }
 }

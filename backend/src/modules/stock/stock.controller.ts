@@ -17,6 +17,8 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { TenantGuard } from '../auth/guards/tenant.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentScope } from '../auth/decorators/current-scope.decorator';
+import { BranchScope } from '../../common/scoping/branch-scope';
 import { UserRole } from '../../common/constants/roles.enum';
 import { StockMovementType } from '../../common/constants/order-status.enum';
 import { PlanFeatureGuard } from '../subscriptions/guards/plan-feature.guard';
@@ -42,8 +44,17 @@ export class StockController {
   @ApiResponse({ status: 400, description: 'Invalid data or insufficient stock' })
   @ApiResponse({ status: 404, description: 'Product not found' })
   @ApiResponse({ status: 403, description: 'Insufficient permissions' })
-  createMovement(@Body() createDto: CreateStockMovementDto, @Request() req) {
-    return this.stockService.createMovement(createDto, req.user.userId, req.tenantId);
+  createMovement(
+    @Body() createDto: CreateStockMovementDto,
+    @Request() req,
+    @CurrentScope() scope: BranchScope,
+  ) {
+    return this.stockService.createMovement(
+      createDto,
+      req.user.userId,
+      req.tenantId,
+      scope.branchId,
+    );
   }
 
   @Get('movements')

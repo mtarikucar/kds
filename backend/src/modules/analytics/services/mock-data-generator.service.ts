@@ -29,6 +29,7 @@ export class MockDataGeneratorService {
    */
   async generateOccupancyData(
     tenantId: string,
+    branchId: string,
     startDate: Date,
     endDate: Date,
     intervalMinutes: number = 5
@@ -50,6 +51,7 @@ export class MockDataGeneratorService {
       tableId: string | null;
       cameraId: string | null;
       tenantId: string;
+      branchId: string;
     }> = [];
 
     let currentTime = new Date(startDate);
@@ -87,6 +89,7 @@ export class MockDataGeneratorService {
             tableId: point.tableId,
             cameraId: null,
             tenantId,
+            branchId,
           });
         }
       }
@@ -105,6 +108,7 @@ export class MockDataGeneratorService {
           tableId: null,
           cameraId: null,
           tenantId,
+          branchId,
         });
       }
 
@@ -128,6 +132,7 @@ export class MockDataGeneratorService {
    */
   async generateTrafficFlowData(
     tenantId: string,
+    branchId: string,
     startDate: Date,
     endDate: Date
   ): Promise<number> {
@@ -142,6 +147,7 @@ export class MockDataGeneratorService {
       exits: number;
       flowDirections: Record<string, number> | null;
       tenantId: string;
+      branchId: string;
     }> = [];
 
     const gridSize = 10; // 10x10 grid
@@ -187,6 +193,7 @@ export class MockDataGeneratorService {
                 west: Math.floor(baseCount * 0.25),
               },
               tenantId,
+              branchId,
             });
           }
         }
@@ -224,6 +231,7 @@ export class MockDataGeneratorService {
    */
   async generateTableAnalyticsData(
     tenantId: string,
+    branchId: string,
     startDate: Date,
     endDate: Date
   ): Promise<number> {
@@ -250,6 +258,7 @@ export class MockDataGeneratorService {
       utilizationScore: number | null;
       peakHours: Record<number, number> | null;
       tenantId: string;
+      branchId: string;
     }> = [];
 
     let currentDate = new Date(startDate);
@@ -320,6 +329,7 @@ export class MockDataGeneratorService {
           utilizationScore,
           peakHours,
           tenantId,
+          branchId,
         });
       }
 
@@ -348,7 +358,7 @@ export class MockDataGeneratorService {
   /**
    * Generate mock AI insights
    */
-  async generateInsights(tenantId: string): Promise<number> {
+  async generateInsights(tenantId: string, branchId: string): Promise<number> {
     const tables = await this.getTables(tenantId);
 
     const insights: Array<{
@@ -367,6 +377,7 @@ export class MockDataGeneratorService {
       validFrom: Date;
       validUntil: Date | null;
       tenantId: string;
+      branchId: string;
     }> = [];
 
     const now = new Date();
@@ -396,6 +407,7 @@ export class MockDataGeneratorService {
         validFrom: now,
         validUntil: oneWeekFromNow,
         tenantId,
+        branchId,
       });
     }
 
@@ -425,6 +437,7 @@ export class MockDataGeneratorService {
       validFrom: now,
       validUntil: oneWeekFromNow,
       tenantId,
+      branchId,
     });
 
     // Customer behavior insight
@@ -449,6 +462,7 @@ export class MockDataGeneratorService {
       validFrom: now,
       validUntil: oneWeekFromNow,
       tenantId,
+      branchId,
     });
 
     // Space optimization insight
@@ -477,6 +491,7 @@ export class MockDataGeneratorService {
       validFrom: now,
       validUntil: oneWeekFromNow,
       tenantId,
+      branchId,
     });
 
     if (insights.length > 0) {
@@ -495,6 +510,7 @@ export class MockDataGeneratorService {
    */
   async generateAllMockData(
     tenantId: string,
+    branchId: string,
     daysBack: number = 7
   ): Promise<{
     occupancyRecords: number;
@@ -505,10 +521,10 @@ export class MockDataGeneratorService {
     const endDate = new Date();
     const startDate = new Date(endDate.getTime() - daysBack * 24 * 60 * 60 * 1000);
 
-    const occupancyRecords = await this.generateOccupancyData(tenantId, startDate, endDate);
-    const trafficFlowRecords = await this.generateTrafficFlowData(tenantId, startDate, endDate);
-    const tableAnalyticsRecords = await this.generateTableAnalyticsData(tenantId, startDate, endDate);
-    const insights = await this.generateInsights(tenantId);
+    const occupancyRecords = await this.generateOccupancyData(tenantId, branchId, startDate, endDate);
+    const trafficFlowRecords = await this.generateTrafficFlowData(tenantId, branchId, startDate, endDate);
+    const tableAnalyticsRecords = await this.generateTableAnalyticsData(tenantId, branchId, startDate, endDate);
+    const insights = await this.generateInsights(tenantId, branchId);
 
     return {
       occupancyRecords,
@@ -521,15 +537,15 @@ export class MockDataGeneratorService {
   /**
    * Clear all analytics data for a tenant
    */
-  async clearAnalyticsData(tenantId: string): Promise<void> {
+  async clearAnalyticsData(tenantId: string, branchId: string): Promise<void> {
     await this.prisma.$transaction([
-      this.prisma.occupancyRecord.deleteMany({ where: { tenantId } }),
-      this.prisma.trafficFlowRecord.deleteMany({ where: { tenantId } }),
-      this.prisma.tableAnalytics.deleteMany({ where: { tenantId } }),
-      this.prisma.analyticsInsight.deleteMany({ where: { tenantId } }),
-      this.prisma.analyticsHeatmapCache.deleteMany({ where: { tenantId } }),
+      this.prisma.occupancyRecord.deleteMany({ where: { tenantId, branchId } }),
+      this.prisma.trafficFlowRecord.deleteMany({ where: { tenantId, branchId } }),
+      this.prisma.tableAnalytics.deleteMany({ where: { tenantId, branchId } }),
+      this.prisma.analyticsInsight.deleteMany({ where: { tenantId, branchId } }),
+      this.prisma.analyticsHeatmapCache.deleteMany({ where: { tenantId, branchId } }),
     ]);
-    this.logger.log(`Cleared all analytics data for tenant ${tenantId}`);
+    this.logger.log(`Cleared analytics data for tenant ${tenantId} / branch ${branchId}`);
   }
 
   // Private helper methods

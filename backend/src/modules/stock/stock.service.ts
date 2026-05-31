@@ -16,6 +16,7 @@ export class StockService {
     createDto: CreateStockMovementDto,
     userId: string,
     tenantId: string,
+    branchId: string,
   ) {
     // Verify product exists and belongs to tenant
     const product = await this.prisma.product.findFirst({
@@ -119,6 +120,8 @@ export class StockService {
           productId: createDto.productId,
           userId,
           tenantId,
+          // v3.0.0 — branch scope propagated from controller's BranchScope.
+          branchId,
         },
         include: {
           product: {
@@ -245,6 +248,7 @@ export class StockService {
     quantity: number,
     userId: string,
     tenantId: string,
+    branchId: string,
   ) {
     const product = await this.prisma.product.findFirst({
       where: {
@@ -270,6 +274,7 @@ export class StockService {
       },
       userId,
       tenantId,
+      branchId,
     );
   }
 }
