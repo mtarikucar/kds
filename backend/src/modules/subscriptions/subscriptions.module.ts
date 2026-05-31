@@ -1,4 +1,4 @@
-import { Module, forwardRef } from "@nestjs/common";
+import { Global, Module, forwardRef } from "@nestjs/common";
 import { PrismaModule } from "../../prisma/prisma.module";
 import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
 import { PaytrSettlementModule } from "../payments/services/paytr-settlement.module";
@@ -24,6 +24,12 @@ import { InvoiceController } from "./controllers/invoice.controller";
 import { SubscriptionGuard } from "./guards/subscription.guard";
 import { PlanFeatureGuard } from "./guards/plan-feature.guard";
 
+// v2.8.99.1 — @Global() so @UseGuards(PlanFeatureGuard) works in
+// any consumer module without that module re-importing
+// SubscriptionsModule transitively. Same boot-time DI shape fix as
+// EntitlementsModule; see that module's class header for the full
+// pathology.
+@Global()
 @Module({
   imports: [
     PrismaModule,

@@ -1,4 +1,4 @@
-import { Module, OnApplicationBootstrap, OnModuleInit, Logger } from '@nestjs/common';
+import { Global, Module, OnApplicationBootstrap, OnModuleInit, Logger } from '@nestjs/common';
 import { PrismaModule } from '../../prisma/prisma.module';
 import { DomainEventBus } from '../outbox/domain-event-bus.service';
 import { OutboxService } from '../outbox/outbox.service';
@@ -16,7 +16,22 @@ import { EntitlementInvalidationBus } from './entitlement-invalidation.bus';
  * dependency-free upstream makes it trivial to import from any other module
  * that needs gating, including future modules like `device-mesh`, `fiscal`,
  * `marketplace`.
+ *
+ * v2.8.99.1 — @Global() so PlanFeatureGuard can be instantiated in any
+ * module that uses @UseGuards(PlanFeatureGuard) without that module
+ * having to chase the EntitlementService transitive import. The
+ * staging v2.8.91/93/96 etc. deploys were crashing at boot because
+ * SettingsModule (which @UseGuards-binds PlanFeatureGuard on
+ * IntegrationsController) didn't import EntitlementsModule:
+ *   Nest can't resolve dependencies of the PlanFeatureGuard
+ *   (Reflector, PrismaService, ?). … argument EntitlementService
+ *   at index [2] is available in the SettingsModule context.
+ * Other modules (orders, menu, tables, reports, analytics) hit the
+ * same pattern but the DI graph short-circuited on SettingsModule
+ * first. Promoting EntitlementsModule to @Global() closes all six
+ * gaps in one shot.
  */
+@Global()
 @Module({
   imports: [PrismaModule],
   controllers: [EntitlementsController],
