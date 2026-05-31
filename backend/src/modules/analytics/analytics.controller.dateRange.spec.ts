@@ -33,6 +33,7 @@ describe('AnalyticsController.resolveRange (iter-89)', () => {
   let mockDataService: any;
 
   const req = { tenantId: 't-1' } as any;
+  const scope = { tenantId: 't-1', branchId: 'b-1', userId: 'u-1', role: 'ADMIN' } as any;
 
   beforeEach(() => {
     heatmapService = {
@@ -69,7 +70,7 @@ describe('AnalyticsController.resolveRange (iter-89)', () => {
     // to lock the defence-in-depth path.
     it('rejects a literal Invalid Date as startDate', async () => {
       await expect(
-        ctrl.getOccupancyHeatmap(req, {
+        ctrl.getOccupancyHeatmap(req, scope, {
           startDate: 'not-an-iso-date-string',
         } as any),
       ).rejects.toBeInstanceOf(BadRequestException);
@@ -77,7 +78,7 @@ describe('AnalyticsController.resolveRange (iter-89)', () => {
 
     it('rejects a literal Invalid Date as endDate', async () => {
       await expect(
-        ctrl.getOccupancyHeatmap(req, {
+        ctrl.getOccupancyHeatmap(req, scope, {
           endDate: 'still-not-iso',
         } as any),
       ).rejects.toBeInstanceOf(BadRequestException);
@@ -87,7 +88,7 @@ describe('AnalyticsController.resolveRange (iter-89)', () => {
   describe('Range ordering', () => {
     it('rejects startDate > endDate', async () => {
       await expect(
-        ctrl.getOccupancyHeatmap(req, {
+        ctrl.getOccupancyHeatmap(req, scope, {
           startDate: '2026-06-01T00:00:00Z',
           endDate: '2026-01-01T00:00:00Z',
         } as any),
@@ -95,7 +96,7 @@ describe('AnalyticsController.resolveRange (iter-89)', () => {
     });
 
     it('accepts equal start and end (point-in-time query)', async () => {
-      await ctrl.getOccupancyHeatmap(req, {
+      await ctrl.getOccupancyHeatmap(req, scope, {
         startDate: '2026-01-01T00:00:00Z',
         endDate: '2026-01-01T00:00:00Z',
       } as any);
@@ -108,7 +109,7 @@ describe('AnalyticsController.resolveRange (iter-89)', () => {
       // 367 days (>366) — pre-iter-89 this would have scanned a year+ of
       // AnalyticsEvent rows in one request.
       await expect(
-        ctrl.getOccupancyHeatmap(req, {
+        ctrl.getOccupancyHeatmap(req, scope, {
           startDate: '2025-01-01T00:00:00Z',
           endDate: '2026-01-04T00:00:00Z', // 368 days
         } as any),
@@ -116,7 +117,7 @@ describe('AnalyticsController.resolveRange (iter-89)', () => {
     });
 
     it('accepts the boundary window (exactly 366 days for leap-year)', async () => {
-      await ctrl.getOccupancyHeatmap(req, {
+      await ctrl.getOccupancyHeatmap(req, scope, {
         startDate: '2024-01-01T00:00:00Z',
         endDate: '2024-12-31T00:00:00Z',
       } as any);
@@ -126,8 +127,8 @@ describe('AnalyticsController.resolveRange (iter-89)', () => {
 
   describe('Defaults when one or both sides are omitted', () => {
     it('falls back to a 24h default for occupancy when no dates passed', async () => {
-      await ctrl.getOccupancyHeatmap(req, {} as any);
-      const [, start, end] = heatmapService.getOccupancyHeatmap.mock.calls[0];
+      await ctrl.getOccupancyHeatmap(req, scope, {} as any);
+      const [, , start, end] = heatmapService.getOccupancyHeatmap.mock.calls[0];
       const windowMs = end.getTime() - start.getTime();
       // Within a tolerance because Date.now() runs twice during the call.
       expect(windowMs).toBeGreaterThan(23 * 60 * 60 * 1000);
@@ -153,12 +154,12 @@ describe('AnalyticsController.resolveRange (iter-89)', () => {
 
   describe('Heatmap granularity passthrough', () => {
     it('forwards a valid granularity to the heatmap service', async () => {
-      await ctrl.getOccupancyHeatmap(req, {
+      await ctrl.getOccupancyHeatmap(req, scope, {
         startDate: '2026-01-01T00:00:00Z',
         endDate: '2026-01-02T00:00:00Z',
         granularity: HeatmapGranularity.HOURLY,
       } as any);
-      const [, , , options] = heatmapService.getOccupancyHeatmap.mock.calls[0];
+      const [, , , , options] = heatmapService.getOccupancyHeatmap.mock.calls[0];
       expect(options).toEqual({ granularity: HeatmapGranularity.HOURLY });
     });
   });

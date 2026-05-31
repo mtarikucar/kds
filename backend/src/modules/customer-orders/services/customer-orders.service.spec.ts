@@ -39,9 +39,21 @@ describe('CustomerOrdersService dedup parity (iter-25)', () => {
   });
 
   describe('createWaiterRequest', () => {
+    // v3.0.0 — createWaiterRequest now derives branchId from
+    // table.branchId and refuses tableless calls with BadRequest.
+    // Stub the table lookup once per test so the dedup paths below
+    // can keep their iter-25 focus.
+    const stubTable = () => {
+      (prisma.table.findFirst as any).mockResolvedValue({
+        id: 'tbl-1',
+        branchId: 'b1',
+      });
+    };
+
     it('dedupes against an OLD still-PENDING row (the iter-25 regression)', async () => {
       // 5-minute-old PENDING row. The old AND query would have missed
       // this and created a duplicate; the OR query must return it.
+      stubTable();
       const oldPending = {
         id: 'wr-old',
         sessionId: 's1',
@@ -54,7 +66,7 @@ describe('CustomerOrdersService dedup parity (iter-25)', () => {
 
       const result = await svc.createWaiterRequest({
         sessionId: 's1',
-        tableId: undefined as any,
+        tableId: 'tbl-1',
       });
 
       expect(result).toBe(oldPending);
@@ -63,6 +75,7 @@ describe('CustomerOrdersService dedup parity (iter-25)', () => {
     });
 
     it('dedupes against a RECENT COMPLETED row (60s tap-spam throttle)', async () => {
+      stubTable();
       const recentCompleted = {
         id: 'wr-recent',
         sessionId: 's1',
@@ -75,7 +88,7 @@ describe('CustomerOrdersService dedup parity (iter-25)', () => {
 
       const result = await svc.createWaiterRequest({
         sessionId: 's1',
-        tableId: undefined as any,
+        tableId: 'tbl-1',
       });
 
       expect(result).toBe(recentCompleted);
@@ -83,29 +96,39 @@ describe('CustomerOrdersService dedup parity (iter-25)', () => {
     });
 
     it('creates a new row when nothing matches the dedup OR clause', async () => {
+      stubTable();
       (prisma.waiterRequest.findFirst as any).mockResolvedValue(null);
       (prisma.waiterRequest.create as any).mockResolvedValue({
         id: 'wr-new',
+        branchId: 'b1',
         table: null,
       });
 
       await svc.createWaiterRequest({
         sessionId: 's1',
-        tableId: undefined as any,
+        tableId: 'tbl-1',
       });
 
       expect((prisma.waiterRequest.create as any).mock.calls.length).toBe(1);
+      // v3.0.0 — create() must carry the table-derived branchId so
+      // the WaiterRequest stream stays branch-correct.
+      const createArgs = (prisma.waiterRequest.create as any).mock.calls[0][0];
+      expect(createArgs.data.branchId).toBe('b1');
     });
 
     it('passes an OR (not AND) clause to findFirst — schema regression guard', async () => {
       // Pin the query shape so a future refactor can't silently revert
       // to the buggy AND form. The OR clause is the load-bearing fix.
+      stubTable();
       (prisma.waiterRequest.findFirst as any).mockResolvedValue(null);
-      (prisma.waiterRequest.create as any).mockResolvedValue({ table: null });
+      (prisma.waiterRequest.create as any).mockResolvedValue({
+        branchId: 'b1',
+        table: null,
+      });
 
       await svc.createWaiterRequest({
         sessionId: 's1',
-        tableId: undefined as any,
+        tableId: 'tbl-1',
       });
 
       const where = (prisma.waiterRequest.findFirst as any).mock.calls[0][0].where;
@@ -117,12 +140,19 @@ describe('CustomerOrdersService dedup parity (iter-25)', () => {
 
   describe('createBillRequest (parity)', () => {
     it('uses the same OR-shaped dedup as waiter (iter-25 parity)', async () => {
+      (prisma.table.findFirst as any).mockResolvedValue({
+        id: 'tbl-1',
+        branchId: 'b1',
+      });
       (prisma.billRequest.findFirst as any).mockResolvedValue(null);
-      (prisma.billRequest.create as any).mockResolvedValue({ table: null });
+      (prisma.billRequest.create as any).mockResolvedValue({
+        branchId: 'b1',
+        table: null,
+      });
 
       await svc.createBillRequest({
         sessionId: 's1',
-        tableId: undefined as any,
+        tableId: 'tbl-1',
       });
 
       const where = (prisma.billRequest.findFirst as any).mock.calls[0][0].where;

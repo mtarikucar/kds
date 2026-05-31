@@ -48,6 +48,7 @@ describe('RecipesService (iter-93)', () => {
             ],
           } as any,
           't1',
+          'b1',
         ),
       ).rejects.toBeInstanceOf(BadRequestException);
       // Never reach the DB writes.
@@ -65,6 +66,7 @@ describe('RecipesService (iter-93)', () => {
             ],
           } as any,
           't1',
+          'b1',
         ),
       ).rejects.toThrow(/butter-uuid/);
     });
@@ -84,6 +86,7 @@ describe('RecipesService (iter-93)', () => {
           ],
         } as any,
         't1',
+        'b1',
       );
       expect(prisma.recipe.create).toHaveBeenCalledTimes(1);
     });

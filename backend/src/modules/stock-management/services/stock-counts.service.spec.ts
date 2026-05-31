@@ -66,7 +66,7 @@ describe('StockCountsService.finalize (iter-94)', () => {
       status: StockCountStatus.IN_PROGRESS,
       name: 'Weekly count',
       items: [
-        { id: 'i1', stockItemId: 's1', countedQty: new Prisma.Decimal(95), expectedQty: new Prisma.Decimal(100) },
+        { id: 'i1', stockItemId: 's1', countedQty: new Prisma.Decimal(95), expectedQty: new Prisma.Decimal(100), stockItem: { branchId: 'b1' } },
       ],
     });
     setupTx();
@@ -95,7 +95,7 @@ describe('StockCountsService.finalize (iter-94)', () => {
       tenantId: 't1',
       status: StockCountStatus.IN_PROGRESS,
       items: [
-        { id: 'i1', stockItemId: 's1', countedQty: new Prisma.Decimal(95), expectedQty: new Prisma.Decimal(100) },
+        { id: 'i1', stockItemId: 's1', countedQty: new Prisma.Decimal(95), expectedQty: new Prisma.Decimal(100), stockItem: { branchId: 'b1' } },
       ],
     });
     setupTx(0); // claim.count = 0 — someone else already finalized
@@ -113,7 +113,7 @@ describe('StockCountsService.finalize (iter-94)', () => {
       status: StockCountStatus.IN_PROGRESS,
       name: 'Weekly count',
       items: [
-        { id: 'i1', stockItemId: 's1', countedQty: new Prisma.Decimal(95), expectedQty: new Prisma.Decimal(100) },
+        { id: 'i1', stockItemId: 's1', countedQty: new Prisma.Decimal(95), expectedQty: new Prisma.Decimal(100), stockItem: { branchId: 'b1' } },
       ],
     });
     setupTx();
@@ -139,7 +139,7 @@ describe('StockCountsService.finalize (iter-94)', () => {
       tenantId: 't1',
       status: StockCountStatus.IN_PROGRESS,
       items: [
-        { id: 'i1', stockItemId: 's1', countedQty: new Prisma.Decimal(100), expectedQty: new Prisma.Decimal(100) },
+        { id: 'i1', stockItemId: 's1', countedQty: new Prisma.Decimal(100), expectedQty: new Prisma.Decimal(100), stockItem: { branchId: 'b1' } },
       ],
     });
     setupTx();
@@ -158,7 +158,7 @@ describe('StockCountsService.finalize (iter-94)', () => {
       status: StockCountStatus.IN_PROGRESS,
       name: 'Weekly count',
       items: [
-        { id: 'i1', stockItemId: 's1', countedQty: new Prisma.Decimal(95), expectedQty: new Prisma.Decimal(100) },
+        { id: 'i1', stockItemId: 's1', countedQty: new Prisma.Decimal(95), expectedQty: new Prisma.Decimal(100), stockItem: { branchId: 'b1' } },
       ],
     });
     setupTx();
@@ -169,6 +169,9 @@ describe('StockCountsService.finalize (iter-94)', () => {
     expect(move.type).toBe(IngredientMovementType.COUNT_ADJUSTMENT);
     expect(move.referenceType).toBe('STOCK_COUNT');
     expect(move.referenceId).toBe('c1');
+    // v3.0.0: ingredientMovement.create now carries branchId from the
+    // parent stockItem so movement rows are branch-scoped end-to-end.
+    expect(move.branchId).toBe('b1');
   });
 });
 

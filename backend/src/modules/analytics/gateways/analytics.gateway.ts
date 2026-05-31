@@ -116,8 +116,11 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
         // happily accept events 12 hours later.
         client.data.tokenExp = payload.exp;
 
-        // Join tenant-specific room
-        client.join(`analytics-${payload.tenantId}`);
+        // v3.0.0 — room layout is per (tenantId, branchId). At connect
+        // time the branchId isn't yet known (the device registers its
+        // cameraId via @SubscribeMessage('edge:register')). We defer the
+        // room join to handleEdgeRegister; until then the socket is
+        // authenticated but receives no broadcasts.
 
         // Schedule auto-disconnect at token expiry so an idle socket can't
         // outlive its JWT. setTimeout is process-local but that's fine —
@@ -256,26 +259,43 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
         },
       });
 
-      // Update camera status if linked
+      // Update camera status if linked + resolve the bound branchId
+      // so the socket can join the per-branch room. A camera's branchId
+      // is the authoritative branch for any analytics flowing through
+      // it — the edge device's branchId is just the registration-time
+      // default and might be stale.
+      let cameraBranchId: string | null = null;
       if (payload.cameraId) {
+        const cam = await this.prisma.camera.findFirst({
+          where: { id: payload.cameraId, tenantId: payload.tenantId },
+          select: { branchId: true },
+        });
+        if (!cam) {
+          this.logger.warn(
+            `Edge device ${payload.deviceId} registration rejected: camera ${payload.cameraId} not found`,
+          );
+          return { success: false, error: 'Camera not found' };
+        }
+        cameraBranchId = cam.branchId;
         await this.prisma.camera.updateMany({
-          where: {
-            id: payload.cameraId,
-            tenantId: payload.tenantId,
-          },
-          data: {
-            status: 'ONLINE',
-            lastSeenAt: new Date(),
-          },
+          where: { id: payload.cameraId, tenantId: payload.tenantId },
+          data: { status: 'ONLINE', lastSeenAt: new Date() },
         });
       }
+
+      // Fall back to the device's defaultBranch when the device hasn't
+      // been bound to a camera yet (rare — usually pairing happens
+      // before registration).
+      const effectiveBranchId = cameraBranchId ?? defaultBranch.id;
+      client.data.branchId = effectiveBranchId;
+      client.join(`analytics-${payload.tenantId}-${effectiveBranchId}`);
 
       // Send current configuration to device
       const config = await this.getDeviceConfig(payload.cameraId, tenantId);
       client.emit('edge:config', { data: config });
 
       this.logger.log(
-        `Edge device ${payload.deviceId} registered (Camera: ${payload.cameraId}, Tenant: ${tenantId})`,
+        `Edge device ${payload.deviceId} registered (Camera: ${payload.cameraId}, Tenant: ${tenantId}, Branch: ${effectiveBranchId})`,
       );
 
       return { success: true };
@@ -358,8 +378,8 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
           this.logger.error(`Traffic flow update failed: ${err.message}`);
         });
 
-        // Broadcast to dashboard clients
-        this.broadcastOccupancyUpdate(tenantId, payload);
+        // Broadcast to dashboard clients on the camera's branch.
+        this.broadcastOccupancyUpdate(tenantId, branchId, payload);
       }
 
       return { success: true, processed: payload.detections.length };
@@ -530,29 +550,50 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
   // DASHBOARD BROADCASTS
   // ========================================
 
-  broadcastOccupancyUpdate(tenantId: string, data: EdgeOccupancyDataDto) {
-    this.server.to(`analytics-${tenantId}`).emit('analytics:occupancy-update', {
-      cameraId: data.cameraId,
-      timestamp: data.timestamp,
-      personCount: data.detections.length,
-      detections: data.detections.map((d) => ({
-        trackingId: d.trackingId,
-        gridX: d.gridX,
-        gridZ: d.gridZ,
-        state: d.state,
-      })),
-    });
+  /**
+   * v3.0.0 — every dashboard broadcast is now (tenantId, branchId)
+   * scoped. A dashboard registered on branch A no longer receives
+   * occupancy / heatmap / insight updates from branch B's cameras.
+   * Callers either pass the camera's branchId directly or resolve it
+   * from the source entity before broadcasting.
+   */
+  broadcastOccupancyUpdate(
+    tenantId: string,
+    branchId: string,
+    data: EdgeOccupancyDataDto,
+  ) {
+    this.server
+      .to(`analytics-${tenantId}-${branchId}`)
+      .emit('analytics:occupancy-update', {
+        cameraId: data.cameraId,
+        timestamp: data.timestamp,
+        personCount: data.detections.length,
+        detections: data.detections.map((d) => ({
+          trackingId: d.trackingId,
+          gridX: d.gridX,
+          gridZ: d.gridZ,
+          state: d.state,
+        })),
+      });
   }
 
-  broadcastHeatmapUpdate(tenantId: string, heatmapData: number[][]) {
-    this.server.to(`analytics-${tenantId}`).emit('analytics:heatmap-update', {
-      timestamp: new Date().toISOString(),
-      grid: heatmapData,
-    });
+  broadcastHeatmapUpdate(
+    tenantId: string,
+    branchId: string,
+    heatmapData: number[][],
+  ) {
+    this.server
+      .to(`analytics-${tenantId}-${branchId}`)
+      .emit('analytics:heatmap-update', {
+        timestamp: new Date().toISOString(),
+        grid: heatmapData,
+      });
   }
 
-  broadcastInsight(tenantId: string, insight: unknown) {
-    this.server.to(`analytics-${tenantId}`).emit('analytics:new-insight', insight);
+  broadcastInsight(tenantId: string, branchId: string, insight: unknown) {
+    this.server
+      .to(`analytics-${tenantId}-${branchId}`)
+      .emit('analytics:new-insight', insight);
   }
 
   // ========================================

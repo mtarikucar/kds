@@ -749,7 +749,10 @@ describe('PaymentsService — progressive per-item payments', () => {
       );
 
       expect(kdsGateway.emitPaymentSuccess).toHaveBeenCalledTimes(1);
-      const [emitTenantId, emitPayment, emitUserId] =
+      // v3.0.0 — emit signature is now (tenantId, branchId, payment, userId).
+      // branchId is forwarded from the payment.branchId (derived from
+      // order.branchId) so the socket room is per-branch.
+      const [emitTenantId, , emitPayment, emitUserId] =
         kdsGateway.emitPaymentSuccess.mock.calls[0];
       expect(emitTenantId).toBe(TENANT_ID);
       expect(emitPayment.id).toBe('payment-1');
@@ -800,7 +803,9 @@ describe('PaymentsService — progressive per-item payments', () => {
       );
 
       expect(kdsGateway.emitPaymentSuccess).toHaveBeenCalledTimes(1);
-      const [, , emitUserId] = kdsGateway.emitPaymentSuccess.mock.calls[0];
+      // v3.0.0 — 4-arg emit: (tenantId, branchId, payment, userId).
+      // Webhook path passes null for the userId so every tablet prints.
+      const [, , , emitUserId] = kdsGateway.emitPaymentSuccess.mock.calls[0];
       expect(emitUserId).toBeNull();
     });
   });

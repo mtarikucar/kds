@@ -57,11 +57,15 @@ describe('DeliveryOrderService (iter-39)', () => {
       isEnabled: true,
       autoAccept: true,
     });
+    // v3.0.0 — Order.branchId is NOT NULL; service resolves a fallback
+    // branch before the txn. Without this mock the early-return path
+    // short-circuits everything that follows.
+    (prisma.branch.findFirst as any).mockResolvedValue({ id: 'br-1' });
     (prisma.$transaction as any).mockImplementation(async (cb: any) => {
       const tx: any = {
         order: {
           findFirst: jest.fn().mockResolvedValue(null),
-          create: jest.fn().mockResolvedValue({ id: 'ord-1', tenantId: 't1' }),
+          create: jest.fn().mockResolvedValue({ id: 'ord-1', tenantId: 't1', branchId: 'br-1' }),
         },
         menuItemMapping: { findMany: jest.fn().mockResolvedValue([]) },
         // Inside-txn config read MUST NOT happen anymore (iter-39).
@@ -90,11 +94,12 @@ describe('DeliveryOrderService (iter-39)', () => {
       isEnabled: true,
       autoAccept: true,
     });
+    (prisma.branch.findFirst as any).mockResolvedValue({ id: 'br-1' });
     (prisma.$transaction as any).mockImplementation(async (cb: any) => {
       const tx: any = {
         order: {
           findFirst: jest.fn().mockResolvedValue(null),
-          create: jest.fn().mockResolvedValue({ id: 'ord-1', tenantId: 't1' }),
+          create: jest.fn().mockResolvedValue({ id: 'ord-1', tenantId: 't1', branchId: 'br-1' }),
         },
         menuItemMapping: { findMany: jest.fn().mockResolvedValue([]) },
         deliveryPlatformConfig: { findUnique: jest.fn() },
@@ -123,11 +128,12 @@ describe('DeliveryOrderService (iter-39)', () => {
       isEnabled: true,
       autoAccept: true,
     });
+    (prisma.branch.findFirst as any).mockResolvedValue({ id: 'br-1' });
     (prisma.$transaction as any).mockImplementation(async (cb: any) => {
       const tx: any = {
         order: {
           findFirst: jest.fn().mockResolvedValue(null),
-          create: jest.fn().mockResolvedValue({ id: 'ord-1' }),
+          create: jest.fn().mockResolvedValue({ id: 'ord-1', branchId: 'br-1' }),
         },
         menuItemMapping: { findMany: jest.fn().mockResolvedValue([]) },
         deliveryPlatformConfig: { findUnique: jest.fn() },
@@ -150,11 +156,12 @@ describe('DeliveryOrderService (iter-39)', () => {
       isEnabled: true,
       autoAccept: false,
     });
+    (prisma.branch.findFirst as any).mockResolvedValue({ id: 'br-1' });
     (prisma.$transaction as any).mockImplementation(async (cb: any) => {
       const tx: any = {
         order: {
           findFirst: jest.fn().mockResolvedValue(null),
-          create: jest.fn().mockResolvedValue({ id: 'ord-1' }),
+          create: jest.fn().mockResolvedValue({ id: 'ord-1', branchId: 'br-1' }),
         },
         menuItemMapping: { findMany: jest.fn().mockResolvedValue([]) },
         deliveryPlatformConfig: { findUnique: jest.fn() },

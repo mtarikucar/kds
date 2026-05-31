@@ -45,7 +45,9 @@ describe('PosSettingsService.update (iter-60)', () => {
     expect((prisma.posSettings.create as any).mock.calls.length).toBe(0);
     expect((prisma.posSettings.upsert as any).mock.calls.length).toBe(1);
     const upsertArgs = (prisma.posSettings.upsert as any).mock.calls[0][0];
-    expect(upsertArgs.where).toEqual({ tenantId: 't1' });
+    expect(upsertArgs.where).toEqual({
+      tenantId_branchId: { tenantId: 't1', branchId: null },
+    });
   });
 
   it('updates run inside a single $transaction (atomicity envelope)', async () => {

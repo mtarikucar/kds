@@ -47,6 +47,9 @@ describe('NotificationsService.notifyAdmins (iter-8 fan-out race fix)', () => {
       { id: 'u-a' },
       { id: 'u-b' },
     ] as any);
+    // v3.0.0 — notifyAdmins now resolves a fallback branchId from the
+    // tenant's first active branch when callers don't supply one.
+    prisma.branch.findFirst.mockResolvedValue({ id: 'b-1' } as any);
 
     let createManyArgs: any = null;
     (prisma.notification.createMany as any).mockImplementation(async ({ data }: any) => {
@@ -72,6 +75,9 @@ describe('NotificationsService.notifyAdmins (iter-8 fan-out race fix)', () => {
     expect(createManyArgs).toHaveLength(2);
     for (const row of createManyArgs) {
       expect(row.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+      // v3.0.0 — Notification.branchId is NOT NULL, populated per row
+      // from the resolved tenant fallback branch.
+      expect(row.branchId).toBe('b-1');
     }
 
     // Load-bearing assertion #2: the re-fetch scopes by id IN [...] and
@@ -90,6 +96,8 @@ describe('NotificationsService.notifyAdmins (iter-8 fan-out race fix)', () => {
       { id: 'u-b' },
       { id: 'u-c' },
     ] as any);
+    // v3.0.0 — branchId fallback resolution.
+    prisma.branch.findFirst.mockResolvedValue({ id: 'b-1' } as any);
     let captured: any[] = [];
     (prisma.notification.createMany as any).mockImplementation(async ({ data }: any) => {
       captured = data;
