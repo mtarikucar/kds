@@ -271,9 +271,13 @@ describe('PaymentsService — progressive per-item payments', () => {
           data: expect.objectContaining({ status: OrderStatus.PAID }),
         }),
       );
-      expect(prisma.table.update).toHaveBeenCalledWith(
+      // v2.8.93 — table release uses updateMany with (id, tenantId)
+      // compound WHERE so a spoofed tableId can't mark another tenant's
+      // table AVAILABLE. The pre-fix `update({where:{id}})` shape is
+      // gone.
+      expect(prisma.table.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: TABLE_ID },
+          where: { id: TABLE_ID, tenantId: TENANT_ID },
           data: { status: 'AVAILABLE' },
         }),
       );

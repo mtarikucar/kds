@@ -52,14 +52,19 @@ export class CallerController {
   // adapter; tenant resolution happens via the URL param (the provider hands
   // out one webhook URL per tenant).
   //
-  // The `mock` provider is intentionally crippled in production: its
-  // parseWebhook ignores the x-signature header (it exists to wire up
-  // CI / the dashboard "send test call" button), so leaving the route
-  // open in prod lets anyone on the public internet inject fake caller
-  // events into any tenant's feed by guessing tenant ids. Mirrors the
-  // iter-41 SMS mockMode prod refusal: an explicit
-  // ALLOW_MOCK_CALLER_IN_PROD=true escape hatch is required for the
-  // rare "we want to seed prod with synthetic calls" case.
+  // The `mock` provider exists for CI + the dashboard "send test call"
+  // button on dev/staging. Its parseWebhook ignores the x-signature
+  // header — leaving the route reachable in prod lets any public caller
+  // inject fabricated caller events into any tenant's feed just by
+  // guessing tenant ids.
+  //
+  // v2.8.93 — the ALLOW_MOCK_CALLER_IN_PROD escape hatch is removed.
+  // An accidentally-flipped env var should not be the difference
+  // between "mock disabled" and "anyone can spoof any caller". If the
+  // QA team needs synthetic calls in a prod-like env they should run
+  // them against staging (NODE_ENV != production) or build a
+  // SuperAdmin-authenticated test-event endpoint that bypasses the
+  // public webhook surface entirely.
   @Public()
   @Post('webhooks/:providerId/:tenantId')
   @ApiOperation({ summary: 'Provider-side webhook ingest. Signature verified by the adapter.' })
@@ -72,12 +77,9 @@ export class CallerController {
     const raw = req.rawBody ?? Buffer.from(JSON.stringify(req.body ?? {}));
     let events: any[] = [];
     if (providerId === 'mock') {
-      if (
-        process.env.NODE_ENV === 'production' &&
-        process.env.ALLOW_MOCK_CALLER_IN_PROD !== 'true'
-      ) {
+      if (process.env.NODE_ENV === 'production') {
         throw new ForbiddenException(
-          'Mock caller webhook is disabled in production. Set ALLOW_MOCK_CALLER_IN_PROD=true to override.',
+          'Mock caller webhook is disabled in production.',
         );
       }
       events = await this.mockProvider.parseWebhook(signature, raw);

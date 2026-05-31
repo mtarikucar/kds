@@ -28,6 +28,16 @@ interface FeatureGateProps {
  * v2.8.88: page-root usage wraps an entire admin route so direct-URL
  * access to a feature the tenant doesn't own shows the upsell instead
  * of a 403 toast.
+ *
+ * @warning UI-ONLY GATE. FeatureGate hides content from the rendered
+ * tree; it does NOT prevent the user from invoking the underlying
+ * endpoint. Anyone with browser DevTools can flip the subscription
+ * context flag and unhide the children, or call the backend directly.
+ *
+ * Every endpoint behind a FeatureGate MUST also be guarded server-side
+ * by `PlanFeatureGuard` + `@RequiresFeature(...)` / `@RequiresIntegration(...)`
+ * (or the equivalent EntitlementGuard + `@RequireEntitlement` pair).
+ * FeatureGate is presentation polish — the trust boundary is the API.
  */
 const FeatureGate = ({
   feature,

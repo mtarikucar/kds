@@ -64,8 +64,26 @@ export class ShipmentService {
     return shipment;
   }
 
-  /** Carrier webhook → mark shipment delivered. Idempotent on shipment+status. */
-  async markDelivered(shipmentId: string) {
+  /**
+   * Carrier webhook → mark shipment delivered. Idempotent on shipment+status.
+   *
+   * v2.8.93 — `tenantId` is now an optional second argument and ALWAYS
+   * scopes the lookup when provided. The Phase 10 carrier webhook
+   * (auto-pulled delivery confirmations) MUST resolve a tenantId from
+   * its authenticated/signed payload and pass it here so a fabricated
+   * shipmentId from one tenant can never flip another tenant's shipment
+   * to delivered. The current sole caller is SuperAdmin which has global
+   * scope; passing `undefined` preserves that path.
+   */
+  async markDelivered(shipmentId: string, tenantId?: string) {
+    const order = await this.prisma.hardwareOrder.findFirst({
+      where: tenantId
+        ? { shipments: { some: { id: shipmentId } }, tenantId }
+        : { shipments: { some: { id: shipmentId } } },
+      select: { id: true, tenantId: true },
+    });
+    if (!order) throw new NotFoundException('Shipment not found');
+
     const s = await this.prisma.shipment.findUnique({ where: { id: shipmentId } });
     if (!s) throw new NotFoundException('Shipment not found');
     if (s.status === 'delivered') return s;
@@ -74,8 +92,10 @@ export class ShipmentService {
       where: { id: shipmentId },
       data: { status: 'delivered', deliveredAt: new Date() },
     });
-    const order = await this.prisma.hardwareOrder.update({
-      where: { id: s.orderId },
+    // Order is already tenant-validated by the findFirst above; reuse the
+    // resolved order.id rather than re-routing through shipment.orderId.
+    await this.prisma.hardwareOrder.update({
+      where: { id: order.id },
       data: { status: 'delivered' },
     });
 

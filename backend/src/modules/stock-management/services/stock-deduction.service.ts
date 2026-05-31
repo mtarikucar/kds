@@ -154,14 +154,33 @@ export class StockDeductionService {
     // receivedAt) batches first. If we run out of batches before the
     // full quantity is consumed, fall through to the bare stockItem
     // path below so legacy deployments without batches still work.
+    //
+    // v2.8.93 — explicit `nulls: 'last'` on expiryDate. Without it, the
+    // sort order for NULL expiry depends on the underlying DB's ASC
+    // default (PostgreSQL: NULLS LAST; MySQL/SQLite: NULLS FIRST). For
+    // FIFO we always want batches WITH expiry (perishables) consumed
+    // first by oldest expiry, and non-perishable / unknown-expiry
+    // batches drawn down last. Pin the intent regardless of DB.
     const batches = await tx.stockBatch.findMany({
       where: {
         stockItemId: deduction.stockItemId,
         tenantId,
         quantity: { gt: 0 },
       },
-      orderBy: [{ expiryDate: 'asc' }, { receivedAt: 'asc' }],
+      orderBy: [
+        { expiryDate: { sort: 'asc', nulls: 'last' } },
+        { receivedAt: 'asc' },
+      ],
     });
+    // v2.8.93 — track batch-level cost during consumption so the
+    // ingredient movement records the WEIGHTED-AVERAGE cost of the
+    // batches actually drawn down, not the stockItem.costPerUnit
+    // snapshot (which is the rolling average across all receipts and
+    // can drift from the cost of the units actually shipped). When no
+    // batches exist (legacy deployments) we fall back to the
+    // stockItem-level cost below.
+    let consumedFromBatches = new Prisma.Decimal(0);
+    let weightedCostAccumulator = new Prisma.Decimal(0);
     for (const batch of batches) {
       if (remaining.lte(0)) break;
       const fromBatch = Prisma.Decimal.min(remaining, batch.quantity);
@@ -171,9 +190,21 @@ export class StockDeductionService {
       });
       if (updated.count === 0) continue; // lost a race with another deduction
       remaining = remaining.sub(fromBatch);
+      consumedFromBatches = consumedFromBatches.add(fromBatch);
+      if (batch.costPerUnit != null) {
+        weightedCostAccumulator = weightedCostAccumulator.add(
+          new Prisma.Decimal(batch.costPerUnit).mul(fromBatch),
+        );
+      }
     }
 
-    const finalCost = stockItem.costPerUnit ?? null;
+    // Prefer batch-weighted cost when any batches were consumed and at
+    // least one carried a costPerUnit. Otherwise fall back to the
+    // stockItem-level rolling cost.
+    const finalCost =
+      consumedFromBatches.gt(0) && weightedCostAccumulator.gt(0)
+        ? weightedCostAccumulator.div(consumedFromBatches)
+        : (stockItem.costPerUnit ?? null);
 
     // After batch drawdown `remaining` is what the bare stockItem row
     // needs to absorb. Do this as a conditional UPDATE: if

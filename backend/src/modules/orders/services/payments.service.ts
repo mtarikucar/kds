@@ -182,6 +182,10 @@ export class PaymentsService {
     });
 
     // Release the table when no other active orders remain on it.
+    // v2.8.93 — table update uses updateMany with (id, tenantId) compound
+    // WHERE so a wrong/spoofed tableId can never mark another tenant's
+    // table AVAILABLE. The pre-fix used update() with id-only which would
+    // happily mutate any tenant's row that matched on id.
     if (order.tableId) {
       const otherActiveOrders = await tx.order.count({
         where: {
@@ -191,8 +195,8 @@ export class PaymentsService {
         },
       });
       if (otherActiveOrders === 0) {
-        await tx.table.update({
-          where: { id: order.tableId },
+        await tx.table.updateMany({
+          where: { id: order.tableId, tenantId: order.tenantId },
           data: { status: TableStatus.AVAILABLE },
         });
       }
@@ -204,15 +208,23 @@ export class PaymentsService {
     // Keeping the helper opt-in for that path avoids silently
     // inflating CRM totals on the first deploy after the refactor.
     if (opts.bumpCustomerStats !== false && customerId) {
-      const customer = await tx.customer.findUnique({ where: { id: customerId } });
+      // v2.8.93 — findFirst with tenantId scope replaces findUnique({id}).
+      // Same risk class as the table update above: a customerId pointing
+      // at another tenant's customer would otherwise let payment
+      // finalization mutate totalOrders/totalSpent on the foreign row.
+      const customer = await tx.customer.findFirst({
+        where: { id: customerId, tenantId: order.tenantId },
+      });
       if (customer) {
         const newTotalOrders = customer.totalOrders + 1;
         const newTotalSpent = new Prisma.Decimal(customer.totalSpent).add(
           closingAmount,
         );
         const newAverageOrder = newTotalSpent.div(newTotalOrders);
-        await tx.customer.update({
-          where: { id: customerId },
+        // updateMany propagates the tenantId filter through the write.
+        // Belt-and-suspenders with the findFirst above.
+        await tx.customer.updateMany({
+          where: { id: customerId, tenantId: order.tenantId },
           data: {
             totalOrders: newTotalOrders,
             totalSpent: newTotalSpent,
@@ -828,8 +840,14 @@ export class PaymentsService {
               },
             });
             if (payment.order.tableId) {
-              await tx.table.update({
-                where: { id: payment.order.tableId },
+              // v2.8.93 — updateMany with (id, tenantId) compound WHERE.
+              // Same cross-tenant write risk as the AVAILABLE branch in
+              // finalizeFullyPaid above; mirror the fix here.
+              await tx.table.updateMany({
+                where: {
+                  id: payment.order.tableId,
+                  tenantId: payment.order.tenantId,
+                },
                 data: { status: TableStatus.OCCUPIED },
               });
             }
@@ -838,8 +856,12 @@ export class PaymentsService {
           // Roll back THIS payment's contribution to customer stats —
           // regardless of which branch we took.
           if (payment.order.customerId) {
-            const cust = await tx.customer.findUnique({
-              where: { id: payment.order.customerId },
+            // v2.8.93 — tenantId-scoped lookup matches finalizeFullyPaid.
+            const cust = await tx.customer.findFirst({
+              where: {
+                id: payment.order.customerId,
+                tenantId: payment.order.tenantId,
+              },
             });
             if (cust && cust.totalOrders > 0) {
               const refundedAmt = new Prisma.Decimal(payment.amount);
@@ -852,8 +874,8 @@ export class PaymentsService {
                 newTotalOrders > 0
                   ? newTotalSpent.div(newTotalOrders)
                   : new Prisma.Decimal(0);
-              await tx.customer.update({
-                where: { id: cust.id },
+              await tx.customer.updateMany({
+                where: { id: cust.id, tenantId: payment.order.tenantId },
                 data: {
                   totalOrders: newTotalOrders,
                   totalSpent: newTotalSpent,

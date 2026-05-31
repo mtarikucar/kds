@@ -150,6 +150,12 @@ model Tenant {
   // cascade aligns with how every other tenant-scoped table is wired.
   featureEntitlements FeatureEntitlement[]
 
+  // v2.8.93 — Branch + Device picked up the missing tenant FK + cascade.
+  // Inverse relations declared here so Prisma keeps the TS-side graph
+  // consistent. Pre-fix both tables were orphan-prone.
+  branches            Branch[]
+  devices             Device[]
+
   @@index([currentPlanId])
   @@index([status])
   @@map("tenants")
@@ -3616,6 +3622,10 @@ model TenantAddOn {
 model Branch {
   id          String   @id @default(uuid())
   tenantId    String
+  // v2.8.93 — explicit Tenant FK + cascade. Pre-fix tenantId was a
+  // free-form String column with no FK, so deleting a tenant left
+  // orphan branches and a typo at write-time silently succeeded.
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   name        String   @default("Main")
   // Free-form code so chains can label as "IST-01", "ANK-Mall", etc.
   code        String?
@@ -3643,6 +3653,10 @@ model Branch {
 model Device {
   id              String   @id @default(uuid())
   tenantId        String
+  // v2.8.93 — explicit Tenant FK + cascade. Matches the Branch fix
+  // above; pre-fix a device's tenantId column had no DB-level integrity
+  // check and orphan devices outlived their tenants.
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   // Optional until the device is assigned to a branch via pairing. Nullable
   // also covers a chain admin creating slots ahead of branch deployment.
   branchId        String?

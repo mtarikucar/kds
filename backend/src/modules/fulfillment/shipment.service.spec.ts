@@ -47,6 +47,7 @@ describe('ShipmentService', () => {
   });
 
   it('markDelivered is idempotent on second call', async () => {
+    prisma.hardwareOrder.findFirst.mockResolvedValue({ id: 'o-1', tenantId: 't1' } as any);
     prisma.shipment.findUnique.mockResolvedValue({ id: 's-1', orderId: 'o-1', status: 'delivered' } as any);
     const out = await svc.markDelivered('s-1');
     expect(out.status).toBe('delivered');
@@ -54,6 +55,7 @@ describe('ShipmentService', () => {
   });
 
   it('markDelivered flips order to delivered and emits', async () => {
+    prisma.hardwareOrder.findFirst.mockResolvedValue({ id: 'o-1', tenantId: 't1' } as any);
     prisma.shipment.findUnique.mockResolvedValue({ id: 's-1', orderId: 'o-1', status: 'in_transit' } as any);
     (prisma.shipment.update as any).mockResolvedValue({ id: 's-1', status: 'delivered' });
     (prisma.hardwareOrder.update as any).mockResolvedValue({ id: 'o-1', tenantId: 't1', status: 'delivered' });
@@ -61,5 +63,12 @@ describe('ShipmentService', () => {
     expect(outbox.append).toHaveBeenCalledWith(
       expect.objectContaining({ type: 'hardware.order.delivered.v1' }),
     );
+  });
+
+  it('markDelivered scopes lookup to tenantId when provided (cross-tenant protection)', async () => {
+    // Foreign tenant lookup must not find the shipment.
+    prisma.hardwareOrder.findFirst.mockResolvedValue(null);
+    await expect(svc.markDelivered('s-1', 'other-tenant')).rejects.toThrow(/Shipment not found/);
+    expect(prisma.shipment.update).not.toHaveBeenCalled();
   });
 });
