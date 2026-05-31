@@ -881,6 +881,20 @@ export class OrdersService {
     // covers the order.update so a validation failure doesn't leave
     // the order without its items.
     const updatedOrder = await this.prisma.$transaction(async (tx) => {
+      // v2.8.94 — SELECT...FOR UPDATE on the order row before any
+      // other read inside the txn. Pre-fix the ensureNoInFlightSelfPayIntent
+      // check (line 945) and the deleteMany (line 946) had a real but
+      // small race window: a customer-self-pay PayTR intent
+      // concurrently being created would see no order lock to block on
+      // and could land its pendingSelfPayment row between the check and
+      // the items deleteMany — the waiter rewrites the cart, the
+      // customer's PayTR webhook finalizes against orphan item ids,
+      // and the customer reports a phantom charge. The row lock
+      // serializes all concurrent waiters and the self-pay creator
+      // against the same order.
+      await tx.$queryRaw`
+        SELECT id FROM orders WHERE id = ${id} AND "tenantId" = ${tenantId} FOR UPDATE
+      `;
       // Re-verify status inside the transaction: a concurrent cancel /
       // pay between the findOne above and this write could otherwise let
       // us layer new items onto a PAID/CANCELLED order (corrupting the

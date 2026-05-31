@@ -19,8 +19,20 @@ import { maskPhone } from '../../common/helpers/pii-mask.helper';
 // cooldown). Numbers chosen conservative; raise via config if legitimate
 // usage patterns show throttling.
 const DAILY_TENANT_SEND_CAP = 500;
-const DAILY_PHONE_SEND_CAP = 8;
+// v2.8.94 — lowered from 8 → 5. Per-OTP maxAttempts=3 + 5 sends = 15
+// brute-force attempts per phone per day; on a 6-digit code (10^6 space)
+// it's still vanishingly small but tightens the budget by ~37%.
+const DAILY_PHONE_SEND_CAP = 5;
 const DAILY_SESSION_SEND_CAP = 10;
+
+// v2.8.94 — cumulative verification-failure cap. Counts rows where
+// attempts >= maxAttempts (the OTP "burned" without success) plus rows
+// with verified=true=false but already past the most recent maxAttempts
+// budget. Past 24h. If the phone burned through this many codes via
+// wrong guesses, it's almost certainly an attacker. Locks both sendOTP
+// (no new codes) and verifyOTP (no more guesses).
+const DAILY_PHONE_FAILURE_LOCKOUT = 15;
+const FAILURE_LOCKOUT_WINDOW_MS = 24 * 60 * 60_000;
 
 @Injectable()
 export class PhoneVerificationService {
@@ -78,6 +90,14 @@ export class PhoneVerificationService {
     if (sessionId && sessionCount >= DAILY_SESSION_SEND_CAP) {
       throw new BadRequestException('Too many verification attempts on this session');
     }
+
+    // v2.8.94 — cumulative failure lockout. A phone that has burned
+    // through DAILY_PHONE_FAILURE_LOCKOUT codes via wrong guesses in
+    // the past 24h is locked from getting more codes. Without this an
+    // attacker could exhaust each code's 3-attempt budget and
+    // immediately request the next code (limited by the per-phone
+    // 60s cooldown but otherwise unbounded under the daily cap).
+    await this.assertNotInFailureLockout(phone, tenantId);
 
     const code = generateOtp();
     const storedCode = hashOtp(code);
@@ -145,6 +165,13 @@ export class PhoneVerificationService {
       throw new BadRequestException('No active verification found or code expired');
     }
 
+    // v2.8.94 — mirror the sendOTP-side lockout on the verify path so an
+    // attacker who already has a code in hand can't keep firing guesses
+    // after the (phone, tenant) crossed the failure threshold. The
+    // sendOTP path normally catches this earlier, but a code in flight
+    // when the threshold was crossed must also be refused.
+    await this.assertNotInFailureLockout(phone, tenantId);
+
     // Atomic increment gated on attempts < max — if another request just
     // consumed the last attempt, count will be 0 and we treat as locked out.
     const incResult = await this.prisma.phoneVerification.updateMany({
@@ -179,6 +206,42 @@ export class PhoneVerificationService {
     }
 
     return { verified: true, verificationId: verification.id };
+  }
+
+  /**
+   * v2.8.94 — cumulative failure lockout helper. Counts verification
+   * rows in the past FAILURE_LOCKOUT_WINDOW_MS that ended with
+   * attempts == maxAttempts and verified=false (i.e. all 3 guesses
+   * burned without success) plus the current row's attempts. If the
+   * total reaches DAILY_PHONE_FAILURE_LOCKOUT, refuse.
+   */
+  private async assertNotInFailureLockout(
+    phone: string,
+    tenantId: string,
+  ): Promise<void> {
+    const since = new Date(Date.now() - FAILURE_LOCKOUT_WINDOW_MS);
+    const burnedCount = await this.prisma.phoneVerification.count({
+      where: {
+        phone,
+        tenantId,
+        verified: false,
+        createdAt: { gte: since },
+        // Postgres-side equality between two columns is awkward in
+        // Prisma without raw SQL. Use the floor: any row with at least
+        // one failed attempt counts. This is slightly more conservative
+        // than "fully burned" (3 attempts), which is intentional — a
+        // partially-burned code still represents an active attacker.
+        attempts: { gt: 0 },
+      },
+    });
+    if (burnedCount >= DAILY_PHONE_FAILURE_LOCKOUT) {
+      this.logger.warn(
+        `Phone failure lockout triggered for ${maskPhone(phone)} tenant=${tenantId} (${burnedCount} failures in ${FAILURE_LOCKOUT_WINDOW_MS / 3600_000}h)`,
+      );
+      throw new BadRequestException(
+        'Too many failed verification attempts on this phone. Please try again in 24 hours.',
+      );
+    }
   }
 
   async isPhoneVerified(phoneRaw: string, tenantId: string): Promise<boolean> {

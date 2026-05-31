@@ -119,11 +119,19 @@ export class StockItemsService {
     const alertDate = new Date();
     alertDate.setDate(alertDate.getDate() + days);
 
+    // v2.8.94 — also gate on stockItem.trackExpiry. The expiryDate
+    // {lte, gte} pair already excludes NULL-expiry rows (PostgreSQL
+    // returns false for any range comparison with NULL), but a data
+    // migration glitch that stamps an expiryDate onto a non-perishable
+    // SKU would still leak it into the alert feed. Filtering by the
+    // explicit `trackExpiry=true` flag keeps the alert noise scoped
+    // to SKUs the operator actually opted into expiry tracking for.
     return this.prisma.stockBatch.findMany({
       where: {
         tenantId,
         quantity: { gt: 0 },
         expiryDate: { lte: alertDate, gte: new Date() },
+        stockItem: { trackExpiry: true },
       },
       include: { stockItem: true },
       orderBy: { expiryDate: 'asc' },

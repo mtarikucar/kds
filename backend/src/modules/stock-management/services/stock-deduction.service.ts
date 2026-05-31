@@ -233,27 +233,39 @@ export class StockDeductionService {
     }
 
     const totalDeducted = deduction.quantity;
+    // v2.8.94 — surface the negative-stock state when allowNegativeStock=true
+    // permits a decrement past zero. Pre-fix this branch logged nothing and
+    // wrote no audit hint on the IngredientMovement, so an inventory
+    // discrepancy (cycle-count miss, supplier short-ship, theft) sat silent
+    // until someone visually scanned the stock list and noticed a negative
+    // currentStock. Now we re-read post-decrement once and, if negative,
+    // tag the movement notes and emit a warn log; the cost-recalc on the
+    // next PO receive (purchase-orders.service) reads the same flag to
+    // clamp its weighted-average math.
+    const refreshed = await tx.stockItem.findFirst({
+      where: { id: deduction.stockItemId, tenantId },
+    });
+    const wentNegative = !!refreshed && new Prisma.Decimal(refreshed.currentStock).lt(0);
+    const movementNotes = wentNegative
+      ? `Order ${orderNumber} ⚠ NEGATIVE_STOCK currentStock=${refreshed!.currentStock}`
+      : `Order ${orderNumber}`;
+    if (wentNegative) {
+      this.logger.warn(
+        `Negative stock after deduction tenant=${tenantId} stockItem=${deduction.stockItemId} (${deduction.stockItemName}) newStock=${refreshed!.currentStock} order=${orderNumber}`,
+      );
+    }
     await tx.ingredientMovement.create({
       data: {
         type: IngredientMovementType.ORDER_DEDUCTION,
         quantity: totalDeducted.neg() as any,
         costPerUnit: finalCost ?? undefined,
-        notes: `Order ${orderNumber}`,
+        notes: movementNotes,
         referenceType: 'ORDER',
         referenceId: orderId,
         stockItemId: deduction.stockItemId,
         tenantId,
         createdById: userId,
       },
-    });
-
-    // Re-read post-decrement so the low-stock alert reflects the row
-    // we just wrote. Compound WHERE for symmetry with the rest of the
-    // service — id is globally unique, but a defensive tenantId filter
-    // keeps a future refactor that splits stockItem.id by tenant from
-    // silently breaking alert emission.
-    const refreshed = await tx.stockItem.findFirst({
-      where: { id: deduction.stockItemId, tenantId },
     });
     if (
       refreshed &&

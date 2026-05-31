@@ -208,9 +208,22 @@ export class PurchaseOrdersService {
         const existingCost = new Prisma.Decimal(stockItem.costPerUnit ?? 0);
         const unitPrice = new Prisma.Decimal(poItem.unitPrice);
         const newStock = existingStock.add(receivedQty);
-        const weightedCost = newStock.isZero()
+        // v2.8.94 — clamp existingStock to zero in the weighted-average
+        // numerator. Pre-fix a negative currentStock (left behind by an
+        // earlier allowNegativeStock=true deduction past zero — see
+        // stock-deduction.service.applyDeduction) would invert the
+        // weighting math: `(-5 * 10 + 100 * 20) / 95 = ~20.5` skews the
+        // cost basis nonsensically. Negative stock is an inventory
+        // discrepancy, not an economic position; the new PO receive
+        // resets the cost basis as if existingStock were zero.
+        const clampedExisting = Prisma.Decimal.max(
+          existingStock,
+          new Prisma.Decimal(0),
+        );
+        const denominator = clampedExisting.add(receivedQty);
+        const weightedCost = newStock.isZero() || denominator.isZero()
           ? unitPrice
-          : existingStock.mul(existingCost).add(receivedQty.mul(unitPrice)).div(newStock);
+          : clampedExisting.mul(existingCost).add(receivedQty.mul(unitPrice)).div(denominator);
 
         await tx.stockItem.update({
           where: { id: poItem.stockItemId },

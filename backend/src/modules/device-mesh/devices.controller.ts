@@ -109,13 +109,20 @@ export class DevicesController {
 
   // -- Device-side (device-token auth) endpoints ---------------------------
 
-  // v2.8.91: tight throttle. Pre-fix /pair carried only @Public() with
-  // no rate limit, so an attacker could brute-force the 6-character
-  // alphanumeric pair code (~2 billion combinations) at HTTP speed.
-  // Sister bridge claim endpoint already uses 10/minute; mirror it here.
-  // A legitimate device pairs exactly once.
+  // v2.8.91/94: tight throttle on /pair. The 6-character alphanumeric
+  // pair code (~2B combinations) has its own 15-minute TTL guard inside
+  // device.service, so the realistic attack window is the TTL × the
+  // rate-limit budget. v2.8.91 set 10/min/IP. v2.8.94 tightens to 5/min/IP
+  // — a legitimate device pairs exactly once per slot and an operator's
+  // re-issue takes seconds, so 5 attempts/min covers human retry while
+  // still capping a single-IP brute-force at 75 attempts per TTL window
+  // (a vanishing fraction of the 2B space). A distributed attacker
+  // bypassing per-IP would need to time their probes within the same
+  // 15-minute TTL — at 5/min/IP × 1000 IPs that's still only ~75K
+  // attempts per TTL, well under the brute-force budget for a 6-char
+  // code.
   @Public()
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('pair')
   @ApiOperation({ summary: 'Device pairs using the pair code shown in the admin UI' })
   pair(@Body() dto: PairDeviceDto) {
