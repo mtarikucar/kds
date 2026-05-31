@@ -44,8 +44,15 @@ export class CustomerOrdersController {
   // CUSTOMER ORDERS (Public endpoints)
   // ========================================
 
+  // v2.8.97 — tightened. Pre-fix 10/min/IP was generous; a single
+  // attacker IP could spam 600 orders/hour and burn through the
+  // kitchen queue. A real diner places a few orders per session;
+  // 3/min/IP is comfortably above that and an order of magnitude
+  // below the previous attack budget. Session validation upstream
+  // (the customer-session row, which the service requires) is the
+  // primary defense; this is throttle layer #2.
   @Public()
-  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
   @Post()
   @ApiOperation({ summary: 'Create a new customer order' })
   @ApiResponse({ status: 201, description: 'Order created successfully' })

@@ -16,6 +16,13 @@ export class GeolocationService {
   private readonly logger = new Logger(GeolocationService.name);
   private readonly cache = new Map<string, { data: GeoData | null; timestamp: number }>();
   private readonly CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
+  // v2.8.97 — cap. Pre-fix the Map grew without bound: a tenant with
+  // high-traffic public-stats endpoints (campaign landing page) could
+  // pile up tens of thousands of entries per day before the periodic
+  // cleanCache() ticks. At 50K entries (~ a few MB) we evict the
+  // oldest-inserted entries (Map preserves insertion order) so RSS
+  // stays bounded.
+  private static readonly MAX_CACHE_SIZE = 50_000;
 
   private isLocalIp(ip: string): boolean {
     return (
@@ -75,7 +82,7 @@ export class GeolocationService {
         };
 
         // Cache the result
-        this.cache.set(ip, { data: geoData, timestamp: Date.now() });
+        this.setCacheEntry(ip, { data: geoData, timestamp: Date.now() });
 
         return geoData;
       }
@@ -84,8 +91,18 @@ export class GeolocationService {
     }
 
     // Cache failed lookups too to avoid repeated failures
-    this.cache.set(ip, { data: null, timestamp: Date.now() });
+    this.setCacheEntry(ip, { data: null, timestamp: Date.now() });
     return null;
+  }
+
+  private setCacheEntry(ip: string, entry: { data: GeoData | null; timestamp: number }): void {
+    if (this.cache.has(ip)) this.cache.delete(ip);
+    this.cache.set(ip, entry);
+    while (this.cache.size > GeolocationService.MAX_CACHE_SIZE) {
+      const oldest = this.cache.keys().next().value;
+      if (!oldest) break;
+      this.cache.delete(oldest);
+    }
   }
 
   // Clean old cache entries periodically

@@ -157,6 +157,25 @@ export class PlanProjectorService {
       ? tenant.currentPlan
       : await this.resolveFreePlan();
 
+    // v2.8.97 — surface the drift case for ops/audit. When the active
+    // subscription's plan doesn't match the tenant's currentPlanId
+    // pointer we want to know — it's a lifecycle bug somewhere, and
+    // even though the engine fold below uses the right grants, the
+    // tenant's billing UI / receipts read currentPlanId directly and
+    // will mislead the operator. The reconcile cron eventually heals
+    // this but the log lets us pre-empt the discovery.
+    if (
+      effectivePlan &&
+      tenant.currentPlanId &&
+      effectivePlan.id !== tenant.currentPlanId
+    ) {
+      this.logger.warn(
+        `Plan pointer drift detected for tenant=${tenantId}: ` +
+          `Tenant.currentPlanId=${tenant.currentPlanId} vs effectivePlan.id=${effectivePlan.id} (${effectivePlan.name}). ` +
+          `Engine projection uses effectivePlan; lifecycle flow likely missed a currentPlanId update.`,
+      );
+    }
+
     const planSource = effectivePlan ? `plan:${effectivePlan.name}` : 'plan:NONE';
     const planGrants: Array<Omit<EntitlementGrant, 'tenantId' | 'source'>> = [];
 

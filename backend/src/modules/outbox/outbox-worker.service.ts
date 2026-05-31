@@ -43,6 +43,21 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
   ) {}
 
   onModuleInit(): void {
+    // v2.8.97 — warn at boot if retention is too short. The webhook
+    // delivery worker uses exponential backoff capped at 6h between
+    // retries; retention below the worst-case retry envelope risks
+    // pruning a row whose downstream delivery is still legitimately
+    // queued. Recommended floor: 7 days (matches the per-row max
+    // attempts × backoff cap). Warn but don't refuse to boot so a
+    // deliberately-aggressive prune (e.g. cost-pressed staging) is
+    // still possible.
+    if (this.RETENTION_DAYS < 7 && this.RETENTION_DAYS >= 1) {
+      this.logger.warn(
+        `OUTBOX_RETENTION_DAYS=${this.RETENTION_DAYS} is below the recommended 7-day floor. ` +
+          `Webhook delivery backoff caps at 6h between retries; rows pruned before delivery completes are silently lost. ` +
+          `Raise the env to 7+ unless you've manually verified the delivery worker drains the outbox faster than your retention window.`,
+      );
+    }
     this.scheduleNext(0);
     // First prune fires shortly after boot so a stale ops dashboard
     // shows a fresh count immediately; subsequent runs are hourly.

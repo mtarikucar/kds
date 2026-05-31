@@ -83,10 +83,19 @@ export class EmailService {
 
       // If no transporter (missing config), just log
       if (!this.transporter) {
-        this.logger.log(`[EMAIL MOCK] To: ${to}`);
+        // v2.8.97 — mock-mode logging now masks the recipient AND
+        // drops the raw context object. Pre-fix the [EMAIL MOCK]
+        // stream re-exposed PII the production path is careful to
+        // mask: full recipient addresses, OTP codes / reset tokens
+        // / temp passwords embedded in template contexts, and full
+        // email bodies after compile. The mock branch fires when
+        // EMAIL_USER/EMAIL_PASSWORD are absent, which is the typical
+        // staging / CI shape — so the leak surface was real even
+        // though the path "felt" dev-only.
+        this.logger.log(`[EMAIL MOCK] To: ${maskEmail(to)}`);
         this.logger.log(`[EMAIL MOCK] Subject: ${subject}`);
         this.logger.log(`[EMAIL MOCK] Template: ${template}`);
-        this.logger.log(`[EMAIL MOCK] Context:`, context);
+        this.logger.log(`[EMAIL MOCK] Context keys: ${Object.keys(context).join(', ')}`);
         return true;
       }
 
@@ -119,9 +128,12 @@ export class EmailService {
   async sendPlainEmail(to: string, subject: string, body: string): Promise<boolean> {
     try {
       if (!this.transporter) {
-        this.logger.log(`[EMAIL MOCK] To: ${to}`);
+        // v2.8.97 — same masking as sendEmail above. Body length is
+        // logged in place of the body so ops can sanity-check "the
+        // message wasn't truncated" without exposing OTP/token text.
+        this.logger.log(`[EMAIL MOCK] To: ${maskEmail(to)}`);
         this.logger.log(`[EMAIL MOCK] Subject: ${subject}`);
-        this.logger.log(`[EMAIL MOCK] Body: ${body}`);
+        this.logger.log(`[EMAIL MOCK] Body length: ${body.length} chars`);
         return true;
       }
       const from =

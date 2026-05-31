@@ -124,8 +124,17 @@ export class HttpExceptionFilter implements ExceptionFilter {
           method: request.method,
         });
       } catch (sentryErr) {
+        // v2.8.97 — log Sentry-side failure cause + the original
+        // exception type so ops can disambiguate "Sentry network
+        // outage" from "Sentry SDK threw on our payload". Pre-fix the
+        // log line mentioned only "Sentry capture failed" with the
+        // sentry error's stack, leaving the root cause of the original
+        // exception silent on the server side. User has already
+        // received an error response by this point, so the goal is
+        // ops observability, not request flow.
         this.logger.error(
-          'Sentry capture failed; original exception preserved',
+          `Sentry capture failed (${(sentryErr as Error)?.message ?? 'unknown'}); ` +
+            `original exception preserved (type=${(exception as any)?.constructor?.name ?? typeof exception}): ${(exception as Error)?.message ?? exception}`,
           (sentryErr as Error)?.stack,
         );
       }

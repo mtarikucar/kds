@@ -3134,7 +3134,11 @@ model LeadOffer {
   planId      String?
   plan        SubscriptionPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
   customPrice Decimal?          @db.Decimal(10, 2)
-  discount    Decimal?          @db.Decimal(5, 2)
+  // v2.8.97 — was Decimal(5, 2) which capped the discount at 999.99
+  // TRY. Sales reps offering a four-digit lira discount on enterprise
+  // tiers would have hit a silent precision overflow. Aligned with
+  // every other money column in the schema (Decimal(10, 2)).
+  discount    Decimal?          @db.Decimal(10, 2)
   trialDays   Int?
   notes       String?           @db.Text
   status      String            @default("DRAFT") // DRAFT, SENT, ACCEPTED, REJECTED, EXPIRED

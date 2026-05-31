@@ -58,6 +58,19 @@ export class OutboxService {
         `outbox.append: emitting unregistered event type "${opts.type}" — add it to EventTypes in event-types.ts so subscribers find it`,
       );
     }
+    // v2.8.97 — warn when a known-retryable event type lands without a
+    // producer-supplied idempotencyKey. The UUIDv7 fallback is unique
+    // per call, so retries of the same logical event produce N rows
+    // and consumers can't dedupe. Types matching this list are the
+    // ones where a duplicate has actual downstream impact (double
+    // notification, double commission, double settlement). Catch typos
+    // at the producer; for fire-and-forget event types (e.g. metric
+    // emits) the fallback is fine and there's no warning.
+    if (!opts.idempotencyKey && DEDUP_REQUIRED_PREFIXES.some((p) => opts.type.startsWith(p))) {
+      this.logger.warn(
+        `outbox.append: ${opts.type} emitted without an idempotencyKey; UUIDv7 fallback is per-call, so retries will produce duplicate rows. Pass a deterministic key (e.g. {tenantId}:{aggregateId}:{action}).`,
+      );
+    }
     const client = tx ?? this.prisma;
     const id = uuidv7();
     await client.outboxEvent.create({
@@ -74,3 +87,14 @@ export class OutboxService {
     return id;
   }
 }
+
+// v2.8.97 — event types where a duplicate row has tangible downstream
+// impact (double-charge, double-notify, double-credit). Producers of
+// these events SHOULD pass a deterministic idempotencyKey.
+const DEDUP_REQUIRED_PREFIXES = [
+  'subscription.',
+  'payment.',
+  'addon.',
+  'commission.',
+  'settlement.',
+];
