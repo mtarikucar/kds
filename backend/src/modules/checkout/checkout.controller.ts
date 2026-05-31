@@ -67,9 +67,15 @@ export class CheckoutController {
     @Ip() buyerIp: string,
     @Body() body: CreateCheckoutIntentDto,
   ) {
+    // v2.8.99.3 — fold the top-level branchId into the cart so it
+    // round-trips through the persisted CheckoutIntent.cartJson and
+    // is recoverable on confirm without a separate column. Validation
+    // (tenant-owned + active branch) runs in confirmAndProvision so
+    // the intent-time row stays cheap; the confirm path is where the
+    // HardwareOrder.branchId actually gets written.
     return this.intentSvc.createIntent({
       tenantId: req.user.tenantId,
-      cart: body.cart as unknown as Cart,
+      cart: { ...(body.cart as unknown as Cart), branchId: body.branchId },
       buyer: body.buyer,
       buyerIp,
       returnUrl: body.returnUrl,

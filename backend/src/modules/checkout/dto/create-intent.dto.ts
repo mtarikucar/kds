@@ -3,6 +3,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
+  IsUUID,
   Matches,
   MaxLength,
   ValidateNested,
@@ -79,4 +80,18 @@ export class CreateCheckoutIntentDto {
   @IsString()
   @MaxLength(512)
   returnUrl?: string;
+
+  // v2.8.99.3 — optional branch reference for hardware-store checkouts.
+  // When the buyer picks "Ship to my branch" in the shipping form, the
+  // SPA passes the chosen branchId here AND copies the branch address
+  // into `cart.shippingAddress` (snapshot). Backend validates the
+  // branch belongs to the caller's tenant and is `status='active'`
+  // before persisting onto HardwareOrder.branchId — see
+  // checkout.service.confirmAndProvision. Optional because the manual
+  // address mode and non-hardware checkouts (plan/addon-only) don't
+  // carry a branch reference.
+  @ApiPropertyOptional({ description: 'Tenant-owned branch the order ships to (snapshot only — see checkout.service)' })
+  @IsOptional()
+  @IsUUID()
+  branchId?: string;
 }

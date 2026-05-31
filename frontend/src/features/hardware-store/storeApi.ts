@@ -163,6 +163,13 @@ export const useCreateCheckoutIntent = () => {
       cart: { items: CartItem[]; shippingAddress?: ShippingAddress; billingAddress?: ShippingAddress };
       buyer: CheckoutBuyer;
       returnUrl?: string;
+      // v2.8.99.3 — "Ship to my branch" reference. When the buyer
+      // picks one of their tenant's branches in ShippingAddressForm,
+      // the SPA passes the branchId here AND copies the branch
+      // address into `cart.shippingAddress` (snapshot). Backend
+      // re-validates (tenant-owned + status='active') and writes to
+      // HardwareOrder.branchId. Omitted on manual-address mode.
+      branchId?: string;
     }): Promise<CheckoutIntentResponse> => {
       const r = await api.post('/v1/checkout/intent', args);
       return r.data;

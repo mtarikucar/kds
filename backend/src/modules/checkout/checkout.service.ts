@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { v7 as uuidv7 } from 'uuid';
 import { PrismaService } from '../../prisma/prisma.service';
 import { OutboxService } from '../outbox/outbox.service';
@@ -73,6 +73,28 @@ export class CheckoutService {
     const addOnLines = quote.lines.filter((l) => l.type === 'addon');
     const planLines = quote.lines.filter((l) => l.type === 'plan');
 
+    // v2.8.99.3 — tenant-scoped active-branch validation. The buyer
+    // picked a branch in the shipping form; we trust the SPA to copy
+    // the branch's address into cart.shippingAddress (snapshot) but
+    // re-validate the branchId here so a forged or stale request
+    // can't stamp another tenant's branch onto this HardwareOrder.
+    // Archived branches are rejected too — re-activating an archived
+    // branch is a deliberate operator action, not something a
+    // checkout flow should resurrect by proxy.
+    let validatedBranchId: string | null = null;
+    if (cart.branchId) {
+      const branch = await this.prisma.branch.findFirst({
+        where: { id: cart.branchId, tenantId, status: 'active' },
+        select: { id: true },
+      });
+      if (!branch) {
+        throw new BadRequestException(
+          `branchId ${cart.branchId} is not an active branch for this tenant`,
+        );
+      }
+      validatedBranchId = branch.id;
+    }
+
     let hardwareOrderId: string | undefined;
     const addOnIds: string[] = [];
 
@@ -99,6 +121,13 @@ export class CheckoutService {
         const order = await tx.hardwareOrder.create({
           data: {
             tenantId,
+            // v2.8.99.3 — buyer-picked branch (already validated above).
+            // Snapshot of which branch this order ships to; the actual
+            // address lives in shippingAddress Json and is frozen at
+            // create time so a later Branch.address edit can't rewrite
+            // history. branchId is for traceability + future
+            // "orders shipping to this branch" reports.
+            branchId: validatedBranchId,
             status: paymentRef ? 'paid' : 'pending_payment',
             subtotalCents: hardwareLines.reduce((a, l) => a + l.subtotalCents, 0),
             taxCents: Math.round(

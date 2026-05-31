@@ -11,6 +11,10 @@ import {
 import { useCartStore, toCartItems } from './cartStore';
 import ShippingAddressForm from './ShippingAddressForm';
 import { useAuthStore } from '../../store/authStore';
+// v2.8.99.3 — pull the tenant's branches into the shipping form so
+// the buyer can "ship to my branch" instead of typing a custom
+// address.
+import { useListBranches } from '../branches/branchesApi';
 
 /**
  * Renders a product image but hides itself when the file is missing (404).
@@ -126,6 +130,9 @@ export default function StorePage() {
   const quote = useQuoteCart();
   const intent = useCreateCheckoutIntent();
   const user = useAuthStore((s) => s.user);
+  // v2.8.99.3 — branches load lazily; ShippingAddressForm tolerates an
+  // empty list (radio toggle hidden, behaves like pre-v2.8.99.3).
+  const { data: branches = [] } = useListBranches();
 
   // v2.8.84: checkout is a two-step modal — shipping address first, then
   // PayTR redirect. shippingAddress is held in component state so a user
@@ -179,10 +186,11 @@ export default function StorePage() {
     return quote.mutateAsync({ items: cartItems });
   }
 
-  async function startCheckout(address: ShippingAddress) {
+  async function startCheckout(result: { address: ShippingAddress; branchId?: string }) {
     if (lines.length === 0 || !user) return;
+    const { address, branchId } = result;
     setShippingAddress(address);
-    const result = await intent.mutateAsync({
+    const intentResult = await intent.mutateAsync({
       cart: { items: cartItems, shippingAddress: address },
       buyer: {
         email: user.email,
@@ -191,9 +199,13 @@ export default function StorePage() {
         address: `${address.line1}${address.line2 ? ', ' + address.line2 : ''}, ${address.city}`,
       },
       returnUrl: `${window.location.origin}/admin/hardware-orders`,
+      // v2.8.99.3 — top-level branchId so the backend stamps it onto
+      // HardwareOrder.branchId. Address still in cart.shippingAddress
+      // as the snapshot; branchId is the reference.
+      branchId,
     });
-    if (result.paymentLink) {
-      window.location.assign(result.paymentLink);
+    if (intentResult.paymentLink) {
+      window.location.assign(intentResult.paymentLink);
     }
   }
 
@@ -396,6 +408,7 @@ export default function StorePage() {
             </p>
             <ShippingAddressForm
               initial={shippingAddress ?? undefined}
+              branches={branches}
               onSubmit={startCheckout}
               submitting={intent.isPending}
               submitLabel="PayTR ile öde"

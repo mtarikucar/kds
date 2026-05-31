@@ -51,6 +51,12 @@ export interface Cart {
   shippingAddress?: Record<string, unknown>;
   billingAddress?: Record<string, unknown>;
   couponCode?: string;
+  // v2.8.99.3 — hardware-store "ship to my branch" reference.
+  // Snapshot of which branch the buyer picked at intent time; the
+  // address inside shippingAddress is copied separately so a branch
+  // moving / archiving later doesn't rewrite this order's address.
+  // Validated tenant-scoped + active in CheckoutService.confirmAndProvision.
+  branchId?: string;
 }
 
 export interface PricedLine {
