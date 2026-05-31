@@ -20,6 +20,15 @@ export interface User {
   lastName: string;
   role: string;
   tenantId: string | null;
+  /** v3.0.0 — the user's home branch. Hard-restricted roles
+   *  (WAITER/KITCHEN/COURIER) always carry a non-null value; ADMIN /
+   *  MANAGER may carry null when they legitimately roam (in that
+   *  case the BranchPicker forces an explicit selection before any
+   *  branch-scoped request fires). */
+  primaryBranchId: string | null;
+  /** v3.0.0 — the allow-list BranchGuard reads on every request.
+   *  ADMIN with an empty list = wildcard tenant access. */
+  allowedBranchIds: string[];
   status?: UserStatus | string;
   approvedAt?: string;
   approvedById?: string;

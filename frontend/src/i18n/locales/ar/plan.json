@@ -39,8 +39,8 @@
     "helpHint": "Reach out to support if you have questions."
   },
   "branchPicker": {
-    "allBranches": "All branches",
-    "comingSoon": "Branch filter is coming soon to reports and order lists.",
-    "comingSoonHint": "Branch filter coming soon — reports and order lists currently show all branches."
+    "activeBranch": "حدد الفرع النشط",
+    "lockedToPrimary": "فرعك ثابت. تواصل مع المدير لتغييره.",
+    "activeTooltip": "الفرع النشط. تتم تصفية جميع الاستعلامات والتدفقات المباشرة وفقاً له."
   }
 }

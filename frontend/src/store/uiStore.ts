@@ -25,12 +25,10 @@ interface UiState {
   toggleSection: (sectionId: string) => void;
   setSectionCollapsed: (sectionId: string, collapsed: boolean) => void;
 
-  // v2.8.88 — global active branch picker. UI-only in this PR; no
-  // query plumbing yet. `null` means "all branches" (default). Persists
-  // across refresh so a tenant who picked their main branch yesterday
-  // lands on it today.
-  activeBranchId: string | null;
-  setActiveBranchId: (branchId: string | null) => void;
+  // v3.0.0 — branch scope lives in branchScopeStore.ts. The legacy
+  // uiStore.activeBranchId field was removed to keep state slices
+  // single-purpose (cross-store side effects were the audit's
+  // High finding #9). useBranchScope() is the read hook.
 
   // Onboarding state
   onboarding: OnboardingState;
@@ -89,12 +87,6 @@ export const useUiStore = create<UiState>()(
         set((state) => ({
           collapsedSections: { ...state.collapsedSections, [sectionId]: collapsed },
         }));
-      },
-
-      // v2.8.88 — active branch picker (UI shell)
-      activeBranchId: null,
-      setActiveBranchId: (branchId: string | null) => {
-        set({ activeBranchId: branchId });
       },
 
       // Onboarding state
@@ -170,7 +162,6 @@ export const useUiStore = create<UiState>()(
       partialize: (state) => ({
         isSidebarCollapsed: state.isSidebarCollapsed,
         collapsedSections: state.collapsedSections,
-        activeBranchId: state.activeBranchId,
         onboarding: state.onboarding,
         defaultReceiptPrinterId: state.defaultReceiptPrinterId,
         defaultKitchenPrinterId: state.defaultKitchenPrinterId,

@@ -64,13 +64,32 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
           return;
         }
 
+        // v3.0.0 — staff sockets must also pass auth.branchId so
+        // tenant-scoped emits don't bleed across the branch axis. We
+        // join two rooms: the user-specific channel (user:${userId})
+        // and the (tenantId, branchId) channel for branch-scoped
+        // emits. Tenant-wide notifications use a separate explicit
+        // broadcastToTenantAcrossBranches() helper (billing/marketing
+        // only) — by default every emit is branch-scoped.
+        const branchId =
+          typeof client.handshake.auth?.branchId === 'string'
+            ? client.handshake.auth.branchId
+            : '';
+        if (!branchId) {
+          this.logger.warn(
+            `Notifications JWT rejected for ${client.id}: missing branchId in handshake`,
+          );
+          client.disconnect();
+          return;
+        }
         client.data.userId = userId;
         client.data.tenantId = payload.tenantId;
+        client.data.branchId = branchId;
         client.data.role = payload.role;
         client.data.tokenExp = payload.exp;
 
         client.join(`user:${userId}`);
-        client.join(`tenant:${payload.tenantId}`);
+        client.join(`tenant:${payload.tenantId}:branch:${branchId}`);
 
         // Auto-disconnect at token expiry so an idle long-lived socket
         // can't keep receiving emits after its JWT becomes invalid. Pure
@@ -114,10 +133,38 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
   }
 
   /**
-   * Send notification to all users in a tenant
+   * Send notification to staff on a specific (tenantId, branchId).
+   *
+   * The room layout post-v3.0.0 includes branchId so a notification
+   * for one branch's staff doesn't pop up on another branch's
+   * dashboards. Use this for branch-bound events (low stock, swap
+   * approval, etc.).
    */
-  sendNotificationToTenant(tenantId: string, notification: any) {
-    this.server.to(`tenant:${tenantId}`).emit('notification', notification);
-    this.logger.log(`Notification sent to tenant ${tenantId}: ${notification.title}`);
+  sendNotificationToBranch(
+    tenantId: string,
+    branchId: string,
+    notification: any,
+  ) {
+    this.server
+      .to(`tenant:${tenantId}:branch:${branchId}`)
+      .emit('notification', notification);
+    this.logger.log(
+      `Notification sent to tenant=${tenantId} branch=${branchId}: ${notification.title}`,
+    );
+  }
+
+  /**
+   * Cross-branch tenant broadcast. Used only by billing / marketing
+   * / system-wide announcements — never by branch-scoped flows. The
+   * explicit name makes a caller pause before reaching for the
+   * tenant-wide bus.
+   */
+  broadcastToTenantAcrossBranches(tenantId: string, notification: any) {
+    this.server
+      .to(`tenant:${tenantId}`)
+      .emit('notification', notification);
+    this.logger.log(
+      `Notification broadcast across tenant ${tenantId}: ${notification.title}`,
+    );
   }
 }

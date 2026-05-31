@@ -39,8 +39,8 @@
     "helpHint": "Reach out to support if you have questions."
   },
   "branchPicker": {
-    "allBranches": "All branches",
-    "comingSoon": "Branch filter is coming soon to reports and order lists.",
-    "comingSoonHint": "Branch filter coming soon — reports and order lists currently show all branches."
+    "activeBranch": "Выберите активный филиал",
+    "lockedToPrimary": "Ваш филиал зафиксирован. Обратитесь к менеджеру для изменения.",
+    "activeTooltip": "Активный филиал. Все запросы и потоки в реальном времени фильтруются по нему."
   }
 }

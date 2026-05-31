@@ -9,13 +9,68 @@ import { CreateBranchDto, UpdateBranchDto } from './dto/branch.dto';
 import { PlanFeatureGuard } from '../subscriptions/guards/plan-feature.guard';
 import { RequiresFeature } from '../subscriptions/decorators/requires-feature.decorator';
 import { PlanFeature } from '../../common/constants/subscription.enum';
+import { SkipBranchScope } from '../auth/decorators/skip-branch-scope.decorator';
+import { HARD_RESTRICTED_ROLES } from '../../common/constants/roles.enum';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @ApiTags('Branches')
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PlanFeatureGuard)
+@SkipBranchScope()
 @Controller('v1/branches')
 export class BranchesController {
-  constructor(private readonly branches: BranchesService) {}
+  constructor(
+    private readonly branches: BranchesService,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  /**
+   * v3.0.0 — visible-branches endpoint.
+   *
+   * Every authenticated role (including WAITER/KITCHEN/COURIER) can
+   * call this to discover the branches their BranchPicker / locked
+   * badge should render. The list is server-filtered by the user's
+   * role:
+   *   - WAITER/KITCHEN/COURIER → exactly one entry (primaryBranchId).
+   *   - MANAGER → the resolved UserBranchAssignment allow-list.
+   *   - ADMIN  → every active branch in the tenant (wildcard owner).
+   *
+   * Distinct from `/v1/branches` (CRUD), which stays ADMIN/MANAGER-
+   * only. Pre-v3 hard-restricted roles got a 403 trying to call list()
+   * and the BranchPicker had nothing to render.
+   */
+  @Get('visible')
+  async visible(@Req() req: any) {
+    const user = req.user;
+    const role = user.role as string;
+    if (HARD_RESTRICTED_ROLES.includes(role as any)) {
+      // The DB CHECK constraint guarantees primaryBranchId is set
+      // for these roles — refusing here would be a server bug.
+      if (!user.primaryBranchId) return [];
+      const branch = await this.prisma.branch.findFirst({
+        where: { id: user.primaryBranchId, tenantId: user.tenantId, status: 'active' },
+        select: { id: true, name: true, address: true, status: true },
+      });
+      return branch ? [branch] : [];
+    }
+    if (role === UserRole.MANAGER) {
+      return this.prisma.branch.findMany({
+        where: {
+          tenantId: user.tenantId,
+          status: 'active',
+          id: { in: user.allowedBranchIds ?? [] },
+        },
+        select: { id: true, name: true, address: true, status: true },
+        orderBy: { createdAt: 'asc' },
+      });
+    }
+    // ADMIN — empty allow-list = wildcard.
+    return this.prisma.branch.findMany({
+      where: { tenantId: user.tenantId, status: 'active' },
+      select: { id: true, name: true, address: true, status: true },
+      orderBy: { createdAt: 'asc' },
+    });
+  }
 
   // v2.8.91: ADMIN/MANAGER only on list + detail. Pre-v2.8.91 the
   // class-level guard chain lacked any @Roles on list/detail — every

@@ -1,4 +1,4 @@
-import { useState, useMemo, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
@@ -114,12 +114,36 @@ import { UpdateDialog } from './components/UpdateDialog';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
 import { useNotificationSocket } from './features/notifications/notificationsApi';
 import { useAuthStore } from './store/authStore';
+import { useBranchScopeStore } from './store/branchScopeStore';
 import { UserRole } from './types';
 import { detectSubdomain } from './utils/subdomain';
+import { useQueryClient } from '@tanstack/react-query';
 
 function App() {
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const isAuthenticated = useAuthStore((state) => !!state.accessToken);
+  const user = useAuthStore((state) => state.user);
+  const queryClient = useQueryClient();
+
+  // v3.0.0 — hydrate the branch scope every time the persisted user
+  // changes. Cross-store side effects live HERE (component effect),
+  // not inside authStore.set — the audit's High finding #9 closed.
+  useEffect(() => {
+    useBranchScopeStore.getState().hydrateFromUser(user);
+  }, [user]);
+
+  // v3.0.0 — invalidate every TanStack Query when the active branch
+  // changes so stale data from the previous branch can't show up
+  // for the staleTime window.
+  useEffect(() => {
+    return useBranchScopeStore.subscribe(
+      (s, prev) => {
+        if (s.branchId !== prev.branchId) {
+          queryClient.removeQueries();
+        }
+      },
+    );
+  }, [queryClient]);
 
   // Detect subdomain access
   const subdomainInfo = useMemo(() => detectSubdomain(), []);

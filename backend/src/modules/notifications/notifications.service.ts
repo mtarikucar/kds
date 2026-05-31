@@ -161,8 +161,11 @@ export class NotificationsService {
         notification,
       );
     } else if (createNotificationDto.isGlobal) {
-      // Send to all users in tenant
-      this.notificationsGateway.sendNotificationToTenant(
+      // v3.0.0 — an isGlobal=true notification spans every branch
+      // of the tenant by design (billing, marketing, system-wide).
+      // Use the explicit cross-branch helper so the intent is
+      // captured at the call site.
+      this.notificationsGateway.broadcastToTenantAcrossBranches(
         createNotificationDto.tenantId,
         notification,
       );

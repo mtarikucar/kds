@@ -39,8 +39,8 @@
     "helpHint": "Sorularınız için destek ekibimizle iletişime geçebilirsiniz."
   },
   "branchPicker": {
-    "allBranches": "Tüm şubeler",
-    "comingSoon": "Şube filtresi yakında raporlara ve sipariş listelerine eklenecek.",
-    "comingSoonHint": "Şube filtresi yakında — şu an raporlar ve sipariş listeleri tüm şubeleri gösteriyor."
+    "activeBranch": "Aktif şube seçin",
+    "lockedToPrimary": "Şubeniz sabit. Değiştirmek için yöneticinize başvurun.",
+    "activeTooltip": "Aktif şube. Tüm sorgular ve gerçek zamanlı akışlar bu şubeye göre filtrelenir."
   }
 }
