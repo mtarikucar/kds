@@ -129,7 +129,16 @@ export class DevicesController {
     return this.devices.pair(dto);
   }
 
+  // v2.8.97 — device-token endpoints get explicit throttles. Pre-fix
+  // they relied solely on DeviceTokenGuard auth, so a compromised
+  // device token could be looped at arbitrary speed (DB CPU burn on
+  // claimNext's $queryRaw with FOR UPDATE SKIP LOCKED; index churn on
+  // heartbeat's repeated lastSeenAt update). The numbers chosen are
+  // ~6× the agent SDK's default polling cadence (1× per 10s for
+  // heartbeat, 1× per 5s for next-command), so a legitimate device
+  // sees daylight and a runaway agent fails fast.
   @UseGuards(DeviceTokenGuard)
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
   @Post('heartbeat')
   @ApiOperation({ summary: 'Device-side heartbeat. Auth: Authorization: Device <token>' })
   heartbeat(@Req() req: any, @Body() dto: HeartbeatDto) {
@@ -137,6 +146,7 @@ export class DevicesController {
   }
 
   @UseGuards(DeviceTokenGuard)
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @Get('next-command')
   @ApiOperation({ summary: 'Device claims the next queued command (returns null if none)' })
   nextCommand(@Req() req: any) {
@@ -144,6 +154,7 @@ export class DevicesController {
   }
 
   @UseGuards(DeviceTokenGuard)
+  @Throttle({ default: { limit: 120, ttl: 60_000 } })
   @Post('commands/:commandId/ack')
   @ApiOperation({ summary: 'Device acks a command outcome' })
   ack(@Req() req: any, @Param('commandId') commandId: string, @Body() dto: AckCommandDto) {

@@ -22,7 +22,14 @@ export class DeviceService {
   private readonly logger = new Logger(DeviceService.name);
   private static readonly PAIR_CODE_TTL_MS = 10 * 60 * 1000;
   private static readonly TOKEN_TTL_MS = 24 * 3600 * 1000;
-  private static readonly HEARTBEAT_GRACE_MS = 60 * 1000;
+  // v2.8.97 — tightened from 60s to 45s. Combined with the sweeper's
+  // 60s cron tick the worst-case "online but actually offline" window
+  // drops from ~120s to ~105s. The 10s default heartbeat interval
+  // (set in the agent SDK) means a healthy device hits 4–5 heartbeats
+  // inside this grace, so the only real path to a false "offline"
+  // is a sustained network drop — which is exactly what we want
+  // surfaced.
+  private static readonly HEARTBEAT_GRACE_MS = 45 * 1000;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -34,11 +41,24 @@ export class DeviceService {
     // Reject I/O/0/1 to reduce typo confusion? The reduction in entropy is
     // small enough vs. the typo win that some POS vendors do it; we keep the
     // full alphabet for now to maximise space — 36^6 ≈ 2.2B for a 10min TTL.
+    //
+    // v2.8.97 — rejection sampling for uniform distribution. Pre-fix
+    // `byte % 36` gave the first 256 % 36 = 4 alphabet positions a
+    // ~0.4% higher selection probability (a tiny but documented modulo
+    // bias). Rejection sampling against the largest multiple of 36
+    // ≤ 256 (= 252) eliminates the bias at the cost of a tiny retry
+    // overhead (~1.5% of bytes rejected).
     const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    const bytes = randomBytes(6);
-    let s = '';
-    for (let i = 0; i < 6; i++) s += alphabet[bytes[i] % alphabet.length];
-    return s;
+    const ceiling = 256 - (256 % alphabet.length); // 252
+    const chars: string[] = [];
+    while (chars.length < 6) {
+      const buf = randomBytes(8);
+      for (let i = 0; i < buf.length && chars.length < 6; i++) {
+        if (buf[i] >= ceiling) continue; // rejection sample
+        chars.push(alphabet[buf[i] % alphabet.length]);
+      }
+    }
+    return chars.join('');
   }
 
   private newToken(): string {
@@ -62,12 +82,24 @@ export class DeviceService {
       }
     }
     let pairCode = this.newPairCode();
-    // Retry on collision — pairCode is globally unique. 36^6 makes collisions
-    // vanishingly rare but the retry is harmless.
+    // Retry on collision — pairCode is globally unique. 36^6 makes
+    // collisions vanishingly rare but the retry is harmless.
+    //
+    // v2.8.97 — log each collision and bail with a 503 if all five
+    // attempts collide. Pre-fix a 5x exhaustion silently used the last
+    // candidate which would then collide on insert and throw P2002 —
+    // confusing 500. With clean bail the operator gets a retryable
+    // 503 instead.
+    let attempts = 0;
     for (let i = 0; i < 5; i++) {
       const exists = await this.prisma.device.findUnique({ where: { pairCode } });
       if (!exists) break;
+      attempts = i + 1;
+      this.logger.warn(`Pair code collision (attempt=${attempts}) tenant=${tenantId}; regenerating`);
       pairCode = this.newPairCode();
+    }
+    if (attempts >= 5) {
+      throw new Error('Could not allocate unique pair code after 5 attempts — retry the request');
     }
 
     const row = await this.prisma.device.create({
@@ -100,12 +132,36 @@ export class DeviceService {
   }
 
   async list(tenantId: string, filters?: { branchId?: string; kind?: string; status?: string }) {
+    // v2.8.97 — explicit select. Pre-fix the list returned every column
+    // including pairCode (still-active if pre-pair), pairCodeExpiresAt,
+    // and tokenHash (sha256, but still — no reason to ship hashes
+    // outside the auth path). Operators only need identity + status to
+    // populate the device-list UI; the per-device admin view fetches
+    // sensitive bits separately. Defense-in-depth against a future
+    // controller that pipes list() output to the wire without
+    // sanitisation.
     return this.prisma.device.findMany({
       where: {
         tenantId,
         ...(filters?.branchId ? { branchId: filters.branchId } : {}),
         ...(filters?.kind ? { kind: filters.kind } : {}),
         ...(filters?.status ? { status: filters.status } : {}),
+      },
+      select: {
+        id: true,
+        tenantId: true,
+        branchId: true,
+        kind: true,
+        capabilities: true,
+        status: true,
+        lastSeenAt: true,
+        serial: true,
+        model: true,
+        ownership: true,
+        warrantyUntil: true,
+        bridgeId: true,
+        createdAt: true,
+        updatedAt: true,
       },
       orderBy: [{ branchId: 'asc' }, { kind: 'asc' }, { createdAt: 'asc' }],
     });

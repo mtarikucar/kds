@@ -192,7 +192,13 @@ export class CommandQueueService {
    */
   async sweepStuck(): Promise<number> {
     const cutoff = new Date(Date.now() - 5 * 60 * 1000);
-    const [requeue, fail] = await this.prisma.$transaction([
+    const now = new Date();
+    // v2.8.97 — also transition expired-queued commands to `expired`
+    // so they're explicitly visible to the admin instead of sitting
+    // in `queued` status with expiresAt in the past (where claimNext
+    // silently skips them and nobody is alerted). The `expired` row
+    // still carries the original payload for forensic review.
+    const [requeue, fail, expired] = await this.prisma.$transaction([
       this.prisma.deviceCommand.updateMany({
         where: {
           status: 'inflight',
@@ -209,11 +215,18 @@ export class CommandQueueService {
         },
         data: { status: 'failed', error: 'No ack received; giving up' },
       }),
+      this.prisma.deviceCommand.updateMany({
+        where: {
+          status: 'queued',
+          expiresAt: { lt: now, not: null },
+        },
+        data: { status: 'expired', error: 'TTL expired before device claimed' },
+      }),
     ]);
-    const total = requeue.count + fail.count;
+    const total = requeue.count + fail.count + expired.count;
     if (total > 0) {
       this.logger.warn(
-        `Swept ${total} stuck device commands (requeued=${requeue.count} failed=${fail.count})`,
+        `Swept ${total} stuck device commands (requeued=${requeue.count} failed=${fail.count} expired=${expired.count})`,
       );
     }
     return total;

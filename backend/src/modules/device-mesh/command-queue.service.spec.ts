@@ -126,22 +126,23 @@ describe('CommandQueueService', () => {
       await svc.sweepStuck();
 
       expect((prisma.$transaction as any).mock.calls.length).toBe(1);
-      // The first $transaction call's first arg is the array of two
-      // updateMany prismas — length must be 2 regardless of how many
-      // rows are stale.
+      // The first $transaction call's first arg is the array of three
+      // updateMany prismas (v2.8.97 added the expired-queued sweep
+      // alongside the requeue + fail branches) — length must be 3
+      // regardless of how many rows are stale.
       const txArgs = (prisma.$transaction as any).mock.calls[0][0];
       expect(Array.isArray(txArgs)).toBe(true);
-      expect(txArgs.length).toBe(2);
+      expect(txArgs.length).toBe(3);
       // findMany must NOT fire — that was the N+1 starting point.
       expect((prisma.deviceCommand.findMany as any).mock.calls.length).toBe(0);
     });
 
-    it('returns the combined requeue+fail count', async () => {
-      (prisma.$transaction as any).mockResolvedValue([{ count: 3 }, { count: 2 }]);
+    it('returns the combined requeue+fail+expired count', async () => {
+      (prisma.$transaction as any).mockResolvedValue([{ count: 3 }, { count: 2 }, { count: 4 }]);
 
       const total = await svc.sweepStuck();
 
-      expect(total).toBe(5);
+      expect(total).toBe(9);
     });
 
     it('predicate splits on attempts vs MAX_ATTEMPTS', async () => {
