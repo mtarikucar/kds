@@ -119,12 +119,38 @@ async function bootstrap() {
     ? process.env.CORS_ORIGIN.split(',')
     : ['http://localhost:5173', 'http://localhost:5179'];
 
+  // v2.8.94 — explicit tenant-subdomain regex with structural caps and
+  // a reserved-name deny-list. Pre-fix `[a-z0-9-]+` matched any length
+  // of any allowed character; combined with `credentials: true` an
+  // attacker controlling a subdomain (DNS hijack, accidental wildcard
+  // delegation, internal misconfig) would get cookied requests. The
+  // new shape:
+  //   - 3–32 char label (matches tenant subdomain validation rules)
+  //   - cannot start or end with a hyphen
+  //   - explicit deny-list of platform-reserved labels prevents an
+  //     attacker who got `admin.hummytummy.com` provisioned to them
+  //     from also winning CORS access
+  const TENANT_SUBDOMAIN_RE = /^https:\/\/(?!-)[a-z0-9-]{3,32}(?<!-)\.hummytummy\.com$/;
+  const TENANT_SUBDOMAIN_STAGING_RE = /^https:\/\/(?!-)[a-z0-9-]{3,32}(?<!-)\.staging\.hummytummy\.com$/;
+  const RESERVED_SUBDOMAINS = new Set([
+    'admin', 'api', 'app', 'auth', 'cdn', 'dashboard', 'docs', 'help',
+    'login', 'mail', 'ops', 'panel', 'platform', 'root', 'staff',
+    'staging', 'status', 'superadmin', 'support', 'system', 'www',
+  ]);
+  const isAllowedTenantOrigin = (origin: string): boolean => {
+    let match = TENANT_SUBDOMAIN_RE.exec(origin);
+    if (!match) match = TENANT_SUBDOMAIN_STAGING_RE.exec(origin);
+    if (!match) return false;
+    const label = origin.replace(/^https:\/\//, '').split('.')[0];
+    if (RESERVED_SUBDOMAINS.has(label)) return false;
+    return true;
+  };
+
   app.enableCors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
-      if (/^https:\/\/[a-z0-9-]+\.hummytummy\.com$/.test(origin)) return callback(null, true);
-      if (/^https:\/\/[a-z0-9-]+\.staging\.hummytummy\.com$/.test(origin)) return callback(null, true);
+      if (isAllowedTenantOrigin(origin)) return callback(null, true);
       return callback(new Error('Not allowed by CORS'), false);
     },
     credentials: true,

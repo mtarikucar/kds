@@ -12,6 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Request } from 'express';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -65,7 +66,14 @@ export class CallerController {
   // them against staging (NODE_ENV != production) or build a
   // SuperAdmin-authenticated test-event endpoint that bypasses the
   // public webhook surface entirely.
+  // v2.8.94 — tight throttle. Pre-fix this was @Public with no rate
+  // limit, so even though real providers HMAC-sign their callbacks an
+  // attacker could spam the endpoint with random (providerId, tenantId)
+  // pairs to enumerate live tenants by response-timing or to burn
+  // adapter CPU on signature verification. 30/min is comfortably above
+  // the busiest real-call rate while killing any practical brute-force.
   @Public()
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Post('webhooks/:providerId/:tenantId')
   @ApiOperation({ summary: 'Provider-side webhook ingest. Signature verified by the adapter.' })
   async webhook(

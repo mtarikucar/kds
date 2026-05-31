@@ -322,22 +322,34 @@ export class CustomerSelfPayService {
 
     if (!origin) return { okUrl: fallbackOk, failUrl: fallbackFail };
 
-    // Comma-separated regex patterns; absent → no override allowed.
+    // v2.8.94 — exact origin allowlist (was: free-form regex). Pre-fix
+    // a misconfigured PAYTR_ALLOWED_RETURN_ORIGINS regex like ".*"
+    // would have rewarded the attacker's chosen origin with a PayTR
+    // return token; even a slightly loose pattern like
+    // `https://.*\.example\.com` would have matched
+    // `https://attacker.com/.example.com#`. Exact match means the env
+    // value must enumerate every legitimate origin, character for
+    // character. Comma-separated, parsed via URL() so a typo surfaces
+    // immediately instead of silently failing as "no match".
     const allowedRaw = this.config.get<string>('PAYTR_ALLOWED_RETURN_ORIGINS') ?? '';
-    const patterns = allowedRaw
+    const allowedOrigins = allowedRaw
       .split(',')
       .map((s) => s.trim())
-      .filter(Boolean);
+      .filter(Boolean)
+      .filter((s) => {
+        try {
+          new URL(s);
+          return true;
+        } catch {
+          // Malformed origin in env — log loudly so ops notices, but
+          // don't take the whole startup path down.
+          return false;
+        }
+      });
 
-    const matches = patterns.some((p) => {
-      try {
-        return new RegExp(`^${p}$`).test(origin);
-      } catch {
-        return false;
-      }
-    });
-
-    if (!matches) return { okUrl: fallbackOk, failUrl: fallbackFail };
+    if (!allowedOrigins.includes(origin)) {
+      return { okUrl: fallbackOk, failUrl: fallbackFail };
+    }
 
     // Origin like https://restaurant.hummytummy.com — same path
     // suffix the SPA uses for the path-based variant ("/payment-result").
