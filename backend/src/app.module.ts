@@ -47,6 +47,7 @@ import { LocalBridgeModule } from './modules/local-bridge/local-bridge.module';
 import { KdsRoutingModule } from './modules/kds-routing/kds-routing.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { CheckoutModule } from './modules/checkout/checkout.module';
+import { CashDrawerModule } from './modules/cash-drawer/cash-drawer.module';
 import { PaymentsCoreModule } from './modules/payments-core/payments-core.module';
 import { FiscalCoreModule } from './modules/fiscal-core/fiscal-core.module';
 import { CallerModule } from './modules/caller/caller.module';
@@ -134,6 +135,7 @@ import { RequestLoggerMiddleware } from './common/middleware/request-logger.midd
     // HummyTummy Phase 5: hardware catalog + checkout (mixed cart).
     CatalogModule,
     CheckoutModule,
+    CashDrawerModule,
     // HummyTummy Phase 6 & 7: payment + fiscal abstractions (vendor-neutral).
     PaymentsCoreModule,
     FiscalCoreModule,

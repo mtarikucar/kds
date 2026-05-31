@@ -208,10 +208,15 @@ export class ZReportsService {
     }
     const totalTax = totalTaxDec.toDecimalPlaces(2).toNumber();
 
-    // Get cash drawer movements for the day
+    // v2.8.99 — only APPROVED cash drawer movements count toward
+    // reconciliation. DRAFT rows are CASH_OUT or ADJUSTMENT entries
+    // awaiting manager approval; including them would skew the
+    // expected-cash sum before a manager has signed off. REJECTED
+    // rows are explicitly excluded.
     const cashMovements = await this.prisma.cashDrawerMovement.findMany({
       where: {
         tenantId,
+        approvalStatus: 'APPROVED',
         createdAt: {
           gte: startOfDay,
           lt: endOfDay,
