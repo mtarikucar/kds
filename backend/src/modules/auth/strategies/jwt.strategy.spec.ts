@@ -76,14 +76,9 @@ describe('JwtStrategy', () => {
       const result = await strategy.validate(payload);
 
       // The strategy strips `tenant` and `tokenVersion` from the
-      // returned user, and v3.0.0 appends `primaryBranchId` +
-      // `activeBranchId` from the JWT payload (null when omitted).
+      // returned user, so we compare against that subset.
       const { tenant: _t, tokenVersion: _v, ...expected } = fullUser as any;
-      expect(result).toEqual({
-        ...expected,
-        primaryBranchId: null,
-        activeBranchId: null,
-      });
+      expect(result).toEqual(expected);
       expect(prisma.user.findUnique).toHaveBeenCalled();
     });
 

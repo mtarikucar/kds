@@ -70,19 +70,6 @@ export async function createTestTenant(prisma: PrismaService) {
     },
   });
 
-  // v3.0.0 — every test tenant gets a "Main" branch by default.
-  // The same shape signup/onboarding will produce in v3.0.0 prod.
-  // Tests that need multi-branch scenarios use `createTestBranch`
-  // below to add additional branches.
-  const branch = await prisma.branch.create({
-    data: {
-      tenantId: tenant.id,
-      name: 'Main',
-      timezone: 'UTC',
-      status: 'active',
-    },
-  });
-
   const hashedPassword = await bcrypt.hash('password123', 10);
 
   const user = await prisma.user.create({
@@ -97,27 +84,7 @@ export async function createTestTenant(prisma: PrismaService) {
     },
   });
 
-  return { tenant, user, branch };
-}
-
-/**
- * v3.0.0 — add a secondary branch to an existing test tenant.
- * Used by branch-aware specs that need a 2-branch scenario.
- */
-export async function createTestBranch(
-  prisma: PrismaService,
-  tenantId: string,
-  overrides: { name?: string; code?: string; timezone?: string; status?: string } = {},
-) {
-  return prisma.branch.create({
-    data: {
-      tenantId,
-      name: overrides.name ?? 'Secondary',
-      code: overrides.code,
-      timezone: overrides.timezone ?? 'UTC',
-      status: overrides.status ?? 'active',
-    },
-  });
+  return { tenant, user };
 }
 
 /**

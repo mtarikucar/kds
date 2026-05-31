@@ -1491,23 +1491,6 @@ export class OrdersService {
       throw new NotFoundException('Target table not found');
     }
 
-    // v3.0.0 — cross-branch transfer is refused on the regular
-    // transfer endpoint. Source and target must share a branchId
-    // (or both be legacy/null in soft-mode). The dedicated
-    // /v1/orders/cross-branch-transfer endpoint exists for the
-    // explicit hand-over flow which writes audit + KDS resend.
-    // Pre-v3 this method silently merged across branches —
-    // produced ghost stock decrements + KDS confusion.
-    if (
-      sourceTable.branchId &&
-      targetTable.branchId &&
-      sourceTable.branchId !== targetTable.branchId
-    ) {
-      throw new BadRequestException(
-        'Cross-branch transfer is not allowed on this endpoint. Use POST /v1/orders/cross-branch-transfer for explicit branch hand-over (audit-logged, KDS-resync).',
-      );
-    }
-
     // Cannot transfer to a RESERVED table
     if (targetTable.status === TableStatus.RESERVED) {
       throw new BadRequestException('Cannot transfer orders to a reserved table');

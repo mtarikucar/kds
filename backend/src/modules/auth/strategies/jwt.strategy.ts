@@ -13,22 +13,6 @@ export interface JwtPayload {
   /** Token-version stamp. Incrementing User.tokenVersion invalidates every
    * previously-issued access token. Omitted on legacy tokens — treated as 0. */
   ver?: number;
-  /**
-   * v3.0.0 — primary branch the user is assigned to. WAITER/KITCHEN/COURIER
-   * are hard-restricted to their primary branch; ADMIN/MANAGER may have
-   * `primaryBranchId=null` (= "all branches"). Optional for backwards
-   * compatibility — pre-v3 tokens without the claim trigger a one-time
-   * fallback in BranchGuard (tenant's single active branch). The
-   * underlying User.primaryBranchId column lands in the same release.
-   */
-  primaryBranchId?: string | null;
-  /**
-   * v3.0.0 — branch currently active for this session. BranchPicker on the
-   * SPA mutates this via token refresh (or X-Branch-Id header on a single
-   * request). For WAITER/KITCHEN/COURIER this must equal primaryBranchId;
-   * BranchGuard enforces. Optional for backwards compat (see above).
-   */
-  activeBranchId?: string | null;
 }
 
 @Injectable()
@@ -86,16 +70,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     const { tenant: _tenant, tokenVersion: _ver, ...result } = user;
-    // v3.0.0 — forward branch claims from the JWT verbatim. BranchGuard
-    // reads `req.user.primaryBranchId` + `req.user.activeBranchId` to
-    // decide which scope this request runs under. Falling through if
-    // the claims are absent (legacy tokens) is fine — BranchGuard's
-    // fallback chain handles the missing-claim case by reading the
-    // tenant's single active branch.
-    return {
-      ...result,
-      primaryBranchId: payload.primaryBranchId ?? null,
-      activeBranchId: payload.activeBranchId ?? null,
-    };
+    return result;
   }
 }

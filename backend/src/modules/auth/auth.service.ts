@@ -223,20 +223,6 @@ export class AuthService {
               cancelAtPeriodEnd: false,
             },
           });
-          // v3.0.0 — every new tenant ships with a "Main" branch in
-          // the same transaction. Without it BranchGuard would have
-          // no row to resolve against on the very first login, and
-          // every branch-scoped read would fall through to soft-mode.
-          // Inserted here (not in the migration alone) so the invariant
-          // holds for every NEW tenant going forward, not just those
-          // present at migration time.
-          await tx.branch.create({
-            data: {
-              tenantId: created.id,
-              name: 'Main',
-              status: 'active',
-            },
-          });
           return created;
         });
         tenantId = tenant.id;
@@ -280,26 +266,6 @@ export class AuthService {
     // Determine user status: ADMIN creating restaurant = ACTIVE, others = PENDING_APPROVAL
     const userStatus = hasRestaurantName ? 'ACTIVE' : 'PENDING_APPROVAL';
 
-    // v3.0.0 — every new account picks up a primaryBranchId.
-    //
-    //   * ADMIN (Scenario 1, owner): the Main branch we just minted
-    //     above. They can still roam, but having a home keeps the
-    //     JWT's primaryBranchId claim non-null from day one.
-    //   * WAITER / KITCHEN / COURIER (Scenario 2, joiner): the
-    //     tenant's first active branch. Hard-restricted roles can't
-    //     ship without a home; BranchGuard would 400 every request.
-    //   * MANAGER joining: home defaults to first active branch; ops
-    //     may later add UserBranchAssignment rows to extend roam.
-    //
-    // We look up the branch by tenantId rather than re-using the
-    // freshly-minted Main's id because Scenario 2 doesn't have it
-    // in scope — the join flow only knows tenantId.
-    const primaryBranch = await this.prisma.branch.findFirst({
-      where: { tenantId, status: 'active' },
-      orderBy: { createdAt: 'asc' },
-      select: { id: true },
-    });
-
     // Create user
     const user = await this.prisma.user.create({
       data: {
@@ -310,7 +276,6 @@ export class AuthService {
         role: userRole,
         tenantId,
         status: userStatus,
-        primaryBranchId: primaryBranch?.id ?? null,
       },
       select: {
         id: true,
@@ -320,37 +285,8 @@ export class AuthService {
         role: true,
         status: true,
         tenantId: true,
-        primaryBranchId: true,
       },
     });
-
-    // v3.0.0 — for WAITER/KITCHEN/COURIER also write the matching
-    // UserBranchAssignment row up front. BranchGuard's allow-list
-    // check would otherwise false-reject these users on first login
-    // (their primaryBranchId is set but the assignments table has
-    // nothing). Best-effort: failure here only loses a row that the
-    // migration backfill will re-create next time it runs.
-    if (
-      primaryBranch?.id &&
-      (userRole === UserRole.WAITER ||
-        userRole === UserRole.KITCHEN ||
-        userRole === UserRole.COURIER)
-    ) {
-      try {
-        await this.prisma.userBranchAssignment.create({
-          data: {
-            userId: user.id,
-            branchId: primaryBranch.id,
-            tenantId,
-          },
-        });
-      } catch (error) {
-        this.logger.warn(
-          `Failed to seed UserBranchAssignment for ${user.id}; BranchGuard allow-list may need backfill.`,
-          error as any,
-        );
-      }
-    }
 
     // Send email verification code automatically after registration
     try {
@@ -677,40 +613,6 @@ export class AuthService {
       where: { id: user.id },
       select: { tokenVersion: true },
     });
-    // v3.0.0 — branch claims. Read User.primaryBranchId directly;
-    // fall back to "tenant's first active branch" so legacy users
-    // whose backfill hasn't run, plus ADMIN/MANAGER accounts that
-    // intentionally have no home assignment, still get a usable
-    // claim. The fallback shape mirrors BranchGuard's fallback
-    // chain so guard + token agree on what "no explicit selection"
-    // means.
-    //
-    // activeBranchId mirrors primaryBranchId at issuance time — the
-    // SPA may pin a different value via X-Branch-Id header on each
-    // request without minting a fresh token.
-    let primaryBranchId: string | null = null;
-    let activeBranchId: string | null = null;
-    try {
-      const homeUser = await this.prisma.user.findUnique({
-        where: { id: user.id },
-        select: { primaryBranchId: true },
-      });
-      if (homeUser?.primaryBranchId) {
-        primaryBranchId = homeUser.primaryBranchId;
-      } else {
-        const branch = await this.prisma.branch.findFirst({
-          where: { tenantId: user.tenantId, status: 'active' },
-          orderBy: { createdAt: 'asc' },
-          select: { id: true },
-        });
-        primaryBranchId = branch?.id ?? null;
-      }
-      activeBranchId = primaryBranchId;
-    } catch {
-      // Branch lookup is best-effort at token mint — a transient DB
-      // hiccup here should not block login. BranchGuard will resolve
-      // the missing claim on the next request.
-    }
     const payload = {
       sub: user.id,
       email: user.email,
@@ -718,8 +620,6 @@ export class AuthService {
       tenantId: user.tenantId,
       type: 'user' as const,
       ver: row?.tokenVersion ?? 0,
-      primaryBranchId,
-      activeBranchId,
     };
 
     const accessToken = this.jwtService.sign(payload, {

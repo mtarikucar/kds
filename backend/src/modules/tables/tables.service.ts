@@ -131,7 +131,7 @@ export class TablesService {
     // Per-tenant pre-start hold window. Single row lookup — keep it
     // unwrapped here rather than passing through every call site.
     const settings = await this.prisma.reservationSettings.findUnique({
-      where: { tenantId_branchId: { tenantId, branchId: null } },
+      where: { tenantId },
       select: { holdOffsetMinutes: true },
     });
     const holdOffsetMin = settings?.holdOffsetMinutes ?? DEFAULT_HOLD_OFFSET_MINUTES;

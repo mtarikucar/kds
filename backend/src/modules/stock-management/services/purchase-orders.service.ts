@@ -29,8 +29,8 @@ export class PurchaseOrdersService {
    */
   private async allocatePoNumber(tx: Tx, tenantId: string): Promise<string> {
     const settings = await tx.stockSettings.upsert({
-      where: { tenantId_branchId: { tenantId, branchId: null } },
-      create: { tenantId, branchId: null, poSequence: 1 },
+      where: { tenantId },
+      create: { tenantId, poSequence: 1 },
       update: { poSequence: { increment: 1 } },
     });
     const seq = String(settings.poSequence).padStart(5, '0');

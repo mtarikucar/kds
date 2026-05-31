@@ -38,7 +38,7 @@ export class AccountingSettingsService {
 
   async findByTenant(tenantId: string) {
     return this.prisma.accountingSettings.upsert({
-      where: { tenantId_branchId: { tenantId, branchId: null } },
+      where: { tenantId },
       update: {},
       create: { tenantId },
     });
@@ -47,7 +47,7 @@ export class AccountingSettingsService {
   async update(tenantId: string, dto: UpdateAccountingSettingsDto) {
     const safeDto = encryptDto(dto);
     return this.prisma.accountingSettings.upsert({
-      where: { tenantId_branchId: { tenantId, branchId: null } },
+      where: { tenantId },
       update: safeDto,
       create: { tenantId, ...safeDto },
     });
@@ -60,7 +60,7 @@ export class AccountingSettingsService {
    */
   async getDecryptedCredentials(tenantId: string) {
     const settings = await this.prisma.accountingSettings.findUnique({
-      where: { tenantId_branchId: { tenantId, branchId: null } },
+      where: { tenantId },
     });
     if (!settings) return null;
     const out: any = { ...settings };
@@ -106,7 +106,7 @@ export class AccountingSettingsService {
   ): Promise<string> {
     const db = tx ?? this.prisma;
     const settings = await db.accountingSettings.upsert({
-      where: { tenantId_branchId: { tenantId, branchId: null } },
+      where: { tenantId },
       update: { nextInvoiceNumber: { increment: 1 } },
       create: { tenantId, nextInvoiceNumber: 2 },
     });

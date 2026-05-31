@@ -75,7 +75,7 @@ export class QrMenuController {
     // GET would let any caller trigger writes for a known tenantId and seed
     // default settings without admin intent. A null response uses defaults.
     const settings = await this.prisma.qrMenuSettings.findUnique({
-      where: { tenantId_branchId: { tenantId, branchId: null } },
+      where: { tenantId },
     });
 
     // Get table information if tableId provided

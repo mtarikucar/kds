@@ -8,7 +8,7 @@ export class StockSettingsService {
 
   async get(tenantId: string) {
     let settings = await this.prisma.stockSettings.findUnique({
-      where: { tenantId_branchId: { tenantId, branchId: null } },
+      where: { tenantId },
     });
 
     if (!settings) {
@@ -22,7 +22,7 @@ export class StockSettingsService {
 
   async update(dto: UpdateStockSettingsDto, tenantId: string) {
     return this.prisma.stockSettings.upsert({
-      where: { tenantId_branchId: { tenantId, branchId: null } },
+      where: { tenantId },
       create: { tenantId, ...dto },
       update: dto,
     });

@@ -10,7 +10,6 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { TenantGuard } from './guards/tenant.guard';
-import { BranchGuard } from './guards/branch.guard';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
@@ -44,16 +43,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
     {
       provide: APP_GUARD,
       useClass: TenantGuard,
-    },
-    // v3.0.0 — BranchGuard sits right after TenantGuard because it
-    // depends on `req.user.tenantId` being populated. Routes opt out
-    // via @SkipBranchScope() (the tenant-wide endpoints — billing,
-    // marketing, marketplace checkout, /me, /branches CRUD itself).
-    // BRANCH_SCOPE_ENFORCED env flag governs strict vs soft mode at
-    // boot.
-    {
-      provide: APP_GUARD,
-      useClass: BranchGuard,
     },
   ],
   exports: [AuthService],

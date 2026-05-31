@@ -57,33 +57,6 @@ describe('OrdersService.transferTableOrders (iter-12 defense-in-depth)', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  // v3.0.0 — cross-branch silent merge gap (deferred from v2.8.98
-  // P2b) is closed. Both tables belong to t1 but to different
-  // branches; the regular transfer endpoint refuses, pointing the
-  // caller at /v1/orders/cross-branch-transfer.
-  it('rejects when source and target are on different branches', async () => {
-    prisma.table.findFirst
-      .mockResolvedValueOnce({ ...validSource, branchId: 'branch-A' } as any)
-      .mockResolvedValueOnce({ ...validTarget, branchId: 'branch-B' } as any);
-    await expect(
-      svc.transferTableOrders({ sourceTableId: 'src', targetTableId: 'tgt' } as any, 't1'),
-    ).rejects.toThrow(/Cross-branch transfer/);
-  });
-
-  // Soft-mode compatibility: if either side's branchId is still
-  // null (pre-backfill row), the cross-branch check stays silent —
-  // BRANCH_SCOPE_ENFORCED=true at the guard layer is the source of
-  // truth for "every row must have a branch."
-  it('allows transfer when one side has null branchId (soft-mode)', async () => {
-    prisma.table.findFirst
-      .mockResolvedValueOnce({ ...validSource, branchId: 'branch-A' } as any)
-      .mockResolvedValueOnce({ ...validTarget, branchId: null } as any);
-    prisma.order.findMany.mockResolvedValueOnce([] as any);
-    await expect(
-      svc.transferTableOrders({ sourceTableId: 'src', targetTableId: 'tgt' } as any, 't1'),
-    ).rejects.toThrow(/No active orders/);
-  });
-
   it('rejects when source has no active orders', async () => {
     prisma.table.findFirst
       .mockResolvedValueOnce(validSource as any)
