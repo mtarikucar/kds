@@ -613,6 +613,31 @@ export class AuthService {
       where: { id: user.id },
       select: { tokenVersion: true },
     });
+    // v3.0.0 — branch claims. Until the User.primaryBranchId column
+    // lands in the schema phase, we fall back to "tenant's single
+    // active branch" so legacy single-branch tenants Just Work; this
+    // is the same shape BranchGuard uses as its fallback chain. After
+    // the schema phase we read user.primaryBranchId directly here.
+    // activeBranchId mirrors primaryBranchId at issuance time — the
+    // SPA may pin a different value via X-Branch-Id header on each
+    // request without minting a fresh token.
+    let primaryBranchId: string | null = null;
+    let activeBranchId: string | null = null;
+    try {
+      const branch = await this.prisma.branch.findFirst({
+        where: { tenantId: user.tenantId, status: 'active' },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      if (branch) {
+        primaryBranchId = branch.id;
+        activeBranchId = branch.id;
+      }
+    } catch {
+      // Branch lookup is best-effort at token mint — a transient DB
+      // hiccup here should not block login. BranchGuard will resolve
+      // the missing claim on the next request.
+    }
     const payload = {
       sub: user.id,
       email: user.email,
@@ -620,6 +645,8 @@ export class AuthService {
       tenantId: user.tenantId,
       type: 'user' as const,
       ver: row?.tokenVersion ?? 0,
+      primaryBranchId,
+      activeBranchId,
     };
 
     const accessToken = this.jwtService.sign(payload, {
