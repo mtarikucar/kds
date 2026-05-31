@@ -82,11 +82,11 @@ model Tenant {
   orders              Order[]
   stockMovements      StockMovement[]
   subscriptions       Subscription[]
-  qrMenuSettings      QrMenuSettings?
-  posSettings         PosSettings?
-  reservationSettings ReservationSettings?
-  smsSettings         SmsSettings?
-  accountingSettings  AccountingSettings?
+  qrMenuSettings      QrMenuSettings[]
+  posSettings         PosSettings[]
+  reservationSettings ReservationSettings[]
+  smsSettings         SmsSettings[]
+  accountingSettings  AccountingSettings[]
   salesInvoices       SalesInvoice[]
   reservations        Reservation[]
   integrationSettings IntegrationSettings[]
@@ -120,7 +120,7 @@ model Tenant {
   ingredientMovements IngredientMovement[]
   wasteLogs           WasteLog[]
   stockCounts         StockCount[]
-  stockSettings       StockSettings?
+  stockSettings       StockSettings[]
 
   // Personnel management relations
   attendances          Attendance[]
@@ -155,6 +155,9 @@ model Tenant {
   // consistent. Pre-fix both tables were orphan-prone.
   branches            Branch[]
   devices             Device[]
+  // v3.0.0 — m:n user↔branch allow-list (BranchGuard reads it).
+  userBranchAssignments UserBranchAssignment[]
+
 
   @@index([currentPlanId])
   @@index([status])
@@ -251,6 +254,16 @@ model User {
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  // v3.0.0 — home branch. CHECK constraint at the DB layer
+  // enforces that WAITER/KITCHEN/COURIER cannot exist with a
+  // null primaryBranchId; nullable in the column itself so
+  // ADMIN owner accounts that legitimately roam may stay
+  // unanchored. Restrict on delete: archiving a branch must
+  // not orphan a user — ops reassigns first.
+  primaryBranchId String?
+  primaryBranch   Branch? @relation("UserPrimaryBranch", fields: [primaryBranchId], references: [id], onDelete: Restrict)
+
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -278,12 +291,54 @@ model User {
   // / İade / Terms is recorded for audit. Cascade-delete with the user
   // because a removed user can't be asked to re-accept anything.
   consents Consent[]
+  // v3.0.0 — m:n allow-list of branches the user may roam.
+  // BranchGuard consults this on every request for
+  // ADMIN/MANAGER roles.
+  branchAssignments        UserBranchAssignment[]
+  grantedBranchAssignments UserBranchAssignment[] @relation("UserBranchAssignmentGrantor")
+
 
   @@index([tenantId])
+  @@index([tenantId, primaryBranchId])
   @@index([email])
   @@index([approvedById])
   @@map("users")
 }
+
+// v3.0.0 — m:n user↔branch allow-list.
+//
+// BranchGuard reads this table on every authenticated request to decide
+// whether an ADMIN/MANAGER may target the resolved branchId. Encodes:
+//   - ADMIN with zero rows = wildcard tenant access (owner accounts).
+//   - MANAGER must have an explicit row for every branch they roam.
+//   - WAITER/KITCHEN/COURIER never have rows here — they are pinned
+//     to primaryBranchId by both the CHECK constraint and BranchGuard.
+//
+// Cascade-delete with either side: removing a branch or a user purges
+// the assignment automatically. assignedById uses SetNull so the audit
+// trail of past grants survives the grantor's account removal.
+model UserBranchAssignment {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Cascade)
+
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  assignedById String?
+  assignedBy   User?   @relation("UserBranchAssignmentGrantor", fields: [assignedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, branchId])
+  @@index([tenantId, branchId])
+  @@map("user_branch_assignments")
+}
+
 
 // ========================================
 // MENU MANAGEMENT
@@ -495,8 +550,8 @@ model Table {
   // Nullable — pre-existing tables predate the Branch model and stay
   // tenant-scoped. New tables created via the branches UI carry a real
   // branchId, and OrdersService.create copies it onto the order.
-  branchId String?
-  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -518,6 +573,10 @@ model Table {
   @@index([tenantId])
   @@index([tenantId, groupId])
   @@index([tenantId, branchId])
+  // v3.0.0 — compound unique enables (tableId, branchId) FK
+  // back-references from Reservation/Order so a row can never
+  // point at a table from a different branch at the DB layer.
+  @@unique([id, branchId])
   @@map("tables")
 }
 
@@ -587,8 +646,8 @@ model Order {
   // column when the caller passes branchId — null-branch orders simply
   // aren't returned by branch-scoped queries, which is the correct
   // behavior (they're shown in tenant-wide reports).
-  branchId String?
-  branch   Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  branchId String
+  branch   Branch  @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -739,6 +798,12 @@ model Payment {
   @@index([status])
   @@index([tenantId, status])
   @@index([tenantId, createdAt])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("payments")
 }
 
@@ -785,6 +850,12 @@ model OrderItemPayment {
   // Hot read path for "which items on this order are paid?" — service
   // aggregates by orderItemId, then joins to payment.status.
   @@index([orderItemId, paymentId])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("order_item_payments")
 }
 
@@ -823,6 +894,12 @@ model PendingSelfPayment {
   @@index([tenantId])
   @@index([expiresAt])
   @@index([tenantId, status, requestHash])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("pending_self_payments")
 }
 
@@ -856,6 +933,12 @@ model StockMovement {
   // alone; this compound index serves the date-bounded variant
   // without a sequential scan over the tenant's history.
   @@index([tenantId, createdAt])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("stock_movements")
 }
 
@@ -1143,7 +1226,7 @@ model InvoiceCounter {
 
 model QrMenuSettings {
   id       String @id @default(uuid())
-  tenantId String @unique
+  tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // Design customization
@@ -1169,6 +1252,11 @@ model QrMenuSettings {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId])
+  // v3.0.0 — branch scope.
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  @@unique([tenantId, branchId])
+
   @@map("qr_menu_settings")
 }
 
@@ -1178,7 +1266,7 @@ model QrMenuSettings {
 
 model PosSettings {
   id       String @id @default(uuid())
-  tenantId String @unique
+  tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   // POS operation modes
@@ -1197,6 +1285,11 @@ model PosSettings {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId])
+  // v3.0.0 — branch scope.
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  @@unique([tenantId, branchId])
+
   @@map("pos_settings")
 }
 
@@ -1206,7 +1299,7 @@ model PosSettings {
 
 model ReservationSettings {
   id       String @id @default(uuid())
-  tenantId String @unique
+  tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   isEnabled               Boolean @default(true)
@@ -1239,6 +1332,11 @@ model ReservationSettings {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId])
+  // v3.0.0 — branch scope.
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  @@unique([tenantId, branchId])
+
   @@map("reservation_settings")
 }
 
@@ -1248,7 +1346,7 @@ model ReservationSettings {
 
 model SmsSettings {
   id       String @id @default(uuid())
-  tenantId String @unique
+  tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   isEnabled Boolean @default(false)
@@ -1278,6 +1376,11 @@ model SmsSettings {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId])
+  // v3.0.0 — branch scope.
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  @@unique([tenantId, branchId])
+
   @@map("sms_settings")
 }
 
@@ -1338,6 +1441,12 @@ model Reservation {
   // Overlap-check query: WHERE tenantId AND tableId AND date AND
   // startTime/endTime range. tableId+date+startTime covers it.
   @@index([tenantId, tableId, date, startTime])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("reservations")
 }
 
@@ -1369,9 +1478,15 @@ model IntegrationSettings {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([tenantId, integrationType, provider])
+  @@unique([tenantId, branchId, integrationType, provider])
   @@index([tenantId])
   @@index([integrationType])
+  // v3.0.0 — branch scope.
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("integration_settings")
 }
 
@@ -1670,6 +1785,12 @@ model Notification {
   // (expiresAt IS NULL OR expiresAt > now()). Composite covers the
   // tenant scope + global vs targeted + expiry filter in one index.
   @@index([tenantId, isGlobal, expiresAt])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("notifications")
 }
 
@@ -1718,6 +1839,12 @@ model WaiterRequest {
   @@index([sessionId])
   @@index([tenantId])
   @@index([tenantId, status])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("waiter_requests")
 }
 
@@ -1744,6 +1871,12 @@ model BillRequest {
   @@index([sessionId])
   @@index([tenantId])
   @@index([tenantId, status])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("bill_requests")
 }
 
@@ -1889,6 +2022,12 @@ model ZReport {
   @@index([tenantId])
   @@index([reportDate])
   @@index([closedById])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("z_reports")
 }
 
@@ -1935,6 +2074,12 @@ model CashDrawerMovement {
   @@index([userId])
   @@index([createdAt])
   @@index([tenantId, approvalStatus])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("cash_drawer_movements")
 }
 
@@ -2158,6 +2303,12 @@ model Camera {
   @@index([tenantId])
   @@index([status])
   @@index([edgeDeviceId])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("cameras")
 }
 
@@ -2193,6 +2344,12 @@ model OccupancyRecord {
   @@index([tableId])
   @@index([trackingId, timestamp])
   @@index([state])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("occupancy_records")
 }
 
@@ -2220,6 +2377,12 @@ model TrafficFlowRecord {
   @@unique([tenantId, hourBucket, cellX, cellZ])
   @@index([tenantId, hourBucket])
   @@index([cellX, cellZ])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("traffic_flow_records")
 }
 
@@ -2263,6 +2426,12 @@ model TableAnalytics {
   @@unique([tableId, date])
   @@index([tenantId, date])
   @@index([tableId])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("table_analytics")
 }
 
@@ -2312,6 +2481,12 @@ model AnalyticsInsight {
   @@index([tenantId, type])
   @@index([tenantId, createdAt])
   @@index([severity])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("analytics_insights")
 }
 
@@ -2345,6 +2520,12 @@ model AnalyticsHeatmapCache {
   @@unique([tenantId, startTime, endTime, granularity, metric])
   @@index([tenantId, metric])
   @@index([expiresAt])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("analytics_heatmap_cache")
 }
 
@@ -2395,6 +2576,12 @@ model EdgeDevice {
   @@unique([tenantId, deviceId])
   @@index([tenantId])
   @@index([status])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("edge_devices")
 }
 
@@ -2490,6 +2677,12 @@ model DeliveryPlatformLog {
   @@index([orderId])
   @@index([success])
   @@index([nextRetryAt])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("delivery_platform_logs")
 }
 
@@ -2580,6 +2773,12 @@ model StockItem {
   @@index([tenantId])
   @@index([categoryId])
   @@index([isActive])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("stock_items")
 }
 
@@ -2606,6 +2805,12 @@ model StockBatch {
   @@index([tenantId])
   @@index([stockItemId])
   @@index([expiryDate])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("stock_batches")
 }
 
@@ -2628,6 +2833,12 @@ model Recipe {
   ingredients RecipeIngredient[]
 
   @@index([tenantId])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("recipes")
 }
 
@@ -2720,6 +2931,12 @@ model PurchaseOrder {
   @@index([tenantId])
   @@index([supplierId])
   @@index([status])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("purchase_orders")
 }
 
@@ -2772,6 +2989,12 @@ model IngredientMovement {
   // Per-tenant date-bounded queries (cost / waste / "last 30 days for
   // this tenant") — the dominant access pattern for cross-item reports.
   @@index([tenantId, createdAt])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("ingredient_movements")
 }
 
@@ -2795,6 +3018,12 @@ model WasteLog {
   @@index([stockItemId])
   @@index([reason])
   @@index([createdAt])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("waste_logs")
 }
 
@@ -2817,6 +3046,12 @@ model StockCount {
 
   @@index([tenantId])
   @@index([status])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("stock_counts")
 }
 
@@ -2840,7 +3075,7 @@ model StockCountItem {
 
 model StockSettings {
   id       String @id @default(uuid())
-  tenantId String @unique
+  tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   enableAutoDeduction Boolean @default(true)
@@ -2859,6 +3094,11 @@ model StockSettings {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId])
+  // v3.0.0 — branch scope.
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  @@unique([tenantId, branchId])
+
   @@map("stock_settings")
 }
 
@@ -2902,6 +3142,12 @@ model Attendance {
   @@index([tenantId, date])
   @@index([userId])
   @@index([status])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("attendances")
 }
 
@@ -2924,6 +3170,12 @@ model ShiftTemplate {
   assignments ShiftAssignment[]
 
   @@index([tenantId])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("shift_templates")
 }
 
@@ -2955,6 +3207,12 @@ model ShiftAssignment {
   @@index([tenantId, date])
   @@index([userId])
   @@index([shiftTemplateId])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("shift_assignments")
 }
 
@@ -2994,6 +3252,12 @@ model ShiftSwapRequest {
   @@index([requesterId])
   @@index([targetId])
   @@index([status])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("shift_swap_requests")
 }
 
@@ -3268,7 +3532,7 @@ model MarketingDistributionConfig {
 
 model AccountingSettings {
   id       String @id @default(uuid())
-  tenantId String @unique
+  tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   autoGenerateInvoice Boolean @default(false)
@@ -3307,6 +3571,11 @@ model AccountingSettings {
   updatedAt DateTime @updatedAt
 
   @@index([tenantId])
+  // v3.0.0 — branch scope.
+  branchId String?
+  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  @@unique([tenantId, branchId])
+
   @@map("accounting_settings")
 }
 
@@ -3673,6 +3942,47 @@ model Branch {
   bridges     LocalBridgeAgent[]
   orders      Order[]
   tables      Table[]
+  // v3.0.0 — strict branch-scope inverse relations.
+  deviceCommands DeviceCommand[]
+  payments Payment[]
+  orderItemPayments OrderItemPayment[]
+  pendingSelfPayments PendingSelfPayment[]
+  waiterRequests WaiterRequest[]
+  billRequests BillRequest[]
+  stockItems StockItem[]
+  stockBatches StockBatch[]
+  ingredientMovements IngredientMovement[]
+  wasteLogs WasteLog[]
+  stockMovements StockMovement[]
+  stockCounts StockCount[]
+  purchaseOrders PurchaseOrder[]
+  recipes Recipe[]
+  reservations Reservation[]
+  zReports ZReport[]
+  cashDrawerMovements CashDrawerMovement[]
+  attendances Attendance[]
+  shiftTemplates ShiftTemplate[]
+  shiftAssignments ShiftAssignment[]
+  shiftSwapRequests ShiftSwapRequest[]
+  cameras Camera[]
+  occupancyRecords OccupancyRecord[]
+  trafficFlowRecords TrafficFlowRecord[]
+  tableAnalytics TableAnalytics[]
+  analyticsInsights AnalyticsInsight[]
+  analyticsHeatmapCache AnalyticsHeatmapCache[]
+  edgeDevices EdgeDevice[]
+  notifications Notification[]
+  deliveryPlatformLogs DeliveryPlatformLog[]
+  posSettings PosSettings[]
+  qrMenuSettings QrMenuSettings[]
+  reservationSettings ReservationSettings[]
+  smsSettings SmsSettings[]
+  accountingSettings AccountingSettings[]
+  stockSettings StockSettings[]
+  integrationSettings IntegrationSettings[]
+  primaryUsers User[] @relation("UserPrimaryBranch")
+  userAssignments UserBranchAssignment[]
+
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
@@ -3691,8 +4001,8 @@ model Device {
   tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   // Optional until the device is assigned to a branch via pairing. Nullable
   // also covers a chain admin creating slots ahead of branch deployment.
-  branchId        String?
-  branch          Branch?  @relation(fields: [branchId], references: [id], onDelete: SetNull)
+  branchId        String
+  branch          Branch  @relation(fields: [branchId], references: [id], onDelete: Restrict)
   // tablet_waiter | tablet_customer | kds_screen | bar_screen | pos_terminal
   // yazarkasa | receipt_printer | kitchen_printer | caller_id | scanner | local_bridge
   kind            String
@@ -3766,6 +4076,12 @@ model DeviceCommand {
   @@index([deviceId, status, priority(sort: Desc), createdAt])
   @@index([tenantId, status])
   @@index([status, updatedAt])
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
+
+  @@index([tenantId, branchId])
+
   @@map("device_commands")
 }
 
