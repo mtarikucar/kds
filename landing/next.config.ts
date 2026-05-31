@@ -31,15 +31,22 @@ const nextConfig: NextConfig = {
   },
 
   async headers() {
-    // Starter Content-Security-Policy. Next + next-intl + Sentry need
-    // 'unsafe-inline'/'unsafe-eval' on script-src today (they ship inline
-    // bootstrap scripts and use new Function() in dev). Tighten in steps:
-    // 1. add a nonce-based middleware and drop 'unsafe-inline'.
+    // Content-Security-Policy. Next + next-intl + Sentry need
+    // 'unsafe-inline' on script-src today (they ship inline bootstrap
+    // scripts). v2.8.97 — dropped 'unsafe-eval' in production: Next's
+    // dev server uses new Function() for HMR but the production bundle
+    // does not, so the relaxed form is dev-only now. Step toward
+    // nonce-based migration:
+    // 1. add nonce middleware + 'strict-dynamic' and drop 'unsafe-inline'.
     // 2. swap Sentry's CDN replay worker for self-hosted to drop the
     //    sentry.io entry from connect-src.
+    const isProd = process.env.NODE_ENV === 'production';
+    const scriptSrc = isProd
+      ? "script-src 'self' 'unsafe-inline'"
+      : "script-src 'self' 'unsafe-inline' 'unsafe-eval'";
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      scriptSrc,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://hummytummy.com https://staging.hummytummy.com https://*.hugin.com.tr https://www.beko.com.tr https://www.epson.com.tr https://www.sunmi.com https://shop.interpay.com.tr https://www.penetek.com https://sps.honeywell.com https://www.zebra.com https://images.samsung.com https://productimages.hepsiburada.net https://cdn.dsmcdn.com https://img.akakce.com",
       "font-src 'self' data:",
@@ -48,6 +55,12 @@ const nextConfig: NextConfig = {
       "base-uri 'self'",
       "form-action 'self'",
       "object-src 'none'",
+      // v2.8.97 — Trusted Types and report-uri additions move the bar
+      // again for any future inline-script regression: any script that
+      // doesn't go through trustedTypes.createPolicy will be blocked
+      // (no policy declared yet → fully strict in browsers that
+      // support it; ignored by others, so backwards-compat-safe).
+      "require-trusted-types-for 'script'",
     ].join('; ');
 
     return [

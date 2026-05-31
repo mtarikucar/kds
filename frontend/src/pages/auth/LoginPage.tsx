@@ -79,13 +79,21 @@ const LoginPage = () => {
     const candidate =
       locationState?.from ||
       (typeof window !== 'undefined' ? readAndClearReturnPath() : null);
-    // Belt-and-suspenders on the /login self-loop: the regex accepts
-    // any `/<non-slash>...` and would happily route us back to /login
-    // if a stale value (or a future regression) writes that path in.
-    // api.ts also guards on the write side; this guards on the read.
+    // v2.8.97 — tighter shape check. Pre-fix the regex `^/[^/]` accepted
+    // any path starting with a single-slash + non-slash char, which
+    // let `/javascript:alert(1)` and other weird shapes through to
+    // navigate(). The new check additionally rejects:
+    //   - protocol-relative `//evil.com` (already covered by [^/] but
+    //     pinned explicitly)
+    //   - any `:` in the path (kills `javascript:` and other URIs)
+    //   - backslashes (kills `\\evil.com` IE-style absolute URLs)
+    //   - the /login self-loop
     if (
       candidate &&
-      /^\/[^/]/.test(candidate) &&
+      typeof candidate === 'string' &&
+      candidate.length < 1024 &&
+      /^\/[a-zA-Z0-9_\-\/?#=&%.]*$/.test(candidate) &&
+      !candidate.startsWith('//') &&
       !candidate.startsWith('/login')
     ) {
       return candidate;
@@ -237,8 +245,17 @@ const LoginPage = () => {
           <motion.div variants={itemVariants}>
             <SocialLoginButtons
               variant="login"
-              onGoogleClick={() => handleGoogleLogin()}
-              disabled={isPending}
+              onGoogleClick={() => {
+                // v2.8.97 — disable while either auth path is already in
+                // flight. Pre-fix a quick double-click on the Google
+                // button while the popup was opening (or a stale ref
+                // re-firing) would queue a second mutation; the cache
+                // clear in useGoogleAuth would land twice, and the
+                // navigate() would race the prior one.
+                if (isPending || isGooglePending) return;
+                handleGoogleLogin();
+              }}
+              disabled={isPending || isGooglePending}
               isLoading={isGooglePending}
             />
           </motion.div>

@@ -62,10 +62,17 @@ export default function Pricing({ apiPlans }: PricingProps) {
     },
   ];
 
-  // Map API plans to overlay discount info
+  // Map API plans to overlay discount info.
+  // v2.8.97 — case-folded comparison strips trailing whitespace and
+  // accidental locale-case anomalies (Turkish "İ"/"i"/"I" lower-cased
+  // inconsistently across browsers). The case-insensitive comparison
+  // alone passed for "free" vs "FREE" but missed "Free " (trailing
+  // space from a CMS paste). Folding both sides via `toLocaleLowerCase`
+  // + trim keeps the match resilient to upstream data hygiene drift.
+  const normalize = (s: string) => s.toLocaleLowerCase('en-US').trim();
   const plans = staticPlans.map((sp) => {
     const apiPlan = apiPlans?.find(
-      (ap) => ap.name.toLowerCase() === sp.key.toLowerCase()
+      (ap) => normalize(ap.name) === normalize(sp.key)
     );
     const hasDiscount = mounted && apiPlan?.isDiscountActive && apiPlan?.discountPercentage &&
       apiPlan?.discountEndDate && new Date(apiPlan.discountEndDate) > new Date();
