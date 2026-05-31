@@ -556,19 +556,57 @@ export class CustomerSelfPayService {
     const merchantOid = this.generateMerchantOid(session.tenantId);
     const expiresAt = new Date(Date.now() + INTENT_TTL_MINUTES * 60_000);
 
-    // Persist intent BEFORE PayTR call so the webhook can find it
-    // even if the response races back faster than our DB write.
-    const intent = await this.prisma.pendingSelfPayment.create({
-      data: {
-        merchantOid,
-        sessionId,
-        tenantId: session.tenantId,
-        itemsByOrder: Array.from(itemsByOrder.values()) as any,
-        amount: totalAmount,
-        status: 'PENDING',
-        customerPhone: dto.customerPhone,
-        expiresAt,
-      },
+    // v2.8.97 — lock all referenced orders FOR UPDATE before
+    // persisting the intent. Pre-fix the intent.create races with
+    // orders.service.update's item-rewrite branch (v2.8.94 added the
+    // waiter-side lock; this is the matching customer-side lock).
+    // Without both sides locking the same row(s) a concurrent rewrite
+    // by the waiter could delete the items referenced in itemsByOrder
+    // between this validation pass and the PayTR webhook landing,
+    // leaving the customer charged for items that no longer exist.
+    // The intent.create stays inside the txn so a rollback on
+    // validation failure also rolls back any speculative state.
+    //
+    // Lock order: ascending orderId string sort, so two concurrent
+    // multi-order intent flows can't deadlock against each other.
+    const lockOrderIds = [...itemsByOrder.keys()].sort();
+    const intent = await this.prisma.$transaction(async (tx) => {
+      for (const oid of lockOrderIds) {
+        await tx.$queryRaw`
+          SELECT id FROM orders WHERE id = ${oid} AND "tenantId" = ${session.tenantId} FOR UPDATE
+        `;
+      }
+      // Re-validate item ids still exist after acquiring the lock.
+      // A waiter rewrite committed BEFORE our lock would already be
+      // visible; one that lands while we hold the lock is serialized
+      // until our intent commits.
+      const stillExistingItemIds = await tx.orderItem.findMany({
+        where: {
+          orderId: { in: lockOrderIds },
+          id: { in: dto.items.map((it) => it.orderItemId) },
+        },
+        select: { id: true },
+      });
+      const stillExistingSet = new Set(stillExistingItemIds.map((r) => r.id));
+      for (const it of dto.items) {
+        if (!stillExistingSet.has(it.orderItemId)) {
+          throw new BadRequestException(
+            `Item ${it.orderItemId} no longer exists — order was modified. Refresh and retry.`,
+          );
+        }
+      }
+      return tx.pendingSelfPayment.create({
+        data: {
+          merchantOid,
+          sessionId,
+          tenantId: session.tenantId,
+          itemsByOrder: Array.from(itemsByOrder.values()) as any,
+          amount: totalAmount,
+          status: 'PENDING',
+          customerPhone: dto.customerPhone,
+          expiresAt,
+        },
+      });
     });
 
     // Build PayTR token request. Return URLs honour the caller's

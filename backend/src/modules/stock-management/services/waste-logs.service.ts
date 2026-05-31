@@ -117,9 +117,43 @@ export class WasteLogsService {
         );
       }
 
-      const costPerUnit = stockItem.costPerUnit
-        ? new Prisma.Decimal(stockItem.costPerUnit)
-        : null;
+      // v2.8.97 — FIFO batch-weighted cost (same shape as v2.8.93
+      // stock-deduction.applyDeduction). Pre-fix the waste log used
+      // `stockItem.costPerUnit` which is the rolling average across
+      // every receipt; for tenants whose supplier prices have moved
+      // since the oldest still-in-stock batch arrived, the rolling
+      // average misrepresents the cost of the units actually being
+      // wasted (which by FIFO are the oldest). Consuming FIFO
+      // batches and weighting by per-batch costPerUnit gives the
+      // economically meaningful number.
+      let remaining = wasteQty;
+      const batches = await tx.stockBatch.findMany({
+        where: { stockItemId: stockItem.id, tenantId, quantity: { gt: 0 } },
+        orderBy: [{ expiryDate: { sort: 'asc', nulls: 'last' } }, { receivedAt: 'asc' }],
+      });
+      let consumed = new Prisma.Decimal(0);
+      let weightedCostAcc = new Prisma.Decimal(0);
+      for (const batch of batches) {
+        if (remaining.lte(0)) break;
+        const take = Prisma.Decimal.min(remaining, batch.quantity);
+        const updated = await tx.stockBatch.updateMany({
+          where: { id: batch.id, quantity: { gte: take } },
+          data: { quantity: { decrement: take as any } },
+        });
+        if (updated.count === 0) continue;
+        remaining = remaining.sub(take);
+        consumed = consumed.add(take);
+        if (batch.costPerUnit != null) {
+          weightedCostAcc = weightedCostAcc.add(new Prisma.Decimal(batch.costPerUnit).mul(take));
+        }
+      }
+
+      const costPerUnit =
+        consumed.gt(0) && weightedCostAcc.gt(0)
+          ? weightedCostAcc.div(consumed)
+          : stockItem.costPerUnit
+            ? new Prisma.Decimal(stockItem.costPerUnit)
+            : null;
       const cost = costPerUnit
         ? wasteQty.mul(costPerUnit).toDecimalPlaces(4, Prisma.Decimal.ROUND_HALF_UP)
         : null;

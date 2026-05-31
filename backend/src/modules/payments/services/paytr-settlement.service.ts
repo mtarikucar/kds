@@ -641,50 +641,14 @@ export class PaytrSettlementService {
     },
   ): Promise<void> {
     try {
-      const existingSignup = await this.prisma.commission.findFirst({
-        where: { tenantId, type: "SIGNUP" },
-        select: { id: true },
-      });
-      if (existingSignup) {
-        this.logger.log(
-          `SIGNUP commission already exists for tenant=${tenantId}; skipping referral credit`,
-        );
-        return;
-      }
-
-      const existingLead = await this.prisma.lead.findUnique({
-        where: { convertedTenantId: tenantId },
-        select: { id: true, assignedToId: true },
-      });
-
-      let leadId: string;
-      let marketerId: string;
-      if (existingLead) {
-        // Admin already attributed this tenant. Use the admin's rep,
-        // not the self-serve code's marketer — manual attribution wins.
-        leadId = existingLead.id;
-        marketerId = existingLead.assignedToId ?? ctx.marketerId;
-      } else {
-        const lead = await this.prisma.lead.create({
-          data: {
-            businessName: tenantName,
-            contactPerson: tenantName,
-            businessType: "OTHER",
-            source: "REFERRAL",
-            status: "WON",
-            assignedToId: ctx.marketerId,
-            convertedTenantId: tenantId,
-            convertedAt: new Date(),
-            notes: ctx.referralCode
-              ? `Auto-created from self-serve checkout (ref code: ${ctx.referralCode})`
-              : "Auto-created from self-serve checkout referral",
-          },
-          select: { id: true },
-        });
-        leadId = lead.id;
-        marketerId = ctx.marketerId;
-      }
-
+      // v2.8.97 — wrap the existence check + lead lookup + commission
+      // create in a Serializable $transaction. Pre-fix two concurrent
+      // settlement calls (webhook retry + recovery sweeper landing
+      // milliseconds apart) both read the empty existingSignup and
+      // both inserted a fresh SIGNUP commission row. The marketer got
+      // credited twice for one signup. The Serializable isolation
+      // means the second call sees the first's insert and aborts
+      // with 40001; we catch and treat as a normal dedup hit.
       const commissionAmount = new Prisma.Decimal(ctx.amount)
         .mul(ctx.commissionRate)
         .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
@@ -694,24 +658,92 @@ export class PaytrSettlementService {
         );
         return;
       }
-
       const now = new Date();
       const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
-      await this.prisma.commission.create({
-        data: {
-          amount: commissionAmount,
-          type: "SIGNUP",
-          status: "PENDING",
-          period,
-          tenantId,
-          leadId,
-          marketingUserId: marketerId,
-          notes: ctx.referralCode
-            ? `Self-serve checkout via referral code ${ctx.referralCode}`
-            : "Self-serve checkout referral",
-        },
-      });
+      let txOutcome: { credited: boolean; leadId?: string; marketerId?: string } = { credited: false };
+      try {
+        txOutcome = await this.prisma.$transaction(
+          async (tx) => {
+            const existingSignup = await tx.commission.findFirst({
+              where: { tenantId, type: "SIGNUP" },
+              select: { id: true },
+            });
+            if (existingSignup) {
+              this.logger.log(
+                `SIGNUP commission already exists for tenant=${tenantId}; skipping referral credit`,
+              );
+              return { credited: false } as const;
+            }
+
+            const existingLead = await tx.lead.findUnique({
+              where: { convertedTenantId: tenantId },
+              select: { id: true, assignedToId: true },
+            });
+
+            let leadId: string;
+            let marketerId: string;
+            if (existingLead) {
+              // Admin already attributed this tenant. Use the admin's rep,
+              // not the self-serve code's marketer — manual attribution wins.
+              leadId = existingLead.id;
+              marketerId = existingLead.assignedToId ?? ctx.marketerId;
+            } else {
+              const lead = await tx.lead.create({
+                data: {
+                  businessName: tenantName,
+                  contactPerson: tenantName,
+                  businessType: "OTHER",
+                  source: "REFERRAL",
+                  status: "WON",
+                  assignedToId: ctx.marketerId,
+                  convertedTenantId: tenantId,
+                  convertedAt: new Date(),
+                  notes: ctx.referralCode
+                    ? `Auto-created from self-serve checkout (ref code: ${ctx.referralCode})`
+                    : "Auto-created from self-serve checkout referral",
+                },
+                select: { id: true },
+              });
+              leadId = lead.id;
+              marketerId = ctx.marketerId;
+            }
+
+            await tx.commission.create({
+              data: {
+                amount: commissionAmount,
+                type: "SIGNUP",
+                status: "PENDING",
+                period,
+                tenantId,
+                leadId,
+                marketingUserId: marketerId,
+                notes: ctx.referralCode
+                  ? `Self-serve checkout via referral code ${ctx.referralCode}`
+                  : "Self-serve checkout referral",
+              },
+            });
+            return { credited: true, leadId, marketerId } as const;
+          },
+          { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        );
+      } catch (err: any) {
+        // Postgres 40001 (serialization_failure) means another
+        // transaction won the race; the SIGNUP row already exists.
+        if (err?.code === "P2034" || err?.code === "40001" || (err?.message ?? "").includes("could not serialize")) {
+          this.logger.log(
+            `SIGNUP commission insert raced (serialization conflict) for tenant=${tenantId}; treating as already credited`,
+          );
+          return;
+        }
+        throw err;
+      }
+
+      if (!txOutcome.credited || !txOutcome.leadId || !txOutcome.marketerId) {
+        // Pre-existing SIGNUP row caught above — nothing more to do.
+        return;
+      }
+      const { leadId, marketerId } = txOutcome;
 
       // Notify the marketer via the in-app notification stream. Best
       // effort — the commission row itself is the source of truth.

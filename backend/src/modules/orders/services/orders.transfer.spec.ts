@@ -74,13 +74,22 @@ describe('OrdersService.transferTableOrders (iter-12 defense-in-depth)', () => {
     prisma.table.findFirst
       .mockResolvedValueOnce(validSource as any)
       .mockResolvedValueOnce(validTarget as any);
-    prisma.order.findMany.mockResolvedValueOnce([
-      { id: 'o-1', tableId: 'src', tenantId: 't1', orderItems: [], table: validSource, user: null },
-    ] as any);
-    // Second order.findMany (the refetch inside the tx after updates).
-    prisma.order.findMany.mockResolvedValueOnce([
-      { id: 'o-1', tableId: 'tgt', tenantId: 't1', orderItems: [], table: validTarget, user: null },
-    ] as any);
+    prisma.order.findMany
+      // Pre-tx active orders read.
+      .mockResolvedValueOnce([
+        { id: 'o-1', tableId: 'src', tenantId: 't1', orderItems: [], table: validSource, user: null },
+      ] as any)
+      // v2.8.97 — in-tx "stillActive" re-read after acquiring the table
+      // locks. Must return the same set so transfer proceeds.
+      .mockResolvedValueOnce([{ id: 'o-1' }] as any)
+      // Final refetch inside the tx after updates (the returned shape).
+      .mockResolvedValueOnce([
+        { id: 'o-1', tableId: 'tgt', tenantId: 't1', orderItems: [], table: validTarget, user: null },
+      ] as any);
+    // Lock advisory queries use $queryRaw — no return shape required.
+    (prisma.$queryRaw as any).mockResolvedValue([]);
+    // remainingOnSource count for the conditional source AVAILABLE flip.
+    (prisma.order.count as any).mockResolvedValue(0);
 
     const updateManyCalls: any[] = [];
     (prisma.order.updateMany as any).mockImplementation(async ({ where, data }: any) => {

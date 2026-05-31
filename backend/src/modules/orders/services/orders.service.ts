@@ -1533,12 +1533,44 @@ export class OrdersService {
 
     // Perform the transfer in a transaction
     const result = await this.prisma.$transaction(async (tx) => {
+      // v2.8.97 — lock both tables FOR UPDATE in deterministic id-sort
+      // order before any write. Pre-fix two concurrent transfers
+      // touching the same source/target tables could leave the source
+      // marked AVAILABLE while another transfer's orders were still
+      // moving to it, OR leave the target marked OCCUPIED when no
+      // orders actually arrived. The lock order (string-sort ASC) is
+      // shared with other order/table mutators so deadlocks can't
+      // form across paths.
+      const [firstLockId, secondLockId] = [sourceTableId, targetTableId].sort();
+      await tx.$queryRaw`SELECT id FROM tables WHERE id = ${firstLockId} AND "tenantId" = ${tenantId} FOR UPDATE`;
+      await tx.$queryRaw`SELECT id FROM tables WHERE id = ${secondLockId} AND "tenantId" = ${tenantId} FOR UPDATE`;
+
+      // Re-verify the source still has the active orders we read
+      // outside the lock — a concurrent payment / cancel between the
+      // pre-tx findMany and this txn's lock could have terminated
+      // them, in which case the transfer is a no-op rather than a
+      // silent table-status flip.
+      const stillActiveIds = await tx.order.findMany({
+        where: {
+          id: { in: activeOrders.map((o) => o.id) },
+          tenantId,
+          tableId: sourceTableId,
+          status: { notIn: [OrderStatus.PAID, OrderStatus.CANCELLED] },
+        },
+        select: { id: true },
+      });
+      if (stillActiveIds.length === 0) {
+        throw new BadRequestException(
+          'All source-table orders changed status while waiting for the table lock — refresh and retry.',
+        );
+      }
+
       // Compound WHERE on tenantId — defence-in-depth so a regression
       // in the pre-validation above can't be amplified by an
       // unconditional updateMany.
       await tx.order.updateMany({
         where: {
-          id: { in: activeOrders.map((o) => o.id) },
+          id: { in: stillActiveIds.map((o) => o.id) },
           tenantId,
         },
         data: {
@@ -1546,11 +1578,22 @@ export class OrdersService {
         },
       });
 
-      // Update source table to AVAILABLE
-      await tx.table.updateMany({
-        where: { id: sourceTableId, tenantId },
-        data: { status: TableStatus.AVAILABLE },
+      // Update source table to AVAILABLE only if no other active
+      // orders remain (a parallel transfer pointing TO the source
+      // could have just added some).
+      const remainingOnSource = await tx.order.count({
+        where: {
+          tableId: sourceTableId,
+          tenantId,
+          status: { notIn: [OrderStatus.PAID, OrderStatus.CANCELLED] },
+        },
       });
+      if (remainingOnSource === 0) {
+        await tx.table.updateMany({
+          where: { id: sourceTableId, tenantId },
+          data: { status: TableStatus.AVAILABLE },
+        });
+      }
 
       // Update target table to OCCUPIED
       await tx.table.updateMany({

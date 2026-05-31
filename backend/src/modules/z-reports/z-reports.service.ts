@@ -82,47 +82,59 @@ export class ZReportsService {
       },
     });
 
+    // v2.8.97 — all money math now goes through Prisma.Decimal so
+    // IEEE-754 drift can't accumulate over high-volume tenants
+    // (~1000+ orders/day) where Number additions silently round.
+    // The final fields are stored as Decimal columns anyway, so
+    // converting at the end is the only place precision crosses
+    // the boundary back to JS Number.
+    const decSum = <T,>(items: T[], pick: (item: T) => Prisma.Decimal | number | string | null | undefined): Prisma.Decimal =>
+      items.reduce(
+        (acc, item) => acc.add(new Prisma.Decimal(pick(item) ?? 0)),
+        new Prisma.Decimal(0),
+      );
+
     // Calculate totals
     const totalOrders = orders.length;
-    const grossSales = orders.reduce((sum, order) => sum + Number(order.totalAmount), 0);
-    const discounts = orders.reduce((sum, order) => sum + Number(order.discount), 0);
-    const rawNetSales = orders.reduce((sum, order) => sum + Number(order.finalAmount), 0);
+    const grossSales = decSum(orders, (o) => o.totalAmount);
+    const discounts = decSum(orders, (o) => o.discount);
+    const rawNetSales = decSum(orders, (o) => o.finalAmount);
 
     // Calculate payment method breakdown (only COMPLETED payments)
     const allPayments = orders.flatMap((o) => o.payments).filter((p) => p.status === 'COMPLETED');
 
     const cashPaymentsList = allPayments.filter((p) => p.method === 'CASH');
-    const cashPayments = cashPaymentsList.reduce((sum, p) => sum + Number(p.amount), 0);
+    const cashPayments = decSum(cashPaymentsList, (p) => p.amount);
     const cashPaymentCount = cashPaymentsList.length;
 
     const cardPaymentsList = allPayments.filter((p) => p.method === 'CARD');
-    const cardPayments = cardPaymentsList.reduce((sum, p) => sum + Number(p.amount), 0);
+    const cardPayments = decSum(cardPaymentsList, (p) => p.amount);
     const cardPaymentCount = cardPaymentsList.length;
 
     const digitalPaymentsList = allPayments.filter((p) => p.method === 'DIGITAL');
-    const digitalPayments = digitalPaymentsList.reduce((sum, p) => sum + Number(p.amount), 0);
+    const digitalPayments = decSum(digitalPaymentsList, (p) => p.amount);
     const digitalPaymentCount = digitalPaymentsList.length;
 
     // Calculate refunds
     const refundedPayments = orders.flatMap((o) => o.payments).filter((p) => p.status === 'REFUNDED');
-    const refundedAmount = refundedPayments.reduce((sum, p) => sum + Number(p.amount), 0);
+    const refundedAmount = decSum(refundedPayments, (p) => p.amount);
     const totalRefunds = refundedAmount;
 
     // Net sales accounts for refunds
-    const netSales = rawNetSales - totalRefunds;
+    const netSales = rawNetSales.sub(totalRefunds);
 
     // Order type breakdown
     const dineInOrders = orders.filter((o) => o.type === 'DINE_IN');
-    const dineInSales = dineInOrders.reduce((sum, o) => sum + Number(o.finalAmount), 0);
+    const dineInSales = decSum(dineInOrders, (o) => o.finalAmount);
 
     const takeawayOrders = orders.filter((o) => o.type === 'TAKEAWAY');
-    const takeawaySales = takeawayOrders.reduce((sum, o) => sum + Number(o.finalAmount), 0);
+    const takeawaySales = decSum(takeawayOrders, (o) => o.finalAmount);
 
     const deliveryOrders = orders.filter((o) => o.type === 'DELIVERY');
-    const deliverySales = deliveryOrders.reduce((sum, o) => sum + Number(o.finalAmount), 0);
+    const deliverySales = decSum(deliveryOrders, (o) => o.finalAmount);
 
     const counterOrders = orders.filter((o) => o.type === 'COUNTER');
-    const counterSales = counterOrders.reduce((sum, o) => sum + Number(o.finalAmount), 0);
+    const counterSales = decSum(counterOrders, (o) => o.finalAmount);
 
     // Cancelled orders that *closed* during the reporting day. Originally
     // this filtered on createdAt — but PAID orders use paidAt (the event
@@ -145,45 +157,56 @@ export class ZReportsService {
       },
     });
     const cancelledOrders = cancelledOrdersList.length;
-    const cancelledOrdersAmount = cancelledOrdersList.reduce(
-      (sum, o) => sum + Number(o.totalAmount),
-      0,
-    );
+    const cancelledOrdersAmount = decSum(cancelledOrdersList, (o) => o.totalAmount);
 
-    // Get top selling products
-    const productSales = new Map<string, { name: string; quantity: number; revenue: number }>();
+    // Get top selling products — Decimal accumulation, number on output.
+    const productDecSales = new Map<string, { name: string; quantity: number; revenue: Prisma.Decimal }>();
     orders.forEach((order) => {
       order.orderItems.forEach((item) => {
-        const existing = productSales.get(item.productId) || {
-          name: item.product.name,
-          quantity: 0,
-          revenue: 0,
-        };
+        let existing = productDecSales.get(item.productId);
+        if (!existing) {
+          existing = { name: item.product.name, quantity: 0, revenue: new Prisma.Decimal(0) };
+          productDecSales.set(item.productId, existing);
+        }
         existing.quantity += item.quantity;
-        existing.revenue += Number(item.subtotal);
-        productSales.set(item.productId, existing);
+        existing.revenue = existing.revenue.add(new Prisma.Decimal(item.subtotal));
       });
     });
 
-    const topProducts = Array.from(productSales.values())
+    const topProducts = Array.from(productDecSales.values())
+      .map((p) => ({ name: p.name, quantity: p.quantity, revenue: p.revenue.toDecimalPlaces(2).toNumber() }))
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 10);
 
-    // Tax breakdown from order items
+    // Tax breakdown from order items (Decimal arithmetic — same
+    // accumulation-precision reason as the sale totals above).
     const allOrderItems = orders.flatMap(o => o.orderItems);
-    const taxBreakdownMap: Record<number, { taxableAmount: number; taxAmount: number }> = {};
-    let totalTax = 0;
+    const taxBreakdownDecMap = new Map<number, { taxableAmount: Prisma.Decimal; taxAmount: Prisma.Decimal }>();
+    let totalTaxDec = new Prisma.Decimal(0);
 
     for (const item of allOrderItems) {
       const rate = item.taxRate ?? 10;
-      const tax = Number(item.taxAmount || 0);
-      if (!taxBreakdownMap[rate]) {
-        taxBreakdownMap[rate] = { taxableAmount: 0, taxAmount: 0 };
+      const tax = new Prisma.Decimal(item.taxAmount || 0);
+      const subtotalDec = new Prisma.Decimal(item.subtotal || 0);
+      let bucket = taxBreakdownDecMap.get(rate);
+      if (!bucket) {
+        bucket = { taxableAmount: new Prisma.Decimal(0), taxAmount: new Prisma.Decimal(0) };
+        taxBreakdownDecMap.set(rate, bucket);
       }
-      taxBreakdownMap[rate].taxAmount += tax;
-      taxBreakdownMap[rate].taxableAmount += Number(item.subtotal) - tax;
-      totalTax += tax;
+      bucket.taxAmount = bucket.taxAmount.add(tax);
+      bucket.taxableAmount = bucket.taxableAmount.add(subtotalDec.sub(tax));
+      totalTaxDec = totalTaxDec.add(tax);
     }
+    // Storage shape stays {number → {taxableAmount: number, taxAmount: number}}
+    // for backward compat with downstream consumers.
+    const taxBreakdownMap: Record<number, { taxableAmount: number; taxAmount: number }> = {};
+    for (const [rate, b] of taxBreakdownDecMap) {
+      taxBreakdownMap[rate] = {
+        taxableAmount: b.taxableAmount.toDecimalPlaces(2).toNumber(),
+        taxAmount: b.taxAmount.toDecimalPlaces(2).toNumber(),
+      };
+    }
+    const totalTax = totalTaxDec.toDecimalPlaces(2).toNumber();
 
     // Get cash drawer movements for the day
     const cashMovements = await this.prisma.cashDrawerMovement.findMany({
@@ -205,32 +228,46 @@ export class ZReportsService {
       },
     });
 
-    // Calculate cash in/out movements
-    const cashInTotal = cashMovements
-      .filter((m) => m.type === 'CASH_IN')
-      .reduce((sum, m) => sum + Number(m.amount), 0);
-    const cashOutTotal = cashMovements
-      .filter((m) => m.type === 'CASH_OUT')
-      .reduce((sum, m) => sum + Number(m.amount), 0);
-    const cashInOut = cashInTotal - cashOutTotal;
+    // Calculate cash in/out movements (Decimal)
+    const cashInTotal = decSum(
+      cashMovements.filter((m) => m.type === 'CASH_IN'),
+      (m) => m.amount,
+    );
+    const cashOutTotal = decSum(
+      cashMovements.filter((m) => m.type === 'CASH_OUT'),
+      (m) => m.amount,
+    );
+    const cashInOut = cashInTotal.sub(cashOutTotal);
 
-    // Cash drawer reconciliation (after cash movements so cashInOut is available)
-    const expectedCash = cashDrawerOpening + cashPayments + cashInOut;
-    const cashDifference = cashDrawerClosing - expectedCash;
+    // Cash drawer reconciliation. cashDrawerOpening / cashDrawerClosing
+    // arrive as JS numbers from the closing DTO; coerce through Decimal
+    // before adding so the final reconciliation row is precision-clean.
+    const openingDec = new Prisma.Decimal(cashDrawerOpening);
+    const closingDec = new Prisma.Decimal(cashDrawerClosing);
+    const expectedCash = openingDec.add(cashPayments).add(cashInOut);
+    const cashDifference = closingDec.sub(expectedCash);
 
-    // Calculate staff performance
-    const staffMap = new Map<string, { name: string; sales: number; orders: number; refunds: number }>();
+    // Calculate staff performance — Decimal accumulation, number on
+    // the JSON output (staffPerformance is read by reporting UIs that
+    // expect plain numbers).
+    const staffDecMap = new Map<string, { name: string; sales: Prisma.Decimal; orders: number; refunds: number }>();
     for (const order of orders) {
       const staffId = order.userId || 'unknown';
       const staffName = order.user ? `${order.user.firstName} ${order.user.lastName}` : 'Unknown';
-      const existing = staffMap.get(staffId) || { name: staffName, sales: 0, orders: 0, refunds: 0 };
-      existing.sales += Number(order.finalAmount);
+      let existing = staffDecMap.get(staffId);
+      if (!existing) {
+        existing = { name: staffName, sales: new Prisma.Decimal(0), orders: 0, refunds: 0 };
+        staffDecMap.set(staffId, existing);
+      }
+      existing.sales = existing.sales.add(new Prisma.Decimal(order.finalAmount));
       existing.orders += 1;
-      staffMap.set(staffId, existing);
     }
-    const staffPerformance = Array.from(staffMap.entries()).map(([id, data]) => ({
+    const staffPerformance = Array.from(staffDecMap.entries()).map(([id, data]) => ({
       staffId: id,
-      ...data,
+      name: data.name,
+      sales: data.sales.toDecimalPlaces(2).toNumber(),
+      orders: data.orders,
+      refunds: data.refunds,
     }));
 
     // Calculate open (unfulfilled) orders
@@ -243,23 +280,28 @@ export class ZReportsService {
       select: { finalAmount: true },
     });
     const openChecks = openOrders.length;
-    const openChecksAmount = openOrders.reduce((sum, o) => sum + Number(o.finalAmount), 0);
+    const openChecksAmount = decSum(openOrders, (o) => o.finalAmount);
 
-    // Calculate category breakdown
-    const categoryMap = new Map<string, { categoryName: string; sales: number; quantity: number }>();
+    // Calculate category breakdown — Decimal accumulation as above.
+    const categoryDecMap = new Map<string, { categoryName: string; sales: Prisma.Decimal; quantity: number }>();
     for (const order of orders) {
       for (const item of order.orderItems) {
         const catId = item.product.categoryId;
         const catName = item.product.category?.name || 'Uncategorized';
-        const existing = categoryMap.get(catId) || { categoryName: catName, sales: 0, quantity: 0 };
-        existing.sales += Number(item.subtotal);
+        let existing = categoryDecMap.get(catId);
+        if (!existing) {
+          existing = { categoryName: catName, sales: new Prisma.Decimal(0), quantity: 0 };
+          categoryDecMap.set(catId, existing);
+        }
+        existing.sales = existing.sales.add(new Prisma.Decimal(item.subtotal));
         existing.quantity += item.quantity;
-        categoryMap.set(catId, existing);
       }
     }
-    const categoryBreakdown = Array.from(categoryMap.entries()).map(([id, data]) => ({
+    const categoryBreakdown = Array.from(categoryDecMap.entries()).map(([id, data]) => ({
       categoryId: id,
-      ...data,
+      categoryName: data.categoryName,
+      sales: data.sales.toDecimalPlaces(2).toNumber(),
+      quantity: data.quantity,
     }));
 
     // Create the Z-Report. The `findFirst` above is a fast-path dedupe;

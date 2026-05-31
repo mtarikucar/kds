@@ -26,6 +26,13 @@ import { AccountingSettingsService } from '../../accounting/services/accounting-
 import { ReceiptSnapshotBuilder } from './receipt-snapshot.builder';
 import { KdsGateway } from '../../kds/kds.gateway';
 
+// v2.8.97 — single source of truth for the cross-payment-path rounding
+// tolerance. Both the single-payment overpayment check and the
+// split-bill exact-match check accept ±1 kuruş for float-legacy callers
+// computing finalAmount client-side. Defining the value once means a
+// future audit/refactor doesn't have to chase two hardcoded literals.
+const PAYMENT_TOLERANCE = new Prisma.Decimal('0.01');
+
 @Injectable()
 export class PaymentsService {
   private readonly logger = new Logger(PaymentsService.name);
@@ -567,8 +574,8 @@ export class PaymentsService {
           });
           const alreadyPaid = new Prisma.Decimal(existingPaid._sum.amount ?? 0);
           const remaining = new Prisma.Decimal(order.finalAmount).sub(alreadyPaid);
-          // 1-cent rounding tolerance for float-legacy callers.
-          if (new Prisma.Decimal(createPaymentDto.amount).gt(remaining.add('0.01'))) {
+          // ±PAYMENT_TOLERANCE rounding tolerance for float-legacy callers.
+          if (new Prisma.Decimal(createPaymentDto.amount).gt(remaining.add(PAYMENT_TOLERANCE))) {
             throw new BadRequestException(
               `Payment amount exceeds remaining (${remaining.toFixed(2)})`,
             );
@@ -1002,9 +1009,8 @@ export class PaymentsService {
       // which let a 100.00 TL bill be settled as [50.00, 49.99] and silently
       // marked PAID with 0.01 TL outstanding — systematic revenue loss when
       // it happens at scale.
-      const tolerance = new Prisma.Decimal('0.01');
       const diff = totalSplitAmount.sub(remaining).abs();
-      if (diff.gt(tolerance)) {
+      if (diff.gt(PAYMENT_TOLERANCE)) {
         const direction = totalSplitAmount.gt(remaining) ? 'exceeds' : 'is below';
         throw new BadRequestException(
           `Split total (${totalSplitAmount.toFixed(2)}) ${direction} remaining amount (${remaining.toFixed(2)})`,
