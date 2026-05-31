@@ -129,7 +129,21 @@ export class EntitlementService implements OnModuleInit, OnModuleDestroy {
 
     const cacheKey = `${tenantId}::${branchId ?? '-'}`;
     const hit = this.cache.get(cacheKey);
-    if (hit && hit.expiresAt > Date.now()) return hit.set;
+    if (hit && hit.expiresAt > Date.now()) {
+      // v2.8.95 — true LRU on cache hit. JS Map preserves insertion
+      // order, so deleting and re-inserting the entry moves it to the
+      // tail. Pre-fix only the WRITE path bumped order (via
+      // setCacheEntry's delete-then-set), so a tenant queried 1000x
+      // within the 30s TTL stayed pinned to its original insertion
+      // slot — the cap-based eviction in setCacheEntry would drop it
+      // alongside the truly idle entries when the cache filled. Now
+      // every hit moves the entry to the tail so the eviction
+      // pressure lands where it should: on tenants that haven't been
+      // queried recently. The delete/set pair is O(1) on Map.
+      this.cache.delete(cacheKey);
+      this.cache.set(cacheKey, hit);
+      return hit.set;
+    }
 
     // Pull every grant for the tenant that *could* apply to this scope:
     // tenant-wide rows always do; branch-scoped rows only when the caller

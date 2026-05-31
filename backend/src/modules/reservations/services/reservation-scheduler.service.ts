@@ -3,6 +3,10 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ReservationStatus } from '../constants/reservation-status.enum';
 import { TableStatus } from '../../tables/dto/create-table.dto';
+// v2.8.95 — both autoHoldUpcoming and releaseExpiredHolds mutate
+// shared table state on a 5-minute tick. Without a per-replica lock
+// every replica double-flips tables and double-emits NO_SHOW events.
+import { withAdvisoryLock } from '../../../common/scheduling/advisory-lock';
 
 /**
  * Default pre-start hold window when a tenant has no ReservationSettings
@@ -51,6 +55,19 @@ export class ReservationSchedulerService {
 
   @Cron(CronExpression.EVERY_5_MINUTES, { name: 'reservation-auto-hold' })
   async autoHoldUpcoming(): Promise<{ held: number }> {
+    let outcome = { held: 0 };
+    await withAdvisoryLock(
+      this.prisma,
+      'reservation-auto-hold',
+      async () => {
+        outcome = await this.autoHoldUpcomingInner();
+      },
+      this.logger,
+    );
+    return outcome;
+  }
+
+  private async autoHoldUpcomingInner(): Promise<{ held: number }> {
     const now = new Date();
 
     // Reservations whose date is today (or tomorrow at the boundary)
@@ -120,6 +137,19 @@ export class ReservationSchedulerService {
 
   @Cron(CronExpression.EVERY_5_MINUTES, { name: 'reservation-release-holds' })
   async releaseExpiredHolds(): Promise<{ released: number }> {
+    let outcome = { released: 0 };
+    await withAdvisoryLock(
+      this.prisma,
+      'reservation-release-holds',
+      async () => {
+        outcome = await this.releaseExpiredHoldsInner();
+      },
+      this.logger,
+    );
+    return outcome;
+  }
+
+  private async releaseExpiredHoldsInner(): Promise<{ released: number }> {
     // Tables with a hold pointer. We pull the reservation alongside so
     // the eligibility check is one query, not N.
     const heldTables = await this.prisma.table.findMany({

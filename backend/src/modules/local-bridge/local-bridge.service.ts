@@ -103,13 +103,27 @@ export class LocalBridgeService {
       where: { tokenHash: newTokenHash },
     });
 
+    // v2.8.95 — log on outbox append failure. Pre-fix
+    //   .catch(() => undefined)
+    // turned a missed `bridge.provisioned.v1` event into a silent gap
+    // — downstream listeners (kds-routing, webhooks-outbound) would
+    // never learn this bridge had come online, and the only sign would
+    // be the absent inventory entry. The bridge row itself is already
+    // committed (the operation needs to be idempotent at the client
+    // for retries), but the event miss should at least surface in
+    // logs for on-call investigation.
     await this.outbox
       .append({
         type: 'bridge.provisioned.v1',
         tenantId: updated.tenantId,
         payload: { bridgeId: updated.id, branchId: updated.branchId },
       })
-      .catch(() => undefined);
+      .catch((err) => {
+        this.logger.error(
+          `bridge.provisioned.v1 outbox append failed for bridge=${updated.id} tenant=${updated.tenantId}: ${(err as Error).message}`,
+          (err as Error).stack,
+        );
+      });
 
     return {
       bridgeId: updated.id,

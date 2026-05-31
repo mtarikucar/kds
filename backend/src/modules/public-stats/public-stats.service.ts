@@ -4,6 +4,12 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { GeolocationService } from './geolocation.service';
 import { TrackViewDto } from './dto/track-view.dto';
 import { CreateReviewDto } from './dto/create-review.dto';
+// v2.8.95 — multi-replica safety. Pre-fix every replica fired its
+// own updateStatsCache tick on the same wall-clock, so the
+// findFirst → calculateAndCacheStats → upsert sequence raced and
+// produced duplicate intermediate counts plus extra Postgres load
+// proportional to the replica count.
+import { withAdvisoryLock } from '../../common/scheduling/advisory-lock';
 import * as crypto from 'crypto';
 
 @Injectable()
@@ -203,16 +209,24 @@ export class PublicStatsService {
     }
   }
 
-  // Update cache every 5 minutes
+  // Update cache every 5 minutes — advisory-lock guarded so only one
+  // replica actually computes per tick. Loser silently skips.
   @Cron(CronExpression.EVERY_5_MINUTES, { name: 'public-stats-cache-update' })
   async updateStatsCache(): Promise<void> {
-    try {
-      this.logger.debug('Updating public stats cache...');
-      await this.calculateAndCacheStats();
-      this.geolocationService.cleanCache();
-    } catch (error) {
-      this.logger.error(`Failed to update stats cache: ${error.message}`);
-    }
+    await withAdvisoryLock(
+      this.prisma,
+      'public-stats-cache-update',
+      async () => {
+        try {
+          this.logger.debug('Updating public stats cache...');
+          await this.calculateAndCacheStats();
+          this.geolocationService.cleanCache();
+        } catch (error: any) {
+          this.logger.error(`Failed to update stats cache: ${error.message}`);
+        }
+      },
+      this.logger,
+    );
   }
 
   private async calculateAndCacheStats() {
