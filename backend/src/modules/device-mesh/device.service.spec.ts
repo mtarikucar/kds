@@ -77,7 +77,7 @@ describe('DeviceService pairing', () => {
       captured.__where = where;
       return { count: 1 };
     });
-    (prisma.device.findUniqueOrThrow as any).mockImplementation(async () => ({
+    (prisma.device.findFirstOrThrow as any).mockImplementation(async () => ({
       id: 'dev-1',
       tenantId: 't1',
       branchId: null,
@@ -152,7 +152,7 @@ describe('DeviceService pairing', () => {
       updateWhere = where;
       return { count: 1 };
     });
-    (prisma.device.findUniqueOrThrow as any).mockResolvedValue({
+    (prisma.device.findFirstOrThrow as any).mockResolvedValue({
       id: 'dev-1', tenantId: 't1', branchId: null, kind: 'kds_screen', capabilities: [],
     } as any);
 

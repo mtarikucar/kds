@@ -72,15 +72,19 @@ export class PaytrWebhookController {
     const merchantKey = this.config.get<string>("PAYTR_MERCHANT_KEY");
     const merchantSalt = this.config.get<string>("PAYTR_MERCHANT_SALT");
     if (!merchantKey || !merchantSalt) {
-      // Misconfigured deploy — we can't verify the hash. Return "OK" so
-      // PayTR stops retrying (which would otherwise cascade into a
-      // 30-minute retry storm), and surface a critical error so ops
-      // notices and fixes env. Recovery sweeper will reconcile the
-      // stuck PENDING rows once creds are restored.
+      // v2.8.94 — when creds are missing we cannot verify the hash, so
+      // the only honest answer is "FAIL". Pre-fix the controller
+      // returned "OK" to avoid PayTR's retry storm — but a sustained
+      // "OK" stream during a misconfig also silently acknowledges any
+      // forged callback that lands while creds are down (the settlement
+      // call is skipped, so it's mostly cosmetic, but ops loses the
+      // strongest signal that something is wrong). PayTR retries (4×
+      // over ~30min) are the loudest possible alert; ops should fix
+      // creds before the window expires.
       this.logger.error(
-        "PayTR credentials missing — acknowledging callback to stop retries; ops alert raised",
+        "PayTR credentials missing — refusing to acknowledge callback; ops MUST restore env before retry window expires",
       );
-      return "OK";
+      return "FAIL";
     }
 
     if (

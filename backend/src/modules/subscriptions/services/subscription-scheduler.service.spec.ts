@@ -357,7 +357,14 @@ describe('SubscriptionSchedulerService.handlePendingCancellations', () => {
     await svc.handlePendingCancellations();
 
     expect(outbox.append).toHaveBeenCalledTimes(2);
-    expect(outbox.append).toHaveBeenCalledWith({
+    // v2.8.94 — outbox.append now also receives a second arg (the tx
+    // client) because the emit runs inside the $transaction. The mock
+    // happens to receive `undefined` for tx because jest-mock-extended's
+    // mockDeep doesn't forward the $transaction callback's tx through
+    // mockImplementation cleanly; we still verify the payload shape
+    // here and leave the atomicity guarantee to integration tests.
+    const calls = outbox.append.mock.calls;
+    expect(calls[0][0]).toEqual({
       type: 'subscription.cancelled.v1',
       tenantId: 'tenant-1',
       payload: {
@@ -367,7 +374,7 @@ describe('SubscriptionSchedulerService.handlePendingCancellations', () => {
         reason: 'period_end_cancel',
       },
     });
-    expect(outbox.append).toHaveBeenCalledWith({
+    expect(calls[1][0]).toEqual({
       type: 'subscription.cancelled.v1',
       tenantId: 'tenant-2',
       payload: {

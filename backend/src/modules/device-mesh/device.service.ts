@@ -180,7 +180,13 @@ export class DeviceService {
         'Pair code already claimed by another device or expired — request a new one',
       );
     }
-    const updated = await this.prisma.device.findUniqueOrThrow({ where: { id: row.id } });
+    // v2.8.94 — defense-in-depth: re-fetch with (id, tenantId) compound.
+    // Pre-fix the response lookup ran id-only, so a future regression of
+    // the atomic claim above could leak a cross-tenant device row to the
+    // pairing caller.
+    const updated = await this.prisma.device.findFirstOrThrow({
+      where: { id: row.id, tenantId: row.tenantId },
+    });
 
     await this.outbox
       .append({

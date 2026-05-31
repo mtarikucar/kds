@@ -56,19 +56,31 @@ export class SubscriptionService {
   private async emitLifecycle(
     type: string,
     sub: { id: string; tenantId: string; plan?: { name?: string } | null; currentPeriodStart?: Date | null; currentPeriodEnd?: Date | null },
+    tx?: any,
   ): Promise<void> {
     try {
-      await this.outbox.append({
-        type,
-        tenantId: sub.tenantId,
-        payload: {
-          subscriptionId: sub.id,
+      // v2.8.94 — accept an optional tx so the lifecycle event lands in
+      // the same Postgres transaction as the (subscription, tenant)
+      // mutation. Pre-fix the emit happened *after* the txn committed,
+      // so a process crash between commit and emit left the subscription
+      // in its new state with no SubscriptionCancelled / -Downgraded /
+      // -Activated event for the projector to react to — entitlements
+      // diverged for up to 24h (until the reconcile cron). Passing tx
+      // makes the invariant: business state ⇔ outbox row.
+      await this.outbox.append(
+        {
+          type,
           tenantId: sub.tenantId,
-          planCode: sub.plan?.name,
-          periodStart: sub.currentPeriodStart?.toISOString(),
-          periodEnd: sub.currentPeriodEnd?.toISOString(),
+          payload: {
+            subscriptionId: sub.id,
+            tenantId: sub.tenantId,
+            planCode: sub.plan?.name,
+            periodStart: sub.currentPeriodStart?.toISOString(),
+            periodEnd: sub.currentPeriodEnd?.toISOString(),
+          },
         },
-      });
+        tx,
+      );
     } catch (e) {
       this.logger.warn(`outbox emit ${type} failed for sub=${sub.id}: ${(e as Error).message}`);
     }
@@ -664,41 +676,59 @@ export class SubscriptionService {
         ? newPlan.monthlyPrice
         : newPlan.yearlyPrice;
 
-    // Atomic claim with compound WHERE on scheduledDowngradePlanId NOT
-    // NULL. The cron should never fire twice for one subscription, but
-    // a manual SuperAdmin re-trigger overlapping the scheduled fire
-    // would otherwise re-apply the same downgrade with a fresh
-    // `amount` write (idempotent) AND notify the admin twice. The
-    // claim makes the loser see count=0 and skip silently.
-    const claim = await this.prisma.subscription.updateMany({
-      where: {
-        id: subscriptionId,
-        scheduledDowngradePlanId: { not: null },
-      },
-      data: {
-        planId: subscription.scheduledDowngradePlanId,
-        billingCycle,
-        amount: newAmount,
-        currency: newPlan.currency,
-        scheduledDowngradePlanId: null,
-        scheduledDowngradeBillingCycle: null,
-      },
+    // v2.8.94 — wrap the claim + tenant.currentPlanId flip + lifecycle
+    // event in a single $transaction. Pre-fix the subscription.planId
+    // and tenant.currentPlanId could land in separate commits and the
+    // SubscriptionDowngraded event was never emitted at all. The
+    // engine projector consequently never re-projected grants, so
+    // tenants retained their pre-downgrade entitlements until the
+    // nightly reconcile cron fired (~24h). Now all three writes
+    // commit together or none do.
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Atomic claim with compound WHERE on scheduledDowngradePlanId NOT
+      // NULL. The cron should never fire twice for one subscription, but
+      // a manual SuperAdmin re-trigger overlapping the scheduled fire
+      // would otherwise re-apply the same downgrade with a fresh
+      // `amount` write (idempotent) AND notify the admin twice. The
+      // claim makes the loser see count=0 and skip silently.
+      const claim = await tx.subscription.updateMany({
+        where: {
+          id: subscriptionId,
+          scheduledDowngradePlanId: { not: null },
+        },
+        data: {
+          planId: subscription.scheduledDowngradePlanId!,
+          billingCycle,
+          amount: newAmount,
+          currency: newPlan.currency,
+          scheduledDowngradePlanId: null,
+          scheduledDowngradeBillingCycle: null,
+        },
+      });
+      if (claim.count === 0) {
+        return null;
+      }
+      const updated = await tx.subscription.findUniqueOrThrow({
+        where: { id: subscriptionId },
+        include: { plan: true },
+      });
+
+      await tx.tenant.update({
+        where: { id: subscription.tenantId },
+        data: { currentPlanId: subscription.scheduledDowngradePlanId },
+      });
+
+      await this.emitLifecycle(EventTypes.SubscriptionDowngraded, updated, tx);
+      return updated;
     });
-    if (claim.count === 0) {
+
+    if (result === null) {
       this.logger.debug(
         `Scheduled downgrade for ${subscriptionId} already applied by another run`,
       );
       return null;
     }
-    const updated = await this.prisma.subscription.findUniqueOrThrow({
-      where: { id: subscriptionId },
-      include: { plan: true },
-    });
-
-    await this.prisma.tenant.update({
-      where: { id: subscription.tenantId },
-      data: { currentPlanId: subscription.scheduledDowngradePlanId },
-    });
+    const updated = result;
 
     const adminUser = await this.prisma.user.findFirst({
       where: { tenantId: subscription.tenantId, role: "ADMIN" },
@@ -824,7 +854,12 @@ export class SubscriptionService {
           select: { id: true },
         })
       : null;
-    const claim = await this.prisma.$transaction(async (tx) => {
+    // v2.8.94 — fold the post-claim fetch and (immediate path's)
+    // lifecycle emit into the same $transaction. Pre-fix the emit
+    // happened *after* the txn committed, so a crash between commit
+    // and emit left the subscription cancelled with no projector
+    // signal — entitlements stayed paid until the nightly reconcile.
+    const txResult = await this.prisma.$transaction(async (tx) => {
       const c = await tx.subscription.updateMany({
         where: {
           id: subscriptionId,
@@ -833,24 +868,36 @@ export class SubscriptionService {
         },
         data,
       });
-      if (c.count > 0 && immediate && freePlan) {
+      if (c.count === 0) {
+        return { claimed: false as const };
+      }
+      if (immediate && freePlan) {
         await tx.tenant.update({
           where: { id: tenantId },
           data: { currentPlanId: freePlan.id },
         });
       }
-      return c;
+      const updated = await tx.subscription.findUniqueOrThrow({
+        where: { id: subscriptionId },
+        include: { plan: true, tenant: true },
+      });
+      // Only "immediate" cancellations terminate access right away;
+      // "at period end" leaves the subscription ACTIVE/TRIALING until
+      // the scheduler closes it. Emit only when access actually changes.
+      if (immediate) {
+        await this.emitLifecycle(EventTypes.SubscriptionCancelled, updated, tx);
+      }
+      return { claimed: true as const, updated };
     });
-    if (claim.count === 0) {
+    if (!txResult.claimed) {
       throw new BadRequestException(
         'Subscription state changed concurrently — refresh and retry.',
       );
     }
-    const updated = await this.prisma.subscription.findUniqueOrThrow({
-      where: { id: subscriptionId },
-      include: { plan: true, tenant: true },
-    });
+    const updated = txResult.updated;
 
+    // Notifications are user-facing side effects and stay outside the
+    // txn — they touch SMTP and can stall for seconds.
     const adminUser = await this.prisma.user.findFirst({
       where: { tenantId: subscription.tenantId, role: "ADMIN" },
       select: { email: true },
@@ -874,15 +921,6 @@ export class SubscriptionService {
       await notifyPromise.catch((err: any) =>
         this.logger.error(`cancellation notification failed: ${err?.message}`),
       );
-    }
-
-    // Only "immediate" cancellations terminate access right away; "at period
-    // end" leaves the subscription ACTIVE/TRIALING until the scheduler closes
-    // it. The projector reads current state, so we only emit when access
-    // actually changes — at-period-end emits will fire when the scheduler
-    // transitions the row.
-    if (immediate) {
-      await this.emitLifecycle(EventTypes.SubscriptionCancelled, updated);
     }
 
     return updated;

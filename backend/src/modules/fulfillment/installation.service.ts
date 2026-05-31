@@ -68,7 +68,8 @@ export class InstallationService {
     if (claim.count === 0) {
       throw new BadRequestException('Installation request status changed concurrently — refresh and retry.');
     }
-    const updated = await this.prisma.installationRequest.findUniqueOrThrow({ where: { id: requestId } });
+    // v2.8.94 — compound-WHERE re-fetch matches the upstream claim.
+    const updated = await this.prisma.installationRequest.findFirstOrThrow({ where: { id: requestId, tenantId } });
     await this.outbox
       .append({
         type: 'installation.scheduled.v1',
@@ -99,7 +100,7 @@ export class InstallationService {
     if (claim.count === 0) {
       throw new BadRequestException(`Cannot complete from status=${row.status}`);
     }
-    const updated = await this.prisma.installationRequest.findUniqueOrThrow({ where: { id: requestId } });
+    const updated = await this.prisma.installationRequest.findFirstOrThrow({ where: { id: requestId, tenantId } });
     await this.outbox
       .append({
         type: 'installation.completed.v1',
@@ -135,7 +136,11 @@ export class InstallationService {
     if (claim.count === 0) {
       throw new BadRequestException(`Cannot cancel from status=${row.status}`);
     }
-    const updated = await this.prisma.installationRequest.findUniqueOrThrow({ where: { id: requestId } });
+    // SuperAdmin path — row.tenantId already proven by the findUnique
+    // above. Use it to maintain the same compound-WHERE re-fetch shape.
+    const updated = await this.prisma.installationRequest.findFirstOrThrow({
+      where: { id: requestId, tenantId: row.tenantId },
+    });
     await this.outbox
       .append({
         type: 'installation.cancelled.v1',

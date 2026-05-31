@@ -165,13 +165,23 @@ export class WebhookAuthGuard implements CanActivate {
       throw new UnauthorizedException('Stale webhook timestamp');
     }
 
-    // Fail closed if rawBody is missing: re-serializing via JSON.stringify
-    // is not byte-identical to what the sender signed (key ordering,
-    // whitespace, number formatting). Verifying against a re-serialized
-    // payload effectively disables signature checking.
-    if (!request.rawBody) {
-      this.logger.error('Trendyol webhook missing rawBody — refusing to verify against re-serialized JSON');
-      throw new UnauthorizedException('Webhook body capture missing');
+    // Fail closed if rawBody is missing OR isn't a Buffer.
+    // Re-serializing via JSON.stringify is not byte-identical to what
+    // the sender signed (key ordering, whitespace, number formatting).
+    // Verifying against a re-serialized payload effectively disables
+    // signature checking.
+    //
+    // v2.8.94 — explicit `instanceof Buffer` check. Without it a
+    // misconfigured upstream body parser that captures rawBody as a
+    // string or as the parsed object can still pass the truthy check
+    // and `.toString('utf8')` would either return the JS-stringified
+    // representation or, for a parsed object, "[object Object]".
+    // Either case silently bypasses HMAC.
+    if (!(request.rawBody instanceof Buffer)) {
+      this.logger.error(
+        `Trendyol webhook rawBody is not a Buffer (typeof=${typeof request.rawBody}) — refusing to verify against re-serialized JSON`,
+      );
+      throw new UnauthorizedException('Webhook body capture missing or malformed');
     }
     const body = request.rawBody.toString('utf8');
     const signedPayload = `${timestamp}.${body}`;

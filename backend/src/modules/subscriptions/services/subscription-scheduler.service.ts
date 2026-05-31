@@ -265,6 +265,13 @@ export class SubscriptionSchedulerService {
         where: { name: SubscriptionPlanType.FREE },
         select: { id: true },
       });
+      // v2.8.94 — emit the SubscriptionCancelled events INSIDE the
+      // transaction. Pre-fix the outbox.append loop ran after the txn
+      // committed, so a process crash between commit and the first
+      // append left a cohort of CANCELLED subscriptions with no
+      // projector signal — paid grants persisted until the nightly
+      // reconcile cron caught them ~24h later. Atomic emit closes the
+      // window.
       const result = await this.prisma.$transaction(async (tx) => {
         const r = await tx.subscription.updateMany({
           where: { id: { in: ids }, status: { not: SubscriptionStatus.CANCELLED } },
@@ -279,24 +286,25 @@ export class SubscriptionSchedulerService {
             data: { currentPlanId: freePlan.id },
           });
         }
+        if (r.count > 0) {
+          for (const sub of expiring) {
+            await this.outbox?.append(
+              {
+                type: EventTypes.SubscriptionCancelled,
+                tenantId: sub.tenantId,
+                payload: {
+                  subscriptionId: sub.id,
+                  tenantId: sub.tenantId,
+                  planCode: sub.plan?.name,
+                  reason: "period_end_cancel",
+                },
+              },
+              tx,
+            );
+          }
+        }
         return r;
       });
-      for (const sub of expiring) {
-        await this.outbox
-          ?.append({
-            type: EventTypes.SubscriptionCancelled,
-            tenantId: sub.tenantId,
-            payload: {
-              subscriptionId: sub.id,
-              tenantId: sub.tenantId,
-              planCode: sub.plan?.name,
-              reason: "period_end_cancel",
-            },
-          })
-          .catch((e) =>
-            this.logger.warn(`cancel emit failed for sub=${sub.id}: ${(e as Error).message}`),
-          );
-      }
       this.logger.log(`Cancelled ${result.count} subscriptions at period end (events emitted)`);
     });
   }
@@ -337,6 +345,10 @@ export class SubscriptionSchedulerService {
         where: { name: SubscriptionPlanType.FREE },
         select: { id: true },
       });
+      // v2.8.94 — mirror handlePendingCancellations: emit the
+      // SubscriptionCancelled events inside the txn so the
+      // (status=EXPIRED, currentPlanId=FREE, outbox row) triple is
+      // either fully durable or fully rolled back.
       const updated = await this.prisma.$transaction(async (tx) => {
         const u = await tx.subscription.updateMany({
           where: { id: { in: ids }, status: SubscriptionStatus.PAST_DUE },
@@ -348,24 +360,25 @@ export class SubscriptionSchedulerService {
             data: { currentPlanId: freePlan.id },
           });
         }
+        if (u.count > 0) {
+          for (const sub of expiring) {
+            await this.outbox?.append(
+              {
+                type: EventTypes.SubscriptionCancelled,
+                tenantId: sub.tenantId,
+                payload: {
+                  subscriptionId: sub.id,
+                  tenantId: sub.tenantId,
+                  planCode: sub.plan?.name,
+                  reason: "grace_expired",
+                },
+              },
+              tx,
+            );
+          }
+        }
         return u;
       });
-      for (const sub of expiring) {
-        await this.outbox
-          ?.append({
-            type: EventTypes.SubscriptionCancelled,
-            tenantId: sub.tenantId,
-            payload: {
-              subscriptionId: sub.id,
-              tenantId: sub.tenantId,
-              planCode: sub.plan?.name,
-              reason: "grace_expired",
-            },
-          })
-          .catch((e) =>
-            this.logger.warn(`expired emit failed for sub=${sub.id}: ${(e as Error).message}`),
-          );
-      }
       this.logger.log(`Expired ${updated.count} past-due subscriptions (events emitted)`);
     });
   }

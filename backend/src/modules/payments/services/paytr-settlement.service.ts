@@ -394,6 +394,41 @@ export class PaytrSettlementService {
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === "P2002"
       ) {
+        // v2.8.94 — inspect err.meta.target to confirm the conflict is
+        // the documented "one active subscription per tenant" guard
+        // before refunding. Pre-fix the catch labelled EVERY P2002 as
+        // DUPLICATE_ACTIVE_SUBSCRIPTION, so a future unique index
+        // anywhere else (e.g. ['tenantId','planId'] for upsell
+        // promotion bookkeeping, or ['merchantOid'] dupes from an
+        // accidental schema drift) would silently FAIL the payment
+        // and queue a phantom refund. Re-throw unknown P2002 so the
+        // settlement layer's outer error path surfaces them as
+        // criticals instead of swallowing.
+        const target = (err.meta as any)?.target;
+        const targetArray = Array.isArray(target)
+          ? target
+          : typeof target === "string"
+            ? [target]
+            : [];
+        const isActiveSubscriptionDupe =
+          targetArray.includes("tenantId") &&
+          targetArray.some((t: string) =>
+            t === "status" || t === "subscriptionId",
+          );
+        if (!isActiveSubscriptionDupe) {
+          this.logger.error(
+            `Unexpected P2002 during PayTR settlement success oid=${payment.paytrMerchantOid} target=${JSON.stringify(target)}`,
+          );
+          captureException(err, {
+            paytrMerchantOid: payment.paytrMerchantOid,
+            subscriptionId: subscription.id,
+            tenantId: subscription.tenantId,
+            severity: "critical",
+            context: "unexpected-p2002-on-paytr-success",
+            target,
+          });
+          throw err;
+        }
         await this.prisma.subscriptionPayment.update({
           where: { id: payment.id },
           data: {

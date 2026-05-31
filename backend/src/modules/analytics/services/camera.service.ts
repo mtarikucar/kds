@@ -146,7 +146,10 @@ export class CameraService {
     if (claim.count === 0) {
       throw new NotFoundException(`Camera with ID ${cameraId} not found`);
     }
-    const updated = await this.prisma.camera.findUniqueOrThrow({ where: { id: cameraId } });
+    // v2.8.94 — defense-in-depth: compound WHERE matches the upstream
+    // claim. If the claim regresses, the re-fetch must not silently
+    // expose a cross-tenant row.
+    const updated = await this.prisma.camera.findFirstOrThrow({ where: { id: cameraId, tenantId } });
 
     this.logger.log(`Updated camera ${cameraId}`);
     return this.mapToResponseDto(updated);
@@ -244,7 +247,10 @@ export class CameraService {
     if (claim.count === 0) {
       throw new NotFoundException(`Camera with ID ${cameraId} not found`);
     }
-    const updated = await this.prisma.camera.findUniqueOrThrow({ where: { id: cameraId } });
+    // v2.8.94 — defense-in-depth: compound WHERE matches the upstream
+    // claim. If the claim regresses, the re-fetch must not silently
+    // expose a cross-tenant row.
+    const updated = await this.prisma.camera.findFirstOrThrow({ where: { id: cameraId, tenantId } });
 
     this.logger.log(`Updated calibration for camera ${cameraId}`);
     return this.mapToResponseDto(updated);
