@@ -20,6 +20,10 @@ export interface User {
   lastName: string;
   role: string;
   tenantId: string | null;
+  // v3.0.0 — home branch. Required for WAITER / KITCHEN / COURIER
+  // (BranchGuard pins them to it); optional for ADMIN / MANAGER who
+  // may roam. Null on legacy accounts whose backfill is in soft-mode.
+  primaryBranchId?: string | null;
   status?: UserStatus | string;
   approvedAt?: string;
   approvedById?: string;

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useAuthStore } from '../store/authStore';
+import { useUiStore } from '../store/uiStore';
 import { API_URL } from './env';
 
 const API_BASE_URL = API_URL;
@@ -14,12 +15,24 @@ export const api = axios.create({
   },
 });
 
-// Request interceptor to add access token
+// Request interceptor to add access token and the active branch hint.
+//
+// v3.0.0 — every authenticated request carries `X-Branch-Id` when the
+// user has picked an active branch via BranchPicker. The backend's
+// BranchGuard prefers the header over the JWT's `activeBranchId`
+// claim, so switching branches via the picker has zero token-refresh
+// cost. WAITER / KITCHEN / COURIER are auto-pinned to their primary
+// branch by the store (they can't switch), so this still sends — but
+// to a fixed value.
 api.interceptors.request.use(
   (config) => {
     const token = useAuthStore.getState().accessToken;
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    const branchId = useUiStore.getState().activeBranchId;
+    if (branchId) {
+      config.headers['X-Branch-Id'] = branchId;
     }
     return config;
   },

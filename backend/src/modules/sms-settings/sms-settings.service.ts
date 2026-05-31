@@ -8,7 +8,7 @@ export class SmsSettingsService {
 
   async findByTenant(tenantId: string) {
     return this.prisma.smsSettings.upsert({
-      where: { tenantId },
+      where: { tenantId_branchId: { tenantId, branchId: null } },
       update: {},
       create: { tenantId },
     });
@@ -16,7 +16,7 @@ export class SmsSettingsService {
 
   async update(tenantId: string, updateDto: UpdateSmsSettingsDto) {
     return this.prisma.smsSettings.upsert({
-      where: { tenantId },
+      where: { tenantId_branchId: { tenantId, branchId: null } },
       update: updateDto,
       create: { tenantId, ...updateDto },
     });

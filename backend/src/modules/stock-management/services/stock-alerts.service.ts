@@ -77,7 +77,7 @@ export class StockAlertsService {
 
   async checkExpiringBatches(tenantId: string, days?: number) {
     const settings = await this.prisma.stockSettings.findUnique({
-      where: { tenantId },
+      where: { tenantId_branchId: { tenantId, branchId: null } },
     });
     const alertDays = days || settings?.lowStockAlertDays || 3;
 

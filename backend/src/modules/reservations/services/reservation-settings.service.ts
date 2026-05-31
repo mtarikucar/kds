@@ -19,7 +19,7 @@ export class ReservationSettingsService {
 
   async getOrCreate(tenantId: string) {
     let settings = await this.prisma.reservationSettings.findUnique({
-      where: { tenantId },
+      where: { tenantId_branchId: { tenantId, branchId: null } },
     });
 
     if (!settings) {
@@ -33,7 +33,7 @@ export class ReservationSettingsService {
 
   async update(tenantId: string, dto: UpdateReservationSettingsDto) {
     let settings = await this.prisma.reservationSettings.findUnique({
-      where: { tenantId },
+      where: { tenantId_branchId: { tenantId, branchId: null } },
     });
 
     if (!settings) {
@@ -42,7 +42,7 @@ export class ReservationSettingsService {
       });
     } else {
       settings = await this.prisma.reservationSettings.update({
-        where: { tenantId },
+        where: { tenantId_branchId: { tenantId, branchId: null } },
         data: dto,
       });
     }

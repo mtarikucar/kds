@@ -142,10 +142,15 @@ export class IntegrationsService {
   }
 
   async create(tenantId: string, createDto: CreateIntegrationDto) {
+    // v3.0.0 — IntegrationSettings now ride the override pattern;
+    // dedup key gains branchId. Tenant-default rows (branchId=null)
+    // still uniquely identify integrations the tenant owns at the
+    // top level.
     const existing = await this.prisma.integrationSettings.findUnique({
       where: {
-        tenantId_integrationType_provider: {
+        tenantId_branchId_integrationType_provider: {
           tenantId,
+          branchId: null,
           integrationType: createDto.integrationType,
           provider: createDto.provider,
         },

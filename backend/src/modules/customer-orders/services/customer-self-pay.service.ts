@@ -182,7 +182,7 @@ export class CustomerSelfPayService {
     // in. The createPayIntent path will also enforce it server-side
     // — this is a UX-layer convenience.
     const posSettings = await this.prisma.posSettings.findUnique({
-      where: { tenantId: session.tenantId },
+      where: { tenantId_branchId: { tenantId: session.tenantId, branchId: null } },
       select: { enableCustomerSelfPay: true },
     });
     const selfPayEnabled = !!posSettings?.enableCustomerSelfPay;
@@ -424,7 +424,7 @@ export class CustomerSelfPayService {
     // is a deliberate guard so a restaurant without a PayTR merchant
     // account doesn't surface a button that will only ever fail.
     const posSettings = await this.prisma.posSettings.findUnique({
-      where: { tenantId: session.tenantId },
+      where: { tenantId_branchId: { tenantId: session.tenantId, branchId: null } },
       select: { enableCustomerSelfPay: true },
     });
     if (!posSettings?.enableCustomerSelfPay) {

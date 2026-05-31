@@ -20,15 +20,22 @@ const SUBDOMAIN_REGEX = /^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/;
 export class QrService {
   constructor(private prisma: PrismaService) {}
 
+  // v3.0.0 — settings tables use the override pattern: a row with
+  // branchId=null is the tenant default; per-branch overrides land
+  // as separate rows. This service operates on the tenant-default
+  // row only (the QR menu config legitimately spans every branch
+  // by default — per-branch QR styling lands later). The compound
+  // unique key `tenantId_branchId` replaces the legacy single-
+  // column `tenantId` unique.
   async getSettings(tenantId: string) {
     let settings = await this.prisma.qrMenuSettings.findUnique({
-      where: { tenantId },
+      where: { tenantId_branchId: { tenantId, branchId: null } },
     });
 
     // Create default settings if they don't exist
     if (!settings) {
       settings = await this.prisma.qrMenuSettings.create({
-        data: { tenantId },
+        data: { tenantId, branchId: null },
       });
     }
 
@@ -37,7 +44,7 @@ export class QrService {
 
   async createSettings(tenantId: string, dto: CreateQrSettingsDto) {
     const existingSettings = await this.prisma.qrMenuSettings.findUnique({
-      where: { tenantId },
+      where: { tenantId_branchId: { tenantId, branchId: null } },
     });
 
     if (existingSettings) {
@@ -48,6 +55,7 @@ export class QrService {
     return this.prisma.qrMenuSettings.create({
       data: {
         tenantId,
+        branchId: null,
         ...dto,
       },
     });
@@ -58,14 +66,14 @@ export class QrService {
     await this.getSettings(tenantId);
 
     return this.prisma.qrMenuSettings.update({
-      where: { tenantId },
+      where: { tenantId_branchId: { tenantId, branchId: null } },
       data: dto,
     });
   }
 
   async deleteSettings(tenantId: string) {
     const settings = await this.prisma.qrMenuSettings.findUnique({
-      where: { tenantId },
+      where: { tenantId_branchId: { tenantId, branchId: null } },
     });
 
     if (!settings) {
@@ -73,7 +81,7 @@ export class QrService {
     }
 
     return this.prisma.qrMenuSettings.delete({
-      where: { tenantId },
+      where: { tenantId_branchId: { tenantId, branchId: null } },
     });
   }
 

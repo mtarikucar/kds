@@ -1,6 +1,35 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { User } from '../types';
+import { useUiStore } from './uiStore';
+
+/**
+ * v3.0.0 — login / setUser must seed the active branch from the
+ * user's primaryBranchId so the very first request after login
+ * already carries `X-Branch-Id` (axios interceptor reads
+ * uiStore.activeBranchId). Skipping this would let the first batch
+ * of dashboard queries fly with no branch hint and hit the
+ * BranchGuard fallback chain — extra DB lookups and a soft-mode
+ * race with the SPA's BranchPicker.
+ */
+function syncActiveBranchFromUser(user: User | null): void {
+  if (!user) return;
+  const uiState = useUiStore.getState();
+  const restrictedRoles = new Set(['WAITER', 'KITCHEN', 'COURIER']);
+  if (restrictedRoles.has(user.role) && user.primaryBranchId) {
+    // Hard-restricted roles always pin to their primary branch —
+    // the picker is disabled in the UI but the store value must
+    // still drive the axios header.
+    uiState.setActiveBranchId(user.primaryBranchId);
+    return;
+  }
+  // ADMIN / MANAGER: only seed when nothing was previously persisted.
+  // Respecting a prior selection keeps multi-branch admins from
+  // bouncing back to "Main" on every refresh.
+  if (!uiState.activeBranchId && user.primaryBranchId) {
+    uiState.setActiveBranchId(user.primaryBranchId);
+  }
+}
 
 /**
  * Auth store with a split-persistence model:
@@ -43,6 +72,7 @@ export const useAuthStore = create<AuthState>()(
 
       setUser: (user: User) => {
         set({ user, isAuthenticated: true });
+        syncActiveBranchFromUser(user);
       },
 
       setAccessToken: (accessToken: string) => {
@@ -55,6 +85,7 @@ export const useAuthStore = create<AuthState>()(
           accessToken,
           isAuthenticated: true,
         });
+        syncActiveBranchFromUser(user);
       },
 
       logout: () => {
@@ -63,6 +94,14 @@ export const useAuthStore = create<AuthState>()(
           accessToken: null,
           isAuthenticated: false,
         });
+        // v3.0.0 — clear activeBranchId too. A logged-out shell
+        // must not carry the previous user's branch context into
+        // a second tenant's login on the same device.
+        try {
+          useUiStore.getState().setActiveBranchId(null);
+        } catch {
+          // ui store hydration race — ignore.
+        }
         // v2.8.97 — explicitly drop the persisted snapshot. Pre-fix
         // `set({user:null})` cleared the in-memory store but Zustand's
         // persist middleware writes-back on the next mutation cycle,

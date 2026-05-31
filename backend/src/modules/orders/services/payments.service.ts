@@ -555,7 +555,7 @@ export class PaymentsService {
           // legacy "pay anytime" behaviour.
           if (order.type === 'DINE_IN' && order.status !== OrderStatus.SERVED) {
             const posSettings = await tx.posSettings.findUnique({
-              where: { tenantId },
+              where: { tenantId_branchId: { tenantId, branchId: null } },
               select: { requireServedForDineInPayment: true },
             });
             if (posSettings?.requireServedForDineInPayment) {
