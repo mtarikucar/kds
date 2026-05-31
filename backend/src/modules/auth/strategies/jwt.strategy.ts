@@ -13,6 +13,19 @@ export interface JwtPayload {
   /** Token-version stamp. Incrementing User.tokenVersion invalidates every
    * previously-issued access token. Omitted on legacy tokens — treated as 0. */
   ver?: number;
+  /** v3.0.0 — the user's home branch. Hard-restricted roles
+   *  (WAITER/KITCHEN/COURIER) must always carry this; ADMIN/MANAGER
+   *  may carry null when they roam. */
+  primaryBranchId?: string | null;
+  /** v3.0.0 — the branch the SPA had pinned when this token was
+   *  minted. The X-Branch-Id header overrides on a per-request basis. */
+  activeBranchId?: string | null;
+  /** v3.0.0 — branches the user may switch into. ADMIN with an empty
+   *  list = wildcard tenant access (owner accounts). MANAGER must have
+   *  every roam-able branch listed. WAITER/KITCHEN/COURIER never carry
+   *  more than one element here; BranchGuard ignores it for those
+   *  roles in favour of primaryBranchId. */
+  allowedBranchIds?: string[];
 }
 
 @Injectable()
@@ -49,6 +62,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         status: true,
         tenantId: true,
         tokenVersion: true,
+        primaryBranchId: true,
         tenant: { select: { status: true } },
       },
     });
@@ -70,6 +84,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     const { tenant: _tenant, tokenVersion: _ver, ...result } = user;
-    return result;
+    // BranchGuard reads activeBranchId / allowedBranchIds straight off
+    // req.user — JWT is authoritative for both (header may override
+    // activeBranchId per-request; allow-list refreshes at token mint,
+    // max 15 min staleness).
+    return {
+      ...result,
+      activeBranchId: payload.activeBranchId ?? null,
+      allowedBranchIds: payload.allowedBranchIds ?? [],
+    };
   }
 }

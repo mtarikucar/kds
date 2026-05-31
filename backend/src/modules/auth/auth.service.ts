@@ -22,7 +22,7 @@ import { LoginDto } from './dto/login.dto';
 import { GoogleAuthDto, AppleAuthDto } from './dto/social-auth.dto';
 import { AuthResponseDto, UserResponseDto } from './dto/auth-response.dto';
 import { ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto } from './dto/password-reset.dto';
-import { UserRole } from '../../common/constants/roles.enum';
+import { HARD_RESTRICTED_ROLES, UserRole } from '../../common/constants/roles.enum';
 import { PaymentProvider, TenantStatus } from '../../common/constants/subscription.enum';
 import { EmailService } from '../../common/services/email.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -139,6 +139,13 @@ export class AuthService {
 
     let tenantId: string;
     let userRole = registerDto.role;
+    // v3.0.0 — every user lands with a primaryBranchId. Scenario 1
+    // (new restaurant) creates the Main branch in the same transaction
+    // and assigns it to the ADMIN. Scenario 2 (join) resolves to the
+    // tenant's first active branch — the DB CHECK constraint refuses
+    // to mint a WAITER/KITCHEN/COURIER without one, so a tenant with
+    // zero active branches cannot accept new staff signups.
+    let primaryBranchId: string;
 
     // Scenario 1: Creating a new restaurant (ADMIN only)
     if (hasRestaurantName) {
@@ -183,7 +190,7 @@ export class AuthService {
       const trialEnd = addDays(now, businessPlan.trialDays);
 
       try {
-        const tenant = await this.prisma.$transaction(async (tx) => {
+        const txResult = await this.prisma.$transaction(async (tx) => {
           const created = await tx.tenant.create({
             data: {
               name: registerDto.restaurantName,
@@ -223,9 +230,25 @@ export class AuthService {
               cancelAtPeriodEnd: false,
             },
           });
-          return created;
+          // v3.0.0 — every new tenant ships with a Main branch.
+          // Bundled into the same tx as tenant + subscription so other
+          // modules never observe a tenant without one. The DB CHECK
+          // constraint on users requires WAITER/KITCHEN/COURIER to
+          // carry a primaryBranchId, so the tenant being usable
+          // depends on this row existing.
+          const mainBranch = await tx.branch.create({
+            data: {
+              tenantId: created.id,
+              name: 'Main',
+              status: 'active',
+              timezone: 'UTC',
+            },
+            select: { id: true },
+          });
+          return { tenant: created, mainBranchId: mainBranch.id };
         });
-        tenantId = tenant.id;
+        tenantId = txResult.tenant.id;
+        primaryBranchId = txResult.mainBranchId;
       } catch (err) {
         if (
           err instanceof Prisma.PrismaClientKnownRequestError &&
@@ -258,6 +281,25 @@ export class AuthService {
       }
 
       tenantId = registerDto.tenantId;
+
+      // v3.0.0 — every joining user lands on the tenant's first
+      // active branch. The DB CHECK constraint on users rejects
+      // restricted roles without a primaryBranchId, so a tenant
+      // without an active branch (impossible under normal ops, but
+      // possible if every branch was archived) cannot accept staff
+      // signups. Surface that as a clear error rather than letting
+      // the user.create call crash on the constraint.
+      const firstBranch = await this.prisma.branch.findFirst({
+        where: { tenantId, status: 'active' },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true },
+      });
+      if (!firstBranch) {
+        throw new ValidationException(
+          'Tenant has no active branch — signup is blocked until an admin restores at least one.',
+        );
+      }
+      primaryBranchId = firstBranch.id;
     }
 
     // Hash password
@@ -266,26 +308,51 @@ export class AuthService {
     // Determine user status: ADMIN creating restaurant = ACTIVE, others = PENDING_APPROVAL
     const userStatus = hasRestaurantName ? 'ACTIVE' : 'PENDING_APPROVAL';
 
-    // Create user
-    const user = await this.prisma.user.create({
-      data: {
-        email: registerDto.email,
-        password: hashedPassword,
-        firstName: registerDto.firstName,
-        lastName: registerDto.lastName,
-        role: userRole,
-        tenantId,
-        status: userStatus,
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        status: true,
-        tenantId: true,
-      },
+    // Create user + matching allow-list row for restricted roles
+    // atomically. The CHECK constraint
+    // `users_restricted_role_requires_primary_branch` makes the
+    // primaryBranchId for WAITER/KITCHEN/COURIER load-bearing — we
+    // set it on every signup. ADMIN's primaryBranchId is the freshly
+    // minted Main branch (scenario 1) so the owner has a default
+    // active branch from day one.
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          email: registerDto.email,
+          password: hashedPassword,
+          firstName: registerDto.firstName,
+          lastName: registerDto.lastName,
+          role: userRole,
+          tenantId,
+          status: userStatus,
+          primaryBranchId,
+        },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          status: true,
+          tenantId: true,
+          primaryBranchId: true,
+        },
+      });
+      // Restricted roles get an explicit allow-list row equal to
+      // their primary branch. BranchGuard short-circuits on
+      // primaryBranchId for these roles, but the row gives admin UI
+      // a uniform place to inspect "which branches does this user
+      // see" without role-conditional branching.
+      if ((HARD_RESTRICTED_ROLES as readonly string[]).includes(userRole!)) {
+        await tx.userBranchAssignment.create({
+          data: {
+            userId: created.id,
+            branchId: primaryBranchId,
+            tenantId,
+          },
+        });
+      }
+      return created;
     });
 
     // Send email verification code automatically after registration
@@ -321,6 +388,11 @@ export class AuthService {
           lastName: user.lastName,
           role: user.role,
           tenantId: user.tenantId,
+          primaryBranchId: user.primaryBranchId,
+          // Restricted roles register with exactly one allow-list
+          // row (their primary branch); ADMIN / MANAGER joining is
+          // refused above so the empty-list path doesn't apply here.
+          allowedBranchIds: [primaryBranchId],
         },
         accessToken: null,
         refreshToken: null,
@@ -602,17 +674,32 @@ export class AuthService {
   }
 
   private async generateTokens(
-    user: UserResponseDto,
+    // Loose input shape — `generateTokens` populates primaryBranchId
+    // and allowedBranchIds itself from the DB, so callers can pass
+    // a plain Prisma row select without first having to read the
+    // branch context. The returned AuthResponseDto.user is the full
+    // UserResponseDto with both fields surfaced.
+    user: Omit<UserResponseDto, 'primaryBranchId' | 'allowedBranchIds'>,
     ip?: string,
     userAgent?: string,
   ): Promise<AuthResponseDto> {
-    // Read current tokenVersion so the access token carries the stamp the
-    // JwtStrategy validates against. Bumping User.tokenVersion invalidates
-    // every prior access token for that user.
+    // Read tokenVersion + branch context in a single round trip. JWT
+    // carries primaryBranchId + activeBranchId (defaults to the home
+    // branch) + the resolved allowedBranchIds list so BranchGuard can
+    // decide without a DB hit. List freshness: max one JWT lifetime
+    // (15 min) since allow-list changes only land at next token mint.
     const row = await this.prisma.user.findUnique({
       where: { id: user.id },
-      select: { tokenVersion: true },
+      select: {
+        tokenVersion: true,
+        primaryBranchId: true,
+        branchAssignments: { select: { branchId: true } },
+      },
     });
+    const primaryBranchId = row?.primaryBranchId ?? null;
+    const allowedBranchIds = (row?.branchAssignments ?? []).map(
+      (a) => a.branchId,
+    );
     const payload = {
       sub: user.id,
       email: user.email,
@@ -620,6 +707,12 @@ export class AuthService {
       tenantId: user.tenantId,
       type: 'user' as const,
       ver: row?.tokenVersion ?? 0,
+      primaryBranchId,
+      // activeBranchId mirrors primaryBranchId at issuance — the SPA
+      // pins a different value per-request via X-Branch-Id without
+      // minting a fresh token.
+      activeBranchId: primaryBranchId,
+      allowedBranchIds,
     };
 
     const accessToken = this.jwtService.sign(payload, {
@@ -659,7 +752,13 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      user,
+      user: {
+        ...user,
+        // Surface the branch claims to the SPA so its branchScopeStore
+        // can hydrate on login without a separate /me round-trip.
+        primaryBranchId,
+        allowedBranchIds,
+      },
     };
   }
 
@@ -673,6 +772,8 @@ export class AuthService {
         lastName: true,
         role: true,
         tenantId: true,
+        primaryBranchId: true,
+        branchAssignments: { select: { branchId: true } },
       },
     });
 
@@ -680,7 +781,11 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    return user;
+    const { branchAssignments, ...rest } = user;
+    return {
+      ...rest,
+      allowedBranchIds: branchAssignments.map((a) => a.branchId),
+    };
   }
 
   /**

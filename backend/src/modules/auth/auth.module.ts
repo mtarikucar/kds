@@ -10,6 +10,7 @@ import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { RolesGuard } from './guards/roles.guard';
 import { TenantGuard } from './guards/tenant.guard';
+import { BranchGuard } from './guards/branch.guard';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
@@ -43,6 +44,13 @@ import { NotificationsModule } from '../notifications/notifications.module';
     {
       provide: APP_GUARD,
       useClass: TenantGuard,
+    },
+    // BranchGuard depends on req.user.tenantId being set, so it must
+    // run after TenantGuard. Routes opt out via @SkipBranchScope()
+    // (billing, marketing, branch CRUD, /me, /auth/*).
+    {
+      provide: APP_GUARD,
+      useClass: BranchGuard,
     },
   ],
   exports: [AuthService],
