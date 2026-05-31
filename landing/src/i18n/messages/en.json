@@ -531,6 +531,27 @@
           "terms": "Terms of Service"
         }
       }
+    },
+    "form": {
+      "title": "Send us a message",
+      "submit": "Send message",
+      "submitting": "Sending…",
+      "honeypotLabel": "Website (leave blank)",
+      "successMessage": "Thanks — we will reply within two business days.",
+      "fields": {
+        "name": "Name",
+        "email": "Email",
+        "phone": "Phone",
+        "message": "Message",
+        "optional": "optional"
+      },
+      "errors": {
+        "nameTooShort": "Name must be at least 2 characters.",
+        "emailInvalid": "Please enter a valid email address.",
+        "messageTooShort": "Message must be at least 10 characters.",
+        "network": "Connection problem — please retry.",
+        "generic": "Could not send the message. Please try again."
+      }
     }
   }
 }

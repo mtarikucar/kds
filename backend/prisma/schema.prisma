@@ -265,6 +265,7 @@ model User {
   readNotifications          UserNotificationRead[]
   zReports                   ZReport[]
   cashDrawerMovements        CashDrawerMovement[]
+  approvedCashDrawerMovements CashDrawerMovement[] @relation("CashDrawerApprovedBy")
 
   // Personnel management relations
   attendances          Attendance[]
@@ -317,7 +318,13 @@ model Product {
 
   isAvailable  Boolean @default(true)
   stockTracked Boolean @default(false)
-  currentStock Int     @default(0)
+  // v2.8.98 — was Int @default(0). Int couldn't model fractional units
+  // (a kg-priced product sold in 0.5kg cuts, a 1.5L bottle sold by the
+  // 0.25L pour) and would overflow at the JS Number.MAX_SAFE bound on
+  // very-high-volume warehouse SKUs. Aligned with StockItem.currentStock
+  // at Decimal(10, 3) — three decimal places covers gram-level
+  // measurement and 10 total digits gives ~9.9M units max.
+  currentStock Decimal @default(0) @db.Decimal(10, 3)
   displayOrder Int     @default(0)
   taxRate      Int     @default(10) // KDV rate: 0, 1, 10, 20
 
@@ -802,6 +809,11 @@ model PendingSelfPayment {
   failureReason String?
   paytrToken    String?
   customerPhone String?
+  // v2.8.98 — deterministic dedup hash over (sessionId, items,
+  // amount, phone). Used by createPayIntent to short-circuit a
+  // double-tap retry before minting a second PayTR session.
+  // Nullable for backwards-compat with rows written pre-v2.8.98.
+  requestHash   String?
 
   expiresAt   DateTime
   createdAt   DateTime  @default(now())
@@ -810,6 +822,7 @@ model PendingSelfPayment {
   @@index([sessionId])
   @@index([tenantId])
   @@index([expiresAt])
+  @@index([tenantId, status, requestHash])
   @@map("pending_self_payments")
 }
 
@@ -1897,6 +1910,20 @@ model CashDrawerMovement {
   userId String
   user   User   @relation(fields: [userId], references: [id], onDelete: Restrict)
 
+  // v2.8.98 — manager approval audit trail. CASH_OUT and ADJUSTMENT
+  // movements move money outside of a sale flow, so they need a
+  // second pair of eyes. DRAFT state is enforced by the service:
+  // a fresh CASH_OUT/ADJUSTMENT lands as DRAFT; a manager (ADMIN
+  // or MANAGER role) flips it to APPROVED before the row counts
+  // toward the cash drawer reconciliation. OPENING / CLOSING /
+  // CASH_IN are auto-APPROVED on insert (they're traceable to the
+  // owning sale or to the open-shift action itself).
+  approvalStatus    String    @default("APPROVED") // DRAFT, APPROVED, REJECTED
+  approvedById      String?
+  approvedBy        User?     @relation("CashDrawerApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt        DateTime?
+  rejectionReason   String?
+
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -1907,6 +1934,7 @@ model CashDrawerMovement {
   @@index([zReportId])
   @@index([userId])
   @@index([createdAt])
+  @@index([tenantId, approvalStatus])
   @@map("cash_drawer_movements")
 }
 

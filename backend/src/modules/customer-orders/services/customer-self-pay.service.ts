@@ -8,9 +8,11 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { Prisma } from '@prisma/client';
-import { randomBytes } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import * as Sentry from '@sentry/node';
+import { withAdvisoryLock } from '../../../common/scheduling/advisory-lock';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { PaymentsService } from '../../orders/services/payments.service';
 import { PaytrAdapter } from '../../payments/adapters/paytr.adapter';
@@ -123,6 +125,50 @@ export class CustomerSelfPayService {
     private customerSessionService: CustomerSessionService,
     private config: ConfigService,
   ) {}
+
+  /**
+   * v2.8.98 — periodic TTL sweeper for expired PENDING intents.
+   *
+   * Pre-fix the expire path was lazy: `getIntentStatus` flipped a
+   * PENDING row to EXPIRED on the first poll AFTER expiresAt; if
+   * nobody polled (customer abandoned the tab) the row sat as
+   * PENDING in pending_self_payments forever. Two problems:
+   *   1. The dedup index (sessionId, tenantId, status, requestHash)
+   *      kept matching against ghost rows so the same session could
+   *      not start a new intent until manual cleanup.
+   *   2. The webhook handler couldn't tell "expired and abandoned"
+   *      from "expired but still in flight"; on a late callback it
+   *      had to assume the latter and provision the order.
+   *
+   * The cron sweeps every 5 minutes under an advisory lock so only
+   * one replica runs at a time, and transitions PENDING+expiresAt<now
+   * to EXPIRED with a reason. Rows aren't hard-deleted — the audit
+   * trail of "customer started a self-pay but didn't finish" is
+   * useful for retention metrics and disputed-charge investigations.
+   */
+  @Cron(CronExpression.EVERY_5_MINUTES, { name: 'self-pay-intent-expire' })
+  async expireStaleIntents(): Promise<void> {
+    await withAdvisoryLock(
+      this.prisma,
+      'self-pay-intent-expire',
+      async () => {
+        const result = await this.prisma.pendingSelfPayment.updateMany({
+          where: {
+            status: 'PENDING',
+            expiresAt: { lt: new Date() },
+          },
+          data: {
+            status: 'EXPIRED',
+            failureReason: 'TTL expired (sweeper)',
+          },
+        });
+        if (result.count > 0) {
+          this.logger.log(`self-pay sweeper: transitioned ${result.count} PENDING intents to EXPIRED`);
+        }
+      },
+      this.logger,
+    );
+  }
 
   // ──────────────────────────────────────────────────────────────────
   // READ: table-wide payable items for the session's table
@@ -556,6 +602,55 @@ export class CustomerSelfPayService {
     const merchantOid = this.generateMerchantOid(session.tenantId);
     const expiresAt = new Date(Date.now() + INTENT_TTL_MINUTES * 60_000);
 
+    // v2.8.98 — deterministic idempotency check. Pre-fix two
+    // rapid-fire createPayIntent calls with the same session + same
+    // item set + same total (a customer's quick double-tap on the
+    // payment button before the PayTR redirect fires) each generated
+    // a fresh merchantOid and the customer ended up with two PayTR
+    // sessions open against the same items. The first to land at the
+    // gateway won; the second got 409 from the dedup-by-status check
+    // upstream but if the customer authorized BOTH the system had to
+    // mark one failed + queue a refund.
+    //
+    // The hash spans (sessionId, sorted itemsByOrder, amount, customer
+    // phone). A second tap with identical inputs lands the existing
+    // PENDING intent — the URL the customer is redirected to is the
+    // same one as the first tap.
+    const reqHash = createHash('sha256')
+      .update(sessionId)
+      .update('|')
+      .update(JSON.stringify(Array.from(itemsByOrder.values()).sort((a, b) => a.orderId.localeCompare(b.orderId))))
+      .update('|')
+      .update(totalAmount.toString())
+      .update('|')
+      .update(dto.customerPhone ?? '')
+      .digest('hex')
+      .slice(0, 32);
+    const dedupExisting = await this.prisma.pendingSelfPayment.findFirst({
+      where: {
+        sessionId,
+        tenantId: session.tenantId,
+        status: 'PENDING',
+        requestHash: reqHash,
+        expiresAt: { gt: new Date() },
+      },
+      select: { id: true, merchantOid: true, expiresAt: true },
+    });
+    if (dedupExisting) {
+      this.logger.log(
+        `Idempotent retry hit: existing PENDING intent ${dedupExisting.merchantOid} for session=${sessionId} expires=${dedupExisting.expiresAt.toISOString()}`,
+      );
+      // The current PayTR session is already live; re-running the
+      // token mint would create a fresh checkout URL that doesn't
+      // match the one the customer is already redirected to. Surface
+      // a 409 with a customer-friendly message so the QR menu can
+      // poll the merchantOid path and complete the existing flow
+      // instead of restarting.
+      throw new ConflictException(
+        'A payment for these items is already in progress — complete it in the open tab, or wait 15 minutes for it to expire.',
+      );
+    }
+
     // v2.8.97 — lock all referenced orders FOR UPDATE before
     // persisting the intent. Pre-fix the intent.create races with
     // orders.service.update's item-rewrite branch (v2.8.94 added the
@@ -605,6 +700,10 @@ export class CustomerSelfPayService {
           status: 'PENDING',
           customerPhone: dto.customerPhone,
           expiresAt,
+          // v2.8.98 — deterministic dedup key over (session, items,
+          // amount, phone); a retry tap with identical inputs hits
+          // the dedupExisting branch above and short-circuits.
+          requestHash: reqHash,
         },
       });
     });

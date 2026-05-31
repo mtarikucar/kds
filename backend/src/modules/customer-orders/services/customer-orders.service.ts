@@ -305,16 +305,35 @@ export class CustomerOrdersService {
     });
     if (existing) return existing;
 
-    const waiterRequest = await this.prisma.waiterRequest.create({
-      data: {
-        tenantId,
-        tableId: dto.tableId || null,
-        sessionId: dto.sessionId,
-        message: dto.message,
-        status: 'PENDING',
-      },
-      include: { table: true },
-    });
+    // v2.8.98 — wrap the create in a P2002 catch. The partial unique
+    // index `waiter_requests_session_active_uniq` (sessionId, tenantId)
+    // WHERE status='PENDING' closes the last race window that the
+    // findFirst+create pair leaves open: two customer taps landing
+    // millisecond-apart both pass the pre-check, both call .create(),
+    // and the DB index rejects the loser. Return the winner's row so
+    // the caller still gets a 200.
+    let waiterRequest;
+    try {
+      waiterRequest = await this.prisma.waiterRequest.create({
+        data: {
+          tenantId,
+          tableId: dto.tableId || null,
+          sessionId: dto.sessionId,
+          message: dto.message,
+          status: 'PENDING',
+        },
+        include: { table: true },
+      });
+    } catch (err: any) {
+      if (err?.code === 'P2002') {
+        const winner = await this.prisma.waiterRequest.findFirst({
+          where: { sessionId: dto.sessionId, tenantId, status: 'PENDING' },
+          include: { table: true },
+        });
+        if (winner) return winner;
+      }
+      throw err;
+    }
 
     this.kdsGateway.emitWaiterRequest(tenantId, waiterRequest);
     return waiterRequest;
@@ -473,15 +492,29 @@ export class CustomerOrdersService {
     });
     if (existing) return existing;
 
-    const billRequest = await this.prisma.billRequest.create({
-      data: {
-        tenantId,
-        tableId: dto.tableId || null,
-        sessionId: dto.sessionId,
-        status: 'PENDING',
-      },
-      include: { table: true },
-    });
+    // v2.8.98 — see createWaiterRequest above; same partial-unique
+    // race close (bill_requests_session_active_uniq).
+    let billRequest;
+    try {
+      billRequest = await this.prisma.billRequest.create({
+        data: {
+          tenantId,
+          tableId: dto.tableId || null,
+          sessionId: dto.sessionId,
+          status: 'PENDING',
+        },
+        include: { table: true },
+      });
+    } catch (err: any) {
+      if (err?.code === 'P2002') {
+        const winner = await this.prisma.billRequest.findFirst({
+          where: { sessionId: dto.sessionId, tenantId, status: 'PENDING' },
+          include: { table: true },
+        });
+        if (winner) return winner;
+      }
+      throw err;
+    }
 
     this.kdsGateway.emitBillRequest(tenantId, billRequest);
     return billRequest;

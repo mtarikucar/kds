@@ -531,6 +531,27 @@
           "terms": "Foydalanish shartlari"
         }
       }
+    },
+    "form": {
+      "title": "Bizga xabar yuboring",
+      "submit": "Xabarni yuborish",
+      "submitting": "Yuborilmoqda…",
+      "honeypotLabel": "Veb-sayt (bo‘sh qoldiring)",
+      "successMessage": "Rahmat — ikki ish kuni ichida javob beramiz.",
+      "fields": {
+        "name": "Ism",
+        "email": "Elektron pochta",
+        "phone": "Telefon",
+        "message": "Xabar",
+        "optional": "ixtiyoriy"
+      },
+      "errors": {
+        "nameTooShort": "Ism kamida 2 ta belgidan iborat bo‘lishi kerak.",
+        "emailInvalid": "To‘g‘ri elektron pochta manzilini kiriting.",
+        "messageTooShort": "Xabar kamida 10 ta belgidan iborat bo‘lishi kerak.",
+        "network": "Ulanish muammosi — qaytadan urinib ko‘ring.",
+        "generic": "Xabar yuborilmadi. Iltimos, qaytadan urinib ko‘ring."
+      }
     }
   }
 }

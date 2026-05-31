@@ -531,6 +531,27 @@
           "terms": "Kullanım Koşulları"
         }
       }
+    },
+    "form": {
+      "title": "Bize mesaj gönderin",
+      "submit": "Mesajı gönder",
+      "submitting": "Gönderiliyor…",
+      "honeypotLabel": "Web sitesi (boş bırakın)",
+      "successMessage": "Teşekkürler — iki iş günü içinde dönüş yapacağız.",
+      "fields": {
+        "name": "Ad",
+        "email": "E-posta",
+        "phone": "Telefon",
+        "message": "Mesaj",
+        "optional": "opsiyonel"
+      },
+      "errors": {
+        "nameTooShort": "Ad en az 2 karakter olmalı.",
+        "emailInvalid": "Geçerli bir e-posta adresi girin.",
+        "messageTooShort": "Mesaj en az 10 karakter olmalı.",
+        "network": "Bağlantı sorunu — tekrar deneyin.",
+        "generic": "Mesaj gönderilemedi. Lütfen tekrar deneyin."
+      }
     }
   }
 }

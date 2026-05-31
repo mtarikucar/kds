@@ -65,8 +65,11 @@ export class CreateProductDto {
   @IsOptional()
   stockTracked?: boolean;
 
+  // v2.8.98 — was @IsInt(); the column is now Decimal(10, 3) so
+  // fractional units (kg cuts, pours) are accepted. The numeric range
+  // cap stays at 1M since the database max is 9,999,999.999.
   @ApiProperty({ example: 0, default: 0, required: false })
-  @IsInt()
+  @IsNumber({ maxDecimalPlaces: 3 })
   @Min(0)
   @Max(1_000_000)
   @IsOptional()

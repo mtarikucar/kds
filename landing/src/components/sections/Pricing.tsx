@@ -83,9 +83,20 @@ export default function Pricing({ apiPlans }: PricingProps) {
       discountLabel: hasDiscount ? apiPlan!.discountLabel : undefined,
       discountEndDate: hasDiscount ? apiPlan!.discountEndDate : undefined,
       // Discounted price is rendered alongside the strikethrough original.
-      // Format matches the TRY base price in the locale files ("499₺").
+      // v2.8.98 — render via Intl.NumberFormat so the symbol + grouping
+      // follow the active locale. Pre-fix the hardcoded ₺ suffix
+      // surfaced in Arabic/Russian/Uzbek strings that otherwise group
+      // numbers with their own separators and place the currency
+      // glyph on the leading side. Intl.NumberFormat with
+      // `currencyDisplay: 'narrowSymbol'` keeps "₺" for tr/en and
+      // does the right thing for the others.
       discountedPrice: hasDiscount && sp.monthlyPrice > 0
-        ? `${Math.round(sp.monthlyPrice * (1 - apiPlan!.discountPercentage! / 100))}₺`
+        ? new Intl.NumberFormat(undefined, {
+            style: 'currency',
+            currency: 'TRY',
+            currencyDisplay: 'narrowSymbol',
+            maximumFractionDigits: 0,
+          }).format(Math.round(sp.monthlyPrice * (1 - apiPlan!.discountPercentage! / 100)))
         : undefined,
     };
   });

@@ -85,7 +85,38 @@ export class KdsRoutingService implements OnModuleInit {
       });
       if (devices.length === 0) return;
 
+      // v2.8.98 — same-order debounce for show_order. Pre-fix two
+      // rapid-fire outbox events for the same order (created then
+      // updated within seconds of each other — a normal cart edit
+      // pattern) produced two distinct show_order commands per device,
+      // each with its own outbox-event idempotency key. The KDS screen
+      // briefly flickered the order twice, and the network/queue did
+      // 2× the work. Now: if any non-terminal show_order for this
+      // (orderId, deviceId) was queued in the last 5s, skip the new
+      // one. The original outbox event's payload-vs-DB consistency is
+      // still guaranteed by the projector reading current state.
+      const RECENT_WINDOW_MS = 5_000;
+      const recentCutoff = new Date(Date.now() - RECENT_WINDOW_MS);
+      let recentByDevice = new Set<string>();
+      if (kind === 'show_order') {
+        const recent = await this.prisma.deviceCommand.findMany({
+          where: {
+            tenantId,
+            kind: 'show_order',
+            deviceId: { in: devices.map((d) => d.id) },
+            status: { in: ['queued', 'inflight'] },
+            createdAt: { gte: recentCutoff },
+            payload: { path: ['orderId'], equals: p.orderId } as any,
+          },
+          select: { deviceId: true },
+        });
+        // Defensive: a mock or in-flight DB error could return
+        // undefined; the dedup is opt-in optimisation, not load-bearing.
+        recentByDevice = new Set((recent ?? []).map((r) => r.deviceId));
+      }
+
       for (const d of devices) {
+        if (kind === 'show_order' && recentByDevice.has(d.id)) continue;
         await this.commands.enqueue(tenantId, d.id, {
           kind,
           payload: { orderId: p.orderId },

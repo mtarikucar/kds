@@ -258,13 +258,16 @@ export class ProductsService {
     // updateStock calls both run this follow-up; both converge to the
     // same boolean (currentStock > 0), so the writer interleaving is
     // idempotent — no need for a transaction here.
+    //
+    // v2.8.98 — `currentStock` is now Prisma.Decimal so the boolean
+    // check goes through `.gt(0)` instead of JS `>`.
     const post = await this.prisma.product.findUniqueOrThrow({
       where: { id },
       select: { currentStock: true },
     });
     await this.prisma.product.updateMany({
       where: { id, tenantId },
-      data: { isAvailable: post.currentStock > 0 },
+      data: { isAvailable: new Prisma.Decimal(post.currentStock).gt(0) },
     });
 
     return this.findOne(id, tenantId);

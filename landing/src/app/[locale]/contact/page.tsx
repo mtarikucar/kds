@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/routing';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/sections/Footer';
+import ContactForm from '@/components/contact/ContactForm';
 
 export default function ContactPage() {
   const t = useTranslations('contact');
@@ -26,6 +27,13 @@ export default function ContactPage() {
             {t('title')}
           </h1>
           <p className="text-slate-500 mb-12">{t('subtitle')}</p>
+
+          {/* v2.8.98 — interactive contact form. Email links below are
+              kept as a fallback for users who prefer their own mail
+              client. */}
+          <div className="mb-12">
+            <ContactForm />
+          </div>
 
           <div className="prose prose-slate max-w-none">
             <section className="mb-12">

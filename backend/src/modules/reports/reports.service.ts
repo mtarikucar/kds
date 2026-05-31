@@ -500,17 +500,26 @@ export class ReportsService {
     // Low stock threshold
     const LOW_STOCK_THRESHOLD = 10;
 
+    // v2.8.98 — currentStock is Prisma.Decimal; comparisons go through
+    // .gt/.lt rather than the JS operators.
+    const stockGt = (p: { currentStock: any }, n: number) =>
+      new Prisma.Decimal(p.currentStock).gt(n);
+    const stockLt = (p: { currentStock: any }, n: number) =>
+      new Prisma.Decimal(p.currentStock).lt(n);
+    const stockLte = (p: { currentStock: any }, n: number) =>
+      new Prisma.Decimal(p.currentStock).lte(n);
+
     // Get low stock items
-    const lowStockItems = products.filter((p) => p.currentStock > 0 && p.currentStock < LOW_STOCK_THRESHOLD);
+    const lowStockItems = products.filter((p) => stockGt(p, 0) && stockLt(p, LOW_STOCK_THRESHOLD));
 
     // Get out of stock items
-    const outOfStockItems = products.filter((p) => p.currentStock <= 0);
+    const outOfStockItems = products.filter((p) => stockLte(p, 0));
 
     // Total stock value. Multiplying-and-accumulating Decimal prices in
     // JS Number drifts after a few hundred line items; do the sum in
     // integer cents and convert once at the end.
     const totalStockValueCents = products.reduce(
-      (sum, p) => sum + p.currentStock * decimalToCents(p.price),
+      (sum, p) => sum + new Prisma.Decimal(p.currentStock).toNumber() * decimalToCents(p.price),
       0,
     );
     const totalStockValue = centsToCurrency(totalStockValueCents);
@@ -535,7 +544,7 @@ export class ReportsService {
         productId: p.id,
         productName: p.name,
         categoryName: p.category?.name,
-        currentStock: p.currentStock,
+        currentStock: new Prisma.Decimal(p.currentStock).toNumber(),
         price: Number(p.price),
       })),
       outOfStockItems: outOfStockItems.map((p) => ({
@@ -547,11 +556,11 @@ export class ReportsService {
         productId: p.id,
         productName: p.name,
         categoryName: p.category?.name,
-        currentStock: p.currentStock,
+        currentStock: new Prisma.Decimal(p.currentStock).toNumber(),
         price: Number(p.price),
-        stockValue: centsToCurrency(p.currentStock * decimalToCents(p.price)),
-        isLowStock: p.currentStock > 0 && p.currentStock < LOW_STOCK_THRESHOLD,
-        isOutOfStock: p.currentStock <= 0,
+        stockValue: centsToCurrency(new Prisma.Decimal(p.currentStock).toNumber() * decimalToCents(p.price)),
+        isLowStock: stockGt(p, 0) && stockLt(p, LOW_STOCK_THRESHOLD),
+        isOutOfStock: stockLte(p, 0),
       })),
       recentMovements: recentMovements.map((m) => ({
         id: m.id,

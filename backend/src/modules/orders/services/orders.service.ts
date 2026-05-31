@@ -1318,9 +1318,12 @@ export class OrdersService {
         });
 
         if (product && product.stockTracked) {
-          const newStock = product.currentStock - item.quantity;
+          // v2.8.98 — currentStock is Decimal; route through Prisma.Decimal
+          // arithmetic so fractional units (kg cuts, pours) compose
+          // correctly and the JS Number precision ceiling is bypassed.
+          const newStock = new Prisma.Decimal(product.currentStock).sub(item.quantity);
 
-          if (newStock < 0) {
+          if (newStock.lt(0)) {
             throw new BadRequestException(
               `Insufficient stock for product: ${product.name}`
             );
@@ -1329,8 +1332,8 @@ export class OrdersService {
           await tx.product.update({
             where: { id: product.id },
             data: {
-              currentStock: newStock,
-              isAvailable: newStock > 0,
+              currentStock: newStock as any,
+              isAvailable: newStock.gt(0),
             },
           });
 

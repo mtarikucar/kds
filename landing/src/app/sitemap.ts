@@ -1,7 +1,35 @@
 import { MetadataRoute } from 'next';
 import { locales } from '@/i18n/config';
 
-export default function sitemap(): MetadataRoute.Sitemap {
+// v2.8.98 — pull catalog SKUs at build/revalidate time so /store/[sku]
+// pages land in the sitemap. The store/[sku] page already revalidates
+// on a 5-minute window; the sitemap follows the same cadence so a
+// freshly-published SKU appears in search-engine crawls within
+// minutes rather than only after the next full deploy.
+async function fetchStoreSkus(): Promise<string[]> {
+  try {
+    const base =
+      process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, '') ??
+      process.env.BACKEND_URL?.replace(/\/+$/, '') ??
+      '';
+    if (!base) return [];
+    const res = await fetch(`${base}/v1/catalog/products`, {
+      next: { revalidate: 300 },
+    });
+    if (!res.ok) return [];
+    const products = (await res.json()) as Array<{ sku?: string }>;
+    return products
+      .map((p) => p.sku)
+      .filter((s): s is string => typeof s === 'string' && s.length > 0);
+  } catch {
+    // Catalog unreachable — emit the static portion of the sitemap
+    // anyway. A missing SKU index for one build is preferable to a
+    // failed sitemap render.
+    return [];
+  }
+}
+
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Prefer the env-provided base URL so a staging build doesn't publish
   // a sitemap pointing at the prod domain. Fallback keeps the local dev
   // build working without extra env wiring.
@@ -38,6 +66,27 @@ export default function sitemap(): MetadataRoute.Sitemap {
         alternates: {
           languages: Object.fromEntries(
             locales.map((l) => [l, `${baseUrl}/${l}${route.path}`])
+          ),
+        },
+      });
+    }
+  }
+
+  // v2.8.98 — fan out the catalog SKUs across every locale. Each SKU
+  // gets priority 0.6 (below the static commercial pages but well
+  // above legal) and weekly changeFrequency so refreshed pricing /
+  // stock metadata is re-crawled promptly.
+  const skus = await fetchStoreSkus();
+  for (const sku of skus) {
+    for (const locale of locales) {
+      entries.push({
+        url: `${baseUrl}/${locale}/store/${encodeURIComponent(sku)}`,
+        lastModified: now,
+        changeFrequency: 'weekly',
+        priority: 0.6,
+        alternates: {
+          languages: Object.fromEntries(
+            locales.map((l) => [l, `${baseUrl}/${l}/store/${encodeURIComponent(sku)}`])
           ),
         },
       });

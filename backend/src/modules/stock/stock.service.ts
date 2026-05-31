@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
 } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateStockMovementDto } from './dto/create-stock-movement.dto';
 import { StockMovementType } from '../../common/constants/order-status.enum';
@@ -39,7 +40,11 @@ export class StockService {
       // second loser sees `count: 0` and we raise insufficient-stock. For
       // ADJUSTMENT we write the literal quantity (explicit override) and
       // for IN we just increment.
-      let newStock: number;
+      //
+      // v2.8.98 — `currentStock` is Prisma.Decimal; the local `newStock`
+      // accumulator is a Decimal so the post-write isAvailable flag
+      // routes through .gt(0).
+      let newStock: Prisma.Decimal;
       switch (createDto.type) {
         case StockMovementType.IN: {
           const res = await tx.product.updateMany({
@@ -55,7 +60,7 @@ export class StockService {
             where: { id: createDto.productId },
             select: { currentStock: true },
           });
-          newStock = fresh.currentStock;
+          newStock = new Prisma.Decimal(fresh.currentStock);
           break;
         }
         case StockMovementType.OUT: {
@@ -76,17 +81,17 @@ export class StockService {
             where: { id: createDto.productId },
             select: { currentStock: true },
           });
-          newStock = fresh.currentStock;
+          newStock = new Prisma.Decimal(fresh.currentStock);
           break;
         }
         case StockMovementType.ADJUSTMENT: {
           if (createDto.quantity < 0) {
             throw new BadRequestException('Adjustment quantity must be >= 0');
           }
-          newStock = createDto.quantity;
+          newStock = new Prisma.Decimal(createDto.quantity);
           const res = await tx.product.updateMany({
             where: { id: createDto.productId, tenantId },
-            data: { currentStock: newStock },
+            data: { currentStock: newStock as any },
           });
           if (res.count !== 1) {
             throw new NotFoundException('Product not found');
@@ -100,7 +105,7 @@ export class StockService {
       await tx.product.update({
         where: { id: createDto.productId },
         data: {
-          isAvailable: newStock > 0,
+          isAvailable: newStock.gt(0),
         },
       });
 
