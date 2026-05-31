@@ -181,41 +181,56 @@ export class TenantMarketplaceService {
     if (row.status !== 'active') throw new BadRequestException(`Cannot cancel — status is ${row.status}`);
 
     const now = new Date();
+    // v2.8.96 — fold claim + post-fetch + emit into one transaction.
+    // Pre-fix the emit ran AFTER the updateMany commit; a process
+    // crash between commit and emit left the add-on cancelled with no
+    // projector signal, so the granted limits/features stayed live
+    // until the next reconcile cron caught it.
+    //
     // Compound WHERE (B41-B45 pattern, iter-31 onward) + status='active'
     // gate so two concurrent cancel calls converge on a single
     // transition. The previous shape (.update by id) accepted the
     // second writer too and would double-emit the AddOnCancelled
     // outbox event; the count check below makes the loser explicit.
-    const claim = await this.prisma.tenantAddOn.updateMany({
-      where: { id: tenantAddOnId, tenantId, status: 'active' },
-      data: immediate
-        ? { status: 'cancelled', cancelledAt: now, endedAt: now, cancelAtPeriodEnd: false }
-        : { cancelAtPeriodEnd: true, cancelledAt: now },
-    });
-    if (claim.count === 0) {
-      throw new BadRequestException('Cancel raced with another request — refresh and retry');
-    }
-    const updated = await this.prisma.tenantAddOn.findFirstOrThrow({
-      where: { id: tenantAddOnId, tenantId },
-    });
+    return this.prisma.$transaction(async (tx) => {
+      const claim = await tx.tenantAddOn.updateMany({
+        where: { id: tenantAddOnId, tenantId, status: 'active' },
+        data: immediate
+          ? { status: 'cancelled', cancelledAt: now, endedAt: now, cancelAtPeriodEnd: false }
+          : { cancelAtPeriodEnd: true, cancelledAt: now },
+      });
+      if (claim.count === 0) {
+        throw new BadRequestException('Cancel raced with another request — refresh and retry');
+      }
+      const updated = await tx.tenantAddOn.findFirstOrThrow({
+        where: { id: tenantAddOnId, tenantId },
+      });
 
-    // Immediate cancellation revokes entitlements right away. At-period-end
-    // cancellation leaves the row active until the nightly sweep / billing
-    // cycle close transitions it.
-    if (immediate) {
-      await this.outbox
-        .append({
-          type: EventTypes.AddOnCancelled,
-          tenantId,
-          payload: {
-            tenantId,
-            addOnId: row.id,
-            addOnCode: '<lookup>', // intentionally elided — projector reads canonical state
-          },
-        })
-        .catch(() => undefined);
-    }
-    return updated;
+      // Immediate cancellation revokes entitlements right away. At-period-end
+      // cancellation leaves the row active until the nightly sweep / billing
+      // cycle close transitions it.
+      if (immediate) {
+        await this.outbox
+          .append(
+            {
+              type: EventTypes.AddOnCancelled,
+              tenantId,
+              payload: {
+                tenantId,
+                addOnId: row.id,
+                addOnCode: '<lookup>', // intentionally elided — projector reads canonical state
+              },
+            },
+            tx,
+          )
+          .catch((e) =>
+            this.logger.error(
+              `AddOnCancelled emit failed for addOn=${row.id} tenant=${tenantId}: ${(e as Error).message}`,
+            ),
+          );
+      }
+      return updated;
+    });
   }
 
   async listMine(tenantId: string) {

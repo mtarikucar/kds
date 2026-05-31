@@ -112,9 +112,21 @@ export class LoyaltyService {
     tenantId: string,
     orderId: string,
     orderNumber: string,
-    orderAmount: number,
+    orderAmount: number | string | Prisma.Decimal,
   ) {
-    const points = Math.floor(orderAmount * LOYALTY_CONFIG.pointsPerCurrencyUnit);
+    // v2.8.96 — Decimal arithmetic for the points calculation. Pre-fix
+    // the caller passed `Number(order.finalAmount.toString())` which is
+    // safe for restaurant-sized totals but silently loses precision
+    // above 2^53 and accumulates IEEE-754 error on the multiplication
+    // for any non-round pointsPerCurrencyUnit (the constant is 1 today
+    // but the rule has changed before). Keeping the call site flexible
+    // (number/string/Decimal) means a downstream refactor that swaps
+    // to a fractional rate doesn't quietly bias point totals.
+    const amountDec = new Prisma.Decimal(orderAmount as any);
+    const points = amountDec
+      .mul(LOYALTY_CONFIG.pointsPerCurrencyUnit)
+      .floor()
+      .toNumber();
 
     // Idempotency MUST happen inside the same Serializable txn that
     // writes the credit — exactly the bug awardWelcomeBonus above was

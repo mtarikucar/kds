@@ -251,12 +251,18 @@ export class PaymentsService {
         select: { customerId: true, finalAmount: true, status: true, orderNumber: true },
       });
       if (!order?.customerId || order.status !== 'PAID') return;
+      // v2.8.96 — pass the Decimal through directly. Pre-fix the
+      // Number(finalAmount.toString()) bounce risked precision loss
+      // (Number_MAX_SAFE for huge aggregates, IEEE-754 drift for
+      // future fractional pointsPerCurrencyUnit). loyalty service
+      // now accepts number | string | Decimal and routes through
+      // Prisma.Decimal arithmetic internally.
       await this.loyaltyService.earnPointsFromOrder(
         order.customerId,
         tenantId,
         orderId,
         order.orderNumber ?? '',
-        Number(order.finalAmount.toString()),
+        order.finalAmount as any,
       );
     } catch (err: any) {
       this.logger.warn(

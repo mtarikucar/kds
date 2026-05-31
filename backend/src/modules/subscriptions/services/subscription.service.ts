@@ -940,33 +940,50 @@ export class SubscriptionService {
         "Can only reactivate subscriptions that are set to cancel at period end",
       );
     }
+    // v2.8.96 — wrap claim + post-fetch + lifecycle emit in one txn.
+    // Pre-fix the emit ran AFTER the updateMany committed; a process
+    // crash between commit and emit left the subscription reactivated
+    // with no SubscriptionActivated signal, so the projector never
+    // ran the safety re-projection and a previously-degraded grant
+    // could stay degraded until the nightly reconcile.
+    //
     // Compound WHERE: tenantId IDOR + cancelAtPeriodEnd=true guard.
     // A concurrent "Cancel immediate" from another admin would already
     // have set status=CANCELLED; reactivating that row would silently
     // flip cancelAtPeriodEnd=false while leaving the subscription
     // CANCELLED — invariant break.
-    const claim = await this.prisma.subscription.updateMany({
-      where: {
-        id: subscriptionId,
-        tenantId,
-        cancelAtPeriodEnd: true,
-        status: { not: SubscriptionStatus.CANCELLED },
-      },
-      data: { cancelAtPeriodEnd: false },
+    const txResult = await this.prisma.$transaction(async (tx) => {
+      const claim = await tx.subscription.updateMany({
+        where: {
+          id: subscriptionId,
+          tenantId,
+          cancelAtPeriodEnd: true,
+          status: { not: SubscriptionStatus.CANCELLED },
+        },
+        data: { cancelAtPeriodEnd: false },
+      });
+      if (claim.count === 0) {
+        return { claimed: false as const };
+      }
+      const updated = await tx.subscription.findUniqueOrThrow({
+        where: { id: subscriptionId },
+        include: { plan: true },
+      });
+      // Reactivation restores entitlement access if it had degraded (it usually
+      // hasn't — at-period-end keeps ACTIVE — but the projector is cheap and
+      // the safe choice is "emit anyway, reproject is idempotent").
+      await this.emitLifecycle(EventTypes.SubscriptionActivated, updated, tx);
+      return { claimed: true as const, updated };
     });
-    if (claim.count === 0) {
+    if (!txResult.claimed) {
       throw new BadRequestException(
         'Subscription state changed concurrently — refresh and retry.',
       );
     }
-    const updated = await this.prisma.subscription.findUniqueOrThrow({
-      where: { id: subscriptionId },
-      include: { plan: true },
-    });
-    // Reactivation restores entitlement access if it had degraded (it usually
-    // hasn't — at-period-end keeps ACTIVE — but the projector is cheap and
-    // the safe choice is "emit anyway, reproject is idempotent").
-    await this.emitLifecycle(EventTypes.SubscriptionActivated, updated);
+    const updated = txResult.updated;
+    // Already emitted inside the txn above — preserve the legacy
+    // "outer scope `updated` is available" shape for the rest of the
+    // function.
     return updated;
   }
 

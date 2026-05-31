@@ -24,30 +24,32 @@ export class PaytrIpAllowlistGuard implements CanActivate {
       return;
     }
     const entries = raw.split(',').map((s) => s.trim()).filter(Boolean);
-    this.allowed = new Set(entries);
     // v2.8.91: startup self-test. Pre-fix a misconfigured
     // PAYTR_WEBHOOK_ALLOWED_IPS (typo, wrong format, accidental quotes)
     // silently dropped every real PayTR webhook with a 200 OK so PayTR
     // stopped retrying — invisible regression until the ops team saw
-    // settlement queues backing up. Now: validate each entry looks
-    // like an IPv4 or IPv6 address at boot. Invalid entries don't
-    // disable the guard, but the loud warning surfaces the misconfig.
+    // settlement queues backing up. v2.8.91 added a warning log.
+    // v2.8.96 — escalate to a HARD FAIL at boot. A warning log is too
+    // easy to miss in a busy startup stream; refusing to boot makes the
+    // ops team notice immediately, and the HMAC primary auth ensures
+    // there's no period where a half-configured allowlist could mis-
+    // route forged callbacks.
     const looksLikeIp = (s: string) =>
       /^[0-9]{1,3}(\.[0-9]{1,3}){3}$/.test(s) || /^[0-9a-fA-F:]+$/.test(s);
     const invalid = entries.filter((e) => !looksLikeIp(e));
     if (invalid.length > 0) {
-      this.logger.error(
+      throw new Error(
         `PAYTR_WEBHOOK_ALLOWED_IPS contains ${invalid.length} entries that do not look like IP addresses: [${invalid.join(', ')}]. ` +
-        `Real PayTR callbacks may be silently dropped — fix the env to match the IPs published in the merchant panel.`,
+        `Refusing to boot — fix the env to match the IPs published in the merchant panel.`,
       );
     }
     if (entries.length === 0) {
-      this.logger.error(
-        'PAYTR_WEBHOOK_ALLOWED_IPS was set but resolved to an empty list after parsing. Every webhook will be rejected.',
+      throw new Error(
+        'PAYTR_WEBHOOK_ALLOWED_IPS was set but resolved to an empty list after parsing. Refusing to boot — set the variable or unset it entirely to disable the allowlist.',
       );
-    } else {
-      this.logger.log(`PayTR webhook allowlist active with ${entries.length} entries`);
     }
+    this.allowed = new Set(entries);
+    this.logger.log(`PayTR webhook allowlist active with ${entries.length} entries`);
   }
 
   canActivate(context: ExecutionContext): boolean {
