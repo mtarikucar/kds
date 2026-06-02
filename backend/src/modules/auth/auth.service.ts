@@ -189,6 +189,31 @@ export class AuthService {
       const now = new Date();
       const trialEnd = addDays(now, businessPlan.trialDays);
 
+      // Seed `featureOverrides` with the BUSINESS plan's flag set so
+      // PlanFeatureGuard's fallback path resolves correctly during the
+      // first ~30 seconds while the entitlement engine projector is
+      // still warming up. Before this seed the engine returned an
+      // empty grant set on fresh signups; the guard's fallback then
+      // read `currentPlan[feature]` directly but the read often raced
+      // against the fresh subscription write and surfaced as the
+      // "Bu özellik aboneliğinizde yok" 403 every new tenant hit when
+      // they tried to create their first branch. Seeding the JSON
+      // column here gives the guard a deterministic source of truth
+      // until the engine catches up — the nightly reconcile cron then
+      // syncs both representations.
+      const planFeatureOverrides = {
+        advancedReports: !!businessPlan.advancedReports,
+        multiLocation: !!businessPlan.multiLocation,
+        customBranding: !!businessPlan.customBranding,
+        apiAccess: !!businessPlan.apiAccess,
+        prioritySupport: !!businessPlan.prioritySupport,
+        inventoryTracking: !!businessPlan.inventoryTracking,
+        kdsIntegration: !!businessPlan.kdsIntegration,
+        reservationSystem: !!businessPlan.reservationSystem,
+        personnelManagement: !!businessPlan.personnelManagement,
+        deliveryIntegration: !!businessPlan.deliveryIntegration,
+      };
+
       try {
         const txResult = await this.prisma.$transaction(async (tx) => {
           const created = await tx.tenant.create({
@@ -205,6 +230,7 @@ export class AuthService {
               trialStartedAt: now,
               trialEndsAt: trialEnd,
               usedTrialPlanIds: [businessPlan.id],
+              featureOverrides: planFeatureOverrides,
             },
           });
           await tx.subscription.create({
