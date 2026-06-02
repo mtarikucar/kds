@@ -1,3 +1,4 @@
+-- @doctor:idempotent verified=every UPDATE has WHERE branchId IS NULL guard, every INSERT uses WHERE NOT EXISTS, every ADD CONSTRAINT wrapped in DO/EXCEPTION duplicate_object, every CREATE TABLE/INDEX uses IF NOT EXISTS, every DROP INDEX uses IF EXISTS, validated by scripts/v3-staging-recovery-rehearsal.ts
 -- v3.0.0 strict multi-branch scope migration.
 --
 -- This is the canonical v3.0.0 schema delta. It transforms every

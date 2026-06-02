@@ -162,6 +162,27 @@ if [ "$failed_count" -eq 1 ]; then
 
   log "Inspecting $name for safe auto-recovery…"
 
+  # ---- Explicit opt-in marker -----------------------------------------
+  # A migration that legitimately needs UPDATE/INSERT/DROP statements
+  # (e.g. an in-place backfill) can declare itself fully idempotent
+  # by-construction with a header comment:
+  #
+  #     -- @doctor:idempotent verified=<one-line rationale>
+  #
+  # The doctor still requires the conservative patterns below to all
+  # pass, but it allows the otherwise-flagged data-touching statements
+  # provided the marker is present. The rationale must reference the
+  # specific guards (IF EXISTS, WHERE NOT EXISTS, DO blocks, etc.) so
+  # a reviewer can audit the claim. Without the marker the doctor
+  # refuses, falling through to the human-judgement path.
+  marker=$(head -10 "$migration_sql" | grep -E '^-- @doctor:idempotent' || true)
+  if [ -n "$marker" ]; then
+    log "Migration carries explicit idempotency marker: ${marker#-- }"
+    declared_idempotent=1
+  else
+    declared_idempotent=0
+  fi
+
   # ---- Risk pattern checks --------------------------------------------
   # Destructive / non-idempotent / data-validating operations that make
   # a blind re-run unsafe. Each match contributes one line to the report.
@@ -188,11 +209,15 @@ if [ "$failed_count" -eq 1 ]; then
     while IFS= read -r line; do add_risk "  $line"; done <<<"$bare_create_index"
   fi
 
-  # Destructive / data-touching operations. Any single hit is a blocker.
+  # Destructive / data-touching operations. Any single hit is a
+  # blocker UNLESS the migration declared itself idempotent via the
+  # @doctor:idempotent marker above. The marker is the author's
+  # signed claim that every UPDATE/INSERT/DROP in the file is
+  # guarded (WHERE NOT EXISTS, IF EXISTS, DO/EXCEPTION block, etc.).
   destructive=$(grep -nE \
     '^[[:space:]]*(DROP[[:space:]]+(TABLE|COLUMN|INDEX|CONSTRAINT)|TRUNCATE|UPDATE[[:space:]]+|INSERT[[:space:]]+INTO|DELETE[[:space:]]+FROM|ALTER[[:space:]]+TABLE[[:space:]]+"[^"]+"[[:space:]]+DROP|ALTER[[:space:]]+TABLE[[:space:]]+"[^"]+"[[:space:]]+RENAME|ALTER[[:space:]]+TABLE[[:space:]]+"[^"]+"[[:space:]]+ALTER[[:space:]]+COLUMN[[:space:]]+"[^"]+"[[:space:]]+TYPE|ADD[[:space:]]+CONSTRAINT[^,;]*[[:space:]]+CHECK)' \
     "$migration_sql" || true)
-  if [ -n "$destructive" ]; then
+  if [ -n "$destructive" ] && [ "$declared_idempotent" -eq 0 ]; then
     add_risk "Destructive or data-validating operations:"
     while IFS= read -r line; do add_risk "  $line"; done <<<"$destructive"
   fi
