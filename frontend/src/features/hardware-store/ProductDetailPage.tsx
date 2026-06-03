@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { useGetProductBySku, type HardwareProduct } from './storeApi';
+import { useGetProductBySku, useRequestQuote, type HardwareProduct } from './storeApi';
 import { useCartStore } from './cartStore';
 import { useListBranches } from '../branches/branchesApi';
+import { useAuthStore } from '../../store/authStore';
 
 /**
  * v2.8.87 — SPA product / service detail page at /admin/store/:sku.
@@ -25,6 +26,18 @@ const STATUS_LABEL_TR: Record<string, string> = {
   preorder: 'Ön sipariş',
   out_of_stock: 'Stokta yok',
   discontinued: 'Üretimden kaldırıldı',
+};
+
+// Seller-responsibility compliance docs (TR law) shown on DIRECT_SALE
+// products under a "Yasal & Garanti" tab.
+const COMPLIANCE_LABELS_TR: Record<string, string> = {
+  invoiceIssued: 'Fatura',
+  warrantyCertUrl: 'Garanti belgesi',
+  distributorName: 'Yetkili distribütör',
+  ceConformityUrl: 'CE / uygunluk',
+  turkishManualUrl: 'Türkçe kullanım kılavuzu',
+  serviceInfo: 'Servis bilgisi',
+  returnTermsUrl: 'İade / garanti şartları',
 };
 
 export default function ProductDetailPage() {
@@ -72,14 +85,24 @@ function HardwareDetail({
 }) {
   const addHardware = useCartStore((s) => s.addHardware);
   const [acquisition, setAcquisition] = useState<'sell' | 'rent'>('sell');
-  const [activeTab, setActiveTab] = useState<'description' | 'specs' | 'compat' | 'requirements' | 'faq'>(
-    'description',
-  );
+  const [activeTab, setActiveTab] = useState<
+    'description' | 'specs' | 'compat' | 'requirements' | 'faq' | 'compliance'
+  >('description');
   const [zoomed, setZoomed] = useState(false);
   const [brokenSet, setBrokenSet] = useState<Set<number>>(new Set());
 
+  // Regulatory tier (TR law). undefined = DIRECT_SALE (back-compat). Drives
+  // which CTA renders; the server-side checkout guard is authoritative.
+  const mode = product.saleMode ?? 'DIRECT_SALE';
+  const partner = product.partnerRedirect ?? null;
+  const complianceEntries = Object.entries(product.complianceDocs ?? {}).filter(
+    ([, v]) => v !== null && v !== undefined && v !== '' && v !== false,
+  );
+  const showCompliance = mode === 'DIRECT_SALE' && complianceEntries.length > 0;
+
   const isOos = product.stockStatus === 'out_of_stock' || product.stockStatus === 'discontinued';
-  const showRental = Boolean(product.rentalMonthlyCents);
+  // Buy/Rent toggle only makes sense for directly-sellable products.
+  const showRental = Boolean(product.rentalMonthlyCents) && mode === 'DIRECT_SALE';
   const showLowStock = (product.available ?? 0) > 0 && (product.available ?? 0) <= 5;
 
   const details = useMemo(() => localizeDetails(product.details), [product.details]);
@@ -179,27 +202,77 @@ function HardwareDetail({
             </div>
           )}
 
-          <div className="rounded-xl border bg-gradient-to-br from-slate-50 to-white p-5">
-            <div className="text-3xl font-semibold text-gray-900">
-              {acquisition === 'rent' && product.rentalMonthlyCents
-                ? `${fmt(product.rentalMonthlyCents)}/ay`
-                : fmt(product.priceCents)}
-            </div>
-            {acquisition === 'sell' && product.rentalMonthlyCents && (
-              <div className="mt-1 text-xs text-gray-500">
-                veya {fmt(product.rentalMonthlyCents)}/ay kira
+          {/* Price / CTA branches by regulatory tier (TR law). */}
+          {mode === 'DIRECT_SALE' ? (
+            <div className="rounded-xl border bg-gradient-to-br from-slate-50 to-white p-5">
+              <div className="text-3xl font-semibold text-gray-900">
+                {acquisition === 'rent' && product.rentalMonthlyCents
+                  ? `${fmt(product.rentalMonthlyCents)}/ay`
+                  : fmt(product.priceCents)}
               </div>
-            )}
-            <div className="mt-1 text-xs text-gray-500">{product.warrantyMonths} ay garanti</div>
-            <button
-              type="button"
-              onClick={add}
-              disabled={isOos}
-              className="mt-4 w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {isOos ? 'Stokta yok' : 'Sepete ekle'}
-            </button>
-          </div>
+              {acquisition === 'sell' && product.rentalMonthlyCents && (
+                <div className="mt-1 text-xs text-gray-500">
+                  veya {fmt(product.rentalMonthlyCents)}/ay kira
+                </div>
+              )}
+              <div className="mt-1 text-xs text-gray-500">{product.warrantyMonths} ay garanti</div>
+              <button
+                type="button"
+                onClick={add}
+                disabled={isOos}
+                className="mt-4 w-full rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isOos ? 'Stokta yok' : 'Sepete ekle'}
+              </button>
+            </div>
+          ) : mode === 'QUOTE_ONLY' ? (
+            <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-5">
+              <div className="text-3xl font-semibold text-gray-900">{fmt(product.priceCents)}</div>
+              <div className="text-xs text-amber-800">
+                Liste fiyatı — kesin fiyat ve kurulum teklifte netleşir.
+              </div>
+              <p className="text-sm text-amber-900">
+                Bu ürün doğrudan satışa kapalıdır. Yetkili bayi/servis üzerinden teklif ve
+                kurulum süreci başlatılır (GİB aktivasyonu dahil).
+              </p>
+              <QuoteRequestForm sku={product.sku} />
+            </div>
+          ) : mode === 'PARTNER_REDIRECT' ? (
+            <div className="space-y-3 rounded-xl border border-indigo-200 bg-indigo-50 p-5">
+              <p className="text-sm text-indigo-900">
+                POS hizmeti HummyTummy tarafından değil, anlaşmalı banka/ödeme kuruluşu
+                tarafından sağlanır.
+              </p>
+              {partner?.partnerUrl ? (
+                <a
+                  href={partner.partnerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full rounded-md bg-indigo-600 px-3 py-2 text-center text-sm font-medium text-white hover:bg-indigo-700"
+                >
+                  {partner.partnerName
+                    ? `${partner.partnerName} ile devam et`
+                    : 'Banka/Ödeme kuruluşuna git'}
+                </a>
+              ) : (
+                <p className="text-sm text-indigo-700">
+                  Yönlendirme için destek ekibiyle iletişime geçin.
+                </p>
+              )}
+              {partner?.disclaimer && (
+                <p className="text-xs text-indigo-700">{partner.disclaimer}</p>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2 rounded-xl border bg-slate-50 p-5">
+              <div className="text-3xl font-semibold text-gray-900">{fmt(product.priceCents)}</div>
+              <p className="text-sm text-slate-700">
+                Bu ekipman yalnızca önerilen ekipman olarak listelenmiştir; doğrudan satışı
+                yapılmamaktadır. Ticari kullanım için uygunluk/kalibrasyon ve servis belgeleri
+                tedarikçiden talep edilmelidir.
+              </p>
+            </div>
+          )}
         </aside>
       </div>
 
@@ -210,6 +283,9 @@ function HardwareDetail({
           { key: 'compat', label: 'Uyumluluk' },
           { key: 'requirements', label: 'Gereklilikler' },
           { key: 'faq', label: 'SSS' },
+          ...(showCompliance
+            ? [{ key: 'compliance', label: 'Yasal & Garanti' }]
+            : []),
         ]}
         active={activeTab}
         onChange={(k) => setActiveTab(k as typeof activeTab)}
@@ -223,6 +299,7 @@ function HardwareDetail({
         {activeTab === 'compat' && <CompatBlock compat={product.compat ?? null} />}
         {activeTab === 'requirements' && <BulletList items={details.requirements} />}
         {activeTab === 'faq' && <FaqList faq={details.faq} />}
+        {activeTab === 'compliance' && <ComplianceBlock entries={complianceEntries} />}
       </Tabs>
 
       {zoomed && (

@@ -554,9 +554,19 @@ export class OrdersService {
             // branch from the Table row, so tableless/counter/QR-self
             // orders ended up at branchId=null and disappeared from
             // every branchScope()-filtered read (KDS, reports, daily
-            // totals). The table-derived branchId still wins when the
-            // order is seated, because BranchGuard already proved the
-            // caller's scope matches the table's branch upstream.
+            // totals).
+            //
+            // Post-round-2: the cross-branch guard above asserts
+            // `table.branchId === scope.branchId` whenever the table's
+            // branchId is non-null, so `tableBranchId` and
+            // `scope.branchId` are provably equal in that case. The
+            // `??` falls through only for legacy single-branch tables
+            // whose `branchId` is still NULL (pre-v3 rows that escaped
+            // the strict-branch backfill). The variable is kept rather
+            // than collapsing to `scope.branchId` to keep the
+            // "inherits from the seated table" intent legible — a
+            // future audit re-reading this block sees the table-tier
+            // first, the scope-tier fallback second.
             createData.branchId = tableBranchId ?? scope.branchId;
 
             return this.prisma.order.create({

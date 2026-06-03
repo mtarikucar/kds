@@ -32,6 +32,18 @@ export interface HardwareProduct {
   // v2.8.87 — public view exposes this scalar so cards can show
   // "Son N adet" low-stock badge without leaking allocated/serials.
   available?: number;
+  // Regulatory sale tier (TR law). Drives the storefront CTA. The server is
+  // authoritative: the checkout guard blocks any non-DIRECT_SALE SKU.
+  // Treat undefined as 'DIRECT_SALE' for back-compat.
+  //   DIRECT_SALE      — normal buy (+ compliance docs shown)
+  //   QUOTE_ONLY       — yazarkasa / YN ÖKC → "Teklif Al"
+  //   PARTNER_REDIRECT — bank POS → redirect to a licensed bank/PSP
+  //   RECOMMENDED_ONLY — uncertified scale etc. → recommended only, no CTA
+  saleMode?: 'DIRECT_SALE' | 'QUOTE_ONLY' | 'PARTNER_REDIRECT' | 'RECOMMENDED_ONLY';
+  // Tier 2 redirect target: { partnerName, partnerUrl, disclaimer? }
+  partnerRedirect?: { partnerName?: string; partnerUrl?: string; disclaimer?: string } | null;
+  // Tier 3 seller-responsibility docs (warranty, distributor, CE, manual, etc.)
+  complianceDocs?: Record<string, string | boolean> | null;
 }
 
 export interface CartItem {
@@ -93,6 +105,29 @@ export const useGetProductBySku = (sku: string | undefined) =>
     },
     enabled: Boolean(sku),
   });
+
+// "Teklif Al" for a QUOTE_ONLY device (yazarkasa / YN ÖKC). These can't be
+// bought directly — the request lands in the marketing lead board so a rep
+// runs the authorized-dealer/service + GİB offer/installation process.
+export interface HardwareQuoteRequest {
+  sku: string;
+  qty?: number;
+  contactPerson: string;
+  phone?: string;
+  email?: string;
+  notes?: string;
+}
+
+export const useRequestQuote = () => {
+  return useMutation({
+    mutationFn: async (body: HardwareQuoteRequest) => {
+      const r = await api.post('/v1/catalog/quote-request', body);
+      return r.data as { ok: boolean; leadId: string; status: string };
+    },
+    onError: (e: any) =>
+      toast.error(e.response?.data?.message ?? 'Teklif talebi gönderilemedi'),
+  });
+};
 
 export const useQuoteCart = () => {
   return useMutation({

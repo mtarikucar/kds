@@ -101,6 +101,16 @@ export class QuoteService {
           warnings.push(`Hardware not purchasable: ${product.sku}`);
           continue;
         }
+        // Regulatory tier guard (TR law) — the authoritative gate. Only
+        // DIRECT_SALE products may be priced/paid. QUOTE_ONLY (yazarkasa /
+        // YN ÖKC), PARTNER_REDIRECT (bank POS) and RECOMMENDED_ONLY
+        // (uncertified scale) are dropped from the quote even if a tampered
+        // client managed to add them — they never reach intent/payment/
+        // provision. Mirrors the existing unpublished-product behavior above.
+        if (product.saleMode && product.saleMode !== "DIRECT_SALE") {
+          warnings.push(`Hardware not directly purchasable: ${product.sku}`);
+          continue;
+        }
         currency = product.currency;
         const acquisition = item.acquisition ?? "sell";
         if (acquisition === "rent" && !product.rentalMonthlyCents) {

@@ -861,6 +861,15 @@ async function main() {
   // v2.8.87: PRODUCTS + SERVICES go through the same upsert path; SERVICES
   // are HardwareProduct rows with category='service'. The shared helper
   // also passes through specs/details/serviceMeta if present on the entry.
+  // Regulatory sale tier per category (TR law). Mirrors
+  // CATEGORY_DEFAULT_SALE_MODE in
+  // backend/src/modules/catalog/dto/create-hardware-product.dto.ts — kept in
+  // sync the same way CATEGORIES already is across DTO/seed/frontend.
+  const SALE_MODE_BY_CATEGORY: Record<string, string> = {
+    yazarkasa: 'QUOTE_ONLY', // Tier 1 — fiscal, dealer/GİB only
+    pos_terminal: 'PARTNER_REDIRECT', // Tier 2 — bank/payment terminal
+    scale: 'RECOMMENDED_ONLY', // Tier 4 — uncertified by default
+  };
   const ALL_CATALOG_ENTRIES = [...PRODUCTS, ...SERVICES];
   for (const p of ALL_CATALOG_ENTRIES) {
     // Overlay the rich-detail JSON for the top-6 hardware SKUs (the
@@ -883,6 +892,9 @@ async function main() {
       details: overlay?.details ?? (p as any).details ?? null,
       serviceMeta: (p as any).serviceMeta ?? null,
       status: 'published',
+      // Per-entry override wins, else map by category, else direct sale.
+      saleMode:
+        (p as any).saleMode ?? SALE_MODE_BY_CATEGORY[p.category] ?? 'DIRECT_SALE',
     };
     const product = await prisma.hardwareProduct.upsert({
       where: { sku: p.sku },

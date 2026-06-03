@@ -110,6 +110,13 @@ function headlineSpecs(p: HardwareProduct): string[] {
   return hs.filter((s): s is string => typeof s === 'string').slice(0, 3);
 }
 
+// Regulatory tier — undefined means DIRECT_SALE (back-compat for rows seeded
+// before saleMode existed). The server is authoritative; this only chooses
+// which storefront CTA to render.
+function saleModeOf(p: HardwareProduct): NonNullable<HardwareProduct['saleMode']> {
+  return p.saleMode ?? 'DIRECT_SALE';
+}
+
 export default function StorePage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [category, setCategory] = useState<string>('all');
@@ -154,9 +161,14 @@ export default function StorePage() {
       return;
     }
     // Services need a branch picker + dates; we send the buyer to the
-    // detail page rather than auto-add. Hardware idempotently lands
-    // in the cart.
-    if (product.category === 'service') {
+    // detail page rather than auto-add. Non-DIRECT_SALE devices (yazarkasa
+    // teklif, bank-POS redirect, recommended-only) likewise can't be
+    // auto-carted — the detail page carries the right CTA. Hardware that is
+    // directly sellable idempotently lands in the cart.
+    if (
+      product.category === 'service' ||
+      (product.saleMode && product.saleMode !== 'DIRECT_SALE')
+    ) {
       const next = new URLSearchParams(searchParams);
       next.delete('sku');
       setSearchParams(next, { replace: true });
@@ -178,6 +190,11 @@ export default function StorePage() {
   const cartItems = useMemo(() => toCartItems(lines), [lines]);
 
   function add(product: HardwareProduct) {
+    // Only directly-sellable devices may be carted. QUOTE_ONLY /
+    // PARTNER_REDIRECT / RECOMMENDED_ONLY are handled by their own CTAs;
+    // this guard backs up the server-side checkout guard against accidental
+    // adds.
+    if ((product.saleMode ?? 'DIRECT_SALE') !== 'DIRECT_SALE') return;
     addHardware(product, { qty: 1, acquisition: 'sell' });
   }
 
@@ -446,6 +463,9 @@ function HardwareCard({ p, onAdd }: { p: HardwareProduct; onAdd: () => void }) {
   const isOos = p.stockStatus === 'out_of_stock' || p.stockStatus === 'discontinued';
   const headline = headlineSpecs(p);
   const showLowStock = (p.available ?? 0) > 0 && (p.available ?? 0) <= 5;
+  const mode = saleModeOf(p);
+  const detailHref = `/admin/store/${encodeURIComponent(p.sku)}`;
+  const partnerUrl = p.partnerRedirect?.partnerUrl;
   return (
     <article className="overflow-hidden rounded-lg border bg-white">
       {p.images?.[0] && <ProductImage src={p.images[0]} alt={p.name} />}
@@ -459,7 +479,22 @@ function HardwareCard({ p, onAdd }: { p: HardwareProduct; onAdd: () => void }) {
               GİB onaylı
             </span>
           )}
-          {showLowStock && (
+          {mode === 'QUOTE_ONLY' && (
+            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700">
+              Teklif ile
+            </span>
+          )}
+          {mode === 'PARTNER_REDIRECT' && (
+            <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700">
+              Banka / PSP
+            </span>
+          )}
+          {mode === 'RECOMMENDED_ONLY' && (
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-600">
+              Önerilen
+            </span>
+          )}
+          {showLowStock && mode === 'DIRECT_SALE' && (
             <span className="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-orange-700">
               Son {p.available} adet
             </span>
@@ -479,25 +514,69 @@ function HardwareCard({ p, onAdd }: { p: HardwareProduct; onAdd: () => void }) {
           </div>
         )}
         <p className="mt-1 line-clamp-2 text-sm text-gray-600">{p.description}</p>
-        <div className="mt-3 flex items-center justify-between">
+        <div className="mt-3 flex items-center justify-between gap-2">
           <span className="text-lg font-medium">
             {(p.priceCents / 100).toLocaleString('tr-TR', { style: 'currency', currency: p.currency })}
           </span>
-          <button
-            className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isOos}
-            onClick={onAdd}
-          >
-            {p.stockStatus === 'out_of_stock'
-              ? 'Stokta yok'
-              : p.stockStatus === 'discontinued'
-                ? 'Üretimden kaldırıldı'
-                : 'Sepete ekle'}
-          </button>
+          {/* CTA branches by regulatory tier (TR law). Only DIRECT_SALE
+              carts; the rest route to the detail page (full disclaimer +
+              quote form) or out to a licensed bank/PSP. */}
+          {mode === 'DIRECT_SALE' ? (
+            <button
+              className="rounded bg-blue-600 px-3 py-1.5 text-sm text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={isOos}
+              onClick={onAdd}
+            >
+              {p.stockStatus === 'out_of_stock'
+                ? 'Stokta yok'
+                : p.stockStatus === 'discontinued'
+                  ? 'Üretimden kaldırıldı'
+                  : 'Sepete ekle'}
+            </button>
+          ) : mode === 'QUOTE_ONLY' ? (
+            <Link
+              to={detailHref}
+              className="rounded bg-amber-600 px-3 py-1.5 text-sm text-white hover:bg-amber-700"
+            >
+              Teklif Al
+            </Link>
+          ) : mode === 'PARTNER_REDIRECT' ? (
+            partnerUrl ? (
+              <a
+                href={partnerUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700"
+              >
+                Kuruluşa git
+              </a>
+            ) : (
+              <Link
+                to={detailHref}
+                className="rounded bg-indigo-600 px-3 py-1.5 text-sm text-white hover:bg-indigo-700"
+              >
+                Detaylar
+              </Link>
+            )
+          ) : (
+            <span className="rounded bg-slate-100 px-3 py-1.5 text-sm text-slate-600">
+              Önerilen ekipman
+            </span>
+          )}
         </div>
+        {mode === 'QUOTE_ONLY' && (
+          <p className="mt-2 text-[11px] leading-snug text-amber-700">
+            Bu ürün doğrudan satışa kapalıdır; yetkili bayi/servis üzerinden teklif ve kurulum süreci başlatılır.
+          </p>
+        )}
+        {mode === 'PARTNER_REDIRECT' && (
+          <p className="mt-2 text-[11px] leading-snug text-indigo-700">
+            POS hizmeti HummyTummy tarafından değil, anlaşmalı banka/ödeme kuruluşu tarafından sağlanır.
+          </p>
+        )}
         <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
           <span>{p.warrantyMonths} ay garanti</span>
-          <Link to={`/admin/store/${encodeURIComponent(p.sku)}`} className="text-blue-600 hover:underline">
+          <Link to={detailHref} className="text-blue-600 hover:underline">
             Detaylar →
           </Link>
         </div>

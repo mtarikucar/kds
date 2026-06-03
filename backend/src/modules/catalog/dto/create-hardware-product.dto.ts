@@ -35,6 +35,37 @@ const CATEGORIES = [
 ] as const;
 const STATUSES = ["draft", "published", "archived"] as const;
 
+// Regulatory sale tiers (TR law). Kept as plain string literals to mirror the
+// CATEGORIES/STATUSES style; the canonical type is Prisma's HardwareSaleMode.
+export const SALE_MODES = [
+  "DIRECT_SALE", // Tier 3 — normal sale, seller-responsibility docs apply
+  "QUOTE_ONLY", // Tier 1 — yazarkasa / YN ÖKC; teklif/kurulum via dealer + GİB
+  "PARTNER_REDIRECT", // Tier 2 — bank POS; redirect to a licensed bank/PSP
+  "RECOMMENDED_ONLY", // Tier 4 — uncertified scale etc.; recommended only
+] as const;
+export type SaleMode = (typeof SALE_MODES)[number];
+
+// Default regulatory tier per category. Applied by CatalogService when an
+// admin omits saleMode, and by backend/prisma/seeds/seed-marketplace.ts.
+// Per-product override is always allowed — saleMode is a real column, so this
+// map is only the default, not a hard constraint. Single source of truth: the
+// storefront reads saleMode off the product payload (no duplicate FE copy).
+export const CATEGORY_DEFAULT_SALE_MODE: Record<string, SaleMode> = {
+  yazarkasa: "QUOTE_ONLY", // Tier 1 — fiscal
+  pos_terminal: "PARTNER_REDIRECT", // Tier 2 — bank/payment terminal
+  printer: "DIRECT_SALE",
+  kds_screen: "DIRECT_SALE",
+  tablet: "DIRECT_SALE",
+  scanner: "DIRECT_SALE",
+  caller_id: "DIRECT_SALE",
+  cash_drawer: "DIRECT_SALE",
+  bridge: "DIRECT_SALE",
+  scale: "RECOMMENDED_ONLY", // Tier 4 — safe default; admin overrides to DIRECT_SALE only with docs
+  cable: "DIRECT_SALE",
+  accessory: "DIRECT_SALE",
+  service: "DIRECT_SALE", // fiscal-install services overridden per-row to QUOTE_ONLY
+};
+
 export class CreateHardwareProductDto {
   @ApiProperty({
     example: "pos-ingenico-lane3000",
@@ -222,4 +253,42 @@ export class CreateHardwareProductDto {
   @IsString()
   @IsIn(STATUSES as unknown as string[])
   status?: string;
+
+  // Regulatory tier. When omitted, CatalogService defaults it from
+  // CATEGORY_DEFAULT_SALE_MODE[category]. The checkout guard
+  // (QuoteService.quote) blocks any non-DIRECT_SALE SKU from a cart.
+  @ApiProperty({
+    required: false,
+    enum: SALE_MODES,
+    description: "Regulatory sale tier — defaults from category when omitted",
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(SALE_MODES as unknown as string[])
+  saleMode?: string;
+
+  // Tier 2 (PARTNER_REDIRECT) target. Shape:
+  //   { partnerName: string, partnerUrl: string, disclaimer?: string }
+  @ApiProperty({
+    required: false,
+    type: Object,
+    description:
+      "Bank/PSP redirect target for PARTNER_REDIRECT products (partnerName, partnerUrl, disclaimer)",
+  })
+  @IsOptional()
+  @IsObject()
+  partnerRedirect?: Record<string, unknown>;
+
+  // Tier 3 (DIRECT_SALE) seller-responsibility compliance docs. Shape:
+  //   { invoiceIssued?, warrantyCertUrl?, distributorName?, ceConformityUrl?,
+  //     turkishManualUrl?, serviceInfo?, returnTermsUrl? }
+  @ApiProperty({
+    required: false,
+    type: Object,
+    description:
+      "Seller-responsibility compliance docs (warranty, distributor, CE, manual, service, return terms)",
+  })
+  @IsOptional()
+  @IsObject()
+  complianceDocs?: Record<string, unknown>;
 }

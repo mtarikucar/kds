@@ -257,10 +257,23 @@ pull_versioned_images() {
     echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin >/dev/null
   fi
 
-  for img in "$BACKEND_IMG" "$FRONTEND_IMG" "$LANDING_IMG" "$MARKETING_IMG"; do
+  # v3.0.1 round-3 — marketing is the newest service; CI may not have
+  # pushed its image for a given $VERSION yet (e.g. running deploy.sh
+  # manually against a tag that predates the marketing SPA, or the very
+  # first cutover before the marketing CI workflow has run end-to-end).
+  # Backend/frontend/landing are MUST-HAVE — their pull failure must
+  # still abort the deploy. Marketing is OPTIONAL on the forward path,
+  # mirroring the rollback path's skip-when-absent guard added in
+  # 8b483fd. If marketing isn't pulled, the swap step's `docker image
+  # inspect` check already skips its `up -d` call.
+  for img in "$BACKEND_IMG" "$FRONTEND_IMG" "$LANDING_IMG"; do
     log "docker pull $img:$VERSION"
     docker pull "$img:$VERSION"
   done
+  log "docker pull $MARKETING_IMG:$VERSION (optional — soft-fails)"
+  if ! docker pull "$MARKETING_IMG:$VERSION"; then
+    warn "marketing image $MARKETING_IMG:$VERSION is not in the registry yet; deploy continues without it. Subsequent CI pushes will populate it."
+  fi
 }
 
 ensure_data_layer() {

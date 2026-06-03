@@ -110,6 +110,21 @@ export class PaytrSettlementService {
       payment.status === PaymentStatus.FAILED ||
       payment.status === PaymentStatus.REFUNDED
     ) {
+      // v3.0.1 round-3 audit note — the return value collapses three
+      // semantically distinct cases into one bucket:
+      //   1. Duplicate of the original SUCCESS webhook (PayTR retried)
+      //   2. Late webhook for a payment that was refunded post-success
+      //   3. Late webhook for a payment that was admin-marked FAILED
+      // All three are SAFE to return ALREADY_TERMINAL because: the
+      // SUCCESS path's atomic claim (line 254-273) only fires when
+      // status=PENDING, so no double credit. Subscription state
+      // mutations downstream are gated on the same claim. The merchant
+      // OID is the durable idempotency anchor; PayTR retries up to
+      // ~12 hours and the response is identical across retries.
+      // We log nothing extra here; the operational signal is
+      // SubscriptionPayment.status itself + the original settlement's
+      // outbox event (refund webhooks are a separate flow that updates
+      // status from SUCCEEDED → REFUNDED with its own audit trail).
       return "ALREADY_TERMINAL";
     }
 

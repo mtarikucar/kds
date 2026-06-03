@@ -7,16 +7,21 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UseGuards,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { Public } from "../auth/decorators/public.decorator";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { UserRole } from "../../common/constants/roles.enum";
 import { SuperAdminGuard } from "../superadmin/guards/superadmin.guard";
 import { SuperAdminRoute } from "../superadmin/decorators/superadmin.decorator";
 import { CatalogService } from "./catalog.service";
 import { CreateHardwareProductDto } from "./dto/create-hardware-product.dto";
 import { UpdateHardwareProductDto } from "./dto/update-hardware-product.dto";
 import { ReceiveStockDto } from "./dto/receive-stock.dto";
+import { HardwareQuoteRequestDto } from "./dto/hardware-quote-request.dto";
 
 @ApiTags("Hardware Catalog")
 @Controller("v1/catalog")
@@ -39,6 +44,31 @@ export class CatalogController {
     // callers (CheckoutService quote/provision path) use
     // findBySkuOrThrow directly when they need the serials column.
     return this.catalog.findBySkuPublicOrThrow(sku);
+  }
+}
+
+// Tenant-authenticated storefront actions. Separate from the @Public catalog
+// controller because these need req.user.tenantId. The global JwtAuthGuard
+// enforces auth (no @Public here); @Roles narrows to the buyer roles.
+@ApiTags("Hardware Catalog")
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
+@Controller("v1/catalog")
+export class TenantCatalogController {
+  constructor(private readonly catalog: CatalogService) {}
+
+  // "Teklif Al" on a QUOTE_ONLY device (yazarkasa / YN ÖKC). Records a
+  // marketing Lead (source=HARDWARE_QUOTE) — these devices can't be bought
+  // directly (the checkout guard blocks them); sale/activation/transfer go
+  // through an authorized dealer/service + GİB.
+  @Post("quote-request")
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiOperation({
+    summary:
+      "Request a quote for a QUOTE_ONLY device — creates a lead (ADMIN, MANAGER).",
+  })
+  requestQuote(@Req() req: any, @Body() body: HardwareQuoteRequestDto) {
+    return this.catalog.requestQuote(req.user.tenantId, body);
   }
 }
 

@@ -6,6 +6,10 @@ import {
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import {
+  CATEGORY_DEFAULT_SALE_MODE,
+  SaleMode,
+} from "./dto/create-hardware-product.dto";
 
 /**
  * Hardware product catalog. The public store reads `published` rows; the
@@ -119,7 +123,26 @@ export class CatalogService {
     images?: string[];
     shippingProfile?: Record<string, unknown>;
     status?: string;
+    saleMode?: string;
+    partnerRedirect?: Record<string, unknown>;
+    complianceDocs?: Record<string, unknown>;
   }) {
+    // Resolve the regulatory tier: explicit input wins, else the category
+    // default (CATEGORY_DEFAULT_SALE_MODE), with the scale-without-docs
+    // fallback applied. Gate publishing of regulated/direct-sale rows.
+    const saleMode = this.finalSaleMode(
+      input.category,
+      input.saleMode,
+      undefined,
+      input.complianceDocs,
+    );
+    if ((input.status ?? "draft") === "published") {
+      this.assertPublishable(
+        saleMode,
+        input.partnerRedirect,
+        input.complianceDocs,
+      );
+    }
     try {
       return await this.prisma.$transaction(async (tx) => {
         const product = await tx.hardwareProduct.create({
@@ -141,6 +164,9 @@ export class CatalogService {
             images: input.images ?? [],
             shippingProfile: input.shippingProfile as any,
             status: input.status ?? "draft",
+            saleMode: saleMode as any,
+            partnerRedirect: input.partnerRedirect as any,
+            complianceDocs: input.complianceDocs as any,
           },
         });
         await tx.hardwareInventory.create({ data: { productId: product.id } });
@@ -165,6 +191,31 @@ export class CatalogService {
       where: { id },
     });
     if (!exists) throw new NotFoundException("Product not found");
+
+    const effectiveCategory = input.category ?? exists.category;
+    // When the category changes we re-derive the tier from the new category's
+    // default (unless the caller set saleMode explicitly) so a printer→yazarkasa
+    // reclassification can't keep a stale DIRECT_SALE tier and bypass the
+    // regulation. When the category is unchanged we keep the existing tier.
+    const categoryChanged =
+      input.category !== undefined && input.category !== exists.category;
+    const effectiveDocs =
+      input.complianceDocs ?? (exists.complianceDocs as any);
+    const saleMode = this.finalSaleMode(
+      effectiveCategory,
+      input.saleMode,
+      categoryChanged ? undefined : (exists.saleMode as SaleMode),
+      effectiveDocs,
+    );
+    const effectiveStatus = input.status ?? exists.status;
+    if (effectiveStatus === "published") {
+      this.assertPublishable(
+        saleMode,
+        input.partnerRedirect ?? (exists.partnerRedirect as any),
+        effectiveDocs,
+      );
+    }
+
     return this.prisma.hardwareProduct.update({
       where: { id },
       data: {
@@ -184,8 +235,77 @@ export class CatalogService {
         images: input.images,
         shippingProfile: input.shippingProfile as any,
         status: input.status,
+        saleMode: saleMode as any,
+        partnerRedirect: input.partnerRedirect as any,
+        complianceDocs: input.complianceDocs as any,
       },
     });
+  }
+
+  /**
+   * Resolve the regulatory tier to persist.
+   *  - explicit `provided` always wins (validated upstream by the DTO);
+   *  - else `existing` (update with unchanged category);
+   *  - else the category default.
+   * Scale (terazi) is metrology-regulated: a DIRECT_SALE scale with no
+   * compliance docs falls back to RECOMMENDED_ONLY rather than being sold.
+   */
+  private finalSaleMode(
+    category: string,
+    provided: string | undefined,
+    existing: SaleMode | null | undefined,
+    complianceDocs: unknown,
+  ): SaleMode {
+    let mode: SaleMode;
+    if (provided) mode = provided as SaleMode;
+    else if (existing) mode = existing;
+    else mode = CATEGORY_DEFAULT_SALE_MODE[category] ?? "DIRECT_SALE";
+
+    if (
+      category === "scale" &&
+      mode === "DIRECT_SALE" &&
+      !this.hasComplianceDocs(complianceDocs)
+    ) {
+      mode = "RECOMMENDED_ONLY";
+    }
+    return mode;
+  }
+
+  /** At least one non-empty compliance/warranty document is on file. */
+  private hasComplianceDocs(docs: unknown): boolean {
+    if (!docs || typeof docs !== "object") return false;
+    return Object.values(docs as Record<string, unknown>).some(
+      (v) => v !== null && v !== undefined && v !== "" && v !== false,
+    );
+  }
+
+  /**
+   * Block publishing rows that would render a broken/non-compliant storefront:
+   *  - PARTNER_REDIRECT without a partnerRedirect.partnerUrl → dead CTA.
+   *  - DIRECT_SALE without any compliance doc → seller-responsibility gap
+   *    (fatura/garanti/distribütör/CE/kılavuz/servis/iade).
+   * QUOTE_ONLY / RECOMMENDED_ONLY are never sold directly, so they don't gate.
+   */
+  private assertPublishable(
+    saleMode: SaleMode,
+    partnerRedirect: unknown,
+    complianceDocs: unknown,
+  ) {
+    if (saleMode === "PARTNER_REDIRECT") {
+      const url = (partnerRedirect as { partnerUrl?: unknown } | null)
+        ?.partnerUrl;
+      if (typeof url !== "string" || !url.trim()) {
+        throw new BadRequestException(
+          "PARTNER_REDIRECT products require partnerRedirect.partnerUrl before publishing",
+        );
+      }
+      return;
+    }
+    if (saleMode === "DIRECT_SALE" && !this.hasComplianceDocs(complianceDocs)) {
+      throw new BadRequestException(
+        "DIRECT_SALE products require at least one compliance document (complianceDocs) before publishing",
+      );
+    }
   }
 
   async archive(id: string) {
@@ -220,6 +340,56 @@ export class CatalogService {
       );
     }
     return this.update(id, { status: "archived" });
+  }
+
+  /**
+   * "Teklif Al" for a QUOTE_ONLY device (yazarkasa / YN ÖKC). These can't be
+   * bought directly (the checkout guard blocks them), so the request is
+   * recorded as a marketing Lead (source=HARDWARE_QUOTE) for a rep to run the
+   * authorized-dealer/service + GİB offer/installation process.
+   *
+   * Decoupling note: we write the shared `leads` row directly via Prisma
+   * rather than importing the marketing module (which doesn't export its
+   * leads service). The lead is unassigned, so it lands in the manager's
+   * lead pool on the marketing board. When marketing splits to its own DB
+   * this should become an outbox event instead of a direct write.
+   */
+  async requestQuote(
+    tenantId: string,
+    input: {
+      sku: string;
+      qty?: number;
+      contactPerson: string;
+      phone?: string;
+      email?: string;
+      notes?: string;
+    },
+  ) {
+    const product = await this.findBySkuOrThrow(input.sku);
+    if (product.saleMode !== "QUOTE_ONLY") {
+      // Only quote-only devices use this flow; other tiers are bought
+      // directly, redirected to a bank/PSP, or recommended-only.
+      throw new BadRequestException(`SKU ${product.sku} is not quote-only`);
+    }
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: { name: true },
+    });
+    const qty = Math.min(999, Math.max(1, input.qty ?? 1));
+    const summary = `[Donanım teklif talebi] ${product.name} (SKU: ${product.sku}) × ${qty}`;
+    const lead = await this.prisma.lead.create({
+      data: {
+        businessName: tenant?.name || input.contactPerson,
+        contactPerson: input.contactPerson,
+        phone: input.phone,
+        email: input.email,
+        businessType: "OTHER",
+        source: "HARDWARE_QUOTE",
+        notes: input.notes ? `${summary}\n\n${input.notes}` : summary,
+      },
+      select: { id: true, status: true, source: true, createdAt: true },
+    });
+    return { ok: true, leadId: lead.id, status: lead.status };
   }
 
   /** Inventory ops — adjust stock and serials in one place to keep totals consistent. */

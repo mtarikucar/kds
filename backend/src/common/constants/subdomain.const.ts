@@ -26,6 +26,12 @@ export const RESERVED_SUBDOMAINS: readonly string[] = [
   "beta",
   "test",
   "demo",
+  // v3.0.1 round-3 — the marketing SPA ships at marketing.hummytummy.com;
+  // a tenant registering "marketing" as their subdomain would inherit
+  // its CORS allowlist and potentially serve their tenant data from
+  // the marketing host. Benign today (the SPA doesn't send tenant
+  // cookies) but defence-in-depth blocks the registration.
+  "marketing",
 ];
 
 /**
