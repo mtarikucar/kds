@@ -44,6 +44,12 @@ import { IngestTokenGuard } from './guards/ingest-token.guard';
 // Event consumers (Step C decoupling: settlement → commission crediting).
 import { SettlementCommissionConsumer } from './events/settlement-commission.consumer';
 
+// Phase 2 telephony — single-line Netgsm sales calls (click-to-dial + manual log).
+import { SalesCallController } from './controllers/sales-call.controller';
+import { SalesCallService } from './services/sales-call.service';
+import { TelephonyProviderRegistry } from './telephony/telephony-provider.registry';
+import { NetgsmLiteAdapter } from './telephony/netgsm-lite.adapter';
+
 @Module({
   imports: [
     JwtModule.registerAsync({
@@ -96,6 +102,7 @@ import { SettlementCommissionConsumer } from './events/settlement-commission.con
     MarketingCommissionsController,
     MarketingNotificationsController,
     MarketingDistributionController,
+    SalesCallController,
   ],
   providers: [
     // Services
@@ -117,6 +124,10 @@ import { SettlementCommissionConsumer } from './events/settlement-commission.con
     // Event consumer: credits SIGNUP/RENEWAL/UPSELL commissions off
     // payment.succeeded.v1 (subscribes via DomainEventBus on init).
     SettlementCommissionConsumer,
+    // Phase 2 telephony: sales-call log + single-line Netgsm provider.
+    SalesCallService,
+    TelephonyProviderRegistry,
+    NetgsmLiteAdapter,
     // Guards
     MarketingGuard,
     MarketingRolesGuard,

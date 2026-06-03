@@ -11,6 +11,7 @@
 export const MarketingEventTypes = {
   LeadConverted: "marketing.lead.converted.v1",
   CommissionCredited: "marketing.commission.credited.v1",
+  CallLogged: "marketing.call.logged.v1",
 } as const;
 
 export type MarketingEventType =
@@ -34,5 +35,14 @@ export interface MarketingCommissionCreditedPayload {
   amount: number;
   /** Accrual period, `YYYY-MM`. */
   period: string;
+  occurredAt: string;
+}
+
+export interface MarketingCallLoggedPayload {
+  callId: string;
+  marketingUserId: string;
+  leadId: string | null;
+  status: string;
+  durationSec: number | null;
   occurredAt: string;
 }

@@ -3551,6 +3551,35 @@ model MarketingDistributionConfig {
   @@map("marketing_distribution_config")
 }
 
+/// Phase-2 telephony: a single-line sales-call log over the company Netgsm line.
+/// Click-to-dial + manual outcome logging behind the TelephonyProvider
+/// abstraction. marketingUserId / leadId are soft references to the
+/// marketing-owned MarketingUser / Lead (no FK — keeps the model portable and
+/// avoids back-relations). externalCallId / durationSec / recordingUrl are the
+/// seams a future Netgsm API/webhook provider fills.
+model SalesCall {
+  id              String    @id @default(uuid())
+  marketingUserId String
+  leadId          String?
+  direction       String    @default("OUTBOUND") // OUTBOUND, INBOUND
+  toPhone         String
+  providerId      String // 'netgsm-lite', ...
+  status          String    @default("INITIATED") // INITIATED, CONNECTED, NO_ANSWER, BUSY, FAILED, CANCELLED
+  externalCallId  String?
+  durationSec     Int?
+  recordingUrl    String?
+  notes           String?   @db.Text
+  startedAt       DateTime  @default(now())
+  endedAt         DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([marketingUserId, startedAt(sort: Desc)])
+  @@index([leadId])
+  @@index([status])
+  @@map("sales_calls")
+}
+
 /// Phase-1 marketing-decoupling provisioning ledger. Written by CORE's
 /// TenantProvisioningService when a marketing Lead is converted into a paying
 /// tenant. It is (a) the durable idempotency anchor — one row per lead, unique
