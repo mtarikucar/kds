@@ -1,26 +1,31 @@
 import {
   Injectable,
+  Inject,
+  Logger,
   BadRequestException,
   ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { randomBytes } from 'crypto';
-import { addDays, addMonths, addYears } from 'date-fns';
-import * as bcrypt from 'bcryptjs';
-import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { EmailService } from '../../../common/services/email.service';
+import { OutboxService } from '../../outbox/outbox.service';
 import { LeadAutoAssignerService } from './lead-auto-assigner.service';
 import { CreateLeadDto } from '../dto/create-lead.dto';
 import { UpdateLeadDto } from '../dto/update-lead.dto';
 import { LeadFilterDto } from '../dto/lead-filter.dto';
 import { ConvertLeadDto } from '../dto/convert-lead.dto';
+import { MarketingEventTypes } from '../events/marketing-event-types';
 import {
-  isSubdomainQuarantined,
-  randomSubdomainSuffix,
-} from '../../../common/helpers/subdomain.helper';
+  CORE_PROVISIONING_PORT,
+  CoreProvisioningPort,
+} from '../../../core-contracts/provisioning/tenant-provisioning.port';
+import {
+  CoreProvisioningEmailInUseError,
+  CoreProvisioningPlanInvalidError,
+  CoreProvisioningSubdomainError,
+} from '../../../core-contracts/provisioning/tenant-provisioning.types';
 
 /**
  * Allowed lead status transitions. Terminal states (WON, LOST) are
@@ -40,51 +45,20 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   LOST: [],
 };
 
-/**
- * Fallback signup-commission rate used when a tenant converts on a
- * plan whose `commissionRate` couldn't be read (cold seed without
- * the new column, or a no-plan conversion). Per-plan overrides on
- * SubscriptionPlan.commissionRate take precedence.
- */
-const DEFAULT_SIGNUP_COMMISSION_RATE = 0.1;
-
 @Injectable()
 export class MarketingLeadsService {
+  private readonly logger = new Logger(MarketingLeadsService.name);
+
   constructor(
     private prisma: PrismaService,
-    private configService: ConfigService,
     private emailService: EmailService,
     private autoAssigner: LeadAutoAssignerService,
+    // Step D decoupling: tenant/user/subscription provisioning is owned by
+    // CORE behind this port — marketing no longer writes those tables.
+    @Inject(CORE_PROVISIONING_PORT)
+    private readonly provisioning: CoreProvisioningPort,
+    private readonly outbox: OutboxService,
   ) {}
-
-  private bcryptCost(): number {
-    const raw = this.configService.get<string>('BCRYPT_COST');
-    const parsed = raw ? parseInt(raw, 10) : NaN;
-    return Number.isFinite(parsed) && parsed >= 10 && parsed <= 15 ? parsed : 12;
-  }
-
-  /**
-   * Pick a free subdomain for a converted tenant. Mirrors
-   * AuthService.allocateSubdomain: prefer the slug derived from the
-   * restaurant name; on collision or quarantine, tack on a 6-hex suffix.
-   * Uniqueness is also enforced by the DB unique index — the try/catch
-   * on the transaction handles the rare simultaneous-convert race.
-   */
-  private async allocateSubdomain(base: string): Promise<string> {
-    const baseClean = base || 'restaurant';
-    const preferredTaken =
-      (await isSubdomainQuarantined(this.prisma, baseClean)) ||
-      (await this.prisma.tenant.findUnique({ where: { subdomain: baseClean } }));
-    if (!preferredTaken) return baseClean;
-    for (let i = 0; i < 5; i += 1) {
-      const candidate = `${baseClean}-${randomSubdomainSuffix()}`;
-      const taken =
-        (await isSubdomainQuarantined(this.prisma, candidate)) ||
-        (await this.prisma.tenant.findUnique({ where: { subdomain: candidate } }));
-      if (!taken) return candidate;
-    }
-    throw new ConflictException('Could not allocate a free subdomain');
-  }
 
   async create(dto: CreateLeadDto, userId: string, userRole: string) {
     // Idempotency: refuse to create a second OPEN lead for the same
@@ -116,6 +90,19 @@ export class MarketingLeadsService {
     //   2. for SALES_REP creators → themselves (they own what they enter)
     //   3. auto-assigner (round-robin / least-loaded) when configured
     //   4. unassigned (null) — falls into the lead pool for the manager
+    //
+    // SALES_REP guard: assigning to another rep is a manager-only
+    // action — `PATCH /leads/:id/assign` enforces that, so we have to
+    // enforce it here too. Without this check a rep could POST a new
+    // lead with `assignedToId` set to another rep and bypass the patch
+    // guard entirely. Self-assignment is fine and matches priority 2.
+    if (
+      userRole === 'SALES_REP' &&
+      dto.assignedToId &&
+      dto.assignedToId !== userId
+    ) {
+      throw new ForbiddenException('Only managers can assign leads to other reps');
+    }
     let resolvedAssignee: string | null = null;
     if (dto.assignedToId) {
       resolvedAssignee = dto.assignedToId;
@@ -633,10 +620,12 @@ export class MarketingLeadsService {
   }
 
   /**
-   * Convert a lead to a paying tenant. Creates tenant + admin user +
-   * subscription in a single transaction, generates a random admin
-   * password (never accepted from the DTO), emails a welcome note, and
-   * records the rep's signup commission. Idempotent via lead.convertedTenantId.
+   * Convert a lead to a paying tenant. Provisioning (tenant + admin user +
+   * subscription) is owned by CORE behind CoreProvisioningPort — idempotent on
+   * the lead, so a retry or a concurrent convert that lost the claim converges
+   * on the same tenant instead of minting a second one. Marketing only
+   * finalizes its own state: claim the lead → WON, accept the offer, cancel
+   * open tasks, stamp the SIGNUP commission, and emit marketing.lead.converted.
    */
   async convert(id: string, dto: ConvertLeadDto, userId: string) {
     const lead = await this.prisma.lead.findUnique({ where: { id } });
@@ -645,17 +634,9 @@ export class MarketingLeadsService {
       throw new ConflictException('Lead already converted');
     }
 
-    // Pre-flight email uniqueness check so we can fail with 409 instead
-    // of leaking a raw Prisma P2002 from inside the transaction.
-    const emailCollision = await this.prisma.user.findUnique({
-      where: { email: dto.adminEmail },
-      select: { id: true },
-    });
-    if (emailCollision) {
-      throw new ConflictException('Admin email is already in use');
-    }
-
-    let plan: Awaited<ReturnType<typeof this.prisma.subscriptionPlan.findUnique>> | null = null;
+    // Resolve the offer (marketing-owned) to derive the plan + offer overrides.
+    // The plan itself is validated + read by CORE inside the provisioning port;
+    // marketing no longer touches SubscriptionPlan/Tenant/User/Subscription.
     let offer: Awaited<ReturnType<typeof this.prisma.leadOffer.findUnique>> | null = null;
     if (dto.offerId) {
       offer = await this.prisma.leadOffer.findUnique({ where: { id: dto.offerId } });
@@ -664,95 +645,73 @@ export class MarketingLeadsService {
       }
     }
     const planId = offer?.planId ?? dto.planId ?? null;
-    if (planId) {
-      plan = await this.prisma.subscriptionPlan.findUnique({ where: { id: planId } });
-      if (!plan || !plan.isActive) {
-        throw new BadRequestException('Plan not found or inactive');
-      }
-    }
 
-    // Generate a random admin password the rep never sees; the new
-    // owner receives it via email and is expected to change it on
-    // first login (they can also use /auth/forgot-password).
-    const rawPassword = randomBytes(12).toString('base64url');
-    const hashedPassword = await bcrypt.hash(rawPassword, this.bcryptCost());
-
-    const now = new Date();
-    const trialDays = offer?.trialDays ?? plan?.trialDays ?? 0;
-    const canTrial = !!plan && trialDays > 0 && plan.name !== 'FREE';
-    const trialStart = canTrial ? now : null;
-    const trialEnd = canTrial ? addDays(now, trialDays) : null;
-    const billingCycle = 'MONTHLY';
-    const currentPeriodEnd = canTrial
-      ? (trialEnd as Date)
-      : plan
-        ? addMonths(now, 1)
-        : addYears(now, 10);
-    const subscriptionAmount = plan
-      ? offer?.customPrice ?? plan.monthlyPrice
-      : null;
-
-    // Allocate a subdomain up-front (not inside the tx). The auth/QR-menu
-    // flows require a non-null subdomain; marketing-converted tenants
-    // previously got a NULL and broke their own QR-menu URL generation.
-    const baseSubdomain = dto.tenantName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
-    const subdomain = await this.allocateSubdomain(baseSubdomain);
-
-    const result = await this.prisma.$transaction(async (tx) => {
-      const tenant = await tx.tenant.create({
-        data: {
-          name: dto.tenantName,
-          subdomain,
-          ...(plan ? { currentPlanId: plan.id } : {}),
-          ...(canTrial && plan
-            ? {
-                trialUsed: true,
-                trialStartedAt: trialStart,
-                trialEndsAt: trialEnd,
-                // Per-plan trial registry stays consistent with the
-                // PaymentsService/SubscriptionService flows.
-                usedTrialPlanIds: [plan.id],
-              }
-            : {}),
-        },
-      });
-
-      await tx.user.create({
-        data: {
+    // Provision via the core port. Idempotent on the lead id, so a concurrent
+    // convert that already provisioned the SAME tenant returns it again (the
+    // claim below then decides the single winner). Port-local errors are
+    // re-mapped to the same HTTP shapes the inline flow used to throw.
+    const provision = await this.provisioning
+      .provisionTenantForLead({
+        leadId: id,
+        idempotencyKey: `lead-convert:${id}`,
+        tenantName: dto.tenantName,
+        admin: {
           email: dto.adminEmail,
-          password: hashedPassword,
           firstName: dto.adminFirstName,
           lastName: dto.adminLastName,
-          role: 'ADMIN',
-          status: 'ACTIVE',
-          emailVerified: true,
-          tenantId: tenant.id,
         },
+        plan: planId
+          ? {
+              planId,
+              amountOverride:
+                offer?.customPrice != null ? Number(offer.customPrice) : null,
+              trialDaysOverride: offer?.trialDays ?? null,
+            }
+          : null,
+      })
+      .catch((err) => {
+        if (err instanceof CoreProvisioningEmailInUseError) {
+          throw new ConflictException('Admin email is already in use');
+        }
+        if (err instanceof CoreProvisioningPlanInvalidError) {
+          throw new BadRequestException('Plan not found or inactive');
+        }
+        if (err instanceof CoreProvisioningSubdomainError) {
+          throw new ConflictException('Could not allocate a free subdomain');
+        }
+        throw err;
       });
 
-      if (plan && subscriptionAmount != null) {
-        await tx.subscription.create({
-          data: {
-            tenantId: tenant.id,
-            planId: plan.id,
-            status: canTrial ? 'TRIALING' : 'ACTIVE',
-            billingCycle,
-            paymentProvider: 'PAYTR',
-            startDate: now,
-            currentPeriodStart: now,
-            currentPeriodEnd,
-            isTrialPeriod: canTrial,
-            trialStart,
-            trialEnd,
-            amount: subscriptionAmount,
-            currency: plan.currency,
-            cancelAtPeriodEnd: false,
-          },
-        });
+    const now = new Date();
+    // SIGNUP commission basis = the plan's catalogue monthly price × rate, both
+    // returned by the port as plan facts (rate already defaulted). NOT the
+    // discounted offer price. Zero for a no-plan (FREE) conversion.
+    const commissionAmount = provision.planFacts
+      ? new Prisma.Decimal(provision.planFacts.monthlyPrice)
+          .mul(provision.planFacts.commissionRate)
+          .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP)
+      : new Prisma.Decimal(0);
+    const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    let commissionId: string | null = null;
+    const result = await this.prisma.$transaction(async (tx) => {
+      // CRITICAL idempotency: claim the lead only if still unconverted. Two
+      // managers converting at the same millisecond both pass the pre-check
+      // and both call the (idempotent) port — which returns the SAME tenant —
+      // but only the first updateMany here flips convertedTenantId. The loser
+      // gets count=0 and aborts with 409; no double commission, one tenant.
+      const claim = await tx.lead.updateMany({
+        where: { id, convertedTenantId: null },
+        data: {
+          status: 'WON',
+          convertedTenantId: provision.tenantId,
+          convertedAt: now,
+        },
+      });
+      if (claim.count === 0) {
+        throw new ConflictException('Lead was converted concurrently');
       }
+      const updatedLead = await tx.lead.findUniqueOrThrow({ where: { id } });
 
       if (offer) {
         await tx.leadOffer.update({
@@ -761,32 +720,7 @@ export class MarketingLeadsService {
         });
       }
 
-      // CRITICAL: compound WHERE on `convertedTenantId: null` to make
-      // conversion idempotent under concurrent calls. Two managers
-      // hitting Convert at the same millisecond both passed the
-      // `lead.convertedTenantId` check at line 445 (READ COMMITTED
-      // can't see the other's uncommitted write), both reached this
-      // tx, and both proceeded to create a tenant + admin + commission
-      // — producing TWO orphan tenants and a DOUBLE commission row
-      // for ONE lead. The claim below makes the second tx's
-      // updateMany return count=0, and the surrounding catch will
-      // roll the whole second transaction back (its tenant + user +
-      // commission rows go away with it).
-      const claim = await tx.lead.updateMany({
-        where: { id, convertedTenantId: null },
-        data: {
-          status: 'WON',
-          convertedTenantId: tenant.id,
-          convertedAt: new Date(),
-        },
-      });
-      if (claim.count === 0) {
-        throw new ConflictException('Lead was converted concurrently');
-      }
-      const updatedLead = await tx.lead.findUniqueOrThrow({ where: { id } });
-
-      // Cancel any open tasks attached to this lead — the rep no
-      // longer needs reminders for a closed deal.
+      // Cancel any open tasks attached to this lead — the deal is closed.
       await tx.marketingTask.updateMany({
         where: {
           leadId: id,
@@ -796,32 +730,19 @@ export class MarketingLeadsService {
       });
 
       if (lead.assignedToId) {
-        // Signup commission: percentage of the plan's monthly price when
-        // a plan was attached to the conversion; 0 when no plan was
-        // specified (FREE flows). Managers can tweak this later via the
-        // commissions service.
-        const commissionAmount = plan
-          ? new Prisma.Decimal(plan.monthlyPrice)
-              .mul(
-                // Per-plan override; defaults to the historical 10%
-                // when the column is absent (transitional rollout).
-                plan.commissionRate ?? DEFAULT_SIGNUP_COMMISSION_RATE,
-              )
-              .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP)
-          : new Prisma.Decimal(0);
-        const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
-        await tx.commission.create({
+        const commission = await tx.commission.create({
           data: {
             amount: commissionAmount,
             type: 'SIGNUP',
             status: 'PENDING',
             period,
-            tenantId: tenant.id,
+            tenantId: provision.tenantId,
             leadId: id,
             marketingUserId: lead.assignedToId,
           },
+          select: { id: true },
         });
+        commissionId = commission.id;
       }
 
       await tx.leadActivity.create({
@@ -834,50 +755,176 @@ export class MarketingLeadsService {
         },
       });
 
-      return { lead: updatedLead, tenantId: tenant.id };
-    })
-    .catch((err) => {
-      if (
-        err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2002'
-      ) {
-        // Subdomain or admin email raced with another request between
-        // our allocator call and the transactional create. Surface a
-        // clear 409 instead of a generic 500.
-        throw new ConflictException(
-          'Could not create tenant — a tenant with that subdomain or an admin with that email was created concurrently. Please retry.',
-        );
-      }
-      throw err;
+      // Durable domain event (audit / analytics consumers). Same tx as the
+      // claim so it only fires when the conversion actually committed.
+      await this.outbox.append(
+        {
+          type: MarketingEventTypes.LeadConverted,
+          tenantId: provision.tenantId,
+          idempotencyKey: `lead-converted:${id}`,
+          payload: {
+            leadId: id,
+            tenantId: provision.tenantId,
+            marketingUserId: lead.assignedToId ?? null,
+            commissionId,
+            occurredAt: now.toISOString(),
+          },
+        },
+        tx as any,
+      );
+
+      return { lead: updatedLead, tenantId: provision.tenantId };
     });
 
-    // Send the welcome email outside the transaction. Failure here
-    // shouldn't roll back the conversion — the owner can still recover
-    // via /auth/forgot-password. Template-driven so the Turkish copy
-    // sits in a .hbs file rather than inline service code (was a
-    // blocker for i18n + translator review).
-    try {
-      const appUrl = process.env.APP_URL ?? 'https://hummytummy.com';
-      await this.emailService.sendEmail({
-        to: dto.adminEmail,
-        subject: 'HummyTummy hesabınız hazır',
-        template: 'marketing-tenant-welcome',
-        context: {
-          adminFirstName: dto.adminFirstName,
-          adminEmail: dto.adminEmail,
-          tenantName: dto.tenantName,
-          rawPassword,
-          appUrl,
-          loginUrl: `${appUrl}/login`,
-        },
-      });
-    } catch (err) {
-      // Log only; do not fail the response.
-      // eslint-disable-next-line no-console
-      console.error('Failed to send welcome email after lead conversion:', err);
+    // Welcome email outside the tx. Only on first provisioning — an idempotent
+    // replay already delivered the password (adminTempPassword is empty then).
+    // Failure here never rolls back the conversion; the owner can recover via
+    // /auth/forgot-password.
+    if (provision.created && provision.adminTempPassword) {
+      try {
+        const appUrl = process.env.APP_URL ?? 'https://hummytummy.com';
+        await this.emailService.sendEmail({
+          to: dto.adminEmail,
+          subject: 'HummyTummy hesabınız hazır',
+          template: 'marketing-tenant-welcome',
+          context: {
+            adminFirstName: dto.adminFirstName,
+            adminEmail: dto.adminEmail,
+            tenantName: dto.tenantName,
+            rawPassword: provision.adminTempPassword,
+            appUrl,
+            loginUrl: `${appUrl}/login`,
+          },
+        });
+      } catch (err) {
+        // Log only; do not fail the response.
+        this.logger.error('Failed to send welcome email after lead conversion', err as any);
+      }
     }
 
     return result;
+  }
+
+  /**
+   * Orphan-reconciliation sweep (Step D saga safety net). Conversion provisions
+   * the tenant via the core port BEFORE the marketing finalization tx; if that
+   * tx fails for a non-claim reason and the user never retries, the tenant is
+   * left with no WON lead / commission. This finds provisioned-but-unfinalized
+   * leads (via the core ledger port) and completes the marketing side. Driven
+   * by an advisory-locked hourly cron (MarketingSchedulerService).
+   */
+  async reconcileOrphanProvisionedConversions(): Promise<{ reconciled: number }> {
+    const nowMs = Date.now();
+    // Grace window: ignore ledger rows younger than 10 min (a convert may be
+    // mid-flight); look back 24h (older orphans should already be handled).
+    const records = await this.provisioning.listProvisionedLeads(
+      new Date(nowMs - 24 * 60 * 60 * 1000),
+      new Date(nowMs - 10 * 60 * 1000),
+    );
+
+    let reconciled = 0;
+    for (const rec of records) {
+      const lead = await this.prisma.lead.findUnique({
+        where: { id: rec.leadId },
+        select: { id: true, assignedToId: true, convertedTenantId: true },
+      });
+      if (!lead || lead.convertedTenantId) continue; // gone or already finalized
+
+      const commissionAmount = rec.planFacts
+        ? new Prisma.Decimal(rec.planFacts.monthlyPrice)
+            .mul(rec.planFacts.commissionRate)
+            .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP)
+        : new Prisma.Decimal(0);
+
+      try {
+        await this.finalizeReconciledConversion(
+          lead.id,
+          lead.assignedToId,
+          rec.tenantId,
+          commissionAmount,
+        );
+        reconciled += 1;
+        this.logger.warn(
+          `Reconciled orphan provisioned conversion: lead=${rec.leadId} tenant=${rec.tenantId}`,
+        );
+      } catch (err) {
+        // A concurrent finalize won the claim → fine; anything else is logged.
+        if (err instanceof ConflictException) continue;
+        this.logger.error(
+          `Orphan reconcile failed for lead=${rec.leadId}: ${(err as Error)?.message ?? err}`,
+        );
+      }
+    }
+    return { reconciled };
+  }
+
+  /** Marketing-only finalization for a reconciled orphan (claim + commission + event). */
+  private async finalizeReconciledConversion(
+    leadId: string,
+    assignedToId: string | null,
+    tenantId: string,
+    commissionAmount: Prisma.Decimal,
+  ): Promise<void> {
+    const now = new Date();
+    const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    await this.prisma.$transaction(async (tx) => {
+      const claim = await tx.lead.updateMany({
+        where: { id: leadId, convertedTenantId: null },
+        data: { status: 'WON', convertedTenantId: tenantId, convertedAt: now },
+      });
+      if (claim.count === 0) {
+        throw new ConflictException('Lead was finalized concurrently');
+      }
+      await tx.marketingTask.updateMany({
+        where: { leadId, status: { in: ['PENDING', 'IN_PROGRESS'] } },
+        data: { status: 'CANCELLED' },
+      });
+
+      let commissionId: string | null = null;
+      if (assignedToId) {
+        const commission = await tx.commission.create({
+          data: {
+            amount: commissionAmount,
+            type: 'SIGNUP',
+            status: 'PENDING',
+            period,
+            tenantId,
+            leadId,
+            marketingUserId: assignedToId,
+          },
+          select: { id: true },
+        });
+        commissionId = commission.id;
+        // LeadActivity.createdById requires a real MarketingUser; use the
+        // assigned rep. Skipped entirely when the lead was unassigned.
+        await tx.leadActivity.create({
+          data: {
+            type: 'STATUS_CHANGE',
+            title: 'Lead conversion reconciled',
+            description:
+              'Provisioned tenant finalized by the orphan-reconciliation sweep',
+            leadId,
+            createdById: assignedToId,
+          },
+        });
+      }
+
+      await this.outbox.append(
+        {
+          type: MarketingEventTypes.LeadConverted,
+          tenantId,
+          idempotencyKey: `lead-converted:${leadId}`,
+          payload: {
+            leadId,
+            tenantId,
+            marketingUserId: assignedToId ?? null,
+            commissionId,
+            occurredAt: now.toISOString(),
+          },
+        },
+        tx as any,
+      );
+    });
   }
 
   async delete(id: string) {

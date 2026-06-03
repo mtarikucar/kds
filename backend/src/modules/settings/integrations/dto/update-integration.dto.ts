@@ -1,5 +1,5 @@
-import { OmitType, PartialType } from '@nestjs/swagger';
-import { CreateIntegrationDto } from './create-integration.dto';
+import { OmitType, PartialType } from "@nestjs/swagger";
+import { CreateIntegrationDto } from "./create-integration.dto";
 
 // `integrationType` and `provider` are the compound unique key AND drive
 // the encryption policy in IntegrationsService (sensitive types get
@@ -8,5 +8,5 @@ import { CreateIntegrationDto } from './create-integration.dto';
 // row by first switching it to a hardware type. Omit them here — callers
 // that legitimately want to re-target an integration must delete + create.
 export class UpdateIntegrationDto extends PartialType(
-  OmitType(CreateIntegrationDto, ['integrationType', 'provider'] as const),
+  OmitType(CreateIntegrationDto, ["integrationType", "provider"] as const),
 ) {}

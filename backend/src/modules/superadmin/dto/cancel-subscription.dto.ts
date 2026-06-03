@@ -1,9 +1,9 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { IsEnum, IsOptional, IsString, MaxLength } from "class-validator";
 
 export enum CancelMode {
-  IMMEDIATE = 'IMMEDIATE',
-  AT_PERIOD_END = 'AT_PERIOD_END',
+  IMMEDIATE = "IMMEDIATE",
+  AT_PERIOD_END = "AT_PERIOD_END",
 }
 
 export class CancelSubscriptionDto {
@@ -11,8 +11,8 @@ export class CancelSubscriptionDto {
     enum: CancelMode,
     default: CancelMode.AT_PERIOD_END,
     description:
-      'IMMEDIATE flips status=CANCELLED right now; AT_PERIOD_END lets the ' +
-      'subscription run until currentPeriodEnd before transitioning',
+      "IMMEDIATE flips status=CANCELLED right now; AT_PERIOD_END lets the " +
+      "subscription run until currentPeriodEnd before transitioning",
   })
   @IsOptional()
   @IsEnum(CancelMode)

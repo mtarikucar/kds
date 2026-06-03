@@ -1,13 +1,13 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty } from "@nestjs/swagger";
 
 export class DesktopRelease {
   @ApiProperty()
   id: string;
 
-  @ApiProperty({ example: '0.2.6' })
+  @ApiProperty({ example: "0.2.6" })
   version: string;
 
-  @ApiProperty({ example: 'v0.2.6' })
+  @ApiProperty({ example: "v0.2.6" })
   releaseTag: string;
 
   @ApiProperty()

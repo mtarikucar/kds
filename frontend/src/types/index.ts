@@ -20,6 +20,15 @@ export interface User {
   lastName: string;
   role: string;
   tenantId: string | null;
+  /** v3.0.0 — the user's home branch. Hard-restricted roles
+   *  (WAITER/KITCHEN/COURIER) always carry a non-null value; ADMIN /
+   *  MANAGER may carry null when they legitimately roam (in that
+   *  case the BranchPicker forces an explicit selection before any
+   *  branch-scoped request fires). */
+  primaryBranchId: string | null;
+  /** v3.0.0 — the allow-list BranchGuard reads on every request.
+   *  ADMIN with an empty list = wildcard tenant access. */
+  allowedBranchIds: string[];
   status?: UserStatus | string;
   approvedAt?: string;
   approvedById?: string;
@@ -590,6 +599,9 @@ export interface CreateStockMovementDto {
 export interface SalesReportDto {
   startDate: string;
   endDate: string;
+  // Restrict to a specific branch. Optional — omitting yields tenant-wide
+  // numbers (including pre-Phase-3 orders that have no branchId set).
+  branchId?: string;
 }
 
 export interface SalesReport {
@@ -710,6 +722,10 @@ export enum InvoiceStatus {
 export interface PlanLimits {
   maxUsers: number;
   maxTables: number;
+  /** v3.0.0 — branch cap. FREE/BASIC=1, PRO=3, BUSINESS=-1 (unlimited).
+   *  Mirrors `SubscriptionPlan.maxBranches`; the engine SUMs the
+   *  `extra_branch` add-on grant onto this. */
+  maxBranches: number;
   maxProducts: number;
   maxCategories: number;
   maxMonthlyOrders: number;
@@ -728,6 +744,10 @@ export interface PlanFeatures {
   /** Delivery-platform (Yemeksepeti, Getir, etc.) integration — added
    *  to backend SubscriptionPlan schema; the frontend type was lagging. */
   deliveryIntegration: boolean;
+  /** v3.0.0 — POS access. Tier-gated BASIC+; FREE post-trial loses POS.
+   *  `<FeatureGate feature="posAccess">` wraps the /pos route and the
+   *  sidebar item; pos-settings endpoints also gate server-side. */
+  posAccess: boolean;
 }
 
 export interface Plan {
@@ -762,6 +782,17 @@ export interface TenantOverrides {
 export interface EffectiveFeatures {
   features: PlanFeatures;
   limits: PlanLimits;
+  /**
+   * v2.8.88 — integration grants from the entitlement engine. Keys are
+   * the domain (delivery, fiscal, caller, …); values are the vendor
+   * lists granted by plan + add-ons (e.g. `['yemeksepeti', 'getir']`
+   * after the Yemeksepeti add-on lands). The frontend reads this map
+   * via `useSubscription().hasIntegration(domain, vendor?)`.
+   *
+   * Optional because brand-new tenants whose projector hasn't run yet
+   * may not have any integration row. Treat missing as "no vendors".
+   */
+  integrations?: Record<string, string[]>;
   /**
    * Plan IDs the tenant hasn't yet trialed and can still claim a free
    * 14-day trial on. UI uses this to badge plan cards.

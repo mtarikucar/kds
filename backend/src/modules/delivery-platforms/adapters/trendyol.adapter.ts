@@ -1,30 +1,32 @@
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { DeliveryPlatformConfig } from '@prisma/client';
-import { DeliveryPlatform } from '../constants/platform.enum';
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { DeliveryPlatformConfig } from "@prisma/client";
+import { DeliveryPlatform } from "../constants/platform.enum";
 import {
   AuthResult,
   MenuSyncItem,
   PlatformAdapter,
-} from '../interfaces/platform-adapter.interface';
-import { NormalizedOrder } from '../interfaces/platform-order.interface';
-import { BaseAdapter } from './base.adapter';
+} from "../interfaces/platform-adapter.interface";
+import { NormalizedOrder } from "../interfaces/platform-order.interface";
+import { BaseAdapter } from "./base.adapter";
 
 @Injectable()
 export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
   constructor(private configService: ConfigService) {
-    super('TrendyolAdapter', 'https://api.trendyol.com/yemek');
-    this.overrideBaseURL(this.configService.get<string>('TRENDYOL_API_BASE_URL'));
+    super("TrendyolAdapter", "https://api.trendyol.com/yemek");
+    this.overrideBaseURL(
+      this.configService.get<string>("TRENDYOL_API_BASE_URL"),
+    );
   }
 
   async authenticate(config: DeliveryPlatformConfig): Promise<AuthResult> {
     const credentials = config.credentials as any;
 
-    if (credentials.apiVersion === 'v2') {
+    if (credentials.apiVersion === "v2") {
       // New webhook-based integration
       const response = await this.request({
-        method: 'POST',
-        url: '/integration/auth/token',
+        method: "POST",
+        url: "/integration/auth/token",
         data: {
           integratorId: credentials.integratorId,
           integratorSecret: credentials.integratorSecret,
@@ -38,7 +40,7 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
     // Deprecated: Basic Auth - token is the base64 encoded credentials
     const token = Buffer.from(
       `${credentials.username}:${credentials.password}`,
-    ).toString('base64');
+    ).toString("base64");
     // Basic auth doesn't expire, but we set a long TTL
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     return { token, expiresAt };
@@ -49,10 +51,10 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
     externalOrderId: string,
   ): Promise<void> {
     await this.request({
-      method: 'PUT',
+      method: "PUT",
       url: `/orders/${externalOrderId}/status`,
       headers: this.getTrendyolAuthHeaders(config),
-      data: { status: 'ACCEPTED' },
+      data: { status: "ACCEPTED" },
     });
   }
 
@@ -62,10 +64,10 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
     reason?: string,
   ): Promise<void> {
     await this.request({
-      method: 'PUT',
+      method: "PUT",
       url: `/orders/${externalOrderId}/status`,
       headers: this.getTrendyolAuthHeaders(config),
-      data: { status: 'REJECTED', reason },
+      data: { status: "REJECTED", reason },
     });
   }
 
@@ -74,10 +76,10 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
     externalOrderId: string,
   ): Promise<void> {
     await this.request({
-      method: 'PUT',
+      method: "PUT",
       url: `/orders/${externalOrderId}/status`,
       headers: this.getTrendyolAuthHeaders(config),
-      data: { status: 'PREPARING' },
+      data: { status: "PREPARING" },
     });
   }
 
@@ -86,10 +88,10 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
     externalOrderId: string,
   ): Promise<void> {
     await this.request({
-      method: 'PUT',
+      method: "PUT",
       url: `/orders/${externalOrderId}/status`,
       headers: this.getTrendyolAuthHeaders(config),
-      data: { status: 'READY' },
+      data: { status: "READY" },
     });
   }
 
@@ -98,10 +100,10 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
     externalOrderId: string,
   ): Promise<void> {
     await this.request({
-      method: 'PUT',
+      method: "PUT",
       url: `/orders/${externalOrderId}/status`,
       headers: this.getTrendyolAuthHeaders(config),
-      data: { status: 'PICKED_UP' },
+      data: { status: "PICKED_UP" },
     });
   }
 
@@ -111,10 +113,10 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
     reason?: string,
   ): Promise<void> {
     await this.request({
-      method: 'PUT',
+      method: "PUT",
       url: `/orders/${externalOrderId}/status`,
       headers: this.getTrendyolAuthHeaders(config),
-      data: { status: 'CANCELLED', reason },
+      data: { status: "CANCELLED", reason },
     });
   }
 
@@ -122,7 +124,7 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
     config: DeliveryPlatformConfig,
   ): Promise<NormalizedOrder[]> {
     const response = await this.request({
-      method: 'GET',
+      method: "GET",
       url: `/restaurants/${config.remoteRestaurantId}/orders?status=NEW`,
       headers: this.getTrendyolAuthHeaders(config),
     });
@@ -140,7 +142,7 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
     items: MenuSyncItem[],
   ): Promise<void> {
     await this.request({
-      method: 'PUT',
+      method: "PUT",
       url: `/restaurants/${config.remoteRestaurantId}/menu`,
       headers: this.getTrendyolAuthHeaders(config),
       data: { products: items },
@@ -153,7 +155,7 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
     available: boolean,
   ): Promise<void> {
     await this.request({
-      method: 'PUT',
+      method: "PUT",
       url: `/restaurants/${config.remoteRestaurantId}/products/${externalItemId}/status`,
       headers: this.getTrendyolAuthHeaders(config),
       data: { isAvailable: available },
@@ -162,7 +164,7 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
 
   async openRestaurant(config: DeliveryPlatformConfig): Promise<void> {
     await this.request({
-      method: 'PUT',
+      method: "PUT",
       url: `/restaurants/${config.remoteRestaurantId}/status`,
       headers: this.getTrendyolAuthHeaders(config),
       data: { isOpen: true },
@@ -171,7 +173,7 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
 
   async closeRestaurant(config: DeliveryPlatformConfig): Promise<void> {
     await this.request({
-      method: 'PUT',
+      method: "PUT",
       url: `/restaurants/${config.remoteRestaurantId}/status`,
       headers: this.getTrendyolAuthHeaders(config),
       data: { isOpen: false },
@@ -181,11 +183,11 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
   async testConnection(config: DeliveryPlatformConfig): Promise<boolean> {
     try {
       const credentials = config.credentials as any;
-      if (credentials.apiVersion === 'v2') {
+      if (credentials.apiVersion === "v2") {
         await this.authenticate(config);
       } else {
         await this.request({
-          method: 'GET',
+          method: "GET",
           url: `/restaurants/${config.remoteRestaurantId}`,
           headers: this.getTrendyolAuthHeaders(config),
         });
@@ -200,7 +202,7 @@ export class TrendyolAdapter extends BaseAdapter implements PlatformAdapter {
     config: DeliveryPlatformConfig,
   ): Record<string, string> {
     const credentials = config.credentials as any;
-    if (credentials.apiVersion === 'v2') {
+    if (credentials.apiVersion === "v2") {
       return { Authorization: `Bearer ${config.accessToken}` };
     }
     return { Authorization: `Basic ${config.accessToken}` };

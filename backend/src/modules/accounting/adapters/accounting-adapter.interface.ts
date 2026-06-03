@@ -19,7 +19,13 @@ export interface AccountingInvoiceData {
 
 export interface AccountingAdapter {
   readonly name: string;
-  authenticate(credentials: Record<string, string>): Promise<{ accessToken: string; expiresAt?: Date }>;
-  pushInvoice(token: string, companyId: string, invoice: AccountingInvoiceData): Promise<{ externalId: string }>;
+  authenticate(
+    credentials: Record<string, string>,
+  ): Promise<{ accessToken: string; expiresAt?: Date }>;
+  pushInvoice(
+    token: string,
+    companyId: string,
+    invoice: AccountingInvoiceData,
+  ): Promise<{ externalId: string }>;
   testConnection(credentials: Record<string, string>): Promise<boolean>;
 }

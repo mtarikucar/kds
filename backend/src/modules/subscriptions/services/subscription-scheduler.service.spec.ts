@@ -18,6 +18,7 @@ function buildSvc(
   paytr: any,
   notifications: any,
   settlement: any = { settlePayment: jest.fn().mockResolvedValue('OK') },
+  outbox?: any,
 ): SubscriptionSchedulerService {
   const svc = new SubscriptionSchedulerService(
     prisma as any,
@@ -26,6 +27,7 @@ function buildSvc(
     {} as any, // billing — not used by these crons
     paytr,
     settlement,
+    outbox,
   );
   // Bypass the advisory-lock SQL probe — assume we acquired the lock.
   prisma.$queryRawUnsafe.mockResolvedValue([{ locked: true }]);
@@ -319,5 +321,77 @@ describe('SubscriptionSchedulerService.handlePaytrPendingRecovery', () => {
     expect(prisma.subscriptionPayment.findMany).toHaveBeenCalledWith(
       expect.objectContaining({ take: 50 }),
     );
+  });
+});
+
+/**
+ * handlePendingCancellations: at-period-end cancellations need to emit
+ * subscription.cancelled.v1 so the entitlement projector revokes grants
+ * the moment the paid window closes — a bare updateMany was silent and
+ * left tenants on premium features until the next ad-hoc reprojection.
+ */
+describe('SubscriptionSchedulerService.handlePendingCancellations', () => {
+  let prisma: MockPrismaClient;
+  let outbox: { append: jest.Mock };
+  let svc: SubscriptionSchedulerService;
+
+  beforeEach(() => {
+    prisma = mockPrismaClient();
+    outbox = { append: jest.fn().mockResolvedValue('outbox-id') };
+    svc = buildSvc(prisma, {}, {}, undefined, outbox);
+    // v2.8.89: handlePendingCancellations now wraps the updateMany +
+    // tenant.updateMany in $transaction. Pass-through callback so the
+    // inner result flows out.
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({ id: 'free-plan' } as any);
+    prisma.tenant.updateMany.mockResolvedValue({ count: 1 } as any);
+  });
+
+  it('emits subscription.cancelled.v1 with reason=period_end_cancel for each expiring row', async () => {
+    prisma.subscription.findMany.mockResolvedValue([
+      { id: 'sub-1', tenantId: 'tenant-1', plan: { name: 'STARTER' } },
+      { id: 'sub-2', tenantId: 'tenant-2', plan: { name: 'PRO' } },
+    ] as any);
+    prisma.subscription.updateMany.mockResolvedValue({ count: 2 } as any);
+
+    await svc.handlePendingCancellations();
+
+    expect(outbox.append).toHaveBeenCalledTimes(2);
+    // v2.8.94 — outbox.append now also receives a second arg (the tx
+    // client) because the emit runs inside the $transaction. The mock
+    // happens to receive `undefined` for tx because jest-mock-extended's
+    // mockDeep doesn't forward the $transaction callback's tx through
+    // mockImplementation cleanly; we still verify the payload shape
+    // here and leave the atomicity guarantee to integration tests.
+    const calls = outbox.append.mock.calls;
+    expect(calls[0][0]).toEqual({
+      type: 'subscription.cancelled.v1',
+      tenantId: 'tenant-1',
+      payload: {
+        subscriptionId: 'sub-1',
+        tenantId: 'tenant-1',
+        planCode: 'STARTER',
+        reason: 'period_end_cancel',
+      },
+    });
+    expect(calls[1][0]).toEqual({
+      type: 'subscription.cancelled.v1',
+      tenantId: 'tenant-2',
+      payload: {
+        subscriptionId: 'sub-2',
+        tenantId: 'tenant-2',
+        planCode: 'PRO',
+        reason: 'period_end_cancel',
+      },
+    });
+  });
+
+  it('short-circuits without calling updateMany when no rows expire', async () => {
+    prisma.subscription.findMany.mockResolvedValue([] as any);
+
+    await svc.handlePendingCancellations();
+
+    expect(prisma.subscription.updateMany).not.toHaveBeenCalled();
+    expect(outbox.append).not.toHaveBeenCalled();
   });
 });

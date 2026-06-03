@@ -1,4 +1,10 @@
-import { Injectable, Logger, Inject, forwardRef } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  Inject,
+  forwardRef,
+  Optional,
+} from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { addDays, addHours } from "date-fns";
 import { PrismaService } from "../../../prisma/prisma.service";
@@ -10,7 +16,10 @@ import { PaytrSettlementService } from "../../payments/services/paytr-settlement
 import {
   PaymentStatus,
   SubscriptionStatus,
+  SubscriptionPlanType,
 } from "../../../common/constants/subscription.enum";
+import { OutboxService } from "../../outbox/outbox.service";
+import { EventTypes } from "../../outbox/event-types";
 
 /**
  * All jobs acquire a Postgres advisory lock per job name before running,
@@ -33,6 +42,9 @@ export class SubscriptionSchedulerService {
     // bootstrap and throws.
     @Inject(forwardRef(() => PaytrSettlementService))
     private readonly settlement: PaytrSettlementService,
+    // OutboxModule is @Global; Optional() so the legacy tests that build
+    // the scheduler directly don't need to supply it.
+    @Optional() private readonly outbox?: OutboxService,
   ) {}
 
   /**
@@ -231,18 +243,80 @@ export class SubscriptionSchedulerService {
     await this.withJobLock("pending-cancellations", async () => {
       this.logger.log("Running pending cancellation check...");
       const now = new Date();
-      const result = await this.prisma.subscription.updateMany({
+      // Two-step (find → updateMany → emit) so the entitlement projector
+      // gets one subscription.cancelled.v1 per row. A bare updateMany
+      // would flip the status but leave grants in place until the next
+      // ad-hoc projection — tenants who opted into cancel-at-period-end
+      // would keep premium access for hours past their paid window.
+      const expiring = await this.prisma.subscription.findMany({
         where: {
           cancelAtPeriodEnd: true,
           currentPeriodEnd: { lte: now },
           status: { not: SubscriptionStatus.CANCELLED },
         },
-        data: {
-          status: SubscriptionStatus.CANCELLED,
-          endedAt: now,
-        },
+        select: { id: true, tenantId: true, plan: { select: { name: true } } },
       });
-      this.logger.log(`Cancelled ${result.count} subscriptions at period end`);
+      if (expiring.length === 0) {
+        this.logger.log("No pending cancellations to apply");
+        return;
+      }
+      const ids = expiring.map((s) => s.id);
+      // v2.8.89 — atomic Tenant.currentPlanId → FREE alongside the
+      // status flip. Pre-v2.8.89 only Subscription.status was updated,
+      // so the projector kept re-projecting the paid plan's grants on
+      // every SubscriptionCancelled event (it reads tenant.currentPlan
+      // directly). Wrap both writes in one txn so an interrupted cron
+      // never leaves (status=CANCELLED, currentPlanId=PAID) on disk.
+      const freePlan = await this.prisma.subscriptionPlan.findUnique({
+        where: { name: SubscriptionPlanType.FREE },
+        select: { id: true },
+      });
+      // v2.8.94 — emit the SubscriptionCancelled events INSIDE the
+      // transaction. Pre-fix the outbox.append loop ran after the txn
+      // committed, so a process crash between commit and the first
+      // append left a cohort of CANCELLED subscriptions with no
+      // projector signal — paid grants persisted until the nightly
+      // reconcile cron caught them ~24h later. Atomic emit closes the
+      // window.
+      const result = await this.prisma.$transaction(async (tx) => {
+        const r = await tx.subscription.updateMany({
+          where: {
+            id: { in: ids },
+            status: { not: SubscriptionStatus.CANCELLED },
+          },
+          data: {
+            status: SubscriptionStatus.CANCELLED,
+            endedAt: now,
+          },
+        });
+        if (freePlan && r.count > 0) {
+          await tx.tenant.updateMany({
+            where: { id: { in: expiring.map((s) => s.tenantId) } },
+            data: { currentPlanId: freePlan.id },
+          });
+        }
+        if (r.count > 0) {
+          for (const sub of expiring) {
+            await this.outbox?.append(
+              {
+                type: EventTypes.SubscriptionCancelled,
+                tenantId: sub.tenantId,
+                payload: {
+                  subscriptionId: sub.id,
+                  tenantId: sub.tenantId,
+                  planCode: sub.plan?.name,
+                  reason: "period_end_cancel",
+                },
+              },
+              tx,
+            );
+          }
+        }
+        return r;
+      });
+      this.logger.log(
+        `Cancelled ${result.count} subscriptions at period end (events emitted)`,
+      );
     });
   }
 
@@ -251,17 +325,79 @@ export class SubscriptionSchedulerService {
     await this.withJobLock("past-due-subscriptions", async () => {
       this.logger.log("Running past-due subscription check...");
       const sevenDaysAgo = addDays(new Date(), -7);
-      const result = await this.prisma.subscription.updateMany({
+      // Two-step transition so we can emit one outbox event per expired
+      // subscription. Plain updateMany was atomic but silent — the
+      // entitlement projector never got the signal to revoke grants on
+      // grace expiry, so tenants whose payment lapsed kept premium
+      // features indefinitely. Now: find expiring rows → flip each one
+      // → emit subscription.cancelled.v1. The cancellation event is the
+      // same one the projector already listens for; downgrade event
+      // semantics ("you're losing access") match grace-expiry intent.
+      const expiring = await this.prisma.subscription.findMany({
         where: {
           status: SubscriptionStatus.PAST_DUE,
           currentPeriodEnd: { lte: sevenDaysAgo },
         },
-        data: {
-          status: SubscriptionStatus.EXPIRED,
-          endedAt: new Date(),
+        select: {
+          id: true,
+          tenantId: true,
+          planId: true,
+          plan: { select: { name: true } },
         },
       });
-      this.logger.log(`Expired ${result.count} past-due subscriptions`);
+      if (expiring.length === 0) {
+        this.logger.log("No past-due subscriptions to expire");
+        return;
+      }
+      const now = new Date();
+      const ids = expiring.map((s) => s.id);
+      // v2.8.89 — atomic Tenant.currentPlanId → FREE alongside the
+      // status flip. Same fix pattern as handlePendingCancellations:
+      // pre-v2.8.89 EXPIRED tenants kept their paid plan grants
+      // because the projector re-projected currentPlan unchanged on
+      // every event. With currentPlanId now flipped in the same txn,
+      // the projector projects FREE grants on commit.
+      const freePlan = await this.prisma.subscriptionPlan.findUnique({
+        where: { name: SubscriptionPlanType.FREE },
+        select: { id: true },
+      });
+      // v2.8.94 — mirror handlePendingCancellations: emit the
+      // SubscriptionCancelled events inside the txn so the
+      // (status=EXPIRED, currentPlanId=FREE, outbox row) triple is
+      // either fully durable or fully rolled back.
+      const updated = await this.prisma.$transaction(async (tx) => {
+        const u = await tx.subscription.updateMany({
+          where: { id: { in: ids }, status: SubscriptionStatus.PAST_DUE },
+          data: { status: SubscriptionStatus.EXPIRED, endedAt: now },
+        });
+        if (freePlan && u.count > 0) {
+          await tx.tenant.updateMany({
+            where: { id: { in: expiring.map((s) => s.tenantId) } },
+            data: { currentPlanId: freePlan.id },
+          });
+        }
+        if (u.count > 0) {
+          for (const sub of expiring) {
+            await this.outbox?.append(
+              {
+                type: EventTypes.SubscriptionCancelled,
+                tenantId: sub.tenantId,
+                payload: {
+                  subscriptionId: sub.id,
+                  tenantId: sub.tenantId,
+                  planCode: sub.plan?.name,
+                  reason: "grace_expired",
+                },
+              },
+              tx,
+            );
+          }
+        }
+        return u;
+      });
+      this.logger.log(
+        `Expired ${updated.count} past-due subscriptions (events emitted)`,
+      );
     });
   }
 

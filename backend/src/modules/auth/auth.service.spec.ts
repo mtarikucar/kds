@@ -147,34 +147,60 @@ describe('AuthService', () => {
         lastName: 'Doe',
         role: UserRole.ADMIN,
         tenantId: 'tenant-new',
+        primaryBranchId: 'branch-main',
       };
 
       // Mock implementations
-      prisma.user.findUnique.mockResolvedValue(null); // No existing user
-      prisma.tenant.findUnique.mockResolvedValue(null); // No existing tenant
-      prisma.subscriptionPlan.findUnique.mockResolvedValue(mockFreePlan as any);
+      (prisma.user.findUnique as any).mockImplementation(async ({ where }: any) => {
+        if (where?.email) return null; // existence check
+        // generateTokens reads with select that includes
+        // tokenVersion + branchAssignments. ADMIN's allow-list is
+        // empty for wildcard semantics.
+        return {
+          tokenVersion: 0,
+          primaryBranchId: 'branch-main',
+          branchAssignments: [],
+        };
+      });
+      prisma.tenant.findUnique.mockResolvedValue(null); // no existing subdomain
+      prisma.subscriptionPlan.findUnique.mockResolvedValue({
+        ...mockFreePlan,
+        name: 'BUSINESS',
+        trialDays: 14,
+      } as any);
+      // Wire $transaction so both the tenant+subscription+branch tx
+      // and the user.create+userBranchAssignment tx run against the
+      // same prisma mock.
+      prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
       prisma.tenant.create.mockResolvedValue(mockTenant as any);
       prisma.subscription.create.mockResolvedValue({} as any);
+      prisma.branch.create.mockResolvedValue({ id: 'branch-main' } as any);
       prisma.user.create.mockResolvedValue(mockUser as any);
+      prisma.refreshToken.create.mockResolvedValue({} as any);
 
-      mockJwtService.sign.mockReturnValueOnce('access-token').mockReturnValueOnce('refresh-token');
+      mockJwtService.sign.mockReturnValue('a-token');
+      mockJwtService.decode.mockReturnValue({ exp: Math.floor(Date.now() / 1000) + 3600 });
 
       // Execute
       const result = await service.register(registerDto);
 
       // Assertions
-      expect(result).toEqual({
-        accessToken: 'access-token',
-        refreshToken: 'refresh-token',
-        user: mockUser,
-      });
-
-      expect(prisma.user.findUnique).toHaveBeenCalledWith({
-        where: { email: registerDto.email },
+      expect(result.accessToken).toBeTruthy();
+      expect(result.refreshToken).toBeTruthy();
+      expect(result.user).toMatchObject({
+        id: mockUser.id,
+        email: mockUser.email,
+        primaryBranchId: 'branch-main',
+        allowedBranchIds: [],
       });
 
       expect(prisma.tenant.create).toHaveBeenCalled();
       expect(prisma.subscription.create).toHaveBeenCalled();
+      expect(prisma.branch.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ name: 'Main', status: 'active' }),
+        }),
+      );
       expect(prisma.user.create).toHaveBeenCalled();
     });
 
@@ -249,9 +275,15 @@ describe('AuthService', () => {
 
       prisma.user.findUnique.mockResolvedValue(null);
       prisma.tenant.findUnique.mockResolvedValue(mockTenant as any);
-      prisma.user.create.mockResolvedValue(mockUser as any);
-
-      mockJwtService.sign.mockReturnValueOnce('access-token').mockReturnValueOnce('refresh-token');
+      // Scenario 2 needs an active branch to satisfy the DB CHECK
+      // constraint for restricted-role users.
+      prisma.branch.findFirst.mockResolvedValue({ id: 'branch-main' } as any);
+      prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
+      prisma.user.create.mockResolvedValue({
+        ...mockUser,
+        primaryBranchId: 'branch-main',
+      } as any);
+      prisma.userBranchAssignment.create.mockResolvedValue({} as any);
 
       const result = await service.register(registerDto);
 
@@ -264,9 +296,23 @@ describe('AuthService', () => {
       expect(result.refreshToken).toBeNull();
       expect((result as any).pendingApproval).toBe(true);
       expect(result.user.email).toBe(registerDto.email);
+      expect(result.user.primaryBranchId).toBe('branch-main');
+      // WAITER's allow-list = single-element [primary] at signup so
+      // the BranchPicker badge has something to render.
+      expect(result.user.allowedBranchIds).toEqual(['branch-main']);
 
       expect(prisma.tenant.findUnique).toHaveBeenCalledWith({
         where: { id: registerDto.tenantId },
+      });
+      // The new UserBranchAssignment row must be written in the
+      // same transaction as user.create — restricted roles cannot
+      // exist without an allow-list entry.
+      expect(prisma.userBranchAssignment.create).toHaveBeenCalledWith({
+        data: {
+          userId: mockUser.id,
+          branchId: 'branch-main',
+          tenantId: 'tenant-existing',
+        },
       });
     });
   });
@@ -481,32 +527,43 @@ describe('AuthService', () => {
   });
 
   describe('getProfile', () => {
-    it('should return user profile', async () => {
+    it('should return user profile with v3 branch context', async () => {
       const userId = 'user-1';
-      const mockUser = {
+      const dbRow = {
         id: userId,
         email: 'test@test.com',
         firstName: 'John',
         lastName: 'Doe',
-        role: UserRole.ADMIN,
+        role: UserRole.MANAGER,
         tenantId: 'tenant-1',
+        primaryBranchId: 'branch-1',
+        branchAssignments: [
+          { branchId: 'branch-1' },
+          { branchId: 'branch-2' },
+        ],
       };
 
-      prisma.user.findUnique.mockResolvedValue(mockUser as any);
+      prisma.user.findUnique.mockResolvedValue(dbRow as any);
 
       const result = await service.getProfile(userId);
 
-      expect(result).toEqual(mockUser);
+      // /me must surface both primaryBranchId and the resolved
+      // allowedBranchIds[] — the SPA's branchScopeStore hydrates
+      // straight off this response, so omitting either field
+      // wedges branch switching.
+      expect(result).toMatchObject({
+        id: userId,
+        email: 'test@test.com',
+        primaryBranchId: 'branch-1',
+        allowedBranchIds: ['branch-1', 'branch-2'],
+      });
       expect(prisma.user.findUnique).toHaveBeenCalledWith({
         where: { id: userId },
-        select: {
+        select: expect.objectContaining({
           id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          role: true,
-          tenantId: true,
-        },
+          primaryBranchId: true,
+          branchAssignments: { select: { branchId: true } },
+        }),
       });
     });
 

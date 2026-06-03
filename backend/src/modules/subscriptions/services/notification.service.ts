@@ -3,8 +3,9 @@ import { ConfigService } from "@nestjs/config";
 import * as nodemailer from "nodemailer";
 import { Transporter } from "nodemailer";
 import * as handlebars from "handlebars";
-import * as fs from "fs";
+import * as fsp from "fs/promises";
 import * as path from "path";
+import { maskEmail } from "../../../common/helpers/pii-mask.helper";
 
 export interface EmailOptions {
   to: string;
@@ -18,9 +19,33 @@ export class NotificationService {
   private readonly logger = new Logger(NotificationService.name);
   private transporter: Transporter;
   private templatesPath: string;
+  // Iter-97: cache compiled handlebars templates. Templates change only
+  // on deploy, so a Map that lives for the process lifetime is fine.
+  // Pre-fix every email send re-read the .hbs file from disk
+  // (fs.readFileSync — sync, blocking the event loop) and recompiled
+  // via handlebars.compile (regex + AST + codegen). With cron-driven
+  // bursts like sendTrialEndingReminder firing for every trial-ending
+  // tenant in one tick, this serialized the email queue on disk I/O
+  // and CPU compile time.
+  private readonly templateCache = new Map<
+    string,
+    HandlebarsTemplateDelegate
+  >();
 
   constructor(private configService: ConfigService) {
-    this.templatesPath = path.join(__dirname, "../templates/emails");
+    // process.cwd() instead of __dirname — same reasoning EmailService
+    // documents (common/services/email.service.ts:26). NestJS+webpack
+    // bundles to a single dist/main.js, so __dirname at runtime is
+    // /app/dist/ regardless of source location. Combined with the
+    // `path.join(__dirname, '../templates/emails')` form, prod
+    // accidentally resolved to /app/templates/emails/ — same dir
+    // EmailService uses — but DEV resolved to
+    // backend/src/modules/subscriptions/templates/emails/, forcing
+    // 17 templates to be maintained in two locations to make dev work.
+    // process.cwd() collapses both environments onto the same canonical
+    // dir (backend/templates/emails/), making the subscriptions/
+    // template duplicates obviously dead.
+    this.templatesPath = path.join(process.cwd(), "templates/emails");
     this.initializeTransporter();
   }
 
@@ -67,7 +92,9 @@ export class NotificationService {
         html,
       });
 
-      this.logger.log(`Email sent to ${options.to}: ${options.subject}`);
+      this.logger.log(
+        `Email sent to ${maskEmail(options.to)}: ${options.subject}`,
+      );
       return true;
     } catch (error) {
       this.logger.error(`Failed to send email: ${error.message}`);
@@ -76,17 +103,17 @@ export class NotificationService {
   }
 
   /**
-   * Render email template
+   * Render email template. Templates are compiled once per process and
+   * memoized in `templateCache`; subsequent renders skip the disk read
+   * and the handlebars.compile pass. See class field for context on the
+   * pre-fix hot path.
    */
   private async renderTemplate(
     templateName: string,
     context: Record<string, any>,
   ): Promise<string> {
-    const templatePath = path.join(this.templatesPath, `${templateName}.hbs`);
-
     try {
-      const templateContent = fs.readFileSync(templatePath, "utf-8");
-      const template = handlebars.compile(templateContent);
+      const template = await this.loadTemplate(templateName);
       return template(context);
     } catch (error) {
       this.logger.error(
@@ -95,6 +122,18 @@ export class NotificationService {
       // Return a simple fallback template
       return `<p>${context.message || "Notification from HummyTummy"}</p>`;
     }
+  }
+
+  private async loadTemplate(
+    templateName: string,
+  ): Promise<HandlebarsTemplateDelegate> {
+    const cached = this.templateCache.get(templateName);
+    if (cached) return cached;
+    const templatePath = path.join(this.templatesPath, `${templateName}.hbs`);
+    const source = await fsp.readFile(templatePath, "utf-8");
+    const compiled = handlebars.compile(source);
+    this.templateCache.set(templateName, compiled);
+    return compiled;
   }
 
   /** App base URL used in template links. */

@@ -12,34 +12,38 @@
 /** Midnight `now` falls into, expressed as a UTC Date, for `timezone`. */
 export function getTenantMidnight(now: Date, timezone: string): Date {
   try {
-    const parts = new Intl.DateTimeFormat('en-CA', {
+    const parts = new Intl.DateTimeFormat("en-CA", {
       timeZone: timezone,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
     }).formatToParts(now);
-    const y = parseInt(parts.find((p) => p.type === 'year')?.value ?? '1970', 10);
-    const m = parseInt(parts.find((p) => p.type === 'month')?.value ?? '1', 10);
-    const d = parseInt(parts.find((p) => p.type === 'day')?.value ?? '1', 10);
+    const y = parseInt(
+      parts.find((p) => p.type === "year")?.value ?? "1970",
+      10,
+    );
+    const m = parseInt(parts.find((p) => p.type === "month")?.value ?? "1", 10);
+    const d = parseInt(parts.find((p) => p.type === "day")?.value ?? "1", 10);
     const approx = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
-    const probe = new Intl.DateTimeFormat('en-US', {
+    const probe = new Intl.DateTimeFormat("en-US", {
       timeZone: timezone,
       hour12: false,
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
     }).formatToParts(approx);
-    const get = (t: string) => parseInt(probe.find((p) => p.type === t)?.value ?? '0', 10);
+    const get = (t: string) =>
+      parseInt(probe.find((p) => p.type === t)?.value ?? "0", 10);
     const zonedAsUtc = Date.UTC(
-      get('year'),
-      get('month') - 1,
-      get('day'),
-      get('hour') % 24,
-      get('minute'),
-      get('second'),
+      get("year"),
+      get("month") - 1,
+      get("day"),
+      get("hour") % 24,
+      get("minute"),
+      get("second"),
     );
     const offset = zonedAsUtc - approx.getTime();
     return new Date(approx.getTime() - offset);

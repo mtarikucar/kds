@@ -11,8 +11,8 @@ import {
   UploadedFiles,
   Query,
   BadRequestException,
-} from '@nestjs/common';
-import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+} from "@nestjs/common";
+import { FileInterceptor, FilesInterceptor } from "@nestjs/platform-express";
 import {
   ApiTags,
   ApiOperation,
@@ -20,139 +20,148 @@ import {
   ApiResponse,
   ApiConsumes,
   ApiBody,
-} from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { TenantGuard } from '../auth/guards/tenant.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '../../common/constants/roles.enum';
-import { UploadService } from './upload.service';
-import { UploadResponseDto, MultipleUploadResponseDto } from './dto/upload-response.dto';
+} from "@nestjs/swagger";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { TenantGuard } from "../auth/guards/tenant.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { UserRole } from "../../common/constants/roles.enum";
+import { UploadService } from "./upload.service";
+import {
+  UploadResponseDto,
+  MultipleUploadResponseDto,
+} from "./dto/upload-response.dto";
 
-@ApiTags('upload')
+@ApiTags("upload")
 @ApiBearerAuth()
-@Controller('upload')
+@Controller("upload")
 @UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
 export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
-  @Post('logo')
+  @Post("logo")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @UseInterceptors(
-    FileInterceptor('logo', {
+    FileInterceptor("logo", {
       limits: { fileSize: 5 * 1024 * 1024, files: 1 },
       fileFilter: (_req, file, cb) => {
         // MIME header is client-supplied; still pre-filter at multer layer
         // so we reject obviously-wrong types before buffering. A magic-byte
         // sniff runs in UploadService for the real check.
-        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
-          cb(new BadRequestException('Invalid file type'), false);
+        if (
+          !["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)
+        ) {
+          cb(new BadRequestException("Invalid file type"), false);
         } else {
           cb(null, true);
         }
       },
     }),
   )
-  @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Upload restaurant logo' })
+  @ApiConsumes("multipart/form-data")
+  @ApiOperation({ summary: "Upload restaurant logo" })
   @ApiBody({
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
         logo: {
-          type: 'string',
-          format: 'binary',
+          type: "string",
+          format: "binary",
         },
       },
     },
   })
   @ApiResponse({
     status: 201,
-    description: 'Logo uploaded successfully',
+    description: "Logo uploaded successfully",
   })
-  @ApiResponse({ status: 400, description: 'Invalid file or file too large' })
+  @ApiResponse({ status: 400, description: "Invalid file or file too large" })
   async uploadLogo(
     @UploadedFile() file: Express.Multer.File,
     @Request() req,
   ): Promise<{ url: string }> {
     if (!file) {
-      throw new BadRequestException('No file uploaded');
+      throw new BadRequestException("No file uploaded");
     }
 
     const tenantId = req.tenantId;
     return this.uploadService.uploadLogo(file, tenantId);
   }
 
-  @Post('product-image')
+  @Post("product-image")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @UseInterceptors(
-    FileInterceptor('image', {
+    FileInterceptor("image", {
       limits: { fileSize: 5 * 1024 * 1024, files: 1 },
       fileFilter: (_req, file, cb) => {
-        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
-          cb(new BadRequestException('Invalid file type'), false);
+        if (
+          !["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)
+        ) {
+          cb(new BadRequestException("Invalid file type"), false);
         } else {
           cb(null, true);
         }
       },
     }),
   )
-  @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Upload single product image' })
+  @ApiConsumes("multipart/form-data")
+  @ApiOperation({ summary: "Upload single product image" })
   @ApiBody({
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
         image: {
-          type: 'string',
-          format: 'binary',
+          type: "string",
+          format: "binary",
         },
       },
     },
   })
   @ApiResponse({
     status: 201,
-    description: 'Image uploaded successfully',
+    description: "Image uploaded successfully",
     type: UploadResponseDto,
   })
-  @ApiResponse({ status: 400, description: 'Invalid file or file too large' })
+  @ApiResponse({ status: 400, description: "Invalid file or file too large" })
   async uploadSingleImage(
     @UploadedFile() file: Express.Multer.File,
     @Request() req,
   ): Promise<UploadResponseDto> {
     if (!file) {
-      throw new BadRequestException('No file uploaded');
+      throw new BadRequestException("No file uploaded");
     }
 
     const tenantId = req.tenantId;
     return this.uploadService.uploadProductImage(file, tenantId);
   }
 
-  @Post('product-images')
+  @Post("product-images")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @UseInterceptors(
-    FilesInterceptor('images', 10, {
+    FilesInterceptor("images", 10, {
       limits: { fileSize: 5 * 1024 * 1024, files: 10 },
       fileFilter: (_req, file, cb) => {
-        if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.mimetype)) {
-          cb(new BadRequestException('Invalid file type'), false);
+        if (
+          !["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)
+        ) {
+          cb(new BadRequestException("Invalid file type"), false);
         } else {
           cb(null, true);
         }
       },
     }),
   )
-  @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Upload multiple product images' })
+  @ApiConsumes("multipart/form-data")
+  @ApiOperation({ summary: "Upload multiple product images" })
   @ApiBody({
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
         images: {
-          type: 'array',
+          type: "array",
           items: {
-            type: 'string',
-            format: 'binary',
+            type: "string",
+            format: "binary",
           },
         },
       },
@@ -160,16 +169,16 @@ export class UploadController {
   })
   @ApiResponse({
     status: 201,
-    description: 'Images uploaded successfully',
+    description: "Images uploaded successfully",
     type: MultipleUploadResponseDto,
   })
-  @ApiResponse({ status: 400, description: 'Invalid files or files too large' })
+  @ApiResponse({ status: 400, description: "Invalid files or files too large" })
   async uploadMultipleImages(
     @UploadedFiles() files: Express.Multer.File[],
     @Request() req,
   ): Promise<MultipleUploadResponseDto> {
     if (!files || files.length === 0) {
-      throw new BadRequestException('No files uploaded');
+      throw new BadRequestException("No files uploaded");
     }
 
     const tenantId = req.tenantId;
@@ -184,43 +193,45 @@ export class UploadController {
     };
   }
 
-  @Delete('product-image/:id')
+  @Delete("product-image/:id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ summary: 'Delete product image' })
-  @ApiResponse({ status: 200, description: 'Image deleted successfully' })
-  @ApiResponse({ status: 404, description: 'Image not found' })
+  @ApiOperation({ summary: "Delete product image" })
+  @ApiResponse({ status: 200, description: "Image deleted successfully" })
+  @ApiResponse({ status: 404, description: "Image not found" })
   async deleteImage(
-    @Param('id') imageId: string,
+    @Param("id") imageId: string,
     @Request() req,
   ): Promise<{ message: string }> {
     const tenantId = req.tenantId;
     await this.uploadService.deleteProductImage(imageId, tenantId);
 
-    return { message: 'Image deleted successfully' };
+    return { message: "Image deleted successfully" };
   }
 
-  @Get('product-images')
+  @Get("product-images")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ summary: 'Get all product images for tenant' })
+  @ApiOperation({ summary: "Get all product images for tenant" })
   @ApiResponse({
     status: 200,
-    description: 'List of product images',
+    description: "List of product images",
     type: [UploadResponseDto],
   })
   async getProductImages(
     @Request() req,
-    @Query('productId') productId?: string,
+    @Query("productId") productId?: string,
   ): Promise<UploadResponseDto[]> {
     const tenantId = req.tenantId;
     return this.uploadService.getProductImages(tenantId, productId);
   }
 
-  @Get('product-images/unused')
+  @Get("product-images/unused")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ summary: 'Get unused product images (not attached to any product)' })
+  @ApiOperation({
+    summary: "Get unused product images (not attached to any product)",
+  })
   @ApiResponse({
     status: 200,
-    description: 'List of unused images',
+    description: "List of unused images",
     type: [UploadResponseDto],
   })
   async getUnusedImages(@Request() req): Promise<UploadResponseDto[]> {

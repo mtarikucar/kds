@@ -1,7 +1,7 @@
-import { SetMetadata } from '@nestjs/common';
-import { SubscriptionPlanType } from '../../../common/constants/subscription.enum';
+import { SetMetadata } from "@nestjs/common";
+import { SubscriptionPlanType } from "../../../common/constants/subscription.enum";
 
-export const REQUIRED_PLANS_KEY = 'requiredPlans';
+export const REQUIRED_PLANS_KEY = "requiredPlans";
 
 /**
  * Decorator to specify which subscription plans are required to access a route

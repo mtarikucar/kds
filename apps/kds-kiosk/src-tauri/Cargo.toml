@@ -1,0 +1,30 @@
+[package]
+name = "hummytummy-kds-kiosk"
+version = "0.1.0"
+description = "HummyTummy KDS kiosk shell"
+authors = ["HummyTummy"]
+edition = "2021"
+
+[lib]
+name = "hummytummy_kds_kiosk_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Secure storage for the device token. `keyring` uses the OS-native
+# credential store (Linux Secret Service, macOS Keychain, Windows DPAPI)
+# so the token never lives in plaintext on disk.
+keyring = "3"
+thiserror = "1"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

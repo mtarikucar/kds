@@ -1,46 +1,57 @@
-import { Logger } from '@nestjs/common';
-import axios, { AxiosInstance } from 'axios';
-import { AccountingAdapter, AccountingInvoiceData } from './accounting-adapter.interface';
+import { Logger } from "@nestjs/common";
+import axios, { AxiosInstance } from "axios";
+import {
+  AccountingAdapter,
+  AccountingInvoiceData,
+} from "./accounting-adapter.interface";
 
 export class ParasutAdapter implements AccountingAdapter {
-  readonly name = 'parasut';
+  readonly name = "parasut";
   private readonly logger = new Logger(ParasutAdapter.name);
   private httpClient: AxiosInstance;
 
   constructor() {
     this.httpClient = axios.create({
-      baseURL: 'https://api.parasut.com',
+      baseURL: "https://api.parasut.com",
       timeout: 15000,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
     });
   }
 
-  async authenticate(credentials: Record<string, string>): Promise<{ accessToken: string; expiresAt?: Date }> {
-    const response = await this.httpClient.post('/oauth/token', {
-      grant_type: 'password',
+  async authenticate(
+    credentials: Record<string, string>,
+  ): Promise<{ accessToken: string; expiresAt?: Date }> {
+    const response = await this.httpClient.post("/oauth/token", {
+      grant_type: "password",
       client_id: credentials.clientId,
       client_secret: credentials.clientSecret,
       username: credentials.username,
       password: credentials.password,
     });
 
-    const expiresAt = new Date(Date.now() + (response.data.expires_in || 7200) * 1000);
+    const expiresAt = new Date(
+      Date.now() + (response.data.expires_in || 7200) * 1000,
+    );
     return { accessToken: response.data.access_token, expiresAt };
   }
 
-  async pushInvoice(token: string, companyId: string, invoice: AccountingInvoiceData): Promise<{ externalId: string }> {
+  async pushInvoice(
+    token: string,
+    companyId: string,
+    invoice: AccountingInvoiceData,
+  ): Promise<{ externalId: string }> {
     const invoiceData: any = {
       data: {
-        type: 'sales_invoices',
+        type: "sales_invoices",
         attributes: {
-          item_type: 'invoice',
+          item_type: "invoice",
           description: `Siparis Faturasi - ${invoice.invoiceNumber}`,
           issue_date: invoice.issueDate,
           due_date: invoice.dueDate || invoice.issueDate,
-          invoice_series: invoice.invoiceNumber.split('-')[0] || 'FTR',
-          invoice_id: parseInt(invoice.invoiceNumber.replace(/\D/g, '')) || 1,
-          currency: invoice.currency || 'TRY',
-          payment_status: invoice.paymentMethod ? 'paid' : 'unpaid',
+          invoice_series: invoice.invoiceNumber.split("-")[0] || "FTR",
+          invoice_id: parseInt(invoice.invoiceNumber.replace(/\D/g, "")) || 1,
+          currency: invoice.currency || "TRY",
+          payment_status: invoice.paymentMethod ? "paid" : "unpaid",
         },
         relationships: {},
       },
@@ -56,7 +67,7 @@ export class ParasutAdapter implements AccountingAdapter {
         });
         if (contactId) {
           invoiceData.data.relationships.contact = {
-            data: { id: contactId, type: 'contacts' },
+            data: { id: contactId, type: "contacts" },
           };
         }
       } catch (err) {
@@ -78,7 +89,7 @@ export class ParasutAdapter implements AccountingAdapter {
         `/v4/${companyId}/sales_invoices/${salesInvoiceId}/relationships/details`,
         {
           data: {
-            type: 'sales_invoice_details',
+            type: "sales_invoice_details",
             attributes: {
               quantity: item.quantity,
               unit_price: item.unitPrice,
@@ -105,7 +116,8 @@ export class ParasutAdapter implements AccountingAdapter {
   }
 
   private async findOrCreateContact(
-    token: string, companyId: string,
+    token: string,
+    companyId: string,
     contact: { name: string; taxNumber?: string; taxOffice?: string },
   ): Promise<string | undefined> {
     try {
@@ -122,10 +134,10 @@ export class ParasutAdapter implements AccountingAdapter {
         `/v4/${companyId}/contacts`,
         {
           data: {
-            type: 'contacts',
+            type: "contacts",
             attributes: {
               name: contact.name,
-              contact_type: 'customer',
+              contact_type: "customer",
               tax_number: contact.taxNumber,
               tax_office: contact.taxOffice,
             },

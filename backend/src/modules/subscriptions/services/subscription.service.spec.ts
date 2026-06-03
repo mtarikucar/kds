@@ -39,7 +39,23 @@ describe('SubscriptionService.startTrialFromIntent', () => {
     notifications = {
       sendTrialStarted: jest.fn().mockResolvedValue(undefined),
     } as any;
-    svc = new SubscriptionService(prisma as any, billing, notifications);
+    svc = new SubscriptionService(
+      prisma as any,
+      billing,
+      notifications,
+      { append: jest.fn().mockResolvedValue('outbox-id') } as any,
+      // v2.8.88: EntitlementService stub. Default returns an empty set
+      // so existing tests (which don't care about engine routing)
+      // continue to hit the plan-only fallback branch.
+      {
+        getForTenant: jest.fn().mockResolvedValue({
+          features: {},
+          limits: {},
+          integrations: {},
+          computedAt: new Date(0).toISOString(),
+        }),
+      } as any,
+    );
 
     // Sensible defaults — individual tests override.
     prisma.user.findUnique.mockResolvedValue({ emailVerified: true } as any);
@@ -304,7 +320,23 @@ describe('SubscriptionService.cancelSubscription', () => {
       sendSubscriptionCancelledImmediate: jest.fn().mockResolvedValue(undefined),
       sendSubscriptionWillCancel: jest.fn().mockResolvedValue(undefined),
     } as any;
-    svc = new SubscriptionService(prisma as any, billing, notifications);
+    svc = new SubscriptionService(
+      prisma as any,
+      billing,
+      notifications,
+      { append: jest.fn().mockResolvedValue('outbox-id') } as any,
+      // v2.8.88: EntitlementService stub. Default returns an empty set
+      // so existing tests (which don't care about engine routing)
+      // continue to hit the plan-only fallback branch.
+      {
+        getForTenant: jest.fn().mockResolvedValue({
+          features: {},
+          limits: {},
+          integrations: {},
+          computedAt: new Date(0).toISOString(),
+        }),
+      } as any,
+    );
 
     // getSubscriptionById uses findUnique({ id })
     prisma.subscription.findUnique.mockResolvedValue(activeSub);
@@ -313,6 +345,12 @@ describe('SubscriptionService.cancelSubscription', () => {
     prisma.subscription.updateMany.mockResolvedValue({ count: 1 } as any);
     prisma.subscription.findUniqueOrThrow.mockResolvedValue(activeSub);
     prisma.user.findFirst.mockResolvedValue({ email: 'admin@example.com' } as any);
+    // v2.8.89: cancelSubscription now wraps the updateMany + tenant
+    // update in $transaction. Pass-through callback so the inner
+    // updateMany count flows out as the txn result.
+    prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
+    prisma.subscriptionPlan.findUnique.mockResolvedValue({ id: 'free-plan' } as any);
+    prisma.tenant.update.mockResolvedValue({} as any);
   });
 
   it('immediate=true → writes CANCELLED + cancelledAt + endedAt', async () => {

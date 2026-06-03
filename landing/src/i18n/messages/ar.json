@@ -9,6 +9,7 @@
     "features": "المميزات",
     "pricing": "الأسعار",
     "security": "الأمان",
+    "store": "المتجر",
     "signIn": "تسجيل الدخول",
     "startFree": "ابدأ مجاناً",
     "openMenu": "فتح القائمة",
@@ -284,8 +285,8 @@
   "footer": {
     "description": "منصة إدارة المطاعم الحديثة. بسّط العمليات، أسعد العملاء.",
     "contact": "اتصل بنا",
-    "address": "Bosna Hersek Mahallesi, Akif Sokak, No.3 Selçuklu, Konya",
-    "phone": "+90 506 068 71 00",
+    "address": "Şehit Osman Avcı Mahallesi, Akın 688 Sitesi B32, Etimesgut / Ankara",
+    "phone": "+90 850 840 73 03",
     "product": "المنتج",
     "company": "الشركة",
     "support": "الدعم",
@@ -294,6 +295,7 @@
       "features": "المميزات",
       "pricing": "الأسعار",
       "security": "الأمان",
+      "shop": "متجر الأجهزة",
       "integrations": "التكاملات",
       "about": "حولنا",
       "blog": "المدونة",
@@ -429,12 +431,81 @@
       }
     }
   },
+  "store": {
+    "title": "متجر أجهزة نقاط البيع",
+    "subtitle": "أجهزة نقاط بيع وطابعات حرارية وشاشات مطبخ وماسحات باركود ومستلزمات مختارة للمطاعم والمقاهي وتجار التجزئة.",
+    "backToHome": "العودة إلى الصفحة الرئيسية",
+    "headerBadge": "أسعار مايو 2026",
+    "categoryAll": "الكل",
+    "categories": {
+      "yazarkasa": "نقطة البيع الضريبية",
+      "pos_terminal": "محطة نقاط البيع",
+      "printer": "طابعة",
+      "kds_screen": "شاشة المطبخ",
+      "tablet": "جهاز لوحي",
+      "scanner": "ماسح باركود",
+      "caller_id": "هوية المتصل",
+      "cash_drawer": "درج النقود",
+      "bridge": "جسر الشبكة",
+      "scale": "ميزان",
+      "cable": "كابل",
+      "accessory": "ملحقات",
+      "service": "خدمة"
+    },
+    "buy": "اطلب الآن",
+    "viewSource": "صفحة الشركة المصنّعة",
+    "from": "{currency}{amount}",
+    "warrantyMonths": "ضمان {months} شهر",
+    "rentalFrom": "أو {currency}{amount} شهرياً تأجير",
+    "gibCertified": "معتمد من GİB",
+    "outOfStock": "غير متوفر",
+    "discontinued": "متوقف",
+    "preorder": "طلب مسبق",
+    "empty": "لا توجد منتجات في هذه الفئة حالياً.",
+    "loadError": "تعذّر تحميل المنتجات. حاول مجدداً بعد قليل.",
+    "byo": {
+      "title": "هل لديك أجهزة سابقة؟",
+      "body": "يمكننا دمج جهاز نقاط البيع الضريبي أو الطابعة الحرارية أو شاشة المطبخ أو ماسح الباركود الذي تملكه بالفعل — لست مضطراً لشراء أجهزة جديدة. بعد التسجيل، شارك العلامة التجارية والطراز مع فريق الدعم لدينا.",
+      "cta": "تواصل مع الدعم"
+    },
+    "gibFootnote": "أجهزة نقاط البيع الضريبية في تركيا (YN ÖKC) يجب أن تكون مدرجة في قائمة GİB وأن يتم تفعيلها عبر وكيل مرخّص. عند الطلب من خلال HummyTummy يُفتح طلب التفعيل تلقائياً.",
+    "viewDetails": "Details",
+    "services": {
+      "sectionTitle": "Installation & Integration Services",
+      "sectionSubtitle": "Hardware install, GİB registration, integration, menu migration — every package is transparent."
+    },
+    "detail": {
+      "backToStore": "Back to store",
+      "buy": "Order",
+      "duration": "Duration",
+      "coverage": "Service areas",
+      "onsite": "On-site",
+      "remote": "Remote",
+      "consultation": "Consultation",
+      "requiresBranch": "Branch required",
+      "lowStock": "Only {n} left",
+      "warrantyMonthsLabel": "{months}-month warranty",
+      "noDetailsAuthored": "Detailed information is not yet authored.",
+      "empty": "No information.",
+      "tabs": {
+        "description": "Description",
+        "specs": "Specs",
+        "compat": "Compatibility",
+        "requirements": "Requirements",
+        "faq": "FAQ",
+        "includes": "What's included",
+        "steps": "Process"
+      }
+    }
+  },
   "contact": {
     "title": "تواصل معنا",
     "subtitle": "تواصل معنا بشأن الأسئلة والطلبات والملاحظات.",
     "backToHome": "العودة إلى الرئيسية",
+    "phone": "+90 850 840 73 03",
     "labels": {
-      "email": "البريد الإلكتروني"
+      "email": "البريد الإلكتروني",
+      "phone": "الهاتف"
     },
     "sections": {
       "general": {
@@ -461,6 +532,27 @@
           "privacy": "سياسة الخصوصية",
           "terms": "شروط الخدمة"
         }
+      }
+    },
+    "form": {
+      "title": "أرسل لنا رسالة",
+      "submit": "إرسال الرسالة",
+      "submitting": "جارٍ الإرسال…",
+      "honeypotLabel": "الموقع الإلكتروني (اتركه فارغًا)",
+      "successMessage": "شكرًا — سنرد خلال يومي عمل.",
+      "fields": {
+        "name": "الاسم",
+        "email": "البريد الإلكتروني",
+        "phone": "الهاتف",
+        "message": "الرسالة",
+        "optional": "اختياري"
+      },
+      "errors": {
+        "nameTooShort": "يجب أن يكون الاسم حرفين على الأقل.",
+        "emailInvalid": "يرجى إدخال عنوان بريد إلكتروني صالح.",
+        "messageTooShort": "يجب أن تكون الرسالة 10 أحرف على الأقل.",
+        "network": "مشكلة في الاتصال — يرجى المحاولة مرة أخرى.",
+        "generic": "تعذر إرسال الرسالة. يرجى المحاولة مرة أخرى."
       }
     }
   }

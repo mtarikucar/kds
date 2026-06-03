@@ -5,6 +5,8 @@ import { PrismaService } from "../../../prisma/prisma.service";
 import { BillingService } from "../../subscriptions/services/billing.service";
 import { NotificationService } from "../../subscriptions/services/notification.service";
 import { captureException } from "../../../sentry.config";
+import { OutboxService } from "../../outbox/outbox.service";
+import { EventTypes } from "../../outbox/event-types";
 import {
   BillingCycle,
   PaymentProvider,
@@ -75,6 +77,14 @@ export class PaytrSettlementService {
     private readonly prisma: PrismaService,
     private readonly billing: BillingService,
     private readonly notifications: NotificationService,
+    // v2.8.89: emit SubscriptionActivated / SubscriptionUpgraded after
+    // applySuccess so the entitlement projector reprojects. Pre-v2.8.89
+    // applySuccess wrote currentPlanId in a Prisma txn but skipped the
+    // outbox event, so the projector — which subscribes to
+    // SubscriptionActivated/Upgraded — never ran. Paid upgrades stayed
+    // stuck on the old plan's grants for up to 24h (until
+    // reconcileNightly).
+    private readonly outbox: OutboxService,
   ) {}
 
   async settlePayment(
@@ -118,32 +128,12 @@ export class PaytrSettlementService {
     const subscription = payment.subscription;
     const now = new Date();
 
-    // Captured inside the transaction, used after commit to fire the
-    // UPSELL commission. `null` when this charge was a fresh activation
-    // rather than an upgrade.
-    let upgradeContext: {
-      planId: string;
-      amount: Prisma.Decimal;
-      commissionRate: Prisma.Decimal;
-    } | null = null;
-    // Signup commission for self-serve referral checkouts — populated
-    // only when this charge isn't an upgrade *and* the payment carries
-    // a resolved referrer. Mutually exclusive with `upgradeContext`.
-    let signupContext: {
-      marketerId: string;
-      referralCode: string | null;
-      amount: Prisma.Decimal;
-      commissionRate: Prisma.Decimal;
-    } | null = null;
-    // Renewal commission for the marketing rep who originally converted
-    // this tenant. Fires when the subscription already has at least one
-    // prior SUCCEEDED payment (manual re-purchase model: each new cycle
-    // is a fresh checkout, not an auto-charge).
-    let renewalContext: {
-      planId: string;
-      amount: Prisma.Decimal;
-      commissionRate: Prisma.Decimal;
-    } | null = null;
+    // Step C marketing decoupling — commission crediting no longer happens
+    // here. PayTR settlement (core) determines WHICH commission kind applies
+    // and emits a single durable `payment.succeeded.v1` inside the settlement
+    // transaction; the marketing-owned SettlementCommissionConsumer reacts to
+    // it and owns the lead lookup + commission write. Payments no longer reads
+    // `lead` or writes `commission`/`marketingNotification`.
 
     try {
       await this.prisma.$transaction(async (tx) => {
@@ -158,6 +148,15 @@ export class PaytrSettlementService {
         let billingCycle: string = subscription.billingCycle;
         let displayName: string = subscription.plan.displayName;
 
+        // Commission event capture (Step C). Determines the kind + amount +
+        // rate that ride payment.succeeded.v1. Precedence mirrors the old
+        // post-tx dispatch order — upgrade → upsell; else prior-succeeded →
+        // renewal (set in the block below); else referral → signup.
+        let commissionKind: "signup" | "renewal" | "upsell" | null = null;
+        let commissionAmount: Prisma.Decimal = new Prisma.Decimal(0);
+        let commissionRate: Prisma.Decimal = new Prisma.Decimal(0.1);
+        let commissionPlanCode: string = subscription.plan.name;
+
         if (upgrade) {
           finalPlanId = upgrade.targetPlanId;
           billingCycle = upgrade.billingCycle;
@@ -167,13 +166,12 @@ export class PaytrSettlementService {
               : (upgrade.targetPlan.yearlyPrice as Prisma.Decimal);
           finalCurrency = upgrade.targetPlan.currency;
           displayName = upgrade.targetPlan.displayName;
-          upgradeContext = {
-            planId: upgrade.targetPlanId,
-            amount: finalAmount,
-            commissionRate:
-              (upgrade.targetPlan.commissionRate as Prisma.Decimal) ??
-              new Prisma.Decimal(0.1),
-          };
+          commissionKind = "upsell";
+          commissionAmount = finalAmount;
+          commissionRate =
+            (upgrade.targetPlan.commissionRate as Prisma.Decimal) ??
+            new Prisma.Decimal(0.1);
+          commissionPlanCode = upgrade.targetPlan.name;
         } else if (payment.referredByMarketingUserId) {
           // Fresh activation with a referral code on the payment.
           // Use payment.amount, not subscription.amount — a tenant
@@ -182,14 +180,11 @@ export class PaytrSettlementService {
           // payment row carries the canonical price the customer is
           // being charged. commissionRate falls back to 0.10 for plans
           // that predate the per-plan rate column.
-          signupContext = {
-            marketerId: payment.referredByMarketingUserId,
-            referralCode: payment.referralCode ?? null,
-            amount: payment.amount as Prisma.Decimal,
-            commissionRate:
-              (subscription.plan.commissionRate as Prisma.Decimal) ??
-              new Prisma.Decimal(0.1),
-          };
+          commissionKind = "signup";
+          commissionAmount = payment.amount as Prisma.Decimal;
+          commissionRate =
+            (subscription.plan.commissionRate as Prisma.Decimal) ??
+            new Prisma.Decimal(0.1);
         }
 
         const periodEnd =
@@ -231,13 +226,15 @@ export class PaytrSettlementService {
             },
           });
           if (priorSucceeded > 0) {
-            renewalContext = {
-              planId: finalPlanId,
-              amount: finalAmount,
-              commissionRate:
-                (subscription.plan.commissionRate as Prisma.Decimal) ??
-                new Prisma.Decimal(0.1),
-            };
+            // Renewal precedence over signup: overwrite even if a referral
+            // signup was tentatively captured above (mirrors the original
+            // dispatch order upgrade > renewal > signup).
+            commissionKind = "renewal";
+            commissionAmount = finalAmount;
+            commissionRate =
+              (subscription.plan.commissionRate as Prisma.Decimal) ??
+              new Prisma.Decimal(0.1);
+            commissionPlanCode = subscription.plan.name;
           }
         }
 
@@ -250,6 +247,12 @@ export class PaytrSettlementService {
         // same charge. updateMany with status=PENDING in the WHERE
         // serialises them; the loser throws ALREADY_TERMINAL upstream
         // by aborting the transaction.
+        //
+        // v3.0.0 — pinned by the finalization audit. This is the canonical
+        // idempotency contract for the PayTR flow: webhook handlers can
+        // safely retry, and the periodic recovery sweeper can race the
+        // real-time callback without producing double-credits or
+        // duplicate `SubscriptionPayment` history rows.
         const claimResult = await tx.subscriptionPayment.updateMany({
           where: { id: payment.id, status: PaymentStatus.PENDING },
           data: {
@@ -261,9 +264,11 @@ export class PaytrSettlementService {
         if (claimResult.count === 0) {
           throw new SettlementAlreadyTerminalError();
         }
-        const succeededPayment = await tx.subscriptionPayment.findUniqueOrThrow({
-          where: { id: payment.id },
-        });
+        const succeededPayment = await tx.subscriptionPayment.findUniqueOrThrow(
+          {
+            where: { id: payment.id },
+          },
+        );
 
         await this.billing.createInvoice(
           tx,
@@ -281,47 +286,95 @@ export class PaytrSettlementService {
         if (upgrade) {
           await tx.pendingPlanChange.delete({ where: { id: upgrade.id } });
         }
+
+        // v2.8.89: emit subscription lifecycle event inside the same txn
+        // so the entitlement projector reprojects on commit. Pre-v2.8.89
+        // applySuccess updated currentPlanId but never told the projector,
+        // so paid upgrades stayed stuck on the old plan's grants for up
+        // to 24h (until reconcileNightly). The event type discriminates
+        // between fresh activation, plan upgrade, and renewal so
+        // downstream consumers (marketing commission, audit log) can
+        // route correctly.
+        const lifecycleType = upgrade
+          ? EventTypes.SubscriptionUpgraded
+          : EventTypes.SubscriptionActivated;
+        await this.outbox.append(
+          {
+            type: lifecycleType,
+            tenantId: subscription.tenantId,
+            payload: {
+              tenantId: subscription.tenantId,
+              subscriptionId: subscription.id,
+              planCode: upgrade
+                ? upgrade.targetPlan.name
+                : subscription.plan.name,
+              currentPeriodStart: now.toISOString(),
+              currentPeriodEnd: periodEnd.toISOString(),
+            },
+          },
+          tx as any,
+        );
+
+        // Step C: emit the commission-relevant payment fact inside the same
+        // settlement tx (durable via the outbox). The marketing
+        // SettlementCommissionConsumer reacts to it and owns the lead lookup +
+        // commission write — payments no longer reads `lead` or writes
+        // `commission`/`marketingNotification`. Only emitted when a commission
+        // kind applies; a plain first paid activation with no referral has no
+        // commission, so (matching pre-decoupling behaviour) no event fires.
+        // Idempotency key `payment-succeeded:{paymentId}` — webhook retry +
+        // recovery sweeper settle the same payment row and re-emit the same
+        // key, which the consumer dedupes against its per-type guards.
+        if (commissionKind) {
+          await this.outbox.append(
+            {
+              type: EventTypes.PaymentSucceeded,
+              tenantId: subscription.tenantId,
+              idempotencyKey: `payment-succeeded:${payment.id}`,
+              payload: {
+                tenantId: subscription.tenantId,
+                tenantName: subscription.tenant?.name ?? subscription.tenantId,
+                subscriptionId: subscription.id,
+                paymentId: payment.id,
+                kind: commissionKind,
+                amount: commissionAmount.toNumber(),
+                currency: finalCurrency,
+                planId: finalPlanId,
+                planCode: commissionPlanCode,
+                commissionRate: commissionRate.toNumber(),
+                referralCode: payment.referralCode ?? null,
+                referredByMarketingUserId:
+                  payment.referredByMarketingUserId ?? null,
+                occurredAt: now.toISOString(),
+              },
+            },
+            tx as any,
+          );
+        }
       });
 
       this.logger.log(
         `Settlement succeeded for subscription=${subscription.id} oid=${payment.paytrMerchantOid}`,
       );
 
-      void this.notifyActivation(
+      // Fire-and-forget after the settlement transaction commits. Each
+      // callee wraps its own body in try/catch, but `void` alone does
+      // NOT catch promise rejections — if a sync throw ever escaped
+      // those inner blocks (Node ≥15 default), the whole API process
+      // would die mid-request. The outer `.catch` is a process-level
+      // safety net; it never masks real bugs because the inner catch
+      // already logs.
+      this.notifyActivation(
         subscription.tenantId,
         subscription.tenant.name,
+      ).catch((err) =>
+        this.logger.error(
+          `unhandled notifyActivation rejection for tenant=${subscription.tenantId}: ${err?.message ?? err}`,
+        ),
       );
 
-      if (upgradeContext) {
-        void this.creditUpsellCommission(
-          subscription.tenantId,
-          upgradeContext as {
-            planId: string;
-            amount: Prisma.Decimal;
-            commissionRate: Prisma.Decimal;
-          },
-        );
-      } else if (renewalContext) {
-        void this.creditRenewalCommission(
-          subscription.tenantId,
-          renewalContext as {
-            planId: string;
-            amount: Prisma.Decimal;
-            commissionRate: Prisma.Decimal;
-          },
-        );
-      } else if (signupContext) {
-        void this.creditSignupCommissionForReferral(
-          subscription.tenantId,
-          subscription.tenant?.name ?? subscription.tenantId,
-          signupContext as {
-            marketerId: string;
-            referralCode: string | null;
-            amount: Prisma.Decimal;
-            commissionRate: Prisma.Decimal;
-          },
-        );
-      }
+      // Commission crediting moved to the marketing SettlementCommissionConsumer
+      // (Step C) — it reacts to the payment.succeeded.v1 emitted in the tx above.
       return "OK";
     } catch (err) {
       // Concurrent settle (webhook retry / recovery sweeper) already
@@ -335,6 +388,41 @@ export class PaytrSettlementService {
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === "P2002"
       ) {
+        // v2.8.94 — inspect err.meta.target to confirm the conflict is
+        // the documented "one active subscription per tenant" guard
+        // before refunding. Pre-fix the catch labelled EVERY P2002 as
+        // DUPLICATE_ACTIVE_SUBSCRIPTION, so a future unique index
+        // anywhere else (e.g. ['tenantId','planId'] for upsell
+        // promotion bookkeeping, or ['merchantOid'] dupes from an
+        // accidental schema drift) would silently FAIL the payment
+        // and queue a phantom refund. Re-throw unknown P2002 so the
+        // settlement layer's outer error path surfaces them as
+        // criticals instead of swallowing.
+        const target = (err.meta as any)?.target;
+        const targetArray = Array.isArray(target)
+          ? target
+          : typeof target === "string"
+            ? [target]
+            : [];
+        const isActiveSubscriptionDupe =
+          targetArray.includes("tenantId") &&
+          targetArray.some(
+            (t: string) => t === "status" || t === "subscriptionId",
+          );
+        if (!isActiveSubscriptionDupe) {
+          this.logger.error(
+            `Unexpected P2002 during PayTR settlement success oid=${payment.paytrMerchantOid} target=${JSON.stringify(target)}`,
+          );
+          captureException(err, {
+            paytrMerchantOid: payment.paytrMerchantOid,
+            subscriptionId: subscription.id,
+            tenantId: subscription.tenantId,
+            severity: "critical",
+            context: "unexpected-p2002-on-paytr-success",
+            target,
+          });
+          throw err;
+        }
         await this.prisma.subscriptionPayment.update({
           where: { id: payment.id },
           data: {
@@ -409,250 +497,6 @@ export class PaytrSettlementService {
       this.logger.error(
         `subscription-activated notification failed for tenant=${tenantId}: ${err?.message}`,
       );
-    }
-  }
-
-  /**
-   * Stamp a PENDING UPSELL commission for the marketing rep who
-   * originally converted this tenant, when a plan upgrade has just
-   * been activated.
-   */
-  private async creditUpsellCommission(
-    tenantId: string,
-    upgrade: {
-      planId: string;
-      amount: Prisma.Decimal;
-      commissionRate: Prisma.Decimal;
-    },
-  ): Promise<void> {
-    try {
-      const lead = await this.prisma.lead.findFirst({
-        where: { convertedTenantId: tenantId },
-        select: { id: true, assignedToId: true },
-      });
-      if (!lead?.assignedToId) return;
-
-      const commissionAmount = new Prisma.Decimal(upgrade.amount)
-        .mul(upgrade.commissionRate)
-        .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
-      if (commissionAmount.lte(0)) return;
-
-      const now = new Date();
-      const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-
-      await this.prisma.commission.create({
-        data: {
-          amount: commissionAmount,
-          type: "UPSELL",
-          status: "PENDING",
-          period,
-          tenantId,
-          leadId: lead.id,
-          marketingUserId: lead.assignedToId,
-        },
-      });
-      this.logger.log(
-        `Upsell commission created for tenant=${tenantId} rep=${lead.assignedToId} amount=${commissionAmount}`,
-      );
-    } catch (err: any) {
-      this.logger.error(
-        `Upsell commission credit failed for tenant=${tenantId}: ${err?.message ?? err}`,
-      );
-    }
-  }
-
-  /**
-   * Stamp a PENDING RENEWAL commission for the marketing rep who
-   * originally converted this tenant, when an existing subscription
-   * gets a re-purchase payment. In the manual-renewal model, every
-   * cycle after the first triggers this (the user paid through the
-   * normal checkout flow; settlement detects the prior SUCCEEDED row
-   * and routes the credit here).
-   *
-   * Replaces the old cron-driven renewal commission credit — manual
-   * re-purchase has no cron, so the credit lives with the settlement
-   * that actually moved the money.
-   */
-  private async creditRenewalCommission(
-    tenantId: string,
-    renewal: {
-      planId: string;
-      amount: Prisma.Decimal;
-      commissionRate: Prisma.Decimal;
-    },
-  ): Promise<void> {
-    try {
-      const lead = await this.prisma.lead.findFirst({
-        where: { convertedTenantId: tenantId },
-        select: { id: true, assignedToId: true },
-      });
-      if (!lead?.assignedToId) return;
-
-      const commissionAmount = new Prisma.Decimal(renewal.amount)
-        .mul(renewal.commissionRate)
-        .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
-      if (commissionAmount.lte(0)) return;
-
-      const now = new Date();
-      const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-
-      await this.prisma.commission.create({
-        data: {
-          amount: commissionAmount,
-          type: "RENEWAL",
-          status: "PENDING",
-          period,
-          tenantId,
-          leadId: lead.id,
-          marketingUserId: lead.assignedToId,
-        },
-      });
-      this.logger.log(
-        `Renewal commission created for tenant=${tenantId} rep=${lead.assignedToId} amount=${commissionAmount}`,
-      );
-    } catch (err: any) {
-      this.logger.error(
-        `Renewal commission credit failed for tenant=${tenantId}: ${err?.message ?? err}`,
-      );
-    }
-  }
-
-  /**
-   * Self-serve SIGNUP commission. Fires when a fresh activation
-   * (no PendingPlanChange) carries a resolved marketer referral on
-   * the payment row. Idempotent on `(tenantId, type='SIGNUP')`: a
-   * webhook retry, or an admin Lead.convert() race, won't double-credit.
-   *
-   * When no Lead exists for this tenant yet we plant one with
-   * source=REFERRAL + status=WON + convertedTenantId — that's the
-   * link the RENEWAL/UPSELL hooks (subscription-scheduler,
-   * creditUpsellCommission above) read from, so lifetime commissions
-   * accrue without any extra wiring. When a Lead already exists
-   * (admin manually convert()ed first), the admin's attribution wins
-   * and we leave both the Lead and the absence of a self-serve SIGNUP
-   * row untouched.
-   *
-   * Best-effort: a failure here is logged but never unwinds the
-   * payment-success transaction — getting paid takes priority over
-   * stamping a commission row.
-   */
-  private async creditSignupCommissionForReferral(
-    tenantId: string,
-    tenantName: string,
-    ctx: {
-      marketerId: string;
-      referralCode: string | null;
-      amount: Prisma.Decimal;
-      commissionRate: Prisma.Decimal;
-    },
-  ): Promise<void> {
-    try {
-      const existingSignup = await this.prisma.commission.findFirst({
-        where: { tenantId, type: "SIGNUP" },
-        select: { id: true },
-      });
-      if (existingSignup) {
-        this.logger.log(
-          `SIGNUP commission already exists for tenant=${tenantId}; skipping referral credit`,
-        );
-        return;
-      }
-
-      const existingLead = await this.prisma.lead.findUnique({
-        where: { convertedTenantId: tenantId },
-        select: { id: true, assignedToId: true },
-      });
-
-      let leadId: string;
-      let marketerId: string;
-      if (existingLead) {
-        // Admin already attributed this tenant. Use the admin's rep,
-        // not the self-serve code's marketer — manual attribution wins.
-        leadId = existingLead.id;
-        marketerId = existingLead.assignedToId ?? ctx.marketerId;
-      } else {
-        const lead = await this.prisma.lead.create({
-          data: {
-            businessName: tenantName,
-            contactPerson: tenantName,
-            businessType: "OTHER",
-            source: "REFERRAL",
-            status: "WON",
-            assignedToId: ctx.marketerId,
-            convertedTenantId: tenantId,
-            convertedAt: new Date(),
-            notes: ctx.referralCode
-              ? `Auto-created from self-serve checkout (ref code: ${ctx.referralCode})`
-              : "Auto-created from self-serve checkout referral",
-          },
-          select: { id: true },
-        });
-        leadId = lead.id;
-        marketerId = ctx.marketerId;
-      }
-
-      const commissionAmount = new Prisma.Decimal(ctx.amount)
-        .mul(ctx.commissionRate)
-        .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
-      if (commissionAmount.lte(0)) {
-        this.logger.warn(
-          `Skipping SIGNUP commission for tenant=${tenantId}: computed amount is zero`,
-        );
-        return;
-      }
-
-      const now = new Date();
-      const period = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-
-      await this.prisma.commission.create({
-        data: {
-          amount: commissionAmount,
-          type: "SIGNUP",
-          status: "PENDING",
-          period,
-          tenantId,
-          leadId,
-          marketingUserId: marketerId,
-          notes: ctx.referralCode
-            ? `Self-serve checkout via referral code ${ctx.referralCode}`
-            : "Self-serve checkout referral",
-        },
-      });
-
-      // Notify the marketer via the in-app notification stream. Best
-      // effort — the commission row itself is the source of truth.
-      try {
-        await this.prisma.marketingNotification.create({
-          data: {
-            userId: marketerId,
-            type: "FOLLOW_UP_REMINDER",
-            title: "Yeni referans kaydı",
-            message: `${tenantName} kodunuzla abone oldu — komisyon: ${commissionAmount.toString()} TL (onay bekliyor)`,
-            metadata: {
-              tenantId,
-              leadId,
-              commissionAmount: commissionAmount.toString(),
-              referralCode: ctx.referralCode ?? null,
-            },
-          },
-        });
-      } catch (notifyErr: any) {
-        this.logger.warn(
-          `Failed to enqueue marketer notification for tenant=${tenantId}: ${notifyErr?.message ?? notifyErr}`,
-        );
-      }
-
-      this.logger.log(
-        `SIGNUP commission credited for tenant=${tenantId} marketer=${marketerId} amount=${commissionAmount}`,
-      );
-    } catch (err: any) {
-      this.logger.error(
-        `SIGNUP commission credit failed for tenant=${tenantId}: ${err?.message ?? err}`,
-      );
-      captureException(err, {
-        tenantId,
-        context: "signup-commission-credit-failed",
-      });
     }
   }
 }

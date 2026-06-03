@@ -1,10 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { PrismaService } from '../../prisma/prisma.service';
-import { GeolocationService } from './geolocation.service';
-import { TrackViewDto } from './dto/track-view.dto';
-import { CreateReviewDto } from './dto/create-review.dto';
-import * as crypto from 'crypto';
+import { Injectable, Logger } from "@nestjs/common";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { PrismaService } from "../../prisma/prisma.service";
+import { GeolocationService } from "./geolocation.service";
+import { TrackViewDto } from "./dto/track-view.dto";
+import { CreateReviewDto } from "./dto/create-review.dto";
+// v2.8.95 — multi-replica safety. Pre-fix every replica fired its
+// own updateStatsCache tick on the same wall-clock, so the
+// findFirst → calculateAndCacheStats → upsert sequence raced and
+// produced duplicate intermediate counts plus extra Postgres load
+// proportional to the replica count.
+import { withAdvisoryLock } from "../../common/scheduling/advisory-lock";
+import * as crypto from "crypto";
 
 @Injectable()
 export class PublicStatsService {
@@ -25,46 +31,54 @@ export class PublicStatsService {
     // silently re-pseudonymize every historical ipHash, breaking visitor
     // analytics and audit comparability. IP_HASH_SALT must be its own
     // value with its own rotation cadence.
-    const inProd = process.env.NODE_ENV === 'production';
+    const inProd = process.env.NODE_ENV === "production";
     if (inProd && !process.env.IP_HASH_SALT) {
       throw new Error(
-        'IP_HASH_SALT must be configured in production (do not reuse JWT_SECRET/APP_SECRET)',
+        "IP_HASH_SALT must be configured in production (do not reuse JWT_SECRET/APP_SECRET)",
       );
     }
     const salt = inProd
       ? process.env.IP_HASH_SALT!
-      : process.env.IP_HASH_SALT ?? 'dev-fallback-salt';
+      : (process.env.IP_HASH_SALT ?? "dev-fallback-salt");
     return crypto
-      .createHash('sha256')
+      .createHash("sha256")
       .update(`${salt}:${ip}`)
-      .digest('hex')
+      .digest("hex")
       .substring(0, 32);
   }
 
   private parseDeviceType(userAgent: string): string {
-    if (!userAgent) return 'unknown';
+    if (!userAgent) return "unknown";
     const ua = userAgent.toLowerCase();
-    if (ua.includes('mobile') || ua.includes('android') || ua.includes('iphone')) {
-      return 'mobile';
+    if (
+      ua.includes("mobile") ||
+      ua.includes("android") ||
+      ua.includes("iphone")
+    ) {
+      return "mobile";
     }
-    if (ua.includes('tablet') || ua.includes('ipad')) {
-      return 'tablet';
+    if (ua.includes("tablet") || ua.includes("ipad")) {
+      return "tablet";
     }
-    return 'desktop';
+    return "desktop";
   }
 
   private parseBrowser(userAgent: string): string {
-    if (!userAgent) return 'unknown';
+    if (!userAgent) return "unknown";
     const ua = userAgent.toLowerCase();
-    if (ua.includes('chrome') && !ua.includes('edge')) return 'Chrome';
-    if (ua.includes('firefox')) return 'Firefox';
-    if (ua.includes('safari') && !ua.includes('chrome')) return 'Safari';
-    if (ua.includes('edge')) return 'Edge';
-    if (ua.includes('opera')) return 'Opera';
-    return 'Other';
+    if (ua.includes("chrome") && !ua.includes("edge")) return "Chrome";
+    if (ua.includes("firefox")) return "Firefox";
+    if (ua.includes("safari") && !ua.includes("chrome")) return "Safari";
+    if (ua.includes("edge")) return "Edge";
+    if (ua.includes("opera")) return "Opera";
+    return "Other";
   }
 
-  async trackPageView(dto: TrackViewDto, ip: string, userAgent: string): Promise<void> {
+  async trackPageView(
+    dto: TrackViewDto,
+    ip: string,
+    userAgent: string,
+  ): Promise<void> {
     try {
       const geoData = await this.geolocationService.lookup(ip);
       const ipHash = this.hashIp(ip);
@@ -93,7 +107,7 @@ export class PublicStatsService {
   async getPublicStats() {
     try {
       const cache = await this.prisma.publicStatsCache.findFirst({
-        where: { id: 'main' },
+        where: { id: "main" },
       });
       const raw = cache ?? (await this.calculateAndCacheStats());
       return this.toPublicView(raw);
@@ -158,9 +172,9 @@ export class PublicStatsService {
 
     // Generate avatar from initials
     const initials = dto.name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
       .substring(0, 2)
       .toUpperCase();
 
@@ -174,7 +188,7 @@ export class PublicStatsService {
         avatar: initials,
         country: geoData?.country,
         city: geoData?.city,
-        status: 'PENDING', // Requires approval
+        status: "PENDING", // Requires approval
       },
     });
   }
@@ -182,8 +196,8 @@ export class PublicStatsService {
   async getApprovedReviews(limit = 10) {
     try {
       return await this.prisma.publicReview.findMany({
-        where: { status: 'APPROVED' },
-        orderBy: { createdAt: 'desc' },
+        where: { status: "APPROVED" },
+        orderBy: { createdAt: "desc" },
         take: limit,
         select: {
           id: true,
@@ -203,21 +217,33 @@ export class PublicStatsService {
     }
   }
 
-  // Update cache every 5 minutes
-  @Cron(CronExpression.EVERY_5_MINUTES, { name: 'public-stats-cache-update' })
+  // Update cache every 5 minutes — advisory-lock guarded so only one
+  // replica actually computes per tick. Loser silently skips.
+  @Cron(CronExpression.EVERY_5_MINUTES, { name: "public-stats-cache-update" })
   async updateStatsCache(): Promise<void> {
-    try {
-      this.logger.debug('Updating public stats cache...');
-      await this.calculateAndCacheStats();
-      this.geolocationService.cleanCache();
-    } catch (error) {
-      this.logger.error(`Failed to update stats cache: ${error.message}`);
-    }
+    await withAdvisoryLock(
+      this.prisma,
+      "public-stats-cache-update",
+      async () => {
+        try {
+          this.logger.debug("Updating public stats cache...");
+          await this.calculateAndCacheStats();
+          this.geolocationService.cleanCache();
+        } catch (error: any) {
+          this.logger.error(`Failed to update stats cache: ${error.message}`);
+        }
+      },
+      this.logger,
+    );
   }
 
   private async calculateAndCacheStats() {
     const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfToday = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
     // ISO/TR week starts Monday. getDay() returns Sunday=0..Saturday=6,
     // so Sunday must roll back 6 days, everything else (dayOfWeek - 1).
     // The previous calculation rolled back to Sunday, which made the
@@ -265,32 +291,32 @@ export class PublicStatsService {
       }),
       // Reviews stats
       this.prisma.publicReview.aggregate({
-        where: { status: 'APPROVED' },
+        where: { status: "APPROVED" },
         _count: true,
         _avg: { rating: true },
       }),
       // Total active tenants
-      this.prisma.tenant.count({ where: { status: 'ACTIVE' } }),
+      this.prisma.tenant.count({ where: { status: "ACTIVE" } }),
       // Total orders and revenue (completed orders)
       this.prisma.order.aggregate({
-        where: { status: { in: ['PAID', 'SERVED', 'READY'] } },
+        where: { status: { in: ["PAID", "SERVED", "READY"] } },
         _count: true,
         _sum: { finalAmount: true },
       }),
       // Country distribution
       this.prisma.pageView.groupBy({
-        by: ['country'],
+        by: ["country"],
         _count: true,
         where: { country: { not: null } },
-        orderBy: { _count: { country: 'desc' } },
+        orderBy: { _count: { country: "desc" } },
         take: 20,
       }),
       // City distribution
       this.prisma.pageView.groupBy({
-        by: ['city'],
+        by: ["city"],
         _count: true,
         where: { city: { not: null } },
-        orderBy: { _count: { city: 'desc' } },
+        orderBy: { _count: { city: "desc" } },
         take: 20,
       }),
     ]);
@@ -328,9 +354,9 @@ export class PublicStatsService {
 
     // Upsert cache
     await this.prisma.publicStatsCache.upsert({
-      where: { id: 'main' },
+      where: { id: "main" },
       create: {
-        id: 'main',
+        id: "main",
         ...statsData,
       },
       update: statsData,
@@ -342,8 +368,8 @@ export class PublicStatsService {
   // Admin methods for review moderation
   async getPendingReviews() {
     return this.prisma.publicReview.findMany({
-      where: { status: 'PENDING' },
-      orderBy: { createdAt: 'desc' },
+      where: { status: "PENDING" },
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -351,7 +377,7 @@ export class PublicStatsService {
     return this.prisma.publicReview.update({
       where: { id },
       data: {
-        status: 'APPROVED',
+        status: "APPROVED",
         approvedAt: new Date(),
       },
     });
@@ -360,7 +386,7 @@ export class PublicStatsService {
   async rejectReview(id: string) {
     return this.prisma.publicReview.update({
       where: { id },
-      data: { status: 'REJECTED' },
+      data: { status: "REJECTED" },
     });
   }
 }

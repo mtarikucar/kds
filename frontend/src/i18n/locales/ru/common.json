@@ -58,8 +58,102 @@
     "personnel": "Персонал",
     "stock": "Склад",
     "invoices": "Счета",
+    "devices": "Устройства",
+    "branches": "Филиалы",
+    "health": "Состояние филиалов",
+    "marketplace": "Маркетплейс",
+    "store": "Магазин оборудования",
+    "bridges": "Локальные мосты",
+    "webhooks": "Веб-хуки",
+    "fiscalRecovery": "Восстановление чеков",
+    "callerFeed": "Журнал звонков",
     "expandSidebar": "Развернуть боковую панель",
     "collapseSidebar": "Свернуть боковую панель"
+  },
+  "hummytummy": {
+    "common": {
+      "loading": "Загрузка…",
+      "empty": "Здесь пока ничего нет.",
+      "save": "Сохранить",
+      "cancel": "Отмена",
+      "retire": "Списать",
+      "remove": "Удалить"
+    },
+    "devices": {
+      "title": "Устройства",
+      "create": "Создать слот",
+      "showRetired": "Показать списанные",
+      "empty": "Устройств пока нет. Нажмите «Создать слот», чтобы добавить первое.",
+      "col": {
+        "kind": "Тип",
+        "status": "Статус",
+        "pairCode": "Код сопряжения",
+        "capabilities": "Возможности",
+        "lastSeen": "Последнее подключение"
+      },
+      "confirmRetire": "Списать это устройство?",
+      "kind": {
+        "kds_screen": "Экран KDS",
+        "tablet_waiter": "Планшет официанта",
+        "tablet_customer": "Планшет клиента",
+        "receipt_printer": "Чековый принтер",
+        "kitchen_printer": "Кухонный принтер",
+        "pos_terminal": "POS-терминал",
+        "yazarkasa": "Yazarkasa",
+        "caller_id": "Caller ID",
+        "scanner": "Сканер",
+        "local_bridge": "Локальный мост"
+      }
+    },
+    "marketplace": {
+      "title": "Маркетплейс",
+      "subtitle": "Расширьте подписку дополнениями. Активация мгновенная.",
+      "filter": { "all": "Все", "software": "ПО", "integration": "Интеграции", "capacity": "Лимиты", "support": "Поддержка" },
+      "purchase": "Купить",
+      "mine": "Ваши дополнения",
+      "mineEmpty": "У вас нет активных дополнений.",
+      "requires": "Требует:",
+      "col": { "addOn": "Дополнение", "quantity": "Количество", "status": "Статус", "periodEnds": "Окончание периода" },
+      "cancelAtPeriodEnd": "будет отменено в конце периода"
+    },
+    "store": {
+      "title": "Магазин оборудования",
+      "category": { "all": "Все категории" },
+      "empty": "В этой категории нет товаров.",
+      "addToCart": "В корзину",
+      "outOfStock": "Нет в наличии",
+      "warranty": "Гарантия {{months}} мес.",
+      "cart": {
+        "title": "Корзина",
+        "empty": "Корзина пуста.",
+        "getQuote": "Рассчитать",
+        "pricing": "Расчёт…",
+        "subtotal": "Сумма",
+        "tax": "Налог",
+        "shipping": "Доставка",
+        "total": "Итого",
+        "place": "Оформить заказ",
+        "placing": "Отправка…"
+      }
+    },
+    "health": {
+      "title": "Состояние филиалов",
+      "subtitle": "Композитный индикатор: онлайн-устройства, последний фискальный чек и заказ. Обновляется каждые 30 сек.",
+      "empty": "Нет активных филиалов.",
+      "score": "{{score}} / 100",
+      "devicesOnline": "Устройства онлайн",
+      "fiscalAge": "Последний чек",
+      "orderAge": "Последний заказ"
+    },
+    "branches": {
+      "title": "Филиалы",
+      "name": "Название",
+      "code": "Код",
+      "timezone": "Часовой пояс",
+      "status": "Статус",
+      "created": "Создан",
+      "add": "Добавить филиал"
+    }
   },
   "header": {
     "notifications": "Уведомления",

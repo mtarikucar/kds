@@ -173,10 +173,21 @@ jobs:
 
       - name: Resolve version from tag
         id: version
+        # Pipe workflow_dispatch input through env: instead of inlining
+        # via ${{ }} into the shell. The ${{ }} expansion happens BEFORE
+        # the regex validation runs, so a maintainer-supplied tag like
+        # `v1.0.0"; rm -rf /; echo "` would have been evaluated by the
+        # shell verbatim — splitting the line into a benign assignment
+        # plus arbitrary commands plus a trailing echo, and the regex
+        # check never gets a chance to reject it. Reading from $INPUT_TAG
+        # treats the value as a literal string regardless of contents.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
           set -euo pipefail
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            v="${{ github.event.inputs.tag }}"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            v="$INPUT_TAG"
           else
             v="${GITHUB_REF#refs/tags/}"
           fi
@@ -364,7 +375,22 @@ jobs:
           # so accidental commits get caught by .gitignore patterns.
 
       - name: Ship env file to server
-        run: scp -o ServerAliveInterval=15 .env.production.rendered root@${{ env.SERVER_HOST }}:/root/kds/.env.production
+        # Atomic write: scp lands the file at a sibling .new path, then
+        # `mv` (a POSIX rename on the same filesystem) swaps it into
+        # place in a single inode-level operation. If scp dies mid-
+        # transfer on a network blip, the existing .env.production
+        # stays intact — the half-written file is at .new and either
+        # the next deploy retries cleanly or this step exits non-zero.
+        # Previously `scp` wrote directly to .env.production and a
+        # truncated transfer would have left docker-compose reading a
+        # malformed env on the next swap.
+        run: |
+          set -euo pipefail
+          scp -o ServerAliveInterval=15 \
+            .env.production.rendered \
+            root@${{ env.SERVER_HOST }}:/root/kds/.env.production.new
+          ssh -o ServerAliveInterval=15 root@${{ env.SERVER_HOST }} \
+            'mv /root/kds/.env.production.new /root/kds/.env.production'
 
       - name: Run deploy.sh on the server
         env:
@@ -482,12 +508,21 @@ jobs:
 
       - name: Resolve version
         id: version
+        # Same env: pipe + regex validation as the build-job version
+        # resolver. Without it a malicious workflow_dispatch tag could
+        # inject shell when written to $GITHUB_OUTPUT.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "VERSION=${{ github.event.inputs.tag }}" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            v="$INPUT_TAG"
           else
-            echo "VERSION=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+            v="${GITHUB_REF#refs/tags/}"
           fi
+          [[ "$v" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Tag '$v' is not vX.Y.Z"; exit 1; }
+          echo "VERSION=$v" >> "$GITHUB_OUTPUT"
 
       - name: Sentry release
         continue-on-error: true

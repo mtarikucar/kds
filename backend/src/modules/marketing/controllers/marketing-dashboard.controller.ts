@@ -10,7 +10,6 @@ import { MarketingUserPayload } from '../types';
 @MarketingRoute()
 @Controller('marketing/dashboard')
 @UseGuards(MarketingGuard, MarketingRolesGuard)
-@MarketingRoute()
 export class MarketingDashboardController {
   constructor(private readonly dashboardService: MarketingDashboardService) {}
 

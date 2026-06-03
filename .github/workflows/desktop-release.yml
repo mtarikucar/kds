@@ -29,12 +29,19 @@ jobs:
     steps:
       - name: Get version from tag
         id: version
+        # Pipe inputs via env: so an injection-shaped tag can't escape
+        # into shell before the regex check rejects it.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_TAG: ${{ github.event.inputs.tag }}
         run: |
-          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            VERSION="${{ github.event.inputs.tag }}"
+          set -euo pipefail
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            VERSION="$INPUT_TAG"
           else
             VERSION="${GITHUB_REF#refs/tags/}"
           fi
+          [[ "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Tag '$VERSION' is not vX.Y.Z"; exit 1; }
           VERSION_NUMBER="${VERSION#v}"
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "VERSION_NUMBER=$VERSION_NUMBER" >> $GITHUB_OUTPUT

@@ -1,6 +1,10 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { AssignShiftDto, BulkAssignShiftDto } from '../dto/assign-shift.dto';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { AssignShiftDto, BulkAssignShiftDto } from "../dto/assign-shift.dto";
 
 @Injectable()
 export class ScheduleService {
@@ -20,17 +24,19 @@ export class ScheduleService {
         date: { gte: start, lte: end },
       },
       include: {
-        user: { select: { id: true, firstName: true, lastName: true, role: true } },
+        user: {
+          select: { id: true, firstName: true, lastName: true, role: true },
+        },
         shiftTemplate: true,
       },
-      orderBy: [{ date: 'asc' }, { user: { firstName: 'asc' } }],
+      orderBy: [{ date: "asc" }, { user: { firstName: "asc" } }],
     });
 
     // Also get all staff for the tenant
     const staff = await this.prisma.user.findMany({
-      where: { tenantId, status: 'ACTIVE' },
+      where: { tenantId, status: "ACTIVE" },
       select: { id: true, firstName: true, lastName: true, role: true },
-      orderBy: { firstName: 'asc' },
+      orderBy: { firstName: "asc" },
     });
 
     return { weekStart: start, weekEnd: end, assignments, staff };
@@ -41,13 +47,13 @@ export class ScheduleService {
     const user = await this.prisma.user.findFirst({
       where: { id: dto.userId, tenantId },
     });
-    if (!user) throw new NotFoundException('User not found in this tenant');
+    if (!user) throw new NotFoundException("User not found in this tenant");
 
     // Validate shift template belongs to tenant
     const template = await this.prisma.shiftTemplate.findFirst({
       where: { id: dto.shiftTemplateId, tenantId },
     });
-    if (!template) throw new NotFoundException('Shift template not found');
+    if (!template) throw new NotFoundException("Shift template not found");
 
     const date = new Date(dto.date);
     date.setHours(0, 0, 0, 0);
@@ -60,15 +66,20 @@ export class ScheduleService {
           date,
           notes: dto.notes,
           tenantId,
+          branchId: template.branchId,
         },
         include: {
-          user: { select: { id: true, firstName: true, lastName: true, role: true } },
+          user: {
+            select: { id: true, firstName: true, lastName: true, role: true },
+          },
           shiftTemplate: true,
         },
       });
     } catch (error: any) {
-      if (error.code === 'P2002') {
-        throw new BadRequestException('User already has a shift assigned for this date');
+      if (error.code === "P2002") {
+        throw new BadRequestException(
+          "User already has a shift assigned for this date",
+        );
       }
       throw error;
     }
@@ -94,7 +105,7 @@ export class ScheduleService {
     });
 
     if (!assignment) {
-      throw new NotFoundException('Shift assignment not found');
+      throw new NotFoundException("Shift assignment not found");
     }
 
     // Defence-in-depth: tenantId in the WHERE (B41-B45 pattern).
@@ -102,7 +113,7 @@ export class ScheduleService {
       where: { id, tenantId },
     });
     if (result.count === 0) {
-      throw new NotFoundException('Shift assignment not found');
+      throw new NotFoundException("Shift assignment not found");
     }
     return { id };
   }

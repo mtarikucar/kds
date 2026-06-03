@@ -3,6 +3,8 @@ import { useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import { format, subDays } from 'date-fns';
 import { useSalesReport, useTopProducts } from '../../features/reports/reportsApi';
+import { useListBranches } from '../../features/branches/branchesApi';
+import { useSubscription } from '../../contexts/SubscriptionContext';
 import { Card, CardHeader, CardTitle, CardContent } from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
@@ -40,7 +42,9 @@ const ReportsPage = () => {
   const lastWeek = format(subDays(new Date(), 7), 'yyyy-MM-dd');
 
   const [activeTab, setActiveTab] = useState<TabType>('sales');
-  const [dateRange, setDateRange] = useState({
+  // dateRange carries branchId too — undefined means "all branches" which
+  // matches the backend's tenant-wide default.
+  const [dateRange, setDateRange] = useState<{ startDate: string; endDate: string; branchId?: string }>({
     startDate: lastWeek,
     endDate: today,
   });
@@ -59,14 +63,22 @@ const ReportsPage = () => {
     setDateRange(data);
   };
 
-  const tabs = [
-    { id: 'sales' as TabType, label: t('reports.sales'), icon: BarChart3 },
-    { id: 'hourly' as TabType, label: t('reports.hourlyBreakdown'), icon: Clock },
-    { id: 'customers' as TabType, label: t('customerAnalytics.title'), icon: Users },
-    { id: 'inventory' as TabType, label: t('inventoryReport.title'), icon: Package },
-    { id: 'staff' as TabType, label: t('staffPerformance.title'), icon: UserCog },
-    { id: 'zreports' as TabType, label: t('zReports.title', 'Z-Reports'), icon: FileText },
+  // v2.8.91: inventory + staff tabs are feature-gated server-side (the
+  // /reports/* endpoints carry @RequiresFeature(INVENTORY_TRACKING) or
+  // PERSONNEL_MANAGEMENT). Pre-v2.8.91 the tabs rendered for every
+  // tenant and clicking returned 403 with no warning. Now we hide the
+  // tab when the matching feature isn't granted. Sales/Hourly/Customers
+  // remain because they use advancedReports which gates the whole page.
+  const { hasFeature } = useSubscription();
+  const allTabs = [
+    { id: 'sales' as TabType, label: t('reports.sales'), icon: BarChart3, gate: undefined as keyof import('../../types').PlanFeatures | undefined },
+    { id: 'hourly' as TabType, label: t('reports.hourlyBreakdown'), icon: Clock, gate: undefined },
+    { id: 'customers' as TabType, label: t('customerAnalytics.title'), icon: Users, gate: undefined },
+    { id: 'inventory' as TabType, label: t('inventoryReport.title'), icon: Package, gate: 'inventoryTracking' as const },
+    { id: 'staff' as TabType, label: t('staffPerformance.title'), icon: UserCog, gate: 'personnelManagement' as const },
+    { id: 'zreports' as TabType, label: t('zReports.title', 'Z-Reports'), icon: FileText, gate: undefined },
   ];
+  const tabs = allTabs.filter((t) => !t.gate || hasFeature(t.gate));
 
   const StatCard = ({
     title,
@@ -143,6 +155,10 @@ const ReportsPage = () => {
                   {...register('endDate')}
                 />
               </div>
+              <BranchFilter
+                value={dateRange.branchId}
+                onChange={(branchId) => setDateRange((d) => ({ ...d, branchId }))}
+              />
               <Button type="submit" className="w-full sm:w-auto">{t('common:buttons.apply')}</Button>
             </form>
           </CardContent>
@@ -346,5 +362,33 @@ const ReportsPage = () => {
     </div>
   );
 };
+
+/**
+ * Branch filter dropdown used inline by the date-range form. Inline so it
+ * lives next to the date pickers — operators expect to refine "this date
+ * range" and "this branch" in the same gesture. Renders only when the
+ * tenant has more than one branch; single-branch tenants see nothing and
+ * the request stays tenant-wide.
+ */
+function BranchFilter({ value, onChange }: { value?: string; onChange: (v?: string) => void }) {
+  const { t } = useTranslation('common');
+  const { data: branches = [] } = useListBranches();
+  if (branches.length <= 1) return null;
+  return (
+    <div className="flex-1">
+      <label className="block text-sm font-medium mb-1">{t('hummytummy.reportsBranchFilter.label')}</label>
+      <select
+        className="w-full rounded border px-2 py-2 text-sm"
+        value={value ?? ''}
+        onChange={(e) => onChange(e.target.value || undefined)}
+      >
+        <option value="">{t('hummytummy.reportsBranchFilter.all')}</option>
+        {branches.map((b) => (
+          <option key={b.id} value={b.id}>{b.name}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
 
 export default ReportsPage;

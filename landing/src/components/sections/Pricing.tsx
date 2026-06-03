@@ -62,10 +62,17 @@ export default function Pricing({ apiPlans }: PricingProps) {
     },
   ];
 
-  // Map API plans to overlay discount info
+  // Map API plans to overlay discount info.
+  // v2.8.97 — case-folded comparison strips trailing whitespace and
+  // accidental locale-case anomalies (Turkish "İ"/"i"/"I" lower-cased
+  // inconsistently across browsers). The case-insensitive comparison
+  // alone passed for "free" vs "FREE" but missed "Free " (trailing
+  // space from a CMS paste). Folding both sides via `toLocaleLowerCase`
+  // + trim keeps the match resilient to upstream data hygiene drift.
+  const normalize = (s: string) => s.toLocaleLowerCase('en-US').trim();
   const plans = staticPlans.map((sp) => {
     const apiPlan = apiPlans?.find(
-      (ap) => ap.name.toLowerCase() === sp.key.toLowerCase()
+      (ap) => normalize(ap.name) === normalize(sp.key)
     );
     const hasDiscount = mounted && apiPlan?.isDiscountActive && apiPlan?.discountPercentage &&
       apiPlan?.discountEndDate && new Date(apiPlan.discountEndDate) > new Date();
@@ -76,9 +83,20 @@ export default function Pricing({ apiPlans }: PricingProps) {
       discountLabel: hasDiscount ? apiPlan!.discountLabel : undefined,
       discountEndDate: hasDiscount ? apiPlan!.discountEndDate : undefined,
       // Discounted price is rendered alongside the strikethrough original.
-      // Format matches the TRY base price in the locale files ("499₺").
+      // v2.8.98 — render via Intl.NumberFormat so the symbol + grouping
+      // follow the active locale. Pre-fix the hardcoded ₺ suffix
+      // surfaced in Arabic/Russian/Uzbek strings that otherwise group
+      // numbers with their own separators and place the currency
+      // glyph on the leading side. Intl.NumberFormat with
+      // `currencyDisplay: 'narrowSymbol'` keeps "₺" for tr/en and
+      // does the right thing for the others.
       discountedPrice: hasDiscount && sp.monthlyPrice > 0
-        ? `${Math.round(sp.monthlyPrice * (1 - apiPlan!.discountPercentage! / 100))}₺`
+        ? new Intl.NumberFormat(undefined, {
+            style: 'currency',
+            currency: 'TRY',
+            currencyDisplay: 'narrowSymbol',
+            maximumFractionDigits: 0,
+          }).format(Math.round(sp.monthlyPrice * (1 - apiPlan!.discountPercentage! / 100)))
         : undefined,
     };
   });

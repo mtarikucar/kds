@@ -12,108 +12,132 @@ import {
   ParseIntPipe,
   DefaultValuePipe,
   Param,
-} from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { PublicStatsService } from './public-stats.service';
-import { TrackViewDto } from './dto/track-view.dto';
-import { CreateReviewDto } from './dto/create-review.dto';
-import { PublicStatsResponseDto, PublicReviewResponseDto } from './dto/public-stats-response.dto';
-import { Throttle } from '@nestjs/throttler';
-import { Public } from '../auth/decorators/public.decorator';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '../../common/constants/roles.enum';
+} from "@nestjs/common";
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+} from "@nestjs/swagger";
+import { PublicStatsService } from "./public-stats.service";
+import { TrackViewDto } from "./dto/track-view.dto";
+import { CreateReviewDto } from "./dto/create-review.dto";
+import {
+  PublicStatsResponseDto,
+  PublicReviewResponseDto,
+} from "./dto/public-stats-response.dto";
+import { Throttle } from "@nestjs/throttler";
+import { Public } from "../auth/decorators/public.decorator";
+import { SuperAdminGuard } from "../superadmin/guards/superadmin.guard";
+import { SuperAdminRoute } from "../superadmin/decorators/superadmin.decorator";
 
-@ApiTags('public-stats')
-@Controller('public-stats')
+@ApiTags("public-stats")
+@Controller("public-stats")
 export class PublicStatsController {
   constructor(private readonly statsService: PublicStatsService) {}
 
   @Public()
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
-  @Post('track')
+  @Post("track")
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Track page view (Public)' })
-  @ApiResponse({ status: 200, description: 'View tracked successfully' })
+  @ApiOperation({ summary: "Track page view (Public)" })
+  @ApiResponse({ status: 200, description: "View tracked successfully" })
   async trackView(
     @Body() dto: TrackViewDto,
     @Ip() ip: string,
-    @Headers('user-agent') userAgent: string,
+    @Headers("user-agent") userAgent: string,
   ) {
     // Fire and forget - don't block response
-    this.statsService.trackPageView(dto, ip, userAgent || '').catch(() => {});
+    this.statsService.trackPageView(dto, ip, userAgent || "").catch(() => {});
     return { success: true };
   }
 
   @Public()
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
-  @Get('stats')
-  @ApiOperation({ summary: 'Get public statistics (Public)' })
-  @ApiResponse({ status: 200, description: 'Public statistics', type: PublicStatsResponseDto })
+  @Get("stats")
+  @ApiOperation({ summary: "Get public statistics (Public)" })
+  @ApiResponse({
+    status: 200,
+    description: "Public statistics",
+    type: PublicStatsResponseDto,
+  })
   async getStats() {
     const stats = await this.statsService.getPublicStats();
     return {
       ...stats,
-      countryDistribution: stats.countryDistribution as Record<string, number> || {},
-      cityDistribution: stats.cityDistribution as Record<string, number> || {},
+      countryDistribution:
+        (stats.countryDistribution as Record<string, number>) || {},
+      cityDistribution:
+        (stats.cityDistribution as Record<string, number>) || {},
     };
   }
 
   @Public()
   @Throttle({ default: { limit: 3, ttl: 60 * 60_000 } })
-  @Post('reviews')
-  @ApiOperation({ summary: 'Submit a review (Public)' })
-  @ApiResponse({ status: 201, description: 'Review submitted successfully' })
-  async submitReview(
-    @Body() dto: CreateReviewDto,
-    @Ip() ip: string,
-  ) {
+  @Post("reviews")
+  @ApiOperation({ summary: "Submit a review (Public)" })
+  @ApiResponse({ status: 201, description: "Review submitted successfully" })
+  async submitReview(@Body() dto: CreateReviewDto, @Ip() ip: string) {
     const review = await this.statsService.submitReview(dto, ip);
     return {
       success: true,
-      message: 'Review submitted successfully. It will be published after approval.',
+      message:
+        "Review submitted successfully. It will be published after approval.",
       reviewId: review.id,
     };
   }
 
   @Public()
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
-  @Get('reviews')
-  @ApiOperation({ summary: 'Get approved reviews (Public)' })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiResponse({ status: 200, description: 'List of approved reviews', type: [PublicReviewResponseDto] })
+  @Get("reviews")
+  @ApiOperation({ summary: "Get approved reviews (Public)" })
+  @ApiQuery({ name: "limit", required: false, type: Number })
+  @ApiResponse({
+    status: 200,
+    description: "List of approved reviews",
+    type: [PublicReviewResponseDto],
+  })
   async getReviews(
-    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Query("limit", new DefaultValuePipe(10), ParseIntPipe) limit: number,
   ): Promise<PublicReviewResponseDto[]> {
     return this.statsService.getApprovedReviews(Math.min(limit, 50));
   }
 
-  // Admin endpoints for review moderation
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @Get('admin/reviews/pending')
+  // Review moderation endpoints — SuperAdmin only.
+  //
+  // PublicReview is a PLATFORM-LEVEL model (it has no tenantId; reviews
+  // are about HummyTummy itself, surfaced on the marketing landing
+  // page's totalReviews / averageRating widget). The earlier
+  // @Roles(UserRole.ADMIN) gate used the tenant-realm ADMIN role —
+  // meaning ANY restaurant tenant's admin could approve fake glowing
+  // reviews of the platform OR reject genuine negative ones, distorting
+  // the public vanity stats. Switch to SuperAdminGuard so only platform
+  // operators can moderate platform-level content.
+  @UseGuards(SuperAdminGuard)
+  @SuperAdminRoute()
+  @Get("admin/reviews/pending")
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get pending reviews (Admin only)' })
+  @ApiOperation({ summary: "Get pending reviews (SuperAdmin only)" })
   async getPendingReviews() {
     return this.statsService.getPendingReviews();
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @Post('admin/reviews/:id/approve')
+  @UseGuards(SuperAdminGuard)
+  @SuperAdminRoute()
+  @Post("admin/reviews/:id/approve")
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Approve a review (Admin only)' })
-  async approveReview(@Param('id') id: string) {
+  @ApiOperation({ summary: "Approve a review (SuperAdmin only)" })
+  async approveReview(@Param("id") id: string) {
     return this.statsService.approveReview(id);
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
-  @Post('admin/reviews/:id/reject')
+  @UseGuards(SuperAdminGuard)
+  @SuperAdminRoute()
+  @Post("admin/reviews/:id/reject")
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Reject a review (Admin only)' })
-  async rejectReview(@Param('id') id: string) {
+  @ApiOperation({ summary: "Reject a review (SuperAdmin only)" })
+  async rejectReview(@Param("id") id: string) {
     return this.statsService.rejectReview(id);
   }
 }

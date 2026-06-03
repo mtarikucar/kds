@@ -1,0 +1,46 @@
+{
+  "page": {
+    "title": "Plan & Access",
+    "subtitle": "Manage your current plan, usage quotas, and active add-ons in one place."
+  },
+  "plan": {
+    "current": "Current plan",
+    "nextBilling": "Next billing: {{date}}",
+    "trialEnds": "Trial ends: {{date}}",
+    "changePlanCta": "Change plan"
+  },
+  "quota": {
+    "title": "Usage quotas",
+    "users": "Users",
+    "branches": "Branches",
+    "products": "Products",
+    "monthlyOrders": "Monthly orders"
+  },
+  "activeAddOns": {
+    "title": "Active add-ons",
+    "empty": "You haven't purchased any add-ons yet. See suggestions below.",
+    "col": {
+      "name": "Add-on",
+      "price": "Price",
+      "renewal": "Renewal"
+    },
+    "scheduledToCancel": "Cancels at period end",
+    "cancelCta": "Cancel"
+  },
+  "suggested": {
+    "title": "Suggested add-ons",
+    "viewAll": "Visit marketplace"
+  },
+  "upsell": {
+    "defaultTitle": "This feature isn't in your subscription",
+    "defaultDescription": "You'll need to upgrade your plan or buy the matching add-on to access this page.",
+    "upgradePlanCta": "Upgrade plan",
+    "viewAddOnCta": "See add-on",
+    "helpHint": "Reach out to support if you have questions."
+  },
+  "branchPicker": {
+    "activeBranch": "Faol filialni tanlang",
+    "lockedToPrimary": "Sizning filialingiz qattiq biriktirilgan. Oʻzgartirish uchun menejerga murojaat qiling.",
+    "activeTooltip": "Faol filial. Barcha soʻrovlar va real vaqt oqimlari shu boʻyicha filtrlanadi."
+  }
+}

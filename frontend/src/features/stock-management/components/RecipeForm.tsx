@@ -28,11 +28,26 @@ const RecipeForm = ({ recipe, onSave, onClose, isLoading }: Props) => {
     })) || [{ stockItemId: '', quantity: 0 }],
   });
 
+  // v2.8.97 — wrap the products fetch in an async IIFE inside the effect
+  // so the catch path doesn't dangle outside try/catch (toast.error
+  // failures would otherwise become an unhandled rejection). Also adds
+  // `t` to the dep array so a language-switch mid-mount re-fetches with
+  // the up-to-date error string (the components key off the i18n
+  // context but the toast text is captured once).
   useEffect(() => {
-    api.get('/menu/products').then((res) => setProducts(res.data)).catch(() => {
-      toast.error(t('common.loadError'));
-    });
-  }, []);
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await api.get('/menu/products');
+        if (!cancelled) setProducts(res.data);
+      } catch {
+        if (!cancelled) toast.error(t('common.loadError'));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [t]);
 
   const addIngredient = () => {
     setForm({ ...form, ingredients: [...form.ingredients, { stockItemId: '', quantity: 0 }] });

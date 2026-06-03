@@ -4,15 +4,15 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-} from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CreateIntegrationDto } from './dto/create-integration.dto';
-import { UpdateIntegrationDto } from './dto/update-integration.dto';
+} from "@nestjs/common";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { CreateIntegrationDto } from "./dto/create-integration.dto";
+import { UpdateIntegrationDto } from "./dto/update-integration.dto";
 import {
   decryptJson,
   encryptJson,
   isEncryptedPayload,
-} from '../../../common/helpers/encryption.helper';
+} from "../../../common/helpers/encryption.helper";
 
 // Integration types whose `config` JSON carries sensitive credentials
 // (API keys, webhook secrets, OAuth tokens). Every one of these uses the
@@ -21,11 +21,11 @@ import {
 // serial-port / device-config data which is not sensitive and keeps the
 // plain JSON shape for the desktop-app consumer.
 const SENSITIVE_INTEGRATION_TYPES = new Set([
-  'PAYMENT_GATEWAY',
-  'THIRD_PARTY_API',
-  'DELIVERY_APP',
-  'ACCOUNTING',
-  'CRM',
+  "PAYMENT_GATEWAY",
+  "THIRD_PARTY_API",
+  "DELIVERY_APP",
+  "ACCOUNTING",
+  "CRM",
 ]);
 
 // Fields the tenant-facing list/find endpoints MUST NOT surface in plaintext
@@ -39,17 +39,17 @@ const SENSITIVE_KEY_PATTERNS = [
   /client.?secret/i,
   /private.?key/i,
 ];
-const REDACTED = '***REDACTED***';
+const REDACTED = "***REDACTED***";
 
 function redactSensitiveKeys(obj: unknown): unknown {
-  if (!obj || typeof obj !== 'object') return obj;
+  if (!obj || typeof obj !== "object") return obj;
   if (Array.isArray(obj)) return obj.map(redactSensitiveKeys);
   const result: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
     const isSensitive = SENSITIVE_KEY_PATTERNS.some((re) => re.test(k));
-    if (isSensitive && typeof v === 'string' && v.length > 0) {
+    if (isSensitive && typeof v === "string" && v.length > 0) {
       result[k] = REDACTED;
-    } else if (v && typeof v === 'object') {
+    } else if (v && typeof v === "object") {
       result[k] = redactSensitiveKeys(v);
     } else {
       result[k] = v;
@@ -108,7 +108,7 @@ export class IntegrationsService {
   async findAll(tenantId: string) {
     const rows = await this.prisma.integrationSettings.findMany({
       where: { tenantId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
     return rows.map((r) => this.toPublicView(r));
   }
@@ -116,7 +116,7 @@ export class IntegrationsService {
   async findByType(tenantId: string, integrationType: string) {
     const rows = await this.prisma.integrationSettings.findMany({
       where: { tenantId, integrationType },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
     return rows.map((r) => this.toPublicView(r));
   }
@@ -125,7 +125,7 @@ export class IntegrationsService {
     const integration = await this.prisma.integrationSettings.findFirst({
       where: { id, tenantId },
     });
-    if (!integration) throw new NotFoundException('Integration not found');
+    if (!integration) throw new NotFoundException("Integration not found");
     return this.toPublicView(integration);
   }
 
@@ -137,15 +137,23 @@ export class IntegrationsService {
     const integration = await this.prisma.integrationSettings.findFirst({
       where: { id, tenantId },
     });
-    if (!integration) throw new NotFoundException('Integration not found');
+    if (!integration) throw new NotFoundException("Integration not found");
     return this.decryptConfig(integration);
   }
 
   async create(tenantId: string, createDto: CreateIntegrationDto) {
     const existing = await this.prisma.integrationSettings.findUnique({
       where: {
-        tenantId_integrationType_provider: {
+        // v3.0.0 — IntegrationSettings now compounds branchId into
+        // its uniqueness invariant so a per-branch override can
+        // co-exist with the tenant-default row of the same provider.
+        // The IntegrationsService is currently the tenant-level
+        // surface (CRUD lives at /v1/integrations, not under a
+        // /v1/branches/:id/integrations route yet); branchId=null is
+        // the tenant-default address.
+        tenantId_branchId_integrationType_provider: {
           tenantId,
+          branchId: null,
           integrationType: createDto.integrationType,
           provider: createDto.provider,
         },
@@ -153,7 +161,7 @@ export class IntegrationsService {
     });
     if (existing) {
       throw new ConflictException(
-        'Integration with this type and provider already exists',
+        "Integration with this type and provider already exists",
       );
     }
 
@@ -180,7 +188,7 @@ export class IntegrationsService {
     const integration = await this.prisma.integrationSettings.findFirst({
       where: { id, tenantId },
     });
-    if (!integration) throw new NotFoundException('Integration not found');
+    if (!integration) throw new NotFoundException("Integration not found");
 
     const data: any = { ...updateDto };
     if (updateDto.config !== undefined) {
@@ -189,9 +197,16 @@ export class IntegrationsService {
         : (updateDto.config as any);
     }
 
-    const updated = await this.prisma.integrationSettings.update({
-      where: { id: integration.id },
+    // Compound WHERE (B41-B45 pattern, iter-31 onward). The findFirst
+    // above already proves ownership, but a future refactor that drops
+    // it shouldn't leak into a cross-tenant write.
+    const claim = await this.prisma.integrationSettings.updateMany({
+      where: { id: integration.id, tenantId },
       data,
+    });
+    if (claim.count === 0) throw new NotFoundException("Integration not found");
+    const updated = await this.prisma.integrationSettings.findFirstOrThrow({
+      where: { id: integration.id, tenantId },
     });
     return this.toPublicView(updated);
   }
@@ -200,7 +215,8 @@ export class IntegrationsService {
     const result = await this.prisma.integrationSettings.deleteMany({
       where: { id, tenantId },
     });
-    if (result.count !== 1) throw new NotFoundException('Integration not found');
+    if (result.count !== 1)
+      throw new NotFoundException("Integration not found");
     return { id, deleted: true };
   }
 
@@ -209,7 +225,8 @@ export class IntegrationsService {
       where: { id, tenantId },
       data: { isEnabled },
     });
-    if (result.count !== 1) throw new NotFoundException('Integration not found');
+    if (result.count !== 1)
+      throw new NotFoundException("Integration not found");
     const row = await this.prisma.integrationSettings.findFirst({
       where: { id, tenantId },
     });
@@ -221,18 +238,19 @@ export class IntegrationsService {
       where: { id, tenantId },
       data: { lastSyncedAt: new Date() },
     });
-    if (result.count !== 1) throw new NotFoundException('Integration not found');
+    if (result.count !== 1)
+      throw new NotFoundException("Integration not found");
   }
 
   async getHardwareConfig(tenantId: string) {
     const hardwareTypes = [
-      'THERMAL_PRINTER',
-      'CASH_DRAWER',
-      'RESTAURANT_PAGER',
-      'BARCODE_READER',
-      'CUSTOMER_DISPLAY',
-      'KITCHEN_DISPLAY',
-      'SCALE_DEVICE',
+      "THERMAL_PRINTER",
+      "CASH_DRAWER",
+      "RESTAURANT_PAGER",
+      "BARCODE_READER",
+      "CUSTOMER_DISPLAY",
+      "KITCHEN_DISPLAY",
+      "SCALE_DEVICE",
     ];
     const integrations = await this.prisma.integrationSettings.findMany({
       where: {
@@ -240,7 +258,7 @@ export class IntegrationsService {
         integrationType: { in: hardwareTypes },
         isEnabled: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
 
     return {
@@ -251,7 +269,8 @@ export class IntegrationsService {
         enabled: integration.isEnabled,
         auto_connect: (integration.config as any)?.auto_connect ?? true,
         connection: {
-          connection_type: (integration.config as any)?.connection_type || 'Serial',
+          connection_type:
+            (integration.config as any)?.connection_type || "Serial",
           config: (integration.config as any)?.connection_config || {},
         },
         settings: (integration.config as any)?.device_settings || {},
@@ -267,13 +286,13 @@ export class IntegrationsService {
     const integration = await this.prisma.integrationSettings.findFirst({
       where: { id: deviceId, tenantId },
     });
-    if (!integration) throw new NotFoundException('Integration not found');
+    if (!integration) throw new NotFoundException("Integration not found");
 
     if (this.isSensitive(integration.integrationType)) {
       // Refuse to merge arbitrary client data into an encrypted credentials
       // blob — previously any WAITER could write keys into a stripe config.
       throw new BadRequestException(
-        'updateDeviceStatus is only available for hardware integrations',
+        "updateDeviceStatus is only available for hardware integrations",
       );
     }
 
@@ -286,36 +305,41 @@ export class IntegrationsService {
       },
     };
 
-    await this.prisma.integrationSettings.update({
-      where: { id: integration.id },
+    // Compound WHERE — same defence-in-depth pattern as update() above.
+    const claim = await this.prisma.integrationSettings.updateMany({
+      where: { id: integration.id, tenantId },
       data: {
         config: updatedConfig as any,
         lastSyncedAt: new Date(),
       },
     });
+    if (claim.count === 0) throw new NotFoundException("Integration not found");
     return { success: true };
   }
 
   async reportDeviceEvent(
     deviceId: string,
     tenantId: string,
-    eventData: Record<string, unknown>,
+    eventData: { event: string; data?: Record<string, unknown> },
   ) {
     const integration = await this.prisma.integrationSettings.findFirst({
       where: { id: deviceId, tenantId },
     });
-    if (!integration) throw new NotFoundException('Integration not found');
+    if (!integration) throw new NotFoundException("Integration not found");
 
     // Log at debug, redacted. Previously console.log dumped full event
     // payloads which often included PII (order detail, customer data).
+    const dataKeys = eventData.data ? Object.keys(eventData.data).length : 0;
     this.logger.debug(
-      `Hardware event for ${integration.provider}: ${Object.keys(eventData).length} fields`,
+      `Hardware event for ${integration.provider}: type=${eventData.event} (${dataKeys} data fields)`,
     );
 
-    await this.prisma.integrationSettings.update({
-      where: { id: integration.id },
+    // Compound WHERE — same defence-in-depth pattern as update() above.
+    const claim = await this.prisma.integrationSettings.updateMany({
+      where: { id: integration.id, tenantId },
       data: { lastSyncedAt: new Date() },
     });
+    if (claim.count === 0) throw new NotFoundException("Integration not found");
     return { success: true };
   }
 }

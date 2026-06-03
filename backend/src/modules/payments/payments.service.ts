@@ -1,28 +1,33 @@
 import {
   Injectable,
+  Inject,
   Logger,
   BadRequestException,
   NotFoundException,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Prisma } from '@prisma/client';
-import { addHours } from 'date-fns';
-import { randomBytes } from 'crypto';
-import { PrismaService } from '../../prisma/prisma.service';
-import { PaytrAdapter } from './adapters/paytr.adapter';
-import { SubscriptionService } from '../subscriptions/services/subscription.service';
-import { ConsentService } from '../legal/services/consent.service';
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { Prisma } from "@prisma/client";
+import { addHours } from "date-fns";
+import { randomBytes } from "crypto";
+import { PrismaService } from "../../prisma/prisma.service";
+import {
+  REFERRAL_DIRECTORY_PORT,
+  ReferralDirectoryPort,
+} from "../../core-contracts/referral/referral-directory.port";
+import { PaytrAdapter } from "./adapters/paytr.adapter";
+import { SubscriptionService } from "../subscriptions/services/subscription.service";
+import { ConsentService } from "../legal/services/consent.service";
 import {
   BillingCycle,
   PaymentProvider,
   PaymentStatus,
   SubscriptionPlanType,
   SubscriptionStatus,
-} from '../../common/constants/subscription.enum';
-import { CreateIntentDto } from './dto/create-intent.dto';
+} from "../../common/constants/subscription.enum";
+import { CreateIntentDto } from "./dto/create-intent.dto";
 
 export interface CreateIntentResult {
-  provider: 'PAYTR' | 'TRIAL';
+  provider: "PAYTR" | "TRIAL";
   paymentLink?: string;
   merchantOid?: string;
   amount: number;
@@ -44,6 +49,10 @@ export class PaymentsService {
     private readonly config: ConfigService,
     private readonly subscriptions: SubscriptionService,
     private readonly consents: ConsentService,
+    // Marketing-owned port (bound globally by ProvisioningModule). Lets core
+    // resolve a referral code without reading marketing_users directly.
+    @Inject(REFERRAL_DIRECTORY_PORT)
+    private readonly referralDirectory: ReferralDirectoryPort,
   ) {}
 
   /**
@@ -70,7 +79,7 @@ export class PaymentsService {
         where: { id: tenantId },
         include: {
           subscriptions: {
-            where: { status: { in: ['ACTIVE', 'TRIALING', 'PAST_DUE'] } },
+            where: { status: { in: ["ACTIVE", "TRIALING", "PAST_DUE"] } },
             // Plan included so trial-eligibility can distinguish a real
             // paid subscription from the auto-created FREE sub that
             // every tenant gets on registration.
@@ -92,8 +101,8 @@ export class PaymentsService {
         },
       }),
     ]);
-    if (!tenant) throw new NotFoundException('Tenant not found');
-    if (!callingUser) throw new BadRequestException('Calling user not found');
+    if (!tenant) throw new NotFoundException("Tenant not found");
+    if (!callingUser) throw new BadRequestException("Calling user not found");
 
     // Mirror the email-verified gate that SubscriptionService.createSubscription
     // enforces. Without this, PayTR could collect money for a tenant who
@@ -101,7 +110,7 @@ export class PaymentsService {
     // upgrades, anything that needs email confirmation).
     if (!callingUser.emailVerified) {
       throw new BadRequestException(
-        'Email must be verified before subscribing. Please check your inbox for the verification code.',
+        "Email must be verified before subscribing. Please check your inbox for the verification code.",
       );
     }
 
@@ -110,14 +119,14 @@ export class PaymentsService {
     // Fail fast with a structured code so the frontend can route the
     // user to their profile page to fill it in, then back to checkout
     // (handled in CheckoutPage.tsx onError + ProfilePage.tsx returnTo).
-    const trimmedPhone = (callingUser.phone ?? '').trim();
+    const trimmedPhone = (callingUser.phone ?? "").trim();
     if (!trimmedPhone) {
       throw new BadRequestException({
         statusCode: 400,
-        error: 'Profile Phone Required',
-        code: 'PROFILE_PHONE_REQUIRED',
+        error: "Profile Phone Required",
+        code: "PROFILE_PHONE_REQUIRED",
         message:
-          'Telefon numarası gereklidir. Lütfen profilinize bir telefon ekleyin ve ödeme adımına geri dönün.',
+          "Telefon numarası gereklidir. Lütfen profilinize bir telefon ekleyin ve ödeme adımına geri dönün.",
       });
     }
 
@@ -125,7 +134,7 @@ export class PaymentsService {
       where: { id: dto.planId },
     });
     if (!plan || !plan.isActive) {
-      throw new NotFoundException('Plan not found or inactive');
+      throw new NotFoundException("Plan not found or inactive");
     }
     // No payment intent for the FREE plan — every tenant has FREE
     // attached from registration and there's nothing to charge. The
@@ -133,8 +142,24 @@ export class PaymentsService {
     // gives the user a clearer error.
     if (plan.name === SubscriptionPlanType.FREE) {
       throw new BadRequestException(
-        'Cannot create a payment intent for the FREE plan',
+        "Cannot create a payment intent for the FREE plan",
       );
+    }
+
+    // Currency safety gate — PayTR collects in TRY only. A plan priced
+    // in USD/EUR would display as "$199" / "€199" on the storefront,
+    // but the adapter (until this iter) hardcoded `currency=TL` on the
+    // wire, so the customer would be charged 199 TL while seeing a USD
+    // total. Fail at the earliest possible point: BEFORE reserving the
+    // SubscriptionPayment row or pre-creating a PENDING Subscription.
+    // The adapter still self-validates as defence-in-depth.
+    if (plan.currency !== "TRY") {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: "Unsupported Currency",
+        code: "PAYTR_ONLY_SUPPORTS_TRY",
+        message: `PayTR yalnızca TRY ile tahsilat yapar. Bu plan ${plan.currency} ile fiyatlandırılmış.`,
+      });
     }
 
     // Legal consent gate — three required documents (KVKK + Mesafeli
@@ -148,10 +173,10 @@ export class PaymentsService {
     if (!dto.acceptedDocumentIds || dto.acceptedDocumentIds.length === 0) {
       throw new BadRequestException({
         statusCode: 400,
-        error: 'Legal Consent Required',
-        code: 'LEGAL_CONSENT_REQUIRED',
+        error: "Legal Consent Required",
+        code: "LEGAL_CONSENT_REQUIRED",
         message:
-          'Devam etmek için KVKK, Mesafeli Satış ve İade politikalarını onaylamanız gerekiyor.',
+          "Devam etmek için KVKK, Mesafeli Satış ve İade politikalarını onaylamanız gerekiyor.",
       });
     }
     await this.consents.verifyAndRecord(dto.acceptedDocumentIds, {
@@ -161,7 +186,9 @@ export class PaymentsService {
     });
 
     const amount =
-      dto.billingCycle === BillingCycle.MONTHLY ? plan.monthlyPrice : plan.yearlyPrice;
+      dto.billingCycle === BillingCycle.MONTHLY
+        ? plan.monthlyPrice
+        : plan.yearlyPrice;
 
     // (1) Trial-eligible? Activate trial; no PayTR charge during trial.
     //
@@ -194,7 +221,7 @@ export class PaymentsService {
       // ends), not 0 — the frontend uses this to render
       // "Free for 14 days, then 1299 TRY/month" for PRO etc.
       return {
-        provider: 'TRIAL',
+        provider: "TRIAL",
         amount: new Prisma.Decimal(amount).toNumber(),
         currency: plan.currency,
         trialActivated: true,
@@ -206,6 +233,16 @@ export class PaymentsService {
     //     rejected at get-token time.
     const merchantOid = this.generateMerchantOid(tenantId);
     const isUpgrade = !!existingSub && existingSub.planId !== plan.id;
+
+    // Resolve marketer referral attribution (if a code was supplied) and
+    // snapshot it onto the payment row below. A bad/unknown code resolves to
+    // null and NEVER blocks checkout — the snapshot just stays empty. The
+    // resolved (not raw) code is stored so attribution survives the marketer
+    // rotating their code later. The post-settlement SettlementCommissionConsumer
+    // reads these snapshot columns to credit the SIGNUP referral commission.
+    const referral = dto.referralCode
+      ? await this.referralDirectory.resolveReferralCode(dto.referralCode)
+      : null;
 
     const { paymentId } = await this.prisma.$transaction(async (tx) => {
       const subscriptionId =
@@ -229,6 +266,10 @@ export class PaymentsService {
           status: PaymentStatus.PENDING,
           paymentProvider: PaymentProvider.PAYTR,
           paytrMerchantOid: merchantOid,
+          // Referral attribution snapshot (null when no/unknown code). Settles
+          // into a SIGNUP commission post-payment via the marketing consumer.
+          referralCode: referral?.referralCode ?? null,
+          referredByMarketingUserId: referral?.marketingUserId ?? null,
         },
       });
 
@@ -254,22 +295,29 @@ export class PaymentsService {
       token = await this.paytr.getIframeToken({
         merchantOid,
         amount,
+        currency: plan.currency,
         email: callingUser.email,
         userName:
-          `${callingUser.firstName ?? ''} ${callingUser.lastName ?? ''}`.trim() ||
+          `${callingUser.firstName ?? ""} ${callingUser.lastName ?? ""}`.trim() ||
           callingUser.email,
         // PayTR rejects get-token with "Zorunlu alan degeri gecersiz veya
         // gonderilmedi: user_address" when this is empty. We don't capture
         // a tenant-level postal address yet, so fall back to the country
         // string — accepted by PayTR as a valid buyer address.
-        userAddress: 'Türkiye',
+        userAddress: "Türkiye",
         // Empty phone was rejected above with PROFILE_PHONE_REQUIRED, so
         // by this point trimmedPhone is guaranteed non-empty.
         userPhone: trimmedPhone,
-        userBasket: [[plan.displayName, new Prisma.Decimal(amount).toFixed(2), 1]],
+        userBasket: [
+          [plan.displayName, new Prisma.Decimal(amount).toFixed(2), 1],
+        ],
         userIp,
-        okUrl: this.config.get<string>('PAYTR_OK_URL') ?? 'http://localhost:5173/subscription/success',
-        failUrl: this.config.get<string>('PAYTR_FAIL_URL') ?? 'http://localhost:5173/subscription/fail',
+        okUrl:
+          this.config.get<string>("PAYTR_OK_URL") ??
+          "http://localhost:5173/subscription/success",
+        failUrl:
+          this.config.get<string>("PAYTR_FAIL_URL") ??
+          "http://localhost:5173/subscription/fail",
       });
     } catch (err) {
       // PayTR rejected → mark the payment FAILED and re-throw so the
@@ -277,7 +325,10 @@ export class PaymentsService {
       // intentionally left behind for audit.
       await this.prisma.subscriptionPayment.update({
         where: { id: paymentId },
-        data: { status: PaymentStatus.FAILED, failureMessage: (err as Error).message },
+        data: {
+          status: PaymentStatus.FAILED,
+          failureMessage: (err as Error).message,
+        },
       });
       throw err;
     }
@@ -288,11 +339,11 @@ export class PaymentsService {
     });
 
     return {
-      provider: 'PAYTR',
+      provider: "PAYTR",
       paymentLink: token.paymentLink,
       merchantOid,
       amount: new Prisma.Decimal(amount).toNumber(),
-      currency: 'TRY',
+      currency: "TRY",
     };
   }
 
@@ -304,9 +355,9 @@ export class PaymentsService {
    * millisecond timestamp — effectively zero collision probability).
    */
   private generateMerchantOid(tenantId: string): string {
-    const tenantHex = tenantId.replace(/-/g, '').slice(0, 12);
+    const tenantHex = tenantId.replace(/-/g, "").slice(0, 12);
     const ts = Date.now().toString(36);
-    const rand = randomBytes(3).toString('hex');
+    const rand = randomBytes(3).toString("hex");
     return `SUB${tenantHex}${ts}${rand}`;
   }
 

@@ -1,12 +1,12 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
   IsBoolean,
   IsEnum,
   IsObject,
   IsOptional,
   IsString,
-} from 'class-validator';
-import { DeliveryPlatform } from '../constants/platform.enum';
+} from "class-validator";
+import { DeliveryPlatform } from "../constants/platform.enum";
 
 export class CreatePlatformConfigDto {
   @ApiProperty({ enum: DeliveryPlatform })

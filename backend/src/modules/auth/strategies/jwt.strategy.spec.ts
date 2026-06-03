@@ -76,10 +76,46 @@ describe('JwtStrategy', () => {
       const result = await strategy.validate(payload);
 
       // The strategy strips `tenant` and `tokenVersion` from the
-      // returned user, so we compare against that subset.
+      // returned user, and v3.0.0 appends `activeBranchId` +
+      // `allowedBranchIds` from the JWT payload (defaults: null + []
+      // when the legacy-shape payload omits them).
       const { tenant: _t, tokenVersion: _v, ...expected } = fullUser as any;
-      expect(result).toEqual(expected);
+      expect(result).toEqual({
+        ...expected,
+        activeBranchId: null,
+        allowedBranchIds: [],
+      });
       expect(prisma.user.findUnique).toHaveBeenCalled();
+    });
+
+    it('returns activeBranchId + allowedBranchIds verbatim from the JWT payload', async () => {
+      const payload = {
+        sub: mockUser.id,
+        email: mockUser.email,
+        role: mockUser.role,
+        tenantId: mockUser.tenantId,
+        primaryBranchId: 'b-primary',
+        activeBranchId: 'b-active',
+        allowedBranchIds: ['b-primary', 'b-other'],
+      };
+      const fullUser = {
+        ...mockUser,
+        firstName: 'Test',
+        lastName: 'User',
+        status: 'ACTIVE',
+        tokenVersion: 0,
+        primaryBranchId: 'b-primary',
+        tenant: { status: 'ACTIVE' },
+      };
+      prisma.user.findUnique.mockResolvedValue(fullUser as any);
+
+      const result = await strategy.validate(payload);
+
+      expect(result).toMatchObject({
+        primaryBranchId: 'b-primary',
+        activeBranchId: 'b-active',
+        allowedBranchIds: ['b-primary', 'b-other'],
+      });
     });
 
     it('should throw UnauthorizedException when user is not found', async () => {

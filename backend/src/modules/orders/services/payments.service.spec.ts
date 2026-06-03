@@ -18,7 +18,7 @@ describe('PaymentsService — progressive per-item payments', () => {
   const TABLE_ID = 'table-1';
 
   let prisma: MockPrismaClient;
-  let ordersService: { findOne: jest.Mock };
+  let ordersService: { findOne: jest.Mock; findOneByTenant: jest.Mock };
   let customersService: any;
   let receiptSnapshotBuilder: any;
   let salesInvoice: any;
@@ -86,8 +86,13 @@ describe('PaymentsService — progressive per-item payments', () => {
 
   beforeEach(() => {
     prisma = mockPrismaClient();
+    // v3.0.0 — payments.service.ts now calls `findOneByTenant` for its
+    // internal cross-flow tenant-isolation pre-checks (the HTTP path
+    // uses `findOne(scope, id)`). Both are wired here so existing
+    // assertions keep working under the new shape.
     ordersService = {
       findOne: jest.fn().mockResolvedValue(makeOrder()),
+      findOneByTenant: jest.fn().mockResolvedValue(makeOrder()),
     };
     customersService = {};
     // Receipt snapshot is wired in but exercised only via the
@@ -271,9 +276,13 @@ describe('PaymentsService — progressive per-item payments', () => {
           data: expect.objectContaining({ status: OrderStatus.PAID }),
         }),
       );
-      expect(prisma.table.update).toHaveBeenCalledWith(
+      // v2.8.93 — table release uses updateMany with (id, tenantId)
+      // compound WHERE so a spoofed tableId can't mark another tenant's
+      // table AVAILABLE. The pre-fix `update({where:{id}})` shape is
+      // gone.
+      expect(prisma.table.updateMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: TABLE_ID },
+          where: { id: TABLE_ID, tenantId: TENANT_ID },
           data: { status: 'AVAILABLE' },
         }),
       );
@@ -745,7 +754,10 @@ describe('PaymentsService — progressive per-item payments', () => {
       );
 
       expect(kdsGateway.emitPaymentSuccess).toHaveBeenCalledTimes(1);
-      const [emitTenantId, emitPayment, emitUserId] =
+      // v3.0.0 — emit signature is now (tenantId, branchId, payment, userId).
+      // branchId is forwarded from the payment.branchId (derived from
+      // order.branchId) so the socket room is per-branch.
+      const [emitTenantId, , emitPayment, emitUserId] =
         kdsGateway.emitPaymentSuccess.mock.calls[0];
       expect(emitTenantId).toBe(TENANT_ID);
       expect(emitPayment.id).toBe('payment-1');
@@ -796,7 +808,9 @@ describe('PaymentsService — progressive per-item payments', () => {
       );
 
       expect(kdsGateway.emitPaymentSuccess).toHaveBeenCalledTimes(1);
-      const [, , emitUserId] = kdsGateway.emitPaymentSuccess.mock.calls[0];
+      // v3.0.0 — 4-arg emit: (tenantId, branchId, payment, userId).
+      // Webhook path passes null for the userId so every tablet prints.
+      const [, , , emitUserId] = kdsGateway.emitPaymentSuccess.mock.calls[0];
       expect(emitUserId).toBeNull();
     });
   });

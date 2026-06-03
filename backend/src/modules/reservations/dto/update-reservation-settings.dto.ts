@@ -1,6 +1,17 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsInt, IsOptional, IsString, Min, Max, IsObject } from 'class-validator';
-import { EmptyStringToNumber, StringToBoolean } from '../../../common/dto/transforms';
+import { ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+  Max,
+  IsObject,
+} from "class-validator";
+import {
+  EmptyStringToNumber,
+  StringToBoolean,
+} from "../../../common/dto/transforms";
 
 export class UpdateReservationSettingsDto {
   @ApiPropertyOptional()
@@ -43,10 +54,16 @@ export class UpdateReservationSettingsDto {
   @Min(15)
   defaultDuration?: number;
 
-  @ApiPropertyOptional({ description: 'Operating hours per day { monday: { open: "09:00", close: "22:00", closed: false } }' })
+  @ApiPropertyOptional({
+    description:
+      'Operating hours per day { monday: { open: "09:00", close: "22:00", closed: false } }',
+  })
   @IsOptional()
   @IsObject()
-  operatingHours?: Record<string, { open: string; close: string; closed: boolean }>;
+  operatingHours?: Record<
+    string,
+    { open: string; close: string; closed: boolean }
+  >;
 
   @ApiPropertyOptional()
   @EmptyStringToNumber()
@@ -96,7 +113,7 @@ export class UpdateReservationSettingsDto {
 
   @ApiPropertyOptional({
     description:
-      'Minutes before a confirmed reservation starts that the table auto-flips to RESERVED. Also bounds the upcomingReservation annotation and the POS reservation dialog. 0 disables pre-hold (table only flips on/after start).',
+      "Minutes before a confirmed reservation starts that the table auto-flips to RESERVED. Also bounds the upcomingReservation annotation and the POS reservation dialog. 0 disables pre-hold (table only flips on/after start).",
   })
   @EmptyStringToNumber()
   @IsOptional()

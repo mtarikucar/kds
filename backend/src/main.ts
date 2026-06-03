@@ -1,17 +1,17 @@
-import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
-import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-import { AppModule } from './app.module';
-import { NestExpressApplication } from '@nestjs/platform-express';
-import { join } from 'path';
-import helmet from 'helmet';
-import * as bodyParser from 'body-parser';
+import { NestFactory } from "@nestjs/core";
+import { ValidationPipe } from "@nestjs/common";
+import { SwaggerModule, DocumentBuilder } from "@nestjs/swagger";
+import { AppModule } from "./app.module";
+import { NestExpressApplication } from "@nestjs/platform-express";
+import { join } from "path";
+import helmet from "helmet";
+import * as bodyParser from "body-parser";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const cookieParser = require('cookie-parser');
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { initSentry } from './sentry.config';
-import { validateEnv } from './common/helpers/env-validation';
-import { RedisIoAdapter } from './common/adapters/redis-io.adapter';
+const cookieParser = require("cookie-parser");
+import { HttpExceptionFilter } from "./common/filters/http-exception.filter";
+import { initSentry } from "./sentry.config";
+import { validateEnv } from "./common/helpers/env-validation";
+import { RedisIoAdapter } from "./common/adapters/redis-io.adapter";
 
 // Fail-fast env validation BEFORE Sentry / Nest touches anything. Missing
 // secrets previously surfaced as a first-request 500; now abort startup.
@@ -20,18 +20,20 @@ validateEnv();
 initSentry();
 
 // Global unhandled error handlers
-process.on('unhandledRejection', (reason: any) => {
-  console.error('Unhandled Rejection:', reason);
+process.on("unhandledRejection", (reason: any) => {
+  console.error("Unhandled Rejection:", reason);
   try {
-    const Sentry = require('@sentry/node');
-    Sentry.captureException(reason instanceof Error ? reason : new Error(String(reason)));
+    const Sentry = require("@sentry/node");
+    Sentry.captureException(
+      reason instanceof Error ? reason : new Error(String(reason)),
+    );
   } catch {}
 });
 
-process.on('uncaughtException', (error: Error) => {
-  console.error('Uncaught Exception:', error);
+process.on("uncaughtException", (error: Error) => {
+  console.error("Uncaught Exception:", error);
   try {
-    const Sentry = require('@sentry/node');
+    const Sentry = require("@sentry/node");
     Sentry.captureException(error);
   } catch {}
   process.exit(1);
@@ -49,9 +51,9 @@ async function bootstrap() {
   const trustProxy = process.env.TRUST_PROXY;
   if (trustProxy) {
     const parsed = Number(trustProxy);
-    app.set('trust proxy', Number.isFinite(parsed) ? parsed : trustProxy);
+    app.set("trust proxy", Number.isFinite(parsed) ? parsed : trustProxy);
   } else {
-    app.set('trust proxy', 1);
+    app.set("trust proxy", 1);
   }
 
   // Body parsers: register path-scoped /api/webhooks FIRST so the generic
@@ -59,9 +61,9 @@ async function bootstrap() {
   // matches). Delivery-platform webhooks can carry 200KB+ line-item bodies;
   // the generic path stays tight to block DoS.
   app.use(
-    '/api/webhooks',
+    "/api/webhooks",
     bodyParser.json({
-      limit: '2mb',
+      limit: "2mb",
       verify: (req: any, _res, buf) => {
         req.rawBody = buf;
       },
@@ -69,13 +71,13 @@ async function bootstrap() {
   );
   app.use(
     bodyParser.json({
-      limit: '100kb',
+      limit: "100kb",
       verify: (req: any, _res, buf) => {
         req.rawBody = buf;
       },
     }),
   );
-  app.use(bodyParser.urlencoded({ limit: '100kb', extended: true }));
+  app.use(bodyParser.urlencoded({ limit: "100kb", extended: true }));
   app.use(cookieParser());
 
   // Security headers with Helmet. CSP hardened with frame-ancestors 'none'
@@ -88,8 +90,8 @@ async function bootstrap() {
           defaultSrc: ["'self'"],
           styleSrc: ["'self'", "'unsafe-inline'"],
           scriptSrc: ["'self'"],
-          imgSrc: ["'self'", 'data:', 'https:'],
-          connectSrc: ["'self'", 'https:', 'wss:'],
+          imgSrc: ["'self'", "data:", "https:"],
+          connectSrc: ["'self'", "https:", "wss:"],
           frameAncestors: ["'none'"],
           objectSrc: ["'none'"],
           baseUri: ["'self'"],
@@ -97,32 +99,86 @@ async function bootstrap() {
         },
       },
       crossOriginEmbedderPolicy: false,
-      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      crossOriginResourcePolicy: { policy: "cross-origin" },
     }),
   );
 
-  app.useStaticAssets(join(__dirname, '..', 'uploads'), {
-    prefix: '/uploads/',
+  // process.cwd() (not __dirname) — webpack bundles to dist/main.js so
+  // __dirname collapses to /app/dist/ in prod. The previous `__dirname/..`
+  // form happened to resolve correctly because /app/dist/../uploads/ is
+  // /app/uploads/ (where the Dockerfile creates the mount), but that's
+  // pure accident of the current bundle layout. process.cwd() pins the
+  // resolution to the canonical app root in both dev and prod. Same
+  // pattern as EmailService + iter-23 SubscriptionNotificationService +
+  // iter-24 ContactMailerService.
+  app.useStaticAssets(join(process.cwd(), "uploads"), {
+    prefix: "/uploads/",
   });
 
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix("api");
 
   const allowedOrigins = process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(',')
-    : ['http://localhost:5173', 'http://localhost:5179'];
+    ? process.env.CORS_ORIGIN.split(",")
+    : ["http://localhost:5173", "http://localhost:5179"];
+
+  // v2.8.94 — explicit tenant-subdomain regex with structural caps and
+  // a reserved-name deny-list. Pre-fix `[a-z0-9-]+` matched any length
+  // of any allowed character; combined with `credentials: true` an
+  // attacker controlling a subdomain (DNS hijack, accidental wildcard
+  // delegation, internal misconfig) would get cookied requests. The
+  // new shape:
+  //   - 3–32 char label (matches tenant subdomain validation rules)
+  //   - cannot start or end with a hyphen
+  //   - explicit deny-list of platform-reserved labels prevents an
+  //     attacker who got `admin.hummytummy.com` provisioned to them
+  //     from also winning CORS access
+  const TENANT_SUBDOMAIN_RE =
+    /^https:\/\/(?!-)[a-z0-9-]{3,32}(?<!-)\.hummytummy\.com$/;
+  const TENANT_SUBDOMAIN_STAGING_RE =
+    /^https:\/\/(?!-)[a-z0-9-]{3,32}(?<!-)\.staging\.hummytummy\.com$/;
+  const RESERVED_SUBDOMAINS = new Set([
+    "admin",
+    "api",
+    "app",
+    "auth",
+    "cdn",
+    "dashboard",
+    "docs",
+    "help",
+    "login",
+    "mail",
+    "ops",
+    "panel",
+    "platform",
+    "root",
+    "staff",
+    "staging",
+    "status",
+    "superadmin",
+    "support",
+    "system",
+    "www",
+  ]);
+  const isAllowedTenantOrigin = (origin: string): boolean => {
+    let match = TENANT_SUBDOMAIN_RE.exec(origin);
+    if (!match) match = TENANT_SUBDOMAIN_STAGING_RE.exec(origin);
+    if (!match) return false;
+    const label = origin.replace(/^https:\/\//, "").split(".")[0];
+    if (RESERVED_SUBDOMAINS.has(label)) return false;
+    return true;
+  };
 
   app.enableCors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) return callback(null, true);
-      if (/^https:\/\/[a-z0-9-]+\.hummytummy\.com$/.test(origin)) return callback(null, true);
-      if (/^https:\/\/[a-z0-9-]+\.staging\.hummytummy\.com$/.test(origin)) return callback(null, true);
-      return callback(new Error('Not allowed by CORS'), false);
+      if (isAllowedTenantOrigin(origin)) return callback(null, true);
+      return callback(new Error("Not allowed by CORS"), false);
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-    exposedHeaders: ['X-Total-Count', 'X-Request-ID'],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+    exposedHeaders: ["X-Total-Count", "X-Request-ID"],
   });
 
   app.useGlobalFilters(new HttpExceptionFilter());
@@ -153,15 +209,18 @@ async function bootstrap() {
   app.enableShutdownHooks();
 
   // Swagger only in non-prod; in prod it reveals the full admin API surface.
-  if (process.env.NODE_ENV !== 'production' || process.env.SWAGGER_ENABLED === 'true') {
+  if (
+    process.env.NODE_ENV !== "production" ||
+    process.env.SWAGGER_ENABLED === "true"
+  ) {
     const config = new DocumentBuilder()
-      .setTitle('HummyTummy API')
-      .setDescription('Cloud-based restaurant management system')
-      .setVersion('1.0')
+      .setTitle("HummyTummy API")
+      .setDescription("Cloud-based restaurant management system")
+      .setVersion("1.0")
       .addBearerAuth()
       .build();
     const document = SwaggerModule.createDocument(app, config);
-    SwaggerModule.setup('api/docs', app, document);
+    SwaggerModule.setup("api/docs", app, document);
   }
 
   const port = process.env.PORT || 3000;

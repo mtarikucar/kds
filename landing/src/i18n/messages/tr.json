@@ -9,6 +9,7 @@
     "features": "Özellikler",
     "pricing": "Fiyatlandırma",
     "security": "Güvenlik",
+    "store": "Mağaza",
     "signIn": "Giriş yap",
     "startFree": "Ücretsiz başla",
     "openMenu": "Menüyü aç",
@@ -284,8 +285,8 @@
   "footer": {
     "description": "Modern restoran yönetim platformu. Operasyonları kolaylaştırın, müşterileri memnun edin.",
     "contact": "İletişim",
-    "address": "Bosna Hersek Mahallesi, Akif Sokak, No.3 Selçuklu, Konya",
-    "phone": "+90 506 068 71 00",
+    "address": "Şehit Osman Avcı Mahallesi, Akın 688 Sitesi B32, Etimesgut / Ankara",
+    "phone": "+90 850 840 73 03",
     "product": "Ürün",
     "company": "Şirket",
     "support": "Destek",
@@ -294,6 +295,7 @@
       "features": "Özellikler",
       "pricing": "Fiyatlandırma",
       "security": "Güvenlik",
+      "shop": "Donanım Mağazası",
       "integrations": "Entegrasyonlar",
       "about": "Hakkımızda",
       "blog": "Blog",
@@ -429,12 +431,81 @@
       }
     }
   },
+  "store": {
+    "title": "POS Donanım Mağazası",
+    "subtitle": "Restoran, cafe ve perakende işletmeleri için kürelenmiş yeni nesil yazarkasa POS, termal yazıcı, KDS ekranı, barkod okuyucu, arayan numara modülü ve aksesuarlar.",
+    "backToHome": "Ana Sayfaya Dön",
+    "headerBadge": "Mayıs 2026 fiyatlandırması",
+    "categoryAll": "Tümü",
+    "categories": {
+      "yazarkasa": "Yazarkasa POS",
+      "pos_terminal": "POS Terminal",
+      "printer": "Yazıcı",
+      "kds_screen": "KDS Ekranı",
+      "tablet": "Tablet",
+      "scanner": "Barkod Okuyucu",
+      "caller_id": "Arayan Numara",
+      "cash_drawer": "Para Çekmecesi",
+      "bridge": "Network Bridge",
+      "scale": "Tartı",
+      "cable": "Kablo",
+      "accessory": "Aksesuar",
+      "service": "Hizmet"
+    },
+    "buy": "Sipariş ver",
+    "viewSource": "Üretici sayfası",
+    "from": "{currency}{amount}",
+    "warrantyMonths": "{months} ay garanti",
+    "rentalFrom": "veya {currency}{amount}/ay kira",
+    "gibCertified": "GİB onaylı YN ÖKC",
+    "outOfStock": "Stokta yok",
+    "discontinued": "Üretimi durduruldu",
+    "preorder": "Ön sipariş",
+    "empty": "Bu kategoride henüz ürün yok.",
+    "loadError": "Ürünler yüklenirken bir sorun oluştu. Birkaç dakika sonra tekrar deneyin.",
+    "byo": {
+      "title": "Mevcut donanımınız var mı?",
+      "body": "Elinizdeki yazarkasa POS, termal yazıcı, KDS ekranı veya barkod okuyucuyu da sistemimize entegre edebiliriz — yeni cihaz almak zorunda değilsiniz. Mevcut ekipmanınızın markası ve modelini kayıt sonrası destek ekibimizle paylaşmanız yeterli; uyumluluğu birlikte doğrularız.",
+      "cta": "Destek ile iletişime geç"
+    },
+    "gibFootnote": "Yeni Nesil Yazarkasa POS (YN ÖKC) cihazları GİB onay listesinde olmak zorundadır ve aktivasyon yetkili bayi kanalı üzerinden yapılır. HummyTummy üzerinden sipariş ettiğinizde aktivasyon talebi otomatik açılır. Detaylı liste: ynokc.gib.gov.tr.",
+    "viewDetails": "Detaylar",
+    "services": {
+      "sectionTitle": "Kurulum & Entegrasyon Hizmetleri",
+      "sectionSubtitle": "Donanım kurulumu, GİB kaydı, Yemeksepeti/Trendyol entegrasyonu, menü migrasyonu — sahaya gelmemiz veya uzaktan destek vermemiz fark etmeksizin paketler şeffaftır."
+    },
+    "detail": {
+      "backToStore": "Mağazaya dön",
+      "buy": "Sipariş ver",
+      "duration": "Süre",
+      "coverage": "Hizmet bölgeleri",
+      "onsite": "Sahada",
+      "remote": "Uzaktan",
+      "consultation": "Danışmanlık",
+      "requiresBranch": "Şube gerekli",
+      "lowStock": "Son {n} adet",
+      "warrantyMonthsLabel": "{months} ay üretici garantisi",
+      "noDetailsAuthored": "Bu ürün için detaylı bilgi henüz girilmedi. Sorularınız için destek ekibimize ulaşabilirsiniz.",
+      "empty": "Bilgi yok.",
+      "tabs": {
+        "description": "Açıklama",
+        "specs": "Özellikler",
+        "compat": "Uyumluluk",
+        "requirements": "Gereklilikler",
+        "faq": "SSS",
+        "includes": "Neler dahil",
+        "steps": "Süreç"
+      }
+    }
+  },
   "contact": {
     "title": "İletişim",
     "subtitle": "Sorularınız, talepleriniz ve geri bildirimleriniz için bize ulaşın.",
     "backToHome": "Ana Sayfaya Dön",
+    "phone": "+90 850 840 73 03",
     "labels": {
-      "email": "E-posta"
+      "email": "E-posta",
+      "phone": "Telefon"
     },
     "sections": {
       "general": {
@@ -461,6 +532,27 @@
           "privacy": "Gizlilik Politikası",
           "terms": "Kullanım Koşulları"
         }
+      }
+    },
+    "form": {
+      "title": "Bize mesaj gönderin",
+      "submit": "Mesajı gönder",
+      "submitting": "Gönderiliyor…",
+      "honeypotLabel": "Web sitesi (boş bırakın)",
+      "successMessage": "Teşekkürler — iki iş günü içinde dönüş yapacağız.",
+      "fields": {
+        "name": "Ad",
+        "email": "E-posta",
+        "phone": "Telefon",
+        "message": "Mesaj",
+        "optional": "opsiyonel"
+      },
+      "errors": {
+        "nameTooShort": "Ad en az 2 karakter olmalı.",
+        "emailInvalid": "Geçerli bir e-posta adresi girin.",
+        "messageTooShort": "Mesaj en az 10 karakter olmalı.",
+        "network": "Bağlantı sorunu — tekrar deneyin.",
+        "generic": "Mesaj gönderilemedi. Lütfen tekrar deneyin."
       }
     }
   }

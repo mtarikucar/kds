@@ -63,6 +63,21 @@ export const useAuthStore = create<AuthState>()(
           accessToken: null,
           isAuthenticated: false,
         });
+        // v2.8.97 — explicitly drop the persisted snapshot. Pre-fix
+        // `set({user:null})` cleared the in-memory store but Zustand's
+        // persist middleware writes-back on the next mutation cycle,
+        // and a quick "logout → new login on same device" sequence
+        // could surface the previous user.name / email briefly before
+        // the new login set landed. Removing the storage key on
+        // logout makes the boot path see a clean slate.
+        if (typeof window !== 'undefined') {
+          try {
+            window.localStorage.removeItem('auth-storage');
+          } catch {
+            // Storage unavailable — fine; the in-memory clear above is
+            // sufficient for this session.
+          }
+        }
       },
     }),
     {

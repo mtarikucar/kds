@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Phone } from 'lucide-react';
 import { Link } from '@/i18n/routing';
 import { useScrollDirection } from '@/hooks/useScrollDirection';
 import { useTranslations } from 'next-intl';
@@ -19,11 +19,15 @@ export default function Navbar() {
     return () => { document.body.style.overflow = ''; };
   }, [isMenuOpen]);
 
-  const navLinks = [
-    { href: '#product', label: t('product') },
-    { href: '#features', label: t('features') },
-    { href: '#pricing', label: t('pricing') },
-    { href: '#security', label: t('security') },
+  // `kind` controls renderer: anchor links use plain <a> (in-page hash jump),
+  // page links use the locale-aware <Link> so we keep the /en/, /tr/ prefix
+  // across navigation without an extra middleware redirect.
+  const navLinks: ReadonlyArray<{ href: string; label: string; kind: 'anchor' | 'page' }> = [
+    { href: '#product', label: t('product'), kind: 'anchor' },
+    { href: '#features', label: t('features'), kind: 'anchor' },
+    { href: '#pricing', label: t('pricing'), kind: 'anchor' },
+    { href: '#security', label: t('security'), kind: 'anchor' },
+    { href: '/store', label: t('store'), kind: 'page' },
   ];
 
   const isHidden = scrollDirection === 'down' && !isAtTop && !isMenuOpen;
@@ -58,19 +62,37 @@ export default function Navbar() {
 
           {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center gap-8">
-            {navLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className={`text-sm font-medium transition-colors duration-300 ${textSecondary}`}
-              >
-                {link.label}
-              </a>
-            ))}
+            {navLinks.map((link) =>
+              link.kind === 'page' ? (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={`text-sm font-medium transition-colors duration-300 ${textSecondary}`}
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  className={`text-sm font-medium transition-colors duration-300 ${textSecondary}`}
+                >
+                  {link.label}
+                </a>
+              ),
+            )}
           </div>
 
           {/* Desktop Actions */}
           <div className="hidden lg:flex items-center gap-4">
+            <a
+              href="tel:+908508407303"
+              dir="ltr"
+              className={`hidden xl:flex items-center gap-1.5 text-sm font-medium transition-colors duration-300 ${textSecondary}`}
+            >
+              <Phone className="h-4 w-4" />
+              +90 850 840 73 03
+            </a>
             <LanguageSwitcher />
             <a
               href="/app/login"
@@ -109,17 +131,37 @@ export default function Navbar() {
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 py-4 space-y-1">
-          {navLinks.map((link) => (
+          {navLinks.map((link) =>
+            link.kind === 'page' ? (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="block px-4 py-3 text-base font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-colors"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                {link.label}
+              </Link>
+            ) : (
+              <a
+                key={link.href}
+                href={link.href}
+                className="block px-4 py-3 text-base font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-colors"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                {link.label}
+              </a>
+            ),
+          )}
+          <div className="pt-4 mt-4 border-t border-slate-200 space-y-3">
             <a
-              key={link.href}
-              href={link.href}
-              className="block px-4 py-3 text-base font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-colors"
+              href="tel:+908508407303"
+              dir="ltr"
+              className="flex items-center gap-2 px-4 py-3 text-base font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-colors"
               onClick={() => setIsMenuOpen(false)}
             >
-              {link.label}
+              <Phone className="h-5 w-5 text-orange-500" />
+              +90 850 840 73 03
             </a>
-          ))}
-          <div className="pt-4 mt-4 border-t border-slate-200 space-y-3">
             <LanguageSwitcher />
             <a
               href="/app/login"

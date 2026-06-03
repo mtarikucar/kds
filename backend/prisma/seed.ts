@@ -30,6 +30,7 @@ async function main() {
       monthlyPrice: 0,
       yearlyPrice: 0,
       currency: 'TRY',
+      maxBranches: 1,
       advancedReports: false,
       multiLocation: false,
       customBranding: false,
@@ -40,6 +41,7 @@ async function main() {
       reservationSystem: false,
       personnelManagement: false,
       deliveryIntegration: false,
+      posAccess: false,
     },
     create: {
       name: 'FREE',
@@ -51,6 +53,7 @@ async function main() {
       trialDays: 0,
       maxUsers: 2,
       maxTables: 5,
+      maxBranches: 1,
       maxProducts: 25,
       maxCategories: 5,
       maxMonthlyOrders: 50,
@@ -64,6 +67,7 @@ async function main() {
       reservationSystem: false,
       personnelManagement: false,
       deliveryIntegration: false,
+      posAccess: false,
       isActive: true,
     },
   });
@@ -76,6 +80,7 @@ async function main() {
       monthlyPrice: 499,
       yearlyPrice: 4490, // 2 ay bedava (10 ay × 499 = 4990 → 4490 promosyon)
       currency: 'TRY',
+      maxBranches: 1,
       advancedReports: false,
       multiLocation: false,
       customBranding: false,
@@ -86,6 +91,7 @@ async function main() {
       reservationSystem: false,
       personnelManagement: false,
       deliveryIntegration: false,
+      posAccess: true,
     },
     create: {
       name: 'BASIC',
@@ -97,6 +103,7 @@ async function main() {
       trialDays: 14,
       maxUsers: 5,
       maxTables: 20,
+      maxBranches: 1,
       maxProducts: 100,
       maxCategories: 20,
       maxMonthlyOrders: 500,
@@ -110,6 +117,7 @@ async function main() {
       reservationSystem: false,
       personnelManagement: false,
       deliveryIntegration: false,
+      posAccess: true,
       isActive: true,
     },
   });
@@ -122,6 +130,7 @@ async function main() {
       monthlyPrice: 1299,
       yearlyPrice: 12990, // 2 ay bedava (10 ay × 1299 = 12990 düz)
       currency: 'TRY',
+      maxBranches: 3,
       advancedReports: true,
       multiLocation: true,
       customBranding: true,
@@ -132,6 +141,7 @@ async function main() {
       reservationSystem: true,
       personnelManagement: true,
       deliveryIntegration: true,
+      posAccess: true,
     },
     create: {
       name: 'PRO',
@@ -143,6 +153,7 @@ async function main() {
       trialDays: 14,
       maxUsers: 15,
       maxTables: 50,
+      maxBranches: 3,
       maxProducts: 500,
       maxCategories: 50,
       maxMonthlyOrders: 2000,
@@ -156,6 +167,7 @@ async function main() {
       reservationSystem: true,
       personnelManagement: true,
       deliveryIntegration: true,
+      posAccess: true,
       isActive: true,
     },
   });
@@ -168,6 +180,7 @@ async function main() {
       monthlyPrice: 2999,
       yearlyPrice: 29990, // 2 ay bedava (10 ay × 2999 = 29990 düz)
       currency: 'TRY',
+      maxBranches: -1,
       advancedReports: true,
       multiLocation: true,
       customBranding: true,
@@ -178,6 +191,7 @@ async function main() {
       reservationSystem: true,
       personnelManagement: true,
       deliveryIntegration: true,
+      posAccess: true,
     },
     create: {
       name: 'BUSINESS',
@@ -189,6 +203,7 @@ async function main() {
       trialDays: 14,
       maxUsers: -1,
       maxTables: -1,
+      maxBranches: -1,
       maxProducts: -1,
       maxCategories: -1,
       maxMonthlyOrders: -1,
@@ -202,6 +217,7 @@ async function main() {
       reservationSystem: true,
       personnelManagement: true,
       deliveryIntegration: true,
+      posAccess: true,
       isActive: true,
     },
   });
@@ -224,6 +240,24 @@ async function main() {
   });
 
   console.log('✅ Tenant created:', tenant.name);
+
+  // v3.0.0 — every tenant needs at least one branch. The strict
+  // branch-scope schema requires Table.branchId, Order.branchId, etc.,
+  // so seed must mint a default "Main" branch before any branch-scoped
+  // row is created. Upsert keeps the seed idempotent against re-runs.
+  const mainBranch = await prisma.branch.upsert({
+    where: { tenantId_code: { tenantId: tenant.id, code: 'MAIN' } },
+    update: {},
+    create: {
+      tenantId: tenant.id,
+      name: 'Main',
+      code: 'MAIN',
+      timezone: 'Europe/Istanbul',
+      status: 'active',
+    },
+  });
+
+  console.log('✅ Default branch created:', mainBranch.name);
 
   // Create users
   const hashedPassword = await bcrypt.hash('password123', 10);
@@ -253,6 +287,9 @@ async function main() {
       role: UserRole.WAITER,
       status: 'ACTIVE',
       tenantId: tenant.id,
+      // v3.0.0 — DB CHECK constraint requires hard-restricted roles
+      // (WAITER/KITCHEN/COURIER) to carry a primaryBranchId.
+      primaryBranchId: mainBranch.id,
     },
   });
 
@@ -267,6 +304,7 @@ async function main() {
       role: UserRole.KITCHEN,
       status: 'ACTIVE',
       tenantId: tenant.id,
+      primaryBranchId: mainBranch.id,
     },
   });
 
@@ -466,6 +504,7 @@ async function main() {
         section: 'Main Hall',
         status: 'AVAILABLE',
         tenantId: tenant.id,
+        branchId: mainBranch.id,
       },
       {
         number: '2',
@@ -473,6 +512,7 @@ async function main() {
         section: 'Main Hall',
         status: 'AVAILABLE',
         tenantId: tenant.id,
+        branchId: mainBranch.id,
       },
       {
         number: '3',
@@ -480,6 +520,7 @@ async function main() {
         section: 'Main Hall',
         status: 'AVAILABLE',
         tenantId: tenant.id,
+        branchId: mainBranch.id,
       },
       {
         number: '4',
@@ -487,6 +528,7 @@ async function main() {
         section: 'Main Hall',
         status: 'AVAILABLE',
         tenantId: tenant.id,
+        branchId: mainBranch.id,
       },
       {
         number: '5',
@@ -494,6 +536,7 @@ async function main() {
         section: 'Terrace',
         status: 'AVAILABLE',
         tenantId: tenant.id,
+        branchId: mainBranch.id,
       },
       {
         number: '6',
@@ -501,6 +544,7 @@ async function main() {
         section: 'Terrace',
         status: 'AVAILABLE',
         tenantId: tenant.id,
+        branchId: mainBranch.id,
       },
       {
         number: '7',
@@ -508,6 +552,7 @@ async function main() {
         section: 'Private Room',
         status: 'AVAILABLE',
         tenantId: tenant.id,
+        branchId: mainBranch.id,
       },
     ],
   });

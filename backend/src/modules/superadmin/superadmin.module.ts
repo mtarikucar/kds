@@ -11,6 +11,7 @@ import {
   SuperAdminSubscriptionsController,
   SuperAdminAuditController,
   SuperAdminMarketingController,
+  SuperAdminOutboxController,
 } from "./controllers";
 
 // Services
@@ -22,6 +23,7 @@ import {
   SuperAdminUsersService,
   SuperAdminSubscriptionsService,
   SuperAdminMarketingService,
+  SuperAdminOutboxService,
 } from "./services";
 
 import { SuperAdminGuard } from "./guards/superadmin.guard";
@@ -81,6 +83,7 @@ import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
     SuperAdminSubscriptionsController,
     SuperAdminAuditController,
     SuperAdminMarketingController,
+    SuperAdminOutboxController,
   ],
   providers: [
     SuperAdminAuthService,
@@ -90,12 +93,26 @@ import { PaytrAdapterModule } from "../payments/adapters/paytr-adapter.module";
     SuperAdminUsersService,
     SuperAdminSubscriptionsService,
     SuperAdminMarketingService,
+    SuperAdminOutboxService,
     SuperAdminGuard,
   ],
   exports: [
     SuperAdminAuthService,
     SuperAdminAuditService,
     SuperAdminUsersService,
+    // Exported so feature modules (marketplace, hardware catalog) can
+    // protect their super-admin controllers with the same guard, rather
+    // than each one redefining its own. The guard is stateless.
+    SuperAdminGuard,
+    // Re-exported so importers inherit the configured JwtService.
+    // SuperAdminGuard's constructor takes JwtService; without this
+    // re-export, NestJS fails to resolve the guard's dependencies in the
+    // importing module's DI context with:
+    //   "Nest can't resolve dependencies of the SuperAdminGuard
+    //    (Reflector, ?, ConfigService, PrismaService)"
+    // Exporting the JwtModule (which is registered with the
+    // SUPERADMIN_JWT_SECRET above) propagates JwtService to importers.
+    JwtModule,
   ],
 })
 export class SuperAdminModule {}

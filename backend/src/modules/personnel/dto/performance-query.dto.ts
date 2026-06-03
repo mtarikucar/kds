@@ -1,5 +1,5 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsDateString, IsString } from 'class-validator';
+import { ApiPropertyOptional } from "@nestjs/swagger";
+import { IsOptional, IsDateString, IsString } from "class-validator";
 
 export class PerformanceQueryDto {
   @ApiPropertyOptional()

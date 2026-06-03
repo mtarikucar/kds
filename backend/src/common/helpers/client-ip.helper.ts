@@ -1,4 +1,4 @@
-import type { Request } from 'express';
+import type { Request } from "express";
 
 /**
  * Resolve the client IP for audit logging and rate-limit keying.
@@ -12,9 +12,9 @@ import type { Request } from 'express';
 export function getClientIp(req: Request): string | undefined {
   if (req.ip) return req.ip;
 
-  const xff = req.headers['x-forwarded-for'];
+  const xff = req.headers["x-forwarded-for"];
   if (!xff) return undefined;
 
   const raw = Array.isArray(xff) ? xff[0] : xff;
-  return raw?.split(',')[0]?.trim() || undefined;
+  return raw?.split(",")[0]?.trim() || undefined;
 }

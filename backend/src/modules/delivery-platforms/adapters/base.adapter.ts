@@ -1,6 +1,6 @@
-import { Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import { Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from "axios";
 
 export abstract class BaseAdapter {
   protected readonly logger: Logger;
@@ -42,7 +42,7 @@ export abstract class BaseAdapter {
         if (attempt < retries) {
           // Honour the platform's Retry-After if present; otherwise back
           // off exponentially. Retry-After can be seconds or an HTTP-date.
-          const retryAfter = error.response?.headers?.['retry-after'];
+          const retryAfter = error.response?.headers?.["retry-after"];
           let delay = Math.min(1000 * Math.pow(2, attempt), 5000);
           if (retryAfter) {
             const asNum = Number(retryAfter);
@@ -63,7 +63,7 @@ export abstract class BaseAdapter {
       }
     }
 
-    throw lastError ?? new Error('Request failed without a recorded error');
+    throw lastError ?? new Error("Request failed without a recorded error");
   }
 
   protected getAuthHeaders(token: string): Record<string, string> {

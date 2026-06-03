@@ -1,7 +1,50 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CreateIngredientMovementDto } from '../dto/create-ingredient-movement.dto';
-import { IngredientMovementType } from '../../../common/constants/stock-management.enum';
+import { Injectable, BadRequestException } from "@nestjs/common";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { CreateIngredientMovementDto } from "../dto/create-ingredient-movement.dto";
+import { IngredientMovementType } from "../../../common/constants/stock-management.enum";
+
+// Iter-92: same window cap as waste-logs / analytics / reports. Bounds
+// the worst-case findMany scan on a chain tenant with years of movement
+// history.
+const STOCK_LOG_MAX_RANGE_DAYS = 366;
+const MILLIS_PER_DAY = 24 * 60 * 60 * 1000;
+
+function parseWindow(
+  startDate?: string,
+  endDate?: string,
+): { gte?: Date; lte?: Date } {
+  const window: { gte?: Date; lte?: Date } = {};
+  let start: Date | undefined;
+  let end: Date | undefined;
+  if (startDate) {
+    start = new Date(startDate);
+    if (Number.isNaN(start.getTime())) {
+      throw new BadRequestException("startDate must be a valid ISO-8601 date");
+    }
+    window.gte = start;
+  }
+  if (endDate) {
+    end = new Date(endDate);
+    if (Number.isNaN(end.getTime())) {
+      throw new BadRequestException("endDate must be a valid ISO-8601 date");
+    }
+    window.lte = end;
+  }
+  if (start && end) {
+    if (start > end) {
+      throw new BadRequestException(
+        "startDate must be before or equal to endDate",
+      );
+    }
+    const windowDays = (end.getTime() - start.getTime()) / MILLIS_PER_DAY;
+    if (windowDays > STOCK_LOG_MAX_RANGE_DAYS) {
+      throw new BadRequestException(
+        `Date range cannot exceed ${STOCK_LOG_MAX_RANGE_DAYS} days. Split the request into smaller windows.`,
+      );
+    }
+  }
+  return window;
+}
 
 @Injectable()
 export class IngredientMovementsService {
@@ -22,11 +65,8 @@ export class IngredientMovementsService {
 
     if (filters?.stockItemId) where.stockItemId = filters.stockItemId;
     if (filters?.type) where.type = filters.type;
-    if (filters?.startDate || filters?.endDate) {
-      where.createdAt = {};
-      if (filters.startDate) where.createdAt.gte = new Date(filters.startDate);
-      if (filters.endDate) where.createdAt.lte = new Date(filters.endDate);
-    }
+    const window = parseWindow(filters?.startDate, filters?.endDate);
+    if (window.gte || window.lte) where.createdAt = window;
 
     // Hard cap: ingredient movements grow without bound (every order
     // closure can write dozens). A no-filter list call on a year-old
@@ -40,7 +80,7 @@ export class IngredientMovementsService {
     return this.prisma.ingredientMovement.findMany({
       where,
       include: { stockItem: { select: { id: true, name: true, unit: true } } },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take,
       skip,
     });
@@ -51,12 +91,12 @@ export class IngredientMovementsService {
       const stockItem = await tx.stockItem.findFirst({
         where: { id: dto.stockItemId, tenantId },
       });
-      if (!stockItem) throw new BadRequestException('Stock item not found');
+      if (!stockItem) throw new BadRequestException("Stock item not found");
 
       const quantityChange =
-        dto.type === 'OUT'
+        dto.type === "OUT"
           ? -Math.abs(dto.quantity)
-          : dto.type === 'IN'
+          : dto.type === "IN"
             ? Math.abs(dto.quantity)
             : dto.quantity; // ADJUSTMENT can be positive or negative
 
@@ -95,8 +135,11 @@ export class IngredientMovementsService {
           notes: dto.notes,
           stockItemId: dto.stockItemId,
           tenantId,
+          branchId: stockItem.branchId,
         },
-        include: { stockItem: { select: { id: true, name: true, unit: true } } },
+        include: {
+          stockItem: { select: { id: true, name: true, unit: true } },
+        },
       });
     });
   }

@@ -1,7 +1,11 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CreateShiftTemplateDto } from '../dto/create-shift-template.dto';
-import { UpdateShiftTemplateDto } from '../dto/update-shift-template.dto';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { CreateShiftTemplateDto } from "../dto/create-shift-template.dto";
+import { UpdateShiftTemplateDto } from "../dto/update-shift-template.dto";
 
 @Injectable()
 export class ShiftTemplatesService {
@@ -10,17 +14,22 @@ export class ShiftTemplatesService {
   private assertDistinctTimes(startTime: string, endTime: string) {
     if (startTime === endTime) {
       throw new BadRequestException(
-        'startTime and endTime must differ (zero-length shift)',
+        "startTime and endTime must differ (zero-length shift)",
       );
     }
   }
 
-  async create(tenantId: string, dto: CreateShiftTemplateDto) {
+  async create(
+    tenantId: string,
+    branchId: string,
+    dto: CreateShiftTemplateDto,
+  ) {
     this.assertDistinctTimes(dto.startTime, dto.endTime);
     return this.prisma.shiftTemplate.create({
       data: {
         ...dto,
         tenantId,
+        branchId,
       },
     });
   }
@@ -28,7 +37,7 @@ export class ShiftTemplatesService {
   async findAll(tenantId: string) {
     return this.prisma.shiftTemplate.findMany({
       where: { tenantId },
-      orderBy: { startTime: 'asc' },
+      orderBy: { startTime: "asc" },
     });
   }
 
@@ -38,7 +47,7 @@ export class ShiftTemplatesService {
     });
 
     if (!template) {
-      throw new NotFoundException('Shift template not found');
+      throw new NotFoundException("Shift template not found");
     }
 
     // Compound WHERE IDOR guard (B41-B45 pattern).
@@ -47,9 +56,13 @@ export class ShiftTemplatesService {
       data: dto,
     });
     if (claim.count === 0) {
-      throw new NotFoundException('Shift template not found');
+      throw new NotFoundException("Shift template not found");
     }
-    return this.prisma.shiftTemplate.findUnique({ where: { id } });
+    // Defence-in-depth — keep the read tenant-scoped too. Same pattern
+    // as iter-33's categories + payments fixes.
+    return this.prisma.shiftTemplate.findFirstOrThrow({
+      where: { id, tenantId },
+    });
   }
 
   async remove(id: string, tenantId: string) {
@@ -58,7 +71,7 @@ export class ShiftTemplatesService {
     });
 
     if (!template) {
-      throw new NotFoundException('Shift template not found');
+      throw new NotFoundException("Shift template not found");
     }
 
     // Check for existing future assignments to prevent cascade deletion

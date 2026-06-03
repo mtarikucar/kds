@@ -58,8 +58,102 @@
     "personnel": "Xodimlar",
     "stock": "Zaxira",
     "invoices": "Hisob-fakturalar",
+    "devices": "Qurilmalar",
+    "branches": "Filiallar",
+    "health": "Filial salomatligi",
+    "marketplace": "Bozor",
+    "store": "Jihozlar do'koni",
+    "bridges": "Mahalliy ko'priklar",
+    "webhooks": "Veb-huklar",
+    "fiscalRecovery": "Chek tiklash",
+    "callerFeed": "Qo'ng'iroqlar",
     "expandSidebar": "Yon panelni kengaytirish",
     "collapseSidebar": "Yon panelni yig'ish"
+  },
+  "hummytummy": {
+    "common": {
+      "loading": "Yuklanmoqda…",
+      "empty": "Hozircha hech narsa yo'q.",
+      "save": "Saqlash",
+      "cancel": "Bekor qilish",
+      "retire": "Ishdan chiqarish",
+      "remove": "O'chirish"
+    },
+    "devices": {
+      "title": "Qurilmalar",
+      "create": "Slot yaratish",
+      "showRetired": "Ishdan chiqarilganlarni ko'rsatish",
+      "empty": "Hali qurilma yo'q. Birinchi qurilmangizni qo'shish uchun \"Slot yaratish\" tugmasini bosing.",
+      "col": {
+        "kind": "Tur",
+        "status": "Holat",
+        "pairCode": "Ulanish kodi",
+        "capabilities": "Imkoniyatlar",
+        "lastSeen": "Oxirgi ulanish"
+      },
+      "confirmRetire": "Bu qurilma ishdan chiqarilsinmi?",
+      "kind": {
+        "kds_screen": "KDS ekrani",
+        "tablet_waiter": "Ofitsiant planshet",
+        "tablet_customer": "Mijoz planshet",
+        "receipt_printer": "Chek printer",
+        "kitchen_printer": "Oshxona printer",
+        "pos_terminal": "POS terminal",
+        "yazarkasa": "Yazarkasa",
+        "caller_id": "Caller ID",
+        "scanner": "Skaner",
+        "local_bridge": "Mahalliy ko'prik"
+      }
+    },
+    "marketplace": {
+      "title": "Bozor",
+      "subtitle": "Obunangizni qo'shimchalar bilan kengaytiring. Darhol faollashadi.",
+      "filter": { "all": "Hammasi", "software": "Dasturiy ta'minot", "integration": "Integratsiyalar", "capacity": "Hajm", "support": "Qo'llab-quvvatlash" },
+      "purchase": "Sotib olish",
+      "mine": "Sizning qo'shimchalaringiz",
+      "mineEmpty": "Faol qo'shimchalaringiz yo'q.",
+      "requires": "Talab qilinadi:",
+      "col": { "addOn": "Qo'shimcha", "quantity": "Miqdor", "status": "Holat", "periodEnds": "Davr tugashi" },
+      "cancelAtPeriodEnd": "davr oxirida bekor qilinadi"
+    },
+    "store": {
+      "title": "Jihozlar do'koni",
+      "category": { "all": "Barcha kategoriyalar" },
+      "empty": "Bu kategoriyada mahsulot yo'q.",
+      "addToCart": "Savatga qo'shish",
+      "outOfStock": "Stokda yo'q",
+      "warranty": "{{months}} oy kafolat",
+      "cart": {
+        "title": "Savat",
+        "empty": "Savatingiz bo'sh.",
+        "getQuote": "Narx olish",
+        "pricing": "Narxlanmoqda…",
+        "subtotal": "Oraliq jami",
+        "tax": "Soliq",
+        "shipping": "Yetkazib berish",
+        "total": "Jami",
+        "place": "Buyurtmani berish",
+        "placing": "Yuborilmoqda…"
+      }
+    },
+    "health": {
+      "title": "Filial salomatligi",
+      "subtitle": "Qurilmalar onlayn %, oxirgi chek va oxirgi buyurtma kompozit ko'rsatkichi. Har 30 sekundda yangilanadi.",
+      "empty": "Faol filiallar yo'q.",
+      "score": "{{score}} / 100",
+      "devicesOnline": "Qurilmalar onlayn",
+      "fiscalAge": "Oxirgi chek",
+      "orderAge": "Oxirgi buyurtma"
+    },
+    "branches": {
+      "title": "Filiallar",
+      "name": "Nomi",
+      "code": "Kod",
+      "timezone": "Vaqt zonasi",
+      "status": "Holat",
+      "created": "Yaratilgan",
+      "add": "Filial qo'shish"
+    }
   },
   "header": {
     "notifications": "Bildirishnomalar",

@@ -1,4 +1,6 @@
-import { PartialType } from '@nestjs/swagger';
-import { CreateShiftTemplateDto } from './create-shift-template.dto';
+import { PartialType } from "@nestjs/swagger";
+import { CreateShiftTemplateDto } from "./create-shift-template.dto";
 
-export class UpdateShiftTemplateDto extends PartialType(CreateShiftTemplateDto) {}
+export class UpdateShiftTemplateDto extends PartialType(
+  CreateShiftTemplateDto,
+) {}

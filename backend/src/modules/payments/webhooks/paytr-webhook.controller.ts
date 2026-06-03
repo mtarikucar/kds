@@ -13,6 +13,7 @@ import { verifyCallbackHash } from "./paytr-hash.util";
 import { PaytrIpAllowlistGuard } from "./paytr-ip-allowlist.guard";
 import { CustomerSelfPayService } from "../../customer-orders/services/customer-self-pay.service";
 import { PaytrSettlementService } from "../services/paytr-settlement.service";
+import { CheckoutSettlementService } from "../../checkout/checkout-settlement.service";
 
 interface PaytrCallbackBody {
   merchant_oid?: string;
@@ -53,6 +54,8 @@ export class PaytrWebhookController {
     private readonly config: ConfigService,
     private readonly selfPay: CustomerSelfPayService,
     private readonly settlement: PaytrSettlementService,
+    // v2.8.85: "CK-" prefix lands here for the mixed-cart checkout flow.
+    private readonly checkoutSettlement: CheckoutSettlementService,
   ) {}
 
   @Post()
@@ -69,15 +72,19 @@ export class PaytrWebhookController {
     const merchantKey = this.config.get<string>("PAYTR_MERCHANT_KEY");
     const merchantSalt = this.config.get<string>("PAYTR_MERCHANT_SALT");
     if (!merchantKey || !merchantSalt) {
-      // Misconfigured deploy — we can't verify the hash. Return "OK" so
-      // PayTR stops retrying (which would otherwise cascade into a
-      // 30-minute retry storm), and surface a critical error so ops
-      // notices and fixes env. Recovery sweeper will reconcile the
-      // stuck PENDING rows once creds are restored.
+      // v2.8.94 — when creds are missing we cannot verify the hash, so
+      // the only honest answer is "FAIL". Pre-fix the controller
+      // returned "OK" to avoid PayTR's retry storm — but a sustained
+      // "OK" stream during a misconfig also silently acknowledges any
+      // forged callback that lands while creds are down (the settlement
+      // call is skipped, so it's mostly cosmetic, but ops loses the
+      // strongest signal that something is wrong). PayTR retries (4×
+      // over ~30min) are the loudest possible alert; ops should fix
+      // creds before the window expires.
       this.logger.error(
-        "PayTR credentials missing — acknowledging callback to stop retries; ops alert raised",
+        "PayTR credentials missing — refusing to acknowledge callback; ops MUST restore env before retry window expires",
       );
-      return "OK";
+      return "FAIL";
     }
 
     if (
@@ -96,8 +103,10 @@ export class PaytrWebhookController {
       return "FAIL";
     }
 
-    // Dispatch by merchantOid prefix: "SP" → customer self-pay
-    // (QR-menu restaurant-order flow), default → subscription flow.
+    // Dispatch by merchantOid prefix:
+    //   "SP" → customer self-pay (QR-menu restaurant-order flow)
+    //   "CK-" → mixed-cart hardware/addon/plan checkout (v2.8.85)
+    //   default → subscription settlement (the original path)
     if (merchantOid.startsWith("SP")) {
       if (status === "success") {
         await this.selfPay.handleWebhookSuccess(merchantOid, body.payment_type);
@@ -105,6 +114,32 @@ export class PaytrWebhookController {
         await this.selfPay.handleWebhookFailure(
           merchantOid,
           body.failed_reason_msg ?? body.failed_reason_code,
+        );
+      }
+      return "OK";
+    }
+
+    if (merchantOid.startsWith("CK-")) {
+      try {
+        if (status === "success") {
+          await this.checkoutSettlement.handleSuccess(
+            merchantOid,
+            body.payment_type,
+          );
+        } else {
+          await this.checkoutSettlement.handleFailure(
+            merchantOid,
+            body.failed_reason_msg ?? body.failed_reason_code,
+          );
+        }
+      } catch (err) {
+        // Provisioning errors throw so a manual retry / sweeper can pick
+        // them up. PayTR still gets "OK" — if we returned "FAIL", PayTR
+        // would retry up to 4× and each retry would re-attempt
+        // provisioning. Better to surface a single failure in our logs
+        // than to feedback-loop the gateway.
+        this.logger.error(
+          `Checkout settlement raised for oid=${merchantOid}: ${(err as Error).message}`,
         );
       }
       return "OK";

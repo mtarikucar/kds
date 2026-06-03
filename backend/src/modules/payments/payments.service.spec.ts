@@ -10,6 +10,7 @@ describe('PaymentsService', () => {
       null as any,
       null as any,
       null as any,
+      null as any,
     );
 
     function oid(tenantId: string): string {
@@ -55,6 +56,7 @@ describe('PaymentsService', () => {
     let paytr: any;
     let config: any;
     let subscriptions: any;
+    let referralDirectory: { resolveReferralCode: jest.Mock };
     let svc: PaymentsService;
 
     const TENANT_ID = '11111111-2222-3333-4444-555555555555';
@@ -86,12 +88,16 @@ describe('PaymentsService', () => {
       const consents = {
         verifyAndRecord: jest.fn().mockResolvedValue(undefined),
       };
+      referralDirectory = {
+        resolveReferralCode: jest.fn().mockResolvedValue(null),
+      };
       svc = new PaymentsService(
         prisma as any,
         paytr,
         config,
         subscriptions,
         consents as any,
+        referralDirectory as any,
       );
     });
 
@@ -215,6 +221,222 @@ describe('PaymentsService', () => {
       expect(result.paymentLink).toContain('paytr.com');
       expect(subscriptions.startTrialFromIntent).not.toHaveBeenCalled();
       expect(paytr.getIframeToken).toHaveBeenCalled();
+    });
+
+    /**
+     * Iter-67 regression. Reported by the user as "199 $ olan şeyi 199
+     * TL olarak satın alıyor". A plan denominated in USD would have
+     * passed through createIntent untouched — the SubscriptionPayment
+     * row would have been reserved with currency=USD and PayTR then
+     * silently collected the same numeric amount in TL because the
+     * adapter hardcoded `currency=TL` on the wire. This suite locks
+     * the pre-check so a non-TRY plan refuses BEFORE any DB write or
+     * PayTR HTTP call.
+     */
+    describe('currency safety gate (iter-67)', () => {
+      it('refuses a USD plan with the canonical error code (no DB writes, no PayTR call)', async () => {
+        prisma.tenant.findUnique.mockResolvedValue({
+          id: TENANT_ID,
+          trialUsed: true,
+          usedTrialPlanIds: [PLAN_ID],
+          subscriptions: [{ id: 'free-sub', planId: 'plan-free', plan: { name: 'FREE' } }],
+          name: 'Test',
+        } as any);
+        prisma.user.findUnique.mockResolvedValue({
+          emailVerified: true,
+          email: 'a@b.com',
+          phone: '+905551234567',
+        } as any);
+        prisma.subscriptionPlan.findUnique.mockResolvedValue({
+          ...proPlan,
+          currency: 'USD',
+        });
+
+        await expect(
+          svc.createIntent(
+            TENANT_ID,
+            USER_ID,
+            {
+              planId: PLAN_ID,
+              billingCycle: 'MONTHLY',
+              acceptedDocumentIds: [
+                '11111111-1111-1111-1111-111111111111',
+                '22222222-2222-2222-2222-222222222222',
+                '33333333-3333-3333-3333-333333333333',
+              ],
+            },
+            '127.0.0.1',
+          ),
+        ).rejects.toMatchObject({
+          response: expect.objectContaining({
+            code: 'PAYTR_ONLY_SUPPORTS_TRY',
+          }),
+        });
+
+        expect(paytr.getIframeToken).not.toHaveBeenCalled();
+        expect(prisma.subscriptionPayment.create as any).not.toHaveBeenCalled();
+        expect(prisma.subscription.create as any).not.toHaveBeenCalled();
+      });
+
+      it('passes the plan.currency through to the adapter on the TRY happy path', async () => {
+        prisma.tenant.findUnique.mockResolvedValue({
+          id: TENANT_ID,
+          trialUsed: true,
+          usedTrialPlanIds: [PLAN_ID],
+          subscriptions: [{ id: 'free-sub', planId: 'plan-free', plan: { name: 'FREE' } }],
+          name: 'Test',
+        } as any);
+        prisma.user.findUnique.mockResolvedValue({
+          emailVerified: true,
+          email: 'a@b.com',
+          firstName: 'A',
+          lastName: 'B',
+          phone: '+905551234567',
+        } as any);
+        prisma.subscriptionPlan.findUnique.mockResolvedValue(proPlan);
+        prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
+        prisma.subscription.create.mockResolvedValue({ id: 'new-pending' } as any);
+        prisma.subscriptionPayment.create.mockResolvedValue({ id: 'payment-1' } as any);
+        paytr.getIframeToken.mockResolvedValue({
+          token: 'tk',
+          paymentLink: 'https://www.paytr.com/odeme/guvenli/tk',
+          merchantOid: 'x',
+          amount: '129900',
+          currency: 'TL',
+        });
+
+        await svc.createIntent(
+          TENANT_ID,
+          USER_ID,
+          {
+            planId: PLAN_ID,
+            billingCycle: 'MONTHLY',
+            acceptedDocumentIds: [
+              '11111111-1111-1111-1111-111111111111',
+              '22222222-2222-2222-2222-222222222222',
+              '33333333-3333-3333-3333-333333333333',
+            ],
+          },
+          '127.0.0.1',
+        );
+
+        // Load-bearing assertion: the adapter must receive the source
+        // currency, not a hardcoded default. If a future refactor drops
+        // this argument the adapter-level gate is the last defence.
+        expect(paytr.getIframeToken).toHaveBeenCalledWith(
+          expect.objectContaining({ currency: 'TRY' }),
+        );
+      });
+    });
+
+    /**
+     * Step B referral-resolve wiring. The marketer code rides the checkout
+     * body, is resolved via the ReferralDirectoryPort, and the RESOLVED code +
+     * marketerId are snapshotted onto the SubscriptionPayment row. A bad code
+     * must never block checkout.
+     */
+    describe('referral attribution snapshot', () => {
+      const docIds = [
+        '11111111-1111-1111-1111-111111111111',
+        '22222222-2222-2222-2222-222222222222',
+        '33333333-3333-3333-3333-333333333333',
+      ];
+
+      function arrangePaidFlow() {
+        prisma.tenant.findUnique.mockResolvedValue({
+          id: TENANT_ID,
+          trialUsed: true,
+          usedTrialPlanIds: [PLAN_ID],
+          subscriptions: [{ id: 'free-sub', planId: 'plan-free', plan: { name: 'FREE' } }],
+          name: 'Test',
+        } as any);
+        prisma.user.findUnique.mockResolvedValue({
+          emailVerified: true,
+          email: 'a@b.com',
+          firstName: 'A',
+          lastName: 'B',
+          phone: '+905551234567',
+        } as any);
+        prisma.subscriptionPlan.findUnique.mockResolvedValue(proPlan);
+        prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
+        prisma.subscription.create.mockResolvedValue({ id: 'new-pending' } as any);
+        prisma.subscriptionPayment.create.mockResolvedValue({ id: 'payment-1' } as any);
+        paytr.getIframeToken.mockResolvedValue({
+          token: 'tk',
+          paymentLink: 'https://www.paytr.com/odeme/guvenli/tk',
+          merchantOid: 'x',
+          amount: '129900',
+          currency: 'TL',
+        });
+      }
+
+      it('snapshots the resolved marketer onto the payment row', async () => {
+        arrangePaidFlow();
+        referralDirectory.resolveReferralCode.mockResolvedValue({
+          marketingUserId: 'm-1',
+          referralCode: 'AHMET42',
+        });
+
+        await svc.createIntent(
+          TENANT_ID,
+          USER_ID,
+          { planId: PLAN_ID, billingCycle: 'MONTHLY', acceptedDocumentIds: docIds, referralCode: 'AHMET42' },
+          '127.0.0.1',
+        );
+
+        expect(referralDirectory.resolveReferralCode).toHaveBeenCalledWith('AHMET42');
+        expect(prisma.subscriptionPayment.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              referralCode: 'AHMET42',
+              referredByMarketingUserId: 'm-1',
+            }),
+          }),
+        );
+      });
+
+      it('snapshots nulls for an unknown code and still completes checkout', async () => {
+        arrangePaidFlow();
+        referralDirectory.resolveReferralCode.mockResolvedValue(null);
+
+        const result = await svc.createIntent(
+          TENANT_ID,
+          USER_ID,
+          { planId: PLAN_ID, billingCycle: 'MONTHLY', acceptedDocumentIds: docIds, referralCode: 'NOPE' },
+          '127.0.0.1',
+        );
+
+        expect(result.provider).toBe('PAYTR');
+        expect(prisma.subscriptionPayment.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              referralCode: null,
+              referredByMarketingUserId: null,
+            }),
+          }),
+        );
+      });
+
+      it('does not resolve when no referral code is supplied', async () => {
+        arrangePaidFlow();
+
+        await svc.createIntent(
+          TENANT_ID,
+          USER_ID,
+          { planId: PLAN_ID, billingCycle: 'MONTHLY', acceptedDocumentIds: docIds },
+          '127.0.0.1',
+        );
+
+        expect(referralDirectory.resolveReferralCode).not.toHaveBeenCalled();
+        expect(prisma.subscriptionPayment.create).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: expect.objectContaining({
+              referralCode: null,
+              referredByMarketingUserId: null,
+            }),
+          }),
+        );
+      });
     });
   });
 });

@@ -1,9 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { PlatformLogDirection, PlatformLogAction } from '../constants/platform.enum';
+import { Injectable, Logger } from "@nestjs/common";
+import { PrismaService } from "../../../prisma/prisma.service";
+import {
+  PlatformLogDirection,
+  PlatformLogAction,
+} from "../constants/platform.enum";
 
 export interface LogEntry {
   tenantId: string;
+  branchId?: string;
   platform: string;
   direction: string;
   action: string;
@@ -32,9 +36,26 @@ export class DeliveryLogService {
    */
   async log(entry: LogEntry) {
     try {
+      // v3.0.0: branchId is NOT NULL on DeliveryPlatformLog. Derive from the
+      // referenced order when possible; fall back to caller-provided branchId.
+      let branchId = entry.branchId;
+      if (!branchId && entry.orderId) {
+        const order = await this.prisma.order.findUnique({
+          where: { id: entry.orderId },
+          select: { branchId: true },
+        });
+        branchId = order?.branchId ?? undefined;
+      }
+      if (!branchId) {
+        this.logger.warn(
+          `Cannot create delivery log without branchId (tenant=${entry.tenantId}, order=${entry.orderId ?? "n/a"})`,
+        );
+        return null;
+      }
       return await this.prisma.deliveryPlatformLog.create({
         data: {
           tenantId: entry.tenantId,
+          branchId,
           platform: entry.platform,
           direction: entry.direction,
           action: entry.action,
@@ -62,14 +83,12 @@ export class DeliveryLogService {
    * inadvertently turn into long-term PII storage.
    */
   scrubPii<T>(raw: T): unknown {
-    if (raw == null || typeof raw !== 'object') return raw;
+    if (raw == null || typeof raw !== "object") return raw;
     const redacted: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-      if (
-        /phone|email|address|customer|name|buyer|recipient|gsm/i.test(key)
-      ) {
-        redacted[key] = '[redacted]';
-      } else if (value && typeof value === 'object') {
+      if (/phone|email|address|customer|name|buyer|recipient|gsm/i.test(key)) {
+        redacted[key] = "[redacted]";
+      } else if (value && typeof value === "object") {
         redacted[key] = this.scrubPii(value);
       } else {
         redacted[key] = value;
@@ -85,7 +104,7 @@ export class DeliveryLogService {
         retryCount: { lt: 3 },
         nextRetryAt: { lte: new Date() },
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
       take: limit,
     });
   }
@@ -134,7 +153,7 @@ export class DeliveryLogService {
     const [logs, total] = await Promise.all([
       this.prisma.deliveryPlatformLog.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         take: filters?.limit || 50,
         skip: filters?.offset || 0,
       }),

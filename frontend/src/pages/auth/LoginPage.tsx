@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -19,6 +19,24 @@ import { AlertCircle, CheckCircle } from 'lucide-react';
 interface LocationState {
   pendingApproval?: boolean;
   message?: string;
+  // Set by ProtectedRoute when it bounces an unauthenticated visitor.
+  // Carries the original `pathname + search + hash` so deeplinks (e.g.
+  // /admin/store?sku=... from the landing storefront) survive login.
+  from?: string;
+}
+
+// One-shot read of the post-login return path stashed by api.ts's 401
+// response interceptor (warm-session expiry → hard reload → React
+// Router state would be wiped). Clears on read so a subsequent visit
+// to /login doesn't reuse a stale target.
+function readAndClearReturnPath(): string | null {
+  try {
+    const value = window.sessionStorage.getItem('postLoginReturn');
+    if (value) window.sessionStorage.removeItem('postLoginReturn');
+    return value;
+  } catch {
+    return null;
+  }
 }
 
 const LoginPage = () => {
@@ -48,16 +66,53 @@ const LoginPage = () => {
     mode: 'onBlur',
   });
 
+  // Post-login redirect target. Two paths feed it:
+  //   1. `state.from` — set by ProtectedRoute when it bounced an
+  //      unauthenticated visitor on a cold deeplink (cheap, in-SPA).
+  //   2. sessionStorage `postLoginReturn` — set by api.ts's 401
+  //      response interceptor when a warm session expires and we
+  //      do a hard `window.location.href` reload (history.state
+  //      doesn't survive that). One-shot — cleared on read.
+  // Either path runs through the same internal-path regex so an
+  // attacker can't sneak `//evil.com` or `http://evil.com` in.
+  const postLoginTarget = useMemo(() => {
+    const candidate =
+      locationState?.from ||
+      (typeof window !== 'undefined' ? readAndClearReturnPath() : null);
+    // v2.8.97 — tighter shape check. Pre-fix the regex `^/[^/]` accepted
+    // any path starting with a single-slash + non-slash char, which
+    // let `/javascript:alert(1)` and other weird shapes through to
+    // navigate(). The new check additionally rejects:
+    //   - protocol-relative `//evil.com` (already covered by [^/] but
+    //     pinned explicitly)
+    //   - any `:` in the path (kills `javascript:` and other URIs)
+    //   - backslashes (kills `\\evil.com` IE-style absolute URLs)
+    //   - the /login self-loop
+    if (
+      candidate &&
+      typeof candidate === 'string' &&
+      candidate.length < 1024 &&
+      /^\/[a-zA-Z0-9_\-\/?#=&%.]*$/.test(candidate) &&
+      !candidate.startsWith('//') &&
+      !candidate.startsWith('/login')
+    ) {
+      return candidate;
+    }
+    return '/dashboard';
+    // Computed once at mount; failed-login re-renders don't change it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     if (isAuthenticated) {
-      navigate('/dashboard');
+      navigate(postLoginTarget, { replace: true });
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, navigate, postLoginTarget]);
 
   const onSubmit = (data: LoginFormData) => {
     login(data, {
       onSuccess: () => {
-        navigate('/dashboard');
+        navigate(postLoginTarget, { replace: true });
       },
     });
   };
@@ -67,7 +122,7 @@ const LoginPage = () => {
     onSuccess: (tokenResponse) => {
       googleAuth(tokenResponse.access_token, {
         onSuccess: () => {
-          navigate('/dashboard');
+          navigate(postLoginTarget, { replace: true });
         },
       });
     },
@@ -190,8 +245,17 @@ const LoginPage = () => {
           <motion.div variants={itemVariants}>
             <SocialLoginButtons
               variant="login"
-              onGoogleClick={() => handleGoogleLogin()}
-              disabled={isPending}
+              onGoogleClick={() => {
+                // v2.8.97 — disable while either auth path is already in
+                // flight. Pre-fix a quick double-click on the Google
+                // button while the popup was opening (or a stale ref
+                // re-firing) would queue a second mutation; the cache
+                // clear in useGoogleAuth would land twice, and the
+                // navigate() would race the prior one.
+                if (isPending || isGooglePending) return;
+                handleGoogleLogin();
+              }}
+              disabled={isPending || isGooglePending}
               isLoading={isGooglePending}
             />
           </motion.div>

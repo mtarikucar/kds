@@ -7,6 +7,7 @@ import Button from '../ui/Button';
 import NotificationCenter from '../NotificationCenter';
 import LanguageSwitcher from '../LanguageSwitcher';
 import { MascotButton } from '../../features/onboarding';
+import BranchPicker from './BranchPicker';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -36,6 +37,11 @@ const Header = ({ onMenuClick }: HeaderProps) => {
         </div>
 
         <div className="flex items-center gap-1 sm:gap-2 md:gap-3 flex-shrink-0">
+          {/* v2.8.88: branch picker (UI-only this PR; hides when not
+              multi-branch). Sits left of LanguageSwitcher so it's
+              prominent on desktop. */}
+          <BranchPicker />
+
           {/* Language Switcher */}
           <LanguageSwitcher />
 

@@ -1,18 +1,32 @@
-import { Controller, Get, Post, Patch, Body, UseGuards, Request } from '@nestjs/common';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
-import { AccountingSettingsService } from '../services/accounting-settings.service';
-import { AccountingSyncService } from '../services/accounting-sync.service';
-import { UpdateAccountingSettingsDto } from '../dto/accounting-settings.dto';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../../auth/guards/roles.guard';
-import { TenantGuard } from '../../auth/guards/tenant.guard';
-import { Roles } from '../../auth/decorators/roles.decorator';
-import { UserRole } from '../../../common/constants/roles.enum';
+import {
+  Controller,
+  Get,
+  Post,
+  Patch,
+  Body,
+  UseGuards,
+  Request,
+} from "@nestjs/common";
+import { ApiTags, ApiBearerAuth } from "@nestjs/swagger";
+import { AccountingSettingsService } from "../services/accounting-settings.service";
+import { AccountingSyncService } from "../services/accounting-sync.service";
+import { UpdateAccountingSettingsDto } from "../dto/accounting-settings.dto";
+import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../../auth/guards/roles.guard";
+import { TenantGuard } from "../../auth/guards/tenant.guard";
+import { Roles } from "../../auth/decorators/roles.decorator";
+import { UserRole } from "../../../common/constants/roles.enum";
+import { PlanFeatureGuard } from "../../subscriptions/guards/plan-feature.guard";
+import { RequiresIntegration } from "../../subscriptions/decorators/requires-integration.decorator";
 
-@ApiTags('accounting-settings')
+// v2.8.90 — accounting credential surface gated on integration. Tenants
+// without any accounting add-on shouldn't see vendor connect / sync
+// endpoints; this gate mirrors the sidebar rule server-side.
+@ApiTags("accounting-settings")
 @ApiBearerAuth()
-@Controller('accounting-settings')
-@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard)
+@Controller("accounting-settings")
+@UseGuards(JwtAuthGuard, TenantGuard, RolesGuard, PlanFeatureGuard)
+@RequiresIntegration("accounting")
 export class AccountingSettingsController {
   constructor(
     private readonly service: AccountingSettingsService,
@@ -33,7 +47,7 @@ export class AccountingSettingsController {
     return this.service.sanitize(settings);
   }
 
-  @Post('test-connection')
+  @Post("test-connection")
   @Roles(UserRole.ADMIN)
   testConnection(@Request() req) {
     return this.syncService.testConnection(req.tenantId);

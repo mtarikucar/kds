@@ -7,6 +7,7 @@ import { LoginRequest, RegisterRequest, AuthResponse, User } from '../../types';
 
 export const useLogin = () => {
   const login = useAuthStore((state) => state.login);
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (data: LoginRequest): Promise<AuthResponse> => {
@@ -14,6 +15,15 @@ export const useLogin = () => {
       return response.data;
     },
     onSuccess: (data) => {
+      // v2.8.91: clear React Query cache on every login so a previous
+      // tenant's entitlements / subscription / quotas don't bleed into
+      // the next session. Pre-v2.8.91 a tenant A login → logout →
+      // tenant B login on the same device kept tenant A's
+      // effective-features in cache for up to 30s (or longer for
+      // queries with 5min staleTime), which was both a privacy leak
+      // and a correctness bug (FeatureGate could grant access tenant
+      // B never paid for).
+      queryClient.clear();
       // refresh token is stored by the backend as an httpOnly cookie
       login(data.user, data.accessToken);
       toast.success(i18n.t('common:notifications.loginSuccessful'));
@@ -50,16 +60,26 @@ export const useRegister = () => {
 
 export const useProfile = () => {
   const setUser = useAuthStore((state) => state.setUser);
+  // v2.8.94 — subscribe to accessToken so the `enabled` flag re-evaluates
+  // when the user logs in/out within a long-lived SPA session (pre-fix
+  // `useAuthStore.getState().accessToken` was a one-time snapshot, so a
+  // mount-time-null token never re-armed the query after a later login).
+  // Also key on user.id + user.tenantId so a tenant switch (or any
+  // user-context shift) produces a distinct cache entry instead of
+  // serving the previous tenant's cached profile.
+  const accessToken = useAuthStore((state) => state.accessToken);
+  const userId = useAuthStore((state) => state.user?.id);
+  const tenantId = useAuthStore((state) => state.user?.tenantId);
 
   return useQuery({
-    queryKey: ['profile'],
+    queryKey: ['profile', userId, tenantId],
     queryFn: async (): Promise<User> => {
       const response = await api.get('/auth/profile');
       // Update auth store with fresh user data (including emailVerified status)
       setUser(response.data);
       return response.data;
     },
-    enabled: !!useAuthStore.getState().accessToken,
+    enabled: !!accessToken,
   });
 };
 
@@ -166,6 +186,7 @@ export const useResendVerificationEmail = () => {
 // Google OAuth Hook
 export const useGoogleAuth = () => {
   const login = useAuthStore((state) => state.login);
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (credential: string): Promise<AuthResponse> => {
@@ -173,6 +194,14 @@ export const useGoogleAuth = () => {
       return response.data;
     },
     onSuccess: (data) => {
+      // v2.8.94 — mirror useLogin's cache clear so a prior-tenant
+      // session's cached entitlements / quotas / subscription don't
+      // bleed into the OAuth sign-in. Pre-fix only the email/password
+      // path clear()'d, so a "switch accounts via Google" flow on a
+      // shared device kept the previous tenant's FeatureGate state
+      // until the queries naturally re-fetched (up to 30s, or 5min
+      // for staleTime-pinned queries).
+      queryClient.clear();
       login(data.user, data.accessToken);
       toast.success(i18n.t('common:notifications.googleLoginSuccessful'));
     },
@@ -185,6 +214,7 @@ export const useGoogleAuth = () => {
 // Apple Sign-In Hook
 export const useAppleAuth = () => {
   const login = useAuthStore((state) => state.login);
+  const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (data: { identityToken: string; firstName?: string; lastName?: string }): Promise<AuthResponse> => {
@@ -192,6 +222,9 @@ export const useAppleAuth = () => {
       return response.data;
     },
     onSuccess: (data) => {
+      // v2.8.94 — see useGoogleAuth above; same cross-tenant cache
+      // leak vector.
+      queryClient.clear();
       login(data.user, data.accessToken);
       toast.success(i18n.t('common:notifications.appleLoginSuccessful'));
     },

@@ -1,0 +1,89 @@
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
+import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { UserRole } from "../../common/constants/roles.enum";
+import { Public } from "../auth/decorators/public.decorator";
+import { AddOnCatalogService } from "./addon-catalog.service";
+import { TenantMarketplaceService } from "./tenant-marketplace.service";
+import { PurchaseAddOnDto } from "./dto/addon.dto";
+
+@ApiTags("Marketplace")
+@Controller("v1/marketplace")
+export class MarketplaceController {
+  constructor(
+    private readonly catalog: AddOnCatalogService,
+    private readonly tenant: TenantMarketplaceService,
+  ) {}
+
+  // Public catalog endpoint — visible from the landing site, no auth needed.
+  // Returns only `published` rows.
+  @Public()
+  @Get("addons")
+  @ApiOperation({ summary: "Public marketplace catalogue (published add-ons)" })
+  list(@Query("kind") kind?: string) {
+    return this.catalog
+      .listPublic()
+      .then((rows) => (kind ? rows.filter((r) => r.kind === kind) : rows));
+  }
+
+  // v2.8.89 — money flow lockdown. Pre-v2.8.89 purchase + cancel carried
+  // only @UseGuards(JwtAuthGuard) → any role (WAITER/KITCHEN/COURIER)
+  // could buy a ₺7500 onsite_install_full add-on and saddle the tenant
+  // with the charge, or cancel an active integration. The frontend
+  // sidebar restricts to ADMIN/MANAGER but that's UX gating, not
+  // defence. mine (read) → ADMIN/MANAGER; purchase + cancel → ADMIN-
+  // only since they're subscription-level billing decisions.
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @ApiBearerAuth()
+  @Get("addons/mine")
+  @ApiOperation({
+    summary:
+      "List add-ons currently held by the authenticated tenant (ADMIN/MANAGER)",
+  })
+  mine(@Req() req: any) {
+    return this.tenant.listMine(req.user.tenantId);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @Post("addons/purchase")
+  @ApiOperation({
+    summary: "Purchase / activate an add-on (ADMIN only — billing event)",
+  })
+  purchase(@Req() req: any, @Body() dto: PurchaseAddOnDto) {
+    return this.tenant.purchase(req.user.tenantId, {
+      addOnCode: dto.addOnCode,
+      quantity: dto.quantity,
+      branchId: dto.branchId,
+    });
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  @ApiBearerAuth()
+  @Delete("addons/:tenantAddOnId")
+  @ApiOperation({
+    summary: "Cancel a held add-on (ADMIN only — billing event)",
+  })
+  cancel(
+    @Req() req: any,
+    @Param("tenantAddOnId") id: string,
+    @Query("immediate") immediate?: string,
+  ) {
+    return this.tenant.cancel(req.user.tenantId, id, immediate === "true");
+  }
+}

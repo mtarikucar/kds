@@ -2,40 +2,51 @@ import {
   Injectable,
   Inject,
   forwardRef,
+  Logger,
   UnauthorizedException,
   BadRequestException,
   NotFoundException,
-} from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
-import * as bcrypt from 'bcryptjs';
-import { createHash, randomBytes, timingSafeEqual } from 'crypto';
-import { OAuth2Client } from 'google-auth-library';
-import * as appleSignin from 'apple-signin-auth';
-import * as Sentry from '@sentry/node';
-import { Prisma } from '@prisma/client';
-import { addDays } from 'date-fns';
-import { PrismaService } from '../../prisma/prisma.service';
-import { RegisterDto } from './dto/register.dto';
-import { LoginDto } from './dto/login.dto';
-import { GoogleAuthDto, AppleAuthDto } from './dto/social-auth.dto';
-import { AuthResponseDto, UserResponseDto } from './dto/auth-response.dto';
-import { ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto } from './dto/password-reset.dto';
-import { UserRole } from '../../common/constants/roles.enum';
-import { PaymentProvider, TenantStatus } from '../../common/constants/subscription.enum';
-import { EmailService } from '../../common/services/email.service';
-import { NotificationsService } from '../notifications/notifications.service';
-import { NotificationType } from '../notifications/dto/create-notification.dto';
+} from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import { ConfigService } from "@nestjs/config";
+import * as bcrypt from "bcryptjs";
+import { createHash, randomBytes, timingSafeEqual } from "crypto";
+import { OAuth2Client } from "google-auth-library";
+import * as appleSignin from "apple-signin-auth";
+import * as Sentry from "@sentry/node";
+import { Prisma } from "@prisma/client";
+import { addDays } from "date-fns";
+import { PrismaService } from "../../prisma/prisma.service";
+import { RegisterDto } from "./dto/register.dto";
+import { LoginDto } from "./dto/login.dto";
+import { GoogleAuthDto, AppleAuthDto } from "./dto/social-auth.dto";
+import { AuthResponseDto, UserResponseDto } from "./dto/auth-response.dto";
+import {
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  ChangePasswordDto,
+} from "./dto/password-reset.dto";
+import {
+  HARD_RESTRICTED_ROLES,
+  UserRole,
+} from "../../common/constants/roles.enum";
+import {
+  PaymentProvider,
+  TenantStatus,
+} from "../../common/constants/subscription.enum";
+import { EmailService } from "../../common/services/email.service";
+import { NotificationsService } from "../notifications/notifications.service";
+import { NotificationType } from "../notifications/dto/create-notification.dto";
 import {
   isSubdomainQuarantined,
   randomSubdomainSuffix,
-} from '../../common/helpers/subdomain.helper';
+} from "../../common/helpers/subdomain.helper";
 import {
   ResourceAlreadyExistsException,
   ResourceNotFoundException,
   InvalidCredentialsException,
   ValidationException,
-} from '../../common/exceptions';
+} from "../../common/exceptions";
 
 // Dummy bcrypt hash used to normalize timing between "user not found" and
 // "bad password" paths. bcrypt.compare against this hash takes the same
@@ -43,16 +54,22 @@ import {
 // response-time deltas to enumerate which emails are registered.
 // Computed once at module load with cost 12 (matches the default).
 const DUMMY_BCRYPT_HASH = bcrypt.hashSync(
-  'dummy-password-for-timing-normalization',
+  "dummy-password-for-timing-normalization",
   12,
 );
 
 @Injectable()
 export class AuthService {
+  // Use NestJS Logger so messages flow through the structured-JSON pipeline
+  // configured in main.ts. The previous `console.error` callsites bypassed
+  // it, writing plain-text lines into the middle of the JSON log stream —
+  // which breaks parsers (Loki/Datadog) that expect one valid JSON object
+  // per line and skips any PII redaction the logger pipeline has.
+  private readonly logger = new Logger(AuthService.name);
   private googleClient: OAuth2Client;
 
   private hashToken(token: string): string {
-    return createHash('sha256').update(token).digest('hex');
+    return createHash("sha256").update(token).digest("hex");
   }
 
   /**
@@ -60,7 +77,7 @@ export class AuthService {
    * env so production can bump cost without a code change.
    */
   private bcryptCost(): number {
-    const raw = this.configService.get<string>('BCRYPT_COST');
+    const raw = this.configService.get<string>("BCRYPT_COST");
     const parsed = raw ? parseInt(raw, 10) : NaN;
     if (Number.isFinite(parsed) && parsed >= 10 && parsed <= 15) {
       return parsed;
@@ -75,21 +92,25 @@ export class AuthService {
    * index (P2002 is caught by the caller); this just picks a candidate.
    */
   private async allocateSubdomain(base: string): Promise<string> {
-    const baseClean = base || 'restaurant';
+    const baseClean = base || "restaurant";
     const preferred = baseClean;
     const preferredTaken =
       (await isSubdomainQuarantined(this.prisma, preferred)) ||
-      (await this.prisma.tenant.findUnique({ where: { subdomain: preferred } }));
+      (await this.prisma.tenant.findUnique({
+        where: { subdomain: preferred },
+      }));
     if (!preferredTaken) return preferred;
     // Up to 5 attempts with random suffix — extraordinarily unlikely to collide.
     for (let i = 0; i < 5; i += 1) {
       const candidate = `${baseClean}-${randomSubdomainSuffix()}`;
       const taken =
         (await isSubdomainQuarantined(this.prisma, candidate)) ||
-        (await this.prisma.tenant.findUnique({ where: { subdomain: candidate } }));
+        (await this.prisma.tenant.findUnique({
+          where: { subdomain: candidate },
+        }));
       if (!taken) return candidate;
     }
-    throw new Error('Could not allocate a free subdomain');
+    throw new Error("Could not allocate a free subdomain");
   }
 
   constructor(
@@ -102,7 +123,7 @@ export class AuthService {
   ) {
     // Initialize Google OAuth client
     this.googleClient = new OAuth2Client(
-      this.configService.get<string>('GOOGLE_CLIENT_ID'),
+      this.configService.get<string>("GOOGLE_CLIENT_ID"),
     );
   }
 
@@ -113,7 +134,11 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new ResourceAlreadyExistsException('User', 'email', registerDto.email);
+      throw new ResourceAlreadyExistsException(
+        "User",
+        "email",
+        registerDto.email,
+      );
     }
 
     // Validate registration data
@@ -122,29 +147,42 @@ export class AuthService {
 
     // Mutual exclusion: cannot provide both
     if (hasRestaurantName && hasTenantId) {
-      throw new ValidationException('Cannot provide both restaurantName and tenantId');
+      throw new ValidationException(
+        "Cannot provide both restaurantName and tenantId",
+      );
     }
 
     // One of them must be provided
     if (!hasRestaurantName && !hasTenantId) {
-      throw new ValidationException('Either restaurantName or tenantId must be provided');
+      throw new ValidationException(
+        "Either restaurantName or tenantId must be provided",
+      );
     }
 
     let tenantId: string;
     let userRole = registerDto.role;
+    // v3.0.0 — every user lands with a primaryBranchId. Scenario 1
+    // (new restaurant) creates the Main branch in the same transaction
+    // and assigns it to the ADMIN. Scenario 2 (join) resolves to the
+    // tenant's first active branch — the DB CHECK constraint refuses
+    // to mint a WAITER/KITCHEN/COURIER without one, so a tenant with
+    // zero active branches cannot accept new staff signups.
+    let primaryBranchId: string;
 
     // Scenario 1: Creating a new restaurant (ADMIN only)
     if (hasRestaurantName) {
       // If creating a restaurant, role must be ADMIN (or default to ADMIN)
       if (userRole && userRole !== UserRole.ADMIN) {
-        throw new ValidationException('Only ADMIN role is allowed when creating a new restaurant');
+        throw new ValidationException(
+          "Only ADMIN role is allowed when creating a new restaurant",
+        );
       }
       userRole = UserRole.ADMIN;
 
       const baseSubdomain = registerDto.restaurantName
         .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-|-$/g, '');
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
 
       const finalSubdomain = await this.allocateSubdomain(baseSubdomain);
 
@@ -155,17 +193,17 @@ export class AuthService {
       // BUSINESS plan here, not FREE, so the new tenant boots into a
       // fully-featured workspace from the first dashboard load.
       const businessPlan = await this.prisma.subscriptionPlan.findUnique({
-        where: { name: 'BUSINESS' },
+        where: { name: "BUSINESS" },
       });
       if (!businessPlan) {
         // Seed misconfigured — refuse to register rather than silently
         // landing the tenant on FREE without a trial. The user will get
         // a clear error and ops can re-seed.
-        throw new ResourceNotFoundException('BUSINESS subscription plan');
+        throw new ResourceNotFoundException("BUSINESS subscription plan");
       }
       if (businessPlan.trialDays <= 0) {
         throw new ResourceNotFoundException(
-          'BUSINESS plan has no trialDays configured — re-seed plans',
+          "BUSINESS plan has no trialDays configured — re-seed plans",
         );
       }
 
@@ -175,8 +213,33 @@ export class AuthService {
       const now = new Date();
       const trialEnd = addDays(now, businessPlan.trialDays);
 
+      // Seed `featureOverrides` with the BUSINESS plan's flag set so
+      // PlanFeatureGuard's fallback path resolves correctly during the
+      // first ~30 seconds while the entitlement engine projector is
+      // still warming up. Before this seed the engine returned an
+      // empty grant set on fresh signups; the guard's fallback then
+      // read `currentPlan[feature]` directly but the read often raced
+      // against the fresh subscription write and surfaced as the
+      // "Bu özellik aboneliğinizde yok" 403 every new tenant hit when
+      // they tried to create their first branch. Seeding the JSON
+      // column here gives the guard a deterministic source of truth
+      // until the engine catches up — the nightly reconcile cron then
+      // syncs both representations.
+      const planFeatureOverrides = {
+        advancedReports: !!businessPlan.advancedReports,
+        multiLocation: !!businessPlan.multiLocation,
+        customBranding: !!businessPlan.customBranding,
+        apiAccess: !!businessPlan.apiAccess,
+        prioritySupport: !!businessPlan.prioritySupport,
+        inventoryTracking: !!businessPlan.inventoryTracking,
+        kdsIntegration: !!businessPlan.kdsIntegration,
+        reservationSystem: !!businessPlan.reservationSystem,
+        personnelManagement: !!businessPlan.personnelManagement,
+        deliveryIntegration: !!businessPlan.deliveryIntegration,
+      };
+
       try {
-        const tenant = await this.prisma.$transaction(async (tx) => {
+        const txResult = await this.prisma.$transaction(async (tx) => {
           const created = await tx.tenant.create({
             data: {
               name: registerDto.restaurantName,
@@ -191,14 +254,15 @@ export class AuthService {
               trialStartedAt: now,
               trialEndsAt: trialEnd,
               usedTrialPlanIds: [businessPlan.id],
+              featureOverrides: planFeatureOverrides,
             },
           });
           await tx.subscription.create({
             data: {
               tenantId: created.id,
               planId: businessPlan.id,
-              status: 'TRIALING',
-              billingCycle: 'MONTHLY',
+              status: "TRIALING",
+              billingCycle: "MONTHLY",
               // PayTR is the only configured provider; this row is the
               // trial — no charge moves until the post-trial checkout.
               paymentProvider: PaymentProvider.PAYTR,
@@ -216,15 +280,35 @@ export class AuthService {
               cancelAtPeriodEnd: false,
             },
           });
-          return created;
+          // v3.0.0 — every new tenant ships with a Main branch.
+          // Bundled into the same tx as tenant + subscription so other
+          // modules never observe a tenant without one. The DB CHECK
+          // constraint on users requires WAITER/KITCHEN/COURIER to
+          // carry a primaryBranchId, so the tenant being usable
+          // depends on this row existing.
+          const mainBranch = await tx.branch.create({
+            data: {
+              tenantId: created.id,
+              name: "Main",
+              status: "active",
+              timezone: "UTC",
+            },
+            select: { id: true },
+          });
+          return { tenant: created, mainBranchId: mainBranch.id };
         });
-        tenantId = tenant.id;
+        tenantId = txResult.tenant.id;
+        primaryBranchId = txResult.mainBranchId;
       } catch (err) {
         if (
           err instanceof Prisma.PrismaClientKnownRequestError &&
-          err.code === 'P2002'
+          err.code === "P2002"
         ) {
-          throw new ResourceAlreadyExistsException('Tenant', 'subdomain', finalSubdomain);
+          throw new ResourceAlreadyExistsException(
+            "Tenant",
+            "subdomain",
+            finalSubdomain,
+          );
         }
         throw err;
       }
@@ -237,12 +321,14 @@ export class AuthService {
       });
 
       if (!tenant) {
-        throw new ResourceNotFoundException('Tenant', registerDto.tenantId);
+        throw new ResourceNotFoundException("Tenant", registerDto.tenantId);
       }
 
       // Cannot join as ADMIN (ADMIN creates their own restaurant)
       if (userRole === UserRole.ADMIN) {
-        throw new ValidationException('Cannot join existing restaurant as ADMIN. ADMIN must create their own restaurant.');
+        throw new ValidationException(
+          "Cannot join existing restaurant as ADMIN. ADMIN must create their own restaurant.",
+        );
       }
 
       // Default to WAITER if no role provided
@@ -251,34 +337,81 @@ export class AuthService {
       }
 
       tenantId = registerDto.tenantId;
+
+      // v3.0.0 — every joining user lands on the tenant's first
+      // active branch. The DB CHECK constraint on users rejects
+      // restricted roles without a primaryBranchId, so a tenant
+      // without an active branch (impossible under normal ops, but
+      // possible if every branch was archived) cannot accept staff
+      // signups. Surface that as a clear error rather than letting
+      // the user.create call crash on the constraint.
+      const firstBranch = await this.prisma.branch.findFirst({
+        where: { tenantId, status: "active" },
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      });
+      if (!firstBranch) {
+        throw new ValidationException(
+          "Tenant has no active branch — signup is blocked until an admin restores at least one.",
+        );
+      }
+      primaryBranchId = firstBranch.id;
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(registerDto.password, this.bcryptCost());
+    const hashedPassword = await bcrypt.hash(
+      registerDto.password,
+      this.bcryptCost(),
+    );
 
     // Determine user status: ADMIN creating restaurant = ACTIVE, others = PENDING_APPROVAL
-    const userStatus = hasRestaurantName ? 'ACTIVE' : 'PENDING_APPROVAL';
+    const userStatus = hasRestaurantName ? "ACTIVE" : "PENDING_APPROVAL";
 
-    // Create user
-    const user = await this.prisma.user.create({
-      data: {
-        email: registerDto.email,
-        password: hashedPassword,
-        firstName: registerDto.firstName,
-        lastName: registerDto.lastName,
-        role: userRole,
-        tenantId,
-        status: userStatus,
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-        status: true,
-        tenantId: true,
-      },
+    // Create user + matching allow-list row for restricted roles
+    // atomically. The CHECK constraint
+    // `users_restricted_role_requires_primary_branch` makes the
+    // primaryBranchId for WAITER/KITCHEN/COURIER load-bearing — we
+    // set it on every signup. ADMIN's primaryBranchId is the freshly
+    // minted Main branch (scenario 1) so the owner has a default
+    // active branch from day one.
+    const user = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          email: registerDto.email,
+          password: hashedPassword,
+          firstName: registerDto.firstName,
+          lastName: registerDto.lastName,
+          role: userRole,
+          tenantId,
+          status: userStatus,
+          primaryBranchId,
+        },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          status: true,
+          tenantId: true,
+          primaryBranchId: true,
+        },
+      });
+      // Restricted roles get an explicit allow-list row equal to
+      // their primary branch. BranchGuard short-circuits on
+      // primaryBranchId for these roles, but the row gives admin UI
+      // a uniform place to inspect "which branches does this user
+      // see" without role-conditional branching.
+      if ((HARD_RESTRICTED_ROLES as readonly string[]).includes(userRole!)) {
+        await tx.userBranchAssignment.create({
+          data: {
+            userId: created.id,
+            branchId: primaryBranchId,
+            tenantId,
+          },
+        });
+      }
+      return created;
     });
 
     // Send email verification code automatically after registration
@@ -286,23 +419,26 @@ export class AuthService {
       await this.sendEmailVerification(user.id);
     } catch (error) {
       // Log error but don't fail registration if email sending fails
-      console.error('Failed to send verification email:', error);
+      this.logger.error("Failed to send verification email", error as any);
     }
 
     // If user is pending approval, notify admins and return without tokens
-    if (userStatus === 'PENDING_APPROVAL') {
+    if (userStatus === "PENDING_APPROVAL") {
       try {
         await this.notificationsService.notifyAdmins(tenantId, {
-          title: 'Yeni Kullanıcı Onay Bekliyor',
+          title: "Yeni Kullanıcı Onay Bekliyor",
           message: `${user.firstName} ${user.lastName} (${user.email}) hesap onayı bekliyor.`,
           type: NotificationType.WARNING,
           data: {
-            action: 'USER_APPROVAL_REQUIRED',
+            action: "USER_APPROVAL_REQUIRED",
             userId: user.id,
           },
         });
       } catch (error) {
-        console.error('Failed to notify admins about pending user:', error);
+        this.logger.error(
+          "Failed to notify admins about pending user",
+          error as any,
+        );
       }
 
       // Return response without tokens - user needs approval
@@ -314,46 +450,58 @@ export class AuthService {
           lastName: user.lastName,
           role: user.role,
           tenantId: user.tenantId,
+          primaryBranchId: user.primaryBranchId,
+          // Restricted roles register with exactly one allow-list
+          // row (their primary branch); ADMIN / MANAGER joining is
+          // refused above so the empty-list path doesn't apply here.
+          allowedBranchIds: [primaryBranchId],
         },
         accessToken: null,
         refreshToken: null,
         pendingApproval: true,
-        message: 'Kayıt başarılı. Hesabınız yönetici onayı bekliyor.',
+        message: "Kayıt başarılı. Hesabınız yönetici onayı bekliyor.",
       } as any;
     }
 
-    // Track successful registration in Sentry
-    Sentry.captureMessage(`New user registered: ${user.email}`, {
-      level: 'info',
+    // Track successful registration in Sentry. We deliberately exclude
+    // email + firstName + lastName from both the message body and the
+    // `extra` payload — sentry.config.ts's beforeSend only scrubs known
+    // user.email/ip_address fields, NOT arbitrary message text or extras,
+    // so anything we interpolate here would persist in Sentry's long-term
+    // retention. GDPR/KVKK violation for a TR-resident SaaS. userId is
+    // enough to join back to the app DB when debugging.
+    Sentry.captureMessage("New user registered", {
+      level: "info",
       tags: {
-        event: 'user.register',
+        event: "user.register",
         role: user.role,
         isNewRestaurant: String(hasRestaurantName),
       },
       extra: {
         userId: user.id,
         tenantId: user.tenantId,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
       },
     });
 
     return this.generateTokens(user);
   }
 
-  async login(loginDto: LoginDto, ip?: string, userAgent?: string): Promise<AuthResponseDto> {
+  async login(
+    loginDto: LoginDto,
+    ip?: string,
+    userAgent?: string,
+  ): Promise<AuthResponseDto> {
     const user = await this.validateUser(loginDto.email, loginDto.password);
 
     if (!user) {
-      // Track failed login attempt
-      Sentry.captureMessage(`Failed login attempt: ${loginDto.email}`, {
-        level: 'warning',
+      // Track failed login attempt. Like in `register`, we keep the
+      // submitted email out of Sentry — message body and extra fields
+      // bypass beforeSend's user.email scrubber, so plaintext emails
+      // would land in long-term retention.
+      Sentry.captureMessage("Failed login attempt", {
+        level: "warning",
         tags: {
-          event: 'user.login.failed',
-        },
-        extra: {
-          email: loginDto.email,
+          event: "user.login.failed",
         },
       });
 
@@ -363,28 +511,34 @@ export class AuthService {
         select: { id: true, tenantId: true },
       });
       if (existingUser) {
-        await this.logUserActivity(existingUser.id, existingUser.tenantId, 'LOGIN_FAILED', ip, userAgent);
+        await this.logUserActivity(
+          existingUser.id,
+          existingUser.tenantId,
+          "LOGIN_FAILED",
+          ip,
+          userAgent,
+        );
       }
 
       throw new InvalidCredentialsException();
     }
 
-    // Track successful login in Sentry
-    Sentry.captureMessage(`User logged in: ${user.email}`, {
-      level: 'info',
+    // Track successful login in Sentry. Email excluded — see register/login
+    // failed comments above.
+    Sentry.captureMessage("User logged in", {
+      level: "info",
       tags: {
-        event: 'user.login',
+        event: "user.login",
         role: user.role,
       },
       extra: {
         userId: user.id,
         tenantId: user.tenantId,
-        email: user.email,
       },
     });
 
     // Log successful login activity
-    await this.logUserActivity(user.id, user.tenantId, 'LOGIN', ip, userAgent);
+    await this.logUserActivity(user.id, user.tenantId, "LOGIN", ip, userAgent);
 
     // Update last login timestamp
     await this.prisma.user.update({
@@ -392,10 +546,12 @@ export class AuthService {
       data: { lastLogin: new Date() },
     });
 
-    // Set user context for future errors
+    // Set user context for future errors. Email omitted — beforeSend would
+    // strip event.user.email on outbound events anyway, but not passing it
+    // in the first place means it's never sitting in the SDK's in-memory
+    // scope where a misconfiguration could leak it.
     Sentry.setUser({
       id: user.id,
-      email: user.email,
     });
 
     return this.generateTokens(user, ip, userAgent);
@@ -421,7 +577,7 @@ export class AuthService {
         },
       });
     } catch (error) {
-      console.error('Failed to log user activity:', error);
+      this.logger.error("Failed to log user activity", error as any);
     }
   }
 
@@ -456,14 +612,16 @@ export class AuthService {
       return null;
     }
 
-    if (user.status === 'PENDING_APPROVAL') {
-      throw new UnauthorizedException('Hesabınız henüz onaylanmadı. Lütfen yönetici onayını bekleyin.');
+    if (user.status === "PENDING_APPROVAL") {
+      throw new UnauthorizedException(
+        "Hesabınız henüz onaylanmadı. Lütfen yönetici onayını bekleyin.",
+      );
     }
-    if (user.status !== 'ACTIVE') {
-      throw new UnauthorizedException('User account is inactive');
+    if (user.status !== "ACTIVE") {
+      throw new UnauthorizedException("User account is inactive");
     }
     if (user.tenant?.status !== TenantStatus.ACTIVE) {
-      throw new UnauthorizedException('Your restaurant account is not active');
+      throw new UnauthorizedException("Your restaurant account is not active");
     }
 
     const { password: _, tenant: __, ...result } = user;
@@ -486,15 +644,15 @@ export class AuthService {
     let payload: any;
     try {
       payload = this.jwtService.verify(refreshToken, {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
-        algorithms: ['HS256'],
+        secret: this.configService.get<string>("JWT_REFRESH_SECRET"),
+        algorithms: ["HS256"],
       });
     } catch (_err) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException("Invalid refresh token");
     }
 
-    if (payload.type && payload.type !== 'user') {
-      throw new UnauthorizedException('Invalid token type');
+    if (payload.type && payload.type !== "user") {
+      throw new UnauthorizedException("Invalid token type");
     }
 
     const tokenHash = this.hashToken(refreshToken);
@@ -519,7 +677,7 @@ export class AuthService {
     });
 
     if (!stored || stored.expiresAt <= new Date()) {
-      throw new UnauthorizedException('Invalid refresh token');
+      throw new UnauthorizedException("Invalid refresh token");
     }
 
     if (claimed.count === 0) {
@@ -530,7 +688,7 @@ export class AuthService {
         where: { userId: stored.userId, revokedAt: null },
         data: { revokedAt: new Date() },
       });
-      throw new UnauthorizedException('Refresh token reuse detected');
+      throw new UnauthorizedException("Refresh token reuse detected");
     }
 
     const user = await this.prisma.user.findUnique({
@@ -548,11 +706,11 @@ export class AuthService {
       },
     });
 
-    if (!user || user.status !== 'ACTIVE') {
-      throw new UnauthorizedException('User not found or inactive');
+    if (!user || user.status !== "ACTIVE") {
+      throw new UnauthorizedException("User not found or inactive");
     }
     if (user.tenant?.status !== TenantStatus.ACTIVE) {
-      throw new UnauthorizedException('Your restaurant account is not active');
+      throw new UnauthorizedException("Your restaurant account is not active");
     }
 
     // Refresh tokens must also respect tokenVersion revocation. Previously
@@ -566,14 +724,18 @@ export class AuthService {
         where: { userId: user.id, revokedAt: null },
         data: { revokedAt: new Date() },
       });
-      throw new UnauthorizedException('Token has been revoked');
+      throw new UnauthorizedException("Token has been revoked");
     }
 
     const { tenant: _t, tokenVersion: _ver, ...userForToken } = user;
     return this.generateTokens(userForToken, ip, userAgent);
   }
 
-  async logout(userId: string, ip?: string, userAgent?: string): Promise<{ message: string }> {
+  async logout(
+    userId: string,
+    ip?: string,
+    userAgent?: string,
+  ): Promise<{ message: string }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { tenantId: true },
@@ -584,50 +746,77 @@ export class AuthService {
         where: { userId, revokedAt: null },
         data: { revokedAt: new Date() },
       });
-      await this.logUserActivity(userId, user.tenantId, 'LOGOUT', ip, userAgent);
+      await this.logUserActivity(
+        userId,
+        user.tenantId,
+        "LOGOUT",
+        ip,
+        userAgent,
+      );
     }
-    return { message: 'Logged out' };
+    return { message: "Logged out" };
   }
 
   private async generateTokens(
-    user: UserResponseDto,
+    // Loose input shape — `generateTokens` populates primaryBranchId
+    // and allowedBranchIds itself from the DB, so callers can pass
+    // a plain Prisma row select without first having to read the
+    // branch context. The returned AuthResponseDto.user is the full
+    // UserResponseDto with both fields surfaced.
+    user: Omit<UserResponseDto, "primaryBranchId" | "allowedBranchIds">,
     ip?: string,
     userAgent?: string,
   ): Promise<AuthResponseDto> {
-    // Read current tokenVersion so the access token carries the stamp the
-    // JwtStrategy validates against. Bumping User.tokenVersion invalidates
-    // every prior access token for that user.
+    // Read tokenVersion + branch context in a single round trip. JWT
+    // carries primaryBranchId + activeBranchId (defaults to the home
+    // branch) + the resolved allowedBranchIds list so BranchGuard can
+    // decide without a DB hit. List freshness: max one JWT lifetime
+    // (15 min) since allow-list changes only land at next token mint.
     const row = await this.prisma.user.findUnique({
       where: { id: user.id },
-      select: { tokenVersion: true },
+      select: {
+        tokenVersion: true,
+        primaryBranchId: true,
+        branchAssignments: { select: { branchId: true } },
+      },
     });
+    const primaryBranchId = row?.primaryBranchId ?? null;
+    const allowedBranchIds = (row?.branchAssignments ?? []).map(
+      (a) => a.branchId,
+    );
     const payload = {
       sub: user.id,
       email: user.email,
       role: user.role,
       tenantId: user.tenantId,
-      type: 'user' as const,
+      type: "user" as const,
       ver: row?.tokenVersion ?? 0,
+      primaryBranchId,
+      // activeBranchId mirrors primaryBranchId at issuance — the SPA
+      // pins a different value per-request via X-Branch-Id without
+      // minting a fresh token.
+      activeBranchId: primaryBranchId,
+      allowedBranchIds,
     };
 
     const accessToken = this.jwtService.sign(payload, {
-      secret: this.configService.get<string>('JWT_SECRET'),
-      expiresIn: this.configService.get<string>('JWT_EXPIRES_IN') || '15m',
-      algorithm: 'HS256',
+      secret: this.configService.get<string>("JWT_SECRET"),
+      expiresIn: this.configService.get<string>("JWT_EXPIRES_IN") || "15m",
+      algorithm: "HS256",
     });
 
     const refreshExpiresIn =
-      this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') || '30d';
+      this.configService.get<string>("JWT_REFRESH_EXPIRES_IN") || "30d";
     // jti makes the refresh token unique even when two issuances land in
     // the same second (same iat → same payload → same JWT bytes → same
     // tokenHash → P2002 on the unique constraint). The access token
     // doesn't need it because it isn't persisted server-side.
     const refreshToken = this.jwtService.sign(
-      { ...payload, jti: randomBytes(8).toString('hex') },
+      { ...payload, jti: randomBytes(8).toString("hex") },
       {
-        secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+        secret: this.configService.get<string>("JWT_REFRESH_SECRET"),
         expiresIn: refreshExpiresIn,
-        algorithm: 'HS256',
+        algorithm: "HS256",
       },
     );
 
@@ -647,7 +836,13 @@ export class AuthService {
     return {
       accessToken,
       refreshToken,
-      user,
+      user: {
+        ...user,
+        // Surface the branch claims to the SPA so its branchScopeStore
+        // can hydrate on login without a separate /me round-trip.
+        primaryBranchId,
+        allowedBranchIds,
+      },
     };
   }
 
@@ -661,21 +856,29 @@ export class AuthService {
         lastName: true,
         role: true,
         tenantId: true,
+        primaryBranchId: true,
+        branchAssignments: { select: { branchId: true } },
       },
     });
 
     if (!user) {
-      throw new UnauthorizedException('User not found');
+      throw new UnauthorizedException("User not found");
     }
 
-    return user;
+    const { branchAssignments, ...rest } = user;
+    return {
+      ...rest,
+      allowedBranchIds: branchAssignments.map((a) => a.branchId),
+    };
   }
 
   /**
    * Send password reset email
    * Generates a secure reset token and sends it via email
    */
-  async forgotPassword(forgotPasswordDto: ForgotPasswordDto): Promise<{ message: string }> {
+  async forgotPassword(
+    forgotPasswordDto: ForgotPasswordDto,
+  ): Promise<{ message: string }> {
     const { email } = forgotPasswordDto;
 
     // Find user
@@ -686,12 +889,13 @@ export class AuthService {
     // Don't reveal if user exists or not (security best practice)
     if (!user) {
       return {
-        message: 'If an account with that email exists, a password reset link has been sent.',
+        message:
+          "If an account with that email exists, a password reset link has been sent.",
       };
     }
 
     // Generate high-entropy reset token (sent via email in raw form, stored hashed)
-    const rawToken = randomBytes(32).toString('hex');
+    const rawToken = randomBytes(32).toString("hex");
     const resetTokenHash = this.hashToken(rawToken);
     const resetTokenExpiry = new Date();
     resetTokenExpiry.setHours(resetTokenExpiry.getHours() + 1); // Token valid for 1 hour
@@ -709,14 +913,17 @@ export class AuthService {
     await this.emailService.sendPasswordResetEmail(user.email, rawToken);
 
     return {
-      message: 'If an account with that email exists, a password reset link has been sent.',
+      message:
+        "If an account with that email exists, a password reset link has been sent.",
     };
   }
 
   /**
    * Reset password using token
    */
-  async resetPassword(resetPasswordDto: ResetPasswordDto): Promise<{ message: string }> {
+  async resetPassword(
+    resetPasswordDto: ResetPasswordDto,
+  ): Promise<{ message: string }> {
     const { token, newPassword } = resetPasswordDto;
 
     // Lookup by the hash of the incoming token (constant-time-ish via unique index)
@@ -732,7 +939,7 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new BadRequestException('Invalid or expired reset token');
+      throw new BadRequestException("Invalid or expired reset token");
     }
 
     // Hash new password
@@ -765,7 +972,7 @@ export class AuthService {
 
     if (updateResult.count === 0) {
       // Lost the race: another request already consumed this token.
-      throw new BadRequestException('Invalid or expired reset token');
+      throw new BadRequestException("Invalid or expired reset token");
     }
 
     // Audit: reset-password successfully consumed a valid token. We had
@@ -776,11 +983,15 @@ export class AuthService {
       select: { tenantId: true },
     });
     if (tenantOnly) {
-      await this.logUserActivity(user.id, tenantOnly.tenantId, 'PASSWORD_RESET');
+      await this.logUserActivity(
+        user.id,
+        tenantOnly.tenantId,
+        "PASSWORD_RESET",
+      );
     }
 
     return {
-      message: 'Password has been reset successfully',
+      message: "Password has been reset successfully",
     };
   }
 
@@ -799,14 +1010,17 @@ export class AuthService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
 
     // Verify current password
-    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    const isPasswordValid = await bcrypt.compare(
+      currentPassword,
+      user.password,
+    );
 
     if (!isPasswordValid) {
-      throw new BadRequestException('Current password is incorrect');
+      throw new BadRequestException("Current password is incorrect");
     }
 
     // Hash new password
@@ -831,10 +1045,10 @@ export class AuthService {
     // Audit trail for incident response: who changed their password
     // when. Failure is swallowed because losing an audit entry shouldn't
     // block a successful password change.
-    await this.logUserActivity(userId, user.tenantId, 'PASSWORD_CHANGED');
+    await this.logUserActivity(userId, user.tenantId, "PASSWORD_CHANGED");
 
     return {
-      message: 'Password changed successfully',
+      message: "Password changed successfully",
     };
   }
 
@@ -845,25 +1059,27 @@ export class AuthService {
   private generateVerificationCode(): string {
     // 1,000,000 values → 0-999,999, formatted as 6 digits
     const n = randomBytes(4).readUInt32BE(0) % 1_000_000;
-    return n.toString().padStart(6, '0');
+    return n.toString().padStart(6, "0");
   }
 
   /**
    * Send email verification code
    * Generates a 6-digit code, stores its sha256 hash, emails the raw code.
    */
-  async sendEmailVerification(userId: string): Promise<{ message: string; codeExpiry: Date }> {
+  async sendEmailVerification(
+    userId: string,
+  ): Promise<{ message: string; codeExpiry: Date }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
 
     if (user.emailVerified) {
       return {
-        message: 'Email is already verified',
+        message: "Email is already verified",
         codeExpiry: null,
       };
     }
@@ -892,24 +1108,28 @@ export class AuthService {
     // Send in-app notification (without code - code is only in email)
     try {
       await this.notificationsService.createAndSend({
-        title: 'E-posta Doğrulaması Gereklidir',
-        message: 'E-posta adresinize gönderilen 6 haneli doğrulama kodunu kullanarak hesabınızı doğrulamanız gerekmektedir. Lütfen e-posta kutunuzu kontrol ediniz.',
+        title: "E-posta Doğrulaması Gereklidir",
+        message:
+          "E-posta adresinize gönderilen 6 haneli doğrulama kodunu kullanarak hesabınızı doğrulamanız gerekmektedir. Lütfen e-posta kutunuzu kontrol ediniz.",
         type: NotificationType.WARNING,
         userId: user.id,
         tenantId: user.tenantId,
         data: {
-          action: 'EMAIL_VERIFICATION_REQUIRED',
+          action: "EMAIL_VERIFICATION_REQUIRED",
           expiresAt: codeExpires.toISOString(),
         },
         expiresAt: codeExpires.toISOString(),
       });
     } catch (error) {
       // Log error but don't fail if notification sending fails
-      console.error('Failed to send verification notification:', error);
+      this.logger.error(
+        "Failed to send verification notification",
+        error as any,
+      );
     }
 
     return {
-      message: 'Verification code sent successfully to your email',
+      message: "Verification code sent successfully to your email",
       codeExpiry: codeExpires,
     };
   }
@@ -938,7 +1158,8 @@ export class AuthService {
     const submitted = this.hashToken(code);
     const submittedOk =
       !!user?.emailVerificationCodeHash &&
-      Buffer.byteLength(user.emailVerificationCodeHash) === Buffer.byteLength(submitted) &&
+      Buffer.byteLength(user.emailVerificationCodeHash) ===
+        Buffer.byteLength(submitted) &&
       timingSafeEqual(
         Buffer.from(user.emailVerificationCodeHash),
         Buffer.from(submitted),
@@ -952,14 +1173,17 @@ export class AuthService {
       user.emailVerificationCodeExpires <= new Date() ||
       !submittedOk
     ) {
-      throw new BadRequestException('Invalid or expired verification code');
+      throw new BadRequestException("Invalid or expired verification code");
     }
 
     // Atomic claim: filter by the current hash so a concurrent verify
     // with the same code can't double-consume. `count === 0` means we
     // lost the race (or the row was mutated mid-flight) → reject.
     const consumed = await this.prisma.user.updateMany({
-      where: { id: user.id, emailVerificationCodeHash: user.emailVerificationCodeHash },
+      where: {
+        id: user.id,
+        emailVerificationCodeHash: user.emailVerificationCodeHash,
+      },
       data: {
         emailVerified: true,
         emailVerificationCodeHash: null,
@@ -967,25 +1191,29 @@ export class AuthService {
       },
     });
     if (consumed.count === 0) {
-      throw new BadRequestException('Invalid or expired verification code');
+      throw new BadRequestException("Invalid or expired verification code");
     }
 
     // Send success notification
     try {
       await this.notificationsService.createAndSend({
-        title: 'Email Başarıyla Doğrulandı',
-        message: 'Email adresiniz başarıyla doğrulandı. Artık tüm özelliklere erişebilirsiniz.',
+        title: "Email Başarıyla Doğrulandı",
+        message:
+          "Email adresiniz başarıyla doğrulandı. Artık tüm özelliklere erişebilirsiniz.",
         type: NotificationType.SUCCESS,
         userId: user.id,
         tenantId: user.tenantId,
       });
     } catch (error) {
       // Log error but don't fail if notification sending fails
-      console.error('Failed to send verification success notification:', error);
+      this.logger.error(
+        "Failed to send verification success notification",
+        error as any,
+      );
     }
 
     return {
-      message: 'Email verified successfully',
+      message: "Email verified successfully",
       verified: true,
     };
   }
@@ -1002,7 +1230,7 @@ export class AuthService {
       select: { status: true },
     });
     if (!tenant || tenant.status !== TenantStatus.ACTIVE) {
-      throw new UnauthorizedException('Your restaurant account is not active');
+      throw new UnauthorizedException("Your restaurant account is not active");
     }
   }
 
@@ -1023,31 +1251,33 @@ export class AuthService {
       try {
         const ticket = await this.googleClient.verifyIdToken({
           idToken: credential,
-          audience: this.configService.get<string>('GOOGLE_CLIENT_ID'),
+          audience: this.configService.get<string>("GOOGLE_CLIENT_ID"),
         });
 
         const payload = ticket.getPayload();
         if (payload) {
           googleId = payload.sub;
           email = payload.email;
-          firstName = payload.given_name || 'User';
-          lastName = payload.family_name || '';
+          firstName = payload.given_name || "User";
+          lastName = payload.family_name || "";
         }
       } catch (idTokenError) {
         // If ID token verification fails, treat the credential as an access
         // token. We must first verify the audience via the tokeninfo endpoint
         // — otherwise any valid Google access token issued for any OAuth
         // client could authenticate as that user here.
-        const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
+        const clientId = this.configService.get<string>("GOOGLE_CLIENT_ID");
         const tokenInfoRes = await fetch(
           `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(credential)}`,
         );
         if (!tokenInfoRes.ok) {
-          throw new UnauthorizedException('Invalid Google token');
+          throw new UnauthorizedException("Invalid Google token");
         }
         const tokenInfo = (await tokenInfoRes.json()) as { aud?: string };
         if (!clientId || tokenInfo.aud !== clientId) {
-          throw new UnauthorizedException('Google token not issued for this application');
+          throw new UnauthorizedException(
+            "Google token not issued for this application",
+          );
         }
 
         const response = await fetch(
@@ -1058,18 +1288,18 @@ export class AuthService {
         );
 
         if (!response.ok) {
-          throw new UnauthorizedException('Invalid Google token');
+          throw new UnauthorizedException("Invalid Google token");
         }
 
         const userInfo = await response.json();
         googleId = userInfo.sub;
         email = userInfo.email;
-        firstName = userInfo.given_name || 'User';
-        lastName = userInfo.family_name || '';
+        firstName = userInfo.given_name || "User";
+        lastName = userInfo.family_name || "";
       }
 
       if (!email) {
-        throw new BadRequestException('Email not provided by Google');
+        throw new BadRequestException("Email not provided by Google");
       }
 
       // Check if user exists by googleId
@@ -1088,22 +1318,21 @@ export class AuthService {
 
       if (user) {
         // User found by googleId - login
-        if (user.status !== 'ACTIVE') {
-          throw new UnauthorizedException('User account is inactive');
+        if (user.status !== "ACTIVE") {
+          throw new UnauthorizedException("User account is inactive");
         }
         await this.assertTenantActive(user.tenantId);
 
-        // Track Google login in Sentry
-        Sentry.captureMessage(`User logged in via Google: ${user.email}`, {
-          level: 'info',
+        // Track Google login in Sentry — email omitted (PII scrub policy).
+        Sentry.captureMessage("User logged in via Google", {
+          level: "info",
           tags: {
-            event: 'user.login.google',
+            event: "user.login.google",
             role: user.role,
           },
           extra: {
             userId: user.id,
             tenantId: user.tenantId,
-            email: user.email,
           },
         });
 
@@ -1127,8 +1356,8 @@ export class AuthService {
 
       if (existingUserByEmail) {
         // Link Google account to existing user
-        if (existingUserByEmail.status !== 'ACTIVE') {
-          throw new UnauthorizedException('User account is inactive');
+        if (existingUserByEmail.status !== "ACTIVE") {
+          throw new UnauthorizedException("User account is inactive");
         }
         await this.assertTenantActive(existingUserByEmail.tenantId);
 
@@ -1136,7 +1365,7 @@ export class AuthService {
           where: { id: existingUserByEmail.id },
           data: {
             googleId,
-            authProvider: existingUserByEmail.googleId ? undefined : 'google',
+            authProvider: existingUserByEmail.googleId ? undefined : "google",
             emailVerified: true, // Email is verified by Google
           },
           select: {
@@ -1150,17 +1379,16 @@ export class AuthService {
           },
         });
 
-        // Track Google account linking in Sentry
-        Sentry.captureMessage(`Google account linked: ${user.email}`, {
-          level: 'info',
+        // Track Google account linking in Sentry — email omitted.
+        Sentry.captureMessage("Google account linked", {
+          level: "info",
           tags: {
-            event: 'user.link.google',
+            event: "user.link.google",
             role: user.role,
           },
           extra: {
             userId: user.id,
             tenantId: user.tenantId,
-            email: user.email,
           },
         });
 
@@ -1170,17 +1398,20 @@ export class AuthService {
       // New user - create tenant and user
       return this.createSocialAuthUser({
         email,
-        firstName: firstName || 'User',
-        lastName: lastName || '',
+        firstName: firstName || "User",
+        lastName: lastName || "",
         googleId,
-        authProvider: 'google',
+        authProvider: "google",
       });
     } catch (error) {
-      if (error instanceof UnauthorizedException || error instanceof BadRequestException) {
+      if (
+        error instanceof UnauthorizedException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
-      console.error('Google auth error:', error);
-      throw new UnauthorizedException('Failed to authenticate with Google');
+      this.logger.error("Google auth error", error as any);
+      throw new UnauthorizedException("Failed to authenticate with Google");
     }
   }
 
@@ -1194,14 +1425,14 @@ export class AuthService {
     try {
       // Verify Apple identity token
       const applePayload = await appleSignin.verifyIdToken(identityToken, {
-        audience: this.configService.get<string>('APPLE_CLIENT_ID'),
+        audience: this.configService.get<string>("APPLE_CLIENT_ID"),
         ignoreExpiration: false,
       });
 
       const { sub: appleId, email } = applePayload;
 
       if (!email) {
-        throw new BadRequestException('Email not provided by Apple');
+        throw new BadRequestException("Email not provided by Apple");
       }
 
       // Check if user exists by appleId
@@ -1220,22 +1451,21 @@ export class AuthService {
 
       if (user) {
         // User found by appleId - login
-        if (user.status !== 'ACTIVE') {
-          throw new UnauthorizedException('User account is inactive');
+        if (user.status !== "ACTIVE") {
+          throw new UnauthorizedException("User account is inactive");
         }
         await this.assertTenantActive(user.tenantId);
 
-        // Track Apple login in Sentry
-        Sentry.captureMessage(`User logged in via Apple: ${user.email}`, {
-          level: 'info',
+        // Track Apple login in Sentry — email omitted (PII scrub policy).
+        Sentry.captureMessage("User logged in via Apple", {
+          level: "info",
           tags: {
-            event: 'user.login.apple',
+            event: "user.login.apple",
             role: user.role,
           },
           extra: {
             userId: user.id,
             tenantId: user.tenantId,
-            email: user.email,
           },
         });
 
@@ -1259,8 +1489,8 @@ export class AuthService {
 
       if (existingUserByEmail) {
         // Link Apple account to existing user
-        if (existingUserByEmail.status !== 'ACTIVE') {
-          throw new UnauthorizedException('User account is inactive');
+        if (existingUserByEmail.status !== "ACTIVE") {
+          throw new UnauthorizedException("User account is inactive");
         }
         await this.assertTenantActive(existingUserByEmail.tenantId);
 
@@ -1268,7 +1498,7 @@ export class AuthService {
           where: { id: existingUserByEmail.id },
           data: {
             appleId,
-            authProvider: existingUserByEmail.appleId ? undefined : 'apple',
+            authProvider: existingUserByEmail.appleId ? undefined : "apple",
             emailVerified: true, // Email is verified by Apple
           },
           select: {
@@ -1282,17 +1512,16 @@ export class AuthService {
           },
         });
 
-        // Track Apple account linking in Sentry
-        Sentry.captureMessage(`Apple account linked: ${user.email}`, {
-          level: 'info',
+        // Track Apple account linking in Sentry — email omitted.
+        Sentry.captureMessage("Apple account linked", {
+          level: "info",
           tags: {
-            event: 'user.link.apple',
+            event: "user.link.apple",
             role: user.role,
           },
           extra: {
             userId: user.id,
             tenantId: user.tenantId,
-            email: user.email,
           },
         });
 
@@ -1303,17 +1532,20 @@ export class AuthService {
       // Note: Apple only sends name on first sign-in
       return this.createSocialAuthUser({
         email,
-        firstName: firstName || 'User',
-        lastName: lastName || '',
+        firstName: firstName || "User",
+        lastName: lastName || "",
         appleId,
-        authProvider: 'apple',
+        authProvider: "apple",
       });
     } catch (error) {
-      if (error instanceof UnauthorizedException || error instanceof BadRequestException) {
+      if (
+        error instanceof UnauthorizedException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
-      console.error('Apple auth error:', error);
-      throw new UnauthorizedException('Failed to authenticate with Apple');
+      this.logger.error("Apple auth error", error as any);
+      throw new UnauthorizedException("Failed to authenticate with Apple");
     }
   }
 
@@ -1329,26 +1561,28 @@ export class AuthService {
     appleId?: string;
     authProvider: string;
   }): Promise<AuthResponseDto> {
-    const { email, firstName, lastName, googleId, appleId, authProvider } = data;
+    const { email, firstName, lastName, googleId, appleId, authProvider } =
+      data;
 
     // Generate restaurant name from email or name
-    const restaurantName = firstName && firstName !== 'User'
-      ? `${firstName}'s Restaurant`
-      : `Restaurant ${email.split('@')[0]}`;
+    const restaurantName =
+      firstName && firstName !== "User"
+        ? `${firstName}'s Restaurant`
+        : `Restaurant ${email.split("@")[0]}`;
 
     const baseSubdomain = restaurantName
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
     const subdomain = await this.allocateSubdomain(baseSubdomain);
 
     // Get FREE plan
     const freePlan = await this.prisma.subscriptionPlan.findUnique({
-      where: { name: 'FREE' },
+      where: { name: "FREE" },
     });
 
     if (!freePlan) {
-      throw new ResourceNotFoundException('FREE subscription plan');
+      throw new ResourceNotFoundException("FREE subscription plan");
     }
 
     const now = new Date();
@@ -1371,8 +1605,8 @@ export class AuthService {
           data: {
             tenantId: tenant.id,
             planId: freePlan.id,
-            status: 'ACTIVE',
-            billingCycle: 'MONTHLY',
+            status: "ACTIVE",
+            billingCycle: "MONTHLY",
             paymentProvider: PaymentProvider.PAYTR,
             startDate: now,
             currentPeriodStart: now,
@@ -1386,7 +1620,7 @@ export class AuthService {
         return tx.user.create({
           data: {
             email,
-            password: '',
+            password: "",
             firstName,
             lastName,
             role: UserRole.ADMIN,
@@ -1409,27 +1643,29 @@ export class AuthService {
     } catch (err) {
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2002'
+        err.code === "P2002"
       ) {
-        throw new ResourceAlreadyExistsException('Tenant', 'subdomain', subdomain);
+        throw new ResourceAlreadyExistsException(
+          "Tenant",
+          "subdomain",
+          subdomain,
+        );
       }
       throw err;
     }
 
-    // Track new social auth registration in Sentry
-    Sentry.captureMessage(`New user registered via ${authProvider}: ${email}`, {
-      level: 'info',
+    // Track new social auth registration in Sentry — email + name omitted
+    // (PII scrub policy). restaurantName is business metadata not PII.
+    Sentry.captureMessage("New user registered via social auth", {
+      level: "info",
       tags: {
-        event: 'user.register.social',
+        event: "user.register.social",
         provider: authProvider,
         role: user.role,
       },
       extra: {
         userId: user.id,
         tenantId: user.tenantId,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
         restaurantName,
       },
     });

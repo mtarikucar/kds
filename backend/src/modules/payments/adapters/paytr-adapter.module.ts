@@ -1,5 +1,5 @@
-import { Module } from '@nestjs/common';
-import { PaytrAdapter } from './paytr.adapter';
+import { Module } from "@nestjs/common";
+import { PaytrAdapter } from "./paytr.adapter";
 
 /**
  * Standalone module wrapping the PayTR HTTP adapter.

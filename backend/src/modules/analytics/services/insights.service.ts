@@ -1,18 +1,18 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../../prisma/prisma.service";
 import {
   InsightType,
   InsightCategory,
   InsightSeverity,
   InsightStatus,
-} from '../enums/analytics.enum';
+} from "../enums/analytics.enum";
 import {
   InsightFilterDto,
   InsightResponseDto,
   InsightListResponseDto,
   UpdateInsightStatusDto,
-} from '../dto';
+} from "../dto";
 
 @Injectable()
 export class InsightsService {
@@ -25,7 +25,7 @@ export class InsightsService {
    */
   async getInsights(
     tenantId: string,
-    filters: InsightFilterDto = {}
+    filters: InsightFilterDto = {},
   ): Promise<InsightListResponseDto> {
     const {
       type,
@@ -43,19 +43,13 @@ export class InsightsService {
       ...(severity && { severity }),
       ...(status && { status }),
       validFrom: { lte: new Date() },
-      OR: [
-        { validUntil: null },
-        { validUntil: { gte: new Date() } },
-      ],
+      OR: [{ validUntil: null }, { validUntil: { gte: new Date() } }],
     };
 
     const [insights, total] = await Promise.all([
       this.prisma.analyticsInsight.findMany({
         where,
-        orderBy: [
-          { severity: 'desc' },
-          { createdAt: 'desc' },
-        ],
+        orderBy: [{ severity: "desc" }, { createdAt: "desc" }],
         skip: offset,
         take: limit,
       }),
@@ -73,7 +67,10 @@ export class InsightsService {
   /**
    * Get a single insight by ID
    */
-  async getInsightById(tenantId: string, insightId: string): Promise<InsightResponseDto> {
+  async getInsightById(
+    tenantId: string,
+    insightId: string,
+  ): Promise<InsightResponseDto> {
     const insight = await this.prisma.analyticsInsight.findFirst({
       where: {
         id: insightId,
@@ -95,7 +92,7 @@ export class InsightsService {
     tenantId: string,
     insightId: string,
     userId: string,
-    dto: UpdateInsightStatusDto
+    dto: UpdateInsightStatusDto,
   ): Promise<InsightResponseDto> {
     const insight = await this.prisma.analyticsInsight.findFirst({
       where: {
@@ -130,7 +127,7 @@ export class InsightsService {
       data: updateData,
     });
     if (claim.count === 0) {
-      throw new NotFoundException('Insight not found');
+      throw new NotFoundException("Insight not found");
     }
     const updated = await this.prisma.analyticsInsight.findUnique({
       where: { id: insightId },
@@ -152,26 +149,23 @@ export class InsightsService {
     const where = {
       tenantId,
       validFrom: { lte: new Date() },
-      OR: [
-        { validUntil: null },
-        { validUntil: { gte: new Date() } },
-      ],
+      OR: [{ validUntil: null }, { validUntil: { gte: new Date() } }],
     };
 
     const [total, byStatus, bySeverity, byCategory] = await Promise.all([
       this.prisma.analyticsInsight.count({ where }),
       this.prisma.analyticsInsight.groupBy({
-        by: ['status'],
+        by: ["status"],
         where,
         _count: true,
       }),
       this.prisma.analyticsInsight.groupBy({
-        by: ['severity'],
+        by: ["severity"],
         where,
         _count: true,
       }),
       this.prisma.analyticsInsight.groupBy({
-        by: ['category'],
+        by: ["category"],
         where,
         _count: true,
       }),
@@ -179,9 +173,13 @@ export class InsightsService {
 
     return {
       total,
-      byStatus: Object.fromEntries(byStatus.map(s => [s.status, s._count])),
-      bySeverity: Object.fromEntries(bySeverity.map(s => [s.severity, s._count])),
-      byCategory: Object.fromEntries(byCategory.map(s => [s.category, s._count])),
+      byStatus: Object.fromEntries(byStatus.map((s) => [s.status, s._count])),
+      bySeverity: Object.fromEntries(
+        bySeverity.map((s) => [s.severity, s._count]),
+      ),
+      byCategory: Object.fromEntries(
+        byCategory.map((s) => [s.category, s._count]),
+      ),
     };
   }
 
@@ -194,15 +192,9 @@ export class InsightsService {
         tenantId,
         status: { in: [InsightStatus.NEW, InsightStatus.IN_PROGRESS] },
         validFrom: { lte: new Date() },
-        OR: [
-          { validUntil: null },
-          { validUntil: { gte: new Date() } },
-        ],
+        OR: [{ validUntil: null }, { validUntil: { gte: new Date() } }],
       },
-      orderBy: [
-        { severity: 'desc' },
-        { confidenceScore: 'desc' },
-      ],
+      orderBy: [{ severity: "desc" }, { confidenceScore: "desc" }],
       take: 10,
     });
 
@@ -214,7 +206,7 @@ export class InsightsService {
    */
   async getInsightsForTables(
     tenantId: string,
-    tableIds: string[]
+    tableIds: string[],
   ): Promise<InsightResponseDto[]> {
     // Note: Prisma doesn't support array contains directly, so we fetch and filter
     const insights = await this.prisma.analyticsInsight.findMany({
@@ -222,16 +214,13 @@ export class InsightsService {
         tenantId,
         status: { not: InsightStatus.DISMISSED },
         validFrom: { lte: new Date() },
-        OR: [
-          { validUntil: null },
-          { validUntil: { gte: new Date() } },
-        ],
+        OR: [{ validUntil: null }, { validUntil: { gte: new Date() } }],
       },
     });
 
-    const filtered = insights.filter(insight => {
+    const filtered = insights.filter((insight) => {
       if (insight.affectedTableIds.length === 0) return false;
-      return insight.affectedTableIds.some(id => tableIds.includes(id));
+      return insight.affectedTableIds.some((id) => tableIds.includes(id));
     });
 
     return filtered.map(this.mapToResponseDto);
@@ -241,7 +230,7 @@ export class InsightsService {
    * Generate new insights based on analytics data
    * This is called periodically or on-demand to refresh insights
    */
-  async generateInsights(tenantId: string): Promise<number> {
+  async generateInsights(tenantId: string, branchId: string): Promise<number> {
     const now = new Date();
     const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -262,11 +251,16 @@ export class InsightsService {
       validFrom: Date;
       validUntil: Date;
       tenantId: string;
+      // v3.0.0: insights are per-branch — derived from the
+      // camera/edgeDevice context that generated the upstream
+      // tableAnalytics / trafficFlowRecord rows, propagated from the
+      // calling controller via @CurrentScope().branchId.
+      branchId: string;
     }> = [];
 
     // Check for underutilized tables
     const tableAnalytics = await this.prisma.tableAnalytics.groupBy({
-      by: ['tableId'],
+      by: ["tableId"],
       where: {
         tenantId,
         date: {
@@ -284,11 +278,15 @@ export class InsightsService {
       where: { tenantId },
       select: { id: true, number: true },
     });
-    const tableMap = new Map(tables.map(t => [t.id, t]));
+    const tableMap = new Map(tables.map((t) => [t.id, t]));
 
-    const avgUtilization = tableAnalytics.length > 0
-      ? tableAnalytics.reduce((sum, t) => sum + (t._avg.utilizationScore || 0), 0) / tableAnalytics.length
-      : 50;
+    const avgUtilization =
+      tableAnalytics.length > 0
+        ? tableAnalytics.reduce(
+            (sum, t) => sum + (t._avg.utilizationScore || 0),
+            0,
+          ) / tableAnalytics.length
+        : 50;
 
     for (const analytics of tableAnalytics) {
       const utilization = analytics._avg.utilizationScore || 0;
@@ -310,7 +308,10 @@ export class InsightsService {
           insights.push({
             type: InsightType.TABLE_UNDERUTILIZATION,
             category: InsightCategory.REVENUE,
-            severity: utilization < avgUtilization * 0.3 ? InsightSeverity.WARNING : InsightSeverity.INFO,
+            severity:
+              utilization < avgUtilization * 0.3
+                ? InsightSeverity.WARNING
+                : InsightSeverity.INFO,
             title: `Table ${table?.number || analytics.tableId} is underutilized`,
             description: `Table ${table?.number} has ${Math.round(utilization)}% utilization over the past week, significantly below the restaurant average of ${Math.round(avgUtilization)}%.`,
             recommendation: `Consider repositioning Table ${table?.number} to a more visible location or evaluating its placement for customer comfort.`,
@@ -329,6 +330,7 @@ export class InsightsService {
             validFrom: now,
             validUntil: oneWeekFromNow,
             tenantId,
+            branchId,
           });
         }
       }
@@ -348,7 +350,7 @@ export class InsightsService {
         },
         avgDwellTime: { gte: 60 }, // High dwell time indicates congestion
       },
-      orderBy: { hourBucket: 'desc' },
+      orderBy: { hourBucket: "desc" },
       take: 10000,
       select: {
         cellX: true,
@@ -359,10 +361,17 @@ export class InsightsService {
     });
 
     // Aggregate congestion points
-    const congestionMap = new Map<string, { count: number; totalDwell: number; totalPersons: number }>();
+    const congestionMap = new Map<
+      string,
+      { count: number; totalDwell: number; totalPersons: number }
+    >();
     for (const record of trafficData) {
       const key = `${record.cellX},${record.cellZ}`;
-      const existing = congestionMap.get(key) || { count: 0, totalDwell: 0, totalPersons: 0 };
+      const existing = congestionMap.get(key) || {
+        count: 0,
+        totalDwell: 0,
+        totalPersons: 0,
+      };
       existing.count++;
       existing.totalDwell += record.avgDwellTime || 0;
       existing.totalPersons += record.personCount;
@@ -373,8 +382,9 @@ export class InsightsService {
       const avgDwell = data.totalDwell / data.count;
       const avgPersons = data.totalPersons / data.count;
 
-      if (avgDwell > 90 && avgPersons > 10) { // Significant congestion
-        const [x, z] = key.split(',').map(Number);
+      if (avgDwell > 90 && avgPersons > 10) {
+        // Significant congestion
+        const [x, z] = key.split(",").map(Number);
 
         const existingInsight = await this.prisma.analyticsInsight.findFirst({
           where: {
@@ -389,10 +399,12 @@ export class InsightsService {
           insights.push({
             type: InsightType.TRAFFIC_BOTTLENECK,
             category: InsightCategory.OPERATIONAL,
-            severity: avgDwell > 120 ? InsightSeverity.WARNING : InsightSeverity.INFO,
-            title: 'Traffic congestion detected',
+            severity:
+              avgDwell > 120 ? InsightSeverity.WARNING : InsightSeverity.INFO,
+            title: "Traffic congestion detected",
             description: `High traffic congestion detected at grid position (${x}, ${z}) with average dwell time of ${Math.round(avgDwell)} seconds.`,
-            recommendation: 'Consider widening pathways or adding signage to improve traffic flow in this area.',
+            recommendation:
+              "Consider widening pathways or adding signage to improve traffic flow in this area.",
             affectedTableIds: [],
             affectedAreaData: {
               x: x * 2 - 10, // Convert grid to world coordinates
@@ -411,6 +423,7 @@ export class InsightsService {
             validFrom: now,
             validUntil: oneWeekFromNow,
             tenantId,
+            branchId,
           });
           break; // Only one traffic insight at a time
         }
@@ -425,7 +438,9 @@ export class InsightsService {
       });
     }
 
-    this.logger.log(`Generated ${insights.length} new insights for tenant ${tenantId}`);
+    this.logger.log(
+      `Generated ${insights.length} new insights for tenant ${tenantId}`,
+    );
     return insights.length;
   }
 
@@ -441,7 +456,9 @@ export class InsightsService {
       },
     });
 
-    this.logger.log(`Archived ${result.count} expired insights for tenant ${tenantId}`);
+    this.logger.log(
+      `Archived ${result.count} expired insights for tenant ${tenantId}`,
+    );
     return result.count;
   }
 
@@ -478,8 +495,12 @@ export class InsightsService {
       description: insight.description,
       recommendation: insight.recommendation,
       affectedTableIds: insight.affectedTableIds,
-      affectedAreaData: insight.affectedAreaData as Record<string, unknown> | undefined,
-      supportingData: insight.supportingData as Record<string, unknown> | undefined,
+      affectedAreaData: insight.affectedAreaData as
+        | Record<string, unknown>
+        | undefined,
+      supportingData: insight.supportingData as
+        | Record<string, unknown>
+        | undefined,
       potentialImpact: insight.potentialImpact || undefined,
       confidenceScore: insight.confidenceScore,
       status: insight.status as InsightStatus,

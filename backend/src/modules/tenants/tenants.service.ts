@@ -3,15 +3,16 @@ import {
   NotFoundException,
   ConflictException,
   ForbiddenException,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
-import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
-import { TenantStatus } from '../../common/constants/subscription.enum';
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../prisma/prisma.service";
+import { EntitlementService } from "../entitlements/entitlement.service";
+import { UpdateTenantSettingsDto } from "./dto/update-tenant-settings.dto";
+import { TenantStatus } from "../../common/constants/subscription.enum";
 import {
   isSubdomainQuarantined,
   reserveSubdomain,
-} from '../../common/helpers/subdomain.helper';
+} from "../../common/helpers/subdomain.helper";
 
 const SETTINGS_SELECT = {
   id: true,
@@ -40,7 +41,15 @@ const SETTINGS_SELECT = {
 
 @Injectable()
 export class TenantsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    // v2.8.90: subdomain change permission now reads the engine's
+    // customBranding view so customBranding granted via add-on
+    // (`custom_branding_pack` or admin override) is honoured.
+    // Pre-v2.8.90 it read tenant.currentPlan.customBranding directly,
+    // missing both override and add-on paths.
+    private entitlements: EntitlementService,
+  ) {}
 
   async findAllPublic() {
     return this.prisma.tenant.findMany({
@@ -52,7 +61,7 @@ export class TenantsService {
         name: true,
         subdomain: true,
       },
-      orderBy: { name: 'asc' },
+      orderBy: { name: "asc" },
     });
   }
 
@@ -64,16 +73,24 @@ export class TenantsService {
     if (newSubdomain === currentSubdomain) return;
     if (!newSubdomain) return;
 
-    const tenantWithPlan = await this.prisma.tenant.findUnique({
-      where: { id: tenantId },
-      include: { currentPlan: true },
-    });
-
-    const hasCustomBranding = tenantWithPlan?.currentPlan?.customBranding ?? false;
+    // v2.8.90 — engine-routed. Falls back to the plan column if the
+    // engine has no grants for this tenant yet (projector race).
+    const engineSet = await this.entitlements.getForTenant(tenantId, null);
+    const engineCustomBranding = engineSet.features["feature.customBranding"];
+    let hasCustomBranding: boolean;
+    if (typeof engineCustomBranding === "boolean") {
+      hasCustomBranding = engineCustomBranding;
+    } else {
+      const tenantWithPlan = await this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        include: { currentPlan: true },
+      });
+      hasCustomBranding = tenantWithPlan?.currentPlan?.customBranding ?? false;
+    }
 
     if (!hasCustomBranding) {
       throw new ForbiddenException(
-        'Custom subdomain is a Pro feature. Upgrade your plan to set or change your subdomain.',
+        "Custom subdomain is a Pro feature. Upgrade your plan or buy the add-on to set or change your subdomain.",
       );
     }
   }
@@ -107,7 +124,7 @@ export class TenantsService {
     // A suspended/deleted tenant must not be able to keep editing
     // customer-visible settings (subdomain, social links, etc.).
     if (tenant.status !== TenantStatus.ACTIVE) {
-      throw new ForbiddenException('Tenant is not active');
+      throw new ForbiddenException("Tenant is not active");
     }
 
     if (updateDto.subdomain !== undefined) {
@@ -122,7 +139,7 @@ export class TenantsService {
         updateDto.subdomain !== tenant.subdomain &&
         (await isSubdomainQuarantined(this.prisma, updateDto.subdomain))
       ) {
-        throw new ConflictException('Subdomain already in use');
+        throw new ConflictException("Subdomain already in use");
       }
     }
 
@@ -135,7 +152,7 @@ export class TenantsService {
           tenant.subdomain &&
           updateDto.subdomain !== tenant.subdomain
         ) {
-          await reserveSubdomain(tx, tenant.subdomain, 'subdomain_changed');
+          await reserveSubdomain(tx, tenant.subdomain, "subdomain_changed");
         }
         const updated = await tx.tenant.update({
           where: { id: tenantId },
@@ -152,7 +169,7 @@ export class TenantsService {
             data: {
               userId: actorUserId,
               tenantId,
-              action: 'TENANT_SETTINGS_UPDATED',
+              action: "TENANT_SETTINGS_UPDATED",
               metadata: {
                 changedFields: Object.keys(updateDto),
               },
@@ -165,9 +182,9 @@ export class TenantsService {
     } catch (err) {
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2002'
+        err.code === "P2002"
       ) {
-        throw new ConflictException('Subdomain already in use');
+        throw new ConflictException("Subdomain already in use");
       }
       throw err;
     }

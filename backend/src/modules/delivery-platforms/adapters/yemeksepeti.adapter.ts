@@ -1,29 +1,31 @@
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { DeliveryPlatformConfig } from '@prisma/client';
-import { DeliveryPlatform } from '../constants/platform.enum';
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { DeliveryPlatformConfig } from "@prisma/client";
+import { DeliveryPlatform } from "../constants/platform.enum";
 import {
   AuthResult,
   MenuSyncItem,
   PlatformAdapter,
-} from '../interfaces/platform-adapter.interface';
-import { NormalizedOrder } from '../interfaces/platform-order.interface';
-import { BaseAdapter } from './base.adapter';
+} from "../interfaces/platform-adapter.interface";
+import { NormalizedOrder } from "../interfaces/platform-order.interface";
+import { BaseAdapter } from "./base.adapter";
 
 @Injectable()
 export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
   constructor(private configService: ConfigService) {
-    super('YemeksepetiAdapter', 'https://middleware-api.yemeksepeti.com');
-    this.overrideBaseURL(this.configService.get<string>('YEMEKSEPETI_API_BASE_URL'));
+    super("YemeksepetiAdapter", "https://middleware-api.yemeksepeti.com");
+    this.overrideBaseURL(
+      this.configService.get<string>("YEMEKSEPETI_API_BASE_URL"),
+    );
   }
 
   async authenticate(config: DeliveryPlatformConfig): Promise<AuthResult> {
     const credentials = config.credentials as any;
     const response = await this.request({
-      method: 'POST',
-      url: '/v2/login',
+      method: "POST",
+      url: "/v2/login",
       data: {
-        grant_type: 'client_credentials',
+        grant_type: "client_credentials",
         client_id: credentials.clientId,
         client_secret: credentials.clientSecret,
       },
@@ -41,10 +43,10 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
     externalOrderId: string,
   ): Promise<void> {
     await this.request({
-      method: 'POST',
+      method: "POST",
       url: `/v2/order/status/${externalOrderId}`,
       headers: this.getAuthHeaders(config.accessToken!),
-      data: { status: 'accepted' },
+      data: { status: "accepted" },
     });
   }
 
@@ -54,10 +56,13 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
     reason?: string,
   ): Promise<void> {
     await this.request({
-      method: 'POST',
+      method: "POST",
       url: `/v2/order/status/${externalOrderId}`,
       headers: this.getAuthHeaders(config.accessToken!),
-      data: { status: 'rejected', reason: reason || 'Restaurant rejected the order' },
+      data: {
+        status: "rejected",
+        reason: reason || "Restaurant rejected the order",
+      },
     });
   }
 
@@ -66,10 +71,10 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
     externalOrderId: string,
   ): Promise<void> {
     await this.request({
-      method: 'POST',
+      method: "POST",
       url: `/v2/order/status/${externalOrderId}`,
       headers: this.getAuthHeaders(config.accessToken!),
-      data: { status: 'preparing' },
+      data: { status: "preparing" },
     });
   }
 
@@ -78,7 +83,7 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
     externalOrderId: string,
   ): Promise<void> {
     await this.request({
-      method: 'POST',
+      method: "POST",
       url: `/v2/orders/${externalOrderId}/preparation-completed`,
       headers: this.getAuthHeaders(config.accessToken!),
     });
@@ -89,10 +94,10 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
     externalOrderId: string,
   ): Promise<void> {
     await this.request({
-      method: 'POST',
+      method: "POST",
       url: `/v2/order/status/${externalOrderId}`,
       headers: this.getAuthHeaders(config.accessToken!),
-      data: { status: 'delivered' },
+      data: { status: "delivered" },
     });
   }
 
@@ -102,10 +107,10 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
     reason?: string,
   ): Promise<void> {
     await this.request({
-      method: 'POST',
+      method: "POST",
       url: `/v2/order/status/${externalOrderId}`,
       headers: this.getAuthHeaders(config.accessToken!),
-      data: { status: 'cancelled', reason: reason || 'Restaurant cancelled' },
+      data: { status: "cancelled", reason: reason || "Restaurant cancelled" },
     });
   }
 
@@ -130,12 +135,17 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
       externalOrderId: rawPayload.id || rawPayload.orderToken,
       customerName: rawPayload.customerName || rawPayload.customer?.name,
       customerPhone: rawPayload.customerPhone || rawPayload.customer?.phone,
-      customerAddress: rawPayload.deliveryAddress || rawPayload.customer?.address,
+      customerAddress:
+        rawPayload.deliveryAddress || rawPayload.customer?.address,
       notes: rawPayload.customerNote || rawPayload.note,
       items,
       totalAmount: rawPayload.totalPrice || rawPayload.totalAmount || 0,
       discount: rawPayload.discountAmount || rawPayload.discount || 0,
-      finalAmount: rawPayload.paymentAmount || rawPayload.finalAmount || rawPayload.totalPrice || 0,
+      finalAmount:
+        rawPayload.paymentAmount ||
+        rawPayload.finalAmount ||
+        rawPayload.totalPrice ||
+        0,
       rawPayload,
     };
   }
@@ -146,7 +156,7 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     const credentials = config.credentials as any;
     await this.request({
-      method: 'PUT',
+      method: "PUT",
       url: `/v2/chains/${credentials.chainCode}/catalog`,
       headers: this.getAuthHeaders(config.accessToken!),
       data: { items },
@@ -160,7 +170,7 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
   ): Promise<void> {
     const credentials = config.credentials as any;
     await this.request({
-      method: 'PUT',
+      method: "PUT",
       url: `/v2/chains/${credentials.chainCode}/vendors/${credentials.posVendorId}/catalog/items/availability`,
       headers: this.getAuthHeaders(config.accessToken!),
       data: {
@@ -172,7 +182,7 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
   async openRestaurant(config: DeliveryPlatformConfig): Promise<void> {
     const credentials = config.credentials as any;
     await this.request({
-      method: 'PUT',
+      method: "PUT",
       url: `/v2/vendors/${credentials.posVendorId}/status`,
       headers: this.getAuthHeaders(config.accessToken!),
       data: { isOpen: true },
@@ -182,7 +192,7 @@ export class YemeksepetiAdapter extends BaseAdapter implements PlatformAdapter {
   async closeRestaurant(config: DeliveryPlatformConfig): Promise<void> {
     const credentials = config.credentials as any;
     await this.request({
-      method: 'PUT',
+      method: "PUT",
       url: `/v2/vendors/${credentials.posVendorId}/status`,
       headers: this.getAuthHeaders(config.accessToken!),
       data: { isOpen: false },

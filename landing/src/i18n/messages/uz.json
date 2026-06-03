@@ -9,6 +9,7 @@
     "features": "Xususiyatlar",
     "pricing": "Narxlar",
     "security": "Xavfsizlik",
+    "store": "Do'kon",
     "signIn": "Kirish",
     "startFree": "Bepul boshlash",
     "openMenu": "Menyuni ochish",
@@ -284,8 +285,8 @@
   "footer": {
     "description": "Zamonaviy restoran boshqaruv platformasi. Operatsiyalarni soddalashtiring, mijozlarni mamnun qiling.",
     "contact": "Aloqa",
-    "address": "Bosna Hersek Mahallesi, Akif Sokak, No.3 Selçuklu, Konya",
-    "phone": "+90 506 068 71 00",
+    "address": "Şehit Osman Avcı Mahallesi, Akın 688 Sitesi B32, Etimesgut / Ankara",
+    "phone": "+90 850 840 73 03",
     "product": "Mahsulot",
     "company": "Kompaniya",
     "support": "Qo'llab-quvvatlash",
@@ -294,6 +295,7 @@
       "features": "Xususiyatlar",
       "pricing": "Narxlar",
       "security": "Xavfsizlik",
+      "shop": "Jihozlar do'koni",
       "integrations": "Integratsiyalar",
       "about": "Haqida",
       "blog": "Blog",
@@ -429,12 +431,81 @@
       }
     }
   },
+  "store": {
+    "title": "POS jihozlari do'koni",
+    "subtitle": "Restoran, kafe va chakana savdo uchun tanlangan kassa terminallari, termal printerlar, KDS ekranlari, skanerlar va aksessuarlar.",
+    "backToHome": "Bosh sahifaga qaytish",
+    "headerBadge": "May 2026 narxlari",
+    "categoryAll": "Hammasi",
+    "categories": {
+      "yazarkasa": "Fiskal POS",
+      "pos_terminal": "POS Terminal",
+      "printer": "Printer",
+      "kds_screen": "KDS ekrani",
+      "tablet": "Planshet",
+      "scanner": "Shtrix-kod skaneri",
+      "caller_id": "Qo'ng'iroq identifikatori",
+      "cash_drawer": "Pul yashigi",
+      "bridge": "Tarmoq ko'prigi",
+      "scale": "Tarozi",
+      "cable": "Kabel",
+      "accessory": "Aksessuar",
+      "service": "Xizmat"
+    },
+    "buy": "Buyurtma berish",
+    "viewSource": "Ishlab chiqaruvchi sahifasi",
+    "from": "{currency}{amount}",
+    "warrantyMonths": "{months} oy kafolat",
+    "rentalFrom": "yoki {currency}{amount}/oy ijaraga",
+    "gibCertified": "GİB sertifikatlangan",
+    "outOfStock": "Sotuvda yo'q",
+    "discontinued": "Ishlab chiqarish to'xtatilgan",
+    "preorder": "Oldindan buyurtma",
+    "empty": "Bu turkumda hozircha mahsulotlar yo'q.",
+    "loadError": "Mahsulotlarni yuklab bo'lmadi. Birozdan keyin qayta urinib ko'ring.",
+    "byo": {
+      "title": "Sizda jihoz bormi?",
+      "body": "Mavjud fiskal POS, termal printer, KDS ekrani yoki shtrix-kod skaneringizni tizimimizga integratsiya qila olamiz — yangi jihoz sotib olish shart emas. Ro'yxatdan o'tgandan keyin brend va modelni qo'llab-quvvatlash jamoamizga ayting.",
+      "cta": "Qo'llab-quvvatlash bilan bog'lanish"
+    },
+    "gibFootnote": "Turkiya yangi avlod fiskal POS qurilmalari (YN ÖKC) GİB ro'yxatida bo'lishi va vakolatli diler orqali faollashtirilishi shart. HummyTummy orqali buyurtma bersangiz, faollashtirish so'rovi avtomatik ochiladi.",
+    "viewDetails": "Tafsilotlar",
+    "services": {
+      "sectionTitle": "O'rnatish va integratsiya xizmatlari",
+      "sectionSubtitle": "Uskuna o'rnatish, GİB ro'yxatga olish, Yemeksepeti/Trendyol integratsiyasi, menyu ko'chirish — joyda yoki masofadan, har bir paket shaffof."
+    },
+    "detail": {
+      "backToStore": "Do'konga qaytish",
+      "buy": "Buyurtma",
+      "duration": "Davomiyligi",
+      "coverage": "Xizmat hududlari",
+      "onsite": "Joyida",
+      "remote": "Masofadan",
+      "consultation": "Konsultatsiya",
+      "requiresBranch": "Filial kerak",
+      "lowStock": "Faqat {n} qoldi",
+      "warrantyMonthsLabel": "{months} oy kafolat",
+      "noDetailsAuthored": "Batafsil ma'lumot hali kiritilmagan.",
+      "empty": "Ma'lumot yo'q.",
+      "tabs": {
+        "description": "Tavsif",
+        "specs": "Xususiyatlar",
+        "compat": "Mosligi",
+        "requirements": "Talablar",
+        "faq": "Savol-javob",
+        "includes": "Kiritilgan",
+        "steps": "Jarayon"
+      }
+    }
+  },
   "contact": {
     "title": "Aloqa",
     "subtitle": "Savollar, so'rovlar va izohlaringiz uchun biz bilan bog'laning.",
     "backToHome": "Bosh sahifaga qaytish",
+    "phone": "+90 850 840 73 03",
     "labels": {
-      "email": "Email"
+      "email": "Email",
+      "phone": "Telefon"
     },
     "sections": {
       "general": {
@@ -461,6 +532,27 @@
           "privacy": "Maxfiylik siyosati",
           "terms": "Foydalanish shartlari"
         }
+      }
+    },
+    "form": {
+      "title": "Bizga xabar yuboring",
+      "submit": "Xabarni yuborish",
+      "submitting": "Yuborilmoqda…",
+      "honeypotLabel": "Veb-sayt (bo‘sh qoldiring)",
+      "successMessage": "Rahmat — ikki ish kuni ichida javob beramiz.",
+      "fields": {
+        "name": "Ism",
+        "email": "Elektron pochta",
+        "phone": "Telefon",
+        "message": "Xabar",
+        "optional": "ixtiyoriy"
+      },
+      "errors": {
+        "nameTooShort": "Ism kamida 2 ta belgidan iborat bo‘lishi kerak.",
+        "emailInvalid": "To‘g‘ri elektron pochta manzilini kiriting.",
+        "messageTooShort": "Xabar kamida 10 ta belgidan iborat bo‘lishi kerak.",
+        "network": "Ulanish muammosi — qaytadan urinib ko‘ring.",
+        "generic": "Xabar yuborilmadi. Iltimos, qaytadan urinib ko‘ring."
       }
     }
   }

@@ -58,8 +58,251 @@
     "personnel": "Personel",
     "stock": "Stok",
     "invoices": "Faturalar",
+    "devices": "Cihazlar",
+    "branches": "Şubeler",
+    "health": "Şube Sağlığı",
+    "marketplace": "Eklenti Pazarı",
+    "store": "Donanım Mağazası",
+    "bridges": "Yerel Köprüler",
+    "webhooks": "Webhook'lar",
+    "fiscalRecovery": "Fiş Kurtarma",
+    "callerFeed": "Çağrı Akışı",
+    "hardwareOrders": "Donanım Siparişlerim",
+    "planAndAccess": "Plan & Erişim",
+    "sections": {
+      "business": "İşletme",
+      "menuAndTables": "Menü & Masa",
+      "operation": "Operasyon",
+      "multiBranch": "Çoklu Şube",
+      "marketplace": "Pazaryeri",
+      "planAndAccess": "Ayarlar & Erişim"
+    },
     "expandSidebar": "Kenar Çubuğunu Genişlet",
     "collapseSidebar": "Kenar Çubuğunu Daralt"
+  },
+  "hummytummy": {
+    "common": {
+      "loading": "Yükleniyor…",
+      "empty": "Henüz bir şey yok.",
+      "save": "Kaydet",
+      "cancel": "İptal",
+      "retire": "Emekliye Ayır",
+      "remove": "Kaldır"
+    },
+    "devices": {
+      "title": "Cihazlar",
+      "create": "Cihaz Slotu Oluştur",
+      "showRetired": "Emekli cihazları göster",
+      "empty": "Henüz cihaz yok. İlk cihazınızı eklemek için \"Cihaz Slotu Oluştur\" butonuna tıklayın.",
+      "col": {
+        "kind": "Tür",
+        "status": "Durum",
+        "pairCode": "Eşleştirme Kodu",
+        "capabilities": "Yetenekler",
+        "lastSeen": "Son Görülme"
+      },
+      "confirmRetire": "Bu cihaz emekliye ayrılsın mı?",
+      "kind": {
+        "kds_screen": "KDS ekranı",
+        "tablet_waiter": "Garson tableti",
+        "tablet_customer": "Müşteri tableti",
+        "receipt_printer": "Fiş yazıcısı",
+        "kitchen_printer": "Mutfak yazıcısı",
+        "pos_terminal": "POS terminali",
+        "yazarkasa": "Yazarkasa",
+        "caller_id": "Arayan ID",
+        "scanner": "Barkod okuyucu",
+        "local_bridge": "Yerel Köprü"
+      }
+    },
+    "marketplace": {
+      "title": "Eklenti Pazarı",
+      "subtitle": "Aboneliğinizi eklentilerle genişletin. Anında devreye girer.",
+      "filter": { "all": "Tümü", "software": "Yazılım", "integration": "Entegrasyonlar", "capacity": "Kapasite", "support": "Destek" },
+      "purchase": "Satın Al",
+      "mine": "Eklentileriniz",
+      "mineEmpty": "Aktif eklentiniz yok.",
+      "requires": "Gerektirir:",
+      "col": {
+        "addOn": "Eklenti",
+        "quantity": "Adet",
+        "status": "Durum",
+        "periodEnds": "Dönem Bitişi"
+      },
+      "cancelAtPeriodEnd": "dönem sonunda iptal edilecek"
+    },
+    "store": {
+      "title": "Donanım Mağazası",
+      "category": { "all": "Tüm kategoriler" },
+      "empty": "Bu kategoride ürün yok.",
+      "addToCart": "Sepete Ekle",
+      "outOfStock": "Stokta Yok",
+      "warranty": "{{months}} ay garanti",
+      "cart": {
+        "title": "Sepet",
+        "empty": "Sepetiniz boş.",
+        "getQuote": "Fiyat Al",
+        "pricing": "Fiyatlanıyor…",
+        "subtotal": "Ara Toplam",
+        "tax": "Vergi",
+        "shipping": "Kargo",
+        "total": "Toplam",
+        "place": "Siparişi Tamamla",
+        "placing": "Gönderiliyor…"
+      }
+    },
+    "health": {
+      "title": "Şube Sağlığı",
+      "subtitle": "Cihaz online %, son fiş ve son sipariş bileşimi. 30 saniyede bir yenilenir.",
+      "empty": "Aktif şube yok.",
+      "score": "{{score}} / 100",
+      "devicesOnline": "Cihaz Online",
+      "fiscalAge": "Son Fiş",
+      "orderAge": "Son Sipariş"
+    },
+    "branches": {
+      "title": "Şubeler",
+      "name": "Ad",
+      "code": "Kod",
+      "timezone": "Zaman Dilimi",
+      "status": "Durum",
+      "created": "Oluşturuldu",
+      "add": "Şube Ekle"
+    },
+    "webhooks": {
+      "title": "Webhook'lar",
+      "subtitle": "HTTPS endpoint'inizi HummyTummy olaylarına abone edin. Tüm istekler HMAC-SHA256 + zaman damgası ile imzalanır. Art arda 20 başarısız teslim sonrası otomatik duraklatılır.",
+      "newSubscription": "Yeni abonelik",
+      "urlPlaceholder": "https://sunucunuz.example.com/hummytummy-webhook",
+      "events": "Olaylar",
+      "create": "Abonelik oluştur",
+      "yours": "Abonelikleriniz",
+      "noSubscriptions": "Aboneliğiniz yok.",
+      "col": { "url": "URL", "events": "Olaylar", "status": "Durum", "lastDelivery": "Son Teslim" },
+      "revoke": "İptal et",
+      "createdBanner": "Abonelik oluşturuldu.",
+      "secretWarning": "Aşağıda imzalama secret'ı var. Şimdi kopyala — tekrar göstermeyeceğiz.",
+      "copiedIt": "Kopyaladım",
+      "failures": "hata"
+    },
+    "bridges": {
+      "title": "Yerel Köprüler",
+      "newBridge": "Yeni köprü",
+      "provision": "Hazırla",
+      "branch": "Şube",
+      "selectBranch": "— seçin —",
+      "sku": "SKU",
+      "hostname": "Hostname (opsiyonel)",
+      "createdBanner": "Köprü hazırlandı.",
+      "tokenWarning": "Token (tek kullanımlık) — şimdi kopyala ve cihaza gir:",
+      "list": "Köprüler",
+      "noBridges": "Henüz hazırlanmış köprü yok.",
+      "col": { "branch": "Şube", "sku": "SKU", "hostname": "Hostname", "status": "Durum", "lastSeen": "Son Görülme" },
+      "confirmRetire": "Bu köprü emekliye ayrılsın mı?",
+      "retire": "Emekliye Ayır"
+    },
+    "fiscalRecovery": {
+      "title": "Fiş Kurtarma",
+      "subtitle": "Sırada bekleyen + başarısız fişler. Yeniden deneme orijinal idempotency key'i kullanır, bu yüzden cihaz çift fiş bastıramaz.",
+      "refresh": "Yenile",
+      "empty": "Bekleyen veya başarısız fiş yok. 🎉",
+      "col": {
+        "created": "Oluşturuldu",
+        "provider": "Sağlayıcı",
+        "order": "Sipariş",
+        "status": "Durum",
+        "total": "Toplam",
+        "lastError": "Son Hata"
+      },
+      "retry": "Yeniden Dene"
+    },
+    "callerFeed": {
+      "title": "Telefon Çağrıları",
+      "subtitle": "Gelen arayan-ID olayları. Her 10 saniyede güncellenir.",
+      "empty": "Henüz çağrı olayı yok. Arayan-ID cihazı eşleştirin veya pazardan VoIP entegrasyonu etkinleştirin.",
+      "col": {
+        "time": "Zaman",
+        "provider": "Sağlayıcı",
+        "kind": "Tür",
+        "phone": "Telefon",
+        "customer": "Müşteri",
+        "duration": "Süre",
+        "order": "Sipariş"
+      },
+      "view": "Görüntüle",
+      "unmatched": "eşleşmedi",
+      "open": "Aç"
+    },
+    "setupChecklist": {
+      "title": "Restoranınızı kurun",
+      "items": {
+        "branch": "En az bir şube oluşturun",
+        "kds": "Bir mutfak ekranı eşleştirin",
+        "tablet": "En az bir garson tableti eşleştirin",
+        "bridge": "Bir Yerel Köprü (HummyBox) bağlayın",
+        "fiscal": "Bir mali sağlayıcı bağlayın"
+      },
+      "goTo": "{{label}} sayfasına git →"
+    },
+    "reportsBranchFilter": {
+      "label": "Şube",
+      "all": "Tüm şubeler"
+    },
+    "superAdminMarketplace": {
+      "title": "Pazar Yönetimi",
+      "tabs": { "addons": "Eklentiler", "products": "Donanım" },
+      "addons": {
+        "title": "Eklenti kataloğu",
+        "new": "Yeni eklenti",
+        "edit": "Düzenle",
+        "publish": "Yayınla",
+        "archive": "Arşivle",
+        "confirmArchive": "\"{{code}}\" eklentisi arşivlensin mi?",
+        "form": {
+          "newTitle": "Yeni eklenti",
+          "editTitle": "Eklentiyi düzenle",
+          "code": "Kod",
+          "name": "Ad",
+          "kind": "Tür",
+          "billing": "Faturalama",
+          "priceCents": "Fiyat (kuruş)",
+          "currency": "Para birimi",
+          "status": "Durum",
+          "deps": "Bağımlılıklar (virgülle; plan:PRO veya eklenti kodu)",
+          "description": "Açıklama",
+          "grants": "Yetkiler (JSON)",
+          "cancel": "İptal",
+          "create": "Oluştur",
+          "save": "Kaydet",
+          "grantsInvalid": "yetkiler geçerli JSON olmalı"
+        }
+      },
+      "products": {
+        "title": "Donanım kataloğu",
+        "new": "Yeni SKU",
+        "receiveStock": "Stok ekle",
+        "receiveStockPrompt": "Kaç adet ekleniyor?",
+        "publish": "Yayınla",
+        "archive": "Arşivle",
+        "confirmArchive": "\"{{sku}}\" SKU'su arşivlensin mi?",
+        "form": {
+          "title": "Yeni donanım SKU",
+          "sku": "SKU",
+          "name": "Ad",
+          "category": "Kategori",
+          "brand": "Marka",
+          "model": "Model",
+          "priceCents": "Fiyat (kuruş)",
+          "rental": "Aylık kira (kuruş, opsiyonel)",
+          "currency": "Para birimi",
+          "warranty": "Garanti (ay)",
+          "status": "Durum",
+          "description": "Açıklama",
+          "cancel": "İptal",
+          "create": "Oluştur"
+        }
+      }
+    }
   },
   "header": {
     "notifications": "Bildirimler",

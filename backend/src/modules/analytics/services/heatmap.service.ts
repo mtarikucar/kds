@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { HeatmapMetric, HeatmapGranularity } from '../enums/analytics.enum';
+import { Injectable, Logger } from "@nestjs/common";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { HeatmapMetric, HeatmapGranularity } from "../enums/analytics.enum";
 import {
   HeatmapResponseDto,
   HeatmapCellDto,
@@ -8,7 +8,7 @@ import {
   TrafficFlowPathDto,
   CongestionResponseDto,
   CongestionPointDto,
-} from '../dto';
+} from "../dto";
 
 interface HeatmapOptions {
   metric?: HeatmapMetric;
@@ -24,7 +24,7 @@ interface HeatmapOptions {
 const MAX_GRID_DIMENSION = 100;
 
 function clampGridDim(v: number | undefined, fallback: number): number {
-  if (typeof v !== 'number' || !Number.isFinite(v) || v < 1) return fallback;
+  if (typeof v !== "number" || !Number.isFinite(v) || v < 1) return fallback;
   return Math.min(Math.floor(v), MAX_GRID_DIMENSION);
 }
 
@@ -39,9 +39,10 @@ export class HeatmapService {
    */
   async getOccupancyHeatmap(
     tenantId: string,
+    branchId: string,
     startDate: Date,
     endDate: Date,
-    options: HeatmapOptions = {}
+    options: HeatmapOptions = {},
   ): Promise<HeatmapResponseDto> {
     const {
       granularity = HeatmapGranularity.HOURLY,
@@ -57,10 +58,11 @@ export class HeatmapService {
     // Check cache first
     const cached = await this.getCachedHeatmap(
       tenantId,
+      branchId,
       startDate,
       endDate,
       HeatmapMetric.OCCUPANCY,
-      granularity
+      granularity,
     );
     if (cached) {
       return cached;
@@ -89,8 +91,12 @@ export class HeatmapService {
 
     // Aggregate data into grid cells
     for (const record of records) {
-      const cellX = Math.floor((record.positionX + offsetX * cellSize) / cellSize);
-      const cellZ = Math.floor((record.positionZ + offsetZ * cellSize) / cellSize);
+      const cellX = Math.floor(
+        (record.positionX + offsetX * cellSize) / cellSize,
+      );
+      const cellZ = Math.floor(
+        (record.positionZ + offsetZ * cellSize) / cellSize,
+      );
 
       if (cellX >= 0 && cellX < gridWidth && cellZ >= 0 && cellZ < gridDepth) {
         grid[cellZ][cellX]++;
@@ -101,7 +107,12 @@ export class HeatmapService {
     const { normalizedGrid, maxValue, minValue } = this.normalizeGrid(grid);
 
     // Find hotspots
-    const hotspots = this.findHotspots(normalizedGrid, cellSize, offsetX, offsetZ);
+    const hotspots = this.findHotspots(
+      normalizedGrid,
+      cellSize,
+      offsetX,
+      offsetZ,
+    );
 
     const response: HeatmapResponseDto = {
       metric: HeatmapMetric.OCCUPANCY,
@@ -118,7 +129,7 @@ export class HeatmapService {
     };
 
     // Cache the result
-    await this.cacheHeatmap(tenantId, response, granularity);
+    await this.cacheHeatmap(tenantId, branchId, response, granularity);
 
     return response;
   }
@@ -128,9 +139,10 @@ export class HeatmapService {
    */
   async getTrafficHeatmap(
     tenantId: string,
+    branchId: string,
     startDate: Date,
     endDate: Date,
-    options: HeatmapOptions = {}
+    options: HeatmapOptions = {},
   ): Promise<HeatmapResponseDto> {
     const {
       granularity = HeatmapGranularity.HOURLY,
@@ -146,10 +158,11 @@ export class HeatmapService {
     // Check cache first
     const cached = await this.getCachedHeatmap(
       tenantId,
+      branchId,
       startDate,
       endDate,
       HeatmapMetric.TRAFFIC,
-      granularity
+      granularity,
     );
     if (cached) {
       return cached;
@@ -176,7 +189,12 @@ export class HeatmapService {
 
     // Aggregate data
     for (const record of records) {
-      if (record.cellX >= 0 && record.cellX < gridWidth && record.cellZ >= 0 && record.cellZ < gridDepth) {
+      if (
+        record.cellX >= 0 &&
+        record.cellX < gridWidth &&
+        record.cellZ >= 0 &&
+        record.cellZ < gridDepth
+      ) {
         grid[record.cellZ][record.cellX] += record.personCount;
       }
     }
@@ -185,7 +203,12 @@ export class HeatmapService {
     const { normalizedGrid, maxValue, minValue } = this.normalizeGrid(grid);
 
     // Find hotspots
-    const hotspots = this.findHotspots(normalizedGrid, cellSize, gridWidth / 2, gridDepth / 2);
+    const hotspots = this.findHotspots(
+      normalizedGrid,
+      cellSize,
+      gridWidth / 2,
+      gridDepth / 2,
+    );
 
     const response: HeatmapResponseDto = {
       metric: HeatmapMetric.TRAFFIC,
@@ -202,7 +225,7 @@ export class HeatmapService {
     };
 
     // Cache the result
-    await this.cacheHeatmap(tenantId, response, granularity);
+    await this.cacheHeatmap(tenantId, branchId, response, granularity);
 
     return response;
   }
@@ -214,7 +237,7 @@ export class HeatmapService {
     tenantId: string,
     startDate: Date,
     endDate: Date,
-    options: HeatmapOptions = {}
+    options: HeatmapOptions = {},
   ): Promise<HeatmapResponseDto> {
     const {
       granularity = HeatmapGranularity.HOURLY,
@@ -251,24 +274,33 @@ export class HeatmapService {
 
     // Aggregate data (weighted by person count)
     for (const record of records) {
-      if (record.cellX >= 0 && record.cellX < gridWidth && record.cellZ >= 0 && record.cellZ < gridDepth) {
-        dwellGrid[record.cellZ][record.cellX] += (record.avgDwellTime || 0) * record.personCount;
+      if (
+        record.cellX >= 0 &&
+        record.cellX < gridWidth &&
+        record.cellZ >= 0 &&
+        record.cellZ < gridDepth
+      ) {
+        dwellGrid[record.cellZ][record.cellX] +=
+          (record.avgDwellTime || 0) * record.personCount;
         countGrid[record.cellZ][record.cellX] += record.personCount;
       }
     }
 
     // Calculate weighted average
     const grid = dwellGrid.map((row, z) =>
-      row.map((val, x) =>
-        countGrid[z][x] > 0 ? val / countGrid[z][x] : 0
-      )
+      row.map((val, x) => (countGrid[z][x] > 0 ? val / countGrid[z][x] : 0)),
     );
 
     // Normalize data
     const { normalizedGrid, maxValue, minValue } = this.normalizeGrid(grid);
 
     // Find hotspots
-    const hotspots = this.findHotspots(normalizedGrid, cellSize, gridWidth / 2, gridDepth / 2);
+    const hotspots = this.findHotspots(
+      normalizedGrid,
+      cellSize,
+      gridWidth / 2,
+      gridDepth / 2,
+    );
 
     return {
       metric: HeatmapMetric.DWELL_TIME,
@@ -292,7 +324,7 @@ export class HeatmapService {
     tenantId: string,
     startDate: Date,
     endDate: Date,
-    limit: number = 50
+    limit: number = 50,
   ): Promise<TrafficFlowResponseDto> {
     // Get unique tracking IDs within time range
     const trackingIds = await this.prisma.occupancyRecord.findMany({
@@ -302,12 +334,12 @@ export class HeatmapService {
           gte: startDate,
           lte: endDate,
         },
-        state: 'MOVING',
+        state: "MOVING",
       },
       select: {
         trackingId: true,
       },
-      distinct: ['trackingId'],
+      distinct: ["trackingId"],
       take: limit,
     });
 
@@ -330,18 +362,20 @@ export class HeatmapService {
           timestamp: true,
         },
         orderBy: {
-          timestamp: 'asc',
+          timestamp: "asc",
         },
       });
 
       if (points.length >= 2) {
         const firstPoint = points[0];
         const lastPoint = points[points.length - 1];
-        const duration = (lastPoint.timestamp.getTime() - firstPoint.timestamp.getTime()) / 1000;
+        const duration =
+          (lastPoint.timestamp.getTime() - firstPoint.timestamp.getTime()) /
+          1000;
 
         paths.push({
           trackingId,
-          points: points.map(p => ({
+          points: points.map((p) => ({
             x: p.positionX,
             z: p.positionZ,
             timestamp: p.timestamp,
@@ -353,9 +387,10 @@ export class HeatmapService {
 
     // Calculate summary statistics
     const totalVisitors = trackingIds.length;
-    const avgDwellTime = paths.length > 0
-      ? paths.reduce((sum, p) => sum + p.duration, 0) / paths.length
-      : 0;
+    const avgDwellTime =
+      paths.length > 0
+        ? paths.reduce((sum, p) => sum + p.duration, 0) / paths.length
+        : 0;
 
     return {
       startTime: startDate,
@@ -372,7 +407,7 @@ export class HeatmapService {
   async getCongestionAnalysis(
     tenantId: string,
     startDate: Date,
-    endDate: Date
+    endDate: Date,
   ): Promise<CongestionResponseDto> {
     // Get traffic flow data with high dwell times
     const records = await this.prisma.trafficFlowRecord.findMany({
@@ -393,15 +428,18 @@ export class HeatmapService {
     });
 
     // Aggregate by cell
-    const cellData = new Map<string, {
-      x: number;
-      z: number;
-      totalPersons: number;
-      totalDwell: number;
-      count: number;
-      peakHour: number;
-      peakCount: number;
-    }>();
+    const cellData = new Map<
+      string,
+      {
+        x: number;
+        z: number;
+        totalPersons: number;
+        totalDwell: number;
+        count: number;
+        peakHour: number;
+        peakCount: number;
+      }
+    >();
 
     for (const record of records) {
       const key = `${record.cellX},${record.cellZ}`;
@@ -445,7 +483,7 @@ export class HeatmapService {
       const trafficScore = Math.min(avgPersons / 50, 1); // Normalize to 0-1
       const dwellScore = Math.min(avgDwell / 120, 1); // 2 minutes = max
 
-      const severity = (trafficScore * 0.6 + dwellScore * 0.4);
+      const severity = trafficScore * 0.6 + dwellScore * 0.4;
 
       if (severity > 0.5) {
         congestionPoints.push({
@@ -463,21 +501,26 @@ export class HeatmapService {
     congestionPoints.sort((a, b) => b.severity - a.severity);
 
     // Calculate overall score (inverse - lower is better)
-    const overallScore = congestionPoints.length > 0
-      ? Math.round((1 - totalSeverity / congestionPoints.length) * 100)
-      : 100;
+    const overallScore =
+      congestionPoints.length > 0
+        ? Math.round((1 - totalSeverity / congestionPoints.length) * 100)
+        : 100;
 
     // Generate recommendations
     const recommendations: string[] = [];
     if (congestionPoints.length > 0) {
-      recommendations.push('Consider widening high-traffic pathways');
-      recommendations.push('Implement a queue management system during peak hours');
+      recommendations.push("Consider widening high-traffic pathways");
+      recommendations.push(
+        "Implement a queue management system during peak hours",
+      );
     }
-    if (congestionPoints.some(p => p.peakHour >= 12 && p.peakHour <= 14)) {
-      recommendations.push('Add staff during lunch rush (12:00-14:00)');
+    if (congestionPoints.some((p) => p.peakHour >= 12 && p.peakHour <= 14)) {
+      recommendations.push("Add staff during lunch rush (12:00-14:00)");
     }
-    if (congestionPoints.some(p => p.peakHour >= 18 && p.peakHour <= 21)) {
-      recommendations.push('Consider reservation-only dining during dinner peak');
+    if (congestionPoints.some((p) => p.peakHour >= 18 && p.peakHour <= 21)) {
+      recommendations.push(
+        "Consider reservation-only dining during dinner peak",
+      );
     }
 
     return {
@@ -490,7 +533,9 @@ export class HeatmapService {
   // Private helper methods
 
   private initializeGrid(width: number, depth: number): number[][] {
-    return Array(depth).fill(null).map(() => Array(width).fill(0));
+    return Array(depth)
+      .fill(null)
+      .map(() => Array(width).fill(0));
   }
 
   private normalizeGrid(grid: number[][]): {
@@ -511,8 +556,8 @@ export class HeatmapService {
     if (minValue === Infinity) minValue = 0;
 
     const range = maxValue - minValue || 1;
-    const normalizedGrid = grid.map(row =>
-      row.map(val => val > 0 ? (val - minValue) / range : 0)
+    const normalizedGrid = grid.map((row) =>
+      row.map((val) => (val > 0 ? (val - minValue) / range : 0)),
     );
 
     return { normalizedGrid, maxValue, minValue };
@@ -523,7 +568,7 @@ export class HeatmapService {
     cellSize: number,
     offsetX: number,
     offsetZ: number,
-    threshold: number = 0.7
+    threshold: number = 0.7,
   ): HeatmapCellDto[] {
     const hotspots: HeatmapCellDto[] = [];
 
@@ -544,20 +589,22 @@ export class HeatmapService {
 
   private async getCachedHeatmap(
     tenantId: string,
+    branchId: string,
     startTime: Date,
     endTime: Date,
     metric: HeatmapMetric,
-    granularity: HeatmapGranularity
+    granularity: HeatmapGranularity,
   ): Promise<HeatmapResponseDto | null> {
-    const cached = await this.prisma.analyticsHeatmapCache.findUnique({
+    // v3.0.0 — branchId is not part of the @@unique key, so we filter by
+    // findFirst (per-branch) to avoid cross-branch cache collisions.
+    const cached = await this.prisma.analyticsHeatmapCache.findFirst({
       where: {
-        tenantId_startTime_endTime_granularity_metric: {
-          tenantId,
-          startTime,
-          endTime,
-          granularity,
-          metric,
-        },
+        tenantId,
+        branchId,
+        startTime,
+        endTime,
+        granularity,
+        metric,
       },
     });
 
@@ -581,44 +628,63 @@ export class HeatmapService {
 
   private async cacheHeatmap(
     tenantId: string,
+    branchId: string,
     heatmap: HeatmapResponseDto,
-    granularity: HeatmapGranularity
+    granularity: HeatmapGranularity,
   ): Promise<void> {
-    const ttlHours = granularity === HeatmapGranularity.HOURLY ? 1 :
-                     granularity === HeatmapGranularity.DAILY ? 6 : 24;
+    const ttlHours =
+      granularity === HeatmapGranularity.HOURLY
+        ? 1
+        : granularity === HeatmapGranularity.DAILY
+          ? 6
+          : 24;
 
     const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
 
-    await this.prisma.analyticsHeatmapCache.upsert({
+    // v3.0.0 — branchId is not part of the @@unique composite, so an
+    // upsert keyed on (tenantId, startTime, endTime, granularity, metric)
+    // would collide across branches. Use findFirst + update/create so
+    // each branch keeps its own cache row.
+    const existing = await this.prisma.analyticsHeatmapCache.findFirst({
       where: {
-        tenantId_startTime_endTime_granularity_metric: {
-          tenantId,
-          startTime: heatmap.startTime,
-          endTime: heatmap.endTime,
-          granularity: heatmap.granularity,
-          metric: heatmap.metric,
-        },
-      },
-      update: {
-        heatmapData: heatmap.data,
-        maxValue: heatmap.maxValue,
-        minValue: heatmap.minValue,
-        expiresAt,
-      },
-      create: {
         tenantId,
+        branchId,
         startTime: heatmap.startTime,
         endTime: heatmap.endTime,
         granularity: heatmap.granularity,
         metric: heatmap.metric,
-        gridWidth: heatmap.gridWidth,
-        gridDepth: heatmap.gridDepth,
-        cellSize: heatmap.cellSize,
-        heatmapData: heatmap.data,
-        maxValue: heatmap.maxValue,
-        minValue: heatmap.minValue,
-        expiresAt,
       },
+      select: { id: true },
     });
+
+    if (existing) {
+      await this.prisma.analyticsHeatmapCache.update({
+        where: { id: existing.id },
+        data: {
+          heatmapData: heatmap.data,
+          maxValue: heatmap.maxValue,
+          minValue: heatmap.minValue,
+          expiresAt,
+        },
+      });
+    } else {
+      await this.prisma.analyticsHeatmapCache.create({
+        data: {
+          tenantId,
+          branchId,
+          startTime: heatmap.startTime,
+          endTime: heatmap.endTime,
+          granularity: heatmap.granularity,
+          metric: heatmap.metric,
+          gridWidth: heatmap.gridWidth,
+          gridDepth: heatmap.gridDepth,
+          cellSize: heatmap.cellSize,
+          heatmapData: heatmap.data,
+          maxValue: heatmap.maxValue,
+          minValue: heatmap.minValue,
+          expiresAt,
+        },
+      });
+    }
   }
 }

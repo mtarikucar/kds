@@ -20,6 +20,7 @@ const navigation = [
   { name: 'Tenants', href: '/superadmin/tenants', icon: Building2 },
   { name: 'Users', href: '/superadmin/users', icon: Users },
   { name: 'Plans', href: '/superadmin/plans', icon: Layers },
+  { name: 'Marketplace', href: '/superadmin/marketplace', icon: Layers },
   { name: 'Subscriptions', href: '/superadmin/subscriptions', icon: CreditCard },
   { name: 'Audit Logs', href: '/superadmin/audit-logs', icon: FileText },
   { name: 'Settings', href: '/superadmin/settings', icon: Settings },

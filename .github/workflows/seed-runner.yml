@@ -49,9 +49,15 @@ jobs:
 
     steps:
       - name: Confirm input
+        # `environment` is a choice input (GitHub validates the set), so
+        # injection-safe; `confirm` is free-form string and must be piped
+        # via env: so a hostile payload can't break out of the [[ ]] test.
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          ENVIRONMENT: ${{ inputs.environment }}
         run: |
-          if [[ "${{ inputs.confirm }}" != "${{ inputs.environment }}" ]]; then
-            echo "::error::confirm input must match environment: '${{ inputs.environment }}'"
+          if [[ "$CONFIRM" != "$ENVIRONMENT" ]]; then
+            echo "::error::confirm input must match environment: '$ENVIRONMENT'"
             exit 1
           fi
 

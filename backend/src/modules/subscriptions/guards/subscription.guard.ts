@@ -1,8 +1,13 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { REQUIRES_ACTIVE_SUBSCRIPTION_KEY } from '../decorators/requires-active-subscription.decorator';
-import { IS_PUBLIC_KEY } from '../../auth/decorators/public.decorator';
-import { SubscriptionService } from '../services/subscription.service';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { REQUIRES_ACTIVE_SUBSCRIPTION_KEY } from "../decorators/requires-active-subscription.decorator";
+import { IS_PUBLIC_KEY } from "../../auth/decorators/public.decorator";
+import { SubscriptionService } from "../services/subscription.service";
 
 @Injectable()
 export class SubscriptionGuard implements CanActivate {
@@ -36,15 +41,19 @@ export class SubscriptionGuard implements CanActivate {
     const user = request.user;
 
     if (!user || !user.tenantId) {
-      throw new ForbiddenException('User not authenticated or tenant not found');
+      throw new ForbiddenException(
+        "User not authenticated or tenant not found",
+      );
     }
 
     // Check if subscription is active
-    const isActive = await this.subscriptionService.isSubscriptionActive(user.tenantId);
+    const isActive = await this.subscriptionService.isSubscriptionActive(
+      user.tenantId,
+    );
 
     if (!isActive) {
       throw new ForbiddenException(
-        'Your subscription has expired or is inactive. Please renew your subscription to continue.',
+        "Your subscription has expired or is inactive. Please renew your subscription to continue.",
       );
     }
 

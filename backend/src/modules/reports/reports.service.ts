@@ -1,8 +1,24 @@
-import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
-import { OrderStatus } from '../../common/constants/order-status.enum';
-import { getTenantMidnight } from '../../common/helpers/timezone.helper';
+import { BadRequestException, Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../prisma/prisma.service";
+import { OrderStatus } from "../../common/constants/order-status.enum";
+import { getTenantMidnight } from "../../common/helpers/timezone.helper";
+
+/**
+ * Hard cap on the explicit date window a single report call can request.
+ * Everything past the cap is rejected at getDateRange.
+ *
+ * getSalesSummary / getOrdersByHour / getCustomerAnalytics all run
+ * findMany over PAID Orders inside the window and bucket in JS. A
+ * tenant with even modest order volume (1K/day) hits 366K rows for a
+ * 1-year window — already at the edge of comfortable memory pressure.
+ * Letting an admin pass `startDate=2020-01-01` (effectively "all time")
+ * was a one-request DoS lever. 366 days covers every real reporting
+ * use case (calendar-year comparisons, leap-year edge cases) while
+ * keeping per-call memory bounded.
+ */
+const REPORT_MAX_WINDOW_DAYS = 366;
+const MILLIS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /**
  * Convert a Prisma Decimal to a JSON-safe number while preserving full
@@ -42,28 +58,61 @@ export class ReportsService {
     endDate?: Date,
   ) {
     if (startDate && endDate) {
+      // Validate dates are sensible — Date constructed from a malformed
+      // ISO string is `Invalid Date` (getTime() → NaN), which would make
+      // every downstream gte/lte comparison return false silently.
+      if (
+        Number.isNaN(startDate.getTime()) ||
+        Number.isNaN(endDate.getTime())
+      ) {
+        throw new BadRequestException(
+          "startDate / endDate must be valid dates",
+        );
+      }
+      if (startDate > endDate) {
+        throw new BadRequestException(
+          "startDate must be before or equal to endDate",
+        );
+      }
+      const windowDays =
+        (endDate.getTime() - startDate.getTime()) / MILLIS_PER_DAY;
+      if (windowDays > REPORT_MAX_WINDOW_DAYS) {
+        throw new BadRequestException(
+          `Date range cannot exceed ${REPORT_MAX_WINDOW_DAYS} days. Split the report into smaller windows.`,
+        );
+      }
       return { start: startDate, end: endDate };
     }
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
       select: { timezone: true },
     });
-    const tz = tenant?.timezone || 'UTC';
+    const tz = tenant?.timezone || "UTC";
     const now = new Date();
     const start = startDate ?? getTenantMidnight(now, tz);
     const end =
       endDate ??
-      getTenantMidnight(new Date(now.getTime() + 24 * 60 * 60 * 1000), tz);
+      getTenantMidnight(new Date(now.getTime() + MILLIS_PER_DAY), tz);
     return { start, end };
   }
 
-  async getSalesSummary(tenantId: string, startDate?: Date, endDate?: Date) {
+  async getSalesSummary(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+    branchId?: string,
+  ) {
     const dateRange = await this.getDateRange(tenantId, startDate, endDate);
+    // branchScope is spread into every order.where so the same expression
+    // covers tenant-wide (no branchId) and branch-scoped reads. Null-branch
+    // legacy orders are excluded from branch-scoped totals by construction.
+    const branchScope = branchId ? { branchId } : {};
 
     // Get aggregated order data
     const orderStats = await this.prisma.order.aggregate({
       where: {
         tenantId,
+        ...branchScope,
         status: OrderStatus.PAID,
         createdAt: {
           gte: dateRange.start,
@@ -81,22 +130,27 @@ export class ReportsService {
     const totalSales = centsToCurrency(totalSalesCents);
     const totalOrders = orderStats._count;
     const averageOrderValue =
-      totalOrders > 0 ? centsToCurrency(Math.round(totalSalesCents / totalOrders)) : 0;
-    const totalDiscount = centsToCurrency(decimalToCents(orderStats._sum.discount));
+      totalOrders > 0
+        ? centsToCurrency(Math.round(totalSalesCents / totalOrders))
+        : 0;
+    const totalDiscount = centsToCurrency(
+      decimalToCents(orderStats._sum.discount),
+    );
 
     // Get payment method breakdown
     const paymentBreakdown = await this.prisma.payment.groupBy({
-      by: ['method'],
+      by: ["method"],
       where: {
         order: {
           tenantId,
+          ...branchScope,
           status: OrderStatus.PAID,
           createdAt: {
             gte: dateRange.start,
             lte: dateRange.end,
           },
         },
-        status: 'COMPLETED',
+        status: "COMPLETED",
       },
       _sum: {
         amount: true,
@@ -114,6 +168,7 @@ export class ReportsService {
     const paidOrders = await this.prisma.order.findMany({
       where: {
         tenantId,
+        ...branchScope,
         status: OrderStatus.PAID,
         createdAt: {
           gte: dateRange.start,
@@ -163,16 +218,19 @@ export class ReportsService {
     startDate?: Date,
     endDate?: Date,
     limit: number = 10,
+    branchId?: string,
   ) {
     const dateRange = await this.getDateRange(tenantId, startDate, endDate);
     const safeLimit = Math.min(Math.max(limit, 1), 100);
+    const branchScope = branchId ? { branchId } : {};
 
     // Get top selling products
     const topProducts = await this.prisma.orderItem.groupBy({
-      by: ['productId'],
+      by: ["productId"],
       where: {
         order: {
           tenantId,
+          ...branchScope,
           status: OrderStatus.PAID,
           createdAt: {
             gte: dateRange.start,
@@ -186,7 +244,7 @@ export class ReportsService {
       },
       orderBy: {
         _sum: {
-          subtotal: 'desc',
+          subtotal: "desc",
         },
       },
       take: safeLimit,
@@ -215,7 +273,7 @@ export class ReportsService {
       const product = productsMap.get(item.productId);
       return {
         productId: item.productId,
-        productName: product?.name || 'Unknown Product',
+        productName: product?.name || "Unknown Product",
         quantitySold: item._sum.quantity || 0,
         revenue: Number(item._sum.subtotal || 0),
         categoryName: product?.category.name,
@@ -233,21 +291,24 @@ export class ReportsService {
     tenantId: string,
     startDate?: Date,
     endDate?: Date,
+    branchId?: string,
   ) {
     const dateRange = await this.getDateRange(tenantId, startDate, endDate);
+    const branchScope = branchId ? { branchId } : {};
 
     const paymentBreakdown = await this.prisma.payment.groupBy({
-      by: ['method'],
+      by: ["method"],
       where: {
         order: {
           tenantId,
+          ...branchScope,
           status: OrderStatus.PAID,
           createdAt: {
             gte: dateRange.start,
             lte: dateRange.end,
           },
         },
-        status: 'COMPLETED',
+        status: "COMPLETED",
       },
       _sum: {
         amount: true,
@@ -268,7 +329,7 @@ export class ReportsService {
     };
   }
 
-  async getOrdersByHour(tenantId: string, date?: Date) {
+  async getOrdersByHour(tenantId: string, date?: Date, branchId?: string) {
     // Day boundaries and the hour-of-day grouping below must use the
     // tenant's timezone, not the server pod's. Otherwise an Istanbul
     // tenant on a UTC pod loses the 21:00-23:59 hour of orders to "the
@@ -277,17 +338,19 @@ export class ReportsService {
       where: { id: tenantId },
       select: { timezone: true },
     });
-    const tz = tenant?.timezone || 'UTC';
+    const tz = tenant?.timezone || "UTC";
     const anchor = date ?? new Date();
     const targetDate = getTenantMidnight(anchor, tz);
     const endDate = getTenantMidnight(
       new Date(anchor.getTime() + 24 * 60 * 60 * 1000),
       tz,
     );
+    const branchScope = branchId ? { branchId } : {};
 
     const orders = await this.prisma.order.findMany({
       where: {
         tenantId,
+        ...branchScope,
         status: OrderStatus.PAID,
         createdAt: {
           gte: targetDate,
@@ -310,9 +373,9 @@ export class ReportsService {
     // `Intl.DateTimeFormat` resolves the hour-of-day in the tenant tz
     // for each order; cheaper than spinning up a TZ-aware lib and still
     // correct across DST transitions because Intl handles them.
-    const hourFmt = new Intl.DateTimeFormat('en-US', {
+    const hourFmt = new Intl.DateTimeFormat("en-US", {
       timeZone: tz,
-      hour: '2-digit',
+      hour: "2-digit",
       hour12: false,
     });
     orders.forEach((order) => {
@@ -335,12 +398,18 @@ export class ReportsService {
   /**
    * Get customer analytics report
    */
-  async getCustomerAnalytics(tenantId: string, startDate?: Date, endDate?: Date) {
+  async getCustomerAnalytics(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+    branchId?: string,
+  ) {
     const dateRange = await this.getDateRange(tenantId, startDate, endDate);
+    const branchScope = branchId ? { branchId } : {};
 
     // Get customer tier distribution
     const tierDistribution = await this.prisma.customer.groupBy({
-      by: ['loyaltyTier'],
+      by: ["loyaltyTier"],
       where: { tenantId },
       _count: true,
     });
@@ -360,6 +429,7 @@ export class ReportsService {
     const returningCustomersOrders = await this.prisma.order.findMany({
       where: {
         tenantId,
+        ...branchScope,
         status: OrderStatus.PAID,
         createdAt: {
           gte: dateRange.start,
@@ -371,7 +441,7 @@ export class ReportsService {
           },
         },
       },
-      distinct: ['customerId'],
+      distinct: ["customerId"],
       select: {
         customerId: true,
       },
@@ -385,7 +455,7 @@ export class ReportsService {
     // Top customers by spending
     const topCustomers = await this.prisma.customer.findMany({
       where: { tenantId },
-      orderBy: { totalSpent: 'desc' },
+      orderBy: { totalSpent: "desc" },
       take: 10,
       select: {
         id: true,
@@ -446,23 +516,36 @@ export class ReportsService {
           select: { name: true },
         },
       },
-      orderBy: { currentStock: 'asc' },
+      orderBy: { currentStock: "asc" },
     });
 
     // Low stock threshold
     const LOW_STOCK_THRESHOLD = 10;
 
+    // v2.8.98 — currentStock is Prisma.Decimal; comparisons go through
+    // .gt/.lt rather than the JS operators.
+    const stockGt = (p: { currentStock: any }, n: number) =>
+      new Prisma.Decimal(p.currentStock).gt(n);
+    const stockLt = (p: { currentStock: any }, n: number) =>
+      new Prisma.Decimal(p.currentStock).lt(n);
+    const stockLte = (p: { currentStock: any }, n: number) =>
+      new Prisma.Decimal(p.currentStock).lte(n);
+
     // Get low stock items
-    const lowStockItems = products.filter((p) => p.currentStock > 0 && p.currentStock < LOW_STOCK_THRESHOLD);
+    const lowStockItems = products.filter(
+      (p) => stockGt(p, 0) && stockLt(p, LOW_STOCK_THRESHOLD),
+    );
 
     // Get out of stock items
-    const outOfStockItems = products.filter((p) => p.currentStock <= 0);
+    const outOfStockItems = products.filter((p) => stockLte(p, 0));
 
     // Total stock value. Multiplying-and-accumulating Decimal prices in
     // JS Number drifts after a few hundred line items; do the sum in
     // integer cents and convert once at the end.
     const totalStockValueCents = products.reduce(
-      (sum, p) => sum + p.currentStock * decimalToCents(p.price),
+      (sum, p) =>
+        sum +
+        new Prisma.Decimal(p.currentStock).toNumber() * decimalToCents(p.price),
       0,
     );
     const totalStockValue = centsToCurrency(totalStockValueCents);
@@ -471,7 +554,7 @@ export class ReportsService {
     const recentMovements = await this.prisma.stockMovement.findMany({
       where: { tenantId },
       take: 20,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       include: {
         product: { select: { name: true } },
         user: { select: { firstName: true, lastName: true } },
@@ -487,7 +570,7 @@ export class ReportsService {
         productId: p.id,
         productName: p.name,
         categoryName: p.category?.name,
-        currentStock: p.currentStock,
+        currentStock: new Prisma.Decimal(p.currentStock).toNumber(),
         price: Number(p.price),
       })),
       outOfStockItems: outOfStockItems.map((p) => ({
@@ -499,11 +582,14 @@ export class ReportsService {
         productId: p.id,
         productName: p.name,
         categoryName: p.category?.name,
-        currentStock: p.currentStock,
+        currentStock: new Prisma.Decimal(p.currentStock).toNumber(),
         price: Number(p.price),
-        stockValue: centsToCurrency(p.currentStock * decimalToCents(p.price)),
-        isLowStock: p.currentStock > 0 && p.currentStock < LOW_STOCK_THRESHOLD,
-        isOutOfStock: p.currentStock <= 0,
+        stockValue: centsToCurrency(
+          new Prisma.Decimal(p.currentStock).toNumber() *
+            decimalToCents(p.price),
+        ),
+        isLowStock: stockGt(p, 0) && stockLt(p, LOW_STOCK_THRESHOLD),
+        isOutOfStock: stockLte(p, 0),
       })),
       recentMovements: recentMovements.map((m) => ({
         id: m.id,
@@ -520,14 +606,21 @@ export class ReportsService {
   /**
    * Get staff performance report
    */
-  async getStaffPerformance(tenantId: string, startDate?: Date, endDate?: Date) {
+  async getStaffPerformance(
+    tenantId: string,
+    startDate?: Date,
+    endDate?: Date,
+    branchId?: string,
+  ) {
     const dateRange = await this.getDateRange(tenantId, startDate, endDate);
+    const branchScope = branchId ? { branchId } : {};
 
     // Get orders grouped by staff
     const staffOrders = await this.prisma.order.groupBy({
-      by: ['userId'],
+      by: ["userId"],
       where: {
         tenantId,
+        ...branchScope,
         status: OrderStatus.PAID,
         createdAt: {
           gte: dateRange.start,
@@ -541,7 +634,9 @@ export class ReportsService {
 
     // Fetch user details — tenant-scoped for the same defense-in-depth reason
     // as product lookups above.
-    const userIds = staffOrders.map((s) => s.userId).filter(Boolean) as string[];
+    const userIds = staffOrders
+      .map((s) => s.userId)
+      .filter(Boolean) as string[];
     const users = await this.prisma.user.findMany({
       where: { id: { in: userIds }, tenantId },
       select: { id: true, firstName: true, lastName: true, role: true },
@@ -556,8 +651,8 @@ export class ReportsService {
         const totalSales = Number(s._sum.finalAmount || 0);
         return {
           userId: s.userId,
-          staffName: user ? `${user.firstName} ${user.lastName}` : 'Unknown',
-          role: user?.role || 'Unknown',
+          staffName: user ? `${user.firstName} ${user.lastName}` : "Unknown",
+          role: user?.role || "Unknown",
           totalOrders: s._count,
           totalSales,
           averageOrderValue: s._count > 0 ? totalSales / s._count : 0,
@@ -566,8 +661,14 @@ export class ReportsService {
       .sort((a, b) => b.totalSales - a.totalSales);
 
     // Calculate totals
-    const totalOrders = staffPerformance.reduce((sum, s) => sum + s.totalOrders, 0);
-    const totalSales = staffPerformance.reduce((sum, s) => sum + s.totalSales, 0);
+    const totalOrders = staffPerformance.reduce(
+      (sum, s) => sum + s.totalOrders,
+      0,
+    );
+    const totalSales = staffPerformance.reduce(
+      (sum, s) => sum + s.totalSales,
+      0,
+    );
 
     return {
       staffPerformance,
@@ -575,8 +676,14 @@ export class ReportsService {
         totalStaff: staffPerformance.length,
         totalOrders,
         totalSales,
-        averageOrdersPerStaff: staffPerformance.length > 0 ? totalOrders / staffPerformance.length : 0,
-        averageSalesPerStaff: staffPerformance.length > 0 ? totalSales / staffPerformance.length : 0,
+        averageOrdersPerStaff:
+          staffPerformance.length > 0
+            ? totalOrders / staffPerformance.length
+            : 0,
+        averageSalesPerStaff:
+          staffPerformance.length > 0
+            ? totalSales / staffPerformance.length
+            : 0,
       },
       startDate: dateRange.start,
       endDate: dateRange.end,

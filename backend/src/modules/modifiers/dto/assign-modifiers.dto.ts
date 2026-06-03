@@ -2,20 +2,18 @@ import {
   ArrayMaxSize,
   IsArray,
   IsInt,
-  IsNotEmpty,
   IsOptional,
-  IsString,
+  IsUUID,
   Min,
   ValidateNested,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { ApiProperty } from '@nestjs/swagger';
-import { EmptyStringToNumber } from '../../../common/dto/transforms';
+} from "class-validator";
+import { Type } from "class-transformer";
+import { ApiProperty } from "@nestjs/swagger";
+import { EmptyStringToNumber } from "../../../common/dto/transforms";
 
 export class AssignModifierGroupDto {
-  @ApiProperty({ example: 'uuid-of-modifier-group' })
-  @IsString()
-  @IsNotEmpty()
+  @ApiProperty({ example: "uuid-of-modifier-group" })
+  @IsUUID()
   groupId: string;
 
   @ApiProperty({ example: 0, default: 0 })

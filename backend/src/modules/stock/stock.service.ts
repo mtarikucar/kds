@@ -2,10 +2,12 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import { CreateStockMovementDto } from './dto/create-stock-movement.dto';
-import { StockMovementType } from '../../common/constants/order-status.enum';
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../prisma/prisma.service";
+import { CreateStockMovementDto } from "./dto/create-stock-movement.dto";
+import { StockMovementType } from "../../common/constants/order-status.enum";
+import { BranchScope, branchScope } from "../../common/scoping/branch-scope";
 
 @Injectable()
 export class StockService {
@@ -15,6 +17,7 @@ export class StockService {
     createDto: CreateStockMovementDto,
     userId: string,
     tenantId: string,
+    branchId: string,
   ) {
     // Verify product exists and belongs to tenant
     const product = await this.prisma.product.findFirst({
@@ -25,12 +28,16 @@ export class StockService {
     });
 
     if (!product) {
-      throw new NotFoundException('Product not found or does not belong to your tenant');
+      throw new NotFoundException(
+        "Product not found or does not belong to your tenant",
+      );
     }
 
     // Check if stock tracking is enabled
     if (!product.stockTracked) {
-      throw new BadRequestException('Stock tracking is not enabled for this product');
+      throw new BadRequestException(
+        "Stock tracking is not enabled for this product",
+      );
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -39,7 +46,11 @@ export class StockService {
       // second loser sees `count: 0` and we raise insufficient-stock. For
       // ADJUSTMENT we write the literal quantity (explicit override) and
       // for IN we just increment.
-      let newStock: number;
+      //
+      // v2.8.98 — `currentStock` is Prisma.Decimal; the local `newStock`
+      // accumulator is a Decimal so the post-write isAvailable flag
+      // routes through .gt(0).
+      let newStock: Prisma.Decimal;
       switch (createDto.type) {
         case StockMovementType.IN: {
           const res = await tx.product.updateMany({
@@ -49,13 +60,13 @@ export class StockService {
             },
           });
           if (res.count !== 1) {
-            throw new NotFoundException('Product not found');
+            throw new NotFoundException("Product not found");
           }
           const fresh = await tx.product.findUniqueOrThrow({
             where: { id: createDto.productId },
             select: { currentStock: true },
           });
-          newStock = fresh.currentStock;
+          newStock = new Prisma.Decimal(fresh.currentStock);
           break;
         }
         case StockMovementType.OUT: {
@@ -70,26 +81,26 @@ export class StockService {
             },
           });
           if (res.count !== 1) {
-            throw new BadRequestException('Insufficient stock');
+            throw new BadRequestException("Insufficient stock");
           }
           const fresh = await tx.product.findUniqueOrThrow({
             where: { id: createDto.productId },
             select: { currentStock: true },
           });
-          newStock = fresh.currentStock;
+          newStock = new Prisma.Decimal(fresh.currentStock);
           break;
         }
         case StockMovementType.ADJUSTMENT: {
           if (createDto.quantity < 0) {
-            throw new BadRequestException('Adjustment quantity must be >= 0');
+            throw new BadRequestException("Adjustment quantity must be >= 0");
           }
-          newStock = createDto.quantity;
+          newStock = new Prisma.Decimal(createDto.quantity);
           const res = await tx.product.updateMany({
             where: { id: createDto.productId, tenantId },
-            data: { currentStock: newStock },
+            data: { currentStock: newStock as any },
           });
           if (res.count !== 1) {
-            throw new NotFoundException('Product not found');
+            throw new NotFoundException("Product not found");
           }
           break;
         }
@@ -100,7 +111,7 @@ export class StockService {
       await tx.product.update({
         where: { id: createDto.productId },
         data: {
-          isAvailable: newStock > 0,
+          isAvailable: newStock.gt(0),
         },
       });
 
@@ -114,6 +125,8 @@ export class StockService {
           productId: createDto.productId,
           userId,
           tenantId,
+          // v3.0.0 — branch scope propagated from controller's BranchScope.
+          branchId,
         },
         include: {
           product: {
@@ -135,14 +148,27 @@ export class StockService {
     });
   }
 
+  /**
+   * Hard cap on a single getMovements page. A long-lived tenant can
+   * accumulate hundreds of thousands of stock movements; without this
+   * the unbounded findMany would happily try to serialise the whole
+   * table into one response and OOM the API process. 500 is generous
+   * for the "scroll back through recent activity" UI use case.
+   */
+  private static readonly MOVEMENTS_PAGE_HARD_CAP = 500;
+
   async getMovements(
-    tenantId: string,
+    scope: BranchScope,
     productId?: string,
     type?: StockMovementType,
     startDate?: Date,
     endDate?: Date,
+    limit?: number,
   ) {
-    const where: any = { tenantId };
+    // v3.0.0 — branch-scoped. StockMovement carries `branchId` (Restrict
+    // FK to Branch) so a MANAGER on branch A can no longer enumerate
+    // branch B's movements via GET /stock/movements.
+    const where: any = { ...branchScope(scope) };
 
     if (productId) {
       where.productId = productId;
@@ -161,6 +187,11 @@ export class StockService {
         where.createdAt.lte = endDate;
       }
     }
+
+    const safeTake = Math.min(
+      Math.max(Math.floor(limit ?? 100), 1),
+      StockService.MOVEMENTS_PAGE_HARD_CAP,
+    );
 
     return this.prisma.stockMovement.findMany({
       where,
@@ -185,7 +216,8 @@ export class StockService {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
+      take: safeTake,
     });
   }
 
@@ -205,7 +237,7 @@ export class StockService {
           },
         },
       },
-      orderBy: { currentStock: 'asc' },
+      orderBy: { currentStock: "asc" },
     });
 
     return products.map((product) => ({
@@ -224,6 +256,7 @@ export class StockService {
     quantity: number,
     userId: string,
     tenantId: string,
+    branchId: string,
   ) {
     const product = await this.prisma.product.findFirst({
       where: {
@@ -233,11 +266,15 @@ export class StockService {
     });
 
     if (!product) {
-      throw new NotFoundException('Product not found or does not belong to your tenant');
+      throw new NotFoundException(
+        "Product not found or does not belong to your tenant",
+      );
     }
 
     if (!product.stockTracked) {
-      throw new BadRequestException('Stock tracking is not enabled for this product');
+      throw new BadRequestException(
+        "Stock tracking is not enabled for this product",
+      );
     }
 
     return this.createMovement(
@@ -245,10 +282,11 @@ export class StockService {
         productId,
         type: StockMovementType.ADJUSTMENT,
         quantity,
-        reason: 'Manual stock adjustment',
+        reason: "Manual stock adjustment",
       },
       userId,
       tenantId,
+      branchId,
     );
   }
 }

@@ -1,12 +1,24 @@
-import { Controller, Get, Param, Query, NotFoundException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { PosSettingsService } from '../../pos-settings/pos-settings.service';
-import { Public } from '../../auth/decorators/public.decorator';
+import {
+  Controller,
+  Get,
+  Param,
+  Query,
+  NotFoundException,
+} from "@nestjs/common";
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+  ApiParam,
+} from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { PosSettingsService } from "../../pos-settings/pos-settings.service";
+import { Public } from "../../auth/decorators/public.decorator";
 
-@ApiTags('qr-menu')
-@Controller('qr-menu')
+@ApiTags("qr-menu")
+@Controller("qr-menu")
 export class QrMenuController {
   constructor(
     private prisma: PrismaService,
@@ -15,22 +27,36 @@ export class QrMenuController {
 
   @Public()
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
-  @Get('by-subdomain/:subdomain')
-  @ApiOperation({ summary: 'Get public menu by subdomain (no authentication required)' })
-  @ApiParam({ name: 'subdomain', description: 'Restaurant subdomain' })
-  @ApiQuery({ name: 'tableId', required: false, description: 'Optional table ID for table-specific QR codes' })
-  @ApiResponse({ status: 200, description: 'Public menu with categories and products' })
-  @ApiResponse({ status: 404, description: 'Restaurant not found' })
+  @Get("by-subdomain/:subdomain")
+  @ApiOperation({
+    summary: "Get public menu by subdomain (no authentication required)",
+  })
+  @ApiParam({ name: "subdomain", description: "Restaurant subdomain" })
+  @ApiQuery({
+    name: "tableId",
+    required: false,
+    description: "Optional table ID for table-specific QR codes",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Public menu with categories and products",
+  })
+  @ApiResponse({ status: 404, description: "Restaurant not found" })
   async getPublicMenuBySubdomain(
-    @Param('subdomain') subdomain: string,
-    @Query('tableId') tableId?: string,
+    @Param("subdomain") subdomain: string,
+    @Query("tableId") tableId?: string,
   ) {
-    const tenant = await this.prisma.tenant.findUnique({
-      where: { subdomain },
+    // v2.8.91: filter inactive/suspended tenants. Pre-fix the by-subdomain
+    // lookup skipped the status check and returned a menu for a
+    // SUSPENDED/DELETED tenant — operationally wrong (suspended tenants
+    // should appear offline) and a small leak (the public QR menu
+    // proves the subdomain exists). Mirrors the by-tenantId path.
+    const tenant = await this.prisma.tenant.findFirst({
+      where: { subdomain, status: "ACTIVE" },
     });
 
     if (!tenant) {
-      throw new NotFoundException('Restaurant not found');
+      throw new NotFoundException("Restaurant not found");
     }
 
     return this.getPublicMenu(tenant.id, tableId);
@@ -38,17 +64,26 @@ export class QrMenuController {
 
   @Public()
   @Throttle({ default: { limit: 60, ttl: 60_000 } })
-  @Get(':tenantId')
-  @ApiOperation({ summary: 'Get public menu for QR code access (no authentication required)' })
-  @ApiQuery({ name: 'tableId', required: false, description: 'Optional table ID for table-specific QR codes' })
-  @ApiResponse({ status: 200, description: 'Public menu with categories and products' })
-  @ApiResponse({ status: 404, description: 'Tenant not found' })
+  @Get(":tenantId")
+  @ApiOperation({
+    summary: "Get public menu for QR code access (no authentication required)",
+  })
+  @ApiQuery({
+    name: "tableId",
+    required: false,
+    description: "Optional table ID for table-specific QR codes",
+  })
+  @ApiResponse({
+    status: 200,
+    description: "Public menu with categories and products",
+  })
+  @ApiResponse({ status: 404, description: "Tenant not found" })
   async getPublicMenu(
-    @Param('tenantId') tenantId: string,
-    @Query('tableId') tableId?: string,
+    @Param("tenantId") tenantId: string,
+    @Query("tableId") tableId?: string,
   ) {
     const tenant = await this.prisma.tenant.findFirst({
-      where: { id: tenantId, status: 'ACTIVE' },
+      where: { id: tenantId, status: "ACTIVE" },
       select: {
         id: true,
         name: true,
@@ -63,14 +98,16 @@ export class QrMenuController {
     });
 
     if (!tenant) {
-      throw new NotFoundException('Restaurant not found');
+      throw new NotFoundException("Restaurant not found");
     }
 
     // Read QR settings without side-effects. Creating a row on an anonymous
     // GET would let any caller trigger writes for a known tenantId and seed
     // default settings without admin intent. A null response uses defaults.
-    const settings = await this.prisma.qrMenuSettings.findUnique({
-      where: { tenantId },
+    // v3.0.1 — findFirst (compound-unique with branchId: null trips
+    // Prisma client validation; see branch-scope.ts helper note).
+    const settings = await this.prisma.qrMenuSettings.findFirst({
+      where: { tenantId, branchId: null },
     });
 
     // Get table information if tableId provided
@@ -109,7 +146,7 @@ export class QrMenuController {
                   },
                 },
               },
-              orderBy: { order: 'asc' },
+              orderBy: { order: "asc" },
             },
             modifierGroups: {
               where: {
@@ -141,40 +178,40 @@ export class QrMenuController {
                         priceAdjustment: true,
                         displayOrder: true,
                       },
-                      orderBy: { displayOrder: 'asc' },
+                      orderBy: { displayOrder: "asc" },
                     },
                   },
                 },
               },
-              orderBy: { displayOrder: 'asc' },
+              orderBy: { displayOrder: "asc" },
             },
           },
-          orderBy: { name: 'asc' },
+          orderBy: { name: "asc" },
         },
       },
-      orderBy: { displayOrder: 'asc' },
+      orderBy: { displayOrder: "asc" },
     });
 
     // Transform categories to include images array instead of productImages
     // Also convert Prisma Decimal to number for JSON serialization
-    const transformedCategories = categories.map(category => ({
+    const transformedCategories = categories.map((category) => ({
       ...category,
-      products: category.products.map(product => ({
+      products: category.products.map((product) => ({
         id: product.id,
         name: product.name,
         description: product.description,
         price: Number(product.price),
         image: product.image,
         categoryId: product.categoryId,
-        images: product.productImages.map(pi => ({
+        images: product.productImages.map((pi) => ({
           id: pi.image.id,
           url: pi.image.url,
           filename: pi.image.filename,
           order: pi.order,
         })),
-        modifierGroups: product.modifierGroups.map(pmg => ({
+        modifierGroups: product.modifierGroups.map((pmg) => ({
           ...pmg.group,
-          modifiers: pmg.group.modifiers.map(mod => ({
+          modifiers: pmg.group.modifiers.map((mod) => ({
             ...mod,
             priceAdjustment: Number(mod.priceAdjustment),
           })),
@@ -189,9 +226,11 @@ export class QrMenuController {
       tenant: {
         id: tenant.id,
         name: tenant.name,
-        wifi: tenant.wifiSsid ? {
-          ssid: tenant.wifiSsid,
-        } : null,
+        wifi: tenant.wifiSsid
+          ? {
+              ssid: tenant.wifiSsid,
+            }
+          : null,
         socialMedia: {
           instagram: tenant.socialInstagram,
           facebook: tenant.socialFacebook,
@@ -201,21 +240,23 @@ export class QrMenuController {
           whatsapp: tenant.socialWhatsapp,
         },
       },
-      table: table ? {
-        id: table.id,
-        number: table.number,
-      } : null,
+      table: table
+        ? {
+            id: table.id,
+            number: table.number,
+          }
+        : null,
       settings: {
-        primaryColor: settings?.primaryColor ?? '#3B82F6',
-        secondaryColor: settings?.secondaryColor ?? '#F3F4F6',
-        backgroundColor: settings?.backgroundColor ?? '#FFFFFF',
-        fontFamily: settings?.fontFamily ?? 'Inter',
+        primaryColor: settings?.primaryColor ?? "#3B82F6",
+        secondaryColor: settings?.secondaryColor ?? "#F3F4F6",
+        backgroundColor: settings?.backgroundColor ?? "#FFFFFF",
+        fontFamily: settings?.fontFamily ?? "Inter",
         logoUrl: settings?.logoUrl ?? null,
         showRestaurantInfo: settings?.showRestaurantInfo ?? true,
         showPrices: settings?.showPrices ?? true,
         showDescription: settings?.showDescription ?? true,
         showImages: settings?.showImages ?? true,
-        layoutStyle: settings?.layoutStyle ?? 'GRID',
+        layoutStyle: settings?.layoutStyle ?? "GRID",
         itemsPerRow: settings?.itemsPerRow ?? 2,
       },
       enableCustomerOrdering: posSettings.enableCustomerOrdering,

@@ -1,1 +1,1 @@
-export * from './edge-device.dto';
+export * from "./edge-device.dto";

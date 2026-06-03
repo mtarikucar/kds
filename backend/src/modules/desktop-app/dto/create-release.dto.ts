@@ -1,80 +1,114 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsBoolean, IsOptional, IsNotEmpty, IsUrl, Matches } from 'class-validator';
-import { EmptyStringToUndefined, StringToBoolean } from '../../../common/dto/transforms';
+import { ApiProperty } from "@nestjs/swagger";
+import {
+  IsString,
+  IsBoolean,
+  IsOptional,
+  IsNotEmpty,
+  IsUrl,
+  Matches,
+} from "class-validator";
+import {
+  EmptyStringToUndefined,
+  StringToBoolean,
+} from "../../../common/dto/transforms";
 
 export class CreateReleaseDto {
-  @ApiProperty({ example: '0.2.6', description: 'Semantic version number (synced with web app)' })
+  @ApiProperty({
+    example: "0.2.6",
+    description: "Semantic version number (synced with web app)",
+  })
   @IsString()
   @IsNotEmpty()
-  @Matches(/^\d+\.\d+\.\d+$/, { message: 'version must be a valid semver format (e.g. 1.2.3)' })
+  @Matches(/^\d+\.\d+\.\d+$/, {
+    message: "version must be a valid semver format (e.g. 1.2.3)",
+  })
   version: string;
 
-  @ApiProperty({ example: 'v0.2.6', description: 'Git release tag' })
+  @ApiProperty({ example: "v0.2.6", description: "Git release tag" })
   @IsString()
   @IsNotEmpty()
   releaseTag: string;
 
-  @ApiProperty({ example: '## What\'s New\n- Feature X\n- Bug fix Y', description: 'Release notes in markdown format' })
+  @ApiProperty({
+    example: "## What's New\n- Feature X\n- Bug fix Y",
+    description: "Release notes in markdown format",
+  })
   @IsString()
   @IsNotEmpty()
   releaseNotes: string;
 
-  @ApiProperty({ required: false, description: 'Detailed changelog in markdown' })
+  @ApiProperty({
+    required: false,
+    description: "Detailed changelog in markdown",
+  })
   @EmptyStringToUndefined()
   @IsOptional()
   @IsString()
   changelog?: string;
 
-  @ApiProperty({ required: false, default: false, description: 'Whether the release is published' })
+  @ApiProperty({
+    required: false,
+    default: false,
+    description: "Whether the release is published",
+  })
   @StringToBoolean()
   @IsOptional()
   @IsBoolean()
   published?: boolean;
 
   // Platform URLs
-  @ApiProperty({ required: false, description: 'Windows installer URL (GitHub Release)' })
+  @ApiProperty({
+    required: false,
+    description: "Windows installer URL (GitHub Release)",
+  })
   @EmptyStringToUndefined()
   @IsOptional()
   @IsUrl()
   windowsUrl?: string;
 
-  @ApiProperty({ required: false, description: 'Windows installer signature' })
+  @ApiProperty({ required: false, description: "Windows installer signature" })
   @EmptyStringToUndefined()
   @IsOptional()
   @IsString()
   windowsSignature?: string;
 
-  @ApiProperty({ required: false, description: 'macOS ARM installer URL' })
+  @ApiProperty({ required: false, description: "macOS ARM installer URL" })
   @EmptyStringToUndefined()
   @IsOptional()
   @IsUrl()
   macArmUrl?: string;
 
-  @ApiProperty({ required: false, description: 'macOS ARM installer signature' })
+  @ApiProperty({
+    required: false,
+    description: "macOS ARM installer signature",
+  })
   @EmptyStringToUndefined()
   @IsOptional()
   @IsString()
   macArmSignature?: string;
 
-  @ApiProperty({ required: false, description: 'macOS Intel installer URL' })
+  @ApiProperty({ required: false, description: "macOS Intel installer URL" })
   @EmptyStringToUndefined()
   @IsOptional()
   @IsUrl()
   macIntelUrl?: string;
 
-  @ApiProperty({ required: false, description: 'macOS Intel installer signature' })
+  @ApiProperty({
+    required: false,
+    description: "macOS Intel installer signature",
+  })
   @EmptyStringToUndefined()
   @IsOptional()
   @IsString()
   macIntelSignature?: string;
 
-  @ApiProperty({ required: false, description: 'Linux installer URL' })
+  @ApiProperty({ required: false, description: "Linux installer URL" })
   @EmptyStringToUndefined()
   @IsOptional()
   @IsUrl()
   linuxUrl?: string;
 
-  @ApiProperty({ required: false, description: 'Linux installer signature' })
+  @ApiProperty({ required: false, description: "Linux installer signature" })
   @EmptyStringToUndefined()
   @IsOptional()
   @IsString()

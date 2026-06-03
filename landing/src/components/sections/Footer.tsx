@@ -2,6 +2,7 @@
 
 import { Link } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
+import { Phone } from 'lucide-react';
 
 export default function Footer() {
   const t = useTranslations('footer');
@@ -10,6 +11,9 @@ export default function Footer() {
     { label: t('links.features'), href: '#features' },
     { label: t('links.pricing'), href: '#pricing' },
     { label: t('links.security'), href: '#security' },
+    // Locale-aware page link (rest are anchors). Renderer below switches
+    // between <Link> and <a> based on the href shape.
+    { label: t('links.shop'), href: '/store' },
     { label: t('links.integrations'), href: '#' },
   ];
 
@@ -51,10 +55,11 @@ export default function Footer() {
                 {t('address')}
               </p>
               <a
-                href="tel:+905060687100"
-                className="text-sm text-slate-500 hover:text-slate-900 transition-colors block"
+                href="tel:+908508407303"
+                className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900 transition-colors"
               >
-                {t('phone')}
+                <Phone className="h-4 w-4 shrink-0 text-orange-500" />
+                <span dir="ltr">{t('phone')}</span>
               </a>
             </div>
           </div>
@@ -65,12 +70,21 @@ export default function Footer() {
             <ul className="space-y-3">
               {productLinks.map((link) => (
                 <li key={link.label}>
-                  <a
-                    href={link.href}
-                    className="text-sm text-slate-500 hover:text-slate-900 transition-colors"
-                  >
-                    {link.label}
-                  </a>
+                  {link.href.startsWith('/') && !link.href.startsWith('/#') ? (
+                    <Link
+                      href={link.href}
+                      className="text-sm text-slate-500 hover:text-slate-900 transition-colors"
+                    >
+                      {link.label}
+                    </Link>
+                  ) : (
+                    <a
+                      href={link.href}
+                      className="text-sm text-slate-500 hover:text-slate-900 transition-colors"
+                    >
+                      {link.label}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>

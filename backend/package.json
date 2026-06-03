@@ -13,9 +13,10 @@
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:cov": "jest --coverage",
+    "test": "jest --maxWorkers=2 --workerIdleMemoryLimit=512MB",
+    "test:watch": "jest --watch --maxWorkers=2 --workerIdleMemoryLimit=512MB",
+    "test:cov": "jest --coverage --maxWorkers=2 --workerIdleMemoryLimit=512MB",
+    "test:full": "jest --maxWorkers=50%",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "prisma:generate": "prisma generate",
@@ -23,7 +24,8 @@
     "prisma:studio": "prisma studio",
     "prisma:seed": "ts-node prisma/seed.ts",
     "test:email": "ts-node scripts/test-email.ts",
-    "seed:demo": "ts-node prisma/seed-demo.ts"
+    "seed:demo": "ts-node prisma/seed-demo.ts",
+    "seed:marketplace": "ts-node prisma/seeds/seed-marketplace.ts"
   },
   "dependencies": {
     "@nestjs-modules/mailer": "^2.0.2",
@@ -89,6 +91,7 @@
     "@types/node": "^20.10.6",
     "@types/passport-jwt": "^4.0.0",
     "@types/passport-local": "^1.0.38",
+    "@types/pg": "^8.20.0",
     "@types/qrcode": "^1.5.6",
     "@types/speakeasy": "^2.0.10",
     "@types/supertest": "^6.0.2",
@@ -100,6 +103,7 @@
     "eslint-plugin-prettier": "^5.1.2",
     "jest": "^29.7.0",
     "jest-mock-extended": "^4.0.0",
+    "pg": "^8.21.0",
     "prettier": "^3.1.1",
     "prisma": "^6.19.0",
     "source-map-support": "^0.5.21",
@@ -128,7 +132,9 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "maxWorkers": 2,
+    "workerIdleMemoryLimit": "512MB"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

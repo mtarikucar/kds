@@ -58,6 +58,7 @@ ACTION=""  # deploy | rollback
 COMPOSE_FILE=""
 ENV_FILE=""
 POSTGRES_CONTAINER=""
+REDIS_CONTAINER=""
 BACKEND_CONTAINER=""
 FRONTEND_CONTAINER=""
 LANDING_CONTAINER=""
@@ -95,6 +96,7 @@ configure_env() {
     COMPOSE_FILE="$PROJECT_ROOT/docker-compose.prod.yml"
     ENV_FILE="$PROJECT_ROOT/.env.production"
     POSTGRES_CONTAINER="kds_postgres_prod"
+    REDIS_CONTAINER="kds_redis_prod"
     BACKEND_CONTAINER="kds_backend_prod"
     FRONTEND_CONTAINER="kds_frontend_prod"
     LANDING_CONTAINER="kds_landing_prod"
@@ -112,6 +114,7 @@ configure_env() {
     COMPOSE_FILE="$PROJECT_ROOT/docker-compose.staging.yml"
     ENV_FILE="$PROJECT_ROOT/.env.test"
     POSTGRES_CONTAINER="kds_postgres_staging"
+    REDIS_CONTAINER="kds_redis_staging"
     BACKEND_CONTAINER="kds_backend_staging"
     FRONTEND_CONTAINER="kds_frontend_staging"
     LANDING_CONTAINER="kds_landing_staging"
@@ -122,14 +125,16 @@ configure_env() {
     API_PUBLIC_URL="https://staging.hummytummy.com/api/health"
     FRONTEND_PUBLIC_URL="https://staging.hummytummy.com"
     LANDING_PUBLIC_URL="https://staging.hummytummy.com/landing"
-    # Aligned with prod (300s). NestJS bootstrap now registers hundreds of
-    # routes from marketplace + hardware-store + fiscal + caller +
-    # integration-gateway + outbound-webhooks, plus Prisma client
-    # introspection across 50+ tables. The original 180s budget assumed a
-    # leaner module graph; rotation logs show route-mapping continuing
-    # past 180s on cold boots, so the old budget caused false-positive
-    # rollbacks where the backend was simply still booting.
-    HEALTH_BUDGET_SEC=300
+    # Bumped from the original 180s → 300s (route-mapping past 180s on
+    # cold boots) → 600s. Run 26431353670 showed the HummyTummy-sized
+    # image still hadn't responded to /api/health at the 300s mark.
+    # NestJS now registers hundreds of routes from marketplace +
+    # hardware-store + fiscal + caller + integration-gateway +
+    # outbound-webhooks plus Prisma client introspection across 50+
+    # tables and onModuleInit DB reads, so the cold path runs ~3-4 min.
+    # 600s leaves comfortable margin; if a future boot exceeds that,
+    # it's a real signal worth investigating.
+    HEALTH_BUDGET_SEC=600
     BACKUP_RETENTION_DAYS=3
     BACKUP_PREFIX="staging"
   fi
@@ -261,7 +266,7 @@ ensure_data_layer() {
   local pg=starting redis_status=starting
   while [ $i -lt $deadline ]; do
     pg=$(docker inspect "$POSTGRES_CONTAINER" --format '{{.State.Health.Status}}' 2>/dev/null || echo "starting")
-    redis_status=$(docker inspect "${POSTGRES_CONTAINER/postgres/redis}" --format '{{.State.Health.Status}}' 2>/dev/null || echo "starting")
+    redis_status=$(docker inspect "$REDIS_CONTAINER" --format '{{.State.Health.Status}}' 2>/dev/null || echo "starting")
     if [ "$pg" = "healthy" ] && [ "$redis_status" = "healthy" ]; then
       ok "postgres + redis healthy (took ~${i}s)"
       return 0
@@ -287,10 +292,20 @@ run_migration_doctor() {
 run_migrations_in_existing_backend() {
   # Migration runs inside the OLD container (additive-only policy
   # ensures the old client tolerates the new schema). If the old
-  # container isn't up yet — first deploy ever — we skip and let the
-  # new container's startup migrate.
-  if ! docker ps --format '{{.Names}}' | grep -q "^${BACKEND_CONTAINER}$"; then
-    log "Existing backend container not running — migrations deferred to post-swap"
+  # container isn't usable — first deploy ever, OR it is crash-looping
+  # / unhealthy — we skip here and let swap_backend() migrate inside the
+  # freshly-started new container (it runs `prisma migrate deploy` too).
+  #
+  # NOTE: a crash-looping container still appears in `docker ps` with
+  # status "Restarting", so a name-match guard would pass and then the
+  # `docker exec` below would fail with "container is restarting, wait
+  # until the container is running" — aborting the deploy before the new
+  # image is ever swapped in, i.e. the deploy could not recover from a
+  # crash-looped backend. Gate on actual State.Status instead.
+  local status
+  status=$(docker inspect -f '{{.State.Status}}' "$BACKEND_CONTAINER" 2>/dev/null || echo "missing")
+  if [ "$status" != "running" ]; then
+    log "Existing backend status=$status (not cleanly running) — migrations deferred to post-swap"
     return 0
   fi
   log "Applying pending migrations inside running $BACKEND_CONTAINER"
@@ -336,6 +351,18 @@ wait_until_healthy() {
     i=$((i + 1))
   done
   err "$url did not respond within ${budget}s"
+  # Forensic dump: when the backend never opens its listener, the
+  # rollback path will recreate the container and we lose its logs.
+  # Capture them here while the container still exists so the workflow
+  # log includes the smoking gun. Best-effort — never let log capture
+  # mask the original failure.
+  if [[ "$url" == *":3002/api/health"* ]] || [[ "$url" == *":3000/api/health"* ]]; then
+    log "─── backend logs (last 200) on health-probe failure ───"
+    docker logs "$BACKEND_CONTAINER" --tail 200 2>&1 | sed 's/^/  /' || true
+    log "─── backend container inspect (state) ───"
+    docker inspect "$BACKEND_CONTAINER" --format '{{.State.Status}} pid={{.State.Pid}} exitCode={{.State.ExitCode}} oomKilled={{.State.OOMKilled}} error={{.State.Error}}' 2>&1 || true
+    log "─── end forensic dump ───"
+  fi
   return 1
 }
 

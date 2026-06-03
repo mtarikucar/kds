@@ -18,6 +18,18 @@ interface UiState {
   toggleSidebar: () => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
 
+  // v2.8.88 — sidebar section collapse state. Per section id; default
+  // is "expanded". Rail mode (isSidebarCollapsed=true) hides section
+  // headers entirely regardless of this map.
+  collapsedSections: Record<string, boolean>;
+  toggleSection: (sectionId: string) => void;
+  setSectionCollapsed: (sectionId: string, collapsed: boolean) => void;
+
+  // v3.0.0 — branch scope lives in branchScopeStore.ts. The legacy
+  // uiStore.activeBranchId field was removed to keep state slices
+  // single-purpose (cross-store side effects were the audit's
+  // High finding #9). useBranchScope() is the read hook.
+
   // Onboarding state
   onboarding: OnboardingState;
   setHasSeenWelcome: (seen: boolean) => void;
@@ -59,6 +71,22 @@ export const useUiStore = create<UiState>()(
 
       setSidebarCollapsed: (collapsed: boolean) => {
         set({ isSidebarCollapsed: collapsed });
+      },
+
+      // v2.8.88 — section collapse
+      collapsedSections: {},
+      toggleSection: (sectionId: string) => {
+        set((state) => ({
+          collapsedSections: {
+            ...state.collapsedSections,
+            [sectionId]: !state.collapsedSections[sectionId],
+          },
+        }));
+      },
+      setSectionCollapsed: (sectionId: string, collapsed: boolean) => {
+        set((state) => ({
+          collapsedSections: { ...state.collapsedSections, [sectionId]: collapsed },
+        }));
       },
 
       // Onboarding state
@@ -133,6 +161,7 @@ export const useUiStore = create<UiState>()(
       name: 'ui-storage',
       partialize: (state) => ({
         isSidebarCollapsed: state.isSidebarCollapsed,
+        collapsedSections: state.collapsedSections,
         onboarding: state.onboarding,
         defaultReceiptPrinterId: state.defaultReceiptPrinterId,
         defaultKitchenPrinterId: state.defaultKitchenPrinterId,

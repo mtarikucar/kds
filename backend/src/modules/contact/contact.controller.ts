@@ -8,19 +8,22 @@ import {
   Post,
   Query,
   UseGuards,
-} from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
-import { ContactService } from './contact.service';
-import { CreateContactDto } from './dto/create-contact.dto';
-import { Public } from '../auth/decorators/public.decorator';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '../../common/constants/roles.enum';
+} from "@nestjs/common";
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiTags,
+} from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
+import { ContactService } from "./contact.service";
+import { CreateContactDto } from "./dto/create-contact.dto";
+import { Public } from "../auth/decorators/public.decorator";
+import { SuperAdminGuard } from "../superadmin/guards/superadmin.guard";
+import { SuperAdminRoute } from "../superadmin/decorators/superadmin.decorator";
 
-@ApiTags('contact')
-@Controller('contact')
+@ApiTags("contact")
+@Controller("contact")
 export class ContactController {
   constructor(private readonly contactService: ContactService) {}
 
@@ -30,41 +33,48 @@ export class ContactController {
   // SMTP open-relay for spammers.
   @Throttle({ default: { limit: 3, ttl: 60 * 60_000 } })
   @Post()
-  @ApiOperation({ summary: 'Submit a contact form message (Public endpoint)' })
-  @ApiResponse({ status: 201, description: 'Message sent successfully' })
+  @ApiOperation({ summary: "Submit a contact form message (Public endpoint)" })
+  @ApiResponse({ status: 201, description: "Message sent successfully" })
   create(@Body() createContactDto: CreateContactDto) {
     return this.contactService.create(createContactDto);
   }
 
+  // Admin moderation endpoints — SuperAdmin only.
+  //
+  // ContactMessage is a PLATFORM-LEVEL model (no tenantId; messages are
+  // addressed to HummyTummy itself via the marketing landing form, often
+  // about competitors, partnership requests, or platform billing). The
+  // earlier @Roles(UserRole.ADMIN) used the tenant-realm ADMIN role, so
+  // every restaurant tenant's admin could enumerate every contact-form
+  // submission to the platform — name, email, phone, message body. Same
+  // privilege issue iter-51 closed on PublicReview. Switch to
+  // SuperAdminGuard so only platform operators can read inbound mail.
+  @UseGuards(SuperAdminGuard)
+  @SuperAdminRoute()
   @Get()
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get paginated contact messages (Admin only)' })
-  findAll(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-  ) {
+  @ApiOperation({ summary: "Get paginated contact messages (SuperAdmin only)" })
+  findAll(@Query("page") page?: string, @Query("limit") limit?: string) {
     const pageNum = page ? parseInt(page, 10) || 1 : 1;
     const limitNum = limit ? parseInt(limit, 10) || 50 : 50;
     return this.contactService.findAll(pageNum, limitNum);
   }
 
-  @Get(':id')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @UseGuards(SuperAdminGuard)
+  @SuperAdminRoute()
+  @Get(":id")
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get a single contact message (Admin only)' })
-  findOne(@Param('id', ParseUUIDPipe) id: string) {
+  @ApiOperation({ summary: "Get a single contact message (SuperAdmin only)" })
+  findOne(@Param("id", ParseUUIDPipe) id: string) {
     return this.contactService.findOne(id);
   }
 
-  @Patch(':id/read')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN)
+  @UseGuards(SuperAdminGuard)
+  @SuperAdminRoute()
+  @Patch(":id/read")
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Mark message as read (Admin only)' })
-  markAsRead(@Param('id', ParseUUIDPipe) id: string) {
+  @ApiOperation({ summary: "Mark message as read (SuperAdmin only)" })
+  markAsRead(@Param("id", ParseUUIDPipe) id: string) {
     return this.contactService.markAsRead(id);
   }
 }

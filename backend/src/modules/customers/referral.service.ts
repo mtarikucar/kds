@@ -4,11 +4,11 @@ import {
   ForbiddenException,
   Injectable,
   Logger,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
-import { LoyaltyService } from './loyalty.service';
-import { generateReferralSuffix } from './customers.helpers';
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../prisma/prisma.service";
+import { LoyaltyService } from "./loyalty.service";
+import { generateReferralSuffix } from "./customers.helpers";
 
 @Injectable()
 export class ReferralService {
@@ -26,21 +26,24 @@ export class ReferralService {
     private loyaltyService: LoyaltyService,
   ) {}
 
-  async generateReferralCode(customerId: string, tenantId: string): Promise<string> {
+  async generateReferralCode(
+    customerId: string,
+    tenantId: string,
+  ): Promise<string> {
     const customer = await this.prisma.customer.findFirst({
       where: { id: customerId, tenantId },
       select: { name: true, referralCode: true },
     });
-    if (!customer) throw new BadRequestException('Customer not found');
+    if (!customer) throw new BadRequestException("Customer not found");
     if (customer.referralCode) return customer.referralCode;
 
     const maxAttempts = 10;
     for (let i = 0; i < maxAttempts; i++) {
       const namePart = customer.name
         .toUpperCase()
-        .replace(/[^A-Z0-9]/g, '')
+        .replace(/[^A-Z0-9]/g, "")
         .substring(0, 4)
-        .padEnd(4, 'X');
+        .padEnd(4, "X");
       const code = `${namePart}${generateReferralSuffix(4)}`;
 
       try {
@@ -56,13 +59,16 @@ export class ReferralService {
         if (updated?.referralCode) return updated.referralCode;
       } catch (err) {
         if (
-          !(err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002')
+          !(
+            err instanceof Prisma.PrismaClientKnownRequestError &&
+            err.code === "P2002"
+          )
         ) {
           throw err;
         }
       }
     }
-    throw new ConflictException('Failed to generate unique referral code');
+    throw new ConflictException("Failed to generate unique referral code");
   }
 
   /**
@@ -83,7 +89,7 @@ export class ReferralService {
   }> {
     const code = referralCode.trim().toUpperCase();
     if (!/^[A-Z0-9]{4,32}$/.test(code)) {
-      throw new BadRequestException('Invalid referral code');
+      throw new BadRequestException("Invalid referral code");
     }
 
     // Per-tenant daily cap on referral grants to cap loyalty-point farming.
@@ -93,117 +99,131 @@ export class ReferralService {
     // (200 × bonus = ~30k farmable points per attack burst).
     const oneDayAgo = new Date(Date.now() - 24 * 60 * 60_000);
 
-    return this.prisma.$transaction(async (tx) => {
-      const todayCount = await tx.customerReferral.count({
-        where: {
-          referrer: { tenantId },
-          createdAt: { gte: oneDayAgo },
-        },
-      });
-      if (todayCount >= this.DAILY_TENANT_CAP) {
-        throw new ForbiddenException('Daily referral limit reached');
-      }
-
-      const referrer = await tx.customer.findFirst({
-        where: { referralCode: code, tenantId },
-        select: { id: true, name: true },
-      });
-      if (!referrer) throw new BadRequestException('Invalid referral code');
-
-      const referredCustomer = await tx.customer.findFirst({
-        where: { id: referredCustomerId, tenantId },
-        select: {
-          id: true,
-          referredBy: true,
-          phoneVerified: true,
-          totalOrders: true,
-        },
-      });
-      if (!referredCustomer) throw new BadRequestException('Customer not found');
-
-      if (!referredCustomer.phoneVerified) {
-        throw new ForbiddenException('Phone must be verified before applying a referral code');
-      }
-      if (referredCustomer.referredBy) {
-        throw new BadRequestException('Customer has already used a referral code');
-      }
-      if (referrer.id === referredCustomerId) {
-        throw new BadRequestException('You cannot use your own referral code');
-      }
-
-      const referral = await tx.customerReferral.create({
-        data: {
-          referrerId: referrer.id,
-          referredId: referredCustomerId,
-          referralCode: code,
-          status: 'COMPLETED',
-          referrerReward: this.REFERRER_BONUS,
-          referredReward: this.REFERRED_BONUS,
-          completedAt: new Date(),
-        },
-      });
-
-      const flagResult = await tx.customer.updateMany({
-        where: { id: referredCustomerId, tenantId, referredBy: null },
-        data: { referredBy: code },
-      });
-      if (flagResult.count !== 1) {
-        throw new ConflictException('Referral already applied');
-      }
-
-      // Inline loyalty mutations to keep the whole flow atomic. These use
-      // the same pattern as LoyaltyService.awardPoints but against the tx
-      // client.
-      const awardInTx = async (customerId: string, points: number, description: string) => {
-        const customer = await tx.customer.findFirstOrThrow({
-          where: { id: customerId, tenantId },
-        });
-        const before = customer.loyaltyPoints;
-        const after = before + points;
-        await tx.customer.updateMany({
-          where: { id: customerId, tenantId },
-          data: { loyaltyPoints: { increment: points } },
-        });
-        await tx.loyaltyTransaction.create({
-          data: {
-            tenantId,
-            customerId,
-            type: 'REFERRAL',
-            points,
-            description,
-            balanceBefore: before,
-            balanceAfter: after,
-            metadata: { additional: { referralId: referral.id } } as any,
+    return this.prisma.$transaction(
+      async (tx) => {
+        const todayCount = await tx.customerReferral.count({
+          where: {
+            referrer: { tenantId },
+            createdAt: { gte: oneDayAgo },
           },
         });
-      };
+        if (todayCount >= this.DAILY_TENANT_CAP) {
+          throw new ForbiddenException("Daily referral limit reached");
+        }
 
-      if (this.REFERRER_BONUS > 0) {
-        await awardInTx(
-          referrer.id,
-          this.REFERRER_BONUS,
-          `Referral bonus for referring customer`,
-        );
-      }
-      if (this.REFERRED_BONUS > 0) {
-        await awardInTx(
-          referredCustomerId,
-          this.REFERRED_BONUS,
-          `Welcome bonus for using referral code ${code}`,
-        );
-      }
+        const referrer = await tx.customer.findFirst({
+          where: { referralCode: code, tenantId },
+          select: { id: true, name: true },
+        });
+        if (!referrer) throw new BadRequestException("Invalid referral code");
 
-      await tx.customerReferral.update({
-        where: { id: referral.id },
-        data: { rewardedAt: new Date() },
-      });
+        const referredCustomer = await tx.customer.findFirst({
+          where: { id: referredCustomerId, tenantId },
+          select: {
+            id: true,
+            referredBy: true,
+            phoneVerified: true,
+            totalOrders: true,
+          },
+        });
+        if (!referredCustomer)
+          throw new BadRequestException("Customer not found");
 
-      return {
-        success: true,
-        referrer: { id: referrer.id, name: referrer.name },
-        bonusAwarded: true,
-      };
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+        if (!referredCustomer.phoneVerified) {
+          throw new ForbiddenException(
+            "Phone must be verified before applying a referral code",
+          );
+        }
+        if (referredCustomer.referredBy) {
+          throw new BadRequestException(
+            "Customer has already used a referral code",
+          );
+        }
+        if (referrer.id === referredCustomerId) {
+          throw new BadRequestException(
+            "You cannot use your own referral code",
+          );
+        }
+
+        const referral = await tx.customerReferral.create({
+          data: {
+            referrerId: referrer.id,
+            referredId: referredCustomerId,
+            referralCode: code,
+            status: "COMPLETED",
+            referrerReward: this.REFERRER_BONUS,
+            referredReward: this.REFERRED_BONUS,
+            completedAt: new Date(),
+          },
+        });
+
+        const flagResult = await tx.customer.updateMany({
+          where: { id: referredCustomerId, tenantId, referredBy: null },
+          data: { referredBy: code },
+        });
+        if (flagResult.count !== 1) {
+          throw new ConflictException("Referral already applied");
+        }
+
+        // Inline loyalty mutations to keep the whole flow atomic. These use
+        // the same pattern as LoyaltyService.awardPoints but against the tx
+        // client.
+        const awardInTx = async (
+          customerId: string,
+          points: number,
+          description: string,
+        ) => {
+          const customer = await tx.customer.findFirstOrThrow({
+            where: { id: customerId, tenantId },
+          });
+          const before = customer.loyaltyPoints;
+          const after = before + points;
+          await tx.customer.updateMany({
+            where: { id: customerId, tenantId },
+            data: { loyaltyPoints: { increment: points } },
+          });
+          await tx.loyaltyTransaction.create({
+            data: {
+              tenantId,
+              customerId,
+              type: "REFERRAL",
+              points,
+              description,
+              balanceBefore: before,
+              balanceAfter: after,
+              metadata: { additional: { referralId: referral.id } } as any,
+            },
+          });
+        };
+
+        if (this.REFERRER_BONUS > 0) {
+          await awardInTx(
+            referrer.id,
+            this.REFERRER_BONUS,
+            `Referral bonus for referring customer`,
+          );
+        }
+        if (this.REFERRED_BONUS > 0) {
+          await awardInTx(
+            referredCustomerId,
+            this.REFERRED_BONUS,
+            `Welcome bonus for using referral code ${code}`,
+          );
+        }
+
+        await tx.customerReferral.update({
+          where: { id: referral.id },
+          data: { rewardedAt: new Date() },
+        });
+
+        return {
+          success: true,
+          referrer: { id: referrer.id, name: referrer.name },
+          bonusAwarded: true,
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
   }
 
   async getReferralStats(customerId: string, tenantId: string) {
@@ -211,22 +231,44 @@ export class ReferralService {
       where: { id: customerId, tenantId },
       select: { referralCode: true },
     });
-    if (!customer) throw new BadRequestException('Customer not found');
+    if (!customer) throw new BadRequestException("Customer not found");
 
-    const referrals = await this.prisma.customerReferral.findMany({
-      where: { referrerId: customerId, referrer: { tenantId } },
-      include: { referred: { select: { name: true } } },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    const totalPointsEarned = referrals
-      .filter((r) => r.rewardedAt)
-      .reduce((sum, r) => sum + r.referrerReward, 0);
+    // Iter-80: count + page-cap on the listing. totalReferrals is the
+    // canonical "how many" — it stays accurate via a separate count()
+    // even if the customer has more than the per-page cap. The list of
+    // rows the public profile renders is bounded so a super-engaged
+    // influencer customer with thousands of referrals doesn't pull
+    // every row through the QR-menu page in one response (each row
+    // carries the referred customer's name; over time that's a
+    // measurable payload).
+    const STATS_PAGE_HARD_CAP = 200;
+    const [referrals, totalReferrals, aggregate] =
+      await this.prisma.$transaction([
+        this.prisma.customerReferral.findMany({
+          where: { referrerId: customerId, referrer: { tenantId } },
+          include: { referred: { select: { name: true } } },
+          orderBy: { createdAt: "desc" },
+          take: STATS_PAGE_HARD_CAP,
+        }),
+        this.prisma.customerReferral.count({
+          where: { referrerId: customerId, referrer: { tenantId } },
+        }),
+        // Sum across ALL rewarded referrals (not just the visible page)
+        // so totalPointsEarned stays canonical regardless of the page cap.
+        this.prisma.customerReferral.aggregate({
+          where: {
+            referrerId: customerId,
+            referrer: { tenantId },
+            rewardedAt: { not: null },
+          },
+          _sum: { referrerReward: true },
+        }),
+      ]);
 
     return {
-      referralCode: customer.referralCode || '',
-      totalReferrals: referrals.length,
-      totalPointsEarned,
+      referralCode: customer.referralCode || "",
+      totalReferrals,
+      totalPointsEarned: aggregate._sum.referrerReward ?? 0,
       referrals: referrals.map((r) => ({
         id: r.id,
         customerName: r.referred.name,
@@ -238,14 +280,11 @@ export class ReferralService {
     };
   }
 
-  async getTenantReferrals(tenantId: string) {
-    return this.prisma.customerReferral.findMany({
-      where: { referrer: { tenantId } },
-      include: {
-        referrer: { select: { id: true, name: true, phone: true } },
-        referred: { select: { id: true, name: true, phone: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
+  // NOTE: a `getTenantReferrals(tenantId)` helper used to live here.
+  // It had no callers (no controller, no scheduler, no service) and
+  // would have returned an unbounded findMany including referrer +
+  // referred phone numbers (PII). Removed in iter-80 so a future
+  // change adding an admin route can't quietly resurrect the
+  // unbounded listing — a fresh implementation will be forced to add
+  // pagination + maskPhone + role-gating from scratch.
 }

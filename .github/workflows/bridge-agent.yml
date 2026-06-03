@@ -1,0 +1,73 @@
+name: Local Bridge Agent
+
+# Build + test the Rust crate under apps/local-bridge-agent.
+#
+# Triggers:
+#   - push / PR that touches the crate or this workflow
+#   - manual dispatch (e.g. cutting a release build)
+#
+# The crate is intentionally NOT in a Cargo workspace at the repo root —
+# it lives standalone so the Node monorepo doesn't grow a Cargo dependency.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/local-bridge-agent/**'
+      - '.github/workflows/bridge-agent.yml'
+  pull_request:
+    paths:
+      - 'apps/local-bridge-agent/**'
+      - '.github/workflows/bridge-agent.yml'
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: cargo check / clippy / test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/local-bridge-agent
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install stable Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      # SQLite + serial-port system deps. Used by `rusqlite` (bundled) and
+      # `serialport` respectively. Bundled rusqlite ships its own SQLite so
+      # libsqlite3-dev is optional, but pkg-config etc. are needed for the
+      # crate's build script.
+      - name: System deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libudev-dev
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/local-bridge-agent/target
+          key: bridge-agent-${{ runner.os }}-${{ hashFiles('apps/local-bridge-agent/Cargo.toml') }}
+
+      - name: Format
+        run: cargo fmt --all -- --check
+
+      - name: Clippy
+        # -D warnings turns lint warnings into errors so they actually
+        # block PRs. Once the crate gets bigger we can relax specific
+        # lints (#[allow]) per-file instead of repo-wide allow-list.
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Test
+        run: cargo test --all-features
+
+      - name: Release build (smoke)
+        # Quick release build to catch link errors that only surface with
+        # LTO + size optimisation enabled. Doesn't upload the artifact —
+        # that's the release-deploy.yml job's responsibility.
+        run: cargo build --release

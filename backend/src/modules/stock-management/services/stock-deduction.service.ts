@@ -3,11 +3,11 @@ import {
   Injectable,
   Logger,
   ConflictException,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { IngredientMovementType } from '../../../common/constants/stock-management.enum';
-import { StockSettingsService } from './stock-settings.service';
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { IngredientMovementType } from "../../../common/constants/stock-management.enum";
+import { StockSettingsService } from "./stock-settings.service";
 
 type Tx = Prisma.TransactionClient;
 
@@ -92,6 +92,7 @@ export class StockDeductionService {
           await this.applyDeduction(
             tx,
             tenantId,
+            order.branchId,
             order.orderNumber,
             orderId,
             deduction,
@@ -117,7 +118,9 @@ export class StockDeductionService {
       if (!recipe) continue;
       const yieldVal = recipe.yield || 1;
       for (const ingredient of recipe.ingredients) {
-        const perServing = new Prisma.Decimal(ingredient.quantity).div(yieldVal);
+        const perServing = new Prisma.Decimal(ingredient.quantity).div(
+          yieldVal,
+        );
         const needed = perServing.mul(orderItem.quantity);
         const existing = acc.get(ingredient.stockItemId);
         if (existing) {
@@ -137,6 +140,7 @@ export class StockDeductionService {
   private async applyDeduction(
     tx: Tx,
     tenantId: string,
+    branchId: string,
     orderNumber: string,
     orderId: string,
     deduction: Deduction,
@@ -154,14 +158,33 @@ export class StockDeductionService {
     // receivedAt) batches first. If we run out of batches before the
     // full quantity is consumed, fall through to the bare stockItem
     // path below so legacy deployments without batches still work.
+    //
+    // v2.8.93 — explicit `nulls: 'last'` on expiryDate. Without it, the
+    // sort order for NULL expiry depends on the underlying DB's ASC
+    // default (PostgreSQL: NULLS LAST; MySQL/SQLite: NULLS FIRST). For
+    // FIFO we always want batches WITH expiry (perishables) consumed
+    // first by oldest expiry, and non-perishable / unknown-expiry
+    // batches drawn down last. Pin the intent regardless of DB.
     const batches = await tx.stockBatch.findMany({
       where: {
         stockItemId: deduction.stockItemId,
         tenantId,
         quantity: { gt: 0 },
       },
-      orderBy: [{ expiryDate: 'asc' }, { receivedAt: 'asc' }],
+      orderBy: [
+        { expiryDate: { sort: "asc", nulls: "last" } },
+        { receivedAt: "asc" },
+      ],
     });
+    // v2.8.93 — track batch-level cost during consumption so the
+    // ingredient movement records the WEIGHTED-AVERAGE cost of the
+    // batches actually drawn down, not the stockItem.costPerUnit
+    // snapshot (which is the rolling average across all receipts and
+    // can drift from the cost of the units actually shipped). When no
+    // batches exist (legacy deployments) we fall back to the
+    // stockItem-level cost below.
+    let consumedFromBatches = new Prisma.Decimal(0);
+    let weightedCostAccumulator = new Prisma.Decimal(0);
     for (const batch of batches) {
       if (remaining.lte(0)) break;
       const fromBatch = Prisma.Decimal.min(remaining, batch.quantity);
@@ -171,9 +194,21 @@ export class StockDeductionService {
       });
       if (updated.count === 0) continue; // lost a race with another deduction
       remaining = remaining.sub(fromBatch);
+      consumedFromBatches = consumedFromBatches.add(fromBatch);
+      if (batch.costPerUnit != null) {
+        weightedCostAccumulator = weightedCostAccumulator.add(
+          new Prisma.Decimal(batch.costPerUnit).mul(fromBatch),
+        );
+      }
     }
 
-    const finalCost = stockItem.costPerUnit ?? null;
+    // Prefer batch-weighted cost when any batches were consumed and at
+    // least one carried a costPerUnit. Otherwise fall back to the
+    // stockItem-level rolling cost.
+    const finalCost =
+      consumedFromBatches.gt(0) && weightedCostAccumulator.gt(0)
+        ? weightedCostAccumulator.div(consumedFromBatches)
+        : (stockItem.costPerUnit ?? null);
 
     // After batch drawdown `remaining` is what the bare stockItem row
     // needs to absorb. Do this as a conditional UPDATE: if
@@ -202,22 +237,41 @@ export class StockDeductionService {
     }
 
     const totalDeducted = deduction.quantity;
+    // v2.8.94 — surface the negative-stock state when allowNegativeStock=true
+    // permits a decrement past zero. Pre-fix this branch logged nothing and
+    // wrote no audit hint on the IngredientMovement, so an inventory
+    // discrepancy (cycle-count miss, supplier short-ship, theft) sat silent
+    // until someone visually scanned the stock list and noticed a negative
+    // currentStock. Now we re-read post-decrement once and, if negative,
+    // tag the movement notes and emit a warn log; the cost-recalc on the
+    // next PO receive (purchase-orders.service) reads the same flag to
+    // clamp its weighted-average math.
+    const refreshed = await tx.stockItem.findFirst({
+      where: { id: deduction.stockItemId, tenantId },
+    });
+    const wentNegative =
+      !!refreshed && new Prisma.Decimal(refreshed.currentStock).lt(0);
+    const movementNotes = wentNegative
+      ? `Order ${orderNumber} ⚠ NEGATIVE_STOCK currentStock=${refreshed!.currentStock}`
+      : `Order ${orderNumber}`;
+    if (wentNegative) {
+      this.logger.warn(
+        `Negative stock after deduction tenant=${tenantId} stockItem=${deduction.stockItemId} (${deduction.stockItemName}) newStock=${refreshed!.currentStock} order=${orderNumber}`,
+      );
+    }
     await tx.ingredientMovement.create({
       data: {
         type: IngredientMovementType.ORDER_DEDUCTION,
         quantity: totalDeducted.neg() as any,
         costPerUnit: finalCost ?? undefined,
-        notes: `Order ${orderNumber}`,
-        referenceType: 'ORDER',
+        notes: movementNotes,
+        referenceType: "ORDER",
         referenceId: orderId,
         stockItemId: deduction.stockItemId,
         tenantId,
+        branchId,
         createdById: userId,
       },
-    });
-
-    const refreshed = await tx.stockItem.findUnique({
-      where: { id: deduction.stockItemId },
     });
     if (
       refreshed &&
@@ -237,25 +291,38 @@ export class StockDeductionService {
       where: {
         tenantId,
         type: IngredientMovementType.ORDER_DEDUCTION,
-        referenceType: 'ORDER',
+        referenceType: "ORDER",
         referenceId: orderId,
       },
     });
     if (movements.length === 0) return;
 
-    const existingReversals = await this.prisma.ingredientMovement.findMany({
-      where: {
-        tenantId,
-        type: IngredientMovementType.ORDER_REVERSAL,
-        referenceType: 'ORDER_REVERSAL',
-        referenceId: orderId,
-      },
-      select: { stockItemId: true },
-    });
-    const reversedItems = new Set(existingReversals.map((m) => m.stockItemId));
-
     return this.prisma.$transaction(
       async (tx) => {
+        // CRITICAL: read existingReversals INSIDE the txn, not above.
+        // The Serializable isolation only protects writes-vs-writes —
+        // it can't see an in-memory Set that was computed before the
+        // txn started. Two concurrent reversal calls (cancel + refund
+        // firing together — the documented case this txn-mode was
+        // chosen for) both read an empty Set outside, both enter the
+        // txn, and both re-create the same ORDER_REVERSAL movements →
+        // stock gets double-credited. Reading inside the txn means
+        // both calls see each other's writes (the second aborts with
+        // 40001 and is retried by Prisma against the new snapshot,
+        // which now includes the first call's reversals).
+        const existingReversals = await tx.ingredientMovement.findMany({
+          where: {
+            tenantId,
+            type: IngredientMovementType.ORDER_REVERSAL,
+            referenceType: "ORDER_REVERSAL",
+            referenceId: orderId,
+          },
+          select: { stockItemId: true },
+        });
+        const reversedItems = new Set(
+          existingReversals.map((m) => m.stockItemId),
+        );
+
         for (const movement of movements) {
           if (reversedItems.has(movement.stockItemId)) continue;
 
@@ -278,11 +345,13 @@ export class StockDeductionService {
               type: IngredientMovementType.ORDER_REVERSAL,
               quantity: reverseQty as any,
               costPerUnit: movement.costPerUnit ?? undefined,
-              notes: `Reversal: order cancellation (${movement.notes ?? ''})`.trim(),
-              referenceType: 'ORDER_REVERSAL',
+              notes:
+                `Reversal: order cancellation (${movement.notes ?? ""})`.trim(),
+              referenceType: "ORDER_REVERSAL",
               referenceId: orderId,
               stockItemId: movement.stockItemId,
               tenantId,
+              branchId: movement.branchId,
               createdById: userId,
             },
           });

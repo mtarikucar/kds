@@ -8,28 +8,28 @@ import {
   Optional,
   Inject,
   forwardRef,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { randomBytes } from 'crypto';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { PosSettingsService } from '../../pos-settings/pos-settings.service';
-import { KdsGateway } from '../../kds/kds.gateway';
-import { CustomersService } from '../../customers/customers.service';
-import { CustomerSessionService } from '../../customers/customer-session.service';
-import { StockDeductionService } from '../../stock-management/services/stock-deduction.service';
-import { CreateCustomerOrderDto } from '../dto/create-customer-order.dto';
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { randomBytes } from "crypto";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { PosSettingsService } from "../../pos-settings/pos-settings.service";
+import { KdsGateway } from "../../kds/kds.gateway";
+import { CustomersService } from "../../customers/customers.service";
+import { CustomerSessionService } from "../../customers/customer-session.service";
+import { StockDeductionService } from "../../stock-management/services/stock-deduction.service";
+import { CreateCustomerOrderDto } from "../dto/create-customer-order.dto";
 import {
   CreateBillRequestDto,
   CreateWaiterRequestDto,
-} from '../dto/waiter-request.dto';
+} from "../dto/waiter-request.dto";
 import {
   OrderStatus,
   OrderType,
-} from '../../../common/constants/order-status.enum';
+} from "../../../common/constants/order-status.enum";
 import {
   isLocationWithinRange,
   isValidCoordinates,
-} from '../../../common/utils/geolocation.util';
+} from "../../../common/utils/geolocation.util";
 
 @Injectable()
 export class CustomerOrdersService {
@@ -48,7 +48,7 @@ export class CustomerOrdersService {
 
   private generateOrderNumber(): string {
     const timestamp = Date.now().toString(36).toUpperCase();
-    const random = randomBytes(4).toString('hex').toUpperCase();
+    const random = randomBytes(4).toString("hex").toUpperCase();
     return `ORD-${timestamp}-${random}`;
   }
 
@@ -59,27 +59,36 @@ export class CustomerOrdersService {
   async createOrder(dto: CreateCustomerOrderDto) {
     // tenantId is resolved from the server-trusted session record, never
     // from the request body — mirrors the customer-public controller fix.
-    const session = await this.customerSessionService.requireSession(dto.sessionId);
+    const session = await this.customerSessionService.requireSession(
+      dto.sessionId,
+    );
     const tenantId = session.tenantId;
 
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
-      select: { id: true, latitude: true, longitude: true, locationRadius: true, status: true },
+      select: {
+        id: true,
+        latitude: true,
+        longitude: true,
+        locationRadius: true,
+        status: true,
+      },
     });
-    if (!tenant) throw new NotFoundException('Tenant not found');
-    if (tenant.status !== 'ACTIVE') throw new ForbiddenException('Tenant is not active');
+    if (!tenant) throw new NotFoundException("Tenant not found");
+    if (tenant.status !== "ACTIVE")
+      throw new ForbiddenException("Tenant is not active");
 
     const posSettings = await this.posSettingsService.findByTenant(tenantId);
     if (!posSettings.enableCustomerOrdering) {
       throw new ForbiddenException(
-        'Customer ordering is currently disabled. Please contact staff to place your order.',
+        "Customer ordering is currently disabled. Please contact staff to place your order.",
       );
     }
 
     if (isValidCoordinates(tenant.latitude, tenant.longitude)) {
       if (!isValidCoordinates(dto.latitude, dto.longitude)) {
         throw new BadRequestException(
-          'Konum bilgisi gerekli. Lütfen tarayıcı konum iznini etkinleştirin.',
+          "Konum bilgisi gerekli. Lütfen tarayıcı konum iznini etkinleştirin.",
         );
       }
       const locationCheck = isLocationWithinRange(
@@ -96,24 +105,45 @@ export class CustomerOrdersService {
       }
     }
 
+    // v3.0.0 — every Order is branch-scoped. With a tableId we read
+    // table.branchId; for tableless mode we fall back to the tenant's
+    // first active branch (the "main counter" for single-branch
+    // tenants; multi-branch tenants who enable tableless mode in
+    // practice configure one specific branch per QR menu URL).
     let orderType: OrderType;
+    let branchId: string;
     if (dto.tableId) {
       const table = await this.prisma.table.findFirst({
         where: { id: dto.tableId, tenantId },
-        select: { id: true },
+        select: { id: true, branchId: true },
       });
-      if (!table) throw new NotFoundException('Table not found');
+      if (!table) throw new NotFoundException("Table not found");
       orderType = dto.type || OrderType.DINE_IN;
+      branchId = table.branchId;
     } else {
       if (!posSettings.enableTablelessMode) {
         throw new BadRequestException(
-          'Tableless ordering is not enabled. Please scan a table QR code to place your order.',
+          "Tableless ordering is not enabled. Please scan a table QR code to place your order.",
         );
       }
       orderType = dto.type || OrderType.COUNTER;
+      const mainBranch = await this.prisma.branch.findFirst({
+        where: { tenantId, status: "active" },
+        orderBy: { createdAt: "asc" },
+        select: { id: true },
+      });
+      if (!mainBranch) {
+        throw new BadRequestException(
+          "Tenant has no active branch — cannot accept tableless orders.",
+        );
+      }
+      branchId = mainBranch.id;
     }
 
-    const validatedItems = await this.validateAndCalculateItems(dto.items, tenantId);
+    const validatedItems = await this.validateAndCalculateItems(
+      dto.items,
+      tenantId,
+    );
 
     const totalAmount = validatedItems.reduce<Prisma.Decimal>(
       (sum, i) => sum.add(i.itemTotal),
@@ -141,6 +171,7 @@ export class CustomerOrdersService {
           data: {
             orderNumber,
             tenantId,
+            branchId,
             tableId: dto.tableId || null,
             sessionId: dto.sessionId,
             customerPhone: dto.customerPhone,
@@ -160,7 +191,7 @@ export class CustomerOrdersService {
                 modifierTotal: item.modifierTotal,
                 subtotal: item.itemTotal,
                 notes: item.notes,
-                status: 'PENDING',
+                status: "PENDING",
                 modifiers: {
                   create: item.modifiers.map((mod) => ({
                     modifierId: mod.modifierId,
@@ -187,9 +218,9 @@ export class CustomerOrdersService {
       } catch (err) {
         if (
           err instanceof Prisma.PrismaClientKnownRequestError &&
-          err.code === 'P2002' &&
+          err.code === "P2002" &&
           Array.isArray((err.meta as any)?.target) &&
-          (err.meta as any).target.includes('orderNumber')
+          (err.meta as any).target.includes("orderNumber")
         ) {
           lastErr = err;
           continue;
@@ -199,10 +230,16 @@ export class CustomerOrdersService {
     }
     if (!createdOrder) {
       this.logger.error(`Order number allocation failed: ${lastErr}`);
-      throw new ConflictException('Could not allocate an order number — please retry');
+      throw new ConflictException(
+        "Could not allocate an order number — please retry",
+      );
     }
 
-    this.kdsGateway.emitNewOrderWithCustomer(tenantId, createdOrder, dto.sessionId);
+    this.kdsGateway.emitNewOrderWithCustomer(
+      tenantId,
+      createdOrder,
+      dto.sessionId,
+    );
 
     // Customer orders start in PENDING_APPROVAL — stock is not deducted until
     // staff approve via OrdersService.approveOrder. We still emit a low-stock
@@ -215,7 +252,11 @@ export class CustomerOrdersService {
           OrderStatus.PENDING_APPROVAL,
         );
         if (deductResult?.lowStockAlerts?.length) {
-          this.kdsGateway.emitLowStockAlert(tenantId, deductResult.lowStockAlerts);
+          this.kdsGateway.emitLowStockAlert(
+            tenantId,
+            branchId,
+            deductResult.lowStockAlerts,
+          );
         }
       } catch (err: any) {
         this.logger.error(
@@ -241,7 +282,7 @@ export class CustomerOrdersService {
         },
         table: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: 50,
     });
   }
@@ -261,7 +302,7 @@ export class CustomerOrdersService {
         approvedBy: { select: { id: true, firstName: true, lastName: true } },
       },
     });
-    if (!order) throw new NotFoundException('Order not found');
+    if (!order) throw new NotFoundException("Order not found");
     return order;
   }
 
@@ -270,43 +311,90 @@ export class CustomerOrdersService {
   // ========================================
 
   async createWaiterRequest(dto: CreateWaiterRequestDto) {
-    const session = await this.customerSessionService.requireSession(dto.sessionId);
+    const session = await this.customerSessionService.requireSession(
+      dto.sessionId,
+    );
     const tenantId = session.tenantId;
 
+    // v3.0.0 — derive branchId from the table the request is bound
+    // to (always set in the QR-scan flow). If a future caller lands
+    // here without a tableId the request would be ambiguous between
+    // multiple branches, so we refuse rather than silently picking
+    // one — keeps the WaiterRequest stream branch-correct.
+    let branchId: string;
     if (dto.tableId) {
       const table = await this.prisma.table.findFirst({
         where: { id: dto.tableId, tenantId },
-        select: { id: true },
+        select: { id: true, branchId: true },
       });
-      if (!table) throw new NotFoundException('Table not found');
+      if (!table) throw new NotFoundException("Table not found");
+      branchId = table.branchId;
+    } else {
+      throw new BadRequestException(
+        "tableId is required to call a waiter — request is otherwise ambiguous across branches.",
+      );
     }
 
-    // Per-session 60s dedupe — matches the existing bill-request pattern and
-    // prevents a customer tapping "Call waiter" 10× in 3s from creating 10 rows.
+    // Dedup. The earlier version ANDed `status active` with `createdAt
+    // recent`, which broke the common case: a still-PENDING waiter
+    // request older than 60s would fail the AND, and the next customer
+    // tap would create a SECOND active row — the POS tray ended up with
+    // two open requests for the same table and the staff acknowledged
+    // both. Switch to OR so:
+    //   - any PENDING/ACKNOWLEDGED row dedupes regardless of age, AND
+    //   - any row (incl. COMPLETED) in the last 60s also dedupes,
+    //     throttling re-requests right after a waiter just finished one.
+    // Mirrors createBillRequest below.
     const oneMinAgo = new Date(Date.now() - 60_000);
     const existing = await this.prisma.waiterRequest.findFirst({
       where: {
         sessionId: dto.sessionId,
         tenantId,
-        status: { in: ['PENDING', 'ACKNOWLEDGED'] },
-        createdAt: { gte: oneMinAgo },
+        OR: [
+          { status: { in: ["PENDING", "ACKNOWLEDGED"] } },
+          { createdAt: { gte: oneMinAgo } },
+        ],
       },
       include: { table: true },
     });
     if (existing) return existing;
 
-    const waiterRequest = await this.prisma.waiterRequest.create({
-      data: {
-        tenantId,
-        tableId: dto.tableId || null,
-        sessionId: dto.sessionId,
-        message: dto.message,
-        status: 'PENDING',
-      },
-      include: { table: true },
-    });
+    // v2.8.98 — wrap the create in a P2002 catch. The partial unique
+    // index `waiter_requests_session_active_uniq` (sessionId, tenantId)
+    // WHERE status='PENDING' closes the last race window that the
+    // findFirst+create pair leaves open: two customer taps landing
+    // millisecond-apart both pass the pre-check, both call .create(),
+    // and the DB index rejects the loser. Return the winner's row so
+    // the caller still gets a 200.
+    let waiterRequest;
+    try {
+      waiterRequest = await this.prisma.waiterRequest.create({
+        data: {
+          tenantId,
+          branchId,
+          tableId: dto.tableId || null,
+          sessionId: dto.sessionId,
+          message: dto.message,
+          status: "PENDING",
+        },
+        include: { table: true },
+      });
+    } catch (err: any) {
+      if (err?.code === "P2002") {
+        const winner = await this.prisma.waiterRequest.findFirst({
+          where: { sessionId: dto.sessionId, tenantId, status: "PENDING" },
+          include: { table: true },
+        });
+        if (winner) return winner;
+      }
+      throw err;
+    }
 
-    this.kdsGateway.emitWaiterRequest(tenantId, waiterRequest);
+    this.kdsGateway.emitWaiterRequest(
+      tenantId,
+      waiterRequest.branchId,
+      waiterRequest,
+    );
     return waiterRequest;
   }
 
@@ -316,44 +404,61 @@ export class CustomerOrdersService {
       where: { sessionId, tenantId: session.tenantId },
       include: {
         table: true,
-        acknowledgedBy: { select: { id: true, firstName: true, lastName: true } },
+        acknowledgedBy: {
+          select: { id: true, firstName: true, lastName: true },
+        },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: 50,
     });
   }
 
   async getActiveWaiterRequests(tenantId: string) {
+    // Iter-86: cap matches the per-session listings above (50 is plenty
+    // for any single dashboard tick on an event-night tenant; 200 here
+    // gives headroom for a large chain summary while still bounding
+    // the payload + PII surface).
     return this.prisma.waiterRequest.findMany({
-      where: { tenantId, status: { in: ['PENDING', 'ACKNOWLEDGED'] } },
+      where: { tenantId, status: { in: ["PENDING", "ACKNOWLEDGED"] } },
       include: {
         table: true,
-        acknowledgedBy: { select: { id: true, firstName: true, lastName: true } },
+        acknowledgedBy: {
+          select: { id: true, firstName: true, lastName: true },
+        },
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
+      take: 200,
     });
   }
 
   async acknowledgeWaiterRequest(id: string, userId: string, tenantId: string) {
     const result = await this.prisma.waiterRequest.updateMany({
-      where: { id, tenantId, status: 'PENDING' },
+      where: { id, tenantId, status: "PENDING" },
       data: {
-        status: 'ACKNOWLEDGED',
+        status: "ACKNOWLEDGED",
         acknowledgedById: userId,
         acknowledgedAt: new Date(),
       },
     });
     if (result.count !== 1) {
-      throw new BadRequestException('Waiter request not found or already acknowledged');
+      throw new BadRequestException(
+        "Waiter request not found or already acknowledged",
+      );
     }
     const updated = await this.prisma.waiterRequest.findFirstOrThrow({
       where: { id, tenantId },
       include: {
         table: true,
-        acknowledgedBy: { select: { id: true, firstName: true, lastName: true } },
+        acknowledgedBy: {
+          select: { id: true, firstName: true, lastName: true },
+        },
       },
     });
-    this.kdsGateway.emitWaiterRequestUpdated(tenantId, updated);
+    this.kdsGateway.emitWaiterRequestUpdated(
+      tenantId,
+      updated.branchId,
+      updated,
+    );
     return updated;
   }
 
@@ -361,32 +466,71 @@ export class CustomerOrdersService {
     const request = await this.prisma.waiterRequest.findFirst({
       where: { id, tenantId },
     });
-    if (!request) throw new NotFoundException('Waiter request not found');
-    if (request.status === 'COMPLETED') {
-      throw new BadRequestException('Waiter request is already completed');
+    if (!request) throw new NotFoundException("Waiter request not found");
+    if (request.status === "COMPLETED") {
+      throw new BadRequestException("Waiter request is already completed");
     }
 
-    const result = await this.prisma.waiterRequest.updateMany({
-      where: { id, tenantId, status: { not: 'COMPLETED' } },
-      data: {
-        status: 'COMPLETED',
-        completedAt: new Date(),
-        acknowledgedById: request.acknowledgedById || userId,
-        acknowledgedAt: request.acknowledgedAt || new Date(),
-      },
+    // Iter-86: complete with TWO disjoint updateMany predicates so a
+    // race between the findFirst snapshot above and the write below
+    // cannot corrupt the acknowledger audit trail.
+    //
+    // Pre-fix shape used a single `acknowledgedById: request.ack || userId`
+    // — if a concurrent acknowledgeWaiterRequest call landed between
+    // the read and the write, our null snapshot OR'd to userId,
+    // overwriting the actual acknowledger's id with the completer's.
+    // The row then claimed "acknowledged by the completer" forever
+    // even though the real acknowledger was someone else.
+    //
+    // Both updateMany calls scope to a STATUS predicate, so they
+    // never both match. The whole pair runs inside one $transaction
+    // — racer either sees PENDING (branch 1 wins) or ACKNOWLEDGED
+    // (branch 2 wins, preserves existing ack metadata) but never
+    // overwrites a non-null acknowledger.
+    const now = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      // Branch 1: row was still PENDING — complete + stamp the ack
+      // metadata from this user (the completer is implicitly also
+      // the acknowledger when nobody acknowledged separately).
+      const fromPending = await tx.waiterRequest.updateMany({
+        where: { id, tenantId, status: "PENDING" },
+        data: {
+          status: "COMPLETED",
+          completedAt: now,
+          acknowledgedById: userId,
+          acknowledgedAt: now,
+        },
+      });
+      if (fromPending.count === 1) return;
+
+      // Branch 2: someone already acknowledged — just close it. Do
+      // NOT touch acknowledgedById / acknowledgedAt; that is the
+      // load-bearing change.
+      const fromAcked = await tx.waiterRequest.updateMany({
+        where: { id, tenantId, status: "ACKNOWLEDGED" },
+        data: { status: "COMPLETED", completedAt: now },
+      });
+      if (fromAcked.count !== 1) {
+        throw new BadRequestException(
+          "Waiter request not found or already completed",
+        );
+      }
     });
-    if (result.count !== 1) {
-      throw new BadRequestException('Waiter request not found or already completed');
-    }
 
     const updated = await this.prisma.waiterRequest.findFirstOrThrow({
       where: { id, tenantId },
       include: {
         table: true,
-        acknowledgedBy: { select: { id: true, firstName: true, lastName: true } },
+        acknowledgedBy: {
+          select: { id: true, firstName: true, lastName: true },
+        },
       },
     });
-    this.kdsGateway.emitWaiterRequestUpdated(tenantId, updated);
+    this.kdsGateway.emitWaiterRequestUpdated(
+      tenantId,
+      updated.branchId,
+      updated,
+    );
     return updated;
   }
 
@@ -395,29 +539,39 @@ export class CustomerOrdersService {
   // ========================================
 
   async createBillRequest(dto: CreateBillRequestDto) {
-    const session = await this.customerSessionService.requireSession(dto.sessionId);
+    const session = await this.customerSessionService.requireSession(
+      dto.sessionId,
+    );
     const tenantId = session.tenantId;
 
+    let branchId: string;
     if (dto.tableId) {
       const table = await this.prisma.table.findFirst({
         where: { id: dto.tableId, tenantId },
-        select: { id: true },
+        select: { id: true, branchId: true },
       });
-      if (!table) throw new NotFoundException('Table not found');
+      if (!table) throw new NotFoundException("Table not found");
+      branchId = table.branchId;
+    } else {
+      throw new BadRequestException(
+        "tableId is required to request the bill — request is otherwise ambiguous across branches.",
+      );
     }
 
     // Coalesce: returning a PENDING/ACKNOWLEDGED row covers the common
-    // "waiter hasn't gotten to me yet" case, but a customer can also
-    // tap the button immediately after one was COMPLETED. Add a 60s
-    // window — mirrors createWaiterRequest — so the POS tray doesn't
-    // get spammed by an impatient table.
+    // "waiter hasn't gotten to me yet" case (ANY age — a slow staff
+    // member shouldn't open the door to dup rows). The second OR clause
+    // catches the "immediately after COMPLETED" tap-spam case with a
+    // 60s throttle window. createWaiterRequest above uses the same
+    // shape — see the comment block there for the bug that motivated
+    // OR over AND.
     const oneMinAgo = new Date(Date.now() - 60_000);
     const existing = await this.prisma.billRequest.findFirst({
       where: {
         sessionId: dto.sessionId,
         tenantId,
         OR: [
-          { status: { in: ['PENDING', 'ACKNOWLEDGED'] } },
+          { status: { in: ["PENDING", "ACKNOWLEDGED"] } },
           { createdAt: { gte: oneMinAgo } },
         ],
       },
@@ -425,17 +579,36 @@ export class CustomerOrdersService {
     });
     if (existing) return existing;
 
-    const billRequest = await this.prisma.billRequest.create({
-      data: {
-        tenantId,
-        tableId: dto.tableId || null,
-        sessionId: dto.sessionId,
-        status: 'PENDING',
-      },
-      include: { table: true },
-    });
+    // v2.8.98 — see createWaiterRequest above; same partial-unique
+    // race close (bill_requests_session_active_uniq).
+    let billRequest;
+    try {
+      billRequest = await this.prisma.billRequest.create({
+        data: {
+          tenantId,
+          branchId,
+          tableId: dto.tableId || null,
+          sessionId: dto.sessionId,
+          status: "PENDING",
+        },
+        include: { table: true },
+      });
+    } catch (err: any) {
+      if (err?.code === "P2002") {
+        const winner = await this.prisma.billRequest.findFirst({
+          where: { sessionId: dto.sessionId, tenantId, status: "PENDING" },
+          include: { table: true },
+        });
+        if (winner) return winner;
+      }
+      throw err;
+    }
 
-    this.kdsGateway.emitBillRequest(tenantId, billRequest);
+    this.kdsGateway.emitBillRequest(
+      tenantId,
+      billRequest.branchId,
+      billRequest,
+    );
     return billRequest;
   }
 
@@ -445,44 +618,54 @@ export class CustomerOrdersService {
       where: { sessionId, tenantId: session.tenantId },
       include: {
         table: true,
-        acknowledgedBy: { select: { id: true, firstName: true, lastName: true } },
+        acknowledgedBy: {
+          select: { id: true, firstName: true, lastName: true },
+        },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: 50,
     });
   }
 
   async getActiveBillRequests(tenantId: string) {
+    // Iter-86: same cap rationale as getActiveWaiterRequests above.
     return this.prisma.billRequest.findMany({
-      where: { tenantId, status: { in: ['PENDING', 'ACKNOWLEDGED'] } },
+      where: { tenantId, status: { in: ["PENDING", "ACKNOWLEDGED"] } },
       include: {
         table: true,
-        acknowledgedBy: { select: { id: true, firstName: true, lastName: true } },
+        acknowledgedBy: {
+          select: { id: true, firstName: true, lastName: true },
+        },
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
+      take: 200,
     });
   }
 
   async acknowledgeBillRequest(id: string, userId: string, tenantId: string) {
     const result = await this.prisma.billRequest.updateMany({
-      where: { id, tenantId, status: 'PENDING' },
+      where: { id, tenantId, status: "PENDING" },
       data: {
-        status: 'ACKNOWLEDGED',
+        status: "ACKNOWLEDGED",
         acknowledgedById: userId,
         acknowledgedAt: new Date(),
       },
     });
     if (result.count !== 1) {
-      throw new BadRequestException('Bill request not found or already acknowledged');
+      throw new BadRequestException(
+        "Bill request not found or already acknowledged",
+      );
     }
     const updated = await this.prisma.billRequest.findFirstOrThrow({
       where: { id, tenantId },
       include: {
         table: true,
-        acknowledgedBy: { select: { id: true, firstName: true, lastName: true } },
+        acknowledgedBy: {
+          select: { id: true, firstName: true, lastName: true },
+        },
       },
     });
-    this.kdsGateway.emitBillRequestUpdated(tenantId, updated);
+    this.kdsGateway.emitBillRequestUpdated(tenantId, updated.branchId, updated);
     return updated;
   }
 
@@ -490,30 +673,48 @@ export class CustomerOrdersService {
     const request = await this.prisma.billRequest.findFirst({
       where: { id, tenantId },
     });
-    if (!request) throw new NotFoundException('Bill request not found');
-    if (request.status === 'COMPLETED') {
-      throw new BadRequestException('Bill request is already completed');
+    if (!request) throw new NotFoundException("Bill request not found");
+    if (request.status === "COMPLETED") {
+      throw new BadRequestException("Bill request is already completed");
     }
-    const result = await this.prisma.billRequest.updateMany({
-      where: { id, tenantId, status: { not: 'COMPLETED' } },
-      data: {
-        status: 'COMPLETED',
-        completedAt: new Date(),
-        acknowledgedById: request.acknowledgedById || userId,
-        acknowledgedAt: request.acknowledgedAt || new Date(),
-      },
+
+    // Iter-86: same TOCTOU fix as completeWaiterRequest above. Split
+    // into two status-scoped updateMany calls inside a transaction so
+    // a concurrent acknowledge cannot have its acknowledger id
+    // overwritten by the completer.
+    const now = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      const fromPending = await tx.billRequest.updateMany({
+        where: { id, tenantId, status: "PENDING" },
+        data: {
+          status: "COMPLETED",
+          completedAt: now,
+          acknowledgedById: userId,
+          acknowledgedAt: now,
+        },
+      });
+      if (fromPending.count === 1) return;
+
+      const fromAcked = await tx.billRequest.updateMany({
+        where: { id, tenantId, status: "ACKNOWLEDGED" },
+        data: { status: "COMPLETED", completedAt: now },
+      });
+      if (fromAcked.count !== 1) {
+        throw new BadRequestException(
+          "Bill request not found or already completed",
+        );
+      }
     });
-    if (result.count !== 1) {
-      throw new BadRequestException('Bill request not found or already completed');
-    }
     const updated = await this.prisma.billRequest.findFirstOrThrow({
       where: { id, tenantId },
       include: {
         table: true,
-        acknowledgedBy: { select: { id: true, firstName: true, lastName: true } },
+        acknowledgedBy: {
+          select: { id: true, firstName: true, lastName: true },
+        },
       },
     });
-    this.kdsGateway.emitBillRequestUpdated(tenantId, updated);
+    this.kdsGateway.emitBillRequestUpdated(tenantId, updated.branchId, updated);
     return updated;
   }
 
@@ -522,7 +723,7 @@ export class CustomerOrdersService {
   // ========================================
 
   private async validateAndCalculateItems(
-    items: CreateCustomerOrderDto['items'],
+    items: CreateCustomerOrderDto["items"],
     tenantId: string,
   ) {
     const productIds = items.map((i) => i.productId);
@@ -533,7 +734,10 @@ export class CustomerOrdersService {
           include: {
             group: {
               include: {
-                modifiers: { where: { isAvailable: true }, select: { id: true } },
+                modifiers: {
+                  where: { isAvailable: true },
+                  select: { id: true },
+                },
               },
             },
           },
@@ -544,7 +748,9 @@ export class CustomerOrdersService {
     // Set-based check catches both "unknown product" and "duplicated productId"
     // more correctly than length equality.
     if (products.length !== new Set(productIds).size) {
-      throw new BadRequestException('One or more products are invalid or unavailable');
+      throw new BadRequestException(
+        "One or more products are invalid or unavailable",
+      );
     }
     const productMap = new Map(products.map((p) => [p.id, p]));
 
@@ -595,7 +801,8 @@ export class CustomerOrdersService {
 
     return items.map((item) => {
       const product = productMap.get(item.productId);
-      if (!product) throw new BadRequestException(`Product ${item.productId} not found`);
+      if (!product)
+        throw new BadRequestException(`Product ${item.productId} not found`);
 
       const unitPrice = new Prisma.Decimal(product.price);
       const quantity = new Prisma.Decimal(item.quantity);

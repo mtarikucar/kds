@@ -31,6 +31,7 @@ import { useResponsive } from '../../hooks/useResponsive';
 import Spinner from '../../components/ui/Spinner';
 import { HardwareService, isTauri } from '../../lib/tauri';
 import { useUiStore } from '../../store/uiStore';
+import { useAuthStore } from '../../store/authStore';
 
 // View state type
 type POSView = 'table-selection' | 'order';
@@ -49,27 +50,38 @@ const POSPage = () => {
 
   const [selectedTable, setSelectedTable] = useState<Table | null>(null);
   // Cart persisted in localStorage so an accidental tab close / refresh
-  // doesn't wipe an in-progress order. Key is per-user implicit (the
-  // axios client wires the JWT, and a different login on the same
-  // device would just see this stale cart — acceptable since the table
-  // selector must be re-chosen anyway). A 12h TTL caps how stale that
-  // cart can get: product prices and stock change overnight, and a
-  // morning cashier seeing yesterday's lunch order is worse than empty.
+  // doesn't wipe an in-progress order.
+  //
+  // v2.8.97 — the key is now `pos_cart::<tenantId>::<userId>` so a
+  // logout-then-different-login on the same device cannot see the
+  // previous user's stale cart. Pre-fix the bare `pos_cart` key was
+  // shared across logins; queryClient.clear() on login (added in
+  // v2.8.91) only flushes React Query, not localStorage. The 12h TTL
+  // is unchanged.
   const CART_TTL_MS = 12 * 60 * 60 * 1000;
+  const user = useAuthStore((s) => s.user);
+  const cartStorageKey = user
+    ? `pos_cart::${user.tenantId}::${user.id}`
+    : null;
   const [cartItems, setCartItems] = useState<CartItem[]>(() => {
+    if (!cartStorageKey) return [];
     try {
-      const saved = localStorage.getItem('pos_cart');
+      // One-time legacy migration: drop the pre-v2.8.97 unscoped key
+      // so an upgraded build starts clean instead of cross-user
+      // surfacing.
+      localStorage.removeItem('pos_cart');
+      const saved = localStorage.getItem(cartStorageKey);
       if (!saved) return [];
       const parsed = JSON.parse(saved);
       // Backwards-compat: older runs persisted a bare array. Treat those
       // as expired (no timestamp = age unknown) so we don't carry over
       // arbitrarily-old carts on first upgrade.
       if (!parsed || !Array.isArray(parsed.items) || typeof parsed.savedAt !== 'number') {
-        localStorage.removeItem('pos_cart');
+        localStorage.removeItem(cartStorageKey);
         return [];
       }
       if (Date.now() - parsed.savedAt > CART_TTL_MS) {
-        localStorage.removeItem('pos_cart');
+        localStorage.removeItem(cartStorageKey);
         return [];
       }
       return parsed.items as CartItem[];
@@ -78,15 +90,16 @@ const POSPage = () => {
     }
   });
   useEffect(() => {
+    if (!cartStorageKey) return;
     try {
       localStorage.setItem(
-        'pos_cart',
+        cartStorageKey,
         JSON.stringify({ items: cartItems, savedAt: Date.now() }),
       );
     } catch {
       // Storage unavailable (private mode, quota exceeded) — drop silently.
     }
-  }, [cartItems]);
+  }, [cartItems, cartStorageKey]);
   const [discount, setDiscount] = useState(0);
   const [customerName, setCustomerName] = useState('');
   const [orderNotes, setOrderNotes] = useState('');

@@ -1,6 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../../../prisma/prisma.service';
+// v2.8.95 — every cron in this file mutates shared rows or creates
+// new ones. Without per-replica coordination the followup-reminder
+// loop in particular fires the duplicate-check + create pair on
+// every replica, producing one notification per replica per lead.
+import { withAdvisoryLock } from '../../../common/scheduling/advisory-lock';
+import { MarketingLeadsService } from './marketing-leads.service';
 
 /**
  * Background jobs that keep marketing data tidy:
@@ -27,41 +33,94 @@ const NOTIFICATION_TTL_DAYS = 30;
 export class MarketingSchedulerService {
   private readonly logger = new Logger(MarketingSchedulerService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly leads: MarketingLeadsService,
+  ) {}
+
+  // Step D saga safety net: finalize conversions that provisioned a tenant
+  // (via the core port) but failed to commit their marketing-side state and
+  // were never retried. Advisory-locked so only one replica sweeps.
+  @Cron(CronExpression.EVERY_HOUR, { name: 'marketing-orphan-reconcile' })
+  async reconcileOrphanConversions(): Promise<{ reconciled: number }> {
+    let outcome = { reconciled: 0 };
+    await withAdvisoryLock(
+      this.prisma,
+      'marketing-orphan-reconcile',
+      async () => {
+        outcome = await this.leads.reconcileOrphanProvisionedConversions();
+        if (outcome.reconciled > 0) {
+          this.logger.warn(
+            `orphan-reconcile: finalized ${outcome.reconciled} provisioned conversion(s)`,
+          );
+        }
+      },
+      this.logger,
+    );
+    return outcome;
+  }
 
   @Cron(CronExpression.EVERY_30_MINUTES, { name: 'marketing-offer-expire' })
   async expireOffers(): Promise<{ expired: number }> {
-    const now = new Date();
-    const result = await this.prisma.leadOffer.updateMany({
-      where: {
-        status: 'SENT',
-        validUntil: { lt: now, not: null },
+    let outcome = { expired: 0 };
+    await withAdvisoryLock(
+      this.prisma,
+      'marketing-offer-expire',
+      async () => {
+        const now = new Date();
+        const result = await this.prisma.leadOffer.updateMany({
+          where: { status: 'SENT', validUntil: { lt: now, not: null } },
+          data: { status: 'EXPIRED' },
+        });
+        if (result.count > 0) {
+          this.logger.log(`offer-expire: marked ${result.count} offer(s) EXPIRED`);
+        }
+        outcome = { expired: result.count };
       },
-      data: { status: 'EXPIRED' },
-    });
-    if (result.count > 0) {
-      this.logger.log(`offer-expire: marked ${result.count} offer(s) EXPIRED`);
-    }
-    return { expired: result.count };
+      this.logger,
+    );
+    return outcome;
   }
 
   @Cron(CronExpression.EVERY_DAY_AT_3AM, { name: 'marketing-notification-cleanup' })
   async cleanupOldNotifications(): Promise<{ deleted: number }> {
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - NOTIFICATION_TTL_DAYS);
-    const result = await this.prisma.marketingNotification.deleteMany({
-      where: { createdAt: { lt: cutoff } },
-    });
-    if (result.count > 0) {
-      this.logger.log(
-        `notification-cleanup: deleted ${result.count} notification(s) older than ${NOTIFICATION_TTL_DAYS}d`,
-      );
-    }
-    return { deleted: result.count };
+    let outcome = { deleted: 0 };
+    await withAdvisoryLock(
+      this.prisma,
+      'marketing-notification-cleanup',
+      async () => {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - NOTIFICATION_TTL_DAYS);
+        const result = await this.prisma.marketingNotification.deleteMany({
+          where: { createdAt: { lt: cutoff } },
+        });
+        if (result.count > 0) {
+          this.logger.log(
+            `notification-cleanup: deleted ${result.count} notification(s) older than ${NOTIFICATION_TTL_DAYS}d`,
+          );
+        }
+        outcome = { deleted: result.count };
+      },
+      this.logger,
+    );
+    return outcome;
   }
 
   @Cron('0 9 * * *', { name: 'marketing-followup-reminder' })
   async fireFollowUpReminders(): Promise<{ reminded: number }> {
+    let outcome = { reminded: 0 };
+    await withAdvisoryLock(
+      this.prisma,
+      'marketing-followup-reminder',
+      async () => {
+        outcome = await this.fireFollowUpRemindersInner();
+      },
+      this.logger,
+    );
+    return outcome;
+  }
+
+  private async fireFollowUpRemindersInner(): Promise<{ reminded: number }> {
     const now = new Date();
     const tomorrow = new Date(now.getTime() + 24 * 60 * 60_000);
 

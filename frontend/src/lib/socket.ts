@@ -1,5 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import { useAuthStore } from '../store/authStore';
+import { useBranchScopeStore } from '../store/branchScopeStore';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000';
 
@@ -27,16 +28,18 @@ export const initializeSocket = (): Socket => {
   }
 
   const token = useAuthStore.getState().accessToken;
+  const branchId = useBranchScopeStore.getState().branchId;
 
+  // v3.0.0 — the staff socket must carry branchId on connect so the
+  // backend KDS gateway can scope its room membership to a single
+  // (tenantId, branchId) tuple. Pre-v3 the room layout was
+  // tenant-only and a WAITER pinned to branch A still saw branch B's
+  // order:new events.
   socket = io(`${SOCKET_URL}/kds`, {
-    auth: { token },
+    auth: { token, branchId },
     transports: ['websocket', 'polling'],
   });
 
-  // React to token rotation: HTTP interceptor bumps useAuthStore.accessToken
-  // when it refreshes; we replay the new JWT on the socket and reconnect so
-  // the backend's tokenVersion-based revocation actually lands. Without this
-  // a revoked token keeps its gateway connection until the next reconnect.
   useAuthStore.subscribe((state, prev) => {
     if (state.accessToken !== prev.accessToken && socket) {
       (socket.auth as any).token = state.accessToken ?? undefined;
@@ -46,8 +49,17 @@ export const initializeSocket = (): Socket => {
     }
   });
 
+  // v3.0.0 — react to BranchPicker changes by emitting `switchBranch`
+  // to the live socket. The backend moves the connection between
+  // rooms without a reconnect; the SPA gets a clean ack/nack from
+  // the server's allow-list check.
+  useBranchScopeStore.subscribe((state, prev) => {
+    if (state.branchId !== prev.branchId && socket?.connected && state.branchId) {
+      socket.emit('switchBranch', { branchId: state.branchId });
+    }
+  });
+
   socket.on('connect_error', (error) => {
-    // Keep one error log (not every retry) — socket.io retries indefinitely.
     console.error('Socket connection error:', error.message);
   });
 
@@ -88,9 +100,10 @@ export const initializeNotificationSocket = (
   }
 
   const token = useAuthStore.getState().accessToken;
+  const branchId = useBranchScopeStore.getState().branchId;
 
   notificationSocket = io(`${SOCKET_URL}/notifications`, {
-    auth: { token },
+    auth: { token, branchId },
     transports: ['websocket', 'polling'],
   });
 
@@ -100,6 +113,19 @@ export const initializeNotificationSocket = (
       if (notificationSocket.connected) {
         notificationSocket.disconnect().connect();
       }
+    }
+  });
+
+  // Branch switch over the notifications socket — same shape as the
+  // KDS socket. The backend updates the tenant:${tenantId}:branch:${branchId}
+  // room membership atomically.
+  useBranchScopeStore.subscribe((state, prev) => {
+    if (
+      state.branchId !== prev.branchId &&
+      notificationSocket?.connected &&
+      state.branchId
+    ) {
+      notificationSocket.emit('switchBranch', { branchId: state.branchId });
     }
   });
 

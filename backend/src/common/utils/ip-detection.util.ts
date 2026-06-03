@@ -1,5 +1,5 @@
-import { Request } from 'express';
-import { isIP } from 'net';
+import { Request } from "express";
+import { isIP } from "net";
 
 /**
  * Extract client IP address from request
@@ -8,21 +8,22 @@ import { isIP } from 'net';
  */
 export function getClientIp(req: Request): string {
   // Check for CF-Connecting-IP header first (Cloudflare — most trustworthy, set by Cloudflare itself)
-  const cfIp = req.headers['cf-connecting-ip'];
-  if (cfIp && typeof cfIp === 'string' && isIP(cfIp)) {
+  const cfIp = req.headers["cf-connecting-ip"];
+  if (cfIp && typeof cfIp === "string" && isIP(cfIp)) {
     return cfIp;
   }
 
   // Check for X-Real-IP header (nginx)
-  const realIp = req.headers['x-real-ip'];
-  if (realIp && typeof realIp === 'string' && isIP(realIp)) {
+  const realIp = req.headers["x-real-ip"];
+  if (realIp && typeof realIp === "string" && isIP(realIp)) {
     return realIp;
   }
 
   // Check for X-Forwarded-For header (most common with proxies/load balancers)
-  const forwardedFor = req.headers['x-forwarded-for'];
+  const forwardedFor = req.headers["x-forwarded-for"];
   if (forwardedFor) {
-    const ips = typeof forwardedFor === 'string' ? forwardedFor.split(',') : forwardedFor;
+    const ips =
+      typeof forwardedFor === "string" ? forwardedFor.split(",") : forwardedFor;
     const clientIp = ips[0].trim();
     if (isIP(clientIp)) {
       return clientIp;
@@ -30,8 +31,12 @@ export function getClientIp(req: Request): string {
   }
 
   // Check for X-Client-IP header
-  const clientIpHeader = req.headers['x-client-ip'];
-  if (clientIpHeader && typeof clientIpHeader === 'string' && isIP(clientIpHeader)) {
+  const clientIpHeader = req.headers["x-client-ip"];
+  if (
+    clientIpHeader &&
+    typeof clientIpHeader === "string" &&
+    isIP(clientIpHeader)
+  ) {
     return clientIpHeader;
   }
 
@@ -39,13 +44,13 @@ export function getClientIp(req: Request): string {
   const socketIp = req.socket?.remoteAddress;
   if (socketIp) {
     // Handle IPv6 mapped IPv4 addresses
-    if (socketIp.startsWith('::ffff:')) {
+    if (socketIp.startsWith("::ffff:")) {
       return socketIp.substring(7);
     }
     return socketIp;
   }
 
-  return '0.0.0.0';
+  return "0.0.0.0";
 }
 
 /**
@@ -53,12 +58,12 @@ export function getClientIp(req: Request): string {
  */
 export function isPrivateIp(ip: string): boolean {
   // IPv6 private ranges
-  if (ip === '::1') return true; // loopback
-  if (ip.startsWith('fc') || ip.startsWith('fd')) return true; // ULA (fc00::/7)
-  if (ip.startsWith('fe80')) return true; // link-local (fe80::/10)
+  if (ip === "::1") return true; // loopback
+  if (ip.startsWith("fc") || ip.startsWith("fd")) return true; // ULA (fc00::/7)
+  if (ip.startsWith("fe80")) return true; // link-local (fe80::/10)
 
   // IPv4 ranges
-  const parts = ip.split('.').map(part => parseInt(part, 10));
+  const parts = ip.split(".").map((part) => parseInt(part, 10));
 
   if (parts.length !== 4) {
     return false;
@@ -83,10 +88,10 @@ export function isPrivateIp(ip: string): boolean {
 export function getProductionSafeIp(req: Request): string {
   const ip = getClientIp(req);
 
-  if (process.env.NODE_ENV === 'production' && isPrivateIp(ip)) {
+  if (process.env.NODE_ENV === "production" && isPrivateIp(ip)) {
     console.warn(
       `[IP Detection] Private IP detected in production: ${ip}. ` +
-      `Check your proxy/load balancer configuration to forward real client IPs.`
+        `Check your proxy/load balancer configuration to forward real client IPs.`,
     );
   }
 

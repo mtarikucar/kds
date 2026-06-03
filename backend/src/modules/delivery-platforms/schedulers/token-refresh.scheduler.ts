@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Interval } from '@nestjs/schedule';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { DeliveryAuthService } from '../services/delivery-auth.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { Interval } from "@nestjs/schedule";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { DeliveryAuthService } from "../services/delivery-auth.service";
 
 @Injectable()
 export class TokenRefreshScheduler {
@@ -20,7 +20,9 @@ export class TokenRefreshScheduler {
     try {
       const [{ locked }] = await this.prisma.$queryRawUnsafe<
         { locked: boolean }[]
-      >(`SELECT pg_try_advisory_lock(${this.lockId('token-refresh')}) AS locked`);
+      >(
+        `SELECT pg_try_advisory_lock(${this.lockId("token-refresh")}) AS locked`,
+      );
       if (!locked) return;
       try {
         const count = await this.authService.refreshExpiringTokens();
@@ -31,7 +33,7 @@ export class TokenRefreshScheduler {
         this.logger.error(`Token refresh scheduler error: ${error.message}`);
       } finally {
         await this.prisma.$queryRawUnsafe(
-          `SELECT pg_advisory_unlock(${this.lockId('token-refresh')})`,
+          `SELECT pg_advisory_unlock(${this.lockId("token-refresh")})`,
         );
       }
     } finally {

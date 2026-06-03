@@ -1,9 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { AdapterFactory } from '../adapters/adapter-factory';
-import { DeliveryConfigService } from './delivery-config.service';
-import { DeliveryLogService } from './delivery-log.service';
-import { PlatformLogDirection, PlatformLogAction } from '../constants/platform.enum';
+import { Injectable, Logger } from "@nestjs/common";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { AdapterFactory } from "../adapters/adapter-factory";
+import { DeliveryConfigService } from "./delivery-config.service";
+import { DeliveryLogService } from "./delivery-log.service";
+import {
+  PlatformLogDirection,
+  PlatformLogAction,
+} from "../constants/platform.enum";
 
 @Injectable()
 export class DeliveryAuthService {

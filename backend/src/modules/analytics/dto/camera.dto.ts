@@ -1,32 +1,48 @@
-import { IsString, IsOptional, IsEnum, IsNumber, IsObject, Min, Max } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { CameraStreamType, CameraStatus } from '../enums/analytics.enum';
-import { EmptyStringToNumber } from '../../../common/dto/transforms';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsNumber,
+  IsObject,
+  Min,
+  Max,
+} from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { CameraStreamType, CameraStatus } from "../enums/analytics.enum";
+import { EmptyStringToNumber } from "../../../common/dto/transforms";
 
 export class CreateCameraDto {
-  @ApiProperty({ description: 'Camera name', example: 'Main Entrance Camera' })
+  @ApiProperty({ description: "Camera name", example: "Main Entrance Camera" })
   @IsString()
   name: string;
 
-  @ApiPropertyOptional({ description: 'Camera description' })
+  @ApiPropertyOptional({ description: "Camera description" })
   @IsString()
   @IsOptional()
   description?: string;
 
-  @ApiProperty({ description: 'Stream URL (RTSP/ONVIF)', example: 'rtsp://admin:password@192.168.1.100:554/stream1' })
+  @ApiProperty({
+    description: "Stream URL (RTSP/ONVIF)",
+    example: "rtsp://admin:password@192.168.1.100:554/stream1",
+  })
   @IsString()
   streamUrl: string;
 
   @ApiPropertyOptional({
-    description: 'Stream type',
+    description: "Stream type",
     enum: CameraStreamType,
-    default: CameraStreamType.RTSP
+    default: CameraStreamType.RTSP,
   })
   @IsEnum(CameraStreamType)
   @IsOptional()
   streamType?: CameraStreamType;
 
-  @ApiPropertyOptional({ description: 'Horizontal rotation in degrees', default: 0, minimum: 0, maximum: 360 })
+  @ApiPropertyOptional({
+    description: "Horizontal rotation in degrees",
+    default: 0,
+    minimum: 0,
+    maximum: 360,
+  })
   @EmptyStringToNumber()
   @IsNumber()
   @Min(0)
@@ -34,7 +50,12 @@ export class CreateCameraDto {
   @IsOptional()
   rotationY?: number;
 
-  @ApiPropertyOptional({ description: 'Field of view in degrees', default: 90, minimum: 30, maximum: 180 })
+  @ApiPropertyOptional({
+    description: "Field of view in degrees",
+    default: 90,
+    minimum: 30,
+    maximum: 180,
+  })
   @EmptyStringToNumber()
   @IsNumber()
   @Min(30)
@@ -42,29 +63,29 @@ export class CreateCameraDto {
   @IsOptional()
   fov?: number;
 
-  @ApiPropertyOptional({ description: 'Floor plan calibration data' })
+  @ApiPropertyOptional({ description: "Floor plan calibration data" })
   @IsObject()
   @IsOptional()
   calibrationData?: Record<string, unknown>;
 
-  @ApiPropertyOptional({ description: 'Edge device ID for processing' })
+  @ApiPropertyOptional({ description: "Edge device ID for processing" })
   @IsString()
   @IsOptional()
   edgeDeviceId?: string;
 }
 
 export class UpdateCameraDto {
-  @ApiPropertyOptional({ description: 'Camera name' })
+  @ApiPropertyOptional({ description: "Camera name" })
   @IsString()
   @IsOptional()
   name?: string;
 
-  @ApiPropertyOptional({ description: 'Camera description' })
+  @ApiPropertyOptional({ description: "Camera description" })
   @IsString()
   @IsOptional()
   description?: string;
 
-  @ApiPropertyOptional({ description: 'Stream URL' })
+  @ApiPropertyOptional({ description: "Stream URL" })
   @IsString()
   @IsOptional()
   streamUrl?: string;

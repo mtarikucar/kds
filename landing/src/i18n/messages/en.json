@@ -9,6 +9,7 @@
     "features": "Features",
     "pricing": "Pricing",
     "security": "Security",
+    "store": "Shop",
     "signIn": "Sign in",
     "startFree": "Start free",
     "openMenu": "Open menu",
@@ -284,8 +285,8 @@
   "footer": {
     "description": "The modern restaurant management platform. Streamline operations, delight customers.",
     "contact": "Contact",
-    "address": "Bosna Hersek Mahallesi, Akif Sokak, No.3 Selçuklu, Konya",
-    "phone": "+90 506 068 71 00",
+    "address": "Şehit Osman Avcı Mahallesi, Akın 688 Sitesi B32, Etimesgut / Ankara",
+    "phone": "+90 850 840 73 03",
     "product": "Product",
     "company": "Company",
     "support": "Support",
@@ -294,6 +295,7 @@
       "features": "Features",
       "pricing": "Pricing",
       "security": "Security",
+      "shop": "Hardware Shop",
       "integrations": "Integrations",
       "about": "About",
       "blog": "Blog",
@@ -429,12 +431,81 @@
       }
     }
   },
+  "store": {
+    "title": "POS Hardware Shop",
+    "subtitle": "Curated point-of-sale terminals, thermal printers, KDS screens, scanners, caller-ID modules, and accessories for restaurants, cafés, and retail.",
+    "backToHome": "Back to home",
+    "headerBadge": "May 2026 pricing",
+    "categoryAll": "All",
+    "categories": {
+      "yazarkasa": "Fiscal POS (YN ÖKC)",
+      "pos_terminal": "POS Terminal",
+      "printer": "Printer",
+      "kds_screen": "KDS Screen",
+      "tablet": "Tablet",
+      "scanner": "Barcode Scanner",
+      "caller_id": "Caller ID",
+      "cash_drawer": "Cash Drawer",
+      "bridge": "Network Bridge",
+      "scale": "Scale",
+      "cable": "Cable",
+      "accessory": "Accessory",
+      "service": "Service"
+    },
+    "buy": "Order now",
+    "viewSource": "Manufacturer page",
+    "from": "{currency}{amount}",
+    "warrantyMonths": "{months}-month warranty",
+    "rentalFrom": "or {currency}{amount}/mo rental",
+    "gibCertified": "GİB-certified YN ÖKC",
+    "outOfStock": "Out of stock",
+    "discontinued": "Discontinued",
+    "preorder": "Pre-order",
+    "empty": "No products in this category yet.",
+    "loadError": "We couldn't load the products right now. Please try again in a few minutes.",
+    "byo": {
+      "title": "Already own equipment?",
+      "body": "We can integrate your existing fiscal POS, thermal printer, KDS screen, or barcode scanner into the platform — you don't have to buy new hardware. After you sign up, share the brand and model with our support team and we'll confirm compatibility together.",
+      "cta": "Talk to support"
+    },
+    "gibFootnote": "Turkey's Next-Generation Fiscal POS (YN ÖKC) devices must appear on the GİB approved list and be activated through an authorized dealer. Orders placed via HummyTummy automatically open an activation request. Full list at ynokc.gib.gov.tr.",
+    "viewDetails": "Details",
+    "services": {
+      "sectionTitle": "Installation & Integration Services",
+      "sectionSubtitle": "Hardware install, GİB registration, Yemeksepeti/Trendyol integration, menu migration — whether we come on-site or work remotely, every package is transparent."
+    },
+    "detail": {
+      "backToStore": "Back to store",
+      "buy": "Order",
+      "duration": "Duration",
+      "coverage": "Service areas",
+      "onsite": "On-site",
+      "remote": "Remote",
+      "consultation": "Consultation",
+      "requiresBranch": "Branch required",
+      "lowStock": "Only {n} left",
+      "warrantyMonthsLabel": "{months}-month manufacturer warranty",
+      "noDetailsAuthored": "Detailed information for this product has not been authored yet. Reach out to support with questions.",
+      "empty": "No information.",
+      "tabs": {
+        "description": "Description",
+        "specs": "Specs",
+        "compat": "Compatibility",
+        "requirements": "Requirements",
+        "faq": "FAQ",
+        "includes": "What's included",
+        "steps": "Process"
+      }
+    }
+  },
   "contact": {
     "title": "Contact",
     "subtitle": "Get in touch for questions, requests, and feedback.",
     "backToHome": "Back to home",
+    "phone": "+90 850 840 73 03",
     "labels": {
-      "email": "Email"
+      "email": "Email",
+      "phone": "Phone"
     },
     "sections": {
       "general": {
@@ -461,6 +532,27 @@
           "privacy": "Privacy Policy",
           "terms": "Terms of Service"
         }
+      }
+    },
+    "form": {
+      "title": "Send us a message",
+      "submit": "Send message",
+      "submitting": "Sending…",
+      "honeypotLabel": "Website (leave blank)",
+      "successMessage": "Thanks — we will reply within two business days.",
+      "fields": {
+        "name": "Name",
+        "email": "Email",
+        "phone": "Phone",
+        "message": "Message",
+        "optional": "optional"
+      },
+      "errors": {
+        "nameTooShort": "Name must be at least 2 characters.",
+        "emailInvalid": "Please enter a valid email address.",
+        "messageTooShort": "Message must be at least 10 characters.",
+        "network": "Connection problem — please retry.",
+        "generic": "Could not send the message. Please try again."
       }
     }
   }

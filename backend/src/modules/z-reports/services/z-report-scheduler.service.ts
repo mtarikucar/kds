@@ -1,7 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { ZReportsService } from '../z-reports.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { ZReportsService } from "../z-reports.service";
+import { getTenantMidnight } from "../../../common/helpers/timezone.helper";
 
 @Injectable()
 export class ZReportSchedulerService {
@@ -21,16 +22,18 @@ export class ZReportSchedulerService {
    * duplicate emails. Matches the stock-alerts / delivery-polling
    * / subscription-scheduler pattern already in use.
    */
-  @Cron('*/15 * * * *', { name: 'z-report-email-check' })
+  @Cron("*/15 * * * *", { name: "z-report-email-check" })
   async handleZReportEmails() {
     if (this.isRunning) return;
     this.isRunning = true;
     try {
       const [{ locked }] = await this.prisma.$queryRawUnsafe<
         { locked: boolean }[]
-      >(`SELECT pg_try_advisory_lock(${this.lockId('z-report-scheduler')}) AS locked`);
+      >(
+        `SELECT pg_try_advisory_lock(${this.lockId("z-report-scheduler")}) AS locked`,
+      );
       if (!locked) {
-        this.logger.debug('Another replica holds the z-report scheduler lock');
+        this.logger.debug("Another replica holds the z-report scheduler lock");
         return;
       }
 
@@ -38,13 +41,15 @@ export class ZReportSchedulerService {
         const tenantsAtClosingTime = await this.getTenantsAtClosingTime();
         if (tenantsAtClosingTime.length === 0) return;
 
-        this.logger.log(`Found ${tenantsAtClosingTime.length} tenant(s) at closing time`);
+        this.logger.log(
+          `Found ${tenantsAtClosingTime.length} tenant(s) at closing time`,
+        );
         for (const tenant of tenantsAtClosingTime) {
           await this.processEndOfDayReport(tenant);
         }
       } finally {
         await this.prisma.$queryRawUnsafe(
-          `SELECT pg_advisory_unlock(${this.lockId('z-report-scheduler')})`,
+          `SELECT pg_advisory_unlock(${this.lockId("z-report-scheduler")})`,
         );
       }
     } catch (error: any) {
@@ -76,7 +81,7 @@ export class ZReportSchedulerService {
         reportEmails: {
           isEmpty: false,
         },
-        status: 'ACTIVE',
+        status: "ACTIVE",
       },
       select: {
         id: true,
@@ -98,10 +103,12 @@ export class ZReportSchedulerService {
       if (!tenant.closingTime) continue;
 
       // Parse tenant's closing time (HH:mm format)
-      const [closingHour, closingMinute] = tenant.closingTime.split(':').map(Number);
+      const [closingHour, closingMinute] = tenant.closingTime
+        .split(":")
+        .map(Number);
 
       // Get current time in tenant's timezone
-      const tenantNow = this.getTimeInTimezone(now, tenant.timezone || 'UTC');
+      const tenantNow = this.getTimeInTimezone(now, tenant.timezone || "UTC");
       const currentHour = tenantNow.getHours();
       const currentMinute = tenantNow.getMinutes();
 
@@ -120,9 +127,14 @@ export class ZReportSchedulerService {
         // would then re-enter generateReport every 15min during the
         // closing window, each time throwing a BadRequestException that
         // polluted the error logs.
-        const tenantTzMidnight = this.getTenantMidnight(
+        // Shared helper — the service-side write path uses the same
+        // import (iter-35) so the dedup-read and the generate-and-
+        // send-write key off the same UTC instant for tenant-local
+        // midnight. Previously this class duplicated the function;
+        // keeping one source of truth prevents the two from drifting.
+        const tenantTzMidnight = getTenantMidnight(
           now,
-          tenant.timezone || 'UTC',
+          tenant.timezone || "UTC",
         );
 
         // Check `isFinalized` instead of `emailSent` only — if the report
@@ -142,7 +154,9 @@ export class ZReportSchedulerService {
         if (!existingReport) {
           matchingTenants.push(tenant);
         } else {
-          this.logger.debug(`Report already sent today for tenant ${tenant.name}`);
+          this.logger.debug(
+            `Report already sent today for tenant ${tenant.name}`,
+          );
         }
       }
     }
@@ -150,72 +164,25 @@ export class ZReportSchedulerService {
     return matchingTenants;
   }
 
-  /**
-   * UTC instant representing "today at 00:00" in the tenant's timezone.
-   * Mirrors ZReportsService.computeDayBoundsInTimezone so the scheduler's
-   * "already sent?" lookup hits the row that generateReport actually
-   * created. Uses Intl.DateTimeFormat + offset correction; falls back to
-   * server-local midnight on an unknown tz string.
-   */
-  private getTenantMidnight(now: Date, timezone: string): Date {
-    try {
-      const parts = new Intl.DateTimeFormat('en-CA', {
-        timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      }).formatToParts(now);
-      const y = parseInt(parts.find((p) => p.type === 'year')?.value ?? '1970', 10);
-      const m = parseInt(parts.find((p) => p.type === 'month')?.value ?? '1', 10);
-      const d = parseInt(parts.find((p) => p.type === 'day')?.value ?? '1', 10);
-      const approx = new Date(Date.UTC(y, m - 1, d, 0, 0, 0));
-      const probe = new Intl.DateTimeFormat('en-US', {
-        timeZone: timezone,
-        hour12: false,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-      }).formatToParts(approx);
-      const get = (t: string) => parseInt(probe.find((p) => p.type === t)?.value ?? '0', 10);
-      const zonedAsUtc = Date.UTC(
-        get('year'),
-        get('month') - 1,
-        get('day'),
-        get('hour') % 24,
-        get('minute'),
-        get('second'),
-      );
-      const offset = zonedAsUtc - approx.getTime();
-      return new Date(approx.getTime() - offset);
-    } catch {
-      const fallback = new Date(now);
-      fallback.setHours(0, 0, 0, 0);
-      return fallback;
-    }
-  }
-
   private getTimeInTimezone(date: Date, timezone: string): Date {
     try {
       const options: Intl.DateTimeFormatOptions = {
         timeZone: timezone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
         hour12: false,
       };
 
-      const formatter = new Intl.DateTimeFormat('en-US', options);
+      const formatter = new Intl.DateTimeFormat("en-US", options);
       const parts = formatter.formatToParts(date);
 
       const values: Record<string, number> = {};
       parts.forEach((part) => {
-        if (part.type !== 'literal') {
+        if (part.type !== "literal") {
           values[part.type] = parseInt(part.value, 10);
         }
       });
@@ -235,7 +202,13 @@ export class ZReportSchedulerService {
   }
 
   /**
-   * Process end-of-day report for a tenant
+   * Process end-of-day report for a tenant.
+   *
+   * v3.0.0: Z-Reports are branch-scoped. The scheduler iterates every
+   * active branch under the tenant and generates one report per branch —
+   * each branch closes independently for fiscal purposes. The admin user's
+   * primary branch is used only as a fallback when a tenant has a single
+   * active branch.
    */
   private async processEndOfDayReport(tenant: { id: string; name: string }) {
     this.logger.log(`Processing end-of-day report for tenant: ${tenant.name}`);
@@ -245,45 +218,97 @@ export class ZReportSchedulerService {
       const adminUser = await this.prisma.user.findFirst({
         where: {
           tenantId: tenant.id,
-          role: 'ADMIN',
+          role: "ADMIN",
         },
-        select: { id: true },
+        select: { id: true, primaryBranchId: true },
       });
 
       if (!adminUser) {
-        this.logger.warn(`No admin user found for tenant ${tenant.name}, skipping`);
+        this.logger.warn(
+          `No admin user found for tenant ${tenant.name}, skipping`,
+        );
         return;
       }
 
-      // Generate and send report
-      const result = await this.zReportsService.generateAndSendReport(tenant.id, adminUser.id);
+      // Resolve the branches to close. Prefer all active branches; fall
+      // back to the admin's primary branch when listing branches yields
+      // nothing (e.g. legacy single-branch tenants whose only branch is
+      // referenced solely via User.primaryBranchId).
+      const branches = await this.prisma.branch.findMany({
+        where: { tenantId: tenant.id, status: "active" },
+        select: { id: true },
+      });
+      const branchIds = branches.length
+        ? branches.map((b) => b.id)
+        : adminUser.primaryBranchId
+          ? [adminUser.primaryBranchId]
+          : [];
+
+      if (branchIds.length === 0) {
+        this.logger.warn(
+          `No branches resolved for tenant ${tenant.name}, skipping`,
+        );
+        return;
+      }
+
+      // Generate and send report for each branch
+      for (const branchId of branchIds) {
+        await this.runForBranch(tenant, branchId, adminUser.id);
+      }
+      return;
+    } catch (error) {
+      this.logger.error(
+        `Failed to process report for tenant ${tenant.name}: ${error.message}`,
+      );
+    }
+  }
+
+  private async runForBranch(
+    tenant: { id: string; name: string },
+    branchId: string,
+    userId: string,
+  ) {
+    try {
+      const result = await this.zReportsService.generateAndSendReport(
+        tenant.id,
+        branchId,
+        userId,
+      );
 
       if (result.emailSent) {
-        this.logger.log(`Successfully sent Z-Report email for tenant ${tenant.name}`);
+        this.logger.log(
+          `Successfully sent Z-Report email for tenant ${tenant.name}`,
+        );
       } else {
-        this.logger.warn(`Z-Report generated but email not sent for tenant ${tenant.name}`);
+        this.logger.warn(
+          `Z-Report generated but email not sent for tenant ${tenant.name}`,
+        );
       }
     } catch (error) {
-      this.logger.error(`Failed to process report for tenant ${tenant.name}: ${error.message}`);
+      this.logger.error(
+        `Failed to process report for tenant ${tenant.name}: ${error.message}`,
+      );
     }
   }
 
   /**
    * Manual trigger for testing
    */
-  async triggerReportForTenant(tenantId: string): Promise<{ success: boolean; message: string }> {
+  async triggerReportForTenant(
+    tenantId: string,
+  ): Promise<{ success: boolean; message: string }> {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
       select: { id: true, name: true },
     });
 
     if (!tenant) {
-      return { success: false, message: 'Tenant not found' };
+      return { success: false, message: "Tenant not found" };
     }
 
     try {
       await this.processEndOfDayReport(tenant);
-      return { success: true, message: 'Report processed successfully' };
+      return { success: true, message: "Report processed successfully" };
     } catch (error) {
       return { success: false, message: error.message };
     }

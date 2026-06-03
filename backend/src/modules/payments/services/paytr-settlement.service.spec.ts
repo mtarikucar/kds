@@ -1,18 +1,28 @@
 import { PaytrSettlementService } from './paytr-settlement.service';
 import { mockPrismaClient, MockPrismaClient } from '../../../common/test/prisma-mock.service';
 import { Prisma } from '@prisma/client';
+import { EventTypes } from '../../outbox/event-types';
 
 /**
- * Settlement service tests focused on commission routing (the new RENEWAL
- * path) and ALREADY_TERMINAL idempotency. Full success-path side-effects
- * (period bump, invoice creation, notifications) are exercised by the
- * e2e suite via simulatePaytrSuccess.
+ * Step C decoupling: settlement no longer writes commissions — it determines
+ * the commission KIND and emits `payment.succeeded.v1` inside the settlement
+ * tx. These tests lock the producer side (which kind, when, and "no event on a
+ * plain first activation"); the marketing SettlementCommissionConsumer spec
+ * covers the actual crediting. Plus ALREADY_TERMINAL idempotency.
  */
-describe('PaytrSettlementService — commission routing', () => {
+describe('PaytrSettlementService — payment.succeeded emission', () => {
   let prisma: MockPrismaClient;
   let billing: any;
   let notifications: any;
+  let outbox: { append: jest.Mock };
   let svc: PaytrSettlementService;
+
+  /** The payment.succeeded.v1 calls among all outbox.append invocations. */
+  function paymentSucceededCalls() {
+    return outbox.append.mock.calls.filter(
+      (c: any[]) => c[0]?.type === EventTypes.PaymentSucceeded,
+    );
+  }
 
   const MERCHANT_OID = 'SUB-tenant-1-abc';
   const PLAN_ID = 'plan-pro';
@@ -50,7 +60,16 @@ describe('PaytrSettlementService — commission routing', () => {
     notifications = {
       sendSubscriptionActivated: jest.fn().mockResolvedValue(undefined),
     };
-    svc = new PaytrSettlementService(prisma as any, billing, notifications);
+    outbox = { append: jest.fn().mockResolvedValue('outbox-id') };
+    svc = new PaytrSettlementService(
+      prisma as any,
+      billing,
+      notifications,
+      // Emits SubscriptionActivated/Upgraded AND (Step C) payment.succeeded.v1
+      // inside applySuccess. The mock prisma.$transaction passes prisma itself
+      // as `tx`, so the append lands on this same stub.
+      outbox as any,
+    );
 
     prisma.subscriptionPayment.findUnique.mockResolvedValue(pendingPayment);
     prisma.$transaction.mockImplementation(async (fn: any) => fn(prisma));
@@ -70,63 +89,57 @@ describe('PaytrSettlementService — commission routing', () => {
       ...pendingPayment.subscription,
       status: 'ACTIVE',
     } as any);
-    prisma.lead.findFirst.mockResolvedValue(null);
-    prisma.commission.create.mockResolvedValue({} as any);
   });
 
-  it('credits a RENEWAL commission when a prior SUCCEEDED payment exists', async () => {
-    // Simulate that the subscription already has 1 prior SUCCEEDED payment
+  it('emits payment.succeeded.v1 with kind=renewal when a prior SUCCEEDED payment exists', async () => {
     prisma.subscriptionPayment.count.mockResolvedValue(1);
-    prisma.lead.findFirst.mockResolvedValue({
-      id: 'lead-1',
-      assignedToId: 'marketing-rep-1',
-    } as any);
 
     await svc.settlePayment(MERCHANT_OID, { kind: 'success', paymentType: 'card' });
-    // Let post-commit fire-and-forget complete.
-    await new Promise((r) => setImmediate(r));
 
-    expect(prisma.commission.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        data: expect.objectContaining({
-          type: 'RENEWAL',
-          status: 'PENDING',
-          tenantId: TENANT_ID,
-          leadId: 'lead-1',
-          marketingUserId: 'marketing-rep-1',
-        }),
+    const calls = paymentSucceededCalls();
+    expect(calls).toHaveLength(1);
+    expect(calls[0][0]).toMatchObject({
+      type: EventTypes.PaymentSucceeded,
+      idempotencyKey: 'payment-succeeded:pay-1',
+      payload: expect.objectContaining({
+        kind: 'renewal',
+        tenantId: TENANT_ID,
+        paymentId: 'pay-1',
+        amount: 799,
+        commissionRate: 0.15,
       }),
-    );
+    });
+    // Settlement no longer writes commissions directly.
+    expect(prisma.commission.create).not.toHaveBeenCalled();
   });
 
-  it('does NOT credit a RENEWAL commission on first activation (no prior payments)', async () => {
+  it('emits NO payment.succeeded.v1 on a plain first activation (no prior, no referral)', async () => {
     prisma.subscriptionPayment.count.mockResolvedValue(0);
-    prisma.lead.findFirst.mockResolvedValue({
-      id: 'lead-1',
-      assignedToId: 'marketing-rep-1',
+
+    await svc.settlePayment(MERCHANT_OID, { kind: 'success' });
+
+    expect(paymentSucceededCalls()).toHaveLength(0);
+    expect(prisma.commission.create).not.toHaveBeenCalled();
+  });
+
+  it('emits payment.succeeded.v1 with kind=signup for a referred first activation', async () => {
+    prisma.subscriptionPayment.count.mockResolvedValue(0);
+    prisma.subscriptionPayment.findUnique.mockResolvedValue({
+      ...pendingPayment,
+      referredByMarketingUserId: 'marketing-rep-9',
+      referralCode: 'AHMET42',
     } as any);
 
     await svc.settlePayment(MERCHANT_OID, { kind: 'success' });
-    await new Promise((r) => setImmediate(r));
 
-    // No RENEWAL commission created.
-    const renewalCalls = (prisma.commission.create as any).mock.calls.filter(
-      (c: any[]) => c[0]?.data?.type === 'RENEWAL',
-    );
-    expect(renewalCalls).toHaveLength(0);
-  });
-
-  it('does NOT credit a RENEWAL commission when the tenant has no marketing lead', async () => {
-    prisma.subscriptionPayment.count.mockResolvedValue(2);
-    prisma.lead.findFirst.mockResolvedValue(null);
-
-    await svc.settlePayment(MERCHANT_OID, { kind: 'success' });
-    await new Promise((r) => setImmediate(r));
-
-    const renewalCalls = (prisma.commission.create as any).mock.calls.filter(
-      (c: any[]) => c[0]?.data?.type === 'RENEWAL',
-    );
-    expect(renewalCalls).toHaveLength(0);
+    const calls = paymentSucceededCalls();
+    expect(calls).toHaveLength(1);
+    expect(calls[0][0].payload).toMatchObject({
+      kind: 'signup',
+      referredByMarketingUserId: 'marketing-rep-9',
+      referralCode: 'AHMET42',
+      tenantName: 'Test Restoran',
+    });
   });
 
   it('does not pass utoken-storage logic (paytrRecurringToken removed)', async () => {
@@ -149,7 +162,12 @@ describe('PaytrSettlementService — idempotency', () => {
 
   beforeEach(() => {
     prisma = mockPrismaClient();
-    svc = new PaytrSettlementService(prisma as any, {} as any, {} as any);
+    svc = new PaytrSettlementService(
+      prisma as any,
+      {} as any,
+      {} as any,
+      { append: jest.fn().mockResolvedValue('outbox-id') } as any,
+    );
   });
 
   it('returns UNKNOWN_OID when no payment row matches', async () => {

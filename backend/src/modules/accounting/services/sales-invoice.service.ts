@@ -1,15 +1,27 @@
-import { Injectable, Optional, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { AccountingSettingsService } from './accounting-settings.service';
-import { TaxCalculationService } from './tax-calculation.service';
-import { AccountingSyncService } from './accounting-sync.service';
-import { CreateSalesInvoiceDto, InvoiceQueryDto } from '../dto/create-sales-invoice.dto';
-import { InvoiceStatus } from '../constants/accounting.enum';
-import { paginated } from '../../../common/pagination';
+import {
+  Injectable,
+  Logger,
+  Optional,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { AccountingSettingsService } from "./accounting-settings.service";
+import { TaxCalculationService } from "./tax-calculation.service";
+import { AccountingSyncService } from "./accounting-sync.service";
+import {
+  CreateSalesInvoiceDto,
+  InvoiceQueryDto,
+} from "../dto/create-sales-invoice.dto";
+import { InvoiceStatus } from "../constants/accounting.enum";
+import { paginated } from "../../../common/pagination";
 
 @Injectable()
 export class SalesInvoiceService {
+  private readonly logger = new Logger(SalesInvoiceService.name);
+
   constructor(
     private prisma: PrismaService,
     private settingsService: AccountingSettingsService,
@@ -17,12 +29,16 @@ export class SalesInvoiceService {
     @Optional() private syncService?: AccountingSyncService,
   ) {}
 
-  async createFromOrder(orderId: string, tenantId: string, dto?: CreateSalesInvoiceDto) {
+  async createFromOrder(
+    orderId: string,
+    tenantId: string,
+    dto?: CreateSalesInvoiceDto,
+  ) {
     const order = await this.prisma.order.findFirst({
-      where: { id: orderId, tenantId, status: 'PAID' },
+      where: { id: orderId, tenantId, status: "PAID" },
       include: {
         orderItems: { include: { product: true } },
-        payments: { where: { status: 'COMPLETED' } },
+        payments: { where: { status: "COMPLETED" } },
         // Only the order-level invoice (paymentId null) blocks a
         // second createFromOrder call. Per-payment invoices created
         // by createFromPayment are separate fataralar and don't count
@@ -31,9 +47,9 @@ export class SalesInvoiceService {
       },
     });
 
-    if (!order) throw new NotFoundException('Paid order not found');
+    if (!order) throw new NotFoundException("Paid order not found");
     if (order.salesInvoices.length > 0) {
-      throw new BadRequestException('Invoice already exists for this order');
+      throw new BadRequestException("Invoice already exists for this order");
     }
 
     // Read the non-secret settings once outside the tx — only the counter
@@ -55,9 +71,10 @@ export class SalesInvoiceService {
       }
 
       return {
-        description: item.product?.name || 'Ürün',
+        description: item.product?.name || "Ürün",
         quantity: item.quantity,
-        unitPrice: Math.round((tax.subtotalExcludingTax / item.quantity) * 100) / 100,
+        unitPrice:
+          Math.round((tax.subtotalExcludingTax / item.quantity) * 100) / 100,
         taxRate,
         taxAmount: tax.taxAmount,
         subtotal: tax.subtotalExcludingTax,
@@ -70,7 +87,10 @@ export class SalesInvoiceService {
     const totalAmount = Number(order.finalAmount);
     const discount = Number(order.discount);
 
-    const taxBreakdown: Record<number, { taxableAmount: number; taxAmount: number }> = {};
+    const taxBreakdown: Record<
+      number,
+      { taxableAmount: number; taxAmount: number }
+    > = {};
     for (const item of invoiceItems) {
       if (!taxBreakdown[item.taxRate]) {
         taxBreakdown[item.taxRate] = { taxableAmount: 0, taxAmount: 0 };
@@ -92,61 +112,67 @@ export class SalesInvoiceService {
     // unique, so two concurrent createFromOrder calls would both pass the
     // length===0 check above and both create. Issuing two fataralar for
     // one order violates Turkish e-fatura compliance.
-    const invoice = await this.prisma.$transaction(async (tx) => {
-      const dupe = await tx.salesInvoice.findFirst({
-        where: { orderId: order.id, tenantId, paymentId: null },
-        select: { id: true },
-      });
-      if (dupe) {
-        throw new ConflictException('Invoice already exists for this order');
-      }
-      const invoiceNumber = await this.settingsService.getNextInvoiceNumber(
-        tenantId,
-        tx,
-      );
-      return tx.salesInvoice.create({
-      data: {
-        invoiceNumber,
-        status: InvoiceStatus.ISSUED,
-        customerName: dto?.customerName || order.customerName,
-        customerPhone: dto?.customerPhone || order.customerPhone,
-        customerEmail: dto?.customerEmail,
-        customerTaxId: dto?.customerTaxId,
-        customerTaxOffice: dto?.customerTaxOffice,
-        subtotal: Math.round(subtotal * 100) / 100,
-        taxAmount: Math.round(taxAmount * 100) / 100,
-        totalAmount,
-        discount,
-        taxBreakdown,
-        orderId: order.id,
-        paymentMethod,
-        issueDate: new Date(),
-        dueDate: settings.defaultPaymentTermDays > 0
-          ? new Date(Date.now() + settings.defaultPaymentTermDays * 86400000)
-          : new Date(),
-        tenantId,
-        items: {
-          create: invoiceItems.map((item) => ({
-            description: item.description,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            taxRate: item.taxRate,
-            taxAmount: item.taxAmount,
-            subtotal: item.subtotal,
-            total: item.total,
-          })),
-        },
+    const invoice = await this.prisma.$transaction(
+      async (tx) => {
+        const dupe = await tx.salesInvoice.findFirst({
+          where: { orderId: order.id, tenantId, paymentId: null },
+          select: { id: true },
+        });
+        if (dupe) {
+          throw new ConflictException("Invoice already exists for this order");
+        }
+        const invoiceNumber = await this.settingsService.getNextInvoiceNumber(
+          tenantId,
+          tx,
+        );
+        return tx.salesInvoice.create({
+          data: {
+            invoiceNumber,
+            status: InvoiceStatus.ISSUED,
+            customerName: dto?.customerName || order.customerName,
+            customerPhone: dto?.customerPhone || order.customerPhone,
+            customerEmail: dto?.customerEmail,
+            customerTaxId: dto?.customerTaxId,
+            customerTaxOffice: dto?.customerTaxOffice,
+            subtotal: Math.round(subtotal * 100) / 100,
+            taxAmount: Math.round(taxAmount * 100) / 100,
+            totalAmount,
+            discount,
+            taxBreakdown,
+            orderId: order.id,
+            paymentMethod,
+            issueDate: new Date(),
+            dueDate:
+              settings.defaultPaymentTermDays > 0
+                ? new Date(
+                    Date.now() + settings.defaultPaymentTermDays * 86400000,
+                  )
+                : new Date(),
+            tenantId,
+            items: {
+              create: invoiceItems.map((item) => ({
+                description: item.description,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                taxRate: item.taxRate,
+                taxAmount: item.taxAmount,
+                subtotal: item.subtotal,
+                total: item.total,
+              })),
+            },
+          },
+          include: { items: true },
+        });
       },
-      include: { items: true },
-    });
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
 
     // Auto-sync if enabled
     if (this.syncService) {
       const accSettings = await this.settingsService.findByTenant(tenantId);
-      if (accSettings.autoSync && accSettings.provider !== 'NONE') {
+      if (accSettings.autoSync && accSettings.provider !== "NONE") {
         this.syncService.syncInvoice(invoice.id, tenantId).catch((err) => {
-          console.error('Auto-sync failed:', err.message);
+          this.logger.error(`Auto-sync failed: ${err.message}`);
         });
       }
     }
@@ -168,7 +194,7 @@ export class SalesInvoiceService {
    */
   async createFromPayment(paymentId: string, tenantId: string) {
     const payment = await this.prisma.payment.findFirst({
-      where: { id: paymentId, tenantId, status: 'COMPLETED' },
+      where: { id: paymentId, tenantId, status: "COMPLETED" },
       include: {
         orderItemPayments: {
           include: { orderItem: { include: { product: true } } },
@@ -178,12 +204,12 @@ export class SalesInvoiceService {
       },
     });
 
-    if (!payment) throw new NotFoundException('Completed payment not found');
+    if (!payment) throw new NotFoundException("Completed payment not found");
     if (payment.salesInvoices.length > 0) return payment.salesInvoices[0];
     if (payment.orderItemPayments.length === 0) {
       throw new BadRequestException(
-        'Per-payment invoice requires the Payment to have at least one OrderItemPayment allocation. ' +
-          'Use createFromOrder for order-level invoices.',
+        "Per-payment invoice requires the Payment to have at least one OrderItemPayment allocation. " +
+          "Use createFromOrder for order-level invoices.",
       );
     }
 
@@ -204,11 +230,13 @@ export class SalesInvoiceService {
       const taxRate = item.taxRate ?? 10;
       const tax = this.taxService.extractTax(lineTotal, taxRate);
       return {
-        description: item.product?.name || 'Ürün',
+        description: item.product?.name || "Ürün",
         quantity: alloc.quantity,
-        unitPrice: alloc.quantity > 0
-          ? Math.round((tax.subtotalExcludingTax / alloc.quantity) * 100) / 100
-          : 0,
+        unitPrice:
+          alloc.quantity > 0
+            ? Math.round((tax.subtotalExcludingTax / alloc.quantity) * 100) /
+              100
+            : 0,
         taxRate,
         taxAmount: tax.taxAmount,
         subtotal: tax.subtotalExcludingTax,
@@ -220,7 +248,10 @@ export class SalesInvoiceService {
     const taxAmount = invoiceItems.reduce((s, i) => s + i.taxAmount, 0);
     const totalAmount = Number(payment.amount);
 
-    const taxBreakdown: Record<number, { taxableAmount: number; taxAmount: number }> = {};
+    const taxBreakdown: Record<
+      number,
+      { taxableAmount: number; taxAmount: number }
+    > = {};
     for (const item of invoiceItems) {
       if (!taxBreakdown[item.taxRate]) {
         taxBreakdown[item.taxRate] = { taxableAmount: 0, taxAmount: 0 };
@@ -253,9 +284,12 @@ export class SalesInvoiceService {
             paymentId: payment.id,
             paymentMethod: payment.method,
             issueDate: new Date(),
-            dueDate: settings.defaultPaymentTermDays > 0
-              ? new Date(Date.now() + settings.defaultPaymentTermDays * 86400000)
-              : new Date(),
+            dueDate:
+              settings.defaultPaymentTermDays > 0
+                ? new Date(
+                    Date.now() + settings.defaultPaymentTermDays * 86400000,
+                  )
+                : new Date(),
             tenantId,
             items: {
               create: invoiceItems.map((item) => ({
@@ -275,9 +309,9 @@ export class SalesInvoiceService {
 
       if (this.syncService) {
         const accSettings = await this.settingsService.findByTenant(tenantId);
-        if (accSettings.autoSync && accSettings.provider !== 'NONE') {
+        if (accSettings.autoSync && accSettings.provider !== "NONE") {
           this.syncService.syncInvoice(invoice.id, tenantId).catch((err) => {
-            console.error('Auto-sync failed:', err.message);
+            this.logger.error(`Auto-sync failed: ${err.message}`);
           });
         }
       }
@@ -286,7 +320,7 @@ export class SalesInvoiceService {
     } catch (err: any) {
       // Idempotency: partial unique on paymentId means a retry hits
       // P2002 and we return the winning row.
-      if (err?.code === 'P2002') {
+      if (err?.code === "P2002") {
         const existing = await this.prisma.salesInvoice.findFirst({
           where: { paymentId, tenantId },
           include: { items: true },
@@ -307,19 +341,23 @@ export class SalesInvoiceService {
     }
     if (query.search) {
       where.OR = [
-        { invoiceNumber: { contains: query.search, mode: 'insensitive' } },
-        { customerName: { contains: query.search, mode: 'insensitive' } },
+        { invoiceNumber: { contains: query.search, mode: "insensitive" } },
+        { customerName: { contains: query.search, mode: "insensitive" } },
       ];
     }
 
-    const page = Number(query.page) || 1;
-    const limit = Number(query.limit) || 20;
+    // DTO already caps these (iter-33), but a service-side Math.min is
+    // cheap defence-in-depth: if a future caller bypasses the DTO (a
+    // worker, a cron, an internal RPC) we still don't pull arbitrarily
+    // large pages of invoice rows + nested items.
+    const page = Math.max(1, Number(query.page) || 1);
+    const limit = Math.min(Math.max(1, Number(query.limit) || 20), 200);
 
     const [invoices, total] = await Promise.all([
       this.prisma.salesInvoice.findMany({
         where,
         include: { items: true },
-        orderBy: { issueDate: 'desc' },
+        orderBy: { issueDate: "desc" },
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -334,14 +372,14 @@ export class SalesInvoiceService {
       where: { id, tenantId },
       include: { items: true, order: true },
     });
-    if (!invoice) throw new NotFoundException('Invoice not found');
+    if (!invoice) throw new NotFoundException("Invoice not found");
     return invoice;
   }
 
   async cancel(id: string, tenantId: string) {
     const invoice = await this.findOne(id, tenantId);
     if (invoice.status === InvoiceStatus.CANCELLED) {
-      throw new BadRequestException('Invoice already cancelled');
+      throw new BadRequestException("Invoice already cancelled");
     }
     // Compound WHERE on status + tenantId: race-safe against a concurrent
     // cancel from another admin, and defence-in-depth IDOR so a regression
@@ -351,7 +389,7 @@ export class SalesInvoiceService {
       data: { status: InvoiceStatus.CANCELLED },
     });
     if (claim.count === 0) {
-      throw new BadRequestException('Invoice already cancelled');
+      throw new BadRequestException("Invoice already cancelled");
     }
     return this.prisma.salesInvoice.findUniqueOrThrow({ where: { id } });
   }

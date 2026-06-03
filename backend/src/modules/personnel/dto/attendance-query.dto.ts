@@ -1,8 +1,16 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsOptional, IsString, IsDateString, IsEnum, IsInt, Min, Max } from 'class-validator';
-import { Type } from 'class-transformer';
-import { AttendanceStatus } from '../constants/personnel.enum';
-import { EmptyStringToUndefined } from '../../../common/dto/transforms';
+import { ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  IsOptional,
+  IsString,
+  IsDateString,
+  IsEnum,
+  IsInt,
+  Min,
+  Max,
+} from "class-validator";
+import { Type } from "class-transformer";
+import { AttendanceStatus } from "../constants/personnel.enum";
+import { EmptyStringToUndefined } from "../../../common/dto/transforms";
 
 export class AttendanceQueryDto {
   @ApiPropertyOptional()

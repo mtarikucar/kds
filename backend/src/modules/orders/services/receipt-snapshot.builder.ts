@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 
 /**
  * Bumped when the snapshot shape changes in a non-additive way (renamed or
@@ -164,7 +164,7 @@ export class ReceiptSnapshotBuilder {
         ...oi,
         totalPrice: oi.subtotal,
         modifiers: (oi.modifiers ?? []).map((om: any) => ({
-          name: om.modifier?.name ?? '',
+          name: om.modifier?.name ?? "",
         })),
       })),
     };

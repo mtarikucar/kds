@@ -52,14 +52,20 @@ export class PublishLegalDocumentDto {
   @MaxLength(200)
   title!: string;
 
+  // 256KB cap. Real KVKK / mesafeli / iade documents land in the
+  // 5-20KB range; this leaves an order of magnitude of headroom while
+  // preventing a hijacked superadmin session from stuffing a 100MB
+  // blob into the bodyMarkdown column (the body-parser limit was the
+  // only previous bound).
   @ApiProperty({ description: "Document body in Markdown" })
   @IsString()
   @IsNotEmpty()
+  @MaxLength(256 * 1024)
   bodyMarkdown!: string;
 
   @ApiPropertyOptional({
     description:
-      'When this version takes effect. Defaults to "now". Useful for scheduling pre-announced policy changes.',
+      'When this version takes effect. Defaults to "now". Stored on the row but informational only — getCurrent() returns whichever row has isCurrent=true regardless of effectiveAt. To pre-stage a future policy: publish with isCurrent=false off-band, or publish at the cutover moment.',
   })
   @IsOptional()
   @IsDateString()

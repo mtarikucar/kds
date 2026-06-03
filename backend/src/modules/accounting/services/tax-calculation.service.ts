@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 
 export interface TaxBreakdown {
   subtotalExcludingTax: number;
@@ -64,7 +64,10 @@ export class TaxCalculationService {
       taxRate: number;
     }>,
   ): OrderTaxSummary {
-    const taxBreakdown: Record<number, { taxableAmount: Prisma.Decimal; taxAmount: Prisma.Decimal }> = {};
+    const taxBreakdown: Record<
+      number,
+      { taxableAmount: Prisma.Decimal; taxAmount: Prisma.Decimal }
+    > = {};
     let totalExcTax = D(0);
     let totalTax = D(0);
     let totalIncTax = D(0);
@@ -101,7 +104,10 @@ export class TaxCalculationService {
       };
     });
 
-    const serializedBreakdown: Record<number, { taxableAmount: number; taxAmount: number }> = {};
+    const serializedBreakdown: Record<
+      number,
+      { taxableAmount: number; taxAmount: number }
+    > = {};
     for (const [k, v] of Object.entries(taxBreakdown)) {
       serializedBreakdown[Number(k)] = {
         taxableAmount: round2(v.taxableAmount).toNumber(),

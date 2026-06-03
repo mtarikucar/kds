@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomInt } from 'crypto';
+import { createHash, randomBytes, randomInt } from "crypto";
 
 /**
  * Normalize a phone number to a canonical form so duplicate detection under
@@ -18,19 +18,19 @@ import { createHash, randomBytes, randomInt } from 'crypto';
 export function normalizePhone(raw: string): string {
   if (!raw) return raw;
   const trimmed = raw.trim();
-  const hasPlus = trimmed.startsWith('+');
-  const digits = trimmed.replace(/\D+/g, '');
+  const hasPlus = trimmed.startsWith("+");
+  const digits = trimmed.replace(/\D+/g, "");
   if (!digits) return trimmed;
 
   // Turkish mobile/landline always reduce to 10 digits after the country
   // code. The three shapes below are the ones we keep seeing in the wild.
-  if (digits.length === 11 && digits.startsWith('0')) {
+  if (digits.length === 11 && digits.startsWith("0")) {
     return `+90${digits.slice(1)}`;
   }
-  if (digits.length === 12 && digits.startsWith('90')) {
+  if (digits.length === 12 && digits.startsWith("90")) {
     return `+${digits}`;
   }
-  if (hasPlus && digits.startsWith('90') && digits.length === 12) {
+  if (hasPlus && digits.startsWith("90") && digits.length === 12) {
     return `+${digits}`;
   }
 
@@ -52,8 +52,8 @@ export function generateOtp(): string {
  * for constant-time compare.
  */
 export function hashOtp(code: string): string {
-  const secret = process.env.JWT_SECRET ?? process.env.APP_SECRET ?? '';
-  return createHash('sha256').update(`${secret}:${code}`).digest('hex');
+  const secret = process.env.JWT_SECRET ?? process.env.APP_SECRET ?? "";
+  return createHash("sha256").update(`${secret}:${code}`).digest("hex");
 }
 
 export function constantTimeEquals(a: string, b: string): boolean {
@@ -68,9 +68,9 @@ export function constantTimeEquals(a: string, b: string): boolean {
  * 8 chars from a 32-symbol alphabet = 32^8 = 2^40 codes.
  */
 export function generateReferralSuffix(length = 4): string {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Crockford-ish, no 0/1/I/O
+  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Crockford-ish, no 0/1/I/O
   const bytes = randomBytes(length);
-  let out = '';
+  let out = "";
   for (let i = 0; i < length; i++) {
     out += alphabet[bytes[i] % alphabet.length];
   }

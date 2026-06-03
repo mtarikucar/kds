@@ -1,11 +1,14 @@
-import { Logger } from '@nestjs/common';
-import axios, { AxiosInstance } from 'axios';
-import { Prisma } from '@prisma/client';
-import * as crypto from 'crypto';
-import { AccountingAdapter, AccountingInvoiceData } from './accounting-adapter.interface';
+import { Logger } from "@nestjs/common";
+import axios, { AxiosInstance } from "axios";
+import { Prisma } from "@prisma/client";
+import * as crypto from "crypto";
+import {
+  AccountingAdapter,
+  AccountingInvoiceData,
+} from "./accounting-adapter.interface";
 
 export class ForibaEfaturaAdapter implements AccountingAdapter {
-  readonly name = 'foriba';
+  readonly name = "foriba";
   private readonly logger = new Logger(ForibaEfaturaAdapter.name);
   private httpClient: AxiosInstance;
 
@@ -13,38 +16,47 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
     this.httpClient = axios.create({ timeout: 30000 });
   }
 
-  async authenticate(credentials: Record<string, string>): Promise<{ accessToken: string; expiresAt?: Date }> {
+  async authenticate(
+    credentials: Record<string, string>,
+  ): Promise<{ accessToken: string; expiresAt?: Date }> {
     const response = await this.httpClient.post(
       `${credentials.apiUrl}/token`,
       new URLSearchParams({
-        grant_type: 'password',
+        grant_type: "password",
         username: credentials.username,
         password: credentials.password,
       }).toString(),
-      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } },
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } },
     );
 
     return {
       accessToken: response.data.access_token,
-      expiresAt: new Date(Date.now() + (response.data.expires_in || 3600) * 1000),
+      expiresAt: new Date(
+        Date.now() + (response.data.expires_in || 3600) * 1000,
+      ),
     };
   }
 
-  async pushInvoice(token: string, _companyId: string, invoice: AccountingInvoiceData): Promise<{ externalId: string }> {
+  async pushInvoice(
+    token: string,
+    _companyId: string,
+    invoice: AccountingInvoiceData,
+  ): Promise<{ externalId: string }> {
     const ublXml = this.generateUblTrXml(invoice);
 
     const response = await this.httpClient.post(
-      `${this.httpClient.defaults.baseURL || 'https://api.fitbulut.com/v2'}/dispatch-invoice`,
-      { content: Buffer.from(ublXml).toString('base64') },
+      `${this.httpClient.defaults.baseURL || "https://api.fitbulut.com/v2"}/dispatch-invoice`,
+      { content: Buffer.from(ublXml).toString("base64") },
       {
         headers: {
           Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
       },
     );
 
-    const externalId = response.data?.uuid || response.data?.id || `foriba-${Date.now()}`;
+    const externalId =
+      response.data?.uuid || response.data?.id || `foriba-${Date.now()}`;
     this.logger.log(`e-Fatura dispatched: ${externalId}`);
     return { externalId };
   }
@@ -75,10 +87,14 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
       return { lineExt, lineTax, rate, unit, qty, item: i };
     });
 
-    const totalExcTax = lineTotals
-      .reduce<Prisma.Decimal>((s, l) => s.add(l.lineExt), new Prisma.Decimal(0));
-    const totalTax = lineTotals
-      .reduce<Prisma.Decimal>((s, l) => s.add(l.lineTax), new Prisma.Decimal(0));
+    const totalExcTax = lineTotals.reduce<Prisma.Decimal>(
+      (s, l) => s.add(l.lineExt),
+      new Prisma.Decimal(0),
+    );
+    const totalTax = lineTotals.reduce<Prisma.Decimal>(
+      (s, l) => s.add(l.lineTax),
+      new Prisma.Decimal(0),
+    );
 
     const lineItems = lineTotals
       .map(
@@ -105,7 +121,7 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
         <cac:Price><cbc:PriceAmount currencyID="${invoice.currency}">${unit.toFixed(2)}</cbc:PriceAmount></cac:Price>
       </cac:InvoiceLine>`,
       )
-      .join('\n');
+      .join("\n");
 
     return `<?xml version="1.0" encoding="UTF-8"?>
 <Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2"
@@ -121,7 +137,7 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
   <cbc:DocumentCurrencyCode>${invoice.currency}</cbc:DocumentCurrencyCode>
   <cac:AccountingCustomerParty>
     <cac:Party>
-      <cac:PartyName><cbc:Name>${this.escapeXml(invoice.customerName || 'Musteri')}</cbc:Name></cac:PartyName>
+      <cac:PartyName><cbc:Name>${this.escapeXml(invoice.customerName || "Musteri")}</cbc:Name></cac:PartyName>
     </cac:Party>
   </cac:AccountingCustomerParty>
   <cac:TaxTotal>
@@ -138,6 +154,11 @@ export class ForibaEfaturaAdapter implements AccountingAdapter {
   }
 
   private escapeXml(str: string): string {
-    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&apos;");
   }
 }

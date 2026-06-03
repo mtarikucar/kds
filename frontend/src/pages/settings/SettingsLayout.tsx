@@ -2,69 +2,82 @@ import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Settings, CreditCard, Monitor, Plug, Download, Menu, X, QrCode, FileText, Palette, CalendarClock, Truck, MessageSquare, Receipt } from 'lucide-react';
+import { useSubscription } from '../../contexts/SubscriptionContext';
+import type { PlanFeatures } from '../../types';
+
+interface SettingsNavItem {
+  to: string;
+  icon: typeof Settings;
+  label: string;
+  // v2.8.91: gate sub-nav items the same way the top-level Sidebar
+  // gates its sections. Hide-not-403: if the tenant doesn't have the
+  // feature/integration the item disappears from the nav. Direct URL
+  // entry is still wrapped in <FeatureGate /> in App.tsx so the user
+  // sees an UpsellCard instead of an empty page.
+  gate?: {
+    feature?: keyof PlanFeatures;
+    integration?: { domain: string; vendor?: string };
+  };
+}
 
 const SettingsLayout = () => {
   const { t } = useTranslation('settings');
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { hasFeature, hasIntegration } = useSubscription();
 
-  const settingsNavItems = [
-    {
-      to: '/admin/settings/subscription',
-      icon: CreditCard,
-      label: t('subscription'),
-    },
-    {
-      to: '/admin/settings/pos',
-      icon: Monitor,
-      label: t('pos'),
-    },
-    {
-      to: '/admin/settings/qr-menu',
-      icon: QrCode,
-      label: t('nav.qrMenu'),
-    },
-    {
-      to: '/admin/settings/reports',
-      icon: FileText,
-      label: t('nav.reports'),
-    },
+  const allSettingsNavItems: SettingsNavItem[] = [
+    { to: '/admin/settings/subscription', icon: CreditCard, label: t('subscription') },
+    { to: '/admin/settings/pos', icon: Monitor, label: t('pos') },
+    { to: '/admin/settings/qr-menu', icon: QrCode, label: t('nav.qrMenu') },
+    { to: '/admin/settings/reports', icon: FileText, label: t('nav.reports') },
     {
       to: '/admin/settings/branding',
       icon: Palette,
       label: t('nav.branding'),
+      gate: { feature: 'customBranding' },
     },
-    {
-      to: '/admin/settings/desktop',
-      icon: Download,
-      label: t('desktopApp'),
-    },
+    { to: '/admin/settings/desktop', icon: Download, label: t('desktopApp') },
     {
       to: '/admin/settings/integrations',
       icon: Plug,
       label: t('integrationsLabel'),
+      gate: { feature: 'apiAccess' },
     },
     {
       to: '/admin/settings/reservations',
       icon: CalendarClock,
       label: t('nav.reservations'),
+      gate: { feature: 'reservationSystem' },
     },
     {
       to: '/admin/settings/sms',
       icon: MessageSquare,
       label: t('nav.sms'),
+      gate: { integration: { domain: 'sms' } },
     },
     {
       to: '/admin/settings/online-orders',
       icon: Truck,
       label: t('nav.onlineOrders'),
+      gate: { feature: 'deliveryIntegration' },
     },
     {
       to: '/admin/settings/accounting',
       icon: Receipt,
       label: t('nav.accounting'),
+      gate: { integration: { domain: 'accounting' } },
     },
   ];
+
+  const settingsNavItems = allSettingsNavItems.filter((item) => {
+    if (!item.gate) return true;
+    if (item.gate.feature && !hasFeature(item.gate.feature)) return false;
+    if (item.gate.integration && !hasIntegration(item.gate.integration.domain, item.gate.integration.vendor)) {
+      return false;
+    }
+    return true;
+  });
 
   const handleNavClick = () => {
     setIsMobileMenuOpen(false);

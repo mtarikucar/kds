@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
+    .header { background: #2563EB; color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+    .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
+    .button { display: inline-block; padding: 12px 30px; background: #2563EB; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+    .order-box { background: white; padding: 20px; border: 1px solid #ddd; border-radius: 6px; margin: 20px 0; }
+    .order-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
+    .order-row:last-child { border-bottom: none; }
+    .order-row.summary { font-weight: bold; padding-top: 16px; border-top: 2px solid #2563EB; margin-top: 12px; }
+    .item-name { flex: 1; }
+    .item-qty { color: #666; margin: 0 8px; }
+    .item-price { white-space: nowrap; }
+    .address { background: #fff; padding: 16px; border-left: 3px solid #2563EB; margin: 16px 0; font-size: 14px; }
+    .meta { color: #666; font-size: 13px; margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>✓ Donanım siparişiniz alındı</h1>
+  </div>
+  <div class="content">
+    <p>Merhaba {{recipientName}},</p>
+
+    <p>{{tenantName}} için donanım siparişiniz başarıyla oluşturuldu. Sipariş özetiniz aşağıdadır.</p>
+
+    <div class="order-box">
+      <h3 style="margin-top: 0;">Sipariş #{{orderNumber}}</h3>
+      <p class="meta">Sipariş tarihi: {{orderDate}}</p>
+      {{#if paymentRef}}
+        <p class="meta">Ödeme referansı: <code>{{paymentRef}}</code></p>
+      {{/if}}
+
+      {{#each items}}
+        <div class="order-row">
+          <span class="item-name">{{this.name}}</span>
+          <span class="item-qty">×{{this.qty}}</span>
+          <span class="item-price">{{this.lineTotal}}</span>
+        </div>
+      {{/each}}
+
+      <div class="order-row">
+        <span class="item-name">Ara toplam</span>
+        <span class="item-price">{{subtotal}}</span>
+      </div>
+      {{#if showTax}}
+        <div class="order-row">
+          <span class="item-name">KDV</span>
+          <span class="item-price">{{tax}}</span>
+        </div>
+      {{/if}}
+      {{#if showShipping}}
+        <div class="order-row">
+          <span class="item-name">Kargo</span>
+          <span class="item-price">{{shipping}}</span>
+        </div>
+      {{/if}}
+      <div class="order-row summary">
+        <span class="item-name">Genel toplam</span>
+        <span class="item-price">{{total}}</span>
+      </div>
+    </div>
+
+    {{#if shippingAddressLines}}
+      <h4>Teslimat adresi</h4>
+      <div class="address">
+        {{#each shippingAddressLines}}
+          {{this}}<br>
+        {{/each}}
+      </div>
+    {{/if}}
+
+    {{#if installationRequested}}
+      <p><strong>Kurulum talebi:</strong> Cihazlarınız kargoya verilmeden önce ekibimiz sizinle iletişime geçecek ve kurulum randevusu planlanacaktır.</p>
+    {{/if}}
+
+    <p>Sipariş durumunu hesabınızdan takip edebilirsiniz.</p>
+
+    <a href="{{appUrl}}/admin/hardware/orders/{{orderId}}" class="button">Siparişi görüntüle</a>
+
+    <p style="color: #666; font-size: 13px; margin-top: 24px;">
+      Bir sorunuz olursa <a href="mailto:destek@hummytummy.com">destek@hummytummy.com</a> adresinden bize ulaşabilirsiniz.
+    </p>
+
+    <p>Saygılarımızla,<br>
+    HummyTummy Ekibi</p>
+
+    <p style="color: #999; font-size: 11px; margin-top: 32px;">© {{currentYear}} HummyTummy</p>
+  </div>
+</body>
+</html>

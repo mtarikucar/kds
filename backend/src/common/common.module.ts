@@ -1,6 +1,6 @@
-import { Global, Module } from '@nestjs/common';
-import { EmailService } from './services/email.service';
-import { LoggerService } from './services/logger.service';
+import { Global, Module } from "@nestjs/common";
+import { EmailService } from "./services/email.service";
+import { LoggerService } from "./services/logger.service";
 
 /**
  * Global common module
@@ -12,7 +12,7 @@ import { LoggerService } from './services/logger.service';
     EmailService,
     {
       provide: LoggerService,
-      useValue: new LoggerService('App'),
+      useValue: new LoggerService("App"),
     },
   ],
   exports: [EmailService, LoggerService],

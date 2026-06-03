@@ -1,4 +1,4 @@
-import { useState, useMemo, lazy, Suspense } from 'react';
+import { useState, useEffect, useMemo, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from './pages/auth/LoginPage';
 import RegisterPage from './pages/auth/RegisterPage';
@@ -17,6 +17,7 @@ const PlansPage = lazy(() => import('./pages/superadmin/PlansPage'));
 const SubscriptionsPage = lazy(() => import('./pages/superadmin/SubscriptionsPage'));
 const AuditLogsPage = lazy(() => import('./pages/superadmin/AuditLogsPage'));
 const SuperAdminSettingsPage = lazy(() => import('./pages/superadmin/SuperAdminSettingsPage'));
+const MarketplaceAdminPage = lazy(() => import('./pages/superadmin/MarketplaceAdminPage'));
 import { SuperAdminLayout, SuperAdminProtectedRoute } from './features/superadmin/components';
 
 // Marketing Panel Pages (lazy-loaded)
@@ -93,16 +94,56 @@ const SmsSettingsPage = lazy(() => import('./pages/settings/SmsSettingsPage'));
 const AccountingSettingsPage = lazy(() => import('./pages/settings/AccountingSettingsPage'));
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+// HummyTummy Phase 3–12 admin screens.
+import DevicesPage from './features/devices/DevicesPage';
+import MarketplacePage from './features/marketplace/MarketplacePage';
+import StorePage from './features/hardware-store/StorePage';
+import HardwareOrdersListPage from './features/hardware-store/HardwareOrdersListPage';
+import HardwareOrderDetailPage from './features/hardware-store/HardwareOrderDetailPage';
+import ProductDetailPage from './features/hardware-store/ProductDetailPage';
+import BranchesPage from './features/branches/BranchesPage';
+import HealthPage from './features/health/HealthPage';
+import WebhooksPage from './features/webhooks/WebhooksPage';
+import BridgesPage from './features/bridges/BridgesPage';
+import FiscalRecoveryPage from './features/fiscal/FiscalRecoveryPage';
+import CallerFeedPage from './features/caller/CallerFeedPage';
+import PlanAndAccessPage from './features/plan/PlanAndAccessPage';
+import FeatureGate from './components/subscriptions/FeatureGate';
+import UpsellCard from './components/subscriptions/UpsellCard';
 import { UpdateDialog } from './components/UpdateDialog';
 import { useAutoUpdate } from './hooks/useAutoUpdate';
 import { useNotificationSocket } from './features/notifications/notificationsApi';
 import { useAuthStore } from './store/authStore';
+import { useBranchScopeStore } from './store/branchScopeStore';
 import { UserRole } from './types';
 import { detectSubdomain } from './utils/subdomain';
+import { useQueryClient } from '@tanstack/react-query';
 
 function App() {
   const [showUpdateDialog, setShowUpdateDialog] = useState(false);
   const isAuthenticated = useAuthStore((state) => !!state.accessToken);
+  const user = useAuthStore((state) => state.user);
+  const queryClient = useQueryClient();
+
+  // v3.0.0 — hydrate the branch scope every time the persisted user
+  // changes. Cross-store side effects live HERE (component effect),
+  // not inside authStore.set — the audit's High finding #9 closed.
+  useEffect(() => {
+    useBranchScopeStore.getState().hydrateFromUser(user);
+  }, [user]);
+
+  // v3.0.0 — invalidate every TanStack Query when the active branch
+  // changes so stale data from the previous branch can't show up
+  // for the staleTime window.
+  useEffect(() => {
+    return useBranchScopeStore.subscribe(
+      (s, prev) => {
+        if (s.branchId !== prev.branchId) {
+          queryClient.removeQueries();
+        }
+      },
+    );
+  }, [queryClient]);
 
   // Detect subdomain access
   const subdomainInfo = useMemo(() => detectSubdomain(), []);
@@ -177,7 +218,15 @@ function App() {
 
       {/* Protected Routes - ADMIN, MANAGER, WAITER */}
       <Route element={<ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.MANAGER, UserRole.WAITER]}><Layout /></ProtectedRoute>}>
-        <Route path="/pos" element={<POSPage />} />
+        {/* v3.0.0 — POS is tier-gated (BASIC+). FREE plans (post-trial
+            fallback) see the UpsellCard; backend pos-settings endpoints
+            also return 403 for these tenants. Sidebar item is hidden
+            via the same posAccess feature flag below. */}
+        <Route path="/pos" element={
+          <FeatureGate feature="posAccess" fallback={<UpsellCard planName="BASIC" />}>
+            <POSPage />
+          </FeatureGate>
+        } />
         <Route path="/customers" element={<CustomersPage />} />
         <Route path="/customers/:id" element={<CustomerDetailPage />} />
       </Route>
@@ -193,11 +242,34 @@ function App() {
         <Route path="/admin/tables" element={<TableManagementPage />} />
         <Route path="/admin/users" element={<UserManagementPage />} />
         <Route path="/admin/qr-codes" element={<QRManagementPage />} />
-        <Route path="/admin/reports" element={<ReportsPage />} />
-        <Route path="/admin/analytics" element={<AnalyticsPage />} />
-        <Route path="/admin/reservations" element={<ReservationsPage />} />
-        <Route path="/admin/personnel" element={<PersonnelManagementPage />} />
-        <Route path="/admin/stock" element={<StockManagementPage />} />
+        {/* v2.8.88 page-root FeatureGate: direct URL access shows an
+            upsell instead of 403. Each fallback links to the matching
+            marketplace add-on. */}
+        <Route path="/admin/reports" element={
+          <FeatureGate feature="advancedReports" fallback={<UpsellCard addOnCode="advanced_reports" />}>
+            <ReportsPage />
+          </FeatureGate>
+        } />
+        <Route path="/admin/analytics" element={
+          <FeatureGate feature="advancedReports" fallback={<UpsellCard addOnCode="advanced_reports" />}>
+            <AnalyticsPage />
+          </FeatureGate>
+        } />
+        <Route path="/admin/reservations" element={
+          <FeatureGate feature="reservationSystem" fallback={<UpsellCard planName="PRO" />}>
+            <ReservationsPage />
+          </FeatureGate>
+        } />
+        <Route path="/admin/personnel" element={
+          <FeatureGate feature="personnelManagement" fallback={<UpsellCard planName="PRO" />}>
+            <PersonnelManagementPage />
+          </FeatureGate>
+        } />
+        <Route path="/admin/stock" element={
+          <FeatureGate feature="inventoryTracking" fallback={<UpsellCard planName="BASIC" />}>
+            <StockManagementPage />
+          </FeatureGate>
+        } />
         <Route path="/admin/invoices" element={<InvoicesPage />} />
 
         {/* Settings Routes - Nested */}
@@ -207,13 +279,40 @@ function App() {
           <Route path="pos" element={<POSSettingsPage />} />
           <Route path="qr-menu" element={<QRMenuSettingsPage />} />
           <Route path="reports" element={<ReportsSettingsPage />} />
-          <Route path="branding" element={<BrandingSettingsPage />} />
+          <Route path="branding" element={
+            <FeatureGate feature="customBranding" fallback={<UpsellCard planName="PRO" />}>
+              <BrandingSettingsPage />
+            </FeatureGate>
+          } />
           <Route path="desktop" element={<DesktopAppSettingsPage />} />
-          <Route path="integrations" element={<IntegrationsSettingsPage />} />
-          <Route path="reservations" element={<ReservationSettingsPage />} />
-          <Route path="sms" element={<SmsSettingsPage />} />
-          <Route path="online-orders" element={<DeliveryPlatformsSettingsPage />} />
-          <Route path="accounting" element={<AccountingSettingsPage />} />
+          {/* v2.8.91: settings sub-pages now wrapped in FeatureGate so
+              direct URL hits show UpsellCard instead of an empty page +
+              403 toast on every backend call. */}
+          <Route path="integrations" element={
+            <FeatureGate feature="apiAccess" fallback={<UpsellCard addOnCode="api_access" planName="BUSINESS" />}>
+              <IntegrationsSettingsPage />
+            </FeatureGate>
+          } />
+          <Route path="reservations" element={
+            <FeatureGate feature="reservationSystem" fallback={<UpsellCard planName="PRO" />}>
+              <ReservationSettingsPage />
+            </FeatureGate>
+          } />
+          <Route path="sms" element={
+            <FeatureGate integration={{ domain: 'sms' }} fallback={<UpsellCard addOnCode="integration_sms" />}>
+              <SmsSettingsPage />
+            </FeatureGate>
+          } />
+          <Route path="online-orders" element={
+            <FeatureGate feature="deliveryIntegration" fallback={<UpsellCard addOnCode="delivery_yemeksepeti" planName="PRO" />}>
+              <DeliveryPlatformsSettingsPage />
+            </FeatureGate>
+          } />
+          <Route path="accounting" element={
+            <FeatureGate integration={{ domain: 'accounting' }} fallback={<UpsellCard addOnCode="integration_efatura" />}>
+              <AccountingSettingsPage />
+            </FeatureGate>
+          } />
         </Route>
 
         {/* Legacy redirects */}
@@ -230,6 +329,40 @@ function App() {
         <Route path="/subscription/payment" element={<Navigate to="/subscription/plans" replace />} />
         <Route path="/subscription/payment/success" element={<Navigate to="/subscription/success" replace />} />
         <Route path="/subscription/payment/failed" element={<Navigate to="/subscription/fail" replace />} />
+
+        {/* HummyTummy Phase 3–12: devices, marketplace, hardware store, branches, health */}
+        <Route path="/admin/devices" element={<DevicesPage />} />
+        <Route path="/admin/marketplace" element={<MarketplacePage />} />
+        <Route path="/admin/store" element={<StorePage />} />
+        {/* v2.8.87: rich product/service detail page (real route, not modal). */}
+        <Route path="/admin/store/:sku" element={<ProductDetailPage />} />
+        {/* v2.8.84: tenant order history + detail. */}
+        <Route path="/admin/hardware-orders" element={<HardwareOrdersListPage />} />
+        <Route path="/admin/hardware-orders/:id" element={<HardwareOrderDetailPage />} />
+        <Route path="/admin/branches" element={
+          <FeatureGate feature="multiLocation" fallback={<UpsellCard addOnCode="extra_branch" planName="PRO" />}>
+            <BranchesPage />
+          </FeatureGate>
+        } />
+        <Route path="/admin/health" element={<HealthPage />} />
+        <Route path="/admin/bridges" element={<BridgesPage />} />
+        <Route path="/admin/webhooks" element={
+          <FeatureGate feature="apiAccess" fallback={<UpsellCard addOnCode="api_access" planName="BUSINESS" />}>
+            <WebhooksPage />
+          </FeatureGate>
+        } />
+        <Route path="/admin/fiscal-recovery" element={
+          <FeatureGate integration={{ domain: 'fiscal' }} fallback={<UpsellCard addOnCode="fiscal_hugin" />}>
+            <FiscalRecoveryPage />
+          </FeatureGate>
+        } />
+        <Route path="/admin/caller-feed" element={
+          <FeatureGate integration={{ domain: 'caller' }} fallback={<UpsellCard addOnCode="caller_id_integration" />}>
+            <CallerFeedPage />
+          </FeatureGate>
+        } />
+        {/* v2.8.88: top-level Plan & Erişim page — plan + quota + active add-ons. */}
+        <Route path="/admin/plan" element={<PlanAndAccessPage />} />
       </Route>
 
       {/* SuperAdmin Routes */}
@@ -243,6 +376,7 @@ function App() {
           <Route path="/superadmin/tenants/:id" element={<TenantDetailPage />} />
           <Route path="/superadmin/users" element={<AllUsersPage />} />
           <Route path="/superadmin/plans" element={<PlansPage />} />
+          <Route path="/superadmin/marketplace" element={<MarketplaceAdminPage />} />
           <Route path="/superadmin/subscriptions" element={<SubscriptionsPage />} />
           <Route path="/superadmin/audit-logs" element={<AuditLogsPage />} />
           <Route path="/superadmin/settings" element={<SuperAdminSettingsPage />} />

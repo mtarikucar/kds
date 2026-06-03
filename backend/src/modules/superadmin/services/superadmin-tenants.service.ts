@@ -1,64 +1,72 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../../prisma/prisma.service";
 import {
   TenantFilterDto,
   UpdateTenantStatusDto,
   TenantStatus,
-} from '../dto/tenant-filter.dto';
-import { UpdateTenantOverridesDto } from '../dto/update-tenant-overrides.dto';
-import { SuperAdminAuditService } from './superadmin-audit.service';
-import { AuditAction, EntityType } from '../dto/audit-filter.dto';
-import { NotificationsService } from '../../notifications/notifications.service';
-import { NotificationType } from '../../notifications/dto/create-notification.dto';
-import { EmailService } from '../../../common/services/email.service';
-import { reserveSubdomain } from '../../../common/helpers/subdomain.helper';
+} from "../dto/tenant-filter.dto";
+import { UpdateTenantOverridesDto } from "../dto/update-tenant-overrides.dto";
+import { SuperAdminAuditService } from "./superadmin-audit.service";
+import { AuditAction, EntityType } from "../dto/audit-filter.dto";
+import { NotificationsService } from "../../notifications/notifications.service";
+import { NotificationType } from "../../notifications/dto/create-notification.dto";
+import { EmailService } from "../../../common/services/email.service";
+import { reserveSubdomain } from "../../../common/helpers/subdomain.helper";
+import { OutboxService } from "../../outbox/outbox.service";
+import { EventTypes } from "../../outbox/event-types";
 
 type PlanFeatureKey =
-  | 'advancedReports'
-  | 'multiLocation'
-  | 'customBranding'
-  | 'apiAccess'
-  | 'prioritySupport'
-  | 'inventoryTracking'
-  | 'kdsIntegration'
-  | 'reservationSystem'
-  | 'personnelManagement'
-  | 'deliveryIntegration';
+  | "advancedReports"
+  | "multiLocation"
+  | "customBranding"
+  | "apiAccess"
+  | "prioritySupport"
+  | "inventoryTracking"
+  | "kdsIntegration"
+  | "reservationSystem"
+  | "personnelManagement"
+  | "deliveryIntegration";
 const FEATURE_KEYS: readonly PlanFeatureKey[] = [
-  'advancedReports',
-  'multiLocation',
-  'customBranding',
-  'apiAccess',
-  'prioritySupport',
-  'inventoryTracking',
-  'kdsIntegration',
-  'reservationSystem',
-  'personnelManagement',
-  'deliveryIntegration',
+  "advancedReports",
+  "multiLocation",
+  "customBranding",
+  "apiAccess",
+  "prioritySupport",
+  "inventoryTracking",
+  "kdsIntegration",
+  "reservationSystem",
+  "personnelManagement",
+  "deliveryIntegration",
 ];
 
 type PlanLimitKey =
-  | 'maxUsers'
-  | 'maxTables'
-  | 'maxProducts'
-  | 'maxCategories'
-  | 'maxMonthlyOrders';
+  | "maxUsers"
+  | "maxTables"
+  | "maxProducts"
+  | "maxCategories"
+  | "maxMonthlyOrders";
 const LIMIT_KEYS: readonly PlanLimitKey[] = [
-  'maxUsers',
-  'maxTables',
-  'maxProducts',
-  'maxCategories',
-  'maxMonthlyOrders',
+  "maxUsers",
+  "maxTables",
+  "maxProducts",
+  "maxCategories",
+  "maxMonthlyOrders",
 ];
 
 @Injectable()
 export class SuperAdminTenantsService {
+  private readonly logger = new Logger(SuperAdminTenantsService.name);
+
   constructor(
     private prisma: PrismaService,
     private auditService: SuperAdminAuditService,
     private notificationsService: NotificationsService,
     private emailService: EmailService,
+    // OutboxModule is @Global, so no module import is needed. Override edits
+    // by super-admin are entitlement-shaping events: the projector reads the
+    // freshly written Tenant row and rebuilds grants.
+    private readonly outbox: OutboxService,
   ) {}
 
   async findAll(filters: TenantFilterDto) {
@@ -68,16 +76,16 @@ export class SuperAdminTenantsService {
       planId,
       page = 1,
       limit = 20,
-      sortBy = 'createdAt',
-      sortOrder = 'desc',
+      sortBy = "createdAt",
+      sortOrder = "desc",
     } = filters;
 
     const where: Prisma.TenantWhereInput = {};
 
     if (search) {
       where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { subdomain: { contains: search, mode: 'insensitive' } },
+        { name: { contains: search, mode: "insensitive" } },
+        { subdomain: { contains: search, mode: "insensitive" } },
       ];
     }
 
@@ -89,8 +97,14 @@ export class SuperAdminTenantsService {
       where.currentPlanId = planId;
     }
 
-    const allowedSortFields = ['createdAt', 'updatedAt', 'name', 'subdomain', 'status'];
-    const sortField = allowedSortFields.includes(sortBy) ? sortBy : 'createdAt';
+    const allowedSortFields = [
+      "createdAt",
+      "updatedAt",
+      "name",
+      "subdomain",
+      "status",
+    ];
+    const sortField = allowedSortFields.includes(sortBy) ? sortBy : "createdAt";
 
     const [tenants, total] = await Promise.all([
       this.prisma.tenant.findMany({
@@ -132,7 +146,7 @@ export class SuperAdminTenantsService {
       include: {
         currentPlan: true,
         subscriptions: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           take: 5,
           include: {
             plan: {
@@ -154,17 +168,21 @@ export class SuperAdminTenantsService {
     });
 
     if (!tenant) {
-      throw new NotFoundException('Tenant not found');
+      throw new NotFoundException("Tenant not found");
     }
 
     // Compute date boundaries without mutating a shared `Date` instance.
     const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfDay = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const [totalRevenue, ordersToday, ordersThisMonth] = await Promise.all([
       this.prisma.order.aggregate({
-        where: { tenantId: id, status: 'PAID' },
+        where: { tenantId: id, status: "PAID" },
         _sum: { finalAmount: true },
       }),
       this.prisma.order.count({
@@ -196,7 +214,7 @@ export class SuperAdminTenantsService {
     });
 
     if (!tenant) {
-      throw new NotFoundException('Tenant not found');
+      throw new NotFoundException("Tenant not found");
     }
 
     const previousStatus = tenant.status;
@@ -240,8 +258,8 @@ export class SuperAdminTenantsService {
           tx,
           next.subdomain,
           updateDto.status === TenantStatus.DELETED
-            ? 'tenant_deleted'
-            : 'tenant_suspended',
+            ? "tenant_deleted"
+            : "tenant_suspended",
         );
       }
 
@@ -305,7 +323,10 @@ export class SuperAdminTenantsService {
     if (previousStatus !== updateDto.status) {
       await this.notifyTenantStatusChange(id, tenant.name, updateDto).catch(
         (err) => {
-          console.error('Failed to notify tenant of status change:', err);
+          this.logger.error(
+            "Failed to notify tenant of status change",
+            err as any,
+          );
         },
       );
     }
@@ -319,19 +340,19 @@ export class SuperAdminTenantsService {
     updateDto: UpdateTenantStatusDto,
   ): Promise<void> {
     const admins = await this.prisma.user.findMany({
-      where: { tenantId, role: 'ADMIN' },
+      where: { tenantId, role: "ADMIN" },
       select: { id: true, email: true, firstName: true, lastName: true },
     });
 
     const title =
       updateDto.status === TenantStatus.SUSPENDED
-        ? 'Account Suspended'
+        ? "Account Suspended"
         : updateDto.status === TenantStatus.DELETED
-          ? 'Account Deleted'
+          ? "Account Deleted"
           : updateDto.status === TenantStatus.ACTIVE
-            ? 'Account Reactivated'
-            : 'Account Status Changed';
-    const reason = updateDto.reason ? ` Reason: ${updateDto.reason}` : '';
+            ? "Account Reactivated"
+            : "Account Status Changed";
+    const reason = updateDto.reason ? ` Reason: ${updateDto.reason}` : "";
     const message = `${tenantName} status is now ${updateDto.status}.${reason}`;
 
     // Fan out in parallel so a slow SMTP can't block the HTTP response.
@@ -347,12 +368,14 @@ export class SuperAdminTenantsService {
                 : NotificationType.WARNING,
             userId: admin.id,
             tenantId,
-            data: { action: 'TENANT_STATUS_CHANGE', status: updateDto.status },
+            data: { action: "TENANT_STATUS_CHANGE", status: updateDto.status },
           })
-          .catch((err) => console.error('notifyAdmins failed:', err)),
+          .catch((err) => this.logger.error("notifyAdmins failed", err as any)),
         this.emailService
           .sendPlainEmail(admin.email, title, message)
-          .catch((err) => console.error('sendPlainEmail failed:', err)),
+          .catch((err) =>
+            this.logger.error("sendPlainEmail failed", err as any),
+          ),
       ]),
     );
   }
@@ -361,7 +384,7 @@ export class SuperAdminTenantsService {
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({
         where: { tenantId },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
         select: {
@@ -397,7 +420,7 @@ export class SuperAdminTenantsService {
     const [orders, total] = await Promise.all([
       this.prisma.order.findMany({
         where: { tenantId },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
         select: {
@@ -433,12 +456,16 @@ export class SuperAdminTenantsService {
     });
 
     if (!tenant) {
-      throw new NotFoundException('Tenant not found');
+      throw new NotFoundException("Tenant not found");
     }
 
     // Build boundary dates without mutating a shared Date object.
     const now = new Date();
-    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfDay = new Date(
+      now.getFullYear(),
+      now.getMonth(),
+      now.getDate(),
+    );
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
     const [
@@ -461,15 +488,15 @@ export class SuperAdminTenantsService {
         where: { tenantId, createdAt: { gte: startOfMonth } },
       }),
       this.prisma.order.aggregate({
-        where: { tenantId, status: 'PAID' },
+        where: { tenantId, status: "PAID" },
         _sum: { finalAmount: true },
       }),
       this.prisma.order.aggregate({
-        where: { tenantId, status: 'PAID', createdAt: { gte: startOfDay } },
+        where: { tenantId, status: "PAID", createdAt: { gte: startOfDay } },
         _sum: { finalAmount: true },
       }),
       this.prisma.order.aggregate({
-        where: { tenantId, status: 'PAID', createdAt: { gte: startOfMonth } },
+        where: { tenantId, status: "PAID", createdAt: { gte: startOfMonth } },
         _sum: { finalAmount: true },
       }),
       this.prisma.user.count({ where: { tenantId } }),
@@ -505,35 +532,43 @@ export class SuperAdminTenantsService {
     });
 
     if (!tenant) {
-      throw new NotFoundException('Tenant not found');
+      throw new NotFoundException("Tenant not found");
     }
 
     const plan = tenant.currentPlan;
-    const featureOverrides = (tenant.featureOverrides as Record<string, boolean> | null) ?? null;
-    const limitOverrides = (tenant.limitOverrides as Record<string, number> | null) ?? null;
+    const featureOverrides =
+      (tenant.featureOverrides as Record<string, boolean> | null) ?? null;
+    const limitOverrides =
+      (tenant.limitOverrides as Record<string, number> | null) ?? null;
 
-    const planFeatures = plan ? {
-      advancedReports: plan.advancedReports,
-      multiLocation: plan.multiLocation,
-      customBranding: plan.customBranding,
-      apiAccess: plan.apiAccess,
-      prioritySupport: plan.prioritySupport,
-      inventoryTracking: plan.inventoryTracking,
-      kdsIntegration: plan.kdsIntegration,
-      reservationSystem: plan.reservationSystem,
-      personnelManagement: plan.personnelManagement,
-      deliveryIntegration: plan.deliveryIntegration,
-    } : {};
+    const planFeatures = plan
+      ? {
+          advancedReports: plan.advancedReports,
+          multiLocation: plan.multiLocation,
+          customBranding: plan.customBranding,
+          apiAccess: plan.apiAccess,
+          prioritySupport: plan.prioritySupport,
+          inventoryTracking: plan.inventoryTracking,
+          kdsIntegration: plan.kdsIntegration,
+          reservationSystem: plan.reservationSystem,
+          personnelManagement: plan.personnelManagement,
+          deliveryIntegration: plan.deliveryIntegration,
+        }
+      : {};
 
-    const planLimits = plan ? {
-      maxUsers: plan.maxUsers,
-      maxTables: plan.maxTables,
-      maxProducts: plan.maxProducts,
-      maxCategories: plan.maxCategories,
-      maxMonthlyOrders: plan.maxMonthlyOrders,
-    } : {};
+    const planLimits = plan
+      ? {
+          maxUsers: plan.maxUsers,
+          maxTables: plan.maxTables,
+          maxProducts: plan.maxProducts,
+          maxCategories: plan.maxCategories,
+          maxMonthlyOrders: plan.maxMonthlyOrders,
+        }
+      : {};
 
-    const effectiveFeatures: Record<string, boolean> = { ...planFeatures as Record<string, boolean> };
+    const effectiveFeatures: Record<string, boolean> = {
+      ...(planFeatures as Record<string, boolean>),
+    };
     if (featureOverrides) {
       for (const key of FEATURE_KEYS) {
         const value = featureOverrides[key];
@@ -543,7 +578,9 @@ export class SuperAdminTenantsService {
       }
     }
 
-    const effectiveLimits: Record<string, number> = { ...planLimits as Record<string, number> };
+    const effectiveLimits: Record<string, number> = {
+      ...(planLimits as Record<string, number>),
+    };
     if (limitOverrides) {
       for (const key of LIMIT_KEYS) {
         const value = limitOverrides[key];
@@ -578,7 +615,7 @@ export class SuperAdminTenantsService {
     });
 
     if (!tenant) {
-      throw new NotFoundException('Tenant not found');
+      throw new NotFoundException("Tenant not found");
     }
 
     const previousFeatureOverrides =
@@ -587,7 +624,9 @@ export class SuperAdminTenantsService {
       (tenant.limitOverrides as Record<string, number>) || {};
 
     // Merge only whitelisted keys; DTO-level validation also constrains values.
-    let newFeatureOverrides: Record<string, boolean> | null = { ...previousFeatureOverrides };
+    let newFeatureOverrides: Record<string, boolean> | null = {
+      ...previousFeatureOverrides,
+    };
     if (dto.featureOverrides) {
       for (const key of FEATURE_KEYS) {
         const value = dto.featureOverrides[key];
@@ -602,7 +641,9 @@ export class SuperAdminTenantsService {
       newFeatureOverrides = null;
     }
 
-    let newLimitOverrides: Record<string, number> | null = { ...previousLimitOverrides };
+    let newLimitOverrides: Record<string, number> | null = {
+      ...previousLimitOverrides,
+    };
     if (dto.limitOverrides) {
       for (const key of LIMIT_KEYS) {
         const value = dto.limitOverrides[key];
@@ -643,20 +684,31 @@ export class SuperAdminTenantsService {
       targetTenantName: tenant.name,
     });
 
-    return { featureOverrides: newFeatureOverrides, limitOverrides: newLimitOverrides };
+    // Signal the entitlement engine to reproject. The event payload is
+    // deliberately minimal — the projector re-reads the canonical state
+    // from Postgres, sidestepping any race between the event payload and
+    // the row it describes.
+    await this.outbox
+      .append({
+        type: EventTypes.TenantOverridesChanged,
+        tenantId,
+        payload: { tenantId },
+      })
+      .catch(() => undefined);
+
+    return {
+      featureOverrides: newFeatureOverrides,
+      limitOverrides: newLimitOverrides,
+    };
   }
 
-  async resetOverrides(
-    tenantId: string,
-    actorId: string,
-    actorEmail: string,
-  ) {
+  async resetOverrides(tenantId: string, actorId: string, actorEmail: string) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
     });
 
     if (!tenant) {
-      throw new NotFoundException('Tenant not found');
+      throw new NotFoundException("Tenant not found");
     }
 
     const previousFeatureOverrides = tenant.featureOverrides;
@@ -687,6 +739,14 @@ export class SuperAdminTenantsService {
       targetTenantId: tenantId,
       targetTenantName: tenant.name,
     });
+
+    await this.outbox
+      .append({
+        type: EventTypes.TenantOverridesChanged,
+        tenantId,
+        payload: { tenantId },
+      })
+      .catch(() => undefined);
 
     return { featureOverrides: null, limitOverrides: null };
   }

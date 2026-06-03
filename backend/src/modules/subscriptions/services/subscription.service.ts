@@ -10,6 +10,9 @@ import { addDays, addMonths, addYears } from "date-fns";
 import { PrismaService } from "../../../prisma/prisma.service";
 import { BillingService } from "./billing.service";
 import { NotificationService } from "./notification.service";
+import { OutboxService } from "../../outbox/outbox.service";
+import { EventTypes } from "../../outbox/event-types";
+import { EntitlementService } from "../../entitlements/entitlement.service";
 import {
   SubscriptionStatus,
   BillingCycle,
@@ -28,7 +31,68 @@ export class SubscriptionService {
     private prisma: PrismaService,
     private billingService: BillingService,
     private notificationService: NotificationService,
+    // OutboxModule is @Global, so injection works without a module-level
+    // import. Wired so meaningful subscription transitions emit events
+    // for the entitlement projector and any later consumers (audit,
+    // marketing automation, support tickets) to react to.
+    private readonly outbox: OutboxService,
+    // v2.8.88: getEffectiveFeatures now routes through the engine's
+    // resolved view so add-on grants (TenantAddOn → projector → engine)
+    // reach the frontend. Pre-v2.8.88 this endpoint read plan rows +
+    // overrides only — buying integration_yemeksepeti updated the engine
+    // table but the UI never saw the change (it pulls from this method).
+    private readonly entitlements: EntitlementService,
   ) {}
+
+  /**
+   * Append a subscription lifecycle event to the outbox.
+   *
+   * Centralised so every mutation site uses the same payload shape; the
+   * outbox worker delivers to the in-process bus and the entitlement
+   * projector reprojects. Failures here are swallowed — the user-facing
+   * action has already succeeded, and the nightly reconcile would catch
+   * any miss anyway. Logged for observability.
+   */
+  private async emitLifecycle(
+    type: string,
+    sub: {
+      id: string;
+      tenantId: string;
+      plan?: { name?: string } | null;
+      currentPeriodStart?: Date | null;
+      currentPeriodEnd?: Date | null;
+    },
+    tx?: any,
+  ): Promise<void> {
+    try {
+      // v2.8.94 — accept an optional tx so the lifecycle event lands in
+      // the same Postgres transaction as the (subscription, tenant)
+      // mutation. Pre-fix the emit happened *after* the txn committed,
+      // so a process crash between commit and emit left the subscription
+      // in its new state with no SubscriptionCancelled / -Downgraded /
+      // -Activated event for the projector to react to — entitlements
+      // diverged for up to 24h (until the reconcile cron). Passing tx
+      // makes the invariant: business state ⇔ outbox row.
+      await this.outbox.append(
+        {
+          type,
+          tenantId: sub.tenantId,
+          payload: {
+            subscriptionId: sub.id,
+            tenantId: sub.tenantId,
+            planCode: sub.plan?.name,
+            periodStart: sub.currentPeriodStart?.toISOString(),
+            periodEnd: sub.currentPeriodEnd?.toISOString(),
+          },
+        },
+        tx,
+      );
+    } catch (e) {
+      this.logger.warn(
+        `outbox emit ${type} failed for sub=${sub.id}: ${(e as Error).message}`,
+      );
+    }
+  }
 
   /**
    * Best-effort trial-started email. Always called post-commit so a
@@ -391,6 +455,11 @@ export class SubscriptionService {
       // unwind the trial creation.
       void this.notifyTrialStarted(tenantId, plan.displayName, plan.trialDays);
 
+      // TRIALING grants the same access as ACTIVE (see PlanFeatureGuard),
+      // so the entitlement projector treats activation and trial start
+      // identically. Emit a single canonical "activated" event.
+      await this.emitLifecycle(EventTypes.SubscriptionActivated, subscription);
+
       return subscription;
     } catch (err) {
       if (
@@ -525,13 +594,14 @@ export class SubscriptionService {
     });
     if (claim.count === 0) {
       throw new BadRequestException(
-        'A scheduled plan change was just registered by another session — refresh and retry.',
+        "A scheduled plan change was just registered by another session — refresh and retry.",
       );
     }
-    const updatedSubscription = await this.prisma.subscription.findUniqueOrThrow({
-      where: { id: subscriptionId },
-      include: { plan: true, scheduledDowngradePlan: true },
-    });
+    const updatedSubscription =
+      await this.prisma.subscription.findUniqueOrThrow({
+        where: { id: subscriptionId },
+        include: { plan: true, scheduledDowngradePlan: true },
+      });
 
     return {
       subscription: updatedSubscription,
@@ -615,41 +685,59 @@ export class SubscriptionService {
         ? newPlan.monthlyPrice
         : newPlan.yearlyPrice;
 
-    // Atomic claim with compound WHERE on scheduledDowngradePlanId NOT
-    // NULL. The cron should never fire twice for one subscription, but
-    // a manual SuperAdmin re-trigger overlapping the scheduled fire
-    // would otherwise re-apply the same downgrade with a fresh
-    // `amount` write (idempotent) AND notify the admin twice. The
-    // claim makes the loser see count=0 and skip silently.
-    const claim = await this.prisma.subscription.updateMany({
-      where: {
-        id: subscriptionId,
-        scheduledDowngradePlanId: { not: null },
-      },
-      data: {
-        planId: subscription.scheduledDowngradePlanId,
-        billingCycle,
-        amount: newAmount,
-        currency: newPlan.currency,
-        scheduledDowngradePlanId: null,
-        scheduledDowngradeBillingCycle: null,
-      },
+    // v2.8.94 — wrap the claim + tenant.currentPlanId flip + lifecycle
+    // event in a single $transaction. Pre-fix the subscription.planId
+    // and tenant.currentPlanId could land in separate commits and the
+    // SubscriptionDowngraded event was never emitted at all. The
+    // engine projector consequently never re-projected grants, so
+    // tenants retained their pre-downgrade entitlements until the
+    // nightly reconcile cron fired (~24h). Now all three writes
+    // commit together or none do.
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Atomic claim with compound WHERE on scheduledDowngradePlanId NOT
+      // NULL. The cron should never fire twice for one subscription, but
+      // a manual SuperAdmin re-trigger overlapping the scheduled fire
+      // would otherwise re-apply the same downgrade with a fresh
+      // `amount` write (idempotent) AND notify the admin twice. The
+      // claim makes the loser see count=0 and skip silently.
+      const claim = await tx.subscription.updateMany({
+        where: {
+          id: subscriptionId,
+          scheduledDowngradePlanId: { not: null },
+        },
+        data: {
+          planId: subscription.scheduledDowngradePlanId!,
+          billingCycle,
+          amount: newAmount,
+          currency: newPlan.currency,
+          scheduledDowngradePlanId: null,
+          scheduledDowngradeBillingCycle: null,
+        },
+      });
+      if (claim.count === 0) {
+        return null;
+      }
+      const updated = await tx.subscription.findUniqueOrThrow({
+        where: { id: subscriptionId },
+        include: { plan: true },
+      });
+
+      await tx.tenant.update({
+        where: { id: subscription.tenantId },
+        data: { currentPlanId: subscription.scheduledDowngradePlanId },
+      });
+
+      await this.emitLifecycle(EventTypes.SubscriptionDowngraded, updated, tx);
+      return updated;
     });
-    if (claim.count === 0) {
+
+    if (result === null) {
       this.logger.debug(
         `Scheduled downgrade for ${subscriptionId} already applied by another run`,
       );
       return null;
     }
-    const updated = await this.prisma.subscription.findUniqueOrThrow({
-      where: { id: subscriptionId },
-      include: { plan: true },
-    });
-
-    await this.prisma.tenant.update({
-      where: { id: subscription.tenantId },
-      data: { currentPlanId: subscription.scheduledDowngradePlanId },
-    });
+    const updated = result;
 
     const adminUser = await this.prisma.user.findFirst({
       where: { tenantId: subscription.tenantId, role: "ADMIN" },
@@ -715,7 +803,7 @@ export class SubscriptionService {
     });
     if (claim.count === 0) {
       throw new BadRequestException(
-        'Scheduled downgrade no longer exists — it may have just been applied.',
+        "Scheduled downgrade no longer exists — it may have just been applied.",
       );
     }
     return { success: true, message: "Scheduled downgrade cancelled" };
@@ -757,37 +845,68 @@ export class SubscriptionService {
           cancellationReason: reason,
         };
 
-    // Manual-renewal model: no PayTR-side token to revoke (we never
-    // store one), no auto-renew flag to flip off. Cancellation is now
-    // a single subscription update.
-    //
-    // Compound WHERE: tenantId IDOR defence-in-depth + status not
-    // already CANCELLED. Without the status guard, two admins clicking
-    // "Cancel immediate" and "Cancel at period end" within the same
-    // millisecond both pass the status check above, then one writes
-    // status=CANCELLED + endedAt and the other writes
-    // cancelAtPeriodEnd=true on the now-CANCELLED row — landing the
-    // subscription with cancelAtPeriodEnd=true AND status=CANCELLED,
-    // which the period-end cron then re-cancels at period boundary,
-    // sending a confusing follow-up email.
-    const claim = await this.prisma.subscription.updateMany({
-      where: {
-        id: subscriptionId,
-        tenantId,
-        status: { not: SubscriptionStatus.CANCELLED },
-      },
-      data,
+    // v2.8.89 — atomic currentPlanId flip on immediate cancel.
+    // Pre-v2.8.89: status → CANCELLED but Tenant.currentPlanId was left
+    // pointing at the paid plan. The entitlement projector then re-
+    // projected `plan:BUSINESS` grants on every subsequent
+    // SubscriptionCancelled / TenantOverridesChanged event, leaking
+    // paid feature access until the nightly reconcile cron caught up.
+    // The new projector (plan-projector.service.ts v2.8.89) defends
+    // against this by reading Subscription.status alongside
+    // currentPlanId, but we still flip currentPlanId here so the
+    // tenant row stays honest with the access reality. Wrap in a txn
+    // so an interrupted cancellation never leaves
+    // (status=CANCELLED, currentPlanId=PAID) on disk.
+    const freePlan = immediate
+      ? await this.prisma.subscriptionPlan.findUnique({
+          where: { name: SubscriptionPlanType.FREE },
+          select: { id: true },
+        })
+      : null;
+    // v2.8.94 — fold the post-claim fetch and (immediate path's)
+    // lifecycle emit into the same $transaction. Pre-fix the emit
+    // happened *after* the txn committed, so a crash between commit
+    // and emit left the subscription cancelled with no projector
+    // signal — entitlements stayed paid until the nightly reconcile.
+    const txResult = await this.prisma.$transaction(async (tx) => {
+      const c = await tx.subscription.updateMany({
+        where: {
+          id: subscriptionId,
+          tenantId,
+          status: { not: SubscriptionStatus.CANCELLED },
+        },
+        data,
+      });
+      if (c.count === 0) {
+        return { claimed: false as const };
+      }
+      if (immediate && freePlan) {
+        await tx.tenant.update({
+          where: { id: tenantId },
+          data: { currentPlanId: freePlan.id },
+        });
+      }
+      const updated = await tx.subscription.findUniqueOrThrow({
+        where: { id: subscriptionId },
+        include: { plan: true, tenant: true },
+      });
+      // Only "immediate" cancellations terminate access right away;
+      // "at period end" leaves the subscription ACTIVE/TRIALING until
+      // the scheduler closes it. Emit only when access actually changes.
+      if (immediate) {
+        await this.emitLifecycle(EventTypes.SubscriptionCancelled, updated, tx);
+      }
+      return { claimed: true as const, updated };
     });
-    if (claim.count === 0) {
+    if (!txResult.claimed) {
       throw new BadRequestException(
-        'Subscription state changed concurrently — refresh and retry.',
+        "Subscription state changed concurrently — refresh and retry.",
       );
     }
-    const updated = await this.prisma.subscription.findUniqueOrThrow({
-      where: { id: subscriptionId },
-      include: { plan: true, tenant: true },
-    });
+    const updated = txResult.updated;
 
+    // Notifications are user-facing side effects and stay outside the
+    // txn — they touch SMTP and can stall for seconds.
     const adminUser = await this.prisma.user.findFirst({
       where: { tenantId: subscription.tenantId, role: "ADMIN" },
       select: { email: true },
@@ -830,29 +949,50 @@ export class SubscriptionService {
         "Can only reactivate subscriptions that are set to cancel at period end",
       );
     }
+    // v2.8.96 — wrap claim + post-fetch + lifecycle emit in one txn.
+    // Pre-fix the emit ran AFTER the updateMany committed; a process
+    // crash between commit and emit left the subscription reactivated
+    // with no SubscriptionActivated signal, so the projector never
+    // ran the safety re-projection and a previously-degraded grant
+    // could stay degraded until the nightly reconcile.
+    //
     // Compound WHERE: tenantId IDOR + cancelAtPeriodEnd=true guard.
     // A concurrent "Cancel immediate" from another admin would already
     // have set status=CANCELLED; reactivating that row would silently
     // flip cancelAtPeriodEnd=false while leaving the subscription
     // CANCELLED — invariant break.
-    const claim = await this.prisma.subscription.updateMany({
-      where: {
-        id: subscriptionId,
-        tenantId,
-        cancelAtPeriodEnd: true,
-        status: { not: SubscriptionStatus.CANCELLED },
-      },
-      data: { cancelAtPeriodEnd: false },
+    const txResult = await this.prisma.$transaction(async (tx) => {
+      const claim = await tx.subscription.updateMany({
+        where: {
+          id: subscriptionId,
+          tenantId,
+          cancelAtPeriodEnd: true,
+          status: { not: SubscriptionStatus.CANCELLED },
+        },
+        data: { cancelAtPeriodEnd: false },
+      });
+      if (claim.count === 0) {
+        return { claimed: false as const };
+      }
+      const updated = await tx.subscription.findUniqueOrThrow({
+        where: { id: subscriptionId },
+        include: { plan: true },
+      });
+      // Reactivation restores entitlement access if it had degraded (it usually
+      // hasn't — at-period-end keeps ACTIVE — but the projector is cheap and
+      // the safe choice is "emit anyway, reproject is idempotent").
+      await this.emitLifecycle(EventTypes.SubscriptionActivated, updated, tx);
+      return { claimed: true as const, updated };
     });
-    if (claim.count === 0) {
+    if (!txResult.claimed) {
       throw new BadRequestException(
-        'Subscription state changed concurrently — refresh and retry.',
+        "Subscription state changed concurrently — refresh and retry.",
       );
     }
-    const updated = await this.prisma.subscription.findUniqueOrThrow({
-      where: { id: subscriptionId },
-      include: { plan: true },
-    });
+    const updated = txResult.updated;
+    // Already emitted inside the txn above — preserve the legacy
+    // "outer scope `updated` is available" shape for the rest of the
+    // function.
     return updated;
   }
 
@@ -968,6 +1108,32 @@ export class SubscriptionService {
     });
   }
 
+  /**
+   * v2.8.88 — engine-routed effective features.
+   *
+   * Pre-v2.8.88 this method read `tenant.currentPlan + featureOverrides +
+   * limitOverrides` and returned a static plan-only snapshot. The
+   * entitlement engine had been populating `feature.*`, `limit.*`,
+   * `integration.*` rows from plan + add-on + override sources for
+   * months — but the frontend's `useGetEffectiveFeatures` hook (the
+   * single source for `hasFeature` / `checkLimit` across the entire UI)
+   * never consumed them. Result: a tenant who purchased
+   * `integration_yemeksepeti` (₺249/mo) got a successful charge, a
+   * projection event, an engine grant, AND no visible effect on their
+   * UI. Their entitlement row sat in the DB doing nothing.
+   *
+   * Now: pull the resolved set from the engine and translate the
+   * dotted keys to the camelCase / unprefixed shape the frontend
+   * already consumes. Result shape is additive — adds `integrations`
+   * — so old frontends keep working.
+   *
+   * Fallback: if the engine returns an empty set (a tenant whose
+   * projector hasn't run yet — e.g. mid-signup race, or a tenant
+   * created before reconcileNightly's first pass), we fall through to
+   * the legacy plan-only computation so the UI still has SOMETHING to
+   * render rather than a blank loading state. Reconcile-nightly catches
+   * this within 24h; the projector also reprojects on next mutation.
+   */
   async getEffectiveFeatures(tenantId: string) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
@@ -977,10 +1143,6 @@ export class SubscriptionService {
       throw new NotFoundException("Tenant or plan not found");
     }
     const plan = tenant.currentPlan;
-    const featureOverrides =
-      (tenant.featureOverrides as Record<string, boolean>) || null;
-    const limitOverrides =
-      (tenant.limitOverrides as Record<string, number>) || null;
 
     // Per-plan trial eligibility — the UI uses this to surface a
     // "14 gün ücretsiz dene" CTA on each plan card the tenant hasn't
@@ -994,33 +1156,138 @@ export class SubscriptionService {
       .filter((p) => p.trialDays > 0 && !usedTrialPlanIds.includes(p.id))
       .map((p) => p.id);
 
-    const features = {
-      advancedReports:
-        featureOverrides?.advancedReports ?? plan.advancedReports,
-      multiLocation: featureOverrides?.multiLocation ?? plan.multiLocation,
-      customBranding: featureOverrides?.customBranding ?? plan.customBranding,
-      apiAccess: featureOverrides?.apiAccess ?? plan.apiAccess,
-      prioritySupport:
-        featureOverrides?.prioritySupport ?? plan.prioritySupport,
-      inventoryTracking:
-        featureOverrides?.inventoryTracking ?? plan.inventoryTracking,
-      kdsIntegration: featureOverrides?.kdsIntegration ?? plan.kdsIntegration,
-      reservationSystem:
-        featureOverrides?.reservationSystem ?? plan.reservationSystem,
-      personnelManagement:
-        featureOverrides?.personnelManagement ?? plan.personnelManagement,
-      deliveryIntegration:
-        featureOverrides?.deliveryIntegration ?? plan.deliveryIntegration,
-    };
-    const limits = {
-      maxUsers: limitOverrides?.maxUsers ?? plan.maxUsers,
-      maxTables: limitOverrides?.maxTables ?? plan.maxTables,
-      maxProducts: limitOverrides?.maxProducts ?? plan.maxProducts,
-      maxCategories: limitOverrides?.maxCategories ?? plan.maxCategories,
-      maxMonthlyOrders:
-        limitOverrides?.maxMonthlyOrders ?? plan.maxMonthlyOrders,
-    };
-    return { features, limits, trialEligiblePlanIds };
+    // Pull the engine-resolved view. tenant-scoped (branchId=null);
+    // per-branch entitlements would surface here when a future caller
+    // asks for them, but the existing `useGetEffectiveFeatures` is a
+    // tenant-level hook so tenant scope is correct.
+    const engineSet = await this.entitlements.getForTenant(tenantId, null);
+    const hasAnyEngineGrants =
+      Object.keys(engineSet.features).length > 0 ||
+      Object.keys(engineSet.limits).length > 0 ||
+      Object.keys(engineSet.integrations).length > 0;
+
+    if (!hasAnyEngineGrants) {
+      // Engine empty — projector hasn't run for this tenant yet. Fall
+      // through to plan + override + add-on fold computation so the UI
+      // still renders. v2.8.90 — the fold now reads active TenantAddOn
+      // rows so a tenant who purchased an add-on but hit a projector
+      // race sees their purchase reflected; pre-v2.8.90 this branch
+      // returned plan-only and the frontend showed locked features.
+      // reconcileNightly still catches the engine miss within 24h.
+      this.logger.debug(
+        `getEffectiveFeatures fell back to plan + override + addon fold for tenant=${tenantId} (engine empty)`,
+      );
+      const featureOverrides =
+        (tenant.featureOverrides as Record<string, boolean>) || null;
+      const limitOverrides =
+        (tenant.limitOverrides as Record<string, number>) || null;
+      const features: Record<string, boolean> = {
+        advancedReports: plan.advancedReports,
+        multiLocation: plan.multiLocation,
+        customBranding: plan.customBranding,
+        apiAccess: plan.apiAccess,
+        prioritySupport: plan.prioritySupport,
+        inventoryTracking: plan.inventoryTracking,
+        kdsIntegration: plan.kdsIntegration,
+        reservationSystem: plan.reservationSystem,
+        personnelManagement: plan.personnelManagement,
+        deliveryIntegration: plan.deliveryIntegration,
+      };
+      const limits: Record<string, number> = {
+        maxUsers: plan.maxUsers,
+        maxTables: plan.maxTables,
+        maxProducts: plan.maxProducts,
+        maxCategories: plan.maxCategories,
+        maxMonthlyOrders: plan.maxMonthlyOrders,
+      };
+      const integrations: Record<string, string[]> = {};
+
+      // Fold active add-ons. Each TenantAddOn carries a snapshot of the
+      // MarketplaceAddOn.grants JSON applied at purchase time. The
+      // engine's projector uses the same shape — features OR-true,
+      // limits SUM, integrations array-union — so reproduce it here.
+      const activeAddOns = await this.prisma.tenantAddOn.findMany({
+        where: { tenantId, status: "active" },
+        include: { addOn: { select: { grants: true } } },
+      });
+      for (const ta of activeAddOns) {
+        const grants = (ta.addOn?.grants ?? {}) as Record<string, unknown>;
+        for (const [k, v] of Object.entries(grants)) {
+          if (k.startsWith("feature.")) {
+            const name = k.slice("feature.".length);
+            if (v === true && name in features) features[name] = true;
+          } else if (k.startsWith("limit.")) {
+            const name = k.slice("limit.".length);
+            if (typeof v === "number" && name in limits) {
+              // SUM by qty. Engine treats -1 as "unlimited"; preserve.
+              if (limits[name] === -1 || v === -1) {
+                limits[name] = -1;
+              } else {
+                limits[name] = limits[name] + v * (ta.quantity ?? 1);
+              }
+            }
+          } else if (k.startsWith("integration.")) {
+            const domain = k.slice("integration.".length);
+            const vendors = Array.isArray(v) ? (v as string[]) : [];
+            if (!integrations[domain]) integrations[domain] = [];
+            for (const vendor of vendors) {
+              if (!integrations[domain].includes(vendor)) {
+                integrations[domain].push(vendor);
+              }
+            }
+          }
+        }
+      }
+
+      // Overrides win last (REPLACE semantics matching the engine).
+      if (featureOverrides) {
+        for (const [k, v] of Object.entries(featureOverrides)) {
+          if (k in features) features[k] = v;
+        }
+      }
+      if (limitOverrides) {
+        for (const [k, v] of Object.entries(limitOverrides)) {
+          if (k in limits) limits[k] = v;
+        }
+      }
+
+      return {
+        features,
+        limits,
+        integrations,
+        trialEligiblePlanIds,
+      };
+    }
+
+    // Engine-resolved path: strip the `feature.` / `limit.` /
+    // `integration.` prefixes to match the frontend's shape. Engine
+    // keys are dotted ("feature.multiLocation", "limit.maxTables",
+    // "integration.delivery"); the response shape this method has
+    // shipped for ~6 months is flat camelCase ({ features: {
+    // multiLocation }, limits: { maxTables }, integrations: { delivery
+    // } }). The unprefix step keeps backwards compat for every
+    // existing consumer.
+    const features: Record<string, boolean> = {};
+    for (const [k, v] of Object.entries(engineSet.features)) {
+      const unprefixed = k.startsWith("feature.")
+        ? k.slice("feature.".length)
+        : k;
+      features[unprefixed] = v;
+    }
+    const limits: Record<string, number> = {};
+    for (const [k, v] of Object.entries(engineSet.limits)) {
+      const unprefixed = k.startsWith("limit.") ? k.slice("limit.".length) : k;
+      limits[unprefixed] = v;
+    }
+    const integrations: Record<string, string[]> = {};
+    for (const [k, v] of Object.entries(engineSet.integrations)) {
+      const unprefixed = k.startsWith("integration.")
+        ? k.slice("integration.".length)
+        : k;
+      integrations[unprefixed] = v;
+    }
+
+    return { features, limits, integrations, trialEligiblePlanIds };
   }
 
   async getPlanByName(name: SubscriptionPlanType) {
@@ -1099,6 +1366,17 @@ export class SubscriptionService {
         this.logger.log(
           `Trial subscription ${subscription.id} expired → tenant ${subscription.tenantId} dropped to FREE`,
         );
+
+        // Plan tier changed → entitlement set needs rebuilding. Treated as a
+        // downgrade so consumers can distinguish trial-expiry from a paid
+        // upgrade if they ever need to (the projector itself doesn't care).
+        await this.emitLifecycle(EventTypes.SubscriptionDowngraded, {
+          id: subscription.id,
+          tenantId: subscription.tenantId,
+          plan: { name: "FREE" },
+          currentPeriodStart: now,
+          currentPeriodEnd: freePeriodEnd,
+        });
 
         // Best-effort trial-expired email; failure here mustn't block the
         // status transition (the cron must remain idempotent).

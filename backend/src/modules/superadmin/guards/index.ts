@@ -1,1 +1,1 @@
-export * from './superadmin.guard';
+export * from "./superadmin.guard";

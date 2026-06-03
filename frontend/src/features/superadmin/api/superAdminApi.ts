@@ -25,8 +25,10 @@ import {
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
-// Create axios instance for SuperAdmin API
-const superAdminApi = axios.create({
+// Create axios instance for SuperAdmin API. Exported so feature modules
+// (marketplace admin, catalog admin) can share the same auth + refresh
+// pipeline instead of each one rebuilding the interceptor stack.
+export const superAdminApi = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
@@ -79,6 +81,22 @@ superAdminApi.interceptors.response.use(
         return superAdminApi(originalRequest);
       } catch (refreshError) {
         useSuperAdminAuthStore.getState().logout();
+        // Mirror the tenant-side 401 deeplink preservation
+        // (see frontend/src/lib/api.ts). Stash the path in
+        // sessionStorage so SuperAdminLoginPage can return the
+        // operator to the page they were on (e.g.
+        // /superadmin/tenants/abc) instead of always landing on
+        // the dashboard root.
+        try {
+          if (typeof window !== 'undefined' && window.location) {
+            const here = window.location.pathname + window.location.search + window.location.hash;
+            if (here && !here.startsWith('/superadmin/login')) {
+              window.sessionStorage.setItem('superAdminPostLoginReturn', here);
+            }
+          }
+        } catch {
+          // Private-mode / sandbox iframe: non-fatal.
+        }
         window.location.href = import.meta.env.BASE_URL + 'superadmin/login';
         return Promise.reject(refreshError);
       }

@@ -1,5 +1,5 @@
-import { IsEnum, IsNotEmpty, IsString, IsOptional } from 'class-validator';
-import { BillingCycle } from '../../../common/constants/subscription.enum';
+import { IsEnum, IsNotEmpty, IsString, IsOptional } from "class-validator";
+import { BillingCycle } from "../../../common/constants/subscription.enum";
 
 export class ChangePlanDto {
   @IsString()

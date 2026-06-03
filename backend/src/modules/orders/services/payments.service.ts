@@ -7,24 +7,36 @@ import {
   Logger,
   Inject,
   forwardRef,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CreatePaymentDto } from '../dto/create-payment.dto';
-import { SplitBillDto, SplitType } from '../dto/split-bill.dto';
-import { PayItemsDto } from '../dto/pay-items.dto';
-import { PaymentStatus, OrderStatus, StockMovementType } from '../../../common/constants/order-status.enum';
-import { TableStatus } from '../../tables/dto/create-table.dto';
-import { OrdersService } from './orders.service';
-import { CustomersService } from '../../customers/customers.service';
-import { LoyaltyService } from '../../customers/loyalty.service';
-import { StockDeductionService } from '../../stock-management/services/stock-deduction.service';
-import { withTransaction, addBreadcrumb } from '../../../common/utils/tracing';
-import * as Sentry from '@sentry/node';
-import { SalesInvoiceService } from '../../accounting/services/sales-invoice.service';
-import { AccountingSettingsService } from '../../accounting/services/accounting-settings.service';
-import { ReceiptSnapshotBuilder } from './receipt-snapshot.builder';
-import { KdsGateway } from '../../kds/kds.gateway';
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { CreatePaymentDto } from "../dto/create-payment.dto";
+import { SplitBillDto, SplitType } from "../dto/split-bill.dto";
+import { PayItemsDto } from "../dto/pay-items.dto";
+import {
+  PaymentStatus,
+  OrderStatus,
+  StockMovementType,
+} from "../../../common/constants/order-status.enum";
+import { TableStatus } from "../../tables/dto/create-table.dto";
+import { OrdersService } from "./orders.service";
+import { CustomersService } from "../../customers/customers.service";
+import { LoyaltyService } from "../../customers/loyalty.service";
+import { StockDeductionService } from "../../stock-management/services/stock-deduction.service";
+import { withTransaction, addBreadcrumb } from "../../../common/utils/tracing";
+import * as Sentry from "@sentry/node";
+import { SalesInvoiceService } from "../../accounting/services/sales-invoice.service";
+import { AccountingSettingsService } from "../../accounting/services/accounting-settings.service";
+import { ReceiptSnapshotBuilder } from "./receipt-snapshot.builder";
+import { KdsGateway } from "../../kds/kds.gateway";
+import { BranchScope, branchScope } from "../../../common/scoping/branch-scope";
+
+// v2.8.97 — single source of truth for the cross-payment-path rounding
+// tolerance. Both the single-payment overpayment check and the
+// split-bill exact-match check accept ±1 kuruş for float-legacy callers
+// computing finalAmount client-side. Defining the value once means a
+// future audit/refactor doesn't have to chase two hardcoded literals.
+const PAYMENT_TOLERANCE = new Prisma.Decimal("0.01");
 
 @Injectable()
 export class PaymentsService {
@@ -68,6 +80,7 @@ export class PaymentsService {
     try {
       this.kdsGateway.emitPaymentSuccess(
         tenantId,
+        payment.branchId,
         {
           id: payment.id,
           orderId: payment.orderId,
@@ -104,7 +117,7 @@ export class PaymentsService {
       SELECT id FROM orders WHERE id = ${orderId} AND "tenantId" = ${tenantId} FOR UPDATE
     `;
     if (rows.length === 0) {
-      throw new NotFoundException('Order not found');
+      throw new NotFoundException("Order not found");
     }
   }
 
@@ -182,6 +195,10 @@ export class PaymentsService {
     });
 
     // Release the table when no other active orders remain on it.
+    // v2.8.93 — table update uses updateMany with (id, tenantId) compound
+    // WHERE so a wrong/spoofed tableId can never mark another tenant's
+    // table AVAILABLE. The pre-fix used update() with id-only which would
+    // happily mutate any tenant's row that matched on id.
     if (order.tableId) {
       const otherActiveOrders = await tx.order.count({
         where: {
@@ -191,8 +208,8 @@ export class PaymentsService {
         },
       });
       if (otherActiveOrders === 0) {
-        await tx.table.update({
-          where: { id: order.tableId },
+        await tx.table.updateMany({
+          where: { id: order.tableId, tenantId: order.tenantId },
           data: { status: TableStatus.AVAILABLE },
         });
       }
@@ -204,15 +221,23 @@ export class PaymentsService {
     // Keeping the helper opt-in for that path avoids silently
     // inflating CRM totals on the first deploy after the refactor.
     if (opts.bumpCustomerStats !== false && customerId) {
-      const customer = await tx.customer.findUnique({ where: { id: customerId } });
+      // v2.8.93 — findFirst with tenantId scope replaces findUnique({id}).
+      // Same risk class as the table update above: a customerId pointing
+      // at another tenant's customer would otherwise let payment
+      // finalization mutate totalOrders/totalSpent on the foreign row.
+      const customer = await tx.customer.findFirst({
+        where: { id: customerId, tenantId: order.tenantId },
+      });
       if (customer) {
         const newTotalOrders = customer.totalOrders + 1;
         const newTotalSpent = new Prisma.Decimal(customer.totalSpent).add(
           closingAmount,
         );
         const newAverageOrder = newTotalSpent.div(newTotalOrders);
-        await tx.customer.update({
-          where: { id: customerId },
+        // updateMany propagates the tenantId filter through the write.
+        // Belt-and-suspenders with the findFirst above.
+        await tx.customer.updateMany({
+          where: { id: customerId, tenantId: order.tenantId },
           data: {
             totalOrders: newTotalOrders,
             totalSpent: newTotalSpent,
@@ -222,7 +247,6 @@ export class PaymentsService {
         });
       }
     }
-
   }
 
   /**
@@ -232,19 +256,33 @@ export class PaymentsService {
    * the 5s ceiling (loyalty does its own read-update-write). Idempotent
    * on (customer, order); retries are safe.
    */
-  private async creditLoyaltyForFinalizedOrder(orderId: string, tenantId: string): Promise<void> {
+  private async creditLoyaltyForFinalizedOrder(
+    orderId: string,
+    tenantId: string,
+  ): Promise<void> {
     try {
       const order = await this.prisma.order.findUnique({
         where: { id: orderId },
-        select: { customerId: true, finalAmount: true, status: true, orderNumber: true },
+        select: {
+          customerId: true,
+          finalAmount: true,
+          status: true,
+          orderNumber: true,
+        },
       });
-      if (!order?.customerId || order.status !== 'PAID') return;
+      if (!order?.customerId || order.status !== "PAID") return;
+      // v2.8.96 — pass the Decimal through directly. Pre-fix the
+      // Number(finalAmount.toString()) bounce risked precision loss
+      // (Number_MAX_SAFE for huge aggregates, IEEE-754 drift for
+      // future fractional pointsPerCurrencyUnit). loyalty service
+      // now accepts number | string | Decimal and routes through
+      // Prisma.Decimal arithmetic internally.
       await this.loyaltyService.earnPointsFromOrder(
         order.customerId,
         tenantId,
         orderId,
-        order.orderNumber ?? '',
-        Number(order.finalAmount.toString()),
+        order.orderNumber ?? "",
+        order.finalAmount as any,
       );
     } catch (err: any) {
       this.logger.warn(
@@ -322,7 +360,12 @@ export class PaymentsService {
    */
   private async linkCustomerForPayment(
     tx: Prisma.TransactionClient,
-    payment: { id: string; orderId: string; tenantId: string; amount: Prisma.Decimal | number | string },
+    payment: {
+      id: string;
+      orderId: string;
+      tenantId: string;
+      amount: Prisma.Decimal | number | string;
+    },
     phone: string,
   ): Promise<void> {
     let customer = await tx.customer.findFirst({
@@ -396,13 +439,17 @@ export class PaymentsService {
   ): Promise<void> {
     if (!this.salesInvoiceService || !this.accountingSettingsService) return;
     try {
-      const accSettings = await this.accountingSettingsService.findByTenant(tenantId);
+      const accSettings =
+        await this.accountingSettingsService.findByTenant(tenantId);
       if (!accSettings.autoGenerateInvoice) return;
       let lastErr: unknown;
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
           if (paymentId) {
-            await this.salesInvoiceService.createFromPayment(paymentId, tenantId);
+            await this.salesInvoiceService.createFromPayment(
+              paymentId,
+              tenantId,
+            );
           } else {
             await this.salesInvoiceService.createFromOrder(orderId, tenantId);
           }
@@ -416,14 +463,15 @@ export class PaymentsService {
         }
       }
       if (lastErr) {
-        const msg = lastErr instanceof Error ? lastErr.message : String(lastErr);
+        const msg =
+          lastErr instanceof Error ? lastErr.message : String(lastErr);
         const stack = lastErr instanceof Error ? lastErr.stack : undefined;
         this.logger.error(
           `REVENUE_SYNC_FAILED: auto-invoice for order ${orderId}: ${msg}`,
           stack,
         );
         Sentry.captureException(lastErr, {
-          tags: { event: 'REVENUE_SYNC_FAILED', tenantId },
+          tags: { event: "REVENUE_SYNC_FAILED", tenantId },
           extra: { orderId },
         });
       }
@@ -433,8 +481,8 @@ export class PaymentsService {
         err.stack,
       );
       Sentry.captureException(err, {
-        tags: { event: 'REVENUE_SYNC_FAILED', tenantId },
-        extra: { orderId, phase: 'settings-lookup' },
+        tags: { event: "REVENUE_SYNC_FAILED", tenantId },
+        extra: { orderId, phase: "settings-lookup" },
       });
     }
   }
@@ -447,24 +495,27 @@ export class PaymentsService {
   ) {
     return withTransaction(
       {
-        name: 'payment.create',
-        op: 'payment',
+        name: "payment.create",
+        op: "payment",
         tags: {
-          'payment.method': createPaymentDto.method,
-          'tenant.id': tenantId,
-          'order.id': orderId,
+          "payment.method": createPaymentDto.method,
+          "tenant.id": tenantId,
+          "order.id": orderId,
         },
         data: {
           amount: createPaymentDto.amount,
         },
       },
       async () => {
-        addBreadcrumb('Starting payment creation', 'payment', { orderId, amount: createPaymentDto.amount });
+        addBreadcrumb("Starting payment creation", "payment", {
+          orderId,
+          amount: createPaymentDto.amount,
+        });
 
         // Verify order exists and belongs to tenant (lightweight pre-check for tenant isolation)
-        await this.ordersService.findOne(orderId, tenantId);
+        await this.ordersService.findOneByTenant(orderId, tenantId);
 
-        addBreadcrumb('Payment validation passed', 'payment', { orderId });
+        addBreadcrumb("Payment validation passed", "payment", { orderId });
 
         // Idempotency fast-path: if the client supplied a key and we've already
         // recorded a payment for this (orderId, key), return that row instead of
@@ -494,141 +545,166 @@ export class PaymentsService {
         let result;
         try {
           result = await this.prisma.$transaction(async (tx) => {
-          // Serialize concurrent payment paths on the same order.
-          await this.acquireOrderLock(tx, orderId, tenantId);
+            // Serialize concurrent payment paths on the same order.
+            await this.acquireOrderLock(tx, orderId, tenantId);
 
-          // Re-fetch order inside transaction for a consistent view
-          const order = await tx.order.findFirst({
-            where: { id: orderId, tenantId },
-          });
-
-          if (!order) {
-            throw new NotFoundException('Order not found');
-          }
-
-          // Check if order is already paid (inside transaction to prevent race condition)
-          if (order.status === OrderStatus.PAID) {
-            throw new BadRequestException('Order is already paid');
-          }
-
-          // Check if order is cancelled
-          if (order.status === OrderStatus.CANCELLED) {
-            throw new BadRequestException('Cannot pay for a cancelled order');
-          }
-
-          // Prevent payment for orders awaiting approval (check BEFORE creating payment)
-          if (order.requiresApproval && order.status === OrderStatus.PENDING_APPROVAL) {
-            throw new BadRequestException(
-              'Order requires approval before payment can be processed. Please approve the order first.'
-            );
-          }
-
-          // PosSettings.requireServedForDineInPayment gates dine-in
-          // payments on order.status === SERVED — opt-in for tenants
-          // who want the waiter to confirm the food landed before
-          // taking money. Tenants who leave the toggle off keep the
-          // legacy "pay anytime" behaviour.
-          if (order.type === 'DINE_IN' && order.status !== OrderStatus.SERVED) {
-            const posSettings = await tx.posSettings.findUnique({
-              where: { tenantId },
-              select: { requireServedForDineInPayment: true },
+            // Re-fetch order inside transaction for a consistent view
+            const order = await tx.order.findFirst({
+              where: { id: orderId, tenantId },
             });
-            if (posSettings?.requireServedForDineInPayment) {
+
+            if (!order) {
+              throw new NotFoundException("Order not found");
+            }
+
+            // Check if order is already paid (inside transaction to prevent race condition)
+            if (order.status === OrderStatus.PAID) {
+              throw new BadRequestException("Order is already paid");
+            }
+
+            // Check if order is cancelled
+            if (order.status === OrderStatus.CANCELLED) {
+              throw new BadRequestException("Cannot pay for a cancelled order");
+            }
+
+            // Prevent payment for orders awaiting approval (check BEFORE creating payment)
+            if (
+              order.requiresApproval &&
+              order.status === OrderStatus.PENDING_APPROVAL
+            ) {
               throw new BadRequestException(
-                'Order must be SERVED before payment (tenant policy: requireServedForDineInPayment).',
+                "Order requires approval before payment can be processed. Please approve the order first.",
               );
             }
-          }
 
-          // Validate payment amount against REMAINING (not total). A partial
-          // payment must not be allowed to push the order into overpayment by
-          // sending a second full-amount payment.
-          const existingPaid = await tx.payment.aggregate({
-            where: { orderId, status: PaymentStatus.COMPLETED },
-            _sum: { amount: true },
-          });
-          const alreadyPaid = new Prisma.Decimal(existingPaid._sum.amount ?? 0);
-          const remaining = new Prisma.Decimal(order.finalAmount).sub(alreadyPaid);
-          // 1-cent rounding tolerance for float-legacy callers.
-          if (new Prisma.Decimal(createPaymentDto.amount).gt(remaining.add('0.01'))) {
-            throw new BadRequestException(
-              `Payment amount exceeds remaining (${remaining.toFixed(2)})`,
+            // PosSettings.requireServedForDineInPayment gates dine-in
+            // payments on order.status === SERVED — opt-in for tenants
+            // who want the waiter to confirm the food landed before
+            // taking money. Tenants who leave the toggle off keep the
+            // legacy "pay anytime" behaviour.
+            if (
+              order.type === "DINE_IN" &&
+              order.status !== OrderStatus.SERVED
+            ) {
+              // v3.0.1 — findFirst (Prisma rejects compound-unique with
+              // branchId: null even when DB allows it; see branch-scope helper).
+              const posSettings = await tx.posSettings.findFirst({
+                where: { tenantId, branchId: null },
+                select: { requireServedForDineInPayment: true },
+              });
+              if (posSettings?.requireServedForDineInPayment) {
+                throw new BadRequestException(
+                  "Order must be SERVED before payment (tenant policy: requireServedForDineInPayment).",
+                );
+              }
+            }
+
+            // Validate payment amount against REMAINING (not total). A partial
+            // payment must not be allowed to push the order into overpayment by
+            // sending a second full-amount payment.
+            const existingPaid = await tx.payment.aggregate({
+              where: { orderId, status: PaymentStatus.COMPLETED },
+              _sum: { amount: true },
+            });
+            const alreadyPaid = new Prisma.Decimal(
+              existingPaid._sum.amount ?? 0,
             );
-          }
+            const remaining = new Prisma.Decimal(order.finalAmount).sub(
+              alreadyPaid,
+            );
+            // ±PAYMENT_TOLERANCE rounding tolerance for float-legacy callers.
+            if (
+              new Prisma.Decimal(createPaymentDto.amount).gt(
+                remaining.add(PAYMENT_TOLERANCE),
+              )
+            ) {
+              throw new BadRequestException(
+                `Payment amount exceeds remaining (${remaining.toFixed(2)})`,
+              );
+            }
 
-          // Build the receipt snapshot before payment.create so it's persisted
-          // in the same transaction. Fail-soft: if tenant or order data is
-          // unexpectedly missing pieces, fall back to JsonNull rather than
-          // crashing the payment — this is a reprint convenience, not the
-          // source of truth for accounting.
-          const receiptSnapshot = await this.buildReceiptSnapshotForPayment(
-            tx,
-            orderId,
-            tenantId,
-            {
-              method: createPaymentDto.method,
-              transactionId: createPaymentDto.transactionId ?? null,
-            },
-          );
-
-          // Create payment
-          const payment = await tx.payment.create({
-            data: {
-              amount: createPaymentDto.amount,
-              method: createPaymentDto.method,
-              status: PaymentStatus.COMPLETED,
-              notes: createPaymentDto.notes,
+            // Build the receipt snapshot before payment.create so it's persisted
+            // in the same transaction. Fail-soft: if tenant or order data is
+            // unexpectedly missing pieces, fall back to JsonNull rather than
+            // crashing the payment — this is a reprint convenience, not the
+            // source of truth for accounting.
+            const receiptSnapshot = await this.buildReceiptSnapshotForPayment(
+              tx,
               orderId,
               tenantId,
-              paidAt: new Date(),
-              // Persist external gateway reference + client-provided idempotency
-              // key so retries of the same request return the same payment row
-              // (enforced by the partial unique index on the schema side).
-              transactionId: createPaymentDto.transactionId,
-              idempotencyKey: createPaymentDto.idempotencyKey,
-              receiptSnapshot,
-            },
-            include: {
-              order: {
-                include: {
-                  orderItems: {
-                    include: {
-                      product: true,
+              {
+                method: createPaymentDto.method,
+                transactionId: createPaymentDto.transactionId ?? null,
+              },
+            );
+
+            // Create payment
+            const payment = await tx.payment.create({
+              data: {
+                amount: createPaymentDto.amount,
+                method: createPaymentDto.method,
+                status: PaymentStatus.COMPLETED,
+                notes: createPaymentDto.notes,
+                orderId,
+                tenantId,
+                // v3.0.0 — branchId is now required (NOT NULL on Payment).
+                // Derive from the order being paid so the payment stays in the
+                // same branch as the order — staff at branch B can never book
+                // a payment that lands on a foreign branch's books.
+                branchId: order.branchId,
+                paidAt: new Date(),
+                // Persist external gateway reference + client-provided idempotency
+                // key so retries of the same request return the same payment row
+                // (enforced by the partial unique index on the schema side).
+                transactionId: createPaymentDto.transactionId,
+                idempotencyKey: createPaymentDto.idempotencyKey,
+                receiptSnapshot,
+              },
+              include: {
+                order: {
+                  include: {
+                    orderItems: {
+                      include: {
+                        product: true,
+                      },
                     },
                   },
                 },
               },
-            },
-          });
+            });
 
-          // Check if total payments equal or exceed order amount
-          const totalPaid = await tx.payment.aggregate({
-            where: {
-              orderId,
-              status: PaymentStatus.COMPLETED,
-            },
-            _sum: {
-              amount: true,
-            },
-          });
+            // Check if total payments equal or exceed order amount
+            const totalPaid = await tx.payment.aggregate({
+              where: {
+                orderId,
+                status: PaymentStatus.COMPLETED,
+              },
+              _sum: {
+                amount: true,
+              },
+            });
 
-          // Stay in Decimal end-to-end on the "are we fully paid?" check.
-          // Number conversion drops precision on totals > ~$70k, which
-          // could let a still-short order flip to PAID (M1).
-          const totalPaidAmount = new Prisma.Decimal(totalPaid._sum.amount ?? 0);
-          const orderAmount = new Prisma.Decimal(order.finalAmount);
-
-          if (totalPaidAmount.gte(orderAmount)) {
-            await this.finalizeFullyPaid(
-              tx,
-              order,
-              createPaymentDto.customerPhone,
-              orderAmount,
+            // Stay in Decimal end-to-end on the "are we fully paid?" check.
+            // Number conversion drops precision on totals > ~$70k, which
+            // could let a still-short order flip to PAID (M1).
+            const totalPaidAmount = new Prisma.Decimal(
+              totalPaid._sum.amount ?? 0,
             );
-          }
+            const orderAmount = new Prisma.Decimal(order.finalAmount);
 
-          addBreadcrumb('Payment completed successfully', 'payment', { paymentId: payment.id });
-          return payment;
+            if (totalPaidAmount.gte(orderAmount)) {
+              await this.finalizeFullyPaid(
+                tx,
+                order,
+                createPaymentDto.customerPhone,
+                orderAmount,
+              );
+            }
+
+            addBreadcrumb("Payment completed successfully", "payment", {
+              paymentId: payment.id,
+            });
+            return payment;
           });
         } catch (err) {
           // Partial unique index on (orderId, idempotencyKey) WHERE key IS NOT
@@ -637,7 +713,7 @@ export class PaymentsService {
           // client gets an idempotent response.
           if (
             err instanceof Prisma.PrismaClientKnownRequestError &&
-            err.code === 'P2002' &&
+            err.code === "P2002" &&
             createPaymentDto.idempotencyKey
           ) {
             const existing = await this.prisma.payment.findFirst({
@@ -669,13 +745,13 @@ export class PaymentsService {
         this.safeEmitPaymentSuccess(tenantId, result, initiatedByUserId);
 
         return result;
-      }
+      },
     );
   }
 
   async findByOrder(orderId: string, tenantId: string) {
     // Verify order exists and belongs to tenant
-    await this.ordersService.findOne(orderId, tenantId);
+    await this.ordersService.findOneByTenant(orderId, tenantId);
 
     // Defence-in-depth: also filter payments by tenantId. The pre-check
     // above ensures the order is the caller's, but a future regression
@@ -684,12 +760,15 @@ export class PaymentsService {
     // call safe in isolation.
     return this.prisma.payment.findMany({
       where: { orderId, tenantId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 
   // Valid payment status transitions
-  private static readonly VALID_PAYMENT_TRANSITIONS: Record<PaymentStatus, PaymentStatus[]> = {
+  private static readonly VALID_PAYMENT_TRANSITIONS: Record<
+    PaymentStatus,
+    PaymentStatus[]
+  > = {
     [PaymentStatus.PENDING]: [PaymentStatus.COMPLETED, PaymentStatus.FAILED],
     [PaymentStatus.COMPLETED]: [PaymentStatus.REFUNDED],
     [PaymentStatus.FAILED]: [],
@@ -715,10 +794,11 @@ export class PaymentsService {
 
     // Validate payment state transition
     const currentStatus = payment.status as PaymentStatus;
-    const validTransitions = PaymentsService.VALID_PAYMENT_TRANSITIONS[currentStatus] || [];
+    const validTransitions =
+      PaymentsService.VALID_PAYMENT_TRANSITIONS[currentStatus] || [];
     if (!validTransitions.includes(status)) {
       throw new BadRequestException(
-        `Invalid payment status transition: ${currentStatus} -> ${status}. Allowed: ${validTransitions.join(', ') || 'none'}`,
+        `Invalid payment status transition: ${currentStatus} -> ${status}. Allowed: ${validTransitions.join(", ") || "none"}`,
       );
     }
 
@@ -732,154 +812,176 @@ export class PaymentsService {
       // orders.service.ts:719-728). Doing it inside the tx would tie the
       // cancellation to the success of an external stock service.
       let orderMovedToCancelled = false;
-      const result = await this.prisma.$transaction(async (tx) => {
-        // Atomic claim: filtering on status=COMPLETED prevents a double-tap
-        // refund click from both passing the (stale) VALID_TRANSITIONS check
-        // above and both deducting from customer stats. The findUnique used
-        // for that validation runs outside this tx and can race with another
-        // request flipping status; updateMany + count check serializes them.
-        //
-        // Serializable isolation (set on $transaction below) covers the
-        // SEPARATE race where two refunds of DIFFERENT payments of the
-        // SAME order both reach this tx — without it, the customer-stats
-        // read-modify-write at line ~849 would lose-update (both read
-        // totalOrders=N, both write N-1).
-        const refundResult = await tx.payment.updateMany({
-          where: { id, status: PaymentStatus.COMPLETED },
-          data: { status: PaymentStatus.REFUNDED, paidAt: null },
-        });
-        if (refundResult.count === 0) {
-          throw new BadRequestException(
-            'Payment is no longer refundable (state changed mid-flight)',
-          );
-        }
+      const result = await this.prisma.$transaction(
+        async (tx) => {
+          // Atomic claim: filtering on status=COMPLETED prevents a double-tap
+          // refund click from both passing the (stale) VALID_TRANSITIONS check
+          // above and both deducting from customer stats. The findUnique used
+          // for that validation runs outside this tx and can race with another
+          // request flipping status; updateMany + count check serializes them.
+          //
+          // Serializable isolation (set on $transaction below) covers the
+          // SEPARATE race where two refunds of DIFFERENT payments of the
+          // SAME order both reach this tx — without it, the customer-stats
+          // read-modify-write at line ~849 would lose-update (both read
+          // totalOrders=N, both write N-1).
+          const refundResult = await tx.payment.updateMany({
+            where: { id, status: PaymentStatus.COMPLETED },
+            data: { status: PaymentStatus.REFUNDED, paidAt: null },
+          });
+          if (refundResult.count === 0) {
+            throw new BadRequestException(
+              "Payment is no longer refundable (state changed mid-flight)",
+            );
+          }
 
-        // Free the per-item allocations linked to this payment. The
-        // OrderItemPayment.amount snapshot stays in the Payment audit
-        // (Payment is not deleted, only flipped to REFUNDED), but the
-        // units become payable again because subsequent reads filter on
-        // payment.status = COMPLETED.
-        //
-        // Filter by paymentId alone: the Payment row was already
-        // authenticated by tenantId at line 376, and a tenantId guard
-        // here would silently strand rows in the (impossible-today
-        // but possible-tomorrow) world where allocation.tenantId
-        // drifts from payment.tenantId.
-        await tx.orderItemPayment.deleteMany({
-          where: { paymentId: id },
-        });
-        const updated = await tx.payment.findUnique({ where: { id } });
+          // Free the per-item allocations linked to this payment. The
+          // OrderItemPayment.amount snapshot stays in the Payment audit
+          // (Payment is not deleted, only flipped to REFUNDED), but the
+          // units become payable again because subsequent reads filter on
+          // payment.status = COMPLETED.
+          //
+          // Filter by paymentId alone: the Payment row was already
+          // authenticated by tenantId at line 376, and a tenantId guard
+          // here would silently strand rows in the (impossible-today
+          // but possible-tomorrow) world where allocation.tenantId
+          // drifts from payment.tenantId.
+          await tx.orderItemPayment.deleteMany({
+            where: { paymentId: id },
+          });
+          const updated = await tx.payment.findUnique({ where: { id } });
 
-        const completedSum = await tx.payment.aggregate({
-          where: { orderId: payment.orderId, status: PaymentStatus.COMPLETED },
-          _sum: { amount: true },
-        });
-        const stillPaid = new Prisma.Decimal(completedSum._sum.amount ?? 0);
-        const orderAmount = new Prisma.Decimal(payment.order.finalAmount);
-
-        // If the remaining completed payments no longer cover the order,
-        // we need to back the order out of PAID. The right target state
-        // depends on whether ANY completed payment survives the refund:
-        //
-        //  - Other completed payments exist (typical for progressive
-        //    flow: A and B already paid for their share, C refunds his)
-        //    → drop back to SERVED. Table stays OCCUPIED. The remaining
-        //    customers' allocations are intact; the items C originally
-        //    paid for are re-payable. NO stock reversal — the order is
-        //    not cancelled, the food was served.
-        //
-        //  - Zero completed payments left (the refunded payment was the
-        //    only one; the order was paid in a single Payment.create
-        //    that has now been refunded) → CANCELLED + stock reversal.
-        //    This is the legacy single-payment flow.
-        //
-        // Customer-stats rollback is always per-Payment.amount, never
-        // per-order finalAmount — only the refunded payment's
-        // contribution should be undone.
-        if (stillPaid.lt(orderAmount) && payment.order.status === OrderStatus.PAID) {
-          const otherCompletedCount = await tx.payment.count({
+          const completedSum = await tx.payment.aggregate({
             where: {
               orderId: payment.orderId,
               status: PaymentStatus.COMPLETED,
-              id: { not: id },
             },
+            _sum: { amount: true },
           });
+          const stillPaid = new Prisma.Decimal(completedSum._sum.amount ?? 0);
+          const orderAmount = new Prisma.Decimal(payment.order.finalAmount);
 
-          if (otherCompletedCount === 0) {
-            // Full unwind: nothing left, treat as if the order was cancelled.
-            await tx.order.update({
-              where: { id: payment.orderId },
-              data: {
-                status: OrderStatus.CANCELLED,
-                paidAt: null,
-                cancelledAt: new Date(),
+          // If the remaining completed payments no longer cover the order,
+          // we need to back the order out of PAID. The right target state
+          // depends on whether ANY completed payment survives the refund:
+          //
+          //  - Other completed payments exist (typical for progressive
+          //    flow: A and B already paid for their share, C refunds his)
+          //    → drop back to SERVED. Table stays OCCUPIED. The remaining
+          //    customers' allocations are intact; the items C originally
+          //    paid for are re-payable. NO stock reversal — the order is
+          //    not cancelled, the food was served.
+          //
+          //  - Zero completed payments left (the refunded payment was the
+          //    only one; the order was paid in a single Payment.create
+          //    that has now been refunded) → CANCELLED + stock reversal.
+          //    This is the legacy single-payment flow.
+          //
+          // Customer-stats rollback is always per-Payment.amount, never
+          // per-order finalAmount — only the refunded payment's
+          // contribution should be undone.
+          if (
+            stillPaid.lt(orderAmount) &&
+            payment.order.status === OrderStatus.PAID
+          ) {
+            const otherCompletedCount = await tx.payment.count({
+              where: {
+                orderId: payment.orderId,
+                status: PaymentStatus.COMPLETED,
+                id: { not: id },
               },
             });
-            orderMovedToCancelled = true;
-          } else {
-            // Partial unwind: there are still paying customers. Back
-            // the order to SERVED and keep the table occupied. Don't
-            // touch cancelledAt; this is not a cancellation.
-            await tx.order.update({
-              where: { id: payment.orderId },
-              data: {
-                status: OrderStatus.SERVED,
-                paidAt: null,
-              },
-            });
-            if (payment.order.tableId) {
-              await tx.table.update({
-                where: { id: payment.order.tableId },
-                data: { status: TableStatus.OCCUPIED },
-              });
-            }
-          }
 
-          // Roll back THIS payment's contribution to customer stats —
-          // regardless of which branch we took.
-          if (payment.order.customerId) {
-            const cust = await tx.customer.findUnique({
-              where: { id: payment.order.customerId },
-            });
-            if (cust && cust.totalOrders > 0) {
-              const refundedAmt = new Prisma.Decimal(payment.amount);
-              const newTotalOrders = Math.max(0, cust.totalOrders - 1);
-              const newTotalSpent = Prisma.Decimal.max(
-                new Prisma.Decimal(0),
-                new Prisma.Decimal(cust.totalSpent).sub(refundedAmt),
-              );
-              const newAverage =
-                newTotalOrders > 0
-                  ? newTotalSpent.div(newTotalOrders)
-                  : new Prisma.Decimal(0);
-              await tx.customer.update({
-                where: { id: cust.id },
+            if (otherCompletedCount === 0) {
+              // Full unwind: nothing left, treat as if the order was cancelled.
+              await tx.order.update({
+                where: { id: payment.orderId },
                 data: {
-                  totalOrders: newTotalOrders,
-                  totalSpent: newTotalSpent,
-                  averageOrder: newAverage,
+                  status: OrderStatus.CANCELLED,
+                  paidAt: null,
+                  cancelledAt: new Date(),
                 },
               });
+              orderMovedToCancelled = true;
+            } else {
+              // Partial unwind: there are still paying customers. Back
+              // the order to SERVED and keep the table occupied. Don't
+              // touch cancelledAt; this is not a cancellation.
+              await tx.order.update({
+                where: { id: payment.orderId },
+                data: {
+                  status: OrderStatus.SERVED,
+                  paidAt: null,
+                },
+              });
+              if (payment.order.tableId) {
+                // v2.8.93 — updateMany with (id, tenantId) compound WHERE.
+                // Same cross-tenant write risk as the AVAILABLE branch in
+                // finalizeFullyPaid above; mirror the fix here.
+                await tx.table.updateMany({
+                  where: {
+                    id: payment.order.tableId,
+                    tenantId: payment.order.tenantId,
+                  },
+                  data: { status: TableStatus.OCCUPIED },
+                });
+              }
+            }
+
+            // Roll back THIS payment's contribution to customer stats —
+            // regardless of which branch we took.
+            if (payment.order.customerId) {
+              // v2.8.93 — tenantId-scoped lookup matches finalizeFullyPaid.
+              const cust = await tx.customer.findFirst({
+                where: {
+                  id: payment.order.customerId,
+                  tenantId: payment.order.tenantId,
+                },
+              });
+              if (cust && cust.totalOrders > 0) {
+                const refundedAmt = new Prisma.Decimal(payment.amount);
+                const newTotalOrders = Math.max(0, cust.totalOrders - 1);
+                const newTotalSpent = Prisma.Decimal.max(
+                  new Prisma.Decimal(0),
+                  new Prisma.Decimal(cust.totalSpent).sub(refundedAmt),
+                );
+                const newAverage =
+                  newTotalOrders > 0
+                    ? newTotalSpent.div(newTotalOrders)
+                    : new Prisma.Decimal(0);
+                await tx.customer.updateMany({
+                  where: { id: cust.id, tenantId: payment.order.tenantId },
+                  data: {
+                    totalOrders: newTotalOrders,
+                    totalSpent: newTotalSpent,
+                    averageOrder: newAverage,
+                  },
+                });
+              }
             }
           }
-        }
 
-        return updated;
-      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+          return updated;
+        },
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+      );
 
       // Reverse the stock deductions the original PAID transition booked.
       // Until 2026-05-11 the refund flow silently left stock decremented
       // even though the order was now CANCELLED — inventory drifted.
       if (orderMovedToCancelled && this.stockDeductionService) {
         try {
-          await this.stockDeductionService.reverseForOrder(payment.orderId, tenantId);
+          await this.stockDeductionService.reverseForOrder(
+            payment.orderId,
+            tenantId,
+          );
         } catch (err: any) {
           this.logger.error(
             `CRITICAL: stock reversal failed for refunded order ${payment.orderId}: ${err.message}`,
             err.stack,
           );
           Sentry.captureException(err, {
-            tags: { event: 'REFUND_STOCK_REVERSAL_FAILED', tenantId },
+            tags: { event: "REFUND_STOCK_REVERSAL_FAILED", tenantId },
             extra: { orderId: payment.orderId, paymentId: id },
           });
         }
@@ -901,7 +1003,11 @@ export class PaymentsService {
     if (claim.count === 0) {
       throw new NotFoundException(`Payment with ID ${id} not found`);
     }
-    return this.prisma.payment.findUniqueOrThrow({ where: { id } });
+    // Defence-in-depth — the compound updateMany above proved tenant
+    // ownership; keep the same compound WHERE on the post-write read so
+    // a future reorder of these steps can't regress into a cross-tenant
+    // leak (same pattern as the inner-tx writes at L894 above).
+    return this.prisma.payment.findFirstOrThrow({ where: { id, tenantId } });
   }
 
   // ========================================
@@ -920,15 +1026,15 @@ export class PaymentsService {
     });
 
     if (!preCheck) {
-      throw new NotFoundException('Order not found');
+      throw new NotFoundException("Order not found");
     }
 
     if (preCheck.status === OrderStatus.PAID) {
-      throw new BadRequestException('Order is already fully paid');
+      throw new BadRequestException("Order is already fully paid");
     }
 
     if (preCheck.status === OrderStatus.CANCELLED) {
-      throw new BadRequestException('Cannot pay for a cancelled order');
+      throw new BadRequestException("Cannot pay for a cancelled order");
     }
 
     // All validation and payment creation inside transaction for race-condition safety
@@ -946,7 +1052,7 @@ export class PaymentsService {
       });
 
       if (!order) {
-        throw new NotFoundException('Order not found');
+        throw new NotFoundException("Order not found");
       }
 
       // Decimal-clean tolerance check. The earlier JS-Number implementation
@@ -970,10 +1076,11 @@ export class PaymentsService {
       // which let a 100.00 TL bill be settled as [50.00, 49.99] and silently
       // marked PAID with 0.01 TL outstanding — systematic revenue loss when
       // it happens at scale.
-      const tolerance = new Prisma.Decimal('0.01');
       const diff = totalSplitAmount.sub(remaining).abs();
-      if (diff.gt(tolerance)) {
-        const direction = totalSplitAmount.gt(remaining) ? 'exceeds' : 'is below';
+      if (diff.gt(PAYMENT_TOLERANCE)) {
+        const direction = totalSplitAmount.gt(remaining)
+          ? "exceeds"
+          : "is below";
         throw new BadRequestException(
           `Split total (${totalSplitAmount.toFixed(2)}) ${direction} remaining amount (${remaining.toFixed(2)})`,
         );
@@ -997,8 +1104,7 @@ export class PaymentsService {
       > = [];
       for (const [idx, entry] of dto.payments.entries()) {
         const key =
-          entry.idempotencyKey ??
-          (batchKey ? `${batchKey}:${idx}` : undefined);
+          entry.idempotencyKey ?? (batchKey ? `${batchKey}:${idx}` : undefined);
         try {
           // Per-split snapshot so each entry in the split has its own
           // reprintable fiş. Method differs per entry (one diner cash,
@@ -1017,6 +1123,10 @@ export class PaymentsService {
               notes: entry.label || null,
               orderId: orderId,
               tenantId,
+              // v3.0.0 — required branchId, derived from the order so every
+              // split entry settles in the order's branch (no cross-branch
+              // leak even if a stray request reached the wrong terminal).
+              branchId: order.branchId,
               paidAt: new Date(),
               idempotencyKey: key,
               receiptSnapshot,
@@ -1026,7 +1136,7 @@ export class PaymentsService {
         } catch (err) {
           if (
             err instanceof Prisma.PrismaClientKnownRequestError &&
-            err.code === 'P2002' &&
+            err.code === "P2002" &&
             key
           ) {
             const existing = await tx.payment.findFirst({
@@ -1061,9 +1171,15 @@ export class PaymentsService {
         // were NOT bumped here. payByItems opts in, create() always
         // bumped — splitBill stays opt-out to avoid a behaviour drift
         // on the first deploy.
-        await this.finalizeFullyPaid(tx, order, dto.customerPhone, orderAmount, {
-          bumpCustomerStats: false,
-        });
+        await this.finalizeFullyPaid(
+          tx,
+          order,
+          dto.customerPhone,
+          orderAmount,
+          {
+            bumpCustomerStats: false,
+          },
+        );
       }
 
       return { payments, isFullyPaid };
@@ -1127,7 +1243,10 @@ export class PaymentsService {
    */
   public derivePerUnitNet(
     item: { quantity: number; subtotal: Prisma.Decimal | number | string },
-    order: { discount: Prisma.Decimal | number | string; totalAmount: Prisma.Decimal | number | string },
+    order: {
+      discount: Prisma.Decimal | number | string;
+      totalAmount: Prisma.Decimal | number | string;
+    },
   ): Prisma.Decimal {
     return this.perUnitGross(item).mul(this.discountMultiplier(order));
   }
@@ -1171,7 +1290,9 @@ export class PaymentsService {
       totalAmount: Prisma.Decimal | number | string;
     },
   ): Prisma.Decimal {
-    return new Prisma.Decimal(item.subtotal).mul(this.discountMultiplier(order));
+    return new Prisma.Decimal(item.subtotal).mul(
+      this.discountMultiplier(order),
+    );
   }
 
   /**
@@ -1198,23 +1319,23 @@ export class PaymentsService {
   ) {
     return withTransaction(
       {
-        name: 'payment.payByItems',
-        op: 'payment',
+        name: "payment.payByItems",
+        op: "payment",
         tags: {
-          'payment.method': dto.method,
-          'tenant.id': tenantId,
-          'order.id': orderId,
+          "payment.method": dto.method,
+          "tenant.id": tenantId,
+          "order.id": orderId,
         },
         data: { items: dto.items.length },
       },
       async () => {
-        addBreadcrumb('Starting per-item payment', 'payment', {
+        addBreadcrumb("Starting per-item payment", "payment", {
           orderId,
           items: dto.items.length,
         });
 
         // Lightweight existence check to fail fast on cross-tenant ids.
-        await this.ordersService.findOne(orderId, tenantId);
+        await this.ordersService.findOneByTenant(orderId, tenantId);
 
         // Idempotency fast-path: if the key already maps to a payment,
         // rebuild and return the response from that row's allocations.
@@ -1240,7 +1361,11 @@ export class PaymentsService {
 
         let payment: Awaited<ReturnType<typeof this.prisma.payment.create>>;
         let isFullyPaid = false;
-        let allocations: Array<{ orderItemId: string; quantity: number; amount: string }>;
+        let allocations: Array<{
+          orderItemId: string;
+          quantity: number;
+          amount: string;
+        }>;
         let replayedFromInnerCatch = false;
 
         try {
@@ -1253,22 +1378,27 @@ export class PaymentsService {
             });
 
             if (!order) {
-              throw new NotFoundException('Order not found');
+              throw new NotFoundException("Order not found");
             }
             if (order.status === OrderStatus.PAID) {
-              throw new BadRequestException('Order is already paid');
+              throw new BadRequestException("Order is already paid");
             }
             if (order.status === OrderStatus.CANCELLED) {
-              throw new BadRequestException('Cannot pay for a cancelled order');
+              throw new BadRequestException("Cannot pay for a cancelled order");
             }
-            if (order.requiresApproval && order.status === OrderStatus.PENDING_APPROVAL) {
+            if (
+              order.requiresApproval &&
+              order.status === OrderStatus.PENDING_APPROVAL
+            ) {
               throw new BadRequestException(
-                'Order requires approval before payment can be processed. Please approve the order first.',
+                "Order requires approval before payment can be processed. Please approve the order first.",
               );
             }
 
             // Validate that every entry references a real OrderItem on this order.
-            const itemsById = new Map(order.orderItems.map((i) => [i.id, i] as const));
+            const itemsById = new Map(
+              order.orderItems.map((i) => [i.id, i] as const),
+            );
             for (const entry of dto.items) {
               const item = itemsById.get(entry.orderItemId);
               if (!item) {
@@ -1292,7 +1422,7 @@ export class PaymentsService {
 
             // Sum already-paid quantities per OrderItem (only COMPLETED payments count).
             const paidAgg = await tx.orderItemPayment.groupBy({
-              by: ['orderItemId'],
+              by: ["orderItemId"],
               where: {
                 tenantId,
                 orderItem: { orderId },
@@ -1314,7 +1444,7 @@ export class PaymentsService {
             const pendingIntents = await tx.pendingSelfPayment.findMany({
               where: {
                 tenantId,
-                status: 'PENDING',
+                status: "PENDING",
                 expiresAt: { gt: new Date() },
               },
               select: { itemsByOrder: true },
@@ -1342,7 +1472,10 @@ export class PaymentsService {
               const item = itemsById.get(entry.orderItemId)!;
               const alreadyPaid = paidByItem.get(entry.orderItemId) ?? 0;
               const reserved = reservedByItem.get(entry.orderItemId) ?? 0;
-              if (reserved > 0 && entry.quantity > item.quantity - alreadyPaid - reserved) {
+              if (
+                reserved > 0 &&
+                entry.quantity > item.quantity - alreadyPaid - reserved
+              ) {
                 throw new ConflictException(
                   `Item ${entry.orderItemId} has ${reserved} unit(s) currently being paid by a customer via PayTR — wait for that intent to finalize (up to 15 minutes) before collecting at the POS.`,
                 );
@@ -1359,12 +1492,17 @@ export class PaymentsService {
             // When this entry closes the last remaining unit of an item,
             // its amount absorbs the rounding residual so per-payment
             // totals reconcile exactly to itemTotal × discount-factor.
-            const allocationRows: { orderItemId: string; quantity: number; amount: Prisma.Decimal }[] = [];
+            const allocationRows: {
+              orderItemId: string;
+              quantity: number;
+              amount: Prisma.Decimal;
+            }[] = [];
             let derivedTotal = new Prisma.Decimal(0);
             for (const entry of dto.items) {
               const item = itemsById.get(entry.orderItemId)!;
               const alreadyPaid = paidByItem.get(entry.orderItemId) ?? 0;
-              const isLastUnits = alreadyPaid + entry.quantity === item.quantity;
+              const isLastUnits =
+                alreadyPaid + entry.quantity === item.quantity;
 
               let entryAmount: Prisma.Decimal;
               if (isLastUnits) {
@@ -1383,7 +1521,9 @@ export class PaymentsService {
                 entryAmount = itemTotal.sub(priorSum);
                 if (entryAmount.lt(0)) entryAmount = new Prisma.Decimal(0);
               } else {
-                const perUnit = this.perUnitGross(item).mul(this.discountMultiplier(order));
+                const perUnit = this.perUnitGross(item).mul(
+                  this.discountMultiplier(order),
+                );
                 entryAmount = perUnit.mul(entry.quantity);
               }
               // Round to 2dp for the snapshot.
@@ -1419,6 +1559,10 @@ export class PaymentsService {
                   notes: dto.notes,
                   orderId,
                   tenantId,
+                  // v3.0.0 — required branchId. Order is the authoritative
+                  // source of branch scope for every payment that closes it
+                  // (waiter cash, customer self-pay via PayTR webhook etc.).
+                  branchId: order.branchId,
                   paidAt: new Date(),
                   transactionId: dto.transactionId,
                   idempotencyKey: dto.idempotencyKey,
@@ -1428,11 +1572,15 @@ export class PaymentsService {
             } catch (err) {
               if (
                 err instanceof Prisma.PrismaClientKnownRequestError &&
-                err.code === 'P2002' &&
+                err.code === "P2002" &&
                 dto.idempotencyKey
               ) {
                 const existing = await tx.payment.findFirst({
-                  where: { orderId, tenantId, idempotencyKey: dto.idempotencyKey },
+                  where: {
+                    orderId,
+                    tenantId,
+                    idempotencyKey: dto.idempotencyKey,
+                  },
                   include: { orderItemPayments: true },
                 });
                 if (existing) {
@@ -1464,6 +1612,11 @@ export class PaymentsService {
                 quantity: row.quantity,
                 amount: row.amount,
                 tenantId,
+                // v3.0.0 — branchId required on the join row too so
+                // per-branch revenue queries on OrderItemPayment don't
+                // need a join through Payment. Derived from the order
+                // (same branch as the parent Payment by construction).
+                branchId: order.branchId,
               })),
             });
 
@@ -1489,7 +1642,9 @@ export class PaymentsService {
               where: { orderId, status: PaymentStatus.COMPLETED },
               _sum: { amount: true },
             });
-            const totalPaidAmount = new Prisma.Decimal(totalPaid._sum.amount ?? 0);
+            const totalPaidAmount = new Prisma.Decimal(
+              totalPaid._sum.amount ?? 0,
+            );
             const orderAmount = new Prisma.Decimal(order.finalAmount);
             const fullyPaid = totalPaidAmount.gte(orderAmount);
 
@@ -1497,9 +1652,15 @@ export class PaymentsService {
               // bumpCustomerStats:false because each progressive
               // payment already did its own per-customer bump above.
               // We don't want the closing payment to double-count.
-              await this.finalizeFullyPaid(tx, order, dto.customerPhone, orderAmount, {
-                bumpCustomerStats: false,
-              });
+              await this.finalizeFullyPaid(
+                tx,
+                order,
+                dto.customerPhone,
+                orderAmount,
+                {
+                  bumpCustomerStats: false,
+                },
+              );
             }
 
             return {
@@ -1526,7 +1687,7 @@ export class PaymentsService {
         } catch (err) {
           if (
             err instanceof Prisma.PrismaClientKnownRequestError &&
-            err.code === 'P2002' &&
+            err.code === "P2002" &&
             dto.idempotencyKey
           ) {
             const existing = await this.prisma.payment.findFirst({
@@ -1570,7 +1731,7 @@ export class PaymentsService {
           this.safeEmitPaymentSuccess(tenantId, payment, initiatedByUserId);
         }
 
-        addBreadcrumb('Per-item payment completed', 'payment', {
+        addBreadcrumb("Per-item payment completed", "payment", {
           paymentId: payment.id,
           orderFullyPaid,
         });
@@ -1618,14 +1779,17 @@ export class PaymentsService {
   ) {
     return withTransaction(
       {
-        name: 'payment.writeOff',
-        op: 'payment',
-        tags: { 'tenant.id': tenantId, 'order.id': orderId },
+        name: "payment.writeOff",
+        op: "payment",
+        tags: { "tenant.id": tenantId, "order.id": orderId },
       },
       async () => {
-        addBreadcrumb('Starting write-off', 'payment', { orderId, reason: dto.reason });
+        addBreadcrumb("Starting write-off", "payment", {
+          orderId,
+          reason: dto.reason,
+        });
 
-        await this.ordersService.findOne(orderId, tenantId);
+        await this.ordersService.findOneByTenant(orderId, tenantId);
 
         // Idempotency fast-path
         const idemKey = dto.idempotencyKey ?? `writeoff:${orderId}`;
@@ -1646,12 +1810,12 @@ export class PaymentsService {
           const order = await tx.order.findFirst({
             where: { id: orderId, tenantId },
           });
-          if (!order) throw new NotFoundException('Order not found');
+          if (!order) throw new NotFoundException("Order not found");
           if (order.status === OrderStatus.PAID) {
-            throw new BadRequestException('Order is already paid in full');
+            throw new BadRequestException("Order is already paid in full");
           }
           if (order.status === OrderStatus.CANCELLED) {
-            throw new BadRequestException('Cannot write off a cancelled order');
+            throw new BadRequestException("Cannot write off a cancelled order");
           }
 
           const completedSum = await tx.payment.aggregate({
@@ -1663,7 +1827,7 @@ export class PaymentsService {
           const remaining = finalAmount.sub(alreadyPaid);
           if (remaining.lte(0)) {
             throw new BadRequestException(
-              'Nothing to write off — the order is already fully paid.',
+              "Nothing to write off — the order is already fully paid.",
             );
           }
 
@@ -1674,7 +1838,7 @@ export class PaymentsService {
             tx,
             orderId,
             tenantId,
-            { method: 'HOUSE', transactionId: null },
+            { method: "HOUSE", transactionId: null },
           );
 
           let payment: Awaited<ReturnType<typeof tx.payment.create>>;
@@ -1682,11 +1846,16 @@ export class PaymentsService {
             payment = await tx.payment.create({
               data: {
                 amount: remaining,
-                method: 'HOUSE',
+                method: "HOUSE",
                 status: PaymentStatus.COMPLETED,
-                notes: dto.reason ?? 'House write-off',
+                notes: dto.reason ?? "House write-off",
                 orderId,
                 tenantId,
+                // v3.0.0 — required branchId. HOUSE write-offs still need
+                // a branch (manager at branch A absorbing a no-show on an
+                // order opened at branch A); deriving from the order keeps
+                // that consistent regardless of where the manager logs in.
+                branchId: order.branchId,
                 paidAt: new Date(),
                 idempotencyKey: idemKey,
                 receiptSnapshot,
@@ -1695,7 +1864,7 @@ export class PaymentsService {
           } catch (err) {
             if (
               err instanceof Prisma.PrismaClientKnownRequestError &&
-              err.code === 'P2002'
+              err.code === "P2002"
             ) {
               const dup = await tx.payment.findFirst({
                 where: { orderId, tenantId, idempotencyKey: idemKey },
@@ -1719,11 +1888,21 @@ export class PaymentsService {
         // Without paymentId, an order that already had per-payment
         // fataralar for diners A/B would also generate an order-level
         // invoice double-counting the same line items.
-        await this.maybeGenerateAutoInvoice(orderId, tenantId, result.payment.id);
+        await this.maybeGenerateAutoInvoice(
+          orderId,
+          tenantId,
+          result.payment.id,
+        );
         await this.creditLoyaltyForFinalizedOrder(orderId, tenantId);
-        this.safeEmitPaymentSuccess(tenantId, result.payment, initiatedByUserId);
+        this.safeEmitPaymentSuccess(
+          tenantId,
+          result.payment,
+          initiatedByUserId,
+        );
 
-        addBreadcrumb('Write-off completed', 'payment', { paymentId: result.payment.id });
+        addBreadcrumb("Write-off completed", "payment", {
+          paymentId: result.payment.id,
+        });
 
         return {
           payment: result.payment,
@@ -1752,14 +1931,14 @@ export class PaymentsService {
         },
         payments: {
           where: { status: PaymentStatus.COMPLETED },
-          orderBy: { createdAt: 'asc' },
+          orderBy: { createdAt: "asc" },
           include: { orderItemPayments: true },
         },
       },
     });
 
     if (!order) {
-      throw new NotFoundException('Order not found');
+      throw new NotFoundException("Order not found");
     }
 
     const finalAmount = new Prisma.Decimal(order.finalAmount);
@@ -1775,7 +1954,9 @@ export class PaymentsService {
         0,
       );
       const remainingQuantity = item.quantity - paidQuantity;
-      const perUnit = this.perUnitGross(item).mul(this.discountMultiplier(order));
+      const perUnit = this.perUnitGross(item).mul(
+        this.discountMultiplier(order),
+      );
       // itemTotal is the authoritative discount-adjusted line total
       // used server-side for last-unit residual settlement. Exposing
       // it lets the UI display the same number the server will charge
@@ -1790,13 +1971,16 @@ export class PaymentsService {
         unitPrice: new Prisma.Decimal(item.unitPrice).toFixed(2),
         unitTotal: perUnit.toFixed(2),
         itemTotal: itemTotal.toFixed(2),
-        modifierLabels: (item.modifiers || []).map(
-          (m) => m.modifier?.displayName || m.modifier?.name || '',
-        ).filter(Boolean),
+        modifierLabels: (item.modifiers || [])
+          .map((m) => m.modifier?.displayName || m.modifier?.name || "")
+          .filter(Boolean),
       };
     });
 
-    const remainingQuantity = items.reduce((s, i) => s + i.remainingQuantity, 0);
+    const remainingQuantity = items.reduce(
+      (s, i) => s + i.remainingQuantity,
+      0,
+    );
 
     return {
       orderId: order.id,
@@ -1820,12 +2004,17 @@ export class PaymentsService {
     };
   }
 
-  async getGroupBillSummary(groupId: string, tenantId: string) {
+  async getGroupBillSummary(scope: BranchScope, groupId: string) {
+    // v3.0.0 — branch-scoped: the table group, by construction, lives
+    // in one branch; this gate stops a manager in branch A from
+    // viewing a sister-branch's combined bill by coercion of groupId.
     const tables = await this.prisma.table.findMany({
-      where: { groupId, tenantId },
+      where: { groupId, ...branchScope(scope) },
       include: {
         orders: {
-          where: { status: { notIn: [OrderStatus.PAID, OrderStatus.CANCELLED] } },
+          where: {
+            status: { notIn: [OrderStatus.PAID, OrderStatus.CANCELLED] },
+          },
           include: {
             orderItems: {
               include: {
@@ -1842,16 +2031,16 @@ export class PaymentsService {
           },
         },
       },
-      orderBy: { number: 'asc' },
+      orderBy: { number: "asc" },
     });
 
     if (tables.length === 0) {
-      throw new NotFoundException('Table group not found');
+      throw new NotFoundException("Table group not found");
     }
 
-    const allOrders = tables.flatMap(t => t.orders);
-    const allItems = allOrders.flatMap(o =>
-      o.orderItems.map(item => {
+    const allOrders = tables.flatMap((t) => t.orders);
+    const allItems = allOrders.flatMap((o) =>
+      o.orderItems.map((item) => {
         const paidQuantity = (item.orderItemPayments || []).reduce(
           (s, a) => s + a.quantity,
           0,
@@ -1860,19 +2049,19 @@ export class PaymentsService {
           id: item.id,
           orderId: o.id,
           orderNumber: o.orderNumber,
-          tableNumber: tables.find(t => t.id === o.tableId)?.number,
+          tableNumber: tables.find((t) => t.id === o.tableId)?.number,
           productName: item.product?.name,
           quantity: item.quantity,
           paidQuantity,
           remainingQuantity: item.quantity - paidQuantity,
           unitPrice: Number(item.unitPrice),
           subtotal: Number(item.subtotal),
-          modifiers: item.modifiers?.map(m => ({
+          modifiers: item.modifiers?.map((m) => ({
             name: m.modifier?.displayName || m.modifier?.name,
             price: Number(m.modifier?.priceAdjustment || 0),
           })),
         };
-      })
+      }),
     );
 
     // Group bill totals in Decimal end-to-end so cross-table groups
@@ -1897,8 +2086,8 @@ export class PaymentsService {
 
     return {
       groupId,
-      tables: tables.map(t => ({ id: t.id, number: t.number })),
-      orders: allOrders.map(o => {
+      tables: tables.map((t) => ({ id: t.id, number: t.number })),
+      orders: allOrders.map((o) => {
         const paid = o.payments.reduce<Prisma.Decimal>(
           (s, p) => s.add(new Prisma.Decimal(p.amount)),
           new Prisma.Decimal(0),

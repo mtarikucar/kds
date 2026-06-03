@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 
 // Types
 interface CalibrationPoint {
@@ -38,6 +39,7 @@ export function CameraCalibration({
   onCancel,
 }: CameraCalibrationProps) {
   const queryClient = useQueryClient();
+  const { t } = useTranslation('common');
 
   // State
   const [step, setStep] = useState<CalibrationStep>('image-points');
@@ -301,7 +303,11 @@ export function CameraCalibration({
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save calibration');
+        throw new Error(
+          t('cameras.calibration.saveFailed', {
+            defaultValue: 'Failed to save calibration',
+          }),
+        );
       }
 
       return response.json();
@@ -312,7 +318,13 @@ export function CameraCalibration({
       onCalibrationComplete?.(data);
     },
     onError: (err) => {
-      setError(err instanceof Error ? err.message : 'Failed to save calibration');
+      setError(
+        err instanceof Error
+          ? err.message
+          : t('cameras.calibration.saveFailed', {
+              defaultValue: 'Failed to save calibration',
+            }),
+      );
     },
   });
 

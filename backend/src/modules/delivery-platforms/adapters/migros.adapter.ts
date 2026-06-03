@@ -1,19 +1,19 @@
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { DeliveryPlatformConfig } from '@prisma/client';
-import { DeliveryPlatform } from '../constants/platform.enum';
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { DeliveryPlatformConfig } from "@prisma/client";
+import { DeliveryPlatform } from "../constants/platform.enum";
 import {
   AuthResult,
   PlatformAdapter,
-} from '../interfaces/platform-adapter.interface';
-import { NormalizedOrder } from '../interfaces/platform-order.interface';
-import { BaseAdapter } from './base.adapter';
+} from "../interfaces/platform-adapter.interface";
+import { NormalizedOrder } from "../interfaces/platform-order.interface";
+import { BaseAdapter } from "./base.adapter";
 
 @Injectable()
 export class MigrosAdapter extends BaseAdapter implements PlatformAdapter {
   constructor(private configService: ConfigService) {
-    super('MigrosAdapter', 'https://partner-api.migros.com.tr/yemek');
-    this.overrideBaseURL(this.configService.get<string>('MIGROS_API_BASE_URL'));
+    super("MigrosAdapter", "https://partner-api.migros.com.tr/yemek");
+    this.overrideBaseURL(this.configService.get<string>("MIGROS_API_BASE_URL"));
   }
 
   async authenticate(config: DeliveryPlatformConfig): Promise<AuthResult> {
@@ -30,10 +30,10 @@ export class MigrosAdapter extends BaseAdapter implements PlatformAdapter {
     externalOrderId: string,
   ): Promise<void> {
     await this.request({
-      method: 'PUT',
+      method: "PUT",
       url: `/orders/${externalOrderId}/status`,
       headers: this.getMigrosHeaders(config),
-      data: { status: 'ACCEPTED' },
+      data: { status: "ACCEPTED" },
     });
   }
 
@@ -43,10 +43,10 @@ export class MigrosAdapter extends BaseAdapter implements PlatformAdapter {
     reason?: string,
   ): Promise<void> {
     await this.request({
-      method: 'PUT',
+      method: "PUT",
       url: `/orders/${externalOrderId}/status`,
       headers: this.getMigrosHeaders(config),
-      data: { status: 'REJECTED', reason },
+      data: { status: "REJECTED", reason },
     });
   }
 
@@ -55,10 +55,10 @@ export class MigrosAdapter extends BaseAdapter implements PlatformAdapter {
     externalOrderId: string,
   ): Promise<void> {
     await this.request({
-      method: 'PUT',
+      method: "PUT",
       url: `/orders/${externalOrderId}/status`,
       headers: this.getMigrosHeaders(config),
-      data: { status: 'PREPARING' },
+      data: { status: "PREPARING" },
     });
   }
 
@@ -67,10 +67,10 @@ export class MigrosAdapter extends BaseAdapter implements PlatformAdapter {
     externalOrderId: string,
   ): Promise<void> {
     await this.request({
-      method: 'PUT',
+      method: "PUT",
       url: `/orders/${externalOrderId}/status`,
       headers: this.getMigrosHeaders(config),
-      data: { status: 'READY' },
+      data: { status: "READY" },
     });
   }
 
@@ -79,7 +79,9 @@ export class MigrosAdapter extends BaseAdapter implements PlatformAdapter {
     externalOrderId: string,
   ): Promise<void> {
     // Migros has limited status updates - markReady is the last status we can set
-    this.logger.log(`Order ${externalOrderId} picked up (Migros: no separate pickup endpoint)`);
+    this.logger.log(
+      `Order ${externalOrderId} picked up (Migros: no separate pickup endpoint)`,
+    );
   }
 
   async cancelOrder(
@@ -88,10 +90,10 @@ export class MigrosAdapter extends BaseAdapter implements PlatformAdapter {
     reason?: string,
   ): Promise<void> {
     await this.request({
-      method: 'PUT',
+      method: "PUT",
       url: `/orders/${externalOrderId}/status`,
       headers: this.getMigrosHeaders(config),
-      data: { status: 'CANCELLED', reason },
+      data: { status: "CANCELLED", reason },
     });
   }
 
@@ -99,7 +101,7 @@ export class MigrosAdapter extends BaseAdapter implements PlatformAdapter {
     config: DeliveryPlatformConfig,
   ): Promise<NormalizedOrder[]> {
     const response = await this.request({
-      method: 'GET',
+      method: "GET",
       url: `/restaurants/${config.remoteRestaurantId}/orders?status=NEW`,
       headers: this.getMigrosHeaders(config),
     });
@@ -111,7 +113,7 @@ export class MigrosAdapter extends BaseAdapter implements PlatformAdapter {
   async testConnection(config: DeliveryPlatformConfig): Promise<boolean> {
     try {
       await this.request({
-        method: 'GET',
+        method: "GET",
         url: `/restaurants/${config.remoteRestaurantId}`,
         headers: this.getMigrosHeaders(config),
       });
@@ -126,8 +128,8 @@ export class MigrosAdapter extends BaseAdapter implements PlatformAdapter {
   ): Record<string, string> {
     const credentials = config.credentials as any;
     return {
-      'X-API-Key': credentials.apiKey,
-      'X-Branch-Id': config.remoteRestaurantId || '',
+      "X-API-Key": credentials.apiKey,
+      "X-Branch-Id": config.remoteRestaurantId || "",
     };
   }
 

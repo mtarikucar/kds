@@ -2,13 +2,13 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
-} from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CreateModifierGroupDto } from '../dto/create-modifier-group.dto';
-import { UpdateModifierGroupDto } from '../dto/update-modifier-group.dto';
-import { CreateModifierDto } from '../dto/create-modifier.dto';
-import { UpdateModifierDto } from '../dto/update-modifier.dto';
-import { AssignModifiersToProductDto } from '../dto/assign-modifiers.dto';
+} from "@nestjs/common";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { CreateModifierGroupDto } from "../dto/create-modifier-group.dto";
+import { UpdateModifierGroupDto } from "../dto/update-modifier-group.dto";
+import { CreateModifierDto } from "../dto/create-modifier.dto";
+import { UpdateModifierDto } from "../dto/update-modifier.dto";
+import { AssignModifiersToProductDto } from "../dto/assign-modifiers.dto";
 
 @Injectable()
 export class ModifiersService {
@@ -26,7 +26,7 @@ export class ModifiersService {
       },
       include: {
         modifiers: {
-          orderBy: { displayOrder: 'asc' },
+          orderBy: { displayOrder: "asc" },
         },
       },
     });
@@ -41,7 +41,7 @@ export class ModifiersService {
       include: {
         modifiers: {
           where: includeInactive ? {} : { isAvailable: true },
-          orderBy: { displayOrder: 'asc' },
+          orderBy: { displayOrder: "asc" },
         },
         _count: {
           select: {
@@ -49,7 +49,7 @@ export class ModifiersService {
           },
         },
       },
-      orderBy: { displayOrder: 'asc' },
+      orderBy: { displayOrder: "asc" },
     });
   }
 
@@ -58,7 +58,7 @@ export class ModifiersService {
       where: { id, tenantId },
       include: {
         modifiers: {
-          orderBy: { displayOrder: 'asc' },
+          orderBy: { displayOrder: "asc" },
         },
         productMappings: {
           include: {
@@ -75,7 +75,7 @@ export class ModifiersService {
     });
 
     if (!group) {
-      throw new NotFoundException('Modifier group not found');
+      throw new NotFoundException("Modifier group not found");
     }
 
     return group;
@@ -90,13 +90,13 @@ export class ModifiersService {
       data: dto,
     });
     if (claim.count === 0) {
-      throw new NotFoundException('Modifier group not found');
+      throw new NotFoundException("Modifier group not found");
     }
     return this.prisma.modifierGroup.findUnique({
       where: { id },
       include: {
         modifiers: {
-          orderBy: { displayOrder: 'asc' },
+          orderBy: { displayOrder: "asc" },
         },
       },
     });
@@ -112,7 +112,7 @@ export class ModifiersService {
 
     if (productCount > 0) {
       throw new BadRequestException(
-        `Cannot delete modifier group. It is assigned to ${productCount} product(s).`
+        `Cannot delete modifier group. It is assigned to ${productCount} product(s).`,
       );
     }
 
@@ -121,7 +121,7 @@ export class ModifiersService {
       where: { id, tenantId },
     });
 
-    return { message: 'Modifier group deleted successfully' };
+    return { message: "Modifier group deleted successfully" };
   }
 
   // ========================================
@@ -139,7 +139,7 @@ export class ModifiersService {
 
     if (!group) {
       throw new BadRequestException(
-        'Invalid modifier group or group does not belong to your tenant'
+        "Invalid modifier group or group does not belong to your tenant",
       );
     }
 
@@ -160,7 +160,11 @@ export class ModifiersService {
     });
   }
 
-  async findAllModifiers(tenantId: string, groupId?: string, includeUnavailable = false) {
+  async findAllModifiers(
+    tenantId: string,
+    groupId?: string,
+    includeUnavailable = false,
+  ) {
     return this.prisma.modifier.findMany({
       where: {
         tenantId,
@@ -176,10 +180,7 @@ export class ModifiersService {
           },
         },
       },
-      orderBy: [
-        { groupId: 'asc' },
-        { displayOrder: 'asc' },
-      ],
+      orderBy: [{ groupId: "asc" }, { displayOrder: "asc" }],
     });
   }
 
@@ -192,7 +193,7 @@ export class ModifiersService {
     });
 
     if (!modifier) {
-      throw new NotFoundException('Modifier not found');
+      throw new NotFoundException("Modifier not found");
     }
 
     return modifier;
@@ -207,7 +208,7 @@ export class ModifiersService {
       data: dto,
     });
     if (claim.count === 0) {
-      throw new NotFoundException('Modifier not found');
+      throw new NotFoundException("Modifier not found");
     }
     return this.prisma.modifier.findUnique({
       where: { id },
@@ -233,7 +234,7 @@ export class ModifiersService {
 
     if (orderItemCount > 0) {
       throw new BadRequestException(
-        `Cannot delete modifier. It has been used in ${orderItemCount} order item(s).`
+        `Cannot delete modifier. It has been used in ${orderItemCount} order item(s).`,
       );
     }
 
@@ -242,7 +243,7 @@ export class ModifiersService {
       where: { id, tenantId },
     });
 
-    return { message: 'Modifier deleted successfully' };
+    return { message: "Modifier deleted successfully" };
   }
 
   // ========================================
@@ -252,14 +253,14 @@ export class ModifiersService {
   async assignModifiersToProduct(
     productId: string,
     dto: AssignModifiersToProductDto,
-    tenantId: string
+    tenantId: string,
   ) {
     const product = await this.prisma.product.findFirst({
       where: { id: productId, tenantId },
       select: { id: true },
     });
     if (!product) {
-      throw new NotFoundException('Product not found');
+      throw new NotFoundException("Product not found");
     }
 
     const groupIds = dto.modifierGroups.map((mg) => mg.groupId);
@@ -268,7 +269,7 @@ export class ModifiersService {
       select: { id: true },
     });
     if (groups.length !== new Set(groupIds).size) {
-      throw new BadRequestException('One or more modifier groups are invalid');
+      throw new BadRequestException("One or more modifier groups are invalid");
     }
 
     // Atomic replace: deleteMany + createMany in one transaction so a
@@ -294,12 +295,12 @@ export class ModifiersService {
               include: {
                 modifiers: {
                   where: { isAvailable: true },
-                  orderBy: { displayOrder: 'asc' },
+                  orderBy: { displayOrder: "asc" },
                 },
               },
             },
           },
-          orderBy: { displayOrder: 'asc' },
+          orderBy: { displayOrder: "asc" },
         },
       },
     });
@@ -312,7 +313,7 @@ export class ModifiersService {
     });
 
     if (!product) {
-      throw new NotFoundException('Product not found');
+      throw new NotFoundException("Product not found");
     }
 
     return this.prisma.productModifierGroup.findMany({
@@ -322,19 +323,19 @@ export class ModifiersService {
           include: {
             modifiers: {
               where: { isAvailable: true },
-              orderBy: { displayOrder: 'asc' },
+              orderBy: { displayOrder: "asc" },
             },
           },
         },
       },
-      orderBy: { displayOrder: 'asc' },
+      orderBy: { displayOrder: "asc" },
     });
   }
 
   async removeModifierGroupFromProduct(
     productId: string,
     groupId: string,
-    tenantId: string
+    tenantId: string,
   ) {
     // Verify product exists and belongs to tenant
     const product = await this.prisma.product.findFirst({
@@ -342,7 +343,7 @@ export class ModifiersService {
     });
 
     if (!product) {
-      throw new NotFoundException('Product not found');
+      throw new NotFoundException("Product not found");
     }
 
     await this.prisma.productModifierGroup.deleteMany({
@@ -352,6 +353,6 @@ export class ModifiersService {
       },
     });
 
-    return { message: 'Modifier group removed from product successfully' };
+    return { message: "Modifier group removed from product successfully" };
   }
 }

@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Inject,
   NotFoundException,
   ForbiddenException,
   BadRequestException,
@@ -7,10 +8,20 @@ import {
 import { PrismaService } from '../../../prisma/prisma.service';
 import { CreateOfferDto } from '../dto/create-offer.dto';
 import { UpdateOfferDto } from '../dto/update-offer.dto';
+import {
+  CORE_PROVISIONING_PORT,
+  CoreProvisioningPort,
+} from '../../../core-contracts/provisioning/tenant-provisioning.port';
 
 @Injectable()
 export class MarketingOffersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    // Step E: snapshot plan display facts at offer-create via the port, so the
+    // offer never reads SubscriptionPlan and stays valid after the FK is dropped.
+    @Inject(CORE_PROVISIONING_PORT)
+    private readonly provisioning: CoreProvisioningPort,
+  ) {}
 
   async create(dto: CreateOfferDto, userId: string, userRole: string) {
     // Validate lead exists
@@ -27,9 +38,19 @@ export class MarketingOffersService {
       throw new ForbiddenException('You can only create offers for your own leads');
     }
 
+    // Snapshot the plan's display facts via the port (no SubscriptionPlan read
+    // from marketing). A missing/unknown planId snapshots nothing.
+    const planSnapshot = dto.planId
+      ? await this.provisioning.describePlan(dto.planId)
+      : null;
+
     return this.prisma.leadOffer.create({
       data: {
         planId: dto.planId,
+        planCode: planSnapshot?.planCode ?? null,
+        planName: planSnapshot?.planName ?? null,
+        planMonthlyPrice: planSnapshot?.monthlyPrice ?? null,
+        planCurrency: planSnapshot?.currency ?? null,
         customPrice: dto.customPrice,
         discount: dto.discount,
         trialDays: dto.trialDays,
