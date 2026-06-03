@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { appHref } from '@/lib/urls';
 import { Container } from '@/components/ui/Container';
 import { ArrowRight, MessageCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -119,7 +120,7 @@ export default function FinalCTA() {
               className="flex flex-col sm:flex-row gap-4 justify-center mb-12"
             >
               <a
-                href="/app/register"
+                href={appHref('/register')}
                 className="hover-lift inline-flex items-center justify-center gap-2 px-8 py-4 text-lg font-semibold text-slate-900 bg-gradient-to-r from-orange-500 to-amber-500 rounded-2xl hover:from-amber-500 hover:to-orange-500 transition-all shadow-lg shadow-orange-500/20 group"
               >
                 {t('primaryBtn')}

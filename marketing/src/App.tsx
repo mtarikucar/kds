@@ -14,9 +14,9 @@ import CommissionsPage from './pages/marketing/CommissionsPage';
 import MarketingUsersPage from './pages/marketing/MarketingUsersPage';
 
 /**
- * Standalone marketing console — the same panel the POS app serves under
- * /app/marketing, but at the ROOT of marketing.hummytummy.com. Routes mirror
- * the POS App.tsx marketing block with the /marketing prefix stripped.
+ * Standalone marketing console at the ROOT of marketing.hummytummy.com. This is
+ * the sole home of the marketing panel now — the POS app no longer embeds it
+ * (its /marketing routes were removed; nginx 301-redirects /marketing/* here).
  */
 export default function App() {
   return (

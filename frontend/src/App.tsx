@@ -20,20 +20,8 @@ const SuperAdminSettingsPage = lazy(() => import('./pages/superadmin/SuperAdminS
 const MarketplaceAdminPage = lazy(() => import('./pages/superadmin/MarketplaceAdminPage'));
 import { SuperAdminLayout, SuperAdminProtectedRoute } from './features/superadmin/components';
 
-// Marketing Panel Pages (lazy-loaded)
-const MarketingLoginPage = lazy(() => import('./pages/marketing/MarketingLoginPage'));
-const MarketingDashboardPage = lazy(() => import('./pages/marketing/MarketingDashboardPage'));
-const LeadsPage = lazy(() => import('./pages/marketing/LeadsPage'));
-const LeadDetailPage = lazy(() => import('./pages/marketing/LeadDetailPage'));
-const CreateLeadPage = lazy(() => import('./pages/marketing/CreateLeadPage'));
-const TasksPage = lazy(() => import('./pages/marketing/TasksPage'));
-const CalendarPage = lazy(() => import('./pages/marketing/CalendarPage'));
-const OffersPage = lazy(() => import('./pages/marketing/OffersPage'));
-const MarketingReportsPage = lazy(() => import('./pages/marketing/ReportsPage'));
-const CommissionsPage = lazy(() => import('./pages/marketing/CommissionsPage'));
-const MarketingUsersPage = lazy(() => import('./pages/marketing/MarketingUsersPage'));
-import { MarketingLayout, MarketingProtectedRoute } from './features/marketing/components';
-import { MarketingRole } from './features/marketing/types';
+// Marketing panel is now a standalone app served at marketing.hummytummy.com
+// (see the marketing/ package). Its routes/pages were removed from this SPA.
 import ProfilePage from './pages/profile/ProfilePage';
 import FAQPage from './pages/help/FAQPage';
 import CustomersPage from './pages/customers/CustomersPage';
@@ -382,31 +370,8 @@ function App() {
           <Route path="/superadmin/settings" element={<SuperAdminSettingsPage />} />
         </Route>
       </Route>
-      {/* Marketing Panel Routes */}
-      <Route path="/marketing/login" element={<MarketingLoginPage />} />
-      <Route element={<MarketingProtectedRoute />}>
-        <Route element={<MarketingLayout />}>
-          <Route path="/marketing" element={<Navigate to="/marketing/dashboard" replace />} />
-          <Route path="/marketing/dashboard" element={<MarketingDashboardPage />} />
-          <Route path="/marketing/leads" element={<LeadsPage />} />
-          <Route path="/marketing/leads/new" element={<CreateLeadPage />} />
-          <Route path="/marketing/leads/:id" element={<LeadDetailPage />} />
-          <Route path="/marketing/leads/:id/edit" element={<CreateLeadPage />} />
-          <Route path="/marketing/tasks" element={<TasksPage />} />
-          <Route path="/marketing/calendar" element={<CalendarPage />} />
-          <Route path="/marketing/offers" element={<OffersPage />} />
-          <Route path="/marketing/reports" element={<MarketingReportsPage />} />
-          <Route path="/marketing/commissions" element={<CommissionsPage />} />
-        </Route>
-        {/* Manager-only sub-tree. Bare-URL navigation by a SALES_REP
-            redirects to the dashboard rather than rendering the page
-            and waiting for the backend 403. */}
-        <Route element={<MarketingProtectedRoute requiredRole={MarketingRole.SALES_MANAGER} />}>
-          <Route element={<MarketingLayout />}>
-            <Route path="/marketing/users" element={<MarketingUsersPage />} />
-          </Route>
-        </Route>
-      </Route>
+      {/* Marketing panel routes removed — it is now a standalone app at
+          marketing.hummytummy.com; nginx 301-redirects /marketing/* there. */}
     </Routes>
     </Suspense>
 

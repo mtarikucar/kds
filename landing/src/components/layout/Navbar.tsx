@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { appHref } from '@/lib/urls';
 import Image from 'next/image';
 import { Menu, X, Phone } from 'lucide-react';
 import { Link } from '@/i18n/routing';
@@ -95,13 +96,13 @@ export default function Navbar() {
             </a>
             <LanguageSwitcher />
             <a
-              href="/app/login"
+              href={appHref('/login')}
               className={`text-sm font-medium transition-colors duration-300 ${textSecondary}`}
             >
               {t('signIn')}
             </a>
             <a
-              href="/app/register"
+              href={appHref('/register')}
               className={`inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-300 ${
                 isAtTop
                   ? 'text-white bg-orange-500 hover:bg-orange-600'
@@ -164,13 +165,13 @@ export default function Navbar() {
             </a>
             <LanguageSwitcher />
             <a
-              href="/app/login"
+              href={appHref('/login')}
               className="block px-4 py-3 text-base font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-colors"
             >
               {t('signIn')}
             </a>
             <a
-              href="/app/register"
+              href={appHref('/register')}
               className="block px-4 py-3 text-base font-medium text-center text-white bg-slate-900 rounded-lg hover:bg-slate-800 transition-colors"
             >
               {t('startFree')}
