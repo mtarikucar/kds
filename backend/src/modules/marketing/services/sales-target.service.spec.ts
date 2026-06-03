@@ -94,4 +94,34 @@ describe('SalesTargetService', () => {
       await expect(svc.remove('x')).rejects.toBeInstanceOf(NotFoundException);
     });
   });
+
+  describe('teamPerformance', () => {
+    it('returns per-metric attainment for every active rep', async () => {
+      prisma.marketingUser.findMany.mockResolvedValue([
+        { id: 'rep-1', firstName: 'Ada', lastName: 'Lovelace', role: 'SALES_REP' },
+      ] as any);
+      prisma.salesTarget.findMany.mockResolvedValue([
+        { metric: 'WON_LEADS', targetValue: new Prisma.Decimal(5) },
+      ] as any);
+      prisma.lead.count.mockResolvedValue(4);
+      (prisma.commission.aggregate as any).mockResolvedValue({ _sum: { amount: null } });
+      prisma.salesCall.count.mockResolvedValue(0);
+
+      const team = await svc.teamPerformance('2026-06');
+
+      expect(team).toHaveLength(1);
+      expect(team[0].marketingUser.id).toBe('rep-1');
+      expect(team[0].metrics).toHaveLength(3);
+      expect(team[0].metrics.find((m) => m.metric === 'WON_LEADS')).toEqual({
+        metric: 'WON_LEADS',
+        target: 5,
+        actual: 4,
+        attainmentPct: 80,
+      });
+      // active filter is applied
+      expect(prisma.marketingUser.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { status: 'ACTIVE' } }),
+      );
+    });
+  });
 });
