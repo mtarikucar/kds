@@ -1,7 +1,7 @@
-import { Module } from '@nestjs/common';
-import { PrismaModule } from '../../prisma/prisma.module';
-import { CashDrawerController } from './cash-drawer.controller';
-import { CashDrawerService } from './cash-drawer.service';
+import { Module } from "@nestjs/common";
+import { PrismaModule } from "../../prisma/prisma.module";
+import { CashDrawerController } from "./cash-drawer.controller";
+import { CashDrawerService } from "./cash-drawer.service";
 
 /**
  * v2.8.99 — cash drawer movement management with DRAFT/APPROVED/REJECTED

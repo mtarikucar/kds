@@ -1,16 +1,23 @@
-import { IsEmail, IsNotEmpty, IsString, Matches, MaxLength, MinLength } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+} from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
 
 const PASSWORD_COMPLEXITY_REGEX = /(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/;
 const PASSWORD_COMPLEXITY_MESSAGE =
-  'Password must contain at least one lowercase letter, one uppercase letter, and one digit';
+  "Password must contain at least one lowercase letter, one uppercase letter, and one digit";
 // 128 — well above bcrypt's 72-byte truncation, low enough that the
 // bcryptjs (JS impl) doesn't burn API CPU on hash work for a hostile
 // megabyte payload. Same rationale as LoginDto.
 const PASSWORD_MAX_LENGTH = 128;
 
 export class ForgotPasswordDto {
-  @ApiProperty({ example: 'user@example.com' })
+  @ApiProperty({ example: "user@example.com" })
   @IsEmail()
   @IsNotEmpty()
   @MaxLength(254) // RFC 5321

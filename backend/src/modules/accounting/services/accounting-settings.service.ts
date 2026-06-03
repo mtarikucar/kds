@@ -1,11 +1,11 @@
-import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { UpdateAccountingSettingsDto } from '../dto/accounting-settings.dto';
+import { Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { UpdateAccountingSettingsDto } from "../dto/accounting-settings.dto";
 import {
   encryptString,
   decryptString,
-} from '../../../common/helpers/encryption.helper';
+} from "../../../common/helpers/encryption.helper";
 
 /**
  * Field names that contain secrets and must be encrypted at rest with
@@ -15,17 +15,17 @@ import {
  * for every tenant.
  */
 const ENCRYPTED_FIELDS = [
-  'parasutClientSecret',
-  'parasutPassword',
-  'logoPassword',
-  'foribaPassword',
+  "parasutClientSecret",
+  "parasutPassword",
+  "logoPassword",
+  "foribaPassword",
 ] as const;
 
 function encryptDto<T extends Record<string, any>>(dto: T): T {
   const out: any = { ...dto };
   for (const k of ENCRYPTED_FIELDS) {
     const v = out[k];
-    if (typeof v === 'string' && v.length > 0 && !v.startsWith('v1:')) {
+    if (typeof v === "string" && v.length > 0 && !v.startsWith("v1:")) {
       out[k] = encryptString(v);
     }
   }
@@ -36,21 +36,61 @@ function encryptDto<T extends Record<string, any>>(dto: T): T {
 export class AccountingSettingsService {
   constructor(private prisma: PrismaService) {}
 
+  // v3.0.1 — findFirst + opportunistic create/update. The compound
+  // unique (tenantId, branchId) with nullable branchId trips Prisma's
+  // client-side validation on upsert; see branch-scope helper note.
   async findByTenant(tenantId: string) {
-    return this.prisma.accountingSettings.upsert({
-      where: { tenantId_branchId: { tenantId, branchId: null } },
-      update: {},
-      create: { tenantId },
+    const existing = await this.prisma.accountingSettings.findFirst({
+      where: { tenantId, branchId: null },
     });
+    if (existing) return existing;
+    try {
+      return await this.prisma.accountingSettings.create({
+        data: { tenantId },
+      });
+    } catch (e: any) {
+      if (e?.code === "P2002") {
+        const row = await this.prisma.accountingSettings.findFirst({
+          where: { tenantId, branchId: null },
+        });
+        if (row) return row;
+      }
+      throw e;
+    }
   }
 
   async update(tenantId: string, dto: UpdateAccountingSettingsDto) {
     const safeDto = encryptDto(dto);
-    return this.prisma.accountingSettings.upsert({
-      where: { tenantId_branchId: { tenantId, branchId: null } },
-      update: safeDto,
-      create: { tenantId, ...safeDto },
+    const existing = await this.prisma.accountingSettings.findFirst({
+      where: { tenantId, branchId: null },
     });
+    if (existing) {
+      const updated = await this.prisma.accountingSettings.updateMany({
+        where: { tenantId, branchId: null },
+        data: safeDto,
+      });
+      if (updated.count > 0) {
+        return this.prisma.accountingSettings.findFirstOrThrow({
+          where: { tenantId, branchId: null },
+        });
+      }
+    }
+    try {
+      return await this.prisma.accountingSettings.create({
+        data: { tenantId, ...safeDto },
+      });
+    } catch (e: any) {
+      if (e?.code === "P2002") {
+        await this.prisma.accountingSettings.updateMany({
+          where: { tenantId, branchId: null },
+          data: safeDto,
+        });
+        return this.prisma.accountingSettings.findFirstOrThrow({
+          where: { tenantId, branchId: null },
+        });
+      }
+      throw e;
+    }
   }
 
   /**
@@ -59,14 +99,14 @@ export class AccountingSettingsService {
    * unchanged, so this rollout is backwards-compatible with existing data.
    */
   async getDecryptedCredentials(tenantId: string) {
-    const settings = await this.prisma.accountingSettings.findUnique({
-      where: { tenantId_branchId: { tenantId, branchId: null } },
+    const settings = await this.prisma.accountingSettings.findFirst({
+      where: { tenantId, branchId: null },
     });
     if (!settings) return null;
     const out: any = { ...settings };
     for (const k of ENCRYPTED_FIELDS) {
       const v = (out as any)[k];
-      if (typeof v === 'string' && v.length > 0) {
+      if (typeof v === "string" && v.length > 0) {
         try {
           (out as any)[k] = decryptString(v);
         } catch {
@@ -81,13 +121,17 @@ export class AccountingSettingsService {
 
   sanitize(settings: any) {
     const {
-      parasutClientSecret, parasutPassword,
-      logoPassword, foribaPassword,
+      parasutClientSecret,
+      parasutPassword,
+      logoPassword,
+      foribaPassword,
       ...safe
     } = settings;
     return {
       ...safe,
-      hasParasutCredentials: !!(parasutClientSecret && settings.parasutUsername),
+      hasParasutCredentials: !!(
+        parasutClientSecret && settings.parasutUsername
+      ),
       hasLogoCredentials: !!(logoPassword && settings.logoUsername),
       hasForibaCredentials: !!(foribaPassword && settings.foribaUsername),
     };
@@ -97,22 +141,50 @@ export class AccountingSettingsService {
    * Mint the next invoice number for this tenant. Pass a transaction
    * client so the number is rolled back with the surrounding SalesInvoice
    * create if that fails — prevents sequence gaps that complicate audits.
-   * The atomic `{ increment: 1 }` upsert already prevents number duplication
-   * (two concurrent calls get distinct nextInvoiceNumber values).
+   * v3.0.1: atomic increment via updateMany (compound-unique upsert
+   * disallowed with branchId: null). Two concurrent calls still get
+   * distinct numbers because PostgreSQL serialises the row update.
    */
   async getNextInvoiceNumber(
     tenantId: string,
     tx?: Prisma.TransactionClient,
   ): Promise<string> {
     const db = tx ?? this.prisma;
-    const settings = await db.accountingSettings.upsert({
-      where: { tenantId_branchId: { tenantId, branchId: null } },
-      update: { nextInvoiceNumber: { increment: 1 } },
-      create: { tenantId, nextInvoiceNumber: 2 },
+    let settings = await db.accountingSettings.findFirst({
+      where: { tenantId, branchId: null },
     });
+    if (settings) {
+      const updated = await db.accountingSettings.updateMany({
+        where: { tenantId, branchId: null },
+        data: { nextInvoiceNumber: { increment: 1 } },
+      });
+      if (updated.count > 0) {
+        settings = await db.accountingSettings.findFirstOrThrow({
+          where: { tenantId, branchId: null },
+        });
+      }
+    } else {
+      try {
+        settings = await db.accountingSettings.create({
+          data: { tenantId, nextInvoiceNumber: 2 },
+        });
+      } catch (e: any) {
+        if (e?.code === "P2002") {
+          await db.accountingSettings.updateMany({
+            where: { tenantId, branchId: null },
+            data: { nextInvoiceNumber: { increment: 1 } },
+          });
+          settings = await db.accountingSettings.findFirstOrThrow({
+            where: { tenantId, branchId: null },
+          });
+        } else {
+          throw e;
+        }
+      }
+    }
 
-    const prefix = settings.invoicePrefix || 'FTR';
+    const prefix = settings.invoicePrefix || "FTR";
     const num = (settings.nextInvoiceNumber || 2) - 1; // We incremented, so subtract 1 to get current
-    return `${prefix}-${String(num).padStart(6, '0')}`;
+    return `${prefix}-${String(num).padStart(6, "0")}`;
   }
 }

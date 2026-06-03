@@ -3,12 +3,12 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { KdsGateway } from '../../kds/kds.gateway';
-import { CreateSwapRequestDto } from '../dto/create-swap-request.dto';
-import { SwapRequestStatus } from '../constants/personnel.enum';
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { KdsGateway } from "../../kds/kds.gateway";
+import { CreateSwapRequestDto } from "../dto/create-swap-request.dto";
+import { SwapRequestStatus } from "../constants/personnel.enum";
 
 @Injectable()
 export class ShiftSwapService {
@@ -17,23 +17,27 @@ export class ShiftSwapService {
     private kdsGateway: KdsGateway,
   ) {}
 
-  async createRequest(tenantId: string, requesterId: string, dto: CreateSwapRequestDto) {
+  async createRequest(
+    tenantId: string,
+    requesterId: string,
+    dto: CreateSwapRequestDto,
+  ) {
     if (requesterId === dto.targetId) {
-      throw new BadRequestException('Cannot swap shifts with yourself');
+      throw new BadRequestException("Cannot swap shifts with yourself");
     }
 
     if (dto.requesterAssignmentId === dto.targetAssignmentId) {
-      throw new BadRequestException('Cannot swap the same assignment');
+      throw new BadRequestException("Cannot swap the same assignment");
     }
 
     // Target must actually belong to the caller's tenant — otherwise
     // the 404 on assignment below quietly leaks that the user exists.
     const target = await this.prisma.user.findFirst({
-      where: { id: dto.targetId, tenantId, status: 'ACTIVE' },
+      where: { id: dto.targetId, tenantId, status: "ACTIVE" },
       select: { id: true },
     });
     if (!target) {
-      throw new BadRequestException('Target user not found');
+      throw new BadRequestException("Target user not found");
     }
 
     // Validate requester assignment belongs to requester
@@ -41,10 +45,12 @@ export class ShiftSwapService {
       where: { id: dto.requesterAssignmentId, userId: requesterId, tenantId },
     });
     if (!requesterAssignment) {
-      throw new NotFoundException('Requester shift assignment not found');
+      throw new NotFoundException("Requester shift assignment not found");
     }
-    if (requesterAssignment.status === 'SWAPPED') {
-      throw new BadRequestException('Requester assignment has already been swapped');
+    if (requesterAssignment.status === "SWAPPED") {
+      throw new BadRequestException(
+        "Requester assignment has already been swapped",
+      );
     }
 
     // Validate target assignment belongs to target
@@ -52,16 +58,18 @@ export class ShiftSwapService {
       where: { id: dto.targetAssignmentId, userId: dto.targetId, tenantId },
     });
     if (!targetAssignment) {
-      throw new NotFoundException('Target shift assignment not found');
+      throw new NotFoundException("Target shift assignment not found");
     }
-    if (targetAssignment.status === 'SWAPPED') {
-      throw new BadRequestException('Target assignment has already been swapped');
+    if (targetAssignment.status === "SWAPPED") {
+      throw new BadRequestException(
+        "Target assignment has already been swapped",
+      );
     }
 
     // v3.0.0: branchId is required and must match across both assignments —
     // cross-branch swaps are not a supported operation.
     if (requesterAssignment.branchId !== targetAssignment.branchId) {
-      throw new BadRequestException('Cannot swap shifts across branches');
+      throw new BadRequestException("Cannot swap shifts across branches");
     }
     const branchId = requesterAssignment.branchId;
 
@@ -101,10 +109,14 @@ export class ShiftSwapService {
       where: { id, tenantId, status: SwapRequestStatus.PENDING },
     });
     if (!request) {
-      throw new NotFoundException('Swap request not found or already processed');
+      throw new NotFoundException(
+        "Swap request not found or already processed",
+      );
     }
     if (request.targetId !== userId) {
-      throw new ForbiddenException('Only the target employee can respond to this swap');
+      throw new ForbiddenException(
+        "Only the target employee can respond to this swap",
+      );
     }
     const status = accept
       ? SwapRequestStatus.TARGET_ACCEPTED
@@ -122,7 +134,9 @@ export class ShiftSwapService {
       },
     });
     if (claim.count !== 1) {
-      throw new NotFoundException('Swap request not found or already processed');
+      throw new NotFoundException(
+        "Swap request not found or already processed",
+      );
     }
 
     const updated = await this.prisma.shiftSwapRequest.findFirstOrThrow({
@@ -148,104 +162,131 @@ export class ShiftSwapService {
 
     if (!request) {
       throw new NotFoundException(
-        'Swap request not found, awaiting target consent, or already processed',
+        "Swap request not found, awaiting target consent, or already processed",
       );
     }
 
     // Manager cannot approve a swap that targets or involves themselves.
-    if (approvedById === request.requesterId || approvedById === request.targetId) {
-      throw new ForbiddenException('Cannot self-approve a swap');
+    if (
+      approvedById === request.requesterId ||
+      approvedById === request.targetId
+    ) {
+      throw new ForbiddenException("Cannot self-approve a swap");
     }
 
-    const result = await this.prisma.$transaction(async (tx) => {
-      const [targetAssignment, reqAssignment] = await Promise.all([
-        tx.shiftAssignment.findFirst({
-          where: { id: request.targetAssignmentId, tenantId },
-        }),
-        tx.shiftAssignment.findFirst({
-          where: { id: request.requesterAssignmentId, tenantId },
-        }),
-      ]);
-
-      if (!targetAssignment) {
-        throw new NotFoundException('Target assignment no longer exists');
-      }
-      if (!reqAssignment) {
-        throw new NotFoundException('Requester assignment no longer exists');
-      }
-      const isSameDate = reqAssignment.date.getTime() === targetAssignment.date.getTime();
-
-      // For different-date swaps, validate no double-booking (inside transaction for consistency)
-      if (!isSameDate) {
-        const [reqUserOnTargetDate, targetUserOnReqDate] = await Promise.all([
+    const result = await this.prisma.$transaction(
+      async (tx) => {
+        const [targetAssignment, reqAssignment] = await Promise.all([
           tx.shiftAssignment.findFirst({
-            where: { userId: request.requesterId, date: targetAssignment.date, tenantId },
+            where: { id: request.targetAssignmentId, tenantId },
           }),
           tx.shiftAssignment.findFirst({
-            where: { userId: request.targetId, date: reqAssignment.date, tenantId },
+            where: { id: request.requesterAssignmentId, tenantId },
           }),
         ]);
 
-        // Allow the existing swap assignments themselves, but block other conflicts
-        if (reqUserOnTargetDate && reqUserOnTargetDate.id !== request.targetAssignmentId) {
-          throw new BadRequestException('Requester already has a shift on the target date');
+        if (!targetAssignment) {
+          throw new NotFoundException("Target assignment no longer exists");
         }
-        if (targetUserOnReqDate && targetUserOnReqDate.id !== request.requesterAssignmentId) {
-          throw new BadRequestException('Target already has a shift on the requester date');
+        if (!reqAssignment) {
+          throw new NotFoundException("Requester assignment no longer exists");
         }
-      }
+        const isSameDate =
+          reqAssignment.date.getTime() === targetAssignment.date.getTime();
 
-      // Update swap request status (before touching assignments to avoid cascade issues)
-      const updatedRequest = await tx.shiftSwapRequest.update({
-        where: { id },
-        data: {
-          status: SwapRequestStatus.APPROVED,
-          approvedById,
-        },
-        include: {
-          requester: { select: { id: true, firstName: true, lastName: true } },
-          target: { select: { id: true, firstName: true, lastName: true } },
-        },
-      });
+        // For different-date swaps, validate no double-booking (inside transaction for consistency)
+        if (!isSameDate) {
+          const [reqUserOnTargetDate, targetUserOnReqDate] = await Promise.all([
+            tx.shiftAssignment.findFirst({
+              where: {
+                userId: request.requesterId,
+                date: targetAssignment.date,
+                tenantId,
+              },
+            }),
+            tx.shiftAssignment.findFirst({
+              where: {
+                userId: request.targetId,
+                date: reqAssignment.date,
+                tenantId,
+              },
+            }),
+          ]);
 
-      if (isSameDate) {
-        // Same-date swap: swap shiftTemplateId to avoid @@unique([userId, date]) violation
-        await tx.shiftAssignment.update({
-          where: { id: request.requesterAssignmentId },
+          // Allow the existing swap assignments themselves, but block other conflicts
+          if (
+            reqUserOnTargetDate &&
+            reqUserOnTargetDate.id !== request.targetAssignmentId
+          ) {
+            throw new BadRequestException(
+              "Requester already has a shift on the target date",
+            );
+          }
+          if (
+            targetUserOnReqDate &&
+            targetUserOnReqDate.id !== request.requesterAssignmentId
+          ) {
+            throw new BadRequestException(
+              "Target already has a shift on the requester date",
+            );
+          }
+        }
+
+        // Update swap request status (before touching assignments to avoid cascade issues)
+        const updatedRequest = await tx.shiftSwapRequest.update({
+          where: { id },
           data: {
-            shiftTemplateId: targetAssignment.shiftTemplateId,
-            status: 'SWAPPED',
+            status: SwapRequestStatus.APPROVED,
+            approvedById,
+          },
+          include: {
+            requester: {
+              select: { id: true, firstName: true, lastName: true },
+            },
+            target: { select: { id: true, firstName: true, lastName: true } },
           },
         });
 
-        await tx.shiftAssignment.update({
-          where: { id: request.targetAssignmentId },
-          data: {
-            shiftTemplateId: reqAssignment.shiftTemplateId,
-            status: 'SWAPPED',
-          },
-        });
-      } else {
-        // Different-date swap: swap userId on each assignment
-        await tx.shiftAssignment.update({
-          where: { id: request.requesterAssignmentId },
-          data: {
-            userId: request.targetId,
-            status: 'SWAPPED',
-          },
-        });
+        if (isSameDate) {
+          // Same-date swap: swap shiftTemplateId to avoid @@unique([userId, date]) violation
+          await tx.shiftAssignment.update({
+            where: { id: request.requesterAssignmentId },
+            data: {
+              shiftTemplateId: targetAssignment.shiftTemplateId,
+              status: "SWAPPED",
+            },
+          });
 
-        await tx.shiftAssignment.update({
-          where: { id: request.targetAssignmentId },
-          data: {
-            userId: request.requesterId,
-            status: 'SWAPPED',
-          },
-        });
-      }
+          await tx.shiftAssignment.update({
+            where: { id: request.targetAssignmentId },
+            data: {
+              shiftTemplateId: reqAssignment.shiftTemplateId,
+              status: "SWAPPED",
+            },
+          });
+        } else {
+          // Different-date swap: swap userId on each assignment
+          await tx.shiftAssignment.update({
+            where: { id: request.requesterAssignmentId },
+            data: {
+              userId: request.targetId,
+              status: "SWAPPED",
+            },
+          });
 
-      return updatedRequest;
-    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+          await tx.shiftAssignment.update({
+            where: { id: request.targetAssignmentId },
+            data: {
+              userId: request.requesterId,
+              status: "SWAPPED",
+            },
+          });
+        }
+
+        return updatedRequest;
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+    );
 
     this.kdsGateway.emitSwapRequestUpdate(tenantId, result.branchId, result);
     return result;
@@ -263,7 +304,9 @@ export class ShiftSwapService {
     });
 
     if (!request) {
-      throw new NotFoundException('Swap request not found or already processed');
+      throw new NotFoundException(
+        "Swap request not found or already processed",
+      );
     }
 
     // Compound WHERE: a concurrent approve/reject from another manager
@@ -283,7 +326,7 @@ export class ShiftSwapService {
     });
     if (claim.count === 0) {
       throw new NotFoundException(
-        'Swap request not found or already processed',
+        "Swap request not found or already processed",
       );
     }
     const result = await this.prisma.shiftSwapRequest.findFirstOrThrow({
@@ -307,7 +350,7 @@ export class ShiftSwapService {
         requesterAssignment: { include: { shiftTemplate: true } },
         approvedBy: { select: { id: true, firstName: true, lastName: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 }

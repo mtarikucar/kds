@@ -21,6 +21,10 @@ export interface UsageDimension {
 export interface UsageSnapshot {
   users: UsageDimension;
   branches: UsageDimension;
+  /** v3.0.0 — added alongside SubscriptionPlan.maxTables surfacing
+   *  through the entitlement engine. Drives the table-management page
+   *  meter and the dashboard quota card. */
+  tables: UsageDimension;
   products: UsageDimension;
   monthlyOrders: UsageDimension;
   computedAt: string;

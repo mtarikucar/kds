@@ -1,6 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 import { OrdersController } from './orders.controller';
 import { OrderStatus } from '../../../common/constants/order-status.enum';
+import { BranchScope } from '../../../common/scoping/branch-scope';
+import { UserRole } from '../../../common/constants/roles.enum';
 
 /**
  * Iter-87 regression for OrdersController.findAll query validation.
@@ -18,9 +20,10 @@ import { OrderStatus } from '../../../common/constants/order-status.enum';
  *     a confusing empty list.
  *
  * The controller now rejects each bad shape at the boundary with a
- * clear 400.
+ * clear 400. v3.0.0 — findAll forwards a BranchScope instead of the
+ * bare tenantId so the service can filter by (tenantId, branchId).
  */
-describe('OrdersController.findAll query validation (iter-87)', () => {
+describe('OrdersController.findAll query validation (iter-87 + v3 scope)', () => {
   let ordersService: any;
   let paymentsService: any;
   let ctrl: OrdersController;
@@ -31,22 +34,27 @@ describe('OrdersController.findAll query validation (iter-87)', () => {
     ctrl = new OrdersController(ordersService, paymentsService);
   });
 
-  const req = { tenantId: 't1', user: { id: 'u1' } } as any;
+  const scope: BranchScope = {
+    tenantId: 't1',
+    branchId: 'b1',
+    userId: 'u1',
+    role: UserRole.MANAGER,
+  };
 
   it('rejects an unknown status value with a clear message', () => {
-    expect(() => ctrl.findAll(req, undefined, 'WHATEVER', undefined, undefined, undefined, undefined))
+    expect(() => ctrl.findAll(scope, undefined, 'WHATEVER', undefined, undefined, undefined, undefined))
       .toThrow(BadRequestException);
   });
 
   it('rejects when ONE of the comma-separated statuses is unknown', () => {
     expect(() =>
-      ctrl.findAll(req, undefined, `${OrderStatus.PENDING},BOGUS`, undefined, undefined, undefined, undefined),
+      ctrl.findAll(scope, undefined, `${OrderStatus.PENDING},BOGUS`, undefined, undefined, undefined, undefined),
     ).toThrow(/invalid: BOGUS/);
   });
 
-  it('accepts multiple valid statuses', async () => {
+  it('accepts multiple valid statuses and forwards scope to the service', async () => {
     await ctrl.findAll(
-      req,
+      scope,
       undefined,
       `${OrderStatus.PENDING},${OrderStatus.PREPARING}`,
       undefined,
@@ -55,7 +63,7 @@ describe('OrdersController.findAll query validation (iter-87)', () => {
       undefined,
     );
     expect(ordersService.findAll).toHaveBeenCalledWith(
-      't1',
+      scope,
       undefined,
       [OrderStatus.PENDING, OrderStatus.PREPARING],
       undefined,
@@ -67,19 +75,19 @@ describe('OrdersController.findAll query validation (iter-87)', () => {
 
   it('rejects a malformed startDate (the Date-NaN empty-list guard)', () => {
     expect(() =>
-      ctrl.findAll(req, undefined, undefined, 'not-an-iso', undefined, undefined, undefined),
+      ctrl.findAll(scope, undefined, undefined, 'not-an-iso', undefined, undefined, undefined),
     ).toThrow(/startDate/);
   });
 
   it('rejects a malformed endDate', () => {
     expect(() =>
-      ctrl.findAll(req, undefined, undefined, undefined, 'also-not-iso', undefined, undefined),
+      ctrl.findAll(scope, undefined, undefined, undefined, 'also-not-iso', undefined, undefined),
     ).toThrow(/endDate/);
   });
 
   it('accepts valid ISO dates', async () => {
     await ctrl.findAll(
-      req,
+      scope,
       undefined,
       undefined,
       '2026-01-01T00:00:00Z',
@@ -90,12 +98,12 @@ describe('OrdersController.findAll query validation (iter-87)', () => {
     expect(ordersService.findAll).toHaveBeenCalled();
   });
 
-  it('passes a valid UUID tableId straight through (sanity check)', async () => {
+  it('passes a valid UUID tableId straight through and forwards scope', async () => {
     // ParseUUIDPipe is wired but Nest doesn't invoke pipes in plain
     // unit tests — the boundary check is exercised by e2e. Here we
     // verify the happy-path forward.
     await ctrl.findAll(
-      req,
+      scope,
       '550e8400-e29b-41d4-a716-446655440000',
       undefined,
       undefined,
@@ -104,7 +112,7 @@ describe('OrdersController.findAll query validation (iter-87)', () => {
       undefined,
     );
     expect(ordersService.findAll).toHaveBeenCalledWith(
-      't1',
+      scope,
       '550e8400-e29b-41d4-a716-446655440000',
       undefined,
       undefined,

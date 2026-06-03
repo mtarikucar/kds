@@ -1,9 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { SmsProvider, SmsSendResult } from './sms-providers/sms-provider.interface';
-import { TwilioProvider } from './sms-providers/twilio.provider';
-import { NetGsmProvider } from './sms-providers/netgsm.provider';
-import { maskPhone } from '../../common/helpers/pii-mask.helper';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import {
+  SmsProvider,
+  SmsSendResult,
+} from "./sms-providers/sms-provider.interface";
+import { TwilioProvider } from "./sms-providers/twilio.provider";
+import { NetGsmProvider } from "./sms-providers/netgsm.provider";
+import { maskPhone } from "../../common/helpers/pii-mask.helper";
 
 @Injectable()
 export class SmsService {
@@ -25,57 +28,61 @@ export class SmsService {
       // is an explicit escape hatch for the rare "we genuinely want to
       // silence outbound SMS in prod" case (e.g. a dry-run window).
       if (
-        process.env.NODE_ENV === 'production' &&
-        process.env.ALLOW_MOCK_SMS_IN_PROD !== 'true'
+        process.env.NODE_ENV === "production" &&
+        process.env.ALLOW_MOCK_SMS_IN_PROD !== "true"
       ) {
         throw new Error(
-          'SMS provider not configured in production. Set SMS_PROVIDER + the corresponding ' +
-            '*_USERCODE / *_AUTH_TOKEN credentials, or set ALLOW_MOCK_SMS_IN_PROD=true to ' +
-            'explicitly silence customer OTP delivery.',
+          "SMS provider not configured in production. Set SMS_PROVIDER + the corresponding " +
+            "*_USERCODE / *_AUTH_TOKEN credentials, or set ALLOW_MOCK_SMS_IN_PROD=true to " +
+            "explicitly silence customer OTP delivery.",
         );
       }
-      this.logger.warn('No SMS provider configured - SMS will be mocked (NON-PRODUCTION ONLY)');
+      this.logger.warn(
+        "No SMS provider configured - SMS will be mocked (NON-PRODUCTION ONLY)",
+      );
     }
   }
 
   private initializeProvider(): SmsProvider | null {
-    const providerName = (this.configService.get<string>('SMS_PROVIDER') || '').toLowerCase();
+    const providerName = (
+      this.configService.get<string>("SMS_PROVIDER") || ""
+    ).toLowerCase();
 
     // Explicit provider selection
-    if (providerName === 'netgsm') {
+    if (providerName === "netgsm") {
       const provider = new NetGsmProvider(
-        this.configService.get<string>('NETGSM_USERCODE'),
-        this.configService.get<string>('NETGSM_PASSWORD'),
-        this.configService.get<string>('NETGSM_MSGHEADER'),
+        this.configService.get<string>("NETGSM_USERCODE"),
+        this.configService.get<string>("NETGSM_PASSWORD"),
+        this.configService.get<string>("NETGSM_MSGHEADER"),
       );
       if (provider.isConfigured()) return provider;
-      this.logger.warn('NetGSM selected but credentials missing');
+      this.logger.warn("NetGSM selected but credentials missing");
       return null;
     }
 
-    if (providerName === 'twilio') {
+    if (providerName === "twilio") {
       const provider = new TwilioProvider(
-        this.configService.get<string>('TWILIO_ACCOUNT_SID'),
-        this.configService.get<string>('TWILIO_AUTH_TOKEN'),
-        this.configService.get<string>('TWILIO_PHONE_NUMBER'),
+        this.configService.get<string>("TWILIO_ACCOUNT_SID"),
+        this.configService.get<string>("TWILIO_AUTH_TOKEN"),
+        this.configService.get<string>("TWILIO_PHONE_NUMBER"),
       );
       if (provider.isConfigured()) return provider;
-      this.logger.warn('Twilio selected but credentials missing');
+      this.logger.warn("Twilio selected but credentials missing");
       return null;
     }
 
     // Auto-detect: try NetGSM first (cheaper for TR), then Twilio
     const netgsm = new NetGsmProvider(
-      this.configService.get<string>('NETGSM_USERCODE'),
-      this.configService.get<string>('NETGSM_PASSWORD'),
-      this.configService.get<string>('NETGSM_MSGHEADER'),
+      this.configService.get<string>("NETGSM_USERCODE"),
+      this.configService.get<string>("NETGSM_PASSWORD"),
+      this.configService.get<string>("NETGSM_MSGHEADER"),
     );
     if (netgsm.isConfigured()) return netgsm;
 
     const twilio = new TwilioProvider(
-      this.configService.get<string>('TWILIO_ACCOUNT_SID'),
-      this.configService.get<string>('TWILIO_AUTH_TOKEN'),
-      this.configService.get<string>('TWILIO_PHONE_NUMBER'),
+      this.configService.get<string>("TWILIO_ACCOUNT_SID"),
+      this.configService.get<string>("TWILIO_AUTH_TOKEN"),
+      this.configService.get<string>("TWILIO_PHONE_NUMBER"),
     );
     if (twilio.isConfigured()) return twilio;
 
@@ -107,15 +114,17 @@ export class SmsService {
         const result = await this.provider.send(to, message);
 
         // Provider returned a non-retryable error
-        if (!result.success && result.error?.startsWith('Non-retryable:')) {
-          this.logger.error(`${this.provider.name} non-retryable error for ${masked}: ${result.error}`);
+        if (!result.success && result.error?.startsWith("Non-retryable:")) {
+          this.logger.error(
+            `${this.provider.name} non-retryable error for ${masked}: ${result.error}`,
+          );
           return result;
         }
 
         if (result.success) return result;
 
         // Unexpected failure without throw
-        lastError = new Error(result.error || 'Unknown error');
+        lastError = new Error(result.error || "Unknown error");
       } catch (error) {
         lastError = error as Error;
         this.logger.warn(
@@ -134,7 +143,7 @@ export class SmsService {
       `Failed to send SMS to ${masked} via ${this.provider.name} after ${maxRetries} attempts: ${lastError?.message}`,
     );
 
-    return { success: false, error: lastError?.message || 'Unknown error' };
+    return { success: false, error: lastError?.message || "Unknown error" };
   }
 
   /**
@@ -165,6 +174,6 @@ export class SmsService {
    * Get active provider name
    */
   getProviderName(): string {
-    return this.provider?.name || 'mock';
+    return this.provider?.name || "mock";
   }
 }

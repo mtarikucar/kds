@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
   IsArray,
   IsIn,
@@ -9,19 +9,21 @@ import {
   Matches,
   Max,
   Min,
-} from 'class-validator';
+} from "class-validator";
 
-const KIND = ['software', 'integration', 'capacity', 'support'] as const;
-const BILLING = ['recurring', 'oneTime'] as const;
-const STATUS = ['draft', 'published', 'archived'] as const;
+const KIND = ["software", "integration", "capacity", "support"] as const;
+const BILLING = ["recurring", "oneTime"] as const;
+const STATUS = ["draft", "published", "archived"] as const;
 
 export class CreateAddOnDto {
   // Code is the immutable handle other systems reference. ASCII letters,
   // digits, dashes, underscores — anything else risks breaking URLs and
   // dependency strings ("plan:PRO" delimits on colons).
-  @ApiProperty({ example: 'kds_extra_screen' })
+  @ApiProperty({ example: "kds_extra_screen" })
   @IsString()
-  @Matches(/^[a-z0-9_]+$/, { message: 'lowercase letters, digits, underscores only' })
+  @Matches(/^[a-z0-9_]+$/, {
+    message: "lowercase letters, digits, underscores only",
+  })
   code!: string;
 
   @ApiProperty()
@@ -37,7 +39,7 @@ export class CreateAddOnDto {
   @IsIn(KIND as any)
   kind!: (typeof KIND)[number];
 
-  @ApiProperty({ enum: BILLING, default: 'recurring' })
+  @ApiProperty({ enum: BILLING, default: "recurring" })
   @IsIn(BILLING as any)
   billing!: (typeof BILLING)[number];
 
@@ -49,7 +51,7 @@ export class CreateAddOnDto {
   @Max(100_000_000)
   priceCents!: number;
 
-  @ApiPropertyOptional({ default: 'TRY' })
+  @ApiPropertyOptional({ default: "TRY" })
   @IsOptional()
   @IsString()
   currency?: string;
@@ -58,7 +60,7 @@ export class CreateAddOnDto {
   // keys at apply time; we let unknown keys through here so the schema is
   // open to future expansion without code churn.
   @ApiProperty({
-    example: { 'limit.kdsScreens': 1, 'feature.advancedReports': true },
+    example: { "limit.kdsScreens": 1, "feature.advancedReports": true },
   })
   @IsObject()
   grants!: Record<string, boolean | number | string[]>;
@@ -69,7 +71,7 @@ export class CreateAddOnDto {
   @IsString({ each: true })
   deps?: string[];
 
-  @ApiPropertyOptional({ enum: STATUS, default: 'draft' })
+  @ApiPropertyOptional({ enum: STATUS, default: "draft" })
   @IsOptional()
   @IsIn(STATUS as any)
   status?: (typeof STATUS)[number];

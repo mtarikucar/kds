@@ -1,6 +1,14 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CreateSupplierDto, UpdateSupplierDto, SupplierStockItemDto } from '../dto/create-supplier.dto';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
+import { PrismaService } from "../../../prisma/prisma.service";
+import {
+  CreateSupplierDto,
+  UpdateSupplierDto,
+  SupplierStockItemDto,
+} from "../dto/create-supplier.dto";
 
 @Injectable()
 export class SuppliersService {
@@ -12,7 +20,7 @@ export class SuppliersService {
       include: {
         _count: { select: { supplierStockItems: true, purchaseOrders: true } },
       },
-      orderBy: { name: 'asc' },
+      orderBy: { name: "asc" },
     });
   }
 
@@ -21,12 +29,14 @@ export class SuppliersService {
       where: { id, tenantId },
       include: {
         supplierStockItems: {
-          include: { stockItem: { select: { id: true, name: true, unit: true } } },
+          include: {
+            stockItem: { select: { id: true, name: true, unit: true } },
+          },
         },
         _count: { select: { purchaseOrders: true } },
       },
     });
-    if (!supplier) throw new NotFoundException('Supplier not found');
+    if (!supplier) throw new NotFoundException("Supplier not found");
     return supplier;
   }
 
@@ -46,7 +56,7 @@ export class SuppliersService {
       where: { id, tenantId },
       data: dto,
     });
-    if (claim.count === 0) throw new NotFoundException('Supplier not found');
+    if (claim.count === 0) throw new NotFoundException("Supplier not found");
     return this.prisma.supplier.findFirstOrThrow({ where: { id, tenantId } });
   }
 
@@ -54,26 +64,36 @@ export class SuppliersService {
     await this.findOne(id, tenantId);
     // Check if supplier has any non-cancelled POs
     const activePOs = await this.prisma.purchaseOrder.count({
-      where: { supplierId: id, status: { notIn: ['CANCELLED', 'RECEIVED'] } },
+      where: { supplierId: id, status: { notIn: ["CANCELLED", "RECEIVED"] } },
     });
     if (activePOs > 0) {
-      throw new BadRequestException('Cannot delete supplier with active purchase orders');
+      throw new BadRequestException(
+        "Cannot delete supplier with active purchase orders",
+      );
     }
-    const claim = await this.prisma.supplier.deleteMany({ where: { id, tenantId } });
-    if (claim.count === 0) throw new NotFoundException('Supplier not found');
+    const claim = await this.prisma.supplier.deleteMany({
+      where: { id, tenantId },
+    });
+    if (claim.count === 0) throw new NotFoundException("Supplier not found");
     return { id };
   }
 
-  async addStockItem(supplierId: string, dto: SupplierStockItemDto, tenantId: string) {
+  async addStockItem(
+    supplierId: string,
+    dto: SupplierStockItemDto,
+    tenantId: string,
+  ) {
     await this.findOne(supplierId, tenantId);
 
     const stockItem = await this.prisma.stockItem.findFirst({
       where: { id: dto.stockItemId, tenantId },
     });
-    if (!stockItem) throw new BadRequestException('Stock item not found');
+    if (!stockItem) throw new BadRequestException("Stock item not found");
 
     return this.prisma.supplierStockItem.upsert({
-      where: { supplierId_stockItemId: { supplierId, stockItemId: dto.stockItemId } },
+      where: {
+        supplierId_stockItemId: { supplierId, stockItemId: dto.stockItemId },
+      },
       create: {
         supplierId,
         stockItemId: dto.stockItemId,
@@ -90,7 +110,11 @@ export class SuppliersService {
     });
   }
 
-  async removeStockItem(supplierId: string, stockItemId: string, tenantId: string) {
+  async removeStockItem(
+    supplierId: string,
+    stockItemId: string,
+    tenantId: string,
+  ) {
     // findOne validates the supplier belongs to the tenant. The composite
     // key on SupplierStockItem isn't tenant-scoped in the schema, so even
     // after the pre-check a parallel deleteMany with a tenant predicate
@@ -106,7 +130,7 @@ export class SuppliersService {
       },
     });
     if (result.count === 0) {
-      throw new BadRequestException('Supplier-stock association not found');
+      throw new BadRequestException("Supplier-stock association not found");
     }
     return { supplierId, stockItemId };
   }

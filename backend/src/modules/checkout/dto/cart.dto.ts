@@ -14,9 +14,9 @@ import {
   MaxLength,
   Min,
   ValidateNested,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+} from "class-validator";
+import { Type } from "class-transformer";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 // Iter-88: the checkout controller previously accepted `@Body() cart: Cart`
 // where Cart was a *TypeScript interface*, not a class-validator DTO. Nest's
@@ -48,9 +48,9 @@ const PAYMENT_REF_MAX = 128;
 const COUPON_MAX = 64;
 
 export class CartItemDto {
-  @ApiProperty({ enum: ['plan', 'addon', 'hardware', 'service'] })
-  @IsIn(['plan', 'addon', 'hardware', 'service'])
-  type!: 'plan' | 'addon' | 'hardware' | 'service';
+  @ApiProperty({ enum: ["plan", "addon", "hardware", "service"] })
+  @IsIn(["plan", "addon", "hardware", "service"])
+  type!: "plan" | "addon" | "hardware" | "service";
 
   // `code` for plan/addon/service; `sku` for hardware. The quote engine
   // picks the right one based on `type`. Either may be absent for `hardware`
@@ -76,26 +76,28 @@ export class CartItemDto {
   @Max(QTY_MAX)
   qty?: number;
 
-  @ApiPropertyOptional({ enum: ['MONTHLY', 'YEARLY'] })
+  @ApiPropertyOptional({ enum: ["MONTHLY", "YEARLY"] })
   @IsOptional()
-  @IsIn(['MONTHLY', 'YEARLY'])
-  billingCycle?: 'MONTHLY' | 'YEARLY';
+  @IsIn(["MONTHLY", "YEARLY"])
+  billingCycle?: "MONTHLY" | "YEARLY";
 
-  @ApiPropertyOptional({ description: 'Branch UUID for branch-scoped addons / services' })
+  @ApiPropertyOptional({
+    description: "Branch UUID for branch-scoped addons / services",
+  })
   @IsOptional()
   @IsUUID()
   branchId?: string;
 
-  @ApiPropertyOptional({ enum: ['sell', 'rent'] })
+  @ApiPropertyOptional({ enum: ["sell", "rent"] })
   @IsOptional()
-  @IsIn(['sell', 'rent'])
-  acquisition?: 'sell' | 'rent';
+  @IsIn(["sell", "rent"])
+  acquisition?: "sell" | "rent";
 
   // v2.8.87: service-order scheduling intent. Optional (only meaningful
   // for service items; ignored for hardware/addon/plan). 1-3 dates so a
   // buyer can offer alternates without spamming the technician schedule.
   // CheckoutService reads these to populate InstallationRequest.preferredDates.
-  @ApiPropertyOptional({ type: [String], format: 'date', maxItems: 3 })
+  @ApiPropertyOptional({ type: [String], format: "date", maxItems: 3 })
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(3)

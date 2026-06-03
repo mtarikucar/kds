@@ -8,6 +8,8 @@ import Button from '../ui/Button';
 const featurePlanMap: Record<keyof PlanFeatures, SubscriptionPlanType> = {
   kdsIntegration: SubscriptionPlanType.FREE,
   inventoryTracking: SubscriptionPlanType.BASIC,
+  // v3.0.0 — POS access bundled with BASIC and above.
+  posAccess: SubscriptionPlanType.BASIC,
   advancedReports: SubscriptionPlanType.PRO,
   multiLocation: SubscriptionPlanType.PRO,
   customBranding: SubscriptionPlanType.PRO,
@@ -22,6 +24,8 @@ const featurePlanMap: Record<keyof PlanFeatures, SubscriptionPlanType> = {
 const limitDisplayNames: Record<keyof PlanLimits, string> = {
   maxUsers: 'users',
   maxTables: 'tables',
+  // v3.0.0 — branches usage card key, paired with maxBranches limit.
+  maxBranches: 'branches',
   maxProducts: 'products',
   maxCategories: 'categories',
   maxMonthlyOrders: 'monthlyOrders',

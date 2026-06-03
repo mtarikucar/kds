@@ -4,12 +4,12 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
-import { CreateCashDrawerMovementDto } from './dto/create-cash-drawer-movement.dto';
-import { RejectCashDrawerMovementDto } from './dto/reject-cash-drawer-movement.dto';
-import { UserRole } from '../../common/constants/roles.enum';
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../prisma/prisma.service";
+import { CreateCashDrawerMovementDto } from "./dto/create-cash-drawer-movement.dto";
+import { RejectCashDrawerMovementDto } from "./dto/reject-cash-drawer-movement.dto";
+import { UserRole } from "../../common/constants/roles.enum";
 
 /**
  * v2.8.99 — cash drawer movement service.
@@ -38,12 +38,12 @@ export class CashDrawerService {
   constructor(private readonly prisma: PrismaService) {}
 
   private static readonly AUTO_APPROVED_TYPES = new Set([
-    'OPENING',
-    'CLOSING',
-    'CASH_IN',
+    "OPENING",
+    "CLOSING",
+    "CASH_IN",
   ]);
 
-  private static readonly REVIEW_TYPES = new Set(['CASH_OUT', 'ADJUSTMENT']);
+  private static readonly REVIEW_TYPES = new Set(["CASH_OUT", "ADJUSTMENT"]);
 
   async create(
     tenantId: string,
@@ -71,7 +71,7 @@ export class CashDrawerService {
         notes: dto.notes,
         denominationBreakdown: dto.denominationBreakdown as any,
         zReportId: dto.zReportId,
-        approvalStatus: requiresReview ? 'DRAFT' : 'APPROVED',
+        approvalStatus: requiresReview ? "DRAFT" : "APPROVED",
         approvedById: requiresReview ? null : userId,
         approvedAt: requiresReview ? null : new Date(),
       },
@@ -80,11 +80,11 @@ export class CashDrawerService {
 
   async listPending(tenantId: string) {
     return this.prisma.cashDrawerMovement.findMany({
-      where: { tenantId, approvalStatus: 'DRAFT' },
+      where: { tenantId, approvalStatus: "DRAFT" },
       include: {
         user: { select: { id: true, firstName: true, lastName: true } },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -97,16 +97,16 @@ export class CashDrawerService {
     // updateMany with compound WHERE: tenantId IDOR + status=DRAFT gate
     // so a second-approver race doesn't double-flip the row.
     const claim = await this.prisma.cashDrawerMovement.updateMany({
-      where: { id: movementId, tenantId, approvalStatus: 'DRAFT' },
+      where: { id: movementId, tenantId, approvalStatus: "DRAFT" },
       data: {
-        approvalStatus: 'APPROVED',
+        approvalStatus: "APPROVED",
         approvedById: approver.id,
         approvedAt: new Date(),
       },
     });
     if (claim.count === 0) {
       throw new BadRequestException(
-        'Movement is no longer DRAFT — refresh and retry.',
+        "Movement is no longer DRAFT — refresh and retry.",
       );
     }
     return this.prisma.cashDrawerMovement.findFirstOrThrow({
@@ -122,9 +122,9 @@ export class CashDrawerService {
   ) {
     this.assertCanReview(approver.role);
     const claim = await this.prisma.cashDrawerMovement.updateMany({
-      where: { id: movementId, tenantId, approvalStatus: 'DRAFT' },
+      where: { id: movementId, tenantId, approvalStatus: "DRAFT" },
       data: {
-        approvalStatus: 'REJECTED',
+        approvalStatus: "REJECTED",
         approvedById: approver.id,
         approvedAt: new Date(),
         rejectionReason: dto.reason,
@@ -132,7 +132,7 @@ export class CashDrawerService {
     });
     if (claim.count === 0) {
       throw new BadRequestException(
-        'Movement is no longer DRAFT — refresh and retry.',
+        "Movement is no longer DRAFT — refresh and retry.",
       );
     }
     return this.prisma.cashDrawerMovement.findFirstOrThrow({
@@ -148,14 +148,15 @@ export class CashDrawerService {
         approvedBy: { select: { id: true, firstName: true, lastName: true } },
       },
     });
-    if (!movement) throw new NotFoundException('Cash drawer movement not found');
+    if (!movement)
+      throw new NotFoundException("Cash drawer movement not found");
     return movement;
   }
 
   private assertCanReview(role: string): void {
     if (role !== UserRole.ADMIN && role !== UserRole.MANAGER) {
       throw new ForbiddenException(
-        'Only ADMIN or MANAGER can approve / reject cash drawer movements.',
+        "Only ADMIN or MANAGER can approve / reject cash drawer movements.",
       );
     }
   }

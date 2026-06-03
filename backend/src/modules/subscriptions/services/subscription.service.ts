@@ -55,7 +55,13 @@ export class SubscriptionService {
    */
   private async emitLifecycle(
     type: string,
-    sub: { id: string; tenantId: string; plan?: { name?: string } | null; currentPeriodStart?: Date | null; currentPeriodEnd?: Date | null },
+    sub: {
+      id: string;
+      tenantId: string;
+      plan?: { name?: string } | null;
+      currentPeriodStart?: Date | null;
+      currentPeriodEnd?: Date | null;
+    },
     tx?: any,
   ): Promise<void> {
     try {
@@ -82,7 +88,9 @@ export class SubscriptionService {
         tx,
       );
     } catch (e) {
-      this.logger.warn(`outbox emit ${type} failed for sub=${sub.id}: ${(e as Error).message}`);
+      this.logger.warn(
+        `outbox emit ${type} failed for sub=${sub.id}: ${(e as Error).message}`,
+      );
     }
   }
 
@@ -586,13 +594,14 @@ export class SubscriptionService {
     });
     if (claim.count === 0) {
       throw new BadRequestException(
-        'A scheduled plan change was just registered by another session — refresh and retry.',
+        "A scheduled plan change was just registered by another session — refresh and retry.",
       );
     }
-    const updatedSubscription = await this.prisma.subscription.findUniqueOrThrow({
-      where: { id: subscriptionId },
-      include: { plan: true, scheduledDowngradePlan: true },
-    });
+    const updatedSubscription =
+      await this.prisma.subscription.findUniqueOrThrow({
+        where: { id: subscriptionId },
+        include: { plan: true, scheduledDowngradePlan: true },
+      });
 
     return {
       subscription: updatedSubscription,
@@ -794,7 +803,7 @@ export class SubscriptionService {
     });
     if (claim.count === 0) {
       throw new BadRequestException(
-        'Scheduled downgrade no longer exists — it may have just been applied.',
+        "Scheduled downgrade no longer exists — it may have just been applied.",
       );
     }
     return { success: true, message: "Scheduled downgrade cancelled" };
@@ -891,7 +900,7 @@ export class SubscriptionService {
     });
     if (!txResult.claimed) {
       throw new BadRequestException(
-        'Subscription state changed concurrently — refresh and retry.',
+        "Subscription state changed concurrently — refresh and retry.",
       );
     }
     const updated = txResult.updated;
@@ -977,7 +986,7 @@ export class SubscriptionService {
     });
     if (!txResult.claimed) {
       throw new BadRequestException(
-        'Subscription state changed concurrently — refresh and retry.',
+        "Subscription state changed concurrently — refresh and retry.",
       );
     }
     const updated = txResult.updated;
@@ -1198,18 +1207,18 @@ export class SubscriptionService {
       // engine's projector uses the same shape — features OR-true,
       // limits SUM, integrations array-union — so reproduce it here.
       const activeAddOns = await this.prisma.tenantAddOn.findMany({
-        where: { tenantId, status: 'active' },
+        where: { tenantId, status: "active" },
         include: { addOn: { select: { grants: true } } },
       });
       for (const ta of activeAddOns) {
         const grants = (ta.addOn?.grants ?? {}) as Record<string, unknown>;
         for (const [k, v] of Object.entries(grants)) {
-          if (k.startsWith('feature.')) {
-            const name = k.slice('feature.'.length);
+          if (k.startsWith("feature.")) {
+            const name = k.slice("feature.".length);
             if (v === true && name in features) features[name] = true;
-          } else if (k.startsWith('limit.')) {
-            const name = k.slice('limit.'.length);
-            if (typeof v === 'number' && name in limits) {
+          } else if (k.startsWith("limit.")) {
+            const name = k.slice("limit.".length);
+            if (typeof v === "number" && name in limits) {
               // SUM by qty. Engine treats -1 as "unlimited"; preserve.
               if (limits[name] === -1 || v === -1) {
                 limits[name] = -1;
@@ -1217,8 +1226,8 @@ export class SubscriptionService {
                 limits[name] = limits[name] + v * (ta.quantity ?? 1);
               }
             }
-          } else if (k.startsWith('integration.')) {
-            const domain = k.slice('integration.'.length);
+          } else if (k.startsWith("integration.")) {
+            const domain = k.slice("integration.".length);
             const vendors = Array.isArray(v) ? (v as string[]) : [];
             if (!integrations[domain]) integrations[domain] = [];
             for (const vendor of vendors) {
@@ -1260,7 +1269,9 @@ export class SubscriptionService {
     // existing consumer.
     const features: Record<string, boolean> = {};
     for (const [k, v] of Object.entries(engineSet.features)) {
-      const unprefixed = k.startsWith("feature.") ? k.slice("feature.".length) : k;
+      const unprefixed = k.startsWith("feature.")
+        ? k.slice("feature.".length)
+        : k;
       features[unprefixed] = v;
     }
     const limits: Record<string, number> = {};
@@ -1362,7 +1373,7 @@ export class SubscriptionService {
         await this.emitLifecycle(EventTypes.SubscriptionDowngraded, {
           id: subscription.id,
           tenantId: subscription.tenantId,
-          plan: { name: 'FREE' },
+          plan: { name: "FREE" },
           currentPeriodStart: now,
           currentPeriodEnd: freePeriodEnd,
         });

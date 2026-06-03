@@ -18,7 +18,7 @@ describe('PaymentsService — progressive per-item payments', () => {
   const TABLE_ID = 'table-1';
 
   let prisma: MockPrismaClient;
-  let ordersService: { findOne: jest.Mock };
+  let ordersService: { findOne: jest.Mock; findOneByTenant: jest.Mock };
   let customersService: any;
   let receiptSnapshotBuilder: any;
   let salesInvoice: any;
@@ -86,8 +86,13 @@ describe('PaymentsService — progressive per-item payments', () => {
 
   beforeEach(() => {
     prisma = mockPrismaClient();
+    // v3.0.0 — payments.service.ts now calls `findOneByTenant` for its
+    // internal cross-flow tenant-isolation pre-checks (the HTTP path
+    // uses `findOne(scope, id)`). Both are wired here so existing
+    // assertions keep working under the new shape.
     ordersService = {
       findOne: jest.fn().mockResolvedValue(makeOrder()),
+      findOneByTenant: jest.fn().mockResolvedValue(makeOrder()),
     };
     customersService = {};
     // Receipt snapshot is wired in but exercised only via the

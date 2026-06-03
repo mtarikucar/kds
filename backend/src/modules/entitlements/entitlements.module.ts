@@ -1,13 +1,24 @@
-import { Global, Module, OnApplicationBootstrap, OnModuleInit, Logger } from '@nestjs/common';
-import { PrismaModule } from '../../prisma/prisma.module';
-import { DomainEventBus } from '../outbox/domain-event-bus.service';
-import { OutboxService } from '../outbox/outbox.service';
-import { EventTypes, SubscriptionLifecyclePayload, TenantOverridesChangedPayload, AddOnLifecyclePayload } from '../outbox/event-types';
-import { EntitlementsController } from './entitlements.controller';
-import { EntitlementService } from './entitlement.service';
-import { EntitlementGuard } from './entitlement.guard';
-import { PlanProjectorService } from './plan-projector.service';
-import { EntitlementInvalidationBus } from './entitlement-invalidation.bus';
+import {
+  Global,
+  Module,
+  OnApplicationBootstrap,
+  OnModuleInit,
+  Logger,
+} from "@nestjs/common";
+import { PrismaModule } from "../../prisma/prisma.module";
+import { DomainEventBus } from "../outbox/domain-event-bus.service";
+import { OutboxService } from "../outbox/outbox.service";
+import {
+  EventTypes,
+  SubscriptionLifecyclePayload,
+  TenantOverridesChangedPayload,
+  AddOnLifecyclePayload,
+} from "../outbox/event-types";
+import { EntitlementsController } from "./entitlements.controller";
+import { EntitlementService } from "./entitlement.service";
+import { EntitlementGuard } from "./entitlement.guard";
+import { PlanProjectorService } from "./plan-projector.service";
+import { EntitlementInvalidationBus } from "./entitlement-invalidation.bus";
 
 /**
  * The entitlement engine ships as a leaf module — no inbound deps from
@@ -43,7 +54,9 @@ import { EntitlementInvalidationBus } from './entitlement-invalidation.bus';
   ],
   exports: [EntitlementService, EntitlementGuard, PlanProjectorService],
 })
-export class EntitlementsModule implements OnApplicationBootstrap, OnModuleInit {
+export class EntitlementsModule
+  implements OnApplicationBootstrap, OnModuleInit
+{
   private readonly logger = new Logger(EntitlementsModule.name);
 
   constructor(
@@ -101,7 +114,7 @@ export class EntitlementsModule implements OnApplicationBootstrap, OnModuleInit 
 
     const subLifecycle = async (event: { payload: unknown }) => {
       const p = event.payload as SubscriptionLifecyclePayload;
-      if (p?.tenantId) await reproject(p.tenantId, 'subscription');
+      if (p?.tenantId) await reproject(p.tenantId, "subscription");
     };
 
     this.bus.on(EventTypes.SubscriptionActivated, subLifecycle);
@@ -111,12 +124,12 @@ export class EntitlementsModule implements OnApplicationBootstrap, OnModuleInit 
 
     this.bus.on(EventTypes.TenantOverridesChanged, async (event) => {
       const p = event.payload as TenantOverridesChangedPayload;
-      if (p?.tenantId) await reproject(p.tenantId, 'override');
+      if (p?.tenantId) await reproject(p.tenantId, "override");
     });
 
     const addOn = async (event: { payload: unknown }) => {
       const p = event.payload as AddOnLifecyclePayload;
-      if (p?.tenantId) await reproject(p.tenantId, 'addon');
+      if (p?.tenantId) await reproject(p.tenantId, "addon");
     };
     this.bus.on(EventTypes.AddOnPurchased, addOn);
     this.bus.on(EventTypes.AddOnCancelled, addOn);
@@ -130,7 +143,9 @@ export class EntitlementsModule implements OnApplicationBootstrap, OnModuleInit 
     try {
       await this.projector.backfillMissing();
     } catch (e) {
-      this.logger.error(`Entitlement backfill failed at bootstrap: ${(e as Error).message}`);
+      this.logger.error(
+        `Entitlement backfill failed at bootstrap: ${(e as Error).message}`,
+      );
     }
   }
 }

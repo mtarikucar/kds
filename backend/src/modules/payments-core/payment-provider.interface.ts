@@ -5,16 +5,16 @@
 // The split between `online` and `cardPresent` modes lives at the provider
 // level — same interface, different `modes`. Webhook ingest is uniform.
 
-export type PaymentMode = 'online' | 'cardPresent' | 'qr' | 'cash' | 'voucher';
+export type PaymentMode = "online" | "cardPresent" | "qr" | "cash" | "voucher";
 
 export type PaymentStatus =
-  | 'requires_action'  // 3DS challenge etc.
-  | 'pending'
-  | 'succeeded'
-  | 'failed'
-  | 'refunded'
-  | 'partial_refund'
-  | 'cancelled';
+  | "requires_action" // 3DS challenge etc.
+  | "pending"
+  | "succeeded"
+  | "failed"
+  | "refunded"
+  | "partial_refund"
+  | "cancelled";
 
 export interface PaymentIntentRequest {
   tenantId: string;
@@ -109,7 +109,11 @@ export interface SettlementReport {
   totalCents: number;
   currency: string;
   count: number;
-  lines: Array<{ intentId: string; amountCents: number; status: PaymentStatus }>;
+  lines: Array<{
+    intentId: string;
+    amountCents: number;
+    status: PaymentStatus;
+  }>;
 }
 
 /**
@@ -124,7 +128,10 @@ export interface PaymentProvider {
   status(intentId: string): Promise<PaymentTransaction>;
   refund(req: RefundRequest): Promise<RefundTransaction>;
   /** Verify HMAC/sig and surface a normalized event. */
-  parseWebhook(signature: string, raw: Buffer | string): Promise<ProviderWebhookEvent[]>;
+  parseWebhook(
+    signature: string,
+    raw: Buffer | string,
+  ): Promise<ProviderWebhookEvent[]>;
   /** Optional batch report — providers without per-day batch return null. */
   settlements?(tenantId: string, day: Date): Promise<SettlementReport | null>;
   healthCheck(): Promise<{ ok: boolean; details?: Record<string, unknown> }>;
@@ -138,7 +145,14 @@ export interface PaymentTerminal {
   readonly id: string;
   readonly providerId: string;
   readonly deviceId: string;
-  charge(req: { amountCents: number; currency: string; idempotencyKey: string }): Promise<PaymentTransaction>;
+  charge(req: {
+    amountCents: number;
+    currency: string;
+    idempotencyKey: string;
+  }): Promise<PaymentTransaction>;
   void(transactionId: string): Promise<void>;
-  status(): Promise<{ status: 'online' | 'offline' | 'busy' | 'error'; details?: Record<string, unknown> }>;
+  status(): Promise<{
+    status: "online" | "offline" | "busy" | "error";
+    details?: Record<string, unknown>;
+  }>;
 }

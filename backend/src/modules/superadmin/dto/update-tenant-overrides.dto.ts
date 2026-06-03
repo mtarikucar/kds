@@ -4,9 +4,12 @@ import {
   IsBoolean,
   IsInt,
   Min,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { EmptyStringToNumber, StringToBoolean } from '../../../common/dto/transforms';
+} from "class-validator";
+import { Type } from "class-transformer";
+import {
+  EmptyStringToNumber,
+  StringToBoolean,
+} from "../../../common/dto/transforms";
 
 export class FeatureOverridesDto {
   @StringToBoolean()

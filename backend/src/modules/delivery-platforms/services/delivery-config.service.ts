@@ -3,19 +3,19 @@ import {
   NotFoundException,
   ConflictException,
   Logger,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CreatePlatformConfigDto } from '../dto/create-platform-config.dto';
-import { UpdatePlatformConfigDto } from '../dto/update-platform-config.dto';
-import { AdapterFactory } from '../adapters/adapter-factory';
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { CreatePlatformConfigDto } from "../dto/create-platform-config.dto";
+import { UpdatePlatformConfigDto } from "../dto/update-platform-config.dto";
+import { AdapterFactory } from "../adapters/adapter-factory";
 import {
   decryptJson,
   decryptString,
   encryptJson,
   encryptString,
   isEncryptedPayload,
-} from '../../../common/helpers/encryption.helper';
+} from "../../../common/helpers/encryption.helper";
 
 // Error count at which we auto-disable a config so we stop spamming
 // the platform / log table. The admin has to re-enable explicitly.
@@ -37,14 +37,14 @@ export class DeliveryConfigService {
    * decrypts credentials + accessToken in memory. NEVER serialize this
    * to the client.
    */
-  private decryptConfig<T extends { credentials?: unknown; accessToken?: string | null }>(
-    config: T,
-  ): T & { credentials?: StoredCredentials | null } {
+  private decryptConfig<
+    T extends { credentials?: unknown; accessToken?: string | null },
+  >(config: T): T & { credentials?: StoredCredentials | null } {
     const result: any = { ...config };
     if (isEncryptedPayload(config.credentials)) {
       result.credentials = decryptJson<StoredCredentials>(config.credentials);
     }
-    if (typeof config.accessToken === 'string' && config.accessToken) {
+    if (typeof config.accessToken === "string" && config.accessToken) {
       result.accessToken = decryptString(config.accessToken);
     }
     return result;
@@ -62,7 +62,7 @@ export class DeliveryConfigService {
   async findAll(tenantId: string) {
     const configs = await this.prisma.deliveryPlatformConfig.findMany({
       where: { tenantId, deletedAt: null },
-      orderBy: { platform: 'asc' },
+      orderBy: { platform: "asc" },
     });
     return configs.map((c) => this.stripSensitiveFields(c));
   }
@@ -131,7 +131,7 @@ export class DeliveryConfigService {
     } catch (err) {
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2002'
+        err.code === "P2002"
       ) {
         // DB-level @@unique([platform, remoteRestaurantId]) — replaces
         // the prior cross-tenant leak where disabled configs could
@@ -144,7 +144,11 @@ export class DeliveryConfigService {
     }
   }
 
-  async update(tenantId: string, platform: string, dto: UpdatePlatformConfigDto) {
+  async update(
+    tenantId: string,
+    platform: string,
+    dto: UpdatePlatformConfigDto,
+  ) {
     const config = await this.prisma.deliveryPlatformConfig.findFirst({
       where: { tenantId, platform, deletedAt: null },
     });
@@ -190,7 +194,7 @@ export class DeliveryConfigService {
     } catch (err) {
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2002'
+        err.code === "P2002"
       ) {
         throw new ConflictException(
           `Remote restaurant ID is already registered for ${platform}`,

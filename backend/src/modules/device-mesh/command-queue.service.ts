@@ -1,8 +1,13 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { v7 as uuidv7 } from 'uuid';
-import { PrismaService } from '../../prisma/prisma.service';
-import { OutboxService } from '../outbox/outbox.service';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { v7 as uuidv7 } from "uuid";
+import { PrismaService } from "../../prisma/prisma.service";
+import { OutboxService } from "../outbox/outbox.service";
 
 /**
  * Per-device FIFO command queue with priority.
@@ -29,14 +34,20 @@ export class CommandQueueService {
   async enqueue(
     tenantId: string,
     deviceId: string,
-    input: { kind: string; payload: Record<string, unknown>; priority?: number; idempotencyKey?: string },
+    input: {
+      kind: string;
+      payload: Record<string, unknown>;
+      priority?: number;
+      idempotencyKey?: string;
+    },
   ) {
     const device = await this.prisma.device.findFirst({
       where: { id: deviceId, tenantId },
       select: { id: true, status: true, branchId: true },
     });
-    if (!device) throw new NotFoundException('Device not found');
-    if (device.status === 'retired') throw new BadRequestException('Device retired');
+    if (!device) throw new NotFoundException("Device not found");
+    if (device.status === "retired")
+      throw new BadRequestException("Device retired");
 
     const idempotencyKey = input.idempotencyKey ?? uuidv7();
     try {
@@ -55,14 +66,17 @@ export class CommandQueueService {
       });
       await this.outbox
         .append({
-          type: 'device.command.created.v1',
+          type: "device.command.created.v1",
           tenantId,
           payload: { commandId: row.id, deviceId, kind: row.kind },
         })
         .catch(() => undefined);
       return row;
     } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      if (
+        e instanceof Prisma.PrismaClientKnownRequestError &&
+        e.code === "P2002"
+      ) {
         // Idempotency hit — return the existing row so the caller sees the
         // same outcome as if they'd been the first to send.
         const existing = await this.prisma.deviceCommand.findUnique({
@@ -82,15 +96,17 @@ export class CommandQueueService {
    * simultaneous claimers (e.g. a buggy device opening two connections).
    */
   async claimNext(deviceId: string) {
-    const rows = await this.prisma.$queryRaw<Array<{
-      id: string;
-      tenantId: string;
-      kind: string;
-      payload: any;
-      priority: number;
-      attempts: number;
-      idempotencyKey: string;
-    }>>`
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        id: string;
+        tenantId: string;
+        kind: string;
+        payload: any;
+        priority: number;
+        attempts: number;
+        idempotencyKey: string;
+      }>
+    >`
       UPDATE "device_commands"
          SET "status" = 'inflight', "attempts" = "attempts" + 1
        WHERE "id" IN (
@@ -110,7 +126,11 @@ export class CommandQueueService {
   async ack(
     deviceId: string,
     commandId: string,
-    input: { status: 'done' | 'failed'; result?: Record<string, unknown>; error?: string },
+    input: {
+      status: "done" | "failed";
+      result?: Record<string, unknown>;
+      error?: string;
+    },
   ) {
     // Compound WHERE at the DB layer rather than `findUnique` + in-JS
     // `deviceId !==` check. The post-fetch check is an IDOR-adjacent
@@ -121,14 +141,18 @@ export class CommandQueueService {
     const cmd = await this.prisma.deviceCommand.findFirst({
       where: { id: commandId, deviceId },
     });
-    if (!cmd) throw new NotFoundException('Command not found');
-    if (cmd.status !== 'inflight') throw new BadRequestException(`Cannot ack — status is ${cmd.status}`);
+    if (!cmd) throw new NotFoundException("Command not found");
+    if (cmd.status !== "inflight")
+      throw new BadRequestException(`Cannot ack — status is ${cmd.status}`);
 
     // Failed commands with retries remaining go back to `queued`; otherwise
     // they terminate in `failed`. Done commands are terminal regardless.
-    let nextStatus: 'done' | 'failed' | 'queued' = input.status;
-    if (input.status === 'failed' && cmd.attempts < CommandQueueService.MAX_ATTEMPTS) {
-      nextStatus = 'queued';
+    let nextStatus: "done" | "failed" | "queued" = input.status;
+    if (
+      input.status === "failed" &&
+      cmd.attempts < CommandQueueService.MAX_ATTEMPTS
+    ) {
+      nextStatus = "queued";
     }
 
     // Compound-WHERE updateMany + count check closes the same TOCTOU
@@ -136,16 +160,21 @@ export class CommandQueueService {
     // to write, so a row-id-only update can't accidentally clobber a
     // different device's command if the JS code is refactored.
     const claim = await this.prisma.deviceCommand.updateMany({
-      where: { id: commandId, deviceId, status: 'inflight' },
+      where: { id: commandId, deviceId, status: "inflight" },
       data: {
         status: nextStatus,
         result: (input.result as any) ?? undefined,
         error: input.error ?? null,
-        ackedAt: input.status === 'done' || nextStatus === 'failed' ? new Date() : null,
+        ackedAt:
+          input.status === "done" || nextStatus === "failed"
+            ? new Date()
+            : null,
       },
     });
     if (claim.count === 0) {
-      throw new BadRequestException('Command status changed concurrently — refresh and retry');
+      throw new BadRequestException(
+        "Command status changed concurrently — refresh and retry",
+      );
     }
     const updated = await this.prisma.deviceCommand.findUniqueOrThrow({
       where: { id: commandId },
@@ -154,11 +183,11 @@ export class CommandQueueService {
     await this.outbox
       .append({
         type:
-          input.status === 'done'
-            ? 'device.command.completed.v1'
-            : nextStatus === 'failed'
-              ? 'device.command.failed.v1'
-              : 'device.command.requeued.v1',
+          input.status === "done"
+            ? "device.command.completed.v1"
+            : nextStatus === "failed"
+              ? "device.command.failed.v1"
+              : "device.command.requeued.v1",
         tenantId: cmd.tenantId,
         payload: {
           commandId,
@@ -202,26 +231,26 @@ export class CommandQueueService {
     const [requeue, fail, expired] = await this.prisma.$transaction([
       this.prisma.deviceCommand.updateMany({
         where: {
-          status: 'inflight',
+          status: "inflight",
           updatedAt: { lt: cutoff },
           attempts: { lt: CommandQueueService.MAX_ATTEMPTS },
         },
-        data: { status: 'queued', error: 'No ack received; requeued' },
+        data: { status: "queued", error: "No ack received; requeued" },
       }),
       this.prisma.deviceCommand.updateMany({
         where: {
-          status: 'inflight',
+          status: "inflight",
           updatedAt: { lt: cutoff },
           attempts: { gte: CommandQueueService.MAX_ATTEMPTS },
         },
-        data: { status: 'failed', error: 'No ack received; giving up' },
+        data: { status: "failed", error: "No ack received; giving up" },
       }),
       this.prisma.deviceCommand.updateMany({
         where: {
-          status: 'queued',
+          status: "queued",
           expiresAt: { lt: now, not: null },
         },
-        data: { status: 'expired', error: 'TTL expired before device claimed' },
+        data: { status: "expired", error: "TTL expired before device claimed" },
       }),
     ]);
     const total = requeue.count + fail.count + expired.count;
@@ -233,14 +262,18 @@ export class CommandQueueService {
     return total;
   }
 
-  async listForDevice(tenantId: string, deviceId: string, filters?: { status?: string; limit?: number }) {
+  async listForDevice(
+    tenantId: string,
+    deviceId: string,
+    filters?: { status?: string; limit?: number },
+  ) {
     return this.prisma.deviceCommand.findMany({
       where: {
         tenantId,
         deviceId,
         ...(filters?.status ? { status: filters.status } : {}),
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: Math.min(filters?.limit ?? 100, 500),
     });
   }

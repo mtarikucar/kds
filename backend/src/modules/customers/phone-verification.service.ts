@@ -3,16 +3,16 @@ import {
   Injectable,
   Logger,
   UnauthorizedException,
-} from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import { SmsService } from './sms.service';
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma/prisma.service";
+import { SmsService } from "./sms.service";
 import {
   constantTimeEquals,
   generateOtp,
   hashOtp,
   normalizePhone,
-} from './customers.helpers';
-import { maskPhone } from '../../common/helpers/pii-mask.helper';
+} from "./customers.helpers";
+import { maskPhone } from "../../common/helpers/pii-mask.helper";
 
 // Per-tenant and per-phone daily send caps to bound SMS cost and blunt
 // pumping-fraud (attacker cycles target phones to evade the 60s per-phone
@@ -50,7 +50,7 @@ export class PhoneVerificationService {
   ): Promise<{ verificationId: string; expiresAt: Date; message: string }> {
     const phone = normalizePhone(phoneRaw);
     if (!/^\+?[1-9]\d{7,14}$/.test(phone)) {
-      throw new BadRequestException('Invalid phone number format');
+      throw new BadRequestException("Invalid phone number format");
     }
 
     const now = new Date();
@@ -60,10 +60,12 @@ export class PhoneVerificationService {
     // Per-phone 60s cooldown
     const recentAttempt = await this.prisma.phoneVerification.findFirst({
       where: { phone, tenantId, createdAt: { gte: oneMinAgo } },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
     if (recentAttempt) {
-      throw new BadRequestException('Please wait 60 seconds before requesting another code');
+      throw new BadRequestException(
+        "Please wait 60 seconds before requesting another code",
+      );
     }
 
     // Daily caps
@@ -82,13 +84,19 @@ export class PhoneVerificationService {
     ]);
 
     if (phoneCount >= DAILY_PHONE_SEND_CAP) {
-      throw new BadRequestException('Daily verification limit reached for this phone');
+      throw new BadRequestException(
+        "Daily verification limit reached for this phone",
+      );
     }
     if (tenantCount >= DAILY_TENANT_SEND_CAP) {
-      throw new BadRequestException('Daily verification limit reached — please try again tomorrow');
+      throw new BadRequestException(
+        "Daily verification limit reached — please try again tomorrow",
+      );
     }
     if (sessionId && sessionCount >= DAILY_SESSION_SEND_CAP) {
-      throw new BadRequestException('Too many verification attempts on this session');
+      throw new BadRequestException(
+        "Too many verification attempts on this session",
+      );
     }
 
     // v2.8.94 — cumulative failure lockout. A phone that has burned
@@ -132,7 +140,7 @@ export class PhoneVerificationService {
     return {
       verificationId: verification.id,
       expiresAt: verification.expiresAt,
-      message: 'Verification code sent to your phone',
+      message: "Verification code sent to your phone",
     };
   }
 
@@ -158,11 +166,13 @@ export class PhoneVerificationService {
         verified: false,
         expiresAt: { gte: new Date() },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
 
     if (!verification) {
-      throw new BadRequestException('No active verification found or code expired');
+      throw new BadRequestException(
+        "No active verification found or code expired",
+      );
     }
 
     // v2.8.94 — mirror the sendOTP-side lockout on the verify path so an
@@ -184,7 +194,7 @@ export class PhoneVerificationService {
     });
     if (incResult.count === 0) {
       throw new BadRequestException(
-        'Maximum verification attempts reached. Please request a new code.',
+        "Maximum verification attempts reached. Please request a new code.",
       );
     }
 
@@ -239,7 +249,7 @@ export class PhoneVerificationService {
         `Phone failure lockout triggered for ${maskPhone(phone)} tenant=${tenantId} (${burnedCount} failures in ${FAILURE_LOCKOUT_WINDOW_MS / 3600_000}h)`,
       );
       throw new BadRequestException(
-        'Too many failed verification attempts on this phone. Please try again in 24 hours.',
+        "Too many failed verification attempts on this phone. Please try again in 24 hours.",
       );
     }
   }
@@ -248,7 +258,7 @@ export class PhoneVerificationService {
     const phone = normalizePhone(phoneRaw);
     const verification = await this.prisma.phoneVerification.findFirst({
       where: { phone, tenantId, verified: true },
-      orderBy: { verifiedAt: 'desc' },
+      orderBy: { verifiedAt: "desc" },
     });
     return !!verification;
   }
@@ -265,7 +275,11 @@ export class PhoneVerificationService {
    * caller already knows the phone they sent the OTP to; the response
    * is for status polling, not phone disclosure.
    */
-  async getVerificationStatus(verificationId: string, sessionId: string, tenantId: string) {
+  async getVerificationStatus(
+    verificationId: string,
+    sessionId: string,
+    tenantId: string,
+  ) {
     const verification = await this.prisma.phoneVerification.findFirst({
       where: { id: verificationId, sessionId, tenantId },
       select: {
@@ -280,7 +294,7 @@ export class PhoneVerificationService {
       },
     });
 
-    if (!verification) throw new BadRequestException('Verification not found');
+    if (!verification) throw new BadRequestException("Verification not found");
     return {
       ...verification,
       phone: maskPhone(verification.phone),

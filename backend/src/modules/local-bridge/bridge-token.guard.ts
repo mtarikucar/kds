@@ -1,5 +1,10 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
-import { LocalBridgeService } from './local-bridge.service';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from "@nestjs/common";
+import { LocalBridgeService } from "./local-bridge.service";
 
 /**
  * Authenticates a bridge by its bearer token (sent as `Authorization: Bridge
@@ -14,14 +19,18 @@ export class BridgeTokenGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const req = context.switchToHttp().getRequest();
     const header: string | undefined = req.headers?.authorization;
-    if (!header) throw new UnauthorizedException('No bridge token');
-    const [scheme, token] = header.split(' ');
-    if (scheme !== 'Bridge' || !token) {
-      throw new UnauthorizedException('Expected "Authorization: Bridge <token>"');
+    if (!header) throw new UnauthorizedException("No bridge token");
+    const [scheme, token] = header.split(" ");
+    if (scheme !== "Bridge" || !token) {
+      throw new UnauthorizedException(
+        'Expected "Authorization: Bridge <token>"',
+      );
     }
     const bridge = await this.bridges.authenticateToken(token);
-    if (!bridge) throw new UnauthorizedException('Invalid or expired bridge token');
-    if (bridge.status === 'retired') throw new UnauthorizedException('Bridge retired');
+    if (!bridge)
+      throw new UnauthorizedException("Invalid or expired bridge token");
+    if (bridge.status === "retired")
+      throw new UnauthorizedException("Bridge retired");
     req.bridge = bridge;
     return true;
   }

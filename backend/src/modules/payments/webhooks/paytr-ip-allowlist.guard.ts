@@ -1,5 +1,10 @@
-import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  Logger,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 
 /**
  * Defence-in-depth allowlist for the PayTR callback endpoint. The HMAC
@@ -18,12 +23,15 @@ export class PaytrIpAllowlistGuard implements CanActivate {
   private readonly allowed: Set<string> | null;
 
   constructor(private readonly config: ConfigService) {
-    const raw = config.get<string>('PAYTR_WEBHOOK_ALLOWED_IPS');
+    const raw = config.get<string>("PAYTR_WEBHOOK_ALLOWED_IPS");
     if (!raw) {
       this.allowed = null;
       return;
     }
-    const entries = raw.split(',').map((s) => s.trim()).filter(Boolean);
+    const entries = raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
     // v2.8.91: startup self-test. Pre-fix a misconfigured
     // PAYTR_WEBHOOK_ALLOWED_IPS (typo, wrong format, accidental quotes)
     // silently dropped every real PayTR webhook with a 200 OK so PayTR
@@ -39,17 +47,19 @@ export class PaytrIpAllowlistGuard implements CanActivate {
     const invalid = entries.filter((e) => !looksLikeIp(e));
     if (invalid.length > 0) {
       throw new Error(
-        `PAYTR_WEBHOOK_ALLOWED_IPS contains ${invalid.length} entries that do not look like IP addresses: [${invalid.join(', ')}]. ` +
-        `Refusing to boot — fix the env to match the IPs published in the merchant panel.`,
+        `PAYTR_WEBHOOK_ALLOWED_IPS contains ${invalid.length} entries that do not look like IP addresses: [${invalid.join(", ")}]. ` +
+          `Refusing to boot — fix the env to match the IPs published in the merchant panel.`,
       );
     }
     if (entries.length === 0) {
       throw new Error(
-        'PAYTR_WEBHOOK_ALLOWED_IPS was set but resolved to an empty list after parsing. Refusing to boot — set the variable or unset it entirely to disable the allowlist.',
+        "PAYTR_WEBHOOK_ALLOWED_IPS was set but resolved to an empty list after parsing. Refusing to boot — set the variable or unset it entirely to disable the allowlist.",
       );
     }
     this.allowed = new Set(entries);
-    this.logger.log(`PayTR webhook allowlist active with ${entries.length} entries`);
+    this.logger.log(
+      `PayTR webhook allowlist active with ${entries.length} entries`,
+    );
   }
 
   canActivate(context: ExecutionContext): boolean {
@@ -66,9 +76,9 @@ export class PaytrIpAllowlistGuard implements CanActivate {
     // we don't want the guard silently weakened.
     const ip =
       req.ip ||
-      (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim() ||
       req.socket?.remoteAddress ||
-      '';
+      "";
     if (this.allowed.has(ip)) return true;
     // Security log — keep the full IP un-masked. This is an
     // attacker's source address (forged-webhook attempt), not a

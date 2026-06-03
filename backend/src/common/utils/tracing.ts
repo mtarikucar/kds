@@ -1,4 +1,4 @@
-import * as Sentry from '@sentry/node';
+import * as Sentry from "@sentry/node";
 
 /**
  * Context for creating a Sentry transaction
@@ -35,13 +35,16 @@ export interface TransactionContext {
  */
 export async function withTransaction<T>(
   context: TransactionContext,
-  fn: () => Promise<T>
+  fn: () => Promise<T>,
 ): Promise<T> {
   return Sentry.startSpan(
     {
       name: context.name,
       op: context.op,
-      attributes: context.data as Record<string, string | number | boolean | undefined>,
+      attributes: context.data as Record<
+        string,
+        string | number | boolean | undefined
+      >,
     },
     async (span) => {
       // Set tags on the span
@@ -56,14 +59,17 @@ export async function withTransaction<T>(
         span.setStatus({ code: 1 }); // OK
         return result;
       } catch (error) {
-        span.setStatus({ code: 2, message: error instanceof Error ? error.message : 'Unknown error' }); // ERROR
+        span.setStatus({
+          code: 2,
+          message: error instanceof Error ? error.message : "Unknown error",
+        }); // ERROR
         Sentry.captureException(error, {
           tags: context.tags,
           extra: context.data,
         });
         throw error;
       }
-    }
+    },
   );
 }
 
@@ -87,8 +93,10 @@ export async function withTransaction<T>(
  * ```
  */
 export async function withSpan<T>(
-  context: Omit<TransactionContext, 'tags'> & { tags?: Record<string, string | number | boolean> },
-  fn: () => Promise<T>
+  context: Omit<TransactionContext, "tags"> & {
+    tags?: Record<string, string | number | boolean>;
+  },
+  fn: () => Promise<T>,
 ): Promise<T> {
   return Sentry.startSpan(
     {
@@ -105,10 +113,13 @@ export async function withSpan<T>(
         span.setStatus({ code: 1 }); // OK
         return result;
       } catch (error) {
-        span.setStatus({ code: 2, message: error instanceof Error ? error.message : 'Unknown error' }); // ERROR
+        span.setStatus({
+          code: 2,
+          message: error instanceof Error ? error.message : "Unknown error",
+        }); // ERROR
         throw error;
       }
-    }
+    },
   );
 }
 
@@ -120,7 +131,7 @@ export function addBreadcrumb(
   message: string,
   category: string,
   data?: Record<string, unknown>,
-  level: Sentry.SeverityLevel = 'info'
+  level: Sentry.SeverityLevel = "info",
 ): void {
   Sentry.addBreadcrumb({
     message,
@@ -150,6 +161,9 @@ export function setUserContext(user: {
 /**
  * Sets additional context for debugging.
  */
-export function setContext(name: string, context: Record<string, unknown>): void {
+export function setContext(
+  name: string,
+  context: Record<string, unknown>,
+): void {
   Sentry.setContext(name, context);
 }

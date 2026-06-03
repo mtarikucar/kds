@@ -6,16 +6,16 @@ import {
   Injectable,
   Logger,
   UnauthorizedException,
-} from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { shouldBypassGlobalAuth } from '../../../common/helpers/guard-bypass.helper';
-import { IS_SKIP_BRANCH_SCOPE_KEY } from '../decorators/skip-branch-scope.decorator';
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { shouldBypassGlobalAuth } from "../../../common/helpers/guard-bypass.helper";
+import { IS_SKIP_BRANCH_SCOPE_KEY } from "../decorators/skip-branch-scope.decorator";
 import {
   HARD_RESTRICTED_ROLES,
   UserRole,
   isHardRestrictedRole,
-} from '../../../common/constants/roles.enum';
+} from "../../../common/constants/roles.enum";
 
 /**
  * v3.0.0 strict BranchGuard.
@@ -79,7 +79,7 @@ export class BranchGuard implements CanActivate {
     const headerBranchId = this.readHeaderBranchId(request);
     if (!headerBranchId) {
       throw new BadRequestException(
-        'X-Branch-Id header required for branch-scoped routes.',
+        "X-Branch-Id header required for branch-scoped routes.",
       );
     }
 
@@ -90,13 +90,13 @@ export class BranchGuard implements CanActivate {
       where: {
         id: headerBranchId,
         tenantId: user.tenantId,
-        status: 'active',
+        status: "active",
       },
       select: { id: true },
     });
     if (!branch) {
       throw new ForbiddenException(
-        'Branch is not accessible (cross-tenant, archived, or unknown).',
+        "Branch is not accessible (cross-tenant, archived, or unknown).",
       );
     }
 
@@ -183,8 +183,8 @@ export class BranchGuard implements CanActivate {
    * `canActivate` this maps to a 400).
    */
   private readHeaderBranchId(request: any): string | null {
-    const raw = request.headers?.['x-branch-id'];
-    if (typeof raw !== 'string') return null;
+    const raw = request.headers?.["x-branch-id"];
+    if (typeof raw !== "string") return null;
     const trimmed = raw.trim();
     if (!BranchGuard.UUID_RE.test(trimmed)) {
       this.logger.warn(

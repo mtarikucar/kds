@@ -1,5 +1,5 @@
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { BranchScope } from '../../../common/scoping/branch-scope';
+import { createParamDecorator, ExecutionContext } from "@nestjs/common";
+import { BranchScope } from "../../../common/scoping/branch-scope";
 
 /**
  * Extract the resolved `BranchScope` ({tenantId, branchId, userId,
@@ -24,9 +24,9 @@ export const CurrentScope = createParamDecorator(
       // or guards ran out of order — both are bugs the request layer
       // must surface, not paper over.
       throw new Error(
-        'CurrentScope decorator used on a route without BranchGuard. ' +
-          'Annotate the controller with @SkipBranchScope() if tenant-wide ' +
-          'or fix the guard chain.',
+        "CurrentScope decorator used on a route without BranchGuard. " +
+          "Annotate the controller with @SkipBranchScope() if tenant-wide " +
+          "or fix the guard chain.",
       );
     }
     return request.scope;

@@ -41,6 +41,25 @@ import { MarketingGuard } from './guards/marketing.guard';
 import { MarketingRolesGuard } from './guards/marketing-roles.guard';
 import { IngestTokenGuard } from './guards/ingest-token.guard';
 
+// Event consumers (Step C decoupling: settlement → commission crediting).
+import { SettlementCommissionConsumer } from './events/settlement-commission.consumer';
+
+// Phase 2 telephony — single-line Netgsm sales calls (click-to-dial + manual log).
+import { SalesCallController } from './controllers/sales-call.controller';
+import { SalesCallService } from './services/sales-call.service';
+import { TelephonyProviderRegistry } from './telephony/telephony-provider.registry';
+import { NetgsmLiteAdapter } from './telephony/netgsm-lite.adapter';
+
+// Phase 3 installation ops — crews, jobs, scheduling, tasks, ops dashboard.
+import { InstallationController } from './installations/installation.controller';
+import { InstallationJobService } from './installations/installation-job.service';
+import { InstallationCrewService } from './installations/installation-crew.service';
+import { InstallationConsumer } from './installations/installation.consumer';
+
+// Phase 4 sales targets/quotas + performance-vs-target.
+import { SalesTargetController } from './controllers/sales-target.controller';
+import { SalesTargetService } from './services/sales-target.service';
+
 @Module({
   imports: [
     JwtModule.registerAsync({
@@ -93,6 +112,9 @@ import { IngestTokenGuard } from './guards/ingest-token.guard';
     MarketingCommissionsController,
     MarketingNotificationsController,
     MarketingDistributionController,
+    SalesCallController,
+    InstallationController,
+    SalesTargetController,
   ],
   providers: [
     // Services
@@ -111,6 +133,20 @@ import { IngestTokenGuard } from './guards/ingest-token.guard';
     MarketingDistributionService,
     // Cron jobs (offer expiry, notification TTL, follow-up reminders).
     MarketingSchedulerService,
+    // Event consumer: credits SIGNUP/RENEWAL/UPSELL commissions off
+    // payment.succeeded.v1 (subscribes via DomainEventBus on init).
+    SettlementCommissionConsumer,
+    // Phase 2 telephony: sales-call log + single-line Netgsm provider.
+    SalesCallService,
+    TelephonyProviderRegistry,
+    NetgsmLiteAdapter,
+    // Phase 3 installation ops: crews, jobs, and the auto-create consumer
+    // (reacts to marketing.lead.converted.v1).
+    InstallationJobService,
+    InstallationCrewService,
+    InstallationConsumer,
+    // Phase 4 sales targets/quotas + performance.
+    SalesTargetService,
     // Guards
     MarketingGuard,
     MarketingRolesGuard,

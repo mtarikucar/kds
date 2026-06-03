@@ -10,10 +10,10 @@ import {
   ValidateNested,
   ArrayMinSize,
   ArrayMaxSize,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { EmptyStringToUndefined } from '../../../common/dto/transforms';
+} from "class-validator";
+import { Type } from "class-transformer";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { EmptyStringToUndefined } from "../../../common/dto/transforms";
 
 // E.164-ish: 8-15 digits, optional leading +. Mirrors the regex used in
 // orders/dto/create-payment.dto.ts and customer-orders/dto/create-customer-order.dto.ts
@@ -28,11 +28,11 @@ const PHONE_REGEX = /^\+?[1-9]\d{7,14}$/;
  * amount/price field by design).
  */
 export class CustomerPayItemEntry {
-  @ApiProperty({ description: 'OrderItem the customer is paying for' })
+  @ApiProperty({ description: "OrderItem the customer is paying for" })
   @IsUUID()
   orderItemId: string;
 
-  @ApiProperty({ description: 'Number of units to settle', minimum: 1 })
+  @ApiProperty({ description: "Number of units to settle", minimum: 1 })
   @IsInt()
   @Min(1)
   quantity: number;
@@ -45,7 +45,7 @@ export class CustomerPayItemEntry {
  */
 export class CreatePayIntentDto {
   @ApiProperty({
-    description: 'Items (and quantities) the customer wants to pay for now',
+    description: "Items (and quantities) the customer wants to pay for now",
     type: [CustomerPayItemEntry],
   })
   @IsArray()
@@ -57,12 +57,14 @@ export class CreatePayIntentDto {
 
   @ApiPropertyOptional({
     description:
-      'Optional customer phone — links the resulting Payment to a Customer row for loyalty.',
+      "Optional customer phone — links the resulting Payment to a Customer row for loyalty.",
   })
   @EmptyStringToUndefined()
   @IsString()
   @IsOptional()
   @MaxLength(20)
-  @Matches(PHONE_REGEX, { message: 'customerPhone must match E.164 shape (8-15 digits, optional +)' })
+  @Matches(PHONE_REGEX, {
+    message: "customerPhone must match E.164 shape (8-15 digits, optional +)",
+  })
   customerPhone?: string;
 }

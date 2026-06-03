@@ -139,6 +139,8 @@ services:
       interval: 30s
       timeout: 10s
       retries: 5
+      # See docker-compose.staging.yml for rationale — backend bootstrap
+      # has grown past the old 40s budget.
       start_period: 240s
     networks:
       - kds_network

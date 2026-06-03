@@ -1,5 +1,5 @@
-import { lookup } from 'node:dns/promises';
-import { isIP, isIPv4, isIPv6 } from 'node:net';
+import { lookup } from "node:dns/promises";
+import { isIP, isIPv4, isIPv6 } from "node:net";
 
 /**
  * SSRF defence for tenant-supplied URLs.
@@ -25,28 +25,31 @@ import { isIP, isIPv4, isIPv6 } from 'node:net';
  */
 
 const BLOCKED_PORTS = new Set([
-  22,    // SSH
-  23,    // Telnet
-  25,    // SMTP
-  110,   // POP3
-  143,   // IMAP
-  445,   // SMB
-  2049,  // NFS
-  3306,  // MySQL
-  3389,  // RDP
-  5432,  // PostgreSQL
-  5984,  // CouchDB
-  6379,  // Redis
-  8086,  // InfluxDB
-  9200,  // Elasticsearch
-  9300,  // Elasticsearch cluster
+  22, // SSH
+  23, // Telnet
+  25, // SMTP
+  110, // POP3
+  143, // IMAP
+  445, // SMB
+  2049, // NFS
+  3306, // MySQL
+  3389, // RDP
+  5432, // PostgreSQL
+  5984, // CouchDB
+  6379, // Redis
+  8086, // InfluxDB
+  9200, // Elasticsearch
+  9300, // Elasticsearch cluster
   11211, // memcached
   27017, // MongoDB
 ]);
 
 function isPrivateIPv4(ip: string): boolean {
-  const parts = ip.split('.').map(Number);
-  if (parts.length !== 4 || parts.some((p) => Number.isNaN(p) || p < 0 || p > 255)) {
+  const parts = ip.split(".").map(Number);
+  if (
+    parts.length !== 4 ||
+    parts.some((p) => Number.isNaN(p) || p < 0 || p > 255)
+  ) {
     return false;
   }
   const [a, b, c, d] = parts;
@@ -85,12 +88,17 @@ function isPrivateIPv4(ip: string): boolean {
 
 function isPrivateIPv6(ip: string): boolean {
   const n = ip.toLowerCase();
-  if (n === '::1' || n === '::') return true; // loopback + unspecified
-  if (n.startsWith('fc') || n.startsWith('fd')) return true; // ULA fc00::/7
-  if (n.startsWith('fe80:') || n.startsWith('fe9') || n.startsWith('fea') || n.startsWith('feb')) {
+  if (n === "::1" || n === "::") return true; // loopback + unspecified
+  if (n.startsWith("fc") || n.startsWith("fd")) return true; // ULA fc00::/7
+  if (
+    n.startsWith("fe80:") ||
+    n.startsWith("fe9") ||
+    n.startsWith("fea") ||
+    n.startsWith("feb")
+  ) {
     return true; // link-local fe80::/10
   }
-  if (n.startsWith('ff')) return true; // multicast ff00::/8
+  if (n.startsWith("ff")) return true; // multicast ff00::/8
   // IPv4-mapped IPv6 (::ffff:x.x.x.x) — recheck against IPv4 ranges so an
   // attacker can't dress 127.0.0.1 up as ::ffff:127.0.0.1 to bypass.
   const m = n.match(/^::ffff:([0-9.]+)$/);
@@ -101,7 +109,7 @@ function isPrivateIPv6(ip: string): boolean {
 export class UnsafeUrlError extends Error {
   constructor(message: string) {
     super(message);
-    this.name = 'UnsafeUrlError';
+    this.name = "UnsafeUrlError";
   }
 }
 
@@ -111,18 +119,20 @@ export class UnsafeUrlError extends Error {
  * surface to API callers — never echo the DNS resolution result back since
  * that's itself an information leak.
  */
-export async function assertPublicHttpUrl(input: string): Promise<{ url: URL; resolvedIp: string }> {
+export async function assertPublicHttpUrl(
+  input: string,
+): Promise<{ url: URL; resolvedIp: string }> {
   let url: URL;
   try {
     url = new URL(input);
   } catch {
-    throw new UnsafeUrlError('invalid URL');
+    throw new UnsafeUrlError("invalid URL");
   }
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-    throw new UnsafeUrlError('URL must be http or https');
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    throw new UnsafeUrlError("URL must be http or https");
   }
   if (url.username || url.password) {
-    throw new UnsafeUrlError('URL must not include userinfo');
+    throw new UnsafeUrlError("URL must not include userinfo");
   }
   if (url.port && BLOCKED_PORTS.has(Number(url.port))) {
     throw new UnsafeUrlError(`port ${url.port} is not allowed`);
@@ -139,14 +149,14 @@ export async function assertPublicHttpUrl(input: string): Promise<{ url: URL; re
       resolvedIp = r.address;
     } catch {
       // Don't echo the underlying DNS error — it can leak resolver detail.
-      throw new UnsafeUrlError('hostname did not resolve');
+      throw new UnsafeUrlError("hostname did not resolve");
     }
   }
   if (isIPv4(resolvedIp) && isPrivateIPv4(resolvedIp)) {
-    throw new UnsafeUrlError('URL resolves to a private address');
+    throw new UnsafeUrlError("URL resolves to a private address");
   }
   if (isIPv6(resolvedIp) && isPrivateIPv6(resolvedIp)) {
-    throw new UnsafeUrlError('URL resolves to a private address');
+    throw new UnsafeUrlError("URL resolves to a private address");
   }
   return { url, resolvedIp };
 }

@@ -1,11 +1,19 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { AdapterFactory } from '../adapters/adapter-factory';
-import { DeliveryLogService } from './delivery-log.service';
-import { DeliveryAuthService } from './delivery-auth.service';
-import { DeliveryConfigService } from './delivery-config.service';
-import { PlatformLogDirection, PlatformLogAction } from '../constants/platform.enum';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { AdapterFactory } from "../adapters/adapter-factory";
+import { DeliveryLogService } from "./delivery-log.service";
+import { DeliveryAuthService } from "./delivery-auth.service";
+import { DeliveryConfigService } from "./delivery-config.service";
+import {
+  PlatformLogDirection,
+  PlatformLogAction,
+} from "../constants/platform.enum";
 
 @Injectable()
 export class DeliveryMenuSyncService {
@@ -98,7 +106,8 @@ export class DeliveryMenuSyncService {
       // tokens but rejects every syncMenu call would loop forever — the
       // log table fills up but the config never auto-disables because
       // only the auth-refresh path was wired to recordError.
-      await this.configService.recordError(config.id, `menu_sync: ${error.message}`)
+      await this.configService
+        .recordError(config.id, `menu_sync: ${error.message}`)
         .catch((e) => this.logger.warn(`recordError failed: ${e.message}`));
     }
   }
@@ -122,7 +131,11 @@ export class DeliveryMenuSyncService {
       const freshConfig = await this.authService.ensureValidToken(config.id);
       if (!freshConfig) return;
 
-      await adapter.updateItemAvailability(freshConfig, externalItemId, available);
+      await adapter.updateItemAvailability(
+        freshConfig,
+        externalItemId,
+        available,
+      );
 
       await this.logService.log({
         tenantId,
@@ -148,7 +161,8 @@ export class DeliveryMenuSyncService {
       });
 
       // Same circuit-breaker bump as syncMenuToPlatform above.
-      await this.configService.recordError(config.id, `item_availability: ${error.message}`)
+      await this.configService
+        .recordError(config.id, `item_availability: ${error.message}`)
         .catch((e) => this.logger.warn(`recordError failed: ${e.message}`));
     }
   }
@@ -165,7 +179,7 @@ export class DeliveryMenuSyncService {
           select: { id: true, name: true, price: true, isAvailable: true },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -185,7 +199,7 @@ export class DeliveryMenuSyncService {
       select: { id: true },
     });
     if (!product) {
-      throw new NotFoundException('Product not found in this tenant');
+      throw new NotFoundException("Product not found in this tenant");
     }
 
     try {
@@ -210,7 +224,7 @@ export class DeliveryMenuSyncService {
       // → 500. Translate to a friendly ConflictException with guidance.
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2002'
+        err.code === "P2002"
       ) {
         throw new ConflictException(
           `Mapping for externalItemId="${externalItemId}" on ${platform} already exists`,
@@ -228,7 +242,7 @@ export class DeliveryMenuSyncService {
       where: { id: mappingId, tenantId },
     });
     if (result.count === 0) {
-      throw new NotFoundException('Menu item mapping not found');
+      throw new NotFoundException("Menu item mapping not found");
     }
     return result;
   }

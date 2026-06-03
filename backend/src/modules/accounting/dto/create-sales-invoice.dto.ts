@@ -8,9 +8,9 @@ import {
   Max,
   MaxLength,
   Min,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+} from "class-validator";
+import { Type } from "class-transformer";
+import { ApiPropertyOptional } from "@nestjs/swagger";
 
 /**
  * Overrides for the invoice being generated from an order. All optional —
@@ -22,18 +22,32 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
  * operator sees the error at write time, not after sync round-trip.
  */
 export class CreateSalesInvoiceDto {
-  @ApiPropertyOptional() @IsString() @IsOptional() @MaxLength(64) orderId?: string;
-  @ApiPropertyOptional() @IsString() @IsOptional() @MaxLength(200) customerName?: string;
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  @MaxLength(64)
+  orderId?: string;
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  @MaxLength(200)
+  customerName?: string;
 
-  @ApiPropertyOptional({ description: 'TR VKN (10 digits) or TCKN (11 digits)' })
+  @ApiPropertyOptional({
+    description: "TR VKN (10 digits) or TCKN (11 digits)",
+  })
   @IsOptional()
   @IsString()
   @Matches(/^\d{10}(\d)?$/, {
-    message: 'customerTaxId must be 10 (VKN) or 11 (TCKN) digits',
+    message: "customerTaxId must be 10 (VKN) or 11 (TCKN) digits",
   })
   customerTaxId?: string;
 
-  @ApiPropertyOptional() @IsString() @IsOptional() @MaxLength(120) customerTaxOffice?: string;
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  @MaxLength(120)
+  customerTaxOffice?: string;
 
   // Phone shape mirrors the PHONE_REGEX used in create-payment.dto.ts +
   // create-customer-order.dto.ts. Accounting doesn't feed
@@ -44,11 +58,15 @@ export class CreateSalesInvoiceDto {
   @IsOptional()
   @MaxLength(20)
   @Matches(/^\+?[1-9]\d{7,14}$/, {
-    message: 'customerPhone must match E.164 shape (8-15 digits, optional +)',
+    message: "customerPhone must match E.164 shape (8-15 digits, optional +)",
   })
   customerPhone?: string;
 
-  @ApiPropertyOptional() @IsOptional() @IsEmail() @MaxLength(254) customerEmail?: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsEmail()
+  @MaxLength(254)
+  customerEmail?: string;
 }
 
 /**

@@ -2,31 +2,31 @@
 // changes, add-on purchases, hardware SKUs, and service line items.
 
 export interface CartItemPlan {
-  type: 'plan';
+  type: "plan";
   // PlanCode resolves to a SubscriptionPlan.name (FREE|BASIC|PRO|BUSINESS) for
   // now. Once Plan-as-data lands in a separate model, this becomes a row id.
   code: string;
-  billingCycle?: 'MONTHLY' | 'YEARLY';
+  billingCycle?: "MONTHLY" | "YEARLY";
   qty?: number;
 }
 
 export interface CartItemAddOn {
-  type: 'addon';
+  type: "addon";
   code: string;
   qty?: number;
   branchId?: string;
 }
 
 export interface CartItemHardware {
-  type: 'hardware';
+  type: "hardware";
   sku: string;
   qty: number;
   // 'sell' (default) or 'rent' if the SKU offers a rental price.
-  acquisition?: 'sell' | 'rent';
+  acquisition?: "sell" | "rent";
 }
 
 export interface CartItemService {
-  type: 'service';
+  type: "service";
   // v2.8.87: the `code` IS the SKU of a HardwareProduct row with
   // category: 'service'. The 2 hardcoded legacy codes
   // ('onsite_install_kds', 'training_4h') still resolve via the legacy
@@ -44,7 +44,11 @@ export interface CartItemService {
   notes?: string;
 }
 
-export type CartItem = CartItemPlan | CartItemAddOn | CartItemHardware | CartItemService;
+export type CartItem =
+  | CartItemPlan
+  | CartItemAddOn
+  | CartItemHardware
+  | CartItemService;
 
 export interface Cart {
   items: CartItem[];
@@ -60,7 +64,7 @@ export interface Cart {
 }
 
 export interface PricedLine {
-  type: CartItem['type'];
+  type: CartItem["type"];
   code: string;
   name: string;
   qty: number;
@@ -68,7 +72,7 @@ export interface PricedLine {
   subtotalCents: number;
   // Billed monthly|yearly|oneTime — drives the invoice rendering and the
   // recurring-vs-one-time split.
-  cadence: 'monthly' | 'yearly' | 'oneTime';
+  cadence: "monthly" | "yearly" | "oneTime";
   // Free-form metadata the checkout flow may need to wire up post-payment.
   meta?: Record<string, unknown>;
 }
@@ -80,7 +84,7 @@ export interface CartQuote {
   taxCents: number;
   shippingCents: number;
   totalCents: number;
-  warnings: string[];   // soft warnings — e.g. "addon X requires PRO plan"
+  warnings: string[]; // soft warnings — e.g. "addon X requires PRO plan"
   // True if the cart is purely recurring software (no hardware/service):
   // simplifies the success-page UX.
   isPureRecurring: boolean;

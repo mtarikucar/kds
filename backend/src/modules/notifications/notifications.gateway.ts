@@ -3,22 +3,24 @@ import {
   WebSocketServer,
   OnGatewayConnection,
   OnGatewayDisconnect,
-} from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
-import { Injectable, Logger } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+} from "@nestjs/websockets";
+import { Server, Socket } from "socket.io";
+import { Injectable, Logger } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
 
 @Injectable()
 @WebSocketGateway({
-  namespace: '/notifications',
+  namespace: "/notifications",
   cors: {
     origin: process.env.CORS_ORIGIN
-      ? process.env.CORS_ORIGIN.split(',')
-      : ['http://localhost:5173'],
+      ? process.env.CORS_ORIGIN.split(",")
+      : ["http://localhost:5173"],
     credentials: true,
   },
 })
-export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class NotificationsGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
@@ -29,22 +31,28 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
   async handleConnection(client: Socket) {
     try {
       // Extract JWT token from auth or headers
-      const token = client.handshake.auth.token || client.handshake.headers.authorization?.split(' ')[1];
+      const token =
+        client.handshake.auth.token ||
+        client.handshake.headers.authorization?.split(" ")[1];
 
       if (!token) {
-        this.logger.warn(`Client ${client.id} connection rejected: No token provided`);
+        this.logger.warn(
+          `Client ${client.id} connection rejected: No token provided`,
+        );
         client.disconnect();
         return;
       }
 
       // Verify JWT token
       try {
-        const payload = this.jwtService.verify(token, { algorithms: ['HS256'] });
+        const payload = this.jwtService.verify(token, {
+          algorithms: ["HS256"],
+        });
 
         // Reject non-main-app tokens. Marketing + superadmin realms sign
         // against the same secret; without this check they'd silently join
         // the tenant notification stream. Mirrors kds.gateway.ts:105-110.
-        if (payload.type && payload.type !== 'user') {
+        if (payload.type && payload.type !== "user") {
           this.logger.warn(
             `Notifications JWT rejected for ${client.id}: unsupported token type '${payload.type}'`,
           );
@@ -72,9 +80,9 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
         // broadcastToTenantAcrossBranches() helper (billing/marketing
         // only) — by default every emit is branch-scoped.
         const branchId =
-          typeof client.handshake.auth?.branchId === 'string'
+          typeof client.handshake.auth?.branchId === "string"
             ? client.handshake.auth.branchId
-            : '';
+            : "";
         if (!branchId) {
           this.logger.warn(
             `Notifications JWT rejected for ${client.id}: missing branchId in handshake`,
@@ -95,12 +103,14 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
         // can't keep receiving emits after its JWT becomes invalid. Pure
         // server-push gateway (no @SubscribeMessage handlers) so the
         // expiry timer is the only enforcement point.
-        if (payload.exp && typeof payload.exp === 'number') {
+        if (payload.exp && typeof payload.exp === "number") {
           const msToExpiry = payload.exp * 1000 - Date.now();
           if (msToExpiry > 0 && msToExpiry < 0x7fffffff) {
             setTimeout(() => {
               if (client.connected) {
-                this.logger.log(`Client ${client.id} token expired; disconnecting.`);
+                this.logger.log(
+                  `Client ${client.id} token expired; disconnecting.`,
+                );
                 client.disconnect(true);
               }
             }, msToExpiry).unref?.();
@@ -111,11 +121,15 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
           `Client ${client.id} connected (User: ${userId}, Tenant: ${payload.tenantId})`,
         );
       } catch (error) {
-        this.logger.error(`JWT authentication failed for client ${client.id}: ${error.message}`);
+        this.logger.error(
+          `JWT authentication failed for client ${client.id}: ${error.message}`,
+        );
         client.disconnect();
       }
     } catch (error) {
-      this.logger.error(`Client ${client.id} authentication failed: ${error.message}`);
+      this.logger.error(
+        `Client ${client.id} authentication failed: ${error.message}`,
+      );
       client.disconnect();
     }
   }
@@ -128,8 +142,10 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
    * Send notification to a specific user
    */
   sendNotificationToUser(userId: string, notification: any) {
-    this.server.to(`user:${userId}`).emit('notification', notification);
-    this.logger.log(`Notification sent to user ${userId}: ${notification.title}`);
+    this.server.to(`user:${userId}`).emit("notification", notification);
+    this.logger.log(
+      `Notification sent to user ${userId}: ${notification.title}`,
+    );
   }
 
   /**
@@ -147,7 +163,7 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
   ) {
     this.server
       .to(`tenant:${tenantId}:branch:${branchId}`)
-      .emit('notification', notification);
+      .emit("notification", notification);
     this.logger.log(
       `Notification sent to tenant=${tenantId} branch=${branchId}: ${notification.title}`,
     );
@@ -160,9 +176,7 @@ export class NotificationsGateway implements OnGatewayConnection, OnGatewayDisco
    * tenant-wide bus.
    */
   broadcastToTenantAcrossBranches(tenantId: string, notification: any) {
-    this.server
-      .to(`tenant:${tenantId}`)
-      .emit('notification', notification);
+    this.server.to(`tenant:${tenantId}`).emit("notification", notification);
     this.logger.log(
       `Notification broadcast across tenant ${tenantId}: ${notification.title}`,
     );

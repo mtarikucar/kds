@@ -1,4 +1,4 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiPropertyOptional } from "@nestjs/swagger";
 import {
   IsString,
   IsInt,
@@ -10,8 +10,8 @@ import {
   Matches,
   MaxLength,
   ValidateIf,
-} from 'class-validator';
-import { EmptyStringToNumber } from '../../../common/dto/transforms';
+} from "class-validator";
+import { EmptyStringToNumber } from "../../../common/dto/transforms";
 
 // E.164-ish: 8-15 digits, optional leading +. Mirrors CreateReservationDto
 // so an UPDATE can't smuggle a junk phone into reservation.customerPhone
@@ -27,13 +27,17 @@ export class UpdateReservationDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  @Matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, { message: 'Start time must be in HH:mm format' })
+  @Matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, {
+    message: "Start time must be in HH:mm format",
+  })
   startTime?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  @Matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, { message: 'End time must be in HH:mm format' })
+  @Matches(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, {
+    message: "End time must be in HH:mm format",
+  })
   endTime?: string;
 
   @ApiPropertyOptional()
@@ -52,11 +56,17 @@ export class UpdateReservationDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @ValidateIf((o) => o.customerPhone !== undefined && o.customerPhone !== null && o.customerPhone !== '')
+  @ValidateIf(
+    (o) =>
+      o.customerPhone !== undefined &&
+      o.customerPhone !== null &&
+      o.customerPhone !== "",
+  )
   @IsString()
   @MaxLength(20)
   @Matches(PHONE_REGEX, {
-    message: 'customerPhone must be a valid phone number (8-15 digits, optional leading +)',
+    message:
+      "customerPhone must be a valid phone number (8-15 digits, optional leading +)",
   })
   customerPhone?: string;
 
@@ -86,7 +96,7 @@ export class UpdateReservationDto {
 }
 
 export class RejectReservationDto {
-  @ApiPropertyOptional({ description: 'Reason for rejection' })
+  @ApiPropertyOptional({ description: "Reason for rejection" })
   @IsOptional()
   @IsString()
   rejectionReason?: string;

@@ -286,7 +286,7 @@
     "description": "Modern restoran yönetim platformu. Operasyonları kolaylaştırın, müşterileri memnun edin.",
     "contact": "İletişim",
     "address": "Şehit Osman Avcı Mahallesi, Akın 688 Sitesi B32, Etimesgut / Ankara",
-    "phone": "+90 546 678 04 95",
+    "phone": "+90 850 840 73 03",
     "product": "Ürün",
     "company": "Şirket",
     "support": "Destek",
@@ -502,8 +502,10 @@
     "title": "İletişim",
     "subtitle": "Sorularınız, talepleriniz ve geri bildirimleriniz için bize ulaşın.",
     "backToHome": "Ana Sayfaya Dön",
+    "phone": "+90 850 840 73 03",
     "labels": {
-      "email": "E-posta"
+      "email": "E-posta",
+      "phone": "Telefon"
     },
     "sections": {
       "general": {

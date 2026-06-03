@@ -1,27 +1,27 @@
-import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { DeliveryPlatformConfig } from '@prisma/client';
-import { DeliveryPlatform } from '../constants/platform.enum';
+import { Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import { DeliveryPlatformConfig } from "@prisma/client";
+import { DeliveryPlatform } from "../constants/platform.enum";
 import {
   AuthResult,
   MenuSyncItem,
   PlatformAdapter,
-} from '../interfaces/platform-adapter.interface';
-import { NormalizedOrder } from '../interfaces/platform-order.interface';
-import { BaseAdapter } from './base.adapter';
+} from "../interfaces/platform-adapter.interface";
+import { NormalizedOrder } from "../interfaces/platform-order.interface";
+import { BaseAdapter } from "./base.adapter";
 
 @Injectable()
 export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
   constructor(private configService: ConfigService) {
-    super('GetirAdapter', 'https://food-external-api.getir.com');
-    this.overrideBaseURL(this.configService.get<string>('GETIR_API_BASE_URL'));
+    super("GetirAdapter", "https://food-external-api.getir.com");
+    this.overrideBaseURL(this.configService.get<string>("GETIR_API_BASE_URL"));
   }
 
   async authenticate(config: DeliveryPlatformConfig): Promise<AuthResult> {
     const credentials = config.credentials as any;
     const response = await this.request({
-      method: 'POST',
-      url: '/auth/login',
+      method: "POST",
+      url: "/auth/login",
       data: {
         appSecretKey: credentials.appSecretKey,
         restaurantSecretKey: credentials.restaurantSecretKey,
@@ -40,7 +40,7 @@ export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
     externalOrderId: string,
   ): Promise<void> {
     await this.request({
-      method: 'POST',
+      method: "POST",
       url: `/food-orders/${externalOrderId}/verify`,
       headers: this.getAuthHeaders(config.accessToken!),
     });
@@ -52,10 +52,10 @@ export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
     reason?: string,
   ): Promise<void> {
     await this.request({
-      method: 'POST',
+      method: "POST",
       url: `/food-orders/${externalOrderId}/cancel`,
       headers: this.getAuthHeaders(config.accessToken!),
-      data: { rejectReason: reason || 'Restaurant rejected the order' },
+      data: { rejectReason: reason || "Restaurant rejected the order" },
     });
   }
 
@@ -64,7 +64,7 @@ export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
     externalOrderId: string,
   ): Promise<void> {
     await this.request({
-      method: 'POST',
+      method: "POST",
       url: `/food-orders/${externalOrderId}/prepare`,
       headers: this.getAuthHeaders(config.accessToken!),
     });
@@ -75,7 +75,7 @@ export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
     externalOrderId: string,
   ): Promise<void> {
     await this.request({
-      method: 'POST',
+      method: "POST",
       url: `/food-orders/${externalOrderId}/handover`,
       headers: this.getAuthHeaders(config.accessToken!),
     });
@@ -86,7 +86,9 @@ export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
     externalOrderId: string,
   ): Promise<void> {
     // Getir handles pickup via courier - handover is the final status we send
-    this.logger.log(`Order ${externalOrderId} picked up (no separate Getir API call needed)`);
+    this.logger.log(
+      `Order ${externalOrderId} picked up (no separate Getir API call needed)`,
+    );
   }
 
   async cancelOrder(
@@ -95,10 +97,10 @@ export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
     reason?: string,
   ): Promise<void> {
     await this.request({
-      method: 'POST',
+      method: "POST",
       url: `/food-orders/${externalOrderId}/cancel`,
       headers: this.getAuthHeaders(config.accessToken!),
-      data: { cancelReason: reason || 'Restaurant cancelled the order' },
+      data: { cancelReason: reason || "Restaurant cancelled the order" },
     });
   }
 
@@ -106,8 +108,8 @@ export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
     config: DeliveryPlatformConfig,
   ): Promise<NormalizedOrder[]> {
     const response = await this.request({
-      method: 'POST',
-      url: '/food-orders/periodic/unapproved',
+      method: "POST",
+      url: "/food-orders/periodic/unapproved",
       headers: this.getAuthHeaders(config.accessToken!),
     });
 
@@ -121,7 +123,7 @@ export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
     available: boolean,
   ): Promise<void> {
     await this.request({
-      method: 'PUT',
+      method: "PUT",
       url: `/food-products/${externalItemId}/status`,
       headers: this.getAuthHeaders(config.accessToken!),
       data: { isActive: available },
@@ -130,8 +132,8 @@ export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
 
   async openRestaurant(config: DeliveryPlatformConfig): Promise<void> {
     await this.request({
-      method: 'PUT',
-      url: '/restaurants/status',
+      method: "PUT",
+      url: "/restaurants/status",
       headers: this.getAuthHeaders(config.accessToken!),
       data: { isOpen: true },
     });
@@ -139,8 +141,8 @@ export class GetirAdapter extends BaseAdapter implements PlatformAdapter {
 
   async closeRestaurant(config: DeliveryPlatformConfig): Promise<void> {
     await this.request({
-      method: 'PUT',
-      url: '/restaurants/status',
+      method: "PUT",
+      url: "/restaurants/status",
       headers: this.getAuthHeaders(config.accessToken!),
       data: { isOpen: false },
     });

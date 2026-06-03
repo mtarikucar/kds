@@ -1,4 +1,9 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+} from "crypto";
 
 /**
  * AES-256-GCM envelope encryption for sensitive at-rest data (delivery
@@ -21,9 +26,12 @@ export interface EncryptedPayload {
  * programmer bugs without swallowing everything as `Error`.
  */
 export class DecryptionError extends Error {
-  constructor(message: string, public readonly cause?: unknown) {
+  constructor(
+    message: string,
+    public readonly cause?: unknown,
+  ) {
     super(message);
-    this.name = 'DecryptionError';
+    this.name = "DecryptionError";
   }
 }
 
@@ -31,25 +39,25 @@ function requireMasterKey(): Buffer {
   const raw = process.env.ENCRYPTION_MASTER_KEY;
   if (!raw) {
     throw new Error(
-      'ENCRYPTION_MASTER_KEY is not configured — cannot encrypt/decrypt secrets',
+      "ENCRYPTION_MASTER_KEY is not configured — cannot encrypt/decrypt secrets",
     );
   }
   if (raw.length < 32) {
-    throw new Error('ENCRYPTION_MASTER_KEY must be at least 32 chars');
+    throw new Error("ENCRYPTION_MASTER_KEY must be at least 32 chars");
   }
-  return createHash('sha256').update(raw, 'utf8').digest();
+  return createHash("sha256").update(raw, "utf8").digest();
 }
 
 export function encryptJson(value: unknown): EncryptedPayload {
   const key = requireMasterKey();
   const iv = randomBytes(12); // GCM standard nonce size
-  const cipher = createCipheriv('aes-256-gcm', key, iv);
-  const plaintext = Buffer.from(JSON.stringify(value), 'utf8');
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const plaintext = Buffer.from(JSON.stringify(value), "utf8");
   const encrypted = Buffer.concat([cipher.update(plaintext), cipher.final()]);
   return {
-    ciphertext: encrypted.toString('base64url'),
-    iv: iv.toString('base64url'),
-    authTag: cipher.getAuthTag().toString('base64url'),
+    ciphertext: encrypted.toString("base64url"),
+    iv: iv.toString("base64url"),
+    authTag: cipher.getAuthTag().toString("base64url"),
   };
 }
 
@@ -65,39 +73,33 @@ export function decryptJson<T = unknown>(payload: EncryptedPayload): T {
   //   a raw crypto stack trace.
   let plaintext: Buffer;
   try {
-    const iv = Buffer.from(payload.iv, 'base64url');
-    const authTag = Buffer.from(payload.authTag, 'base64url');
-    const ciphertext = Buffer.from(payload.ciphertext, 'base64url');
-    const decipher = createDecipheriv('aes-256-gcm', key, iv);
+    const iv = Buffer.from(payload.iv, "base64url");
+    const authTag = Buffer.from(payload.authTag, "base64url");
+    const ciphertext = Buffer.from(payload.ciphertext, "base64url");
+    const decipher = createDecipheriv("aes-256-gcm", key, iv);
     decipher.setAuthTag(authTag);
-    plaintext = Buffer.concat([
-      decipher.update(ciphertext),
-      decipher.final(),
-    ]);
+    plaintext = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
   } catch (cause) {
     throw new DecryptionError(
-      'Failed to decrypt payload (corrupted ciphertext, wrong key, or tampered auth tag)',
+      "Failed to decrypt payload (corrupted ciphertext, wrong key, or tampered auth tag)",
       cause,
     );
   }
 
   try {
-    return JSON.parse(plaintext.toString('utf8')) as T;
+    return JSON.parse(plaintext.toString("utf8")) as T;
   } catch (cause) {
-    throw new DecryptionError(
-      'Decrypted payload is not valid JSON',
-      cause,
-    );
+    throw new DecryptionError("Decrypted payload is not valid JSON", cause);
   }
 }
 
 export function isEncryptedPayload(value: unknown): value is EncryptedPayload {
   return (
     !!value &&
-    typeof value === 'object' &&
-    typeof (value as any).ciphertext === 'string' &&
-    typeof (value as any).iv === 'string' &&
-    typeof (value as any).authTag === 'string'
+    typeof value === "object" &&
+    typeof (value as any).ciphertext === "string" &&
+    typeof (value as any).iv === "string" &&
+    typeof (value as any).authTag === "string"
   );
 }
 
@@ -109,13 +111,13 @@ export function encryptString(value: string): string {
 }
 
 export function decryptString(blob: string): string {
-  if (!blob.startsWith('v1:')) {
+  if (!blob.startsWith("v1:")) {
     // Legacy plaintext — accept during migration but flag once per process
     // so the operator notices unencrypted rows still in the DB.
     warnPlaintextFallback();
     return blob;
   }
-  const parts = blob.split(':');
+  const parts = blob.split(":");
   if (parts.length !== 4) {
     // Defensive: a malformed `v1:` blob would otherwise feed undefined values
     // into Buffer.from() and surface as a cryptic crypto stack trace.
@@ -133,7 +135,7 @@ function warnPlaintextFallback() {
   _plaintextWarned = true;
   // eslint-disable-next-line no-console
   console.warn(
-    '[encryption] decryptString received unencrypted legacy plaintext — ' +
-      're-encrypt those rows before disabling the fallback.',
+    "[encryption] decryptString received unencrypted legacy plaintext — " +
+      "re-encrypt those rows before disabling the fallback.",
   );
 }

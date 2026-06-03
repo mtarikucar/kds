@@ -1,15 +1,34 @@
-import { IsString, IsOptional, IsEnum, IsArray, ValidateNested, IsNumber, IsInt, Min, Max, ArrayMinSize, ArrayMaxSize, MaxLength, IsUUID } from 'class-validator';
-import { Type } from 'class-transformer';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { OrderType } from '../../../common/constants/order-status.enum';
-import { EmptyStringToNumber } from '../../../common/dto/transforms';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsArray,
+  ValidateNested,
+  IsNumber,
+  IsInt,
+  Min,
+  Max,
+  ArrayMinSize,
+  ArrayMaxSize,
+  MaxLength,
+  IsUUID,
+} from "class-validator";
+import { Type } from "class-transformer";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { OrderType } from "../../../common/constants/order-status.enum";
+import { EmptyStringToNumber } from "../../../common/dto/transforms";
 
 export class OrderItemModifierDto {
-  @ApiProperty({ description: 'Modifier ID' })
+  @ApiProperty({ description: "Modifier ID" })
   @IsString()
   modifierId: string;
 
-  @ApiProperty({ description: 'Quantity of modifier', minimum: 1, maximum: 20, default: 1 })
+  @ApiProperty({
+    description: "Quantity of modifier",
+    minimum: 1,
+    maximum: 20,
+    default: 1,
+  })
   @IsInt()
   @Min(1)
   @Max(20)
@@ -17,23 +36,26 @@ export class OrderItemModifierDto {
 }
 
 export class CreateOrderItemDto {
-  @ApiProperty({ description: 'Product ID' })
+  @ApiProperty({ description: "Product ID" })
   @IsString()
   productId: string;
 
-  @ApiProperty({ description: 'Quantity', minimum: 1, maximum: 9999 })
+  @ApiProperty({ description: "Quantity", minimum: 1, maximum: 9999 })
   @IsNumber()
   @Min(1)
   @Max(9999)
   quantity: number;
 
-  @ApiPropertyOptional({ description: 'Special notes for this item' })
+  @ApiPropertyOptional({ description: "Special notes for this item" })
   @IsString()
   @MaxLength(500)
   @IsOptional()
   notes?: string;
 
-  @ApiPropertyOptional({ type: [OrderItemModifierDto], description: 'Selected modifiers for this item' })
+  @ApiPropertyOptional({
+    type: [OrderItemModifierDto],
+    description: "Selected modifiers for this item",
+  })
   @IsArray()
   @ArrayMaxSize(20)
   @ValidateNested({ each: true })
@@ -43,34 +65,34 @@ export class CreateOrderItemDto {
 }
 
 export class CreateOrderDto {
-  @ApiProperty({ enum: OrderType, description: 'Order type' })
+  @ApiProperty({ enum: OrderType, description: "Order type" })
   @IsEnum(OrderType)
   type: OrderType;
 
-  @ApiPropertyOptional({ description: 'Table ID for dine-in orders' })
+  @ApiPropertyOptional({ description: "Table ID for dine-in orders" })
   @IsString()
   @IsOptional()
   tableId?: string;
 
-  @ApiPropertyOptional({ description: 'Customer name' })
+  @ApiPropertyOptional({ description: "Customer name" })
   @IsString()
   @IsOptional()
   customerName?: string;
 
-  @ApiPropertyOptional({ description: 'Order notes' })
+  @ApiPropertyOptional({ description: "Order notes" })
   @IsString()
   @MaxLength(1000)
   @IsOptional()
   notes?: string;
 
-  @ApiPropertyOptional({ description: 'Discount amount', minimum: 0 })
+  @ApiPropertyOptional({ description: "Discount amount", minimum: 0 })
   @EmptyStringToNumber()
   @IsNumber()
   @Min(0)
   @IsOptional()
   discount?: number;
 
-  @ApiProperty({ type: [CreateOrderItemDto], description: 'Order items' })
+  @ApiProperty({ type: [CreateOrderItemDto], description: "Order items" })
   @IsArray()
   @ArrayMinSize(1)
   @ArrayMaxSize(100)
@@ -85,7 +107,7 @@ export class CreateOrderDto {
    * of creating a duplicate. Optional: legacy callers without one
    * still succeed (just without the dedup guarantee).
    */
-  @ApiPropertyOptional({ description: 'Client UUID for retry deduplication' })
+  @ApiPropertyOptional({ description: "Client UUID for retry deduplication" })
   @IsUUID()
   @IsOptional()
   idempotencyKey?: string;

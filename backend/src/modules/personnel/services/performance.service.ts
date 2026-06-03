@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { PerformanceQueryDto } from '../dto/performance-query.dto';
+import { Injectable } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { PerformanceQueryDto } from "../dto/performance-query.dto";
 
 @Injectable()
 export class PerformanceService {
@@ -9,13 +9,15 @@ export class PerformanceService {
 
   async getEnhancedMetrics(tenantId: string, query: PerformanceQueryDto) {
     const now = new Date();
-    const startDate = query.startDate ? new Date(query.startDate) : new Date(now.getFullYear(), now.getMonth(), 1);
+    const startDate = query.startDate
+      ? new Date(query.startDate)
+      : new Date(now.getFullYear(), now.getMonth(), 1);
     const endDate = query.endDate ? new Date(query.endDate) : now;
 
     const where: any = {
       tenantId,
       createdAt: { gte: startDate, lte: endDate },
-      status: { in: ['READY', 'SERVED', 'PAID'] },
+      status: { in: ["READY", "SERVED", "PAID"] },
     };
     if (query.userId) where.userId = query.userId;
 
@@ -25,7 +27,9 @@ export class PerformanceService {
       select: {
         id: true,
         userId: true,
-        user: { select: { id: true, firstName: true, lastName: true, role: true } },
+        user: {
+          select: { id: true, firstName: true, lastName: true, role: true },
+        },
         finalAmount: true,
         createdAt: true,
         updatedAt: true,
@@ -40,17 +44,22 @@ export class PerformanceService {
       where: {
         tenantId,
         date: { gte: startDate, lte: endDate },
-        status: 'CLOCKED_OUT',
+        status: "CLOCKED_OUT",
         ...(query.userId ? { userId: query.userId } : {}),
       },
       include: {
-        user: { select: { id: true, firstName: true, lastName: true, role: true } },
+        user: {
+          select: { id: true, firstName: true, lastName: true, role: true },
+        },
       },
     });
 
     // Build attendance hours map and user info map
     const hoursMap = new Map<string, number>();
-    const attendanceUserMap = new Map<string, { id: string; firstName: string; lastName: string; role: string }>();
+    const attendanceUserMap = new Map<
+      string,
+      { id: string; firstName: string; lastName: string; role: string }
+    >();
     for (const a of attendances) {
       const current = hoursMap.get(a.userId) || 0;
       hoursMap.set(a.userId, current + a.totalWorkedMinutes / 60);
@@ -91,9 +100,15 @@ export class PerformanceService {
         let totalPrepTime = 0;
         for (const o of userOrdersList) {
           if (o.preparingAt && o.readyAt) {
-            totalPrepTime += (new Date(o.readyAt).getTime() - new Date(o.preparingAt).getTime()) / 60000;
+            totalPrepTime +=
+              (new Date(o.readyAt).getTime() -
+                new Date(o.preparingAt).getTime()) /
+              60000;
           } else {
-            totalPrepTime += (new Date(o.updatedAt).getTime() - new Date(o.createdAt).getTime()) / 60000;
+            totalPrepTime +=
+              (new Date(o.updatedAt).getTime() -
+                new Date(o.createdAt).getTime()) /
+              60000;
           }
         }
         avgPrepTime = totalPrepTime / totalOrders;
@@ -104,15 +119,27 @@ export class PerformanceService {
 
       // Performance score: 40% speed + 30% volume + 30% revenue
       // Normalized against reasonable targets
-      const speedScore = Math.min(100, avgPrepTime > 0 ? (15 / avgPrepTime) * 100 : 0);
+      const speedScore = Math.min(
+        100,
+        avgPrepTime > 0 ? (15 / avgPrepTime) * 100 : 0,
+      );
       const volumeScore = Math.min(100, ordersPerHour * 10);
-      const revenueScore = Math.min(100, (totalSales / Math.max(1, totalOrders)) / 2);
+      const revenueScore = Math.min(
+        100,
+        totalSales / Math.max(1, totalOrders) / 2,
+      );
 
       const performanceScore = Math.round(
         speedScore * 0.4 + volumeScore * 0.3 + revenueScore * 0.3,
       );
 
-      const user = userOrdersList[0]?.user || attendanceUserMap.get(userId) || { id: userId, firstName: 'Unknown', lastName: '', role: '' };
+      const user = userOrdersList[0]?.user ||
+        attendanceUserMap.get(userId) || {
+          id: userId,
+          firstName: "Unknown",
+          lastName: "",
+          role: "",
+        };
 
       metrics.push({
         user,
@@ -132,13 +159,33 @@ export class PerformanceService {
   async getTrends(tenantId: string, query: PerformanceQueryDto) {
     const now = new Date();
     const months = 6;
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthNames = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
 
     // Build all month ranges
     const monthRanges = Array.from({ length: months }, (_, idx) => {
       const i = months - 1 - idx;
       const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59);
+      const monthEnd = new Date(
+        now.getFullYear(),
+        now.getMonth() - i + 1,
+        0,
+        23,
+        59,
+        59,
+      );
       return { monthStart, monthEnd };
     });
 
@@ -148,14 +195,14 @@ export class PerformanceService {
         const orderWhere: any = {
           tenantId,
           createdAt: { gte: monthStart, lte: monthEnd },
-          status: { in: ['READY', 'SERVED', 'PAID'] },
+          status: { in: ["READY", "SERVED", "PAID"] },
         };
         if (query.userId) orderWhere.userId = query.userId;
 
         const attendanceWhere: any = {
           tenantId,
           date: { gte: monthStart, lte: monthEnd },
-          status: 'CLOCKED_OUT',
+          status: "CLOCKED_OUT",
         };
         if (query.userId) attendanceWhere.userId = query.userId;
 
@@ -181,7 +228,10 @@ export class PerformanceService {
           totalSales: Number(orderAgg._sum.finalAmount || 0),
           avgOrderValue: Number(orderAgg._avg.finalAmount || 0),
           totalHours: Math.round(totalHours * 10) / 10,
-          ordersPerHour: totalHours > 0 ? Math.round((orderCount / totalHours) * 10) / 10 : 0,
+          ordersPerHour:
+            totalHours > 0
+              ? Math.round((orderCount / totalHours) * 10) / 10
+              : 0,
         };
       }),
     );

@@ -92,8 +92,12 @@ describe('PaymentsService — receipt snapshot persistence', () => {
     (prisma.pendingSelfPayment.findMany as any).mockResolvedValue([]);
 
     // Lightweight tenant pre-check via OrdersService.
+    // v3.0.0 — payments.service now calls `findOneByTenant` for the
+    // internal tenant-isolation pre-check (HTTP path uses `findOne(scope, id)`).
+    // Both are stubbed so this spec is robust against either path.
     const ordersServiceMock = {
       findOne: jest.fn().mockResolvedValue(baseOrder),
+      findOneByTenant: jest.fn().mockResolvedValue(baseOrder),
     };
 
     const customersServiceMock = {

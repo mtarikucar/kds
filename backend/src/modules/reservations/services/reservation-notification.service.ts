@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { EmailService } from '../../../common/services/email.service';
-import { SmsNotificationService } from '../../sms-settings/sms-notification.service';
-import { SmsSettingsService } from '../../sms-settings/sms-settings.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { EmailService } from "../../../common/services/email.service";
+import { SmsNotificationService } from "../../sms-settings/sms-notification.service";
+import { SmsSettingsService } from "../../sms-settings/sms-settings.service";
 
 /**
  * Channel-aware customer notification for reservation lifecycle events.
@@ -18,7 +18,11 @@ import { SmsSettingsService } from '../../sms-settings/sms-settings.service';
  * That keeps SMS gating (per-event toggles + tenant `isEnabled` switch)
  * in one place.
  */
-export type ReservationEvent = 'created' | 'confirmed' | 'rejected' | 'cancelled';
+export type ReservationEvent =
+  | "created"
+  | "confirmed"
+  | "rejected"
+  | "cancelled";
 
 export interface ReservationNotificationCtx {
   customerName: string;
@@ -31,10 +35,10 @@ export interface ReservationNotificationCtx {
 }
 
 const EMAIL_SUBJECTS: Record<ReservationEvent, string> = {
-  created: 'Rezervasyonunuz Alındı',
-  confirmed: 'Rezervasyonunuz Onaylandı',
-  rejected: 'Rezervasyonunuz Reddedildi',
-  cancelled: 'Rezervasyonunuz İptal Edildi',
+  created: "Rezervasyonunuz Alındı",
+  confirmed: "Rezervasyonunuz Onaylandı",
+  rejected: "Rezervasyonunuz Reddedildi",
+  cancelled: "Rezervasyonunuz İptal Edildi",
 };
 
 @Injectable()
@@ -106,17 +110,29 @@ export class ReservationNotificationService {
     };
 
     switch (event) {
-      case 'created':
-        await this.smsNotificationService.notifyReservationCreated(tenantId, data);
+      case "created":
+        await this.smsNotificationService.notifyReservationCreated(
+          tenantId,
+          data,
+        );
         return;
-      case 'confirmed':
-        await this.smsNotificationService.notifyReservationConfirmed(tenantId, data);
+      case "confirmed":
+        await this.smsNotificationService.notifyReservationConfirmed(
+          tenantId,
+          data,
+        );
         return;
-      case 'rejected':
-        await this.smsNotificationService.notifyReservationRejected(tenantId, data);
+      case "rejected":
+        await this.smsNotificationService.notifyReservationRejected(
+          tenantId,
+          data,
+        );
         return;
-      case 'cancelled':
-        await this.smsNotificationService.notifyReservationCancelled(tenantId, data);
+      case "cancelled":
+        await this.smsNotificationService.notifyReservationCancelled(
+          tenantId,
+          data,
+        );
         return;
     }
   }

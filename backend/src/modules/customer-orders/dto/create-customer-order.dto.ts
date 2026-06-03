@@ -15,11 +15,14 @@ import {
   Matches,
   ArrayMinSize,
   ArrayMaxSize,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { OrderType } from '../../../common/constants/order-status.enum';
-import { EmptyStringToNumber, EmptyStringToUndefined } from '../../../common/dto/transforms';
+} from "class-validator";
+import { Type } from "class-transformer";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { OrderType } from "../../../common/constants/order-status.enum";
+import {
+  EmptyStringToNumber,
+  EmptyStringToUndefined,
+} from "../../../common/dto/transforms";
 
 const PHONE_REGEX = /^\+?[1-9]\d{7,14}$/;
 
@@ -31,7 +34,7 @@ const PHONE_REGEX = /^\+?[1-9]\d{7,14}$/;
 const SESSION_ID_REGEX = /^[0-9a-f]{64}$/;
 
 export class OrderItemModifierDto {
-  @ApiProperty({ example: 'uuid-of-modifier' })
+  @ApiProperty({ example: "uuid-of-modifier" })
   @IsUUID()
   modifierId: string;
 
@@ -43,7 +46,7 @@ export class OrderItemModifierDto {
 }
 
 export class CreateOrderItemDto {
-  @ApiProperty({ example: 'uuid-of-product' })
+  @ApiProperty({ example: "uuid-of-product" })
   @IsUUID()
   productId: string;
 
@@ -56,7 +59,7 @@ export class CreateOrderItemDto {
   @Max(99)
   quantity: number;
 
-  @ApiProperty({ example: 'No onions, extra sauce', required: false })
+  @ApiProperty({ example: "No onions, extra sauce", required: false })
   @IsString()
   @IsOptional()
   @MaxLength(500)
@@ -72,7 +75,10 @@ export class CreateOrderItemDto {
 }
 
 export class CreateCustomerOrderDto {
-  @ApiPropertyOptional({ example: 'uuid-of-table', description: 'Optional for COUNTER orders (tableless mode)' })
+  @ApiPropertyOptional({
+    example: "uuid-of-table",
+    description: "Optional for COUNTER orders (tableless mode)",
+  })
   @IsOptional()
   @IsUUID()
   tableId?: string;
@@ -85,7 +91,9 @@ export class CreateCustomerOrderDto {
   @ApiProperty()
   @IsString()
   @Length(64, 64)
-  @Matches(SESSION_ID_REGEX, { message: 'sessionId must be a 64-char lower-hex string' })
+  @Matches(SESSION_ID_REGEX, {
+    message: "sessionId must be a 64-char lower-hex string",
+  })
   sessionId: string;
 
   @ApiProperty({ required: false })

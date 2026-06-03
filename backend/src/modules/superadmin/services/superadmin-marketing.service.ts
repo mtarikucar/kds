@@ -37,6 +37,33 @@ export class SuperAdminMarketingService {
 
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * Step-F decoupling: the Commission→Tenant FK was dropped, so we can no longer
+   * `include: { tenant }`. SuperAdmin is a core-admin tool and may read Tenant
+   * directly, so we batch-load tenants by the soft `tenantId` reference and
+   * attach them — preserving the `.tenant` shape callers/CSV expect.
+   */
+  private async attachTenants<T extends { tenantId: string | null }>(
+    rows: T[],
+  ): Promise<
+    (T & { tenant: { id: string; name: string; subdomain: string } | null })[]
+  > {
+    const ids = [
+      ...new Set(rows.map((r) => r.tenantId).filter((x): x is string => !!x)),
+    ];
+    const tenants = ids.length
+      ? await this.prisma.tenant.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, name: true, subdomain: true },
+        })
+      : [];
+    const byId = new Map(tenants.map((t) => [t.id, t]));
+    return rows.map((r) => ({
+      ...r,
+      tenant: r.tenantId ? (byId.get(r.tenantId) ?? null) : null,
+    }));
+  }
+
   // ---------- Marketers ----------
 
   // Platform-wide marketer list with lifetime aggregates. We do the
@@ -180,9 +207,6 @@ export class SuperAdminMarketingService {
           where: { marketingUserId: id },
           orderBy: { createdAt: "desc" },
           take: 10,
-          include: {
-            tenant: { select: { id: true, name: true } },
-          },
         }),
         this.prisma.commission.groupBy({
           by: ["status"],
@@ -195,7 +219,7 @@ export class SuperAdminMarketingService {
     return {
       ...marketer,
       recentLeads,
-      recentCommissions,
+      recentCommissions: await this.attachTenants(recentCommissions),
       commissionTotals: commissionAggregate.reduce(
         (acc, row) => {
           acc[row.status] = {
@@ -317,7 +341,6 @@ export class SuperAdminMarketingService {
               referralCode: true,
             },
           },
-          tenant: { select: { id: true, name: true, subdomain: true } },
           lead: { select: { id: true, businessName: true, source: true } },
         },
       }),
@@ -330,7 +353,7 @@ export class SuperAdminMarketingService {
     ]);
 
     return {
-      data: rows,
+      data: await this.attachTenants(rows),
       meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
       summary: {
         totalAmount: summary._sum.amount ?? 0,
@@ -449,7 +472,6 @@ export class SuperAdminMarketingService {
             referralCode: true,
           },
         },
-        tenant: { select: { name: true, subdomain: true } },
         lead: { select: { businessName: true, source: true } },
       },
     });
@@ -471,7 +493,7 @@ export class SuperAdminMarketingService {
       "paidAt",
     ].join(",");
 
-    const body = rows
+    const body = (await this.attachTenants(rows))
       .map((r) => {
         const marketerName = r.marketingUser
           ? `${r.marketingUser.firstName} ${r.marketingUser.lastName}`

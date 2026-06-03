@@ -10,22 +10,22 @@ import {
   RawBodyRequest,
   Req,
   UseGuards,
-} from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
-import { Request } from 'express';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '../../common/constants/roles.enum';
-import { PlanFeatureGuard } from '../subscriptions/guards/plan-feature.guard';
-import { RequiresIntegration } from '../subscriptions/decorators/requires-integration.decorator';
-import { Public } from '../auth/decorators/public.decorator';
-import { CallerService } from './caller.service';
-import { MockCallerProvider } from './adapters/mock-caller.provider';
+} from "@nestjs/common";
+import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
+import { Request } from "express";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { UserRole } from "../../common/constants/roles.enum";
+import { PlanFeatureGuard } from "../subscriptions/guards/plan-feature.guard";
+import { RequiresIntegration } from "../subscriptions/decorators/requires-integration.decorator";
+import { Public } from "../auth/decorators/public.decorator";
+import { CallerService } from "./caller.service";
+import { MockCallerProvider } from "./adapters/mock-caller.provider";
 
-@ApiTags('Caller')
-@Controller('v1/caller')
+@ApiTags("Caller")
+@Controller("v1/caller")
 export class CallerController {
   constructor(
     private readonly caller: CallerService,
@@ -41,12 +41,17 @@ export class CallerController {
   // below stays @Public (it's HMAC-signed by the adapter).
   @UseGuards(JwtAuthGuard, RolesGuard, PlanFeatureGuard)
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @RequiresIntegration('caller')
+  @RequiresIntegration("caller")
   @ApiBearerAuth()
-  @Get('recent')
-  @ApiOperation({ summary: 'Last N caller events for the tenant — drives the calls feed UI' })
-  recent(@Req() req: any, @Query('limit') limit?: string) {
-    return this.caller.listRecent(req.user.tenantId, limit ? parseInt(limit, 10) : 50);
+  @Get("recent")
+  @ApiOperation({
+    summary: "Last N caller events for the tenant — drives the calls feed UI",
+  })
+  recent(@Req() req: any, @Query("limit") limit?: string) {
+    return this.caller.listRecent(
+      req.user.tenantId,
+      limit ? parseInt(limit, 10) : 50,
+    );
   }
 
   // Webhook receiver. Path includes the provider so we route to the right
@@ -74,20 +79,22 @@ export class CallerController {
   // the busiest real-call rate while killing any practical brute-force.
   @Public()
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
-  @Post('webhooks/:providerId/:tenantId')
-  @ApiOperation({ summary: 'Provider-side webhook ingest. Signature verified by the adapter.' })
+  @Post("webhooks/:providerId/:tenantId")
+  @ApiOperation({
+    summary: "Provider-side webhook ingest. Signature verified by the adapter.",
+  })
   async webhook(
-    @Param('providerId') providerId: string,
-    @Param('tenantId') tenantId: string,
-    @Headers('x-signature') signature: string,
+    @Param("providerId") providerId: string,
+    @Param("tenantId") tenantId: string,
+    @Headers("x-signature") signature: string,
     @Req() req: RawBodyRequest<Request>,
   ) {
     const raw = req.rawBody ?? Buffer.from(JSON.stringify(req.body ?? {}));
     let events: any[] = [];
-    if (providerId === 'mock') {
-      if (process.env.NODE_ENV === 'production') {
+    if (providerId === "mock") {
+      if (process.env.NODE_ENV === "production") {
         throw new ForbiddenException(
-          'Mock caller webhook is disabled in production.',
+          "Mock caller webhook is disabled in production.",
         );
       }
       events = await this.mockProvider.parseWebhook(signature, raw);

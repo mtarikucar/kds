@@ -1,4 +1,4 @@
-import { timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual } from "node:crypto";
 
 /**
  * Constant-time HMAC-hex comparison used by every signed-webhook adapter.
@@ -22,9 +22,15 @@ import { timingSafeEqual } from 'node:crypto';
  * configuration errors (missing secret) — adapters handle the boolean
  * result themselves.
  */
-export function verifyHmacHex(expectedHex: string, providedHex: string): boolean {
+export function verifyHmacHex(
+  expectedHex: string,
+  providedHex: string,
+): boolean {
   // Strip any "sha256=" prefix some providers wrap around the hex.
-  const provided = providedHex.replace(/^sha256=/i, '').trim().toLowerCase();
+  const provided = providedHex
+    .replace(/^sha256=/i, "")
+    .trim()
+    .toLowerCase();
   const expected = expectedHex.trim().toLowerCase();
 
   // Hex sanity: every char must be 0-9a-f and the length must be even.
@@ -34,8 +40,8 @@ export function verifyHmacHex(expectedHex: string, providedHex: string): boolean
   if (provided.length !== expected.length) {
     // Constant-time mismatch: spend roughly the same time as a real
     // compare so the rejection path doesn't leak length info.
-    const a = Buffer.from(expected, 'hex');
-    const b = Buffer.alloc(a.byteLength);  // zero buffer of same size
+    const a = Buffer.from(expected, "hex");
+    const b = Buffer.alloc(a.byteLength); // zero buffer of same size
     try {
       timingSafeEqual(a, b);
     } catch {
@@ -44,8 +50,8 @@ export function verifyHmacHex(expectedHex: string, providedHex: string): boolean
     return false;
   }
 
-  const a = Buffer.from(expected, 'hex');
-  const b = Buffer.from(provided, 'hex');
+  const a = Buffer.from(expected, "hex");
+  const b = Buffer.from(provided, "hex");
   if (a.byteLength !== b.byteLength) return false;
   return timingSafeEqual(a, b);
 }

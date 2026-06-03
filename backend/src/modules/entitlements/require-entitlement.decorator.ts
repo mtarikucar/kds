@@ -1,6 +1,6 @@
-import { SetMetadata } from '@nestjs/common';
+import { SetMetadata } from "@nestjs/common";
 
-export const REQUIRE_ENTITLEMENT_KEY = 'requireEntitlement';
+export const REQUIRE_ENTITLEMENT_KEY = "requireEntitlement";
 
 /**
  * One declarative way to gate a route on the entitlement engine.

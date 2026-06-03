@@ -1,14 +1,26 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException, Logger } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { REQUIRED_PLANS_KEY } from '../decorators/requires-plan.decorator';
-import { REQUIRED_FEATURES_KEY } from '../decorators/requires-feature.decorator';
-import { REQUIRED_INTEGRATIONS_KEY } from '../decorators/requires-integration.decorator';
-import { CHECK_LIMIT_KEY, LimitType } from '../decorators/check-limit.decorator';
-import { IS_PUBLIC_KEY } from '../../auth/decorators/public.decorator';
-import { SubscriptionPlanType, PlanFeature } from '../../../common/constants/subscription.enum';
-import { isUnlimited } from '../../../common/constants/subscription-plans.const';
-import { EntitlementService } from '../../entitlements/entitlement.service';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Logger,
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { REQUIRED_PLANS_KEY } from "../decorators/requires-plan.decorator";
+import { REQUIRED_FEATURES_KEY } from "../decorators/requires-feature.decorator";
+import { REQUIRED_INTEGRATIONS_KEY } from "../decorators/requires-integration.decorator";
+import {
+  CHECK_LIMIT_KEY,
+  LimitType,
+} from "../decorators/check-limit.decorator";
+import { IS_PUBLIC_KEY } from "../../auth/decorators/public.decorator";
+import {
+  SubscriptionPlanType,
+  PlanFeature,
+} from "../../../common/constants/subscription.enum";
+import { isUnlimited } from "../../../common/constants/subscription-plans.const";
+import { EntitlementService } from "../../entitlements/entitlement.service";
 
 @Injectable()
 export class PlanFeatureGuard implements CanActivate {
@@ -40,20 +52,21 @@ export class PlanFeatureGuard implements CanActivate {
     const user = request.user;
 
     if (!user || !user.tenantId) {
-      throw new ForbiddenException('User not authenticated or tenant not found');
+      throw new ForbiddenException(
+        "User not authenticated or tenant not found",
+      );
     }
 
     // Get required plans
-    const requiredPlans = this.reflector.getAllAndOverride<SubscriptionPlanType[]>(REQUIRED_PLANS_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requiredPlans = this.reflector.getAllAndOverride<
+      SubscriptionPlanType[]
+    >(REQUIRED_PLANS_KEY, [context.getHandler(), context.getClass()]);
 
     // Get required features
-    const requiredFeatures = this.reflector.getAllAndOverride<PlanFeature[]>(REQUIRED_FEATURES_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const requiredFeatures = this.reflector.getAllAndOverride<PlanFeature[]>(
+      REQUIRED_FEATURES_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     // Get required integrations (v2.8.88)
     const requiredIntegrations = this.reflector.getAllAndOverride<string[]>(
@@ -62,13 +75,18 @@ export class PlanFeatureGuard implements CanActivate {
     );
 
     // Get limit to check
-    const limitToCheck = this.reflector.getAllAndOverride<LimitType>(CHECK_LIMIT_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const limitToCheck = this.reflector.getAllAndOverride<LimitType>(
+      CHECK_LIMIT_KEY,
+      [context.getHandler(), context.getClass()],
+    );
 
     // If no requirements, allow access
-    if (!requiredPlans && !requiredFeatures && !requiredIntegrations && !limitToCheck) {
+    if (
+      !requiredPlans &&
+      !requiredFeatures &&
+      !requiredIntegrations &&
+      !limitToCheck
+    ) {
       return true;
     }
 
@@ -79,7 +97,7 @@ export class PlanFeatureGuard implements CanActivate {
     });
 
     if (!tenant || !tenant.currentPlan) {
-      throw new ForbiddenException('No active subscription plan found');
+      throw new ForbiddenException("No active subscription plan found");
     }
 
     const currentPlan = tenant.currentPlan;
@@ -93,23 +111,25 @@ export class PlanFeatureGuard implements CanActivate {
     const activeSubscription = await this.prisma.subscription.findFirst({
       where: {
         tenantId: user.tenantId,
-        status: { in: ['ACTIVE', 'TRIALING', 'PAST_DUE'] },
+        status: { in: ["ACTIVE", "TRIALING", "PAST_DUE"] },
       },
     });
 
-    if (!activeSubscription && currentPlan.name !== 'FREE') {
+    if (!activeSubscription && currentPlan.name !== "FREE") {
       throw new ForbiddenException(
-        'Your subscription has expired or been cancelled. Please renew to access this feature.',
+        "Your subscription has expired or been cancelled. Please renew to access this feature.",
       );
     }
 
     // Check if plan tier is sufficient
     if (requiredPlans && requiredPlans.length > 0) {
-      const hasPlanAccess = requiredPlans.includes(currentPlan.name as SubscriptionPlanType);
+      const hasPlanAccess = requiredPlans.includes(
+        currentPlan.name as SubscriptionPlanType,
+      );
 
       if (!hasPlanAccess) {
         throw new ForbiddenException(
-          `This feature requires one of the following plans: ${requiredPlans.join(', ')}. Your current plan is ${currentPlan.displayName}.`,
+          `This feature requires one of the following plans: ${requiredPlans.join(", ")}. Your current plan is ${currentPlan.displayName}.`,
         );
       }
     }
@@ -121,7 +141,9 @@ export class PlanFeatureGuard implements CanActivate {
     // on a plan that bundles it. Engine cache is in-process + Redis-
     // invalidated (~30s convergence after a purchase, typically much
     // sooner).
-    let engineSet: Awaited<ReturnType<EntitlementService['getForTenant']>> | null = null;
+    let engineSet: Awaited<
+      ReturnType<EntitlementService["getForTenant"]>
+    > | null = null;
     const loadEngineSet = async () => {
       if (engineSet === null) {
         engineSet = await this.entitlements.getForTenant(user.tenantId, null);
@@ -133,7 +155,10 @@ export class PlanFeatureGuard implements CanActivate {
     if (requiredFeatures && requiredFeatures.length > 0) {
       const set = await loadEngineSet();
       const hasAnyEngineGrants = Object.keys(set.features).length > 0;
-      const featureOverrides = tenant.featureOverrides as Record<string, boolean> | null;
+      const featureOverrides = tenant.featureOverrides as Record<
+        string,
+        boolean
+      > | null;
 
       for (const feature of requiredFeatures) {
         let featureEnabled: boolean;
@@ -146,9 +171,10 @@ export class PlanFeatureGuard implements CanActivate {
           // Engine empty for this tenant (projector race / new signup).
           // Same plan-only fallback used by getEffectiveFeatures; the
           // nightly reconcile cron catches the miss within 24h.
-          featureEnabled = featureOverrides?.[feature] !== undefined
-            ? featureOverrides[feature]
-            : (currentPlan[feature] as boolean);
+          featureEnabled =
+            featureOverrides?.[feature] !== undefined
+              ? featureOverrides[feature]
+              : (currentPlan[feature] as boolean);
           this.logger.debug(
             `PlanFeatureGuard fell back to plan-only for tenant=${user.tenantId} feature=${feature}`,
           );
@@ -182,7 +208,13 @@ export class PlanFeatureGuard implements CanActivate {
     // Check usage limits (override takes precedence over plan)
     if (limitToCheck) {
       const set = await loadEngineSet();
-      await this.checkLimit(user.tenantId, currentPlan, limitToCheck, tenant.limitOverrides as Record<string, number> | null, set);
+      await this.checkLimit(
+        user.tenantId,
+        currentPlan,
+        limitToCheck,
+        tenant.limitOverrides as Record<string, number> | null,
+        set,
+      );
     }
 
     return true;
@@ -207,11 +239,11 @@ export class PlanFeatureGuard implements CanActivate {
     plan: any,
     limitType: LimitType,
     limitOverrides: Record<string, number> | null | undefined,
-    engineSet: Awaited<ReturnType<EntitlementService['getForTenant']>>,
+    engineSet: Awaited<ReturnType<EntitlementService["getForTenant"]>>,
   ): Promise<void> {
     const engineLimit = engineSet.limits[`limit.${limitType}`];
     let limit: number;
-    if (typeof engineLimit === 'number') {
+    if (typeof engineLimit === "number") {
       // Engine wins. The engine has already applied override REPLACE
       // semantics and add-on SUM, so the legacy override-then-plan
       // fallback would just re-do work the engine has finished.
@@ -219,9 +251,10 @@ export class PlanFeatureGuard implements CanActivate {
     } else {
       // Engine empty for this key — fall back to plan-only. Same
       // safety-net as PlanFeatureGuard.canActivate's feature branch.
-      limit = limitOverrides?.[limitType] !== undefined
-        ? limitOverrides[limitType]
-        : plan[limitType];
+      limit =
+        limitOverrides?.[limitType] !== undefined
+          ? limitOverrides[limitType]
+          : plan[limitType];
       this.logger.debug(
         `PlanFeatureGuard.checkLimit fell back to plan-only for tenant=${tenantId} limit=${limitType}`,
       );
@@ -237,11 +270,23 @@ export class PlanFeatureGuard implements CanActivate {
     switch (limitType) {
       case LimitType.USERS:
         // Only count ACTIVE users (not INACTIVE or PENDING_APPROVAL)
-        currentCount = await this.prisma.user.count({ where: { tenantId, status: 'ACTIVE' } });
+        currentCount = await this.prisma.user.count({
+          where: { tenantId, status: "ACTIVE" },
+        });
         break;
 
       case LimitType.TABLES:
         currentCount = await this.prisma.table.count({ where: { tenantId } });
+        break;
+
+      case LimitType.BRANCHES:
+        // v3.0.0 — count only `status: 'active'` branches; archived rows
+        // are soft-deleted via BranchesService.archive() and must not
+        // re-block creation. Matches the projector's "implicit 1"
+        // semantics: the implicit main branch is always status=active.
+        currentCount = await this.prisma.branch.count({
+          where: { tenantId, status: "active" },
+        });
         break;
 
       case LimitType.PRODUCTS:
@@ -249,7 +294,9 @@ export class PlanFeatureGuard implements CanActivate {
         break;
 
       case LimitType.CATEGORIES:
-        currentCount = await this.prisma.category.count({ where: { tenantId } });
+        currentCount = await this.prisma.category.count({
+          where: { tenantId },
+        });
         break;
 
       case LimitType.MONTHLY_ORDERS:

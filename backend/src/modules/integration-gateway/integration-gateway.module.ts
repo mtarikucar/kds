@@ -1,10 +1,10 @@
-import { Module } from '@nestjs/common';
-import { PrismaModule } from '../../prisma/prisma.module';
-import { IntegrationService } from './integration.service';
-import { IntegrationController } from './integration.controller';
-import { YemeksepetiAdapter } from './adapters/yemeksepeti.adapter';
-import { GetirAdapter } from './adapters/getir.adapter';
-import { TrendyolYemekAdapter } from './adapters/trendyol-yemek.adapter';
+import { Module } from "@nestjs/common";
+import { PrismaModule } from "../../prisma/prisma.module";
+import { IntegrationService } from "./integration.service";
+import { IntegrationController } from "./integration.controller";
+import { YemeksepetiAdapter } from "./adapters/yemeksepeti.adapter";
+import { GetirAdapter } from "./adapters/getir.adapter";
+import { TrendyolYemekAdapter } from "./adapters/trendyol-yemek.adapter";
 
 /**
  * Integration gateway module. Adapter classes are registered as plain
@@ -14,7 +14,17 @@ import { TrendyolYemekAdapter } from './adapters/trendyol-yemek.adapter';
 @Module({
   imports: [PrismaModule],
   controllers: [IntegrationController],
-  providers: [IntegrationService, YemeksepetiAdapter, GetirAdapter, TrendyolYemekAdapter],
-  exports: [IntegrationService, YemeksepetiAdapter, GetirAdapter, TrendyolYemekAdapter],
+  providers: [
+    IntegrationService,
+    YemeksepetiAdapter,
+    GetirAdapter,
+    TrendyolYemekAdapter,
+  ],
+  exports: [
+    IntegrationService,
+    YemeksepetiAdapter,
+    GetirAdapter,
+    TrendyolYemekAdapter,
+  ],
 })
 export class IntegrationGatewayModule {}

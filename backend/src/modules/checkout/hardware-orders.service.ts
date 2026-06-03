@@ -1,5 +1,5 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../../prisma/prisma.service";
 
 /**
  * Read-only tenant view over hardware orders. Writes live in
@@ -14,12 +14,27 @@ export class HardwareOrdersService {
   async listMine(tenantId: string, status?: string) {
     return this.prisma.hardwareOrder.findMany({
       where: { tenantId, ...(status ? { status } : {}) },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: 100,
       include: {
-        items: { select: { id: true, name: true, sku: true, qty: true, unitCents: true } },
+        items: {
+          select: {
+            id: true,
+            name: true,
+            sku: true,
+            qty: true,
+            unitCents: true,
+          },
+        },
         shipments: {
-          select: { id: true, carrier: true, trackingNo: true, status: true, shippedAt: true, deliveredAt: true },
+          select: {
+            id: true,
+            carrier: true,
+            trackingNo: true,
+            status: true,
+            shippedAt: true,
+            deliveredAt: true,
+          },
         },
       },
     });
@@ -34,7 +49,7 @@ export class HardwareOrdersService {
         installations: true,
       },
     });
-    if (!row) throw new NotFoundException('Order not found');
+    if (!row) throw new NotFoundException("Order not found");
     return row;
   }
 }

@@ -1,10 +1,15 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { v7 as uuidv7 } from 'uuid';
-import { PrismaService } from '../../prisma/prisma.service';
-import { OutboxService } from '../outbox/outbox.service';
-import { FiscalProviderRegistry } from './fiscal-provider.registry';
-import { FiscalReceiptRequest } from './fiscal-provider.interface';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { v7 as uuidv7 } from "uuid";
+import { PrismaService } from "../../prisma/prisma.service";
+import { OutboxService } from "../outbox/outbox.service";
+import { FiscalProviderRegistry } from "./fiscal-provider.registry";
+import { FiscalReceiptRequest } from "./fiscal-provider.interface";
 
 /**
  * Domain service for fiscal receipts. Persists every receipt request to
@@ -35,24 +40,32 @@ export class FiscalService {
       where: { id: req.fiscalDeviceId, tenantId: req.tenantId },
     });
     if (!device) {
-      throw new NotFoundException('Fiscal device not found');
+      throw new NotFoundException("Fiscal device not found");
     }
-    if (device.status === 'retired') throw new BadRequestException('Fiscal device retired');
+    if (device.status === "retired")
+      throw new BadRequestException("Fiscal device retired");
 
     // Idempotency check.
     const existing = await this.prisma.fiscalReceipt.findUnique({
-      where: { tenantId_idempotencyKey: { tenantId: req.tenantId, idempotencyKey: req.idempotencyKey } },
+      where: {
+        tenantId_idempotencyKey: {
+          tenantId: req.tenantId,
+          idempotencyKey: req.idempotencyKey,
+        },
+      },
     });
     if (existing) return existing;
 
     const totalCents = req.lines.reduce(
-      (acc, l) => acc + Math.round(l.qty * l.unitPriceCents) - (l.discountCents ?? 0),
+      (acc, l) =>
+        acc + Math.round(l.qty * l.unitPriceCents) - (l.discountCents ?? 0),
       0,
     );
     const vatBreakdown: Record<string, number> = {};
     for (const l of req.lines) {
       const vat = Math.round(
-        ((l.qty * l.unitPriceCents - (l.discountCents ?? 0)) * l.vatRate) / (100 + l.vatRate),
+        ((l.qty * l.unitPriceCents - (l.discountCents ?? 0)) * l.vatRate) /
+          (100 + l.vatRate),
       );
       const k = String(l.vatRate);
       vatBreakdown[k] = (vatBreakdown[k] ?? 0) + vat;
@@ -69,7 +82,7 @@ export class FiscalService {
         totalCents,
         vatBreakdown: vatBreakdown as any,
         idempotencyKey: req.idempotencyKey,
-        status: 'queued',
+        status: "queued",
         lines: {
           create: req.lines.map((l, i) => ({
             id: uuidv7(),
@@ -95,16 +108,19 @@ export class FiscalService {
       const updated = await this.prisma.fiscalReceipt.update({
         where: { id: row.id },
         data: {
-          status: result.status === 'issued' ? 'issued' : 'failed',
+          status: result.status === "issued" ? "issued" : "failed",
           fiscalNo: result.fiscalNo,
           fiscalZNo: result.fiscalZNo,
-          issuedAt: result.status === 'issued' ? new Date() : null,
-          lastError: result.status !== 'issued' ? result.error : null,
+          issuedAt: result.status === "issued" ? new Date() : null,
+          lastError: result.status !== "issued" ? result.error : null,
         },
       });
       await this.outbox
         .append({
-          type: result.status === 'issued' ? 'fiscal.receipt.printed.v1' : 'fiscal.receipt.failed.v1',
+          type:
+            result.status === "issued"
+              ? "fiscal.receipt.printed.v1"
+              : "fiscal.receipt.failed.v1",
           tenantId: req.tenantId,
           payload: {
             fiscalReceiptId: updated.id,
@@ -118,11 +134,15 @@ export class FiscalService {
     } catch (e) {
       const updated = await this.prisma.fiscalReceipt.update({
         where: { id: row.id },
-        data: { status: 'failed', lastError: (e as Error).message, attempts: { increment: 1 } },
+        data: {
+          status: "failed",
+          lastError: (e as Error).message,
+          attempts: { increment: 1 },
+        },
       });
       await this.outbox
         .append({
-          type: 'fiscal.receipt.failed.v1',
+          type: "fiscal.receipt.failed.v1",
           tenantId: req.tenantId,
           payload: { fiscalReceiptId: updated.id, error: (e as Error).message },
         })
@@ -131,17 +151,22 @@ export class FiscalService {
     }
   }
 
-  async cancelReceipt(tenantId: string, fiscalReceiptId: string, reason: string) {
+  async cancelReceipt(
+    tenantId: string,
+    fiscalReceiptId: string,
+    reason: string,
+  ) {
     const row = await this.prisma.fiscalReceipt.findFirst({
       where: { id: fiscalReceiptId, tenantId },
     });
-    if (!row) throw new NotFoundException('Receipt not found');
-    if (row.status !== 'issued') throw new BadRequestException('Only issued receipts can be cancelled');
+    if (!row) throw new NotFoundException("Receipt not found");
+    if (row.status !== "issued")
+      throw new BadRequestException("Only issued receipts can be cancelled");
     const provider = this.registry.get(row.providerId);
     await provider.cancelReceipt(fiscalReceiptId, reason);
     return this.prisma.fiscalReceipt.update({
       where: { id: row.id },
-      data: { status: 'cancelled', lastError: `cancelled: ${reason}` },
+      data: { status: "cancelled", lastError: `cancelled: ${reason}` },
     });
   }
 
@@ -149,14 +174,14 @@ export class FiscalService {
     const device = await this.prisma.fiscalDeviceRecord.findFirst({
       where: { id: fiscalDeviceId, tenantId },
     });
-    if (!device) throw new NotFoundException('Fiscal device not found');
+    if (!device) throw new NotFoundException("Fiscal device not found");
     // Mirror issueReceipt's retired-device gate. A retired yazarkasa
     // can't legally produce a Z report (the unit is decommissioned and
     // its counters frozen at the time of retirement), so the operator
     // probably wanted to close the day on a DIFFERENT device. Surface
     // that with a clean 400 rather than letting it fail mid-adapter.
-    if (device.status === 'retired') {
-      throw new BadRequestException('Fiscal device retired — cannot close day');
+    if (device.status === "retired") {
+      throw new BadRequestException("Fiscal device retired — cannot close day");
     }
     const provider = this.registry.get(device.providerId);
     const report = await provider.closeDay(fiscalDeviceId);
@@ -173,7 +198,7 @@ export class FiscalService {
     });
     await this.outbox
       .append({
-        type: 'fiscal.day.closed.v1',
+        type: "fiscal.day.closed.v1",
         tenantId,
         payload: { fiscalDeviceId, zNo: report.zNo },
       })
@@ -184,9 +209,9 @@ export class FiscalService {
   /** List receipts in queued/failed state — for the manual recovery panel. */
   async listPending(tenantId: string, limit = 100) {
     return this.prisma.fiscalReceipt.findMany({
-      where: { tenantId, status: { in: ['queued', 'failed'] } },
+      where: { tenantId, status: { in: ["queued", "failed"] } },
       include: { lines: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: limit,
     });
   }
@@ -211,10 +236,10 @@ export class FiscalService {
       where: { id: fiscalReceiptId, tenantId },
       include: { lines: true, fiscalDevice: true },
     });
-    if (!row) throw new NotFoundException('Receipt not found');
-    if (row.status === 'issued') return row;   // already succeeded
-    if (row.status === 'cancelled') {
-      throw new BadRequestException('Cannot retry a cancelled receipt');
+    if (!row) throw new NotFoundException("Receipt not found");
+    if (row.status === "issued") return row; // already succeeded
+    if (row.status === "cancelled") {
+      throw new BadRequestException("Cannot retry a cancelled receipt");
     }
 
     // Cooldown gate. `updatedAt` bumps on each retry attempt (the next
@@ -234,7 +259,7 @@ export class FiscalService {
         tenantId,
         fiscalDeviceId: row.fiscalDeviceId,
         orderId: row.orderId ?? undefined,
-        idempotencyKey: row.idempotencyKey,   // SAME key — provider dedupes
+        idempotencyKey: row.idempotencyKey, // SAME key — provider dedupes
         lines: row.lines.map((l) => ({
           productCode: l.productCode,
           name: l.name,
@@ -248,24 +273,27 @@ export class FiscalService {
         // module owns them. The adapter only needs them for split/payment
         // breakdowns on the device — TR yazarkasa accepts a single-line
         // payment summary equal to the total, which is what we emit here.
-        payments: [{ method: 'cash', amountCents: row.totalCents }],
+        payments: [{ method: "cash", amountCents: row.totalCents }],
       });
 
       const updated = await this.prisma.fiscalReceipt.update({
         where: { id: row.id },
         data: {
-          status: result.status === 'issued' ? 'issued' : 'failed',
+          status: result.status === "issued" ? "issued" : "failed",
           fiscalNo: result.fiscalNo,
           fiscalZNo: result.fiscalZNo,
-          issuedAt: result.status === 'issued' ? new Date() : null,
-          lastError: result.status !== 'issued' ? result.error : null,
+          issuedAt: result.status === "issued" ? new Date() : null,
+          lastError: result.status !== "issued" ? result.error : null,
           attempts: { increment: 1 },
         },
       });
 
       await this.outbox
         .append({
-          type: result.status === 'issued' ? 'fiscal.receipt.printed.v1' : 'fiscal.receipt.failed.v1',
+          type:
+            result.status === "issued"
+              ? "fiscal.receipt.printed.v1"
+              : "fiscal.receipt.failed.v1",
           tenantId,
           payload: {
             fiscalReceiptId: updated.id,
@@ -282,12 +310,14 @@ export class FiscalService {
       const updated = await this.prisma.fiscalReceipt.update({
         where: { id: row.id },
         data: {
-          status: 'failed',
+          status: "failed",
           lastError: (e as Error).message,
           attempts: { increment: 1 },
         },
       });
-      this.logger.warn(`Retry failed for receipt=${row.id}: ${(e as Error).message}`);
+      this.logger.warn(
+        `Retry failed for receipt=${row.id}: ${(e as Error).message}`,
+      );
       return updated;
     }
   }

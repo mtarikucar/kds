@@ -1,8 +1,12 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import { CreateQrSettingsDto } from './dto/create-qr-settings.dto';
-import { UpdateQrSettingsDto } from './dto/update-qr-settings.dto';
-import * as QRCode from 'qrcode';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma/prisma.service";
+import { CreateQrSettingsDto } from "./dto/create-qr-settings.dto";
+import { UpdateQrSettingsDto } from "./dto/update-qr-settings.dto";
+import * as QRCode from "qrcode";
 
 // Cap on per-request QR generation. Each PNG takes ~500ms of synchronous
 // CPU; a tenant with 10k tables could DOS the Node process. Legitimate
@@ -20,24 +24,30 @@ const SUBDOMAIN_REGEX = /^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/;
 export class QrService {
   constructor(private prisma: PrismaService) {}
 
+  // v3.0.1 — findFirst pattern (see branch-scope.ts loadBranchSettings
+  // note). Prisma's findUnique/upsert/delete on a compound-unique key
+  // reject `branchId: null` at runtime even when the DB allows it.
   async getSettings(tenantId: string) {
-    let settings = await this.prisma.qrMenuSettings.findUnique({
-      where: { tenantId_branchId: { tenantId, branchId: null } },
+    const existing = await this.prisma.qrMenuSettings.findFirst({
+      where: { tenantId, branchId: null },
     });
-
-    // Create default settings if they don't exist
-    if (!settings) {
-      settings = await this.prisma.qrMenuSettings.create({
-        data: { tenantId },
-      });
+    if (existing) return existing;
+    try {
+      return await this.prisma.qrMenuSettings.create({ data: { tenantId } });
+    } catch (e: any) {
+      if (e?.code === "P2002") {
+        const row = await this.prisma.qrMenuSettings.findFirst({
+          where: { tenantId, branchId: null },
+        });
+        if (row) return row;
+      }
+      throw e;
     }
-
-    return settings;
   }
 
   async createSettings(tenantId: string, dto: CreateQrSettingsDto) {
-    const existingSettings = await this.prisma.qrMenuSettings.findUnique({
-      where: { tenantId_branchId: { tenantId, branchId: null } },
+    const existingSettings = await this.prisma.qrMenuSettings.findFirst({
+      where: { tenantId, branchId: null },
     });
 
     if (existingSettings) {
@@ -57,40 +67,48 @@ export class QrService {
     // Ensure settings exist
     await this.getSettings(tenantId);
 
-    return this.prisma.qrMenuSettings.update({
-      where: { tenantId_branchId: { tenantId, branchId: null } },
+    const updated = await this.prisma.qrMenuSettings.updateMany({
+      where: { tenantId, branchId: null },
       data: dto,
+    });
+    if (updated.count === 0) {
+      throw new NotFoundException("QR settings not found");
+    }
+    return this.prisma.qrMenuSettings.findFirstOrThrow({
+      where: { tenantId, branchId: null },
     });
   }
 
   async deleteSettings(tenantId: string) {
-    const settings = await this.prisma.qrMenuSettings.findUnique({
-      where: { tenantId_branchId: { tenantId, branchId: null } },
+    const settings = await this.prisma.qrMenuSettings.findFirst({
+      where: { tenantId, branchId: null },
     });
 
     if (!settings) {
-      throw new NotFoundException('QR settings not found');
+      throw new NotFoundException("QR settings not found");
     }
 
-    return this.prisma.qrMenuSettings.delete({
-      where: { tenantId_branchId: { tenantId, branchId: null } },
+    const deleted = await this.prisma.qrMenuSettings.deleteMany({
+      where: { tenantId, branchId: null },
     });
+    return { count: deleted.count };
   }
 
   async getQrCodes(tenantId: string, baseUrl: string) {
     const tenant = await this.prisma.tenant.findUnique({
       where: { id: tenantId },
     });
-    if (!tenant) throw new NotFoundException('Tenant not found');
+    if (!tenant) throw new NotFoundException("Tenant not found");
 
     // Validate subdomain before embedding it into the QR URL. Tenants module
     // should enforce this at write time, but do a defensive check here so a
     // historical bad-value row doesn't produce a QR that redirects off-host.
-    const hasValidSubdomain = !!tenant.subdomain && SUBDOMAIN_REGEX.test(tenant.subdomain);
+    const hasValidSubdomain =
+      !!tenant.subdomain && SUBDOMAIN_REGEX.test(tenant.subdomain);
 
     const tables = await this.prisma.table.findMany({
       where: { tenantId },
-      orderBy: { number: 'asc' },
+      orderBy: { number: "asc" },
       take: MAX_TABLES_PER_REQUEST + 1,
     });
     if (tables.length > MAX_TABLES_PER_REQUEST) {
@@ -111,8 +129,8 @@ export class QrService {
         // Parse baseUrl to get domain parts
         try {
           const url = new URL(baseUrl);
-          const hostParts = url.hostname.split('.');
-          const isStaging = hostParts.includes('staging');
+          const hostParts = url.hostname.split(".");
+          const isStaging = hostParts.includes("staging");
 
           // Build subdomain URL
           // For staging: {subdomain}.staging.hummytummy.com
@@ -121,7 +139,10 @@ export class QrService {
           if (isStaging) {
             // staging.hummytummy.com -> {subdomain}.staging.hummytummy.com
             subdomainHost = `${tenant.subdomain}.${url.hostname}`;
-          } else if (url.hostname === 'localhost' || url.hostname.includes('localhost')) {
+          } else if (
+            url.hostname === "localhost" ||
+            url.hostname.includes("localhost")
+          ) {
             // Local dev: use path-based URL
             return tableId
               ? `${baseUrl}/qr-menu/${tenantId}?tableId=${tableId}`
@@ -153,14 +174,14 @@ export class QrService {
       width: 400,
       margin: 2,
       color: {
-        dark: settings.primaryColor || '#3B82F6',
-        light: '#FFFFFF',
+        dark: settings.primaryColor || "#3B82F6",
+        light: "#FFFFFF",
       },
     });
 
     qrCodes.push({
       id: `tenant-${tenantId}`,
-      type: 'TENANT',
+      type: "TENANT",
       url: tenantUrl,
       qrDataUrl: tenantQrDataUrl,
       label: tenant.name,
@@ -174,14 +195,14 @@ export class QrService {
           width: 400,
           margin: 2,
           color: {
-            dark: settings.primaryColor || '#3B82F6',
-            light: '#FFFFFF',
+            dark: settings.primaryColor || "#3B82F6",
+            light: "#FFFFFF",
           },
         });
 
         qrCodes.push({
           id: `table-${table.id}`,
-          type: 'TABLE',
+          type: "TABLE",
           url: tableUrl,
           qrDataUrl: tableQrDataUrl,
           tableId: table.id,
@@ -207,8 +228,8 @@ export class QrService {
       width: 400,
       margin: 2,
       color: {
-        dark: options?.color || '#3B82F6',
-        light: '#FFFFFF',
+        dark: options?.color || "#3B82F6",
+        light: "#FFFFFF",
       },
     });
 

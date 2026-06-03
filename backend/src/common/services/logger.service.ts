@@ -1,7 +1,7 @@
-import { Injectable, LoggerService as NestLoggerService } from '@nestjs/common';
-import * as winston from 'winston';
-import DailyRotateFile from 'winston-daily-rotate-file';
-import { join } from 'path';
+import { Injectable, LoggerService as NestLoggerService } from "@nestjs/common";
+import * as winston from "winston";
+import DailyRotateFile from "winston-daily-rotate-file";
+import { join } from "path";
 
 /**
  * Custom Winston Logger Service
@@ -18,17 +18,21 @@ export class LoggerService implements NestLoggerService {
   }
 
   private createLogger(): winston.Logger {
-    const logDir = join(process.cwd(), 'logs');
+    const logDir = join(process.cwd(), "logs");
 
     // Console format for development
     const consoleFormat = winston.format.combine(
-      winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+      winston.format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
       winston.format.colorize(),
-      winston.format.printf(({ timestamp, level, message, context, ...meta }) => {
-        const ctx = context || this.context || 'App';
-        const metaStr = Object.keys(meta).length ? JSON.stringify(meta, null, 2) : '';
-        return `${timestamp} [${level}] [${ctx}] ${message} ${metaStr}`;
-      }),
+      winston.format.printf(
+        ({ timestamp, level, message, context, ...meta }) => {
+          const ctx = context || this.context || "App";
+          const metaStr = Object.keys(meta).length
+            ? JSON.stringify(meta, null, 2)
+            : "";
+          return `${timestamp} [${level}] [${ctx}] ${message} ${metaStr}`;
+        },
+      ),
     );
 
     // JSON format for production
@@ -44,21 +48,25 @@ export class LoggerService implements NestLoggerService {
     // Console transport (always)
     transports.push(
       new winston.transports.Console({
-        format: process.env.NODE_ENV === 'production' ? jsonFormat : consoleFormat,
+        format:
+          process.env.NODE_ENV === "production" ? jsonFormat : consoleFormat,
       }),
     );
 
     // File transports (only in production or if LOG_TO_FILE=true)
-    if (process.env.NODE_ENV === 'production' || process.env.LOG_TO_FILE === 'true') {
+    if (
+      process.env.NODE_ENV === "production" ||
+      process.env.LOG_TO_FILE === "true"
+    ) {
       // Error log file
       transports.push(
         new DailyRotateFile({
           dirname: logDir,
-          filename: 'error-%DATE%.log',
-          datePattern: 'YYYY-MM-DD',
-          level: 'error',
-          maxSize: '20m',
-          maxFiles: '14d',
+          filename: "error-%DATE%.log",
+          datePattern: "YYYY-MM-DD",
+          level: "error",
+          maxSize: "20m",
+          maxFiles: "14d",
           format: jsonFormat,
         }),
       );
@@ -67,10 +75,10 @@ export class LoggerService implements NestLoggerService {
       transports.push(
         new DailyRotateFile({
           dirname: logDir,
-          filename: 'combined-%DATE%.log',
-          datePattern: 'YYYY-MM-DD',
-          maxSize: '20m',
-          maxFiles: '14d',
+          filename: "combined-%DATE%.log",
+          datePattern: "YYYY-MM-DD",
+          maxSize: "20m",
+          maxFiles: "14d",
           format: jsonFormat,
         }),
       );
@@ -79,11 +87,11 @@ export class LoggerService implements NestLoggerService {
       transports.push(
         new DailyRotateFile({
           dirname: logDir,
-          filename: 'access-%DATE%.log',
-          datePattern: 'YYYY-MM-DD',
-          maxSize: '20m',
-          maxFiles: '7d',
-          level: 'http',
+          filename: "access-%DATE%.log",
+          datePattern: "YYYY-MM-DD",
+          maxSize: "20m",
+          maxFiles: "7d",
+          level: "http",
           format: jsonFormat,
         }),
       );
@@ -93,7 +101,8 @@ export class LoggerService implements NestLoggerService {
     // in prod so we don't fill disks with one line per HTTP request. An
     // operator can still flip LOG_LEVEL=debug temporarily without code
     // changes when something needs investigating.
-    const defaultLevel = process.env.NODE_ENV === 'production' ? 'warn' : 'info';
+    const defaultLevel =
+      process.env.NODE_ENV === "production" ? "warn" : "info";
     return winston.createLogger({
       level: process.env.LOG_LEVEL || defaultLevel,
       format: jsonFormat,
@@ -151,7 +160,7 @@ export class LoggerService implements NestLoggerService {
    * Log HTTP request
    */
   http(message: string, meta?: any) {
-    this.logger.log('http', message, { ...meta, context: this.context });
+    this.logger.log("http", message, { ...meta, context: this.context });
   }
 
   /**

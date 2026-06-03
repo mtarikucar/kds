@@ -7,17 +7,20 @@ import {
   Query,
   Body,
   UseGuards,
-} from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
-import { SuperAdminTenantsService } from '../services/superadmin-tenants.service';
-import { TenantFilterDto, UpdateTenantStatusDto } from '../dto/tenant-filter.dto';
-import { UpdateTenantOverridesDto } from '../dto/update-tenant-overrides.dto';
-import { SuperAdminGuard } from '../guards/superadmin.guard';
-import { SuperAdminRoute } from '../decorators/superadmin.decorator';
-import { CurrentSuperAdmin } from '../decorators/current-superadmin.decorator';
+} from "@nestjs/common";
+import { ApiTags, ApiOperation, ApiBearerAuth } from "@nestjs/swagger";
+import { SuperAdminTenantsService } from "../services/superadmin-tenants.service";
+import {
+  TenantFilterDto,
+  UpdateTenantStatusDto,
+} from "../dto/tenant-filter.dto";
+import { UpdateTenantOverridesDto } from "../dto/update-tenant-overrides.dto";
+import { SuperAdminGuard } from "../guards/superadmin.guard";
+import { SuperAdminRoute } from "../decorators/superadmin.decorator";
+import { CurrentSuperAdmin } from "../decorators/current-superadmin.decorator";
 
-@ApiTags('SuperAdmin Tenants')
-@Controller('superadmin/tenants')
+@ApiTags("SuperAdmin Tenants")
+@Controller("superadmin/tenants")
 @UseGuards(SuperAdminGuard)
 @SuperAdminRoute()
 @ApiBearerAuth()
@@ -25,77 +28,80 @@ export class SuperAdminTenantsController {
   constructor(private readonly tenantsService: SuperAdminTenantsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List all tenants with pagination and filters' })
+  @ApiOperation({ summary: "List all tenants with pagination and filters" })
   async findAll(@Query() filters: TenantFilterDto) {
     return this.tenantsService.findAll(filters);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get tenant details' })
-  async findOne(@Param('id') id: string) {
+  @Get(":id")
+  @ApiOperation({ summary: "Get tenant details" })
+  async findOne(@Param("id") id: string) {
     return this.tenantsService.findOne(id);
   }
 
-  @Patch(':id/status')
-  @ApiOperation({ summary: 'Update tenant status (suspend/activate/delete)' })
+  @Patch(":id/status")
+  @ApiOperation({ summary: "Update tenant status (suspend/activate/delete)" })
   async updateStatus(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body() updateDto: UpdateTenantStatusDto,
-    @CurrentSuperAdmin('id') actorId: string,
-    @CurrentSuperAdmin('email') actorEmail: string,
+    @CurrentSuperAdmin("id") actorId: string,
+    @CurrentSuperAdmin("email") actorEmail: string,
   ) {
     return this.tenantsService.updateStatus(id, updateDto, actorId, actorEmail);
   }
 
-  @Get(':id/users')
-  @ApiOperation({ summary: 'Get tenant users' })
+  @Get(":id/users")
+  @ApiOperation({ summary: "Get tenant users" })
   async getTenantUsers(
-    @Param('id') id: string,
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 20,
+    @Param("id") id: string,
+    @Query("page") page: number = 1,
+    @Query("limit") limit: number = 20,
   ) {
     return this.tenantsService.getTenantUsers(id, page, limit);
   }
 
-  @Get(':id/orders')
-  @ApiOperation({ summary: 'Get tenant orders' })
+  @Get(":id/orders")
+  @ApiOperation({ summary: "Get tenant orders" })
   async getTenantOrders(
-    @Param('id') id: string,
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 20,
+    @Param("id") id: string,
+    @Query("page") page: number = 1,
+    @Query("limit") limit: number = 20,
   ) {
     return this.tenantsService.getTenantOrders(id, page, limit);
   }
 
-  @Get(':id/stats')
-  @ApiOperation({ summary: 'Get tenant statistics' })
-  async getTenantStats(@Param('id') id: string) {
+  @Get(":id/stats")
+  @ApiOperation({ summary: "Get tenant statistics" })
+  async getTenantStats(@Param("id") id: string) {
     return this.tenantsService.getTenantStats(id);
   }
 
-  @Get(':id/overrides')
-  @ApiOperation({ summary: 'Get tenant feature & limit overrides with plan defaults and effective values' })
-  async getOverrides(@Param('id') id: string) {
+  @Get(":id/overrides")
+  @ApiOperation({
+    summary:
+      "Get tenant feature & limit overrides with plan defaults and effective values",
+  })
+  async getOverrides(@Param("id") id: string) {
     return this.tenantsService.getOverrides(id);
   }
 
-  @Patch(':id/overrides')
-  @ApiOperation({ summary: 'Update tenant feature & limit overrides' })
+  @Patch(":id/overrides")
+  @ApiOperation({ summary: "Update tenant feature & limit overrides" })
   async updateOverrides(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body() dto: UpdateTenantOverridesDto,
-    @CurrentSuperAdmin('id') actorId: string,
-    @CurrentSuperAdmin('email') actorEmail: string,
+    @CurrentSuperAdmin("id") actorId: string,
+    @CurrentSuperAdmin("email") actorEmail: string,
   ) {
     return this.tenantsService.updateOverrides(id, dto, actorId, actorEmail);
   }
 
-  @Delete(':id/overrides')
-  @ApiOperation({ summary: 'Reset all tenant overrides to plan defaults' })
+  @Delete(":id/overrides")
+  @ApiOperation({ summary: "Reset all tenant overrides to plan defaults" })
   async resetOverrides(
-    @Param('id') id: string,
-    @CurrentSuperAdmin('id') actorId: string,
-    @CurrentSuperAdmin('email') actorEmail: string,
+    @Param("id") id: string,
+    @CurrentSuperAdmin("id") actorId: string,
+    @CurrentSuperAdmin("email") actorEmail: string,
   ) {
     return this.tenantsService.resetOverrides(id, actorId, actorEmail);
   }

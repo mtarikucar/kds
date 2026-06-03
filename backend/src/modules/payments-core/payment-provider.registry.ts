@@ -1,5 +1,5 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { PaymentProvider } from './payment-provider.interface';
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { PaymentProvider } from "./payment-provider.interface";
 
 /**
  * Registry of installed PaymentProvider implementations. The Payments façade
@@ -19,7 +19,9 @@ export class PaymentProviderRegistry {
       this.logger.warn(`PaymentProvider ${provider.id} re-registered`);
     }
     this.providers.set(provider.id, provider);
-    this.logger.log(`Registered PaymentProvider: ${provider.id} (modes=${provider.modes.join(',')})`);
+    this.logger.log(
+      `Registered PaymentProvider: ${provider.id} (modes=${provider.modes.join(",")})`,
+    );
   }
 
   get(id: string): PaymentProvider {

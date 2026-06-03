@@ -1,47 +1,81 @@
-import { IsString, IsOptional, IsEnum, IsArray, IsNumber, IsObject, Min, Max } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { InsightType, InsightCategory, InsightSeverity, InsightStatus } from '../enums/analytics.enum';
+import {
+  IsString,
+  IsOptional,
+  IsEnum,
+  IsArray,
+  IsNumber,
+  IsObject,
+  Min,
+  Max,
+} from "class-validator";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  InsightType,
+  InsightCategory,
+  InsightSeverity,
+  InsightStatus,
+} from "../enums/analytics.enum";
 
 export class UpdateInsightStatusDto {
-  @ApiProperty({ enum: InsightStatus, description: 'New status for the insight' })
+  @ApiProperty({
+    enum: InsightStatus,
+    description: "New status for the insight",
+  })
   @IsEnum(InsightStatus)
   status: InsightStatus;
 
-  @ApiPropertyOptional({ description: 'Reason for dismissing (required if status is DISMISSED)' })
+  @ApiPropertyOptional({
+    description: "Reason for dismissing (required if status is DISMISSED)",
+  })
   @IsString()
   @IsOptional()
   dismissedReason?: string;
 }
 
 export class InsightFilterDto {
-  @ApiPropertyOptional({ enum: InsightType, description: 'Filter by insight type' })
+  @ApiPropertyOptional({
+    enum: InsightType,
+    description: "Filter by insight type",
+  })
   @IsEnum(InsightType)
   @IsOptional()
   type?: InsightType;
 
-  @ApiPropertyOptional({ enum: InsightCategory, description: 'Filter by category' })
+  @ApiPropertyOptional({
+    enum: InsightCategory,
+    description: "Filter by category",
+  })
   @IsEnum(InsightCategory)
   @IsOptional()
   category?: InsightCategory;
 
-  @ApiPropertyOptional({ enum: InsightSeverity, description: 'Filter by severity' })
+  @ApiPropertyOptional({
+    enum: InsightSeverity,
+    description: "Filter by severity",
+  })
   @IsEnum(InsightSeverity)
   @IsOptional()
   severity?: InsightSeverity;
 
-  @ApiPropertyOptional({ enum: InsightStatus, description: 'Filter by status' })
+  @ApiPropertyOptional({ enum: InsightStatus, description: "Filter by status" })
   @IsEnum(InsightStatus)
   @IsOptional()
   status?: InsightStatus;
 
-  @ApiPropertyOptional({ description: 'Number of insights to return', default: 20 })
+  @ApiPropertyOptional({
+    description: "Number of insights to return",
+    default: 20,
+  })
   @IsNumber()
   @Min(1)
   @Max(100)
   @IsOptional()
   limit?: number;
 
-  @ApiPropertyOptional({ description: 'Number of insights to skip', default: 0 })
+  @ApiPropertyOptional({
+    description: "Number of insights to skip",
+    default: 0,
+  })
   @IsNumber()
   @Min(0)
   @IsOptional()

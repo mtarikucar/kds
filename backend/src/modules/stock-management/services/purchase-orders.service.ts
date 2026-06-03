@@ -3,15 +3,15 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
-} from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CreatePurchaseOrderDto } from '../dto/create-purchase-order.dto';
-import { ReceivePurchaseOrderDto } from '../dto/receive-purchase-order.dto';
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { CreatePurchaseOrderDto } from "../dto/create-purchase-order.dto";
+import { ReceivePurchaseOrderDto } from "../dto/receive-purchase-order.dto";
 import {
   PurchaseOrderStatus,
   IngredientMovementType,
-} from '../../../common/constants/stock-management.enum';
+} from "../../../common/constants/stock-management.enum";
 
 type Tx = Prisma.TransactionClient;
 
@@ -28,12 +28,52 @@ export class PurchaseOrdersService {
    * same number.
    */
   private async allocatePoNumber(tx: Tx, tenantId: string): Promise<string> {
-    const settings = await tx.stockSettings.upsert({
-      where: { tenantId_branchId: { tenantId, branchId: null } },
-      create: { tenantId, poSequence: 1 },
-      update: { poSequence: { increment: 1 } },
+    // v3.0.1 — findFirst + update/create instead of upsert. The compound
+    // unique (tenantId, branchId) with branchId nullable trips Prisma's
+    // client-side validation on upsert; see branch-scope helper note.
+    // Race-safety: callers always invoke this inside an outer txn, and
+    // the P2002 catch on create swallows the loser of a concurrent
+    // first-allocation race and re-increments via the now-existing row.
+    const existing = await tx.stockSettings.findFirst({
+      where: { tenantId, branchId: null },
     });
-    const seq = String(settings.poSequence).padStart(5, '0');
+    let settings: { poSequence: number; poNumberPrefix: string };
+    if (existing) {
+      const updated = await tx.stockSettings.updateMany({
+        where: { tenantId, branchId: null },
+        data: { poSequence: { increment: 1 } },
+      });
+      if (updated.count === 0) {
+        // Defensive — the row vanished mid-txn. Treat as fresh allocate.
+        settings = await tx.stockSettings.create({
+          data: { tenantId, poSequence: 1 },
+        });
+      } else {
+        settings = await tx.stockSettings.findFirstOrThrow({
+          where: { tenantId, branchId: null },
+        });
+      }
+    } else {
+      try {
+        settings = await tx.stockSettings.create({
+          data: { tenantId, poSequence: 1 },
+        });
+      } catch (e: any) {
+        if (e?.code === "P2002") {
+          // Concurrent allocator beat us to the create. Re-increment.
+          await tx.stockSettings.updateMany({
+            where: { tenantId, branchId: null },
+            data: { poSequence: { increment: 1 } },
+          });
+          settings = await tx.stockSettings.findFirstOrThrow({
+            where: { tenantId, branchId: null },
+          });
+        } else {
+          throw e;
+        }
+      }
+    }
+    const seq = String(settings.poSequence).padStart(5, "0");
     return `${settings.poNumberPrefix}-${seq}`;
   }
 
@@ -46,10 +86,12 @@ export class PurchaseOrdersService {
       include: {
         supplier: { select: { id: true, name: true } },
         items: {
-          include: { stockItem: { select: { id: true, name: true, unit: true } } },
+          include: {
+            stockItem: { select: { id: true, name: true, unit: true } },
+          },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -59,11 +101,15 @@ export class PurchaseOrdersService {
       include: {
         supplier: true,
         items: {
-          include: { stockItem: { select: { id: true, name: true, unit: true, branchId: true } } },
+          include: {
+            stockItem: {
+              select: { id: true, name: true, unit: true, branchId: true },
+            },
+          },
         },
       },
     });
-    if (!po) throw new NotFoundException('Purchase order not found');
+    if (!po) throw new NotFoundException("Purchase order not found");
     return po;
   }
 
@@ -76,14 +122,14 @@ export class PurchaseOrdersService {
     const supplier = await this.prisma.supplier.findFirst({
       where: { id: dto.supplierId, tenantId },
     });
-    if (!supplier) throw new BadRequestException('Supplier not found');
+    if (!supplier) throw new BadRequestException("Supplier not found");
 
     const stockItemIds = dto.items.map((i) => i.stockItemId);
     const stockItems = await this.prisma.stockItem.findMany({
       where: { id: { in: stockItemIds }, tenantId },
     });
     if (stockItems.length !== stockItemIds.length) {
-      throw new BadRequestException('One or more stock items not found');
+      throw new BadRequestException("One or more stock items not found");
     }
     // v3.0.0 strict branch-scope: a PO is a single-branch document. If
     // the caller's scope doesn't match every referenced stock item's
@@ -91,7 +137,7 @@ export class PurchaseOrdersService {
     // one branch that decrements another branch's stock on receive.
     if (stockItems.some((si) => si.branchId !== branchId)) {
       throw new BadRequestException(
-        'All stock items must belong to the current branch',
+        "All stock items must belong to the current branch",
       );
     }
 
@@ -102,7 +148,9 @@ export class PurchaseOrdersService {
           orderNumber,
           supplierId: dto.supplierId,
           notes: dto.notes,
-          expectedDate: dto.expectedDate ? new Date(dto.expectedDate) : undefined,
+          expectedDate: dto.expectedDate
+            ? new Date(dto.expectedDate)
+            : undefined,
           tenantId,
           branchId,
           createdById: userId,
@@ -117,7 +165,9 @@ export class PurchaseOrdersService {
         include: {
           supplier: { select: { id: true, name: true } },
           items: {
-            include: { stockItem: { select: { id: true, name: true, unit: true } } },
+            include: {
+              stockItem: { select: { id: true, name: true, unit: true } },
+            },
           },
         },
       });
@@ -127,7 +177,9 @@ export class PurchaseOrdersService {
   async submit(id: string, tenantId: string) {
     const po = await this.findOne(id, tenantId);
     if (po.status !== PurchaseOrderStatus.DRAFT) {
-      throw new BadRequestException('Only draft purchase orders can be submitted');
+      throw new BadRequestException(
+        "Only draft purchase orders can be submitted",
+      );
     }
 
     // Atomic claim with tenant + status predicate — if a parallel call
@@ -139,13 +191,19 @@ export class PurchaseOrdersService {
       data: { status: PurchaseOrderStatus.SUBMITTED, submittedAt: new Date() },
     });
     if (result.count === 0) {
-      throw new BadRequestException('Purchase order is no longer in DRAFT');
+      throw new BadRequestException("Purchase order is no longer in DRAFT");
     }
     return this.prisma.purchaseOrder.findUnique({
       where: { id },
       include: {
         supplier: { select: { id: true, name: true } },
-        items: { include: { stockItem: { select: { id: true, name: true, unit: true, branchId: true } } } },
+        items: {
+          include: {
+            stockItem: {
+              select: { id: true, name: true, unit: true, branchId: true },
+            },
+          },
+        },
       },
     });
   }
@@ -165,7 +223,7 @@ export class PurchaseOrdersService {
       po.status !== PurchaseOrderStatus.PARTIALLY_RECEIVED
     ) {
       throw new BadRequestException(
-        'Only submitted or partially received purchase orders can be received',
+        "Only submitted or partially received purchase orders can be received",
       );
     }
 
@@ -208,111 +266,121 @@ export class PurchaseOrdersService {
             data: { quantityReceived: newReceived as any },
           });
 
-        // Weighted-average costing: new unit cost is
-        // (existingStock*existingCost + receivedQty*unitPrice) /
-        // (existingStock + receivedQty). Preserves the book value of
-        // older lots instead of the prior behaviour that blindly
-        // overwrote costPerUnit with the latest unit price.
-        const stockItem = await tx.stockItem.findUnique({
-          where: { id: poItem.stockItemId },
-        });
-        if (!stockItem) {
-          throw new BadRequestException('Stock item disappeared');
+          // Weighted-average costing: new unit cost is
+          // (existingStock*existingCost + receivedQty*unitPrice) /
+          // (existingStock + receivedQty). Preserves the book value of
+          // older lots instead of the prior behaviour that blindly
+          // overwrote costPerUnit with the latest unit price.
+          const stockItem = await tx.stockItem.findUnique({
+            where: { id: poItem.stockItemId },
+          });
+          if (!stockItem) {
+            throw new BadRequestException("Stock item disappeared");
+          }
+          const existingStock = new Prisma.Decimal(stockItem.currentStock);
+          const existingCost = new Prisma.Decimal(stockItem.costPerUnit ?? 0);
+          const unitPrice = new Prisma.Decimal(poItem.unitPrice);
+          const newStock = existingStock.add(receivedQty);
+          // v2.8.94 — clamp existingStock to zero in the weighted-average
+          // numerator. Pre-fix a negative currentStock (left behind by an
+          // earlier allowNegativeStock=true deduction past zero — see
+          // stock-deduction.service.applyDeduction) would invert the
+          // weighting math: `(-5 * 10 + 100 * 20) / 95 = ~20.5` skews the
+          // cost basis nonsensically. Negative stock is an inventory
+          // discrepancy, not an economic position; the new PO receive
+          // resets the cost basis as if existingStock were zero.
+          const clampedExisting = Prisma.Decimal.max(
+            existingStock,
+            new Prisma.Decimal(0),
+          );
+          const denominator = clampedExisting.add(receivedQty);
+          const weightedCost =
+            newStock.isZero() || denominator.isZero()
+              ? unitPrice
+              : clampedExisting
+                  .mul(existingCost)
+                  .add(receivedQty.mul(unitPrice))
+                  .div(denominator);
+
+          await tx.stockItem.update({
+            where: { id: poItem.stockItemId },
+            data: {
+              currentStock: { increment: receivedQty as any },
+              costPerUnit: weightedCost.toDecimalPlaces(
+                4,
+                Prisma.Decimal.ROUND_HALF_UP,
+              ) as any,
+            },
+          });
+
+          // Always create a batch so FIFO drawdown has something to
+          // consume — the prior behaviour only created a batch when
+          // batchNumber / expiryDate was supplied, so typical receives
+          // left deduction on the bare stockItem path.
+          await tx.stockBatch.create({
+            data: {
+              batchNumber: lineItem.batchNumber,
+              quantity: receivedQty as any,
+              costPerUnit: unitPrice as any,
+              expiryDate: lineItem.expiryDate
+                ? new Date(lineItem.expiryDate)
+                : undefined,
+              stockItemId: poItem.stockItemId,
+              purchaseOrderItemId: poItem.id,
+              tenantId,
+              branchId: poItem.stockItem.branchId,
+            },
+          });
+
+          await tx.ingredientMovement.create({
+            data: {
+              type: IngredientMovementType.PO_RECEIVE,
+              quantity: receivedQty as any,
+              costPerUnit: unitPrice as any,
+              notes: `PO ${po.orderNumber}${dto.notes ? ` - ${dto.notes}` : ""}`,
+              referenceType: "PURCHASE_ORDER",
+              referenceId: po.id,
+              stockItemId: poItem.stockItemId,
+              branchId: poItem.stockItem.branchId,
+              tenantId,
+              createdById: userId,
+            },
+          });
         }
-        const existingStock = new Prisma.Decimal(stockItem.currentStock);
-        const existingCost = new Prisma.Decimal(stockItem.costPerUnit ?? 0);
-        const unitPrice = new Prisma.Decimal(poItem.unitPrice);
-        const newStock = existingStock.add(receivedQty);
-        // v2.8.94 — clamp existingStock to zero in the weighted-average
-        // numerator. Pre-fix a negative currentStock (left behind by an
-        // earlier allowNegativeStock=true deduction past zero — see
-        // stock-deduction.service.applyDeduction) would invert the
-        // weighting math: `(-5 * 10 + 100 * 20) / 95 = ~20.5` skews the
-        // cost basis nonsensically. Negative stock is an inventory
-        // discrepancy, not an economic position; the new PO receive
-        // resets the cost basis as if existingStock were zero.
-        const clampedExisting = Prisma.Decimal.max(
-          existingStock,
-          new Prisma.Decimal(0),
+
+        const updatedItems = await tx.purchaseOrderItem.findMany({
+          where: { purchaseOrderId: id },
+        });
+        const allReceived = updatedItems.every((item) =>
+          new Prisma.Decimal(item.quantityReceived).gte(item.quantityOrdered),
         );
-        const denominator = clampedExisting.add(receivedQty);
-        const weightedCost = newStock.isZero() || denominator.isZero()
-          ? unitPrice
-          : clampedExisting.mul(existingCost).add(receivedQty.mul(unitPrice)).div(denominator);
+        const someReceived = updatedItems.some((item) =>
+          new Prisma.Decimal(item.quantityReceived).gt(0),
+        );
 
-        await tx.stockItem.update({
-          where: { id: poItem.stockItemId },
+        const newStatus = allReceived
+          ? PurchaseOrderStatus.RECEIVED
+          : someReceived
+            ? PurchaseOrderStatus.PARTIALLY_RECEIVED
+            : po.status;
+
+        return tx.purchaseOrder.update({
+          where: { id },
           data: {
-            currentStock: { increment: receivedQty as any },
-            costPerUnit: weightedCost.toDecimalPlaces(
-              4,
-              Prisma.Decimal.ROUND_HALF_UP,
-            ) as any,
+            status: newStatus,
+            receivedAt: allReceived ? new Date() : undefined,
+          },
+          include: {
+            supplier: { select: { id: true, name: true } },
+            items: {
+              include: {
+                stockItem: {
+                  select: { id: true, name: true, unit: true, branchId: true },
+                },
+              },
+            },
           },
         });
-
-        // Always create a batch so FIFO drawdown has something to
-        // consume — the prior behaviour only created a batch when
-        // batchNumber / expiryDate was supplied, so typical receives
-        // left deduction on the bare stockItem path.
-        await tx.stockBatch.create({
-          data: {
-            batchNumber: lineItem.batchNumber,
-            quantity: receivedQty as any,
-            costPerUnit: unitPrice as any,
-            expiryDate: lineItem.expiryDate ? new Date(lineItem.expiryDate) : undefined,
-            stockItemId: poItem.stockItemId,
-            purchaseOrderItemId: poItem.id,
-            tenantId,
-            branchId: poItem.stockItem.branchId,
-          },
-        });
-
-        await tx.ingredientMovement.create({
-          data: {
-            type: IngredientMovementType.PO_RECEIVE,
-            quantity: receivedQty as any,
-            costPerUnit: unitPrice as any,
-            notes: `PO ${po.orderNumber}${dto.notes ? ` - ${dto.notes}` : ''}`,
-            referenceType: 'PURCHASE_ORDER',
-            referenceId: po.id,
-            stockItemId: poItem.stockItemId,
-            branchId: poItem.stockItem.branchId,
-            tenantId,
-            createdById: userId,
-          },
-        });
-      }
-
-      const updatedItems = await tx.purchaseOrderItem.findMany({
-        where: { purchaseOrderId: id },
-      });
-      const allReceived = updatedItems.every(
-        (item) => new Prisma.Decimal(item.quantityReceived).gte(item.quantityOrdered),
-      );
-      const someReceived = updatedItems.some((item) =>
-        new Prisma.Decimal(item.quantityReceived).gt(0),
-      );
-
-      const newStatus = allReceived
-        ? PurchaseOrderStatus.RECEIVED
-        : someReceived
-          ? PurchaseOrderStatus.PARTIALLY_RECEIVED
-          : po.status;
-
-      return tx.purchaseOrder.update({
-        where: { id },
-        data: {
-          status: newStatus,
-          receivedAt: allReceived ? new Date() : undefined,
-        },
-        include: {
-          supplier: { select: { id: true, name: true } },
-          items: {
-            include: { stockItem: { select: { id: true, name: true, unit: true, branchId: true } } },
-          },
-        },
-      });
       },
       // Mirrors stock-deduction and sales-invoice: the read-modify-
       // write on quantityReceived + the FIFO batch insert + the
@@ -360,7 +428,7 @@ export class PurchaseOrdersService {
             quantity: received.neg() as any,
             costPerUnit: item.unitPrice,
             notes: `PO ${po.orderNumber} cancelled — reversing received stock`,
-            referenceType: 'PURCHASE_ORDER',
+            referenceType: "PURCHASE_ORDER",
             referenceId: po.id,
             stockItemId: item.stockItemId,
             branchId: item.stockItem.branchId,
@@ -380,7 +448,9 @@ export class PurchaseOrdersService {
         include: {
           supplier: { select: { id: true, name: true } },
           items: {
-            include: { stockItem: { select: { id: true, name: true, unit: true } } },
+            include: {
+              stockItem: { select: { id: true, name: true, unit: true } },
+            },
           },
         },
       });

@@ -1,14 +1,21 @@
-import { Controller, Get, HttpCode, Inject, Optional, Query } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { AppService } from './app.service';
-import { Public } from './modules/auth/decorators/public.decorator';
-import { captureException, captureMessage } from './sentry.config';
-import { KMS_PROVIDER_TOKEN } from './modules/kms/kms.module';
-import { KmsProvider } from './modules/kms/kms-provider.interface';
-import { PaymentProviderRegistry } from './modules/payments-core/payment-provider.registry';
-import { FiscalProviderRegistry } from './modules/fiscal-core/fiscal-provider.registry';
+import {
+  Controller,
+  Get,
+  HttpCode,
+  Inject,
+  Optional,
+  Query,
+} from "@nestjs/common";
+import { ApiTags, ApiOperation } from "@nestjs/swagger";
+import { AppService } from "./app.service";
+import { Public } from "./modules/auth/decorators/public.decorator";
+import { captureException, captureMessage } from "./sentry.config";
+import { KMS_PROVIDER_TOKEN } from "./modules/kms/kms.module";
+import { KmsProvider } from "./modules/kms/kms-provider.interface";
+import { PaymentProviderRegistry } from "./modules/payments-core/payment-provider.registry";
+import { FiscalProviderRegistry } from "./modules/fiscal-core/fiscal-provider.registry";
 
-@ApiTags('health')
+@ApiTags("health")
 @Controller()
 export class AppController {
   constructor(
@@ -22,18 +29,18 @@ export class AppController {
 
   @Public()
   @Get()
-  @ApiOperation({ summary: 'Root endpoint' })
+  @ApiOperation({ summary: "Root endpoint" })
   getRoot(): object {
     return {
-      service: 'HummyTummy API',
-      version: '1.0.0',
-      documentation: '/api/docs',
+      service: "HummyTummy API",
+      version: "1.0.0",
+      documentation: "/api/docs",
     };
   }
 
   @Public()
-  @Get('health')
-  @ApiOperation({ summary: 'Health check with database and Redis status' })
+  @Get("health")
+  @ApiOperation({ summary: "Health check with database and Redis status" })
   async getHealth(): Promise<object> {
     return await this.appService.getHealth();
   }
@@ -47,13 +54,13 @@ export class AppController {
   //                  is unhealthy so the orchestrator stops routing.
 
   @Public()
-  @Get('healthz')
+  @Get("healthz")
   async healthz(): Promise<object> {
     return await this.appService.getHealth();
   }
 
   @Public()
-  @Get('healthz/live')
+  @Get("healthz/live")
   @HttpCode(200)
   liveness(): object {
     // Bumped on every restart via package.json. If this endpoint returns
@@ -63,7 +70,7 @@ export class AppController {
   }
 
   @Public()
-  @Get('healthz/ready')
+  @Get("healthz/ready")
   async readiness(): Promise<object> {
     const base = await this.appService.getHealth();
     // Per-module checks. Optional dependencies are skipped when absent so
@@ -73,7 +80,7 @@ export class AppController {
     // also enumerate every payment + fiscal provider before saying "no".
     const checks: Record<string, { ok: boolean; details?: unknown }> = {};
 
-    if ((base as any).status !== 'ok') {
+    if ((base as any).status !== "ok") {
       return { ok: false, base, checks };
     }
 
@@ -87,7 +94,10 @@ export class AppController {
         const probe = Promise.race([
           this.kms.healthCheck(),
           new Promise<{ ok: false; details: any }>((_, reject) => {
-            t = setTimeout(() => reject(new Error('kms timeout after 2000ms')), 2000);
+            t = setTimeout(
+              () => reject(new Error("kms timeout after 2000ms")),
+              2000,
+            );
           }),
         ]).finally(() => clearTimeout(t!));
         checks.kms = await probe;
@@ -99,13 +109,19 @@ export class AppController {
 
     if (this.payments) {
       const providers = this.payments.list();
-      checks.payments = { ok: true, details: { installed: providers.map((p) => p.id) } };
+      checks.payments = {
+        ok: true,
+        details: { installed: providers.map((p) => p.id) },
+      };
       if (!checks.payments.ok) return { ok: false, base, checks };
     }
 
     if (this.fiscal) {
       const providers = this.fiscal.list();
-      checks.fiscal = { ok: true, details: { installed: providers.map((p) => p.id) } };
+      checks.fiscal = {
+        ok: true,
+        details: { installed: providers.map((p) => p.id) },
+      };
       if (!checks.fiscal.ok) return { ok: false, base, checks };
     }
 
@@ -113,29 +129,33 @@ export class AppController {
   }
 
   @Public()
-  @Get('test-sentry')
-  @ApiOperation({ summary: 'Test Sentry error tracking (dev only)' })
-  testSentry(@Query('type') type?: string): object {
-    if (process.env.NODE_ENV === 'production') {
-      return { error: 'Not available in production' };
+  @Get("test-sentry")
+  @ApiOperation({ summary: "Test Sentry error tracking (dev only)" })
+  testSentry(@Query("type") type?: string): object {
+    if (process.env.NODE_ENV === "production") {
+      return { error: "Not available in production" };
     }
 
-    if (type === 'error') {
-      const testError = new Error('Test error from Sentry integration');
-      captureException(testError, { test: true, timestamp: new Date().toISOString() });
+    if (type === "error") {
+      const testError = new Error("Test error from Sentry integration");
+      captureException(testError, {
+        test: true,
+        timestamp: new Date().toISOString(),
+      });
       throw testError;
     }
 
-    if (type === 'message') {
-      captureMessage('Test message from Sentry integration', 'info');
-      return { success: true, message: 'Test message sent to Sentry' };
+    if (type === "message") {
+      captureMessage("Test message from Sentry integration", "info");
+      return { success: true, message: "Test message sent to Sentry" };
     }
 
     return {
-      usage: 'Use ?type=error to trigger an error, ?type=message to send a message',
+      usage:
+        "Use ?type=error to trigger an error, ?type=message to send a message",
       examples: [
-        '/api/test-sentry?type=error',
-        '/api/test-sentry?type=message',
+        "/api/test-sentry?type=error",
+        "/api/test-sentry?type=message",
       ],
     };
   }

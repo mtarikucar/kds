@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import axios from 'axios';
-import { maskIp } from '../../common/helpers/pii-mask.helper';
+import { Injectable, Logger } from "@nestjs/common";
+import axios from "axios";
+import { maskIp } from "../../common/helpers/pii-mask.helper";
 
 export interface GeoData {
   country: string;
@@ -14,7 +14,10 @@ export interface GeoData {
 @Injectable()
 export class GeolocationService {
   private readonly logger = new Logger(GeolocationService.name);
-  private readonly cache = new Map<string, { data: GeoData | null; timestamp: number }>();
+  private readonly cache = new Map<
+    string,
+    { data: GeoData | null; timestamp: number }
+  >();
   private readonly CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
   // v2.8.97 — cap. Pre-fix the Map grew without bound: a tenant with
   // high-traffic public-stats endpoints (campaign landing page) could
@@ -26,27 +29,27 @@ export class GeolocationService {
 
   private isLocalIp(ip: string): boolean {
     return (
-      ip === '127.0.0.1' ||
-      ip === '::1' ||
-      ip === 'localhost' ||
-      ip.startsWith('192.168.') ||
-      ip.startsWith('10.') ||
-      ip.startsWith('172.16.') ||
-      ip.startsWith('172.17.') ||
-      ip.startsWith('172.18.') ||
-      ip.startsWith('172.19.') ||
-      ip.startsWith('172.20.') ||
-      ip.startsWith('172.21.') ||
-      ip.startsWith('172.22.') ||
-      ip.startsWith('172.23.') ||
-      ip.startsWith('172.24.') ||
-      ip.startsWith('172.25.') ||
-      ip.startsWith('172.26.') ||
-      ip.startsWith('172.27.') ||
-      ip.startsWith('172.28.') ||
-      ip.startsWith('172.29.') ||
-      ip.startsWith('172.30.') ||
-      ip.startsWith('172.31.')
+      ip === "127.0.0.1" ||
+      ip === "::1" ||
+      ip === "localhost" ||
+      ip.startsWith("192.168.") ||
+      ip.startsWith("10.") ||
+      ip.startsWith("172.16.") ||
+      ip.startsWith("172.17.") ||
+      ip.startsWith("172.18.") ||
+      ip.startsWith("172.19.") ||
+      ip.startsWith("172.20.") ||
+      ip.startsWith("172.21.") ||
+      ip.startsWith("172.22.") ||
+      ip.startsWith("172.23.") ||
+      ip.startsWith("172.24.") ||
+      ip.startsWith("172.25.") ||
+      ip.startsWith("172.26.") ||
+      ip.startsWith("172.27.") ||
+      ip.startsWith("172.28.") ||
+      ip.startsWith("172.29.") ||
+      ip.startsWith("172.30.") ||
+      ip.startsWith("172.31.")
     );
   }
 
@@ -68,10 +71,10 @@ export class GeolocationService {
       // serves HTTPS too, just without the `X-Rl` request-budget header.
       const response = await axios.get(
         `https://ip-api.com/json/${ip}?fields=status,country,countryCode,region,city,lat,lon`,
-        { timeout: 3000 }
+        { timeout: 3000 },
       );
 
-      if (response.data.status === 'success') {
+      if (response.data.status === "success") {
         const geoData: GeoData = {
           country: response.data.country,
           countryCode: response.data.countryCode,
@@ -87,7 +90,9 @@ export class GeolocationService {
         return geoData;
       }
     } catch (error) {
-      this.logger.warn(`Geolocation lookup failed for ${maskIp(ip)}: ${error.message}`);
+      this.logger.warn(
+        `Geolocation lookup failed for ${maskIp(ip)}: ${error.message}`,
+      );
     }
 
     // Cache failed lookups too to avoid repeated failures
@@ -95,7 +100,10 @@ export class GeolocationService {
     return null;
   }
 
-  private setCacheEntry(ip: string, entry: { data: GeoData | null; timestamp: number }): void {
+  private setCacheEntry(
+    ip: string,
+    entry: { data: GeoData | null; timestamp: number },
+  ): void {
     if (this.cache.has(ip)) this.cache.delete(ip);
     this.cache.set(ip, entry);
     while (this.cache.size > GeolocationService.MAX_CACHE_SIZE) {

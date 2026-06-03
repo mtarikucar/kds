@@ -6,20 +6,20 @@ import {
   SubscribeMessage,
   MessageBody,
   ConnectedSocket,
-} from '@nestjs/websockets';
-import { Server, Socket } from 'socket.io';
-import { Injectable, Logger, UsePipes, ValidationPipe } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from '../../../prisma/prisma.service';
+} from "@nestjs/websockets";
+import { Server, Socket } from "socket.io";
+import { Injectable, Logger, UsePipes, ValidationPipe } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import { PrismaService } from "../../../prisma/prisma.service";
 
 const corsOrigin = () => {
-  if (process.env.CORS_ORIGIN) return process.env.CORS_ORIGIN.split(',');
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.CORS_ORIGIN) return process.env.CORS_ORIGIN.split(",");
+  if (process.env.NODE_ENV === "production") {
     throw new Error(
-      'CORS_ORIGIN must be configured for the analytics gateway in production',
+      "CORS_ORIGIN must be configured for the analytics gateway in production",
     );
   }
-  return ['http://localhost:5173'];
+  return ["http://localhost:5173"];
 };
 import {
   EdgeDeviceRegisterDto,
@@ -30,8 +30,8 @@ import {
   EdgeDeviceCommandDto,
   CameraCalibrationDto,
   PersonState,
-} from '../dto/edge-device';
-import { decryptString } from '../../../common/helpers/encryption.helper';
+} from "../dto/edge-device";
+import { decryptString } from "../../../common/helpers/encryption.helper";
 
 interface EdgeDeviceConnection {
   socketId: string;
@@ -55,9 +55,11 @@ interface EdgeDeviceConnection {
     origin: corsOrigin(),
     credentials: true,
   },
-  namespace: '/analytics-edge',
+  namespace: "/analytics-edge",
 })
-export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnect {
+export class AnalyticsGateway
+  implements OnGatewayConnection, OnGatewayDisconnect
+{
   @WebSocketServer()
   server: Server;
 
@@ -96,16 +98,20 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
       // Check for JWT token or API key
       const token =
         client.handshake.auth.token ||
-        client.handshake.headers.authorization?.split(' ')[1];
+        client.handshake.headers.authorization?.split(" ")[1];
 
       if (!token) {
-        this.logger.warn(`Edge device ${client.id} connection rejected: No authentication`);
+        this.logger.warn(
+          `Edge device ${client.id} connection rejected: No authentication`,
+        );
         client.disconnect();
         return;
       }
 
       try {
-        const payload = this.jwtService.verify(token, { algorithms: ['HS256'] });
+        const payload = this.jwtService.verify(token, {
+          algorithms: ["HS256"],
+        });
 
         // Store connection info
         client.data.tenantId = payload.tenantId;
@@ -126,25 +132,33 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
         // outlive its JWT. setTimeout is process-local but that's fine —
         // a disconnected socket can't replay against the new replica it
         // reconnects to.
-        if (payload.exp && typeof payload.exp === 'number') {
+        if (payload.exp && typeof payload.exp === "number") {
           const msToExpiry = payload.exp * 1000 - Date.now();
           if (msToExpiry > 0 && msToExpiry < 0x7fffffff) {
             setTimeout(() => {
               if (client.connected) {
-                this.logger.log(`Edge device ${client.id} token expired; disconnecting.`);
+                this.logger.log(
+                  `Edge device ${client.id} token expired; disconnecting.`,
+                );
                 client.disconnect(true);
               }
             }, msToExpiry).unref?.();
           }
         }
 
-        this.logger.log(`Edge device ${client.id} connected (Tenant: ${payload.tenantId})`);
+        this.logger.log(
+          `Edge device ${client.id} connected (Tenant: ${payload.tenantId})`,
+        );
       } catch (error) {
-        this.logger.error(`Edge device ${client.id} authentication failed: ${error.message}`);
+        this.logger.error(
+          `Edge device ${client.id} authentication failed: ${error.message}`,
+        );
         client.disconnect();
       }
     } catch (error) {
-      this.logger.error(`Edge device ${client.id} connection error: ${error.message}`);
+      this.logger.error(
+        `Edge device ${client.id} connection error: ${error.message}`,
+      );
       client.disconnect();
     }
   }
@@ -155,7 +169,7 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
    */
   private tokenStillValid(client: Socket): boolean {
     const exp = client.data?.tokenExp;
-    if (typeof exp !== 'number') return true; // pre-fix tokens — keep working
+    if (typeof exp !== "number") return true; // pre-fix tokens — keep working
     if (exp * 1000 <= Date.now()) {
       this.logger.warn(`Rejecting event from ${client.id}: token expired`);
       client.disconnect(true);
@@ -170,7 +184,7 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
     if (deviceId && tenantId) {
       this.connectedDevices.delete(this.deviceKey(tenantId, deviceId));
 
-      this.updateDeviceStatus(deviceId, 'OFFLINE', tenantId).catch((err) => {
+      this.updateDeviceStatus(deviceId, "OFFLINE", tenantId).catch((err) => {
         this.logger.error(`Failed to update device status: ${err.message}`);
       });
     }
@@ -182,18 +196,19 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
   // EDGE DEVICE REGISTRATION
   // ========================================
 
-  @SubscribeMessage('edge:register')
+  @SubscribeMessage("edge:register")
   async handleEdgeRegister(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: EdgeDeviceRegisterDto,
   ) {
-    if (!this.tokenStillValid(client)) return { success: false, error: 'Token expired' };
+    if (!this.tokenStillValid(client))
+      return { success: false, error: "Token expired" };
     try {
       const tenantId = client.data.tenantId;
 
       if (!tenantId || tenantId !== payload.tenantId) {
         this.logger.warn(`Edge device registration rejected: Tenant mismatch`);
-        return { success: false, error: 'Tenant mismatch' };
+        return { success: false, error: "Tenant mismatch" };
       }
 
       // Store device info in socket
@@ -218,15 +233,15 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
       // first active branch as the registration branch. Operators can
       // move the device later via the admin UI.
       const defaultBranch = await this.prisma.branch.findFirst({
-        where: { tenantId: payload.tenantId, status: 'active' },
-        orderBy: { createdAt: 'asc' },
+        where: { tenantId: payload.tenantId, status: "active" },
+        orderBy: { createdAt: "asc" },
         select: { id: true },
       });
       if (!defaultBranch) {
         this.logger.warn(
           `Edge device ${payload.deviceId} registration rejected: tenant ${payload.tenantId} has no active branch`,
         );
-        return { success: false, error: 'No active branch for tenant' };
+        return { success: false, error: "No active branch for tenant" };
       }
 
       // Update or create edge device in database
@@ -242,7 +257,7 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
           name: `Edge Device ${payload.deviceId}`,
           tenantId: payload.tenantId,
           branchId: defaultBranch.id,
-          status: 'ONLINE',
+          status: "ONLINE",
           lastSeenAt: new Date(),
           lastHeartbeat: new Date(),
           firmwareVersion: payload.firmwareVersion,
@@ -250,7 +265,7 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
           capabilities: payload.capabilities || {},
         },
         update: {
-          status: 'ONLINE',
+          status: "ONLINE",
           lastSeenAt: new Date(),
           lastHeartbeat: new Date(),
           firmwareVersion: payload.firmwareVersion,
@@ -274,12 +289,12 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
           this.logger.warn(
             `Edge device ${payload.deviceId} registration rejected: camera ${payload.cameraId} not found`,
           );
-          return { success: false, error: 'Camera not found' };
+          return { success: false, error: "Camera not found" };
         }
         cameraBranchId = cam.branchId;
         await this.prisma.camera.updateMany({
           where: { id: payload.cameraId, tenantId: payload.tenantId },
-          data: { status: 'ONLINE', lastSeenAt: new Date() },
+          data: { status: "ONLINE", lastSeenAt: new Date() },
         });
       }
 
@@ -292,7 +307,7 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
 
       // Send current configuration to device
       const config = await this.getDeviceConfig(payload.cameraId, tenantId);
-      client.emit('edge:config', { data: config });
+      client.emit("edge:config", { data: config });
 
       this.logger.log(
         `Edge device ${payload.deviceId} registered (Camera: ${payload.cameraId}, Tenant: ${tenantId}, Branch: ${effectiveBranchId})`,
@@ -309,17 +324,18 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
   // OCCUPANCY DATA HANDLING
   // ========================================
 
-  @SubscribeMessage('edge:occupancy')
+  @SubscribeMessage("edge:occupancy")
   async handleOccupancyData(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: EdgeOccupancyDataDto,
   ) {
-    if (!this.tokenStillValid(client)) return { success: false, error: 'Token expired' };
+    if (!this.tokenStillValid(client))
+      return { success: false, error: "Token expired" };
     try {
       const tenantId = client.data.tenantId;
 
       if (!tenantId || tenantId !== payload.tenantId) {
-        return { success: false, error: 'Tenant mismatch' };
+        return { success: false, error: "Tenant mismatch" };
       }
 
       // Bind the data submission to the cameraId the device registered
@@ -331,13 +347,13 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
       // since must match.
       const registeredCameraId: string | undefined = client.data.cameraId;
       if (!registeredCameraId) {
-        return { success: false, error: 'Device not registered to a camera' };
+        return { success: false, error: "Device not registered to a camera" };
       }
       if (payload.cameraId !== registeredCameraId) {
         this.logger.warn(
           `Rejecting occupancy from ${client.id}: cameraId mismatch (payload=${payload.cameraId}, registered=${registeredCameraId})`,
         );
-        return { success: false, error: 'Camera mismatch' };
+        return { success: false, error: "Camera mismatch" };
       }
 
       const timestamp = new Date(payload.timestamp);
@@ -354,7 +370,7 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
           select: { branchId: true },
         });
         if (!camera) {
-          return { success: false, error: 'Camera not found for tenant' };
+          return { success: false, error: "Camera not found for tenant" };
         }
         const branchId = camera.branchId;
 
@@ -374,7 +390,12 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
         });
 
         // Update traffic flow aggregation (async, don't wait)
-        this.updateTrafficFlow(tenantId, branchId, payload.detections, timestamp).catch((err) => {
+        this.updateTrafficFlow(
+          tenantId,
+          branchId,
+          payload.detections,
+          timestamp,
+        ).catch((err) => {
           this.logger.error(`Traffic flow update failed: ${err.message}`);
         });
 
@@ -393,12 +414,13 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
   // HEARTBEAT HANDLING
   // ========================================
 
-  @SubscribeMessage('edge:heartbeat')
+  @SubscribeMessage("edge:heartbeat")
   async handleHeartbeat(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: EdgeHeartbeatDto,
   ) {
-    if (!this.tokenStillValid(client)) return { success: false, error: 'Token expired' };
+    if (!this.tokenStillValid(client))
+      return { success: false, error: "Token expired" };
     try {
       // Use ONLY the registered deviceId. The earlier fallback to
       // payload.deviceId let an authenticated-but-unregistered socket
@@ -408,13 +430,16 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
       // explicit fail-closed branch surfaces the wiring mistake instead.
       const deviceId: string | undefined = client.data.deviceId;
       if (!deviceId) {
-        return { success: false, error: 'Device not registered — send edge:register first' };
+        return {
+          success: false,
+          error: "Device not registered — send edge:register first",
+        };
       }
       if (payload.deviceId && payload.deviceId !== deviceId) {
         this.logger.warn(
           `Rejecting heartbeat from ${client.id}: deviceId mismatch (payload=${payload.deviceId}, registered=${deviceId})`,
         );
-        return { success: false, error: 'Device mismatch' };
+        return { success: false, error: "Device mismatch" };
       }
 
       const device = this.connectedDevices.get(
@@ -432,7 +457,7 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
         data: {
           lastHeartbeat: new Date(),
           lastSeenAt: new Date(),
-          status: 'ONLINE',
+          status: "ONLINE",
         },
       });
 
@@ -447,24 +472,28 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
   // HEALTH STATUS HANDLING
   // ========================================
 
-  @SubscribeMessage('edge:health')
+  @SubscribeMessage("edge:health")
   async handleHealthStatus(
     @ConnectedSocket() client: Socket,
     @MessageBody() payload: EdgeHealthStatusDto,
   ) {
-    if (!this.tokenStillValid(client)) return { success: false, error: 'Token expired' };
+    if (!this.tokenStillValid(client))
+      return { success: false, error: "Token expired" };
     try {
       // Same identity-binding rule as edge:heartbeat — use only the
       // registered deviceId, reject mismatches loudly.
       const deviceId: string | undefined = client.data.deviceId;
       if (!deviceId) {
-        return { success: false, error: 'Device not registered — send edge:register first' };
+        return {
+          success: false,
+          error: "Device not registered — send edge:register first",
+        };
       }
       if (payload.deviceId && payload.deviceId !== deviceId) {
         this.logger.warn(
           `Rejecting health status from ${client.id}: deviceId mismatch (payload=${payload.deviceId}, registered=${deviceId})`,
         );
-        return { success: false, error: 'Device mismatch' };
+        return { success: false, error: "Device mismatch" };
       }
 
       await this.prisma.edgeDevice.updateMany({
@@ -509,7 +538,7 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
       return false;
     }
 
-    this.server.to(device.socketId).emit('edge:config', { data: config });
+    this.server.to(device.socketId).emit("edge:config", { data: config });
     this.logger.log(`Config sent to device ${deviceId}`);
     return true;
   }
@@ -521,11 +550,13 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
   ) {
     const device = this.findDevice(deviceId, tenantId);
     if (!device) {
-      this.logger.warn(`Cannot send command - device ${deviceId} not connected`);
+      this.logger.warn(
+        `Cannot send command - device ${deviceId} not connected`,
+      );
       return false;
     }
 
-    this.server.to(device.socketId).emit('edge:command', { data: command });
+    this.server.to(device.socketId).emit("edge:command", { data: command });
     this.logger.log(`Command ${command.command} sent to device ${deviceId}`);
     return true;
   }
@@ -537,11 +568,15 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
   ) {
     const device = this.findDevice(deviceId, tenantId);
     if (!device) {
-      this.logger.warn(`Cannot send calibration - device ${deviceId} not connected`);
+      this.logger.warn(
+        `Cannot send calibration - device ${deviceId} not connected`,
+      );
       return false;
     }
 
-    this.server.to(device.socketId).emit('edge:calibration', { data: calibration });
+    this.server
+      .to(device.socketId)
+      .emit("edge:calibration", { data: calibration });
     this.logger.log(`Calibration data sent to device ${deviceId}`);
     return true;
   }
@@ -564,7 +599,7 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
   ) {
     this.server
       .to(`analytics-${tenantId}-${branchId}`)
-      .emit('analytics:occupancy-update', {
+      .emit("analytics:occupancy-update", {
         cameraId: data.cameraId,
         timestamp: data.timestamp,
         personCount: data.detections.length,
@@ -584,7 +619,7 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
   ) {
     this.server
       .to(`analytics-${tenantId}-${branchId}`)
-      .emit('analytics:heatmap-update', {
+      .emit("analytics:heatmap-update", {
         timestamp: new Date().toISOString(),
         grid: heatmapData,
       });
@@ -593,7 +628,7 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
   broadcastInsight(tenantId: string, branchId: string, insight: unknown) {
     this.server
       .to(`analytics-${tenantId}-${branchId}`)
-      .emit('analytics:new-insight', insight);
+      .emit("analytics:new-insight", insight);
   }
 
   // ========================================
@@ -632,15 +667,15 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
       // decrypted here. The admin-facing API path already does this in
       // camera.service.ts; forgetting it here previously broke camera
       // analytics end-to-end.
-      cameraUrl: camera.streamUrl ? decryptString(camera.streamUrl) : '',
-      calibration: camera.calibrationData as EdgeDeviceConfigDto['calibration'],
+      cameraUrl: camera.streamUrl ? decryptString(camera.streamUrl) : "",
+      calibration: camera.calibrationData as EdgeDeviceConfigDto["calibration"],
     };
   }
 
   private async updateTrafficFlow(
     tenantId: string,
     branchId: string,
-    detections: EdgeOccupancyDataDto['detections'],
+    detections: EdgeOccupancyDataDto["detections"],
     timestamp: Date,
   ) {
     // Round to hour for aggregation
@@ -656,7 +691,7 @@ export class AnalyticsGateway implements OnGatewayConnection, OnGatewayDisconnec
 
     // Update traffic flow records
     for (const [key, count] of cellCounts) {
-      const [cellX, cellZ] = key.split('-').map(Number);
+      const [cellX, cellZ] = key.split("-").map(Number);
 
       await this.prisma.trafficFlowRecord.upsert({
         where: {

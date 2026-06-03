@@ -1,13 +1,13 @@
-import { Module, forwardRef } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { KdsGateway } from './kds.gateway';
-import { KdsService } from './kds.service';
-import { KdsController } from './kds.controller';
-import { PrismaModule } from '../../prisma/prisma.module';
-import { OrdersModule } from '../orders/orders.module';
-import { DeliveryPlatformsModule } from '../delivery-platforms/delivery-platforms.module';
-import { StockManagementModule } from '../stock-management/stock-management.module';
+import { Module, forwardRef } from "@nestjs/common";
+import { JwtModule } from "@nestjs/jwt";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { KdsGateway } from "./kds.gateway";
+import { KdsService } from "./kds.service";
+import { KdsController } from "./kds.controller";
+import { PrismaModule } from "../../prisma/prisma.module";
+import { OrdersModule } from "../orders/orders.module";
+import { DeliveryPlatformsModule } from "../delivery-platforms/delivery-platforms.module";
+import { StockManagementModule } from "../stock-management/stock-management.module";
 
 @Module({
   imports: [
@@ -18,9 +18,9 @@ import { StockManagementModule } from '../stock-management/stock-management.modu
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>('JWT_SECRET'),
+        secret: configService.get<string>("JWT_SECRET"),
         signOptions: {
-          expiresIn: configService.get<string>('JWT_EXPIRES_IN') || '7d',
+          expiresIn: configService.get<string>("JWT_EXPIRES_IN") || "7d",
         },
       }),
       inject: [ConfigService],

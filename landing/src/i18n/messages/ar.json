@@ -286,7 +286,7 @@
     "description": "منصة إدارة المطاعم الحديثة. بسّط العمليات، أسعد العملاء.",
     "contact": "اتصل بنا",
     "address": "Şehit Osman Avcı Mahallesi, Akın 688 Sitesi B32, Etimesgut / Ankara",
-    "phone": "+90 546 678 04 95",
+    "phone": "+90 850 840 73 03",
     "product": "المنتج",
     "company": "الشركة",
     "support": "الدعم",
@@ -502,8 +502,10 @@
     "title": "تواصل معنا",
     "subtitle": "تواصل معنا بشأن الأسئلة والطلبات والملاحظات.",
     "backToHome": "العودة إلى الرئيسية",
+    "phone": "+90 850 840 73 03",
     "labels": {
-      "email": "البريد الإلكتروني"
+      "email": "البريد الإلكتروني",
+      "phone": "الهاتف"
     },
     "sections": {
       "general": {

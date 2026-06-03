@@ -1,6 +1,11 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import { DomainEventBus } from './domain-event-bus.service';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma/prisma.service";
+import { DomainEventBus } from "./domain-event-bus.service";
 
 /**
  * Drains queued OutboxEvent rows onto the in-process DomainEventBus.
@@ -26,7 +31,9 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
   // pruner deletes them. Configurable via env so ops can extend the
   // forensic window without a deploy. Failed rows are NEVER auto-pruned
   // — they're the DLQ; operator must triage manually.
-  private readonly RETENTION_DAYS = Number(process.env.OUTBOX_RETENTION_DAYS ?? '14');
+  private readonly RETENTION_DAYS = Number(
+    process.env.OUTBOX_RETENTION_DAYS ?? "14",
+  );
   private readonly PRUNE_INTERVAL_MS = 60 * 60_000; // every hour
   // Cap deletions per batch so a backlog doesn't lock the table.
   private readonly PRUNE_BATCH = 5_000;
@@ -79,7 +86,9 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
     if (this.stopping) return;
     this.pruneTimer = setTimeout(() => {
       this.pruneOnce()
-        .catch((e) => this.logger.warn(`outbox prune failed: ${(e as Error).message}`))
+        .catch((e) =>
+          this.logger.warn(`outbox prune failed: ${(e as Error).message}`),
+        )
         .finally(() => this.schedulePrune(this.PRUNE_INTERVAL_MS));
     }, delayMs);
   }
@@ -95,7 +104,9 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
     if (this.RETENTION_DAYS < 1) return; // safety: never delete on bad config
     this.pruning = true;
     try {
-      const cutoff = new Date(Date.now() - this.RETENTION_DAYS * 24 * 60 * 60_000);
+      const cutoff = new Date(
+        Date.now() - this.RETENTION_DAYS * 24 * 60 * 60_000,
+      );
       const result = await this.prisma.$executeRaw`
         DELETE FROM "outbox_events"
          WHERE "id" IN (
@@ -141,15 +152,17 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
     // Postgres syntax: UPDATE ... WHERE id IN (SELECT ... FOR UPDATE SKIP
     // LOCKED LIMIT N) RETURNING *.
     const now = new Date();
-    const rows = await this.prisma.$queryRaw<Array<{
-      id: string;
-      type: string;
-      tenantId: string | null;
-      payload: any;
-      idempotencyKey: string;
-      attempts: number;
-      createdAt: Date;
-    }>>`
+    const rows = await this.prisma.$queryRaw<
+      Array<{
+        id: string;
+        type: string;
+        tenantId: string | null;
+        payload: any;
+        idempotencyKey: string;
+        attempts: number;
+        createdAt: Date;
+      }>
+    >`
       UPDATE "outbox_events"
          SET "status" = 'dispatching', "attempts" = "attempts" + 1
        WHERE "id" IN (
@@ -175,17 +188,21 @@ export class OutboxWorkerService implements OnModuleInit, OnModuleDestroy {
         });
         await this.prisma.outboxEvent.update({
           where: { id: r.id },
-          data: { status: 'dispatched', dispatchedAt: new Date(), lastError: null },
+          data: {
+            status: "dispatched",
+            dispatchedAt: new Date(),
+            lastError: null,
+          },
         });
       } catch (e) {
-        const msg = (e as Error).message?.slice(0, 500) ?? 'unknown';
+        const msg = (e as Error).message?.slice(0, 500) ?? "unknown";
         const final = r.attempts >= this.MAX_ATTEMPTS;
         // Backoff: 0.5s, 1s, 2s, 4s, ... capped at 5min.
         const backoffMs = Math.min(500 * 2 ** r.attempts, 5 * 60_000);
         await this.prisma.outboxEvent.update({
           where: { id: r.id },
           data: {
-            status: final ? 'failed' : 'queued',
+            status: final ? "failed" : "queued",
             lastError: msg,
             nextAttemptAt: final ? null : new Date(Date.now() + backoffMs),
           },

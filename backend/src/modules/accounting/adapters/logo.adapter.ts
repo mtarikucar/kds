@@ -1,9 +1,12 @@
-import { Logger } from '@nestjs/common';
-import axios, { AxiosInstance } from 'axios';
-import { AccountingAdapter, AccountingInvoiceData } from './accounting-adapter.interface';
+import { Logger } from "@nestjs/common";
+import axios, { AxiosInstance } from "axios";
+import {
+  AccountingAdapter,
+  AccountingInvoiceData,
+} from "./accounting-adapter.interface";
 
 export class LogoAdapter implements AccountingAdapter {
-  readonly name = 'logo';
+  readonly name = "logo";
   private readonly logger = new Logger(LogoAdapter.name);
   private httpClient: AxiosInstance;
 
@@ -11,9 +14,11 @@ export class LogoAdapter implements AccountingAdapter {
     this.httpClient = axios.create({ timeout: 15000 });
   }
 
-  async authenticate(credentials: Record<string, string>): Promise<{ accessToken: string; expiresAt?: Date }> {
+  async authenticate(
+    credentials: Record<string, string>,
+  ): Promise<{ accessToken: string; expiresAt?: Date }> {
     this.httpClient.defaults.baseURL = credentials.apiUrl;
-    const response = await this.httpClient.post('/api/v1/token', {
+    const response = await this.httpClient.post("/api/v1/token", {
       username: credentials.username,
       password: credentials.password,
       firmNumber: parseInt(credentials.firmNumber) || 1,
@@ -25,13 +30,17 @@ export class LogoAdapter implements AccountingAdapter {
     };
   }
 
-  async pushInvoice(token: string, _companyId: string, invoice: AccountingInvoiceData): Promise<{ externalId: string }> {
+  async pushInvoice(
+    token: string,
+    _companyId: string,
+    invoice: AccountingInvoiceData,
+  ): Promise<{ externalId: string }> {
     const logoInvoice = {
       TYPE: 7,
       NUMBER: invoice.invoiceNumber,
       DATE: invoice.issueDate,
       DOC_NUMBER: invoice.invoiceNumber,
-      ARP_CODE: invoice.customerTaxId || '',
+      ARP_CODE: invoice.customerTaxId || "",
       TOTAL_NET: invoice.totalAmount,
       TRANSACTIONS: {
         items: invoice.items.map((item, index) => ({
@@ -45,11 +54,16 @@ export class LogoAdapter implements AccountingAdapter {
       },
     };
 
-    const response = await this.httpClient.post('/api/v1/salesInvoices', logoInvoice, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await this.httpClient.post(
+      "/api/v1/salesInvoices",
+      logoInvoice,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      },
+    );
 
-    const externalId = response.data?.INTERNAL_REFERENCE?.toString() || `logo-${Date.now()}`;
+    const externalId =
+      response.data?.INTERNAL_REFERENCE?.toString() || `logo-${Date.now()}`;
     this.logger.log(`Logo invoice created: ${externalId}`);
     return { externalId };
   }

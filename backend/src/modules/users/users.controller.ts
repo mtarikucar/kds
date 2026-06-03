@@ -9,15 +9,20 @@ import {
   Query,
   UseGuards,
   Request,
-} from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
-import { UsersService } from './users.service';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { UpdateProfileDto, UpdateEmailDto } from './dto/update-profile.dto';
-import { UpdateOnboardingDto } from './dto/update-onboarding.dto';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
-import { Roles } from '../auth/decorators/roles.decorator';
+} from "@nestjs/common";
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiResponse,
+} from "@nestjs/swagger";
+import { UsersService } from "./users.service";
+import { CreateUserDto } from "./dto/create-user.dto";
+import { UpdateUserDto } from "./dto/update-user.dto";
+import { UpdateProfileDto, UpdateEmailDto } from "./dto/update-profile.dto";
+import { UpdateOnboardingDto } from "./dto/update-onboarding.dto";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
+import { Roles } from "../auth/decorators/roles.decorator";
 // v2.8.92: route user-limit checks through the canonical PlanFeatureGuard
 // + modern `@CheckLimit(LimitType.USERS)` pair. Pre-v2.8.92 this
 // controller used the legacy SubscriptionLimitsGuard + free-form
@@ -25,9 +30,12 @@ import { Roles } from '../auth/decorators/roles.decorator';
 // path on top of @RequireEntitlement and @RequiresFeature. Both legacy
 // surfaces now resolve via the entitlement engine after v2.8.90, so
 // the legacy code path is dead-weight and has been deleted.
-import { PlanFeatureGuard } from '../subscriptions/guards/plan-feature.guard';
-import { CheckLimit, LimitType } from '../subscriptions/decorators/check-limit.decorator';
-import { UserRole } from '../../common/constants/roles.enum';
+import { PlanFeatureGuard } from "../subscriptions/guards/plan-feature.guard";
+import {
+  CheckLimit,
+  LimitType,
+} from "../subscriptions/decorators/check-limit.decorator";
+import { UserRole } from "../../common/constants/roles.enum";
 
 /**
  * JwtAuthGuard, TenantGuard, and RolesGuard are registered globally via
@@ -35,9 +43,9 @@ import { UserRole } from '../../common/constants/roles.enum';
  * only cause the same guards to run twice. PlanFeatureGuard is NOT
  * global, so it lives at the controller level here.
  */
-@ApiTags('users')
+@ApiTags("users")
 @ApiBearerAuth()
-@Controller('users')
+@Controller("users")
 @UseGuards(PlanFeatureGuard)
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -45,10 +53,13 @@ export class UsersController {
   @Post()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @CheckLimit(LimitType.USERS)
-  @ApiOperation({ summary: 'Create a new user (ADMIN, MANAGER)' })
-  @ApiResponse({ status: 201, description: 'User successfully created' })
-  @ApiResponse({ status: 409, description: 'Email already in use' })
-  @ApiResponse({ status: 403, description: 'Insufficient permissions or limit reached' })
+  @ApiOperation({ summary: "Create a new user (ADMIN, MANAGER)" })
+  @ApiResponse({ status: 201, description: "User successfully created" })
+  @ApiResponse({ status: 409, description: "Email already in use" })
+  @ApiResponse({
+    status: 403,
+    description: "Insufficient permissions or limit reached",
+  })
   create(
     @Body() createUserDto: CreateUserDto,
     @Request() req,
@@ -59,15 +70,15 @@ export class UsersController {
 
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ summary: 'Get all users (ADMIN, MANAGER)' })
-  @ApiResponse({ status: 200, description: 'Paginated list of users' })
+  @ApiOperation({ summary: "Get all users (ADMIN, MANAGER)" })
+  @ApiResponse({ status: 200, description: "Paginated list of users" })
   findAll(
     @Request() req,
-    @Query('status') status?: string,
-    @Query('role') role?: string,
-    @Query('search') search?: string,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
+    @Query("status") status?: string,
+    @Query("role") role?: string,
+    @Query("search") search?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
   ) {
     return this.usersService.findAll(req.tenantId, {
       status,
@@ -78,18 +89,20 @@ export class UsersController {
     });
   }
 
-  @Get(':id')
+  @Get(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ summary: 'Get a user by ID (ADMIN, MANAGER)' })
-  findOne(@Param('id') id: string, @Request() req) {
+  @ApiOperation({ summary: "Get a user by ID (ADMIN, MANAGER)" })
+  findOne(@Param("id") id: string, @Request() req) {
     return this.usersService.findOne(id, req.tenantId);
   }
 
-  @Patch(':id')
+  @Patch(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ summary: 'Update a user (ADMIN, MANAGER; role changes ADMIN-only)' })
+  @ApiOperation({
+    summary: "Update a user (ADMIN, MANAGER; role changes ADMIN-only)",
+  })
   update(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body() updateUserDto: UpdateUserDto,
     @Request() req,
     @CurrentUser() actor: { id: string; role: string },
@@ -97,83 +110,83 @@ export class UsersController {
     return this.usersService.update(id, updateUserDto, req.tenantId, actor);
   }
 
-  @Delete(':id')
+  @Delete(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ summary: 'Soft delete a user (ADMIN, MANAGER)' })
+  @ApiOperation({ summary: "Soft delete a user (ADMIN, MANAGER)" })
   remove(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Request() req,
-    @CurrentUser('id') actorId: string,
+    @CurrentUser("id") actorId: string,
   ) {
     return this.usersService.remove(id, req.tenantId, actorId);
   }
 
   // Profile endpoints (all authenticated users)
-  @Get('me/profile')
-  @ApiOperation({ summary: 'Get current user profile' })
-  getMyProfile(@CurrentUser('id') userId: string) {
+  @Get("me/profile")
+  @ApiOperation({ summary: "Get current user profile" })
+  getMyProfile(@CurrentUser("id") userId: string) {
     return this.usersService.getMyProfile(userId);
   }
 
-  @Patch('me/profile')
-  @ApiOperation({ summary: 'Update current user profile' })
+  @Patch("me/profile")
+  @ApiOperation({ summary: "Update current user profile" })
   updateMyProfile(
-    @CurrentUser('id') userId: string,
+    @CurrentUser("id") userId: string,
     @Body() updateProfileDto: UpdateProfileDto,
   ) {
     return this.usersService.updateProfile(userId, updateProfileDto);
   }
 
-  @Patch('me/email')
-  @ApiOperation({ summary: 'Update user email (requires password)' })
+  @Patch("me/email")
+  @ApiOperation({ summary: "Update user email (requires password)" })
   updateMyEmail(
-    @CurrentUser('id') userId: string,
+    @CurrentUser("id") userId: string,
     @Body() updateEmailDto: UpdateEmailDto,
   ) {
     return this.usersService.updateEmail(userId, updateEmailDto);
   }
 
-  @Patch(':id/approve')
+  @Patch(":id/approve")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ summary: 'Approve a pending user (ADMIN, MANAGER)' })
+  @ApiOperation({ summary: "Approve a pending user (ADMIN, MANAGER)" })
   approveUser(
-    @Param('id') id: string,
-    @CurrentUser('id') approverId: string,
+    @Param("id") id: string,
+    @CurrentUser("id") approverId: string,
     @Request() req,
   ) {
     return this.usersService.approveUser(id, approverId, req.tenantId);
   }
 
-  @Patch(':id/reject')
+  @Patch(":id/reject")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  @ApiOperation({ summary: 'Reject a pending user (ADMIN, MANAGER)' })
-  rejectUser(@Param('id') id: string, @Request() req) {
+  @ApiOperation({ summary: "Reject a pending user (ADMIN, MANAGER)" })
+  rejectUser(@Param("id") id: string, @Request() req) {
     return this.usersService.rejectUser(id, req.tenantId);
   }
 
-  @Patch(':id/reactivate')
+  @Patch(":id/reactivate")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   @CheckLimit(LimitType.USERS)
-  @ApiOperation({ summary: 'Reactivate an inactive user (ADMIN, MANAGER)' })
+  @ApiOperation({ summary: "Reactivate an inactive user (ADMIN, MANAGER)" })
   reactivateUser(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Request() req,
-    @CurrentUser('id') actorId: string,
+    @CurrentUser("id") actorId: string,
   ) {
     return this.usersService.reactivateUser(id, req.tenantId, actorId);
   }
 
   // Onboarding endpoints
-  @Get('me/onboarding')
-  @ApiOperation({ summary: 'Get current user onboarding data' })
-  getMyOnboarding(@CurrentUser('id') userId: string) {
+  @Get("me/onboarding")
+  @ApiOperation({ summary: "Get current user onboarding data" })
+  getMyOnboarding(@CurrentUser("id") userId: string) {
     return this.usersService.getOnboarding(userId);
   }
 
-  @Patch('me/onboarding')
-  @ApiOperation({ summary: 'Update current user onboarding data' })
+  @Patch("me/onboarding")
+  @ApiOperation({ summary: "Update current user onboarding data" })
   updateMyOnboarding(
-    @CurrentUser('id') userId: string,
+    @CurrentUser("id") userId: string,
     @Body() updateOnboardingDto: UpdateOnboardingDto,
   ) {
     return this.usersService.updateOnboarding(userId, updateOnboardingDto);

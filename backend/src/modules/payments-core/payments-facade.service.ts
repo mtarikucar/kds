@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { OutboxService } from '../outbox/outbox.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { OutboxService } from "../outbox/outbox.service";
 import {
   PaymentIntent,
   PaymentIntentRequest,
@@ -7,8 +7,8 @@ import {
   ProviderWebhookEvent,
   RefundRequest,
   RefundTransaction,
-} from './payment-provider.interface';
-import { PaymentProviderRegistry } from './payment-provider.registry';
+} from "./payment-provider.interface";
+import { PaymentProviderRegistry } from "./payment-provider.registry";
 
 /**
  * Provider-neutral payments façade.
@@ -28,13 +28,16 @@ export class PaymentsFacadeService {
     private readonly outbox: OutboxService,
   ) {}
 
-  async createIntent(providerId: string, req: PaymentIntentRequest): Promise<PaymentIntent> {
+  async createIntent(
+    providerId: string,
+    req: PaymentIntentRequest,
+  ): Promise<PaymentIntent> {
     const provider = this.registry.get(providerId);
     const intent = await provider.createIntent(req);
 
     await this.outbox
       .append({
-        type: 'payment.intent_created.v1',
+        type: "payment.intent_created.v1",
         tenantId: req.tenantId,
         payload: {
           providerId,
@@ -49,15 +52,22 @@ export class PaymentsFacadeService {
     return intent;
   }
 
-  async getStatus(providerId: string, intentId: string): Promise<PaymentTransaction> {
+  async getStatus(
+    providerId: string,
+    intentId: string,
+  ): Promise<PaymentTransaction> {
     return this.registry.get(providerId).status(intentId);
   }
 
-  async refund(providerId: string, req: RefundRequest, tenantId: string): Promise<RefundTransaction> {
+  async refund(
+    providerId: string,
+    req: RefundRequest,
+    tenantId: string,
+  ): Promise<RefundTransaction> {
     const refund = await this.registry.get(providerId).refund(req);
     await this.outbox
       .append({
-        type: 'payment.refund_completed.v1',
+        type: "payment.refund_completed.v1",
         tenantId,
         payload: { providerId, ...refund },
       })
@@ -71,8 +81,14 @@ export class PaymentsFacadeService {
    * event per provider event so downstream consumers don't care which
    * vendor produced the message.
    */
-  async ingestWebhook(providerId: string, signature: string, raw: Buffer | string): Promise<void> {
-    const events = await this.registry.get(providerId).parseWebhook(signature, raw);
+  async ingestWebhook(
+    providerId: string,
+    signature: string,
+    raw: Buffer | string,
+  ): Promise<void> {
+    const events = await this.registry
+      .get(providerId)
+      .parseWebhook(signature, raw);
     for (const ev of events) {
       await this.outbox
         .append({

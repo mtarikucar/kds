@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty } from "@nestjs/swagger";
 import {
   ArrayMaxSize,
   IsArray,
@@ -13,7 +13,7 @@ import {
   Max,
   MaxLength,
   Min,
-} from 'class-validator';
+} from "class-validator";
 
 // http(s):// for vendor images, or `/` for self-hosted (landing/public assets).
 // Blocks `javascript:` / `data:` / `vbscript:` — the legacy `image` column lands
@@ -23,7 +23,7 @@ import {
 const PRODUCT_IMAGE_URL_REGEX = /^(https?:\/\/|\/)/;
 
 export class CreateProductDto {
-  @ApiProperty({ example: 'Grilled Chicken' })
+  @ApiProperty({ example: "Grilled Chicken" })
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
@@ -31,7 +31,10 @@ export class CreateProductDto {
 
   // Description is Postgres TEXT — no implicit ceiling. 5,000 is roomy for
   // long-form menu copy without letting a bug-driven write seed a multi-MB row.
-  @ApiProperty({ example: 'Tender grilled chicken with herbs', required: false })
+  @ApiProperty({
+    example: "Tender grilled chicken with herbs",
+    required: false,
+  })
   @IsString()
   @IsOptional()
   @MaxLength(5000)
@@ -46,12 +49,12 @@ export class CreateProductDto {
   @Max(10_000_000)
   price: number;
 
-  @ApiProperty({ example: 'https://example.com/image.jpg', required: false })
+  @ApiProperty({ example: "https://example.com/image.jpg", required: false })
   @IsString()
   @IsOptional()
   @MaxLength(2048)
   @Matches(PRODUCT_IMAGE_URL_REGEX, {
-    message: 'image must be an absolute http(s) URL or a `/`-rooted path',
+    message: "image must be an absolute http(s) URL or a `/`-rooted path",
   })
   image?: string;
 
@@ -75,7 +78,7 @@ export class CreateProductDto {
   @IsOptional()
   currentStock?: number;
 
-  @ApiProperty({ example: 'category-uuid' })
+  @ApiProperty({ example: "category-uuid" })
   @IsUUID()
   categoryId: string;
 
@@ -83,13 +86,14 @@ export class CreateProductDto {
   // N-statement $transaction inside attachImagesToProduct (the existing
   // reorder loop runs one update per id). 20 mirrors the iter-48 catalog cap.
   @ApiProperty({
-    example: ['image-uuid-1', 'image-uuid-2'],
+    example: ["image-uuid-1", "image-uuid-2"],
     required: false,
-    description: 'Array of image IDs to attach to this product. First image will be the primary image.'
+    description:
+      "Array of image IDs to attach to this product. First image will be the primary image.",
   })
   @IsArray()
   @ArrayMaxSize(20)
-  @IsUUID('all', { each: true })
+  @IsUUID("all", { each: true })
   @IsOptional()
   imageIds?: string[];
 

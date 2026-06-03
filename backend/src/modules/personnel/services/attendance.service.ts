@@ -1,10 +1,17 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { KdsGateway } from '../../kds/kds.gateway';
-import { AttendanceStatus } from '../constants/personnel.enum';
-import { AttendanceQueryDto, AttendanceSummaryQueryDto } from '../dto/attendance-query.dto';
-import { paginated } from '../../../common/pagination';
-import { getTenantMidnight } from '../../../common/helpers/timezone.helper';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from "@nestjs/common";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { KdsGateway } from "../../kds/kds.gateway";
+import { AttendanceStatus } from "../constants/personnel.enum";
+import {
+  AttendanceQueryDto,
+  AttendanceSummaryQueryDto,
+} from "../dto/attendance-query.dto";
+import { paginated } from "../../../common/pagination";
+import { getTenantMidnight } from "../../../common/helpers/timezone.helper";
 
 @Injectable()
 export class AttendanceService {
@@ -26,7 +33,7 @@ export class AttendanceService {
       where: { id: tenantId },
       select: { timezone: true },
     });
-    return getTenantMidnight(new Date(), tenant?.timezone || 'UTC');
+    return getTenantMidnight(new Date(), tenant?.timezone || "UTC");
   }
 
   async clockIn(tenantId: string, userId: string, notes?: string) {
@@ -38,11 +45,13 @@ export class AttendanceService {
     });
 
     if (existing && existing.status !== AttendanceStatus.CLOCKED_OUT) {
-      throw new BadRequestException('Already clocked in today');
+      throw new BadRequestException("Already clocked in today");
     }
 
     if (existing && existing.status === AttendanceStatus.CLOCKED_OUT) {
-      throw new BadRequestException('Already clocked out today. Cannot clock in again.');
+      throw new BadRequestException(
+        "Already clocked out today. Cannot clock in again.",
+      );
     }
 
     // Find shift assignment for today
@@ -56,7 +65,9 @@ export class AttendanceService {
     const now = new Date();
 
     if (shiftAssignment?.shiftTemplate) {
-      const [shiftHour, shiftMin] = shiftAssignment.shiftTemplate.startTime.split(':').map(Number);
+      const [shiftHour, shiftMin] = shiftAssignment.shiftTemplate.startTime
+        .split(":")
+        .map(Number);
       const gracePeriod = shiftAssignment.shiftTemplate.gracePeriodMinutes;
 
       const shiftStart = new Date(today);
@@ -66,7 +77,9 @@ export class AttendanceService {
 
       if (now > graceEnd) {
         isLate = true;
-        lateMinutes = Math.floor((now.getTime() - shiftStart.getTime()) / 60000);
+        lateMinutes = Math.floor(
+          (now.getTime() - shiftStart.getTime()) / 60000,
+        );
       }
     }
 
@@ -82,7 +95,7 @@ export class AttendanceService {
     const branchId = user?.primaryBranchId ?? shiftAssignment?.branchId;
     if (!branchId) {
       throw new BadRequestException(
-        'Cannot clock in: user has no primary branch assigned',
+        "Cannot clock in: user has no primary branch assigned",
       );
     }
 
@@ -100,15 +113,19 @@ export class AttendanceService {
           tenantId,
           branchId,
         },
-        include: { user: { select: { id: true, firstName: true, lastName: true, role: true } } },
+        include: {
+          user: {
+            select: { id: true, firstName: true, lastName: true, role: true },
+          },
+        },
       });
 
       this.kdsGateway.emitAttendanceUpdate(tenantId, result.branchId, result);
       return result;
     } catch (error: any) {
       // Handle unique constraint violation (concurrent clock-in)
-      if (error.code === 'P2002') {
-        throw new BadRequestException('Already clocked in today');
+      if (error.code === "P2002") {
+        throw new BadRequestException("Already clocked in today");
       }
       throw error;
     }
@@ -123,15 +140,17 @@ export class AttendanceService {
     });
 
     if (!attendance) {
-      throw new NotFoundException('No attendance record for today');
+      throw new NotFoundException("No attendance record for today");
     }
 
     if (attendance.status === AttendanceStatus.CLOCKED_OUT) {
-      throw new BadRequestException('Already clocked out');
+      throw new BadRequestException("Already clocked out");
     }
 
     if (attendance.status === AttendanceStatus.ON_BREAK) {
-      throw new BadRequestException('Please end your break before clocking out');
+      throw new BadRequestException(
+        "Please end your break before clocking out",
+      );
     }
 
     const now = new Date();
@@ -139,17 +158,16 @@ export class AttendanceService {
     // future or a totalBreakMinutes that exceeds elapsed time.
     const totalWorkedMinutes = Math.max(
       0,
-      Math.floor(
-        (now.getTime() - attendance.clockIn.getTime()) / 60000,
-      ) - attendance.totalBreakMinutes,
+      Math.floor((now.getTime() - attendance.clockIn.getTime()) / 60000) -
+        attendance.totalBreakMinutes,
     );
 
     let overtimeMinutes = 0;
     if (attendance.shiftAssignment?.shiftTemplate) {
       const template = attendance.shiftAssignment.shiftTemplate;
-      const [startH, startM] = template.startTime.split(':').map(Number);
-      const [endH, endM] = template.endTime.split(':').map(Number);
-      let shiftDuration = (endH * 60 + endM) - (startH * 60 + startM);
+      const [startH, startM] = template.startTime.split(":").map(Number);
+      const [endH, endM] = template.endTime.split(":").map(Number);
+      let shiftDuration = endH * 60 + endM - (startH * 60 + startM);
       // Handle overnight shifts (e.g. 22:00 - 06:00)
       if (shiftDuration <= 0) shiftDuration += 24 * 60;
       overtimeMinutes = Math.max(0, totalWorkedMinutes - shiftDuration);
@@ -170,12 +188,16 @@ export class AttendanceService {
     });
     if (claim.count === 0) {
       throw new BadRequestException(
-        'Attendance status changed concurrently — refresh and retry.',
+        "Attendance status changed concurrently — refresh and retry.",
       );
     }
     const result = await this.prisma.attendance.findUniqueOrThrow({
       where: { id: attendance.id },
-      include: { user: { select: { id: true, firstName: true, lastName: true, role: true } } },
+      include: {
+        user: {
+          select: { id: true, firstName: true, lastName: true, role: true },
+        },
+      },
     });
 
     this.kdsGateway.emitAttendanceUpdate(tenantId, result.branchId, result);
@@ -190,16 +212,20 @@ export class AttendanceService {
     });
 
     if (!attendance) {
-      throw new NotFoundException('No attendance record for today');
+      throw new NotFoundException("No attendance record for today");
     }
 
     if (attendance.status !== AttendanceStatus.CLOCKED_IN) {
-      throw new BadRequestException('Must be clocked in to start a break');
+      throw new BadRequestException("Must be clocked in to start a break");
     }
 
     // Compound WHERE on status — race-safe; tenant guard defence-in-depth.
     const claim = await this.prisma.attendance.updateMany({
-      where: { id: attendance.id, tenantId, status: AttendanceStatus.CLOCKED_IN },
+      where: {
+        id: attendance.id,
+        tenantId,
+        status: AttendanceStatus.CLOCKED_IN,
+      },
       data: {
         breakStart: new Date(),
         status: AttendanceStatus.ON_BREAK,
@@ -207,12 +233,16 @@ export class AttendanceService {
     });
     if (claim.count === 0) {
       throw new BadRequestException(
-        'Attendance status changed concurrently — refresh and retry.',
+        "Attendance status changed concurrently — refresh and retry.",
       );
     }
     const result = await this.prisma.attendance.findUniqueOrThrow({
       where: { id: attendance.id },
-      include: { user: { select: { id: true, firstName: true, lastName: true, role: true } } },
+      include: {
+        user: {
+          select: { id: true, firstName: true, lastName: true, role: true },
+        },
+      },
     });
 
     this.kdsGateway.emitAttendanceUpdate(tenantId, result.branchId, result);
@@ -227,15 +257,15 @@ export class AttendanceService {
     });
 
     if (!attendance) {
-      throw new NotFoundException('No attendance record for today');
+      throw new NotFoundException("No attendance record for today");
     }
 
     if (attendance.status !== AttendanceStatus.ON_BREAK) {
-      throw new BadRequestException('Not currently on break');
+      throw new BadRequestException("Not currently on break");
     }
 
     if (!attendance.breakStart) {
-      throw new BadRequestException('Break start time not found');
+      throw new BadRequestException("Break start time not found");
     }
 
     const now = new Date();
@@ -260,12 +290,16 @@ export class AttendanceService {
     });
     if (claim.count === 0) {
       throw new BadRequestException(
-        'Attendance status changed concurrently — refresh and retry.',
+        "Attendance status changed concurrently — refresh and retry.",
       );
     }
     const result = await this.prisma.attendance.findUniqueOrThrow({
       where: { id: attendance.id },
-      include: { user: { select: { id: true, firstName: true, lastName: true, role: true } } },
+      include: {
+        user: {
+          select: { id: true, firstName: true, lastName: true, role: true },
+        },
+      },
     });
 
     this.kdsGateway.emitAttendanceUpdate(tenantId, result.branchId, result);
@@ -279,11 +313,13 @@ export class AttendanceService {
       where: { userId, date: today, tenantId },
       include: {
         shiftAssignment: { include: { shiftTemplate: true } },
-        user: { select: { id: true, firstName: true, lastName: true, role: true } },
+        user: {
+          select: { id: true, firstName: true, lastName: true, role: true },
+        },
       },
     });
 
-    return attendance || { status: 'NOT_CLOCKED_IN', date: today };
+    return attendance || { status: "NOT_CLOCKED_IN", date: today };
   }
 
   async getTodayAttendance(tenantId: string) {
@@ -292,10 +328,12 @@ export class AttendanceService {
     return this.prisma.attendance.findMany({
       where: { tenantId, date: today },
       include: {
-        user: { select: { id: true, firstName: true, lastName: true, role: true } },
+        user: {
+          select: { id: true, firstName: true, lastName: true, role: true },
+        },
         shiftAssignment: { include: { shiftTemplate: true } },
       },
-      orderBy: { clockIn: 'desc' },
+      orderBy: { clockIn: "desc" },
     });
   }
 
@@ -324,10 +362,12 @@ export class AttendanceService {
       this.prisma.attendance.findMany({
         where,
         include: {
-          user: { select: { id: true, firstName: true, lastName: true, role: true } },
+          user: {
+            select: { id: true, firstName: true, lastName: true, role: true },
+          },
           shiftAssignment: { include: { shiftTemplate: true } },
         },
-        orderBy: { date: 'desc' },
+        orderBy: { date: "desc" },
         take: limit,
         skip: (page - 1) * limit,
       }),
@@ -337,9 +377,14 @@ export class AttendanceService {
     return paginated(data, total, page, limit);
   }
 
-  async getAttendanceSummary(tenantId: string, query: AttendanceSummaryQueryDto) {
+  async getAttendanceSummary(
+    tenantId: string,
+    query: AttendanceSummaryQueryDto,
+  ) {
     const now = new Date();
-    const startDate = query.startDate ? new Date(query.startDate) : new Date(now.getFullYear(), now.getMonth(), 1);
+    const startDate = query.startDate
+      ? new Date(query.startDate)
+      : new Date(now.getFullYear(), now.getMonth(), 1);
     const endDate = query.endDate ? new Date(query.endDate) : now;
 
     const attendances = await this.prisma.attendance.findMany({
@@ -349,7 +394,9 @@ export class AttendanceService {
         status: AttendanceStatus.CLOCKED_OUT,
       },
       include: {
-        user: { select: { id: true, firstName: true, lastName: true, role: true } },
+        user: {
+          select: { id: true, firstName: true, lastName: true, role: true },
+        },
       },
     });
 

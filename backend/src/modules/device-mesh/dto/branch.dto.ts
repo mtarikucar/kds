@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
   IsIn,
   IsObject,
@@ -8,7 +8,7 @@ import {
   Validate,
   ValidatorConstraint,
   ValidatorConstraintInterface,
-} from 'class-validator';
+} from "class-validator";
 
 /**
  * iter-73 — branches controller previously accepted inline @Body()
@@ -30,13 +30,13 @@ import {
  *     country-specific) until the multi-country chain feature lands.
  */
 
-@ValidatorConstraint({ name: 'isIanaTimezone', async: false })
+@ValidatorConstraint({ name: "isIanaTimezone", async: false })
 class IsIanaTimezoneConstraint implements ValidatorConstraintInterface {
   validate(value: unknown): boolean {
-    if (typeof value !== 'string' || !value) return false;
+    if (typeof value !== "string" || !value) return false;
     try {
       // eslint-disable-next-line no-new
-      new Intl.DateTimeFormat('en-US', { timeZone: value });
+      new Intl.DateTimeFormat("en-US", { timeZone: value });
       return true;
     } catch {
       return false;
@@ -48,7 +48,10 @@ class IsIanaTimezoneConstraint implements ValidatorConstraintInterface {
 }
 
 export class CreateBranchDto {
-  @ApiPropertyOptional({ description: 'Display name shown in admin UI', example: 'Bağdat Caddesi' })
+  @ApiPropertyOptional({
+    description: "Display name shown in admin UI",
+    example: "Bağdat Caddesi",
+  })
   @IsOptional()
   @IsString()
   @MaxLength(100)
@@ -60,14 +63,17 @@ export class CreateBranchDto {
   @MaxLength(32)
   code?: string;
 
-  @ApiPropertyOptional({ description: 'IANA timezone for this branch', example: 'Europe/Istanbul' })
+  @ApiPropertyOptional({
+    description: "IANA timezone for this branch",
+    example: "Europe/Istanbul",
+  })
   @IsOptional()
   @IsString()
   @MaxLength(64)
   @Validate(IsIanaTimezoneConstraint)
   timezone?: string;
 
-  @ApiPropertyOptional({ description: 'Free-form address blob (JSONB)' })
+  @ApiPropertyOptional({ description: "Free-form address blob (JSONB)" })
   @IsOptional()
   @IsObject()
   address?: Record<string, unknown>;
@@ -98,8 +104,8 @@ export class UpdateBranchDto {
   @IsObject()
   address?: Record<string, unknown>;
 
-  @ApiPropertyOptional({ enum: ['active', 'suspended', 'archived'] })
+  @ApiPropertyOptional({ enum: ["active", "suspended", "archived"] })
   @IsOptional()
-  @IsIn(['active', 'suspended', 'archived'])
-  status?: 'active' | 'suspended' | 'archived';
+  @IsIn(["active", "suspended", "archived"])
+  status?: "active" | "suspended" | "archived";
 }

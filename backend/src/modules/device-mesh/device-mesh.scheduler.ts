@@ -1,10 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { PrismaService } from '../../prisma/prisma.service';
-import { withAdvisoryLock } from '../../common/scheduling/advisory-lock';
-import { DeviceService } from './device.service';
-import { CommandQueueService } from './command-queue.service';
-import { LocalBridgeService } from '../local-bridge/local-bridge.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { PrismaService } from "../../prisma/prisma.service";
+import { withAdvisoryLock } from "../../common/scheduling/advisory-lock";
+import { DeviceService } from "./device.service";
+import { CommandQueueService } from "./command-queue.service";
+import { LocalBridgeService } from "../local-bridge/local-bridge.service";
 
 /**
  * Periodic health sweeps for the mesh:
@@ -32,14 +32,16 @@ export class DeviceMeshScheduler {
   async sweep(): Promise<void> {
     await withAdvisoryLock(
       this.prisma,
-      'device-mesh.sweep',
+      "device-mesh.sweep",
       async () => {
         try {
           const a = await this.devices.sweepStale();
           const b = await this.bridges.sweepStale();
           const c = await this.commands.sweepStuck();
           if (a + b + c > 0) {
-            this.logger.log(`sweep: devicesOffline=${a} bridgesOffline=${b} commandsRequeued=${c}`);
+            this.logger.log(
+              `sweep: devicesOffline=${a} bridgesOffline=${b} commandsRequeued=${c}`,
+            );
           }
         } catch (e) {
           this.logger.warn(`sweep failed: ${(e as Error).message}`);

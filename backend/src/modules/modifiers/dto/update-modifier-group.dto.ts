@@ -1,4 +1,6 @@
-import { PartialType } from '@nestjs/swagger';
-import { CreateModifierGroupDto } from './create-modifier-group.dto';
+import { PartialType } from "@nestjs/swagger";
+import { CreateModifierGroupDto } from "./create-modifier-group.dto";
 
-export class UpdateModifierGroupDto extends PartialType(CreateModifierGroupDto) {}
+export class UpdateModifierGroupDto extends PartialType(
+  CreateModifierGroupDto,
+) {}

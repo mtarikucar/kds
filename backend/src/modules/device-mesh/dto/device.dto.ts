@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
   ArrayMaxSize,
   IsArray,
@@ -12,20 +12,20 @@ import {
   Max,
   MaxLength,
   Min,
-} from 'class-validator';
+} from "class-validator";
 
 const KINDS = [
-  'tablet_waiter',
-  'tablet_customer',
-  'kds_screen',
-  'bar_screen',
-  'pos_terminal',
-  'yazarkasa',
-  'receipt_printer',
-  'kitchen_printer',
-  'caller_id',
-  'scanner',
-  'local_bridge',
+  "tablet_waiter",
+  "tablet_customer",
+  "kds_screen",
+  "bar_screen",
+  "pos_terminal",
+  "yazarkasa",
+  "receipt_printer",
+  "kitchen_printer",
+  "caller_id",
+  "scanner",
+  "local_bridge",
 ] as const;
 
 export class CreateDeviceSlotDto {
@@ -63,17 +63,17 @@ export class CreateDeviceSlotDto {
   @MaxLength(128)
   serial?: string;
 
-  @ApiPropertyOptional({ default: 'byo' })
+  @ApiPropertyOptional({ default: "byo" })
   @IsOptional()
-  @IsIn(['sold', 'rented', 'byo'] as any)
-  ownership?: 'sold' | 'rented' | 'byo';
+  @IsIn(["sold", "rented", "byo"] as any)
+  ownership?: "sold" | "rented" | "byo";
 }
 
 export class PairDeviceDto {
   // 6-character alphanumeric pair code shown to the operator. Keeping it
   // short and uppercase reduces typo rate; the random space is large
   // enough for a 10-minute TTL (36^6 = 2.2B).
-  @ApiProperty({ example: 'A4F9K2' })
+  @ApiProperty({ example: "A4F9K2" })
   @IsString()
   @Length(6, 6)
   @Matches(/^[A-Z0-9]+$/)
@@ -139,7 +139,7 @@ export class EnqueueCommandDto {
   @IsString()
   @MaxLength(64)
   @Matches(/^[a-z0-9._-]+$/, {
-    message: 'kind must be lowercase dot-separated identifier (a-z0-9._-)',
+    message: "kind must be lowercase dot-separated identifier (a-z0-9._-)",
   })
   kind!: string;
 
@@ -171,9 +171,9 @@ export class EnqueueCommandDto {
 }
 
 export class AckCommandDto {
-  @ApiProperty({ enum: ['done', 'failed'] as any })
-  @IsIn(['done', 'failed'] as any)
-  status!: 'done' | 'failed';
+  @ApiProperty({ enum: ["done", "failed"] as any })
+  @IsIn(["done", "failed"] as any)
+  status!: "done" | "failed";
 
   @ApiPropertyOptional()
   @IsOptional()

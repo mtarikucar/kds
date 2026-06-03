@@ -19,9 +19,9 @@
  *   ""                    → ""
  */
 export function maskEmail(value: string | null | undefined): string {
-  if (!value) return '';
-  const at = value.indexOf('@');
-  if (at <= 0) return '***';
+  if (!value) return "";
+  const at = value.indexOf("@");
+  if (at <= 0) return "***";
   const local = value.slice(0, at);
   const domain = value.slice(at + 1);
   if (local.length === 1) return `*@${domain}`;
@@ -40,14 +40,16 @@ export function maskEmail(value: string | null | undefined): string {
  *   ""               → ""
  */
 export function maskPhone(value: string | null | undefined): string {
-  if (!value) return '';
+  if (!value) return "";
   // Strip whitespace for length checks; preserve only digits + optional +.
   const trimmed = value.trim();
-  if (trimmed.length < 4) return '***';
-  if (trimmed.startsWith('+')) {
+  if (trimmed.length < 4) return "***";
+  if (trimmed.startsWith("+")) {
     // Country code = + plus 1-3 digits up to the first non-digit OR after 3 digits.
     // Cheap rule: keep + + the first 1-2 digits and the last 2.
-    const cc = trimmed.startsWith('+9') ? trimmed.slice(0, 3) : trimmed.slice(0, 2);
+    const cc = trimmed.startsWith("+9")
+      ? trimmed.slice(0, 3)
+      : trimmed.slice(0, 2);
     const tail = trimmed.slice(-2);
     return `${cc}****${tail}`;
   }
@@ -75,19 +77,19 @@ export function maskPhone(value: string | null | undefined): string {
  * a customer. Use the raw value at those callsites and document why.
  */
 export function maskIp(value: string | null | undefined): string {
-  if (!value) return '';
+  if (!value) return "";
   const trimmed = value.trim();
-  if (!trimmed) return '';
+  if (!trimmed) return "";
   // Loopback addresses aren't PII; keep them verbatim for local-dev clarity.
-  if (trimmed === '127.0.0.1' || trimmed === '::1') return trimmed;
-  if (trimmed.includes(':')) {
+  if (trimmed === "127.0.0.1" || trimmed === "::1") return trimmed;
+  if (trimmed.includes(":")) {
     // IPv6 — keep the first two hextets (≈ /32, ISP-block grain).
-    const parts = trimmed.split(':');
+    const parts = trimmed.split(":");
     if (parts.length < 3) return trimmed; // Malformed; return as-is.
-    return `${parts[0]}:${parts[1]}:${'x:'.repeat(parts.length - 2).slice(0, -1)}`;
+    return `${parts[0]}:${parts[1]}:${"x:".repeat(parts.length - 2).slice(0, -1)}`;
   }
-  if (trimmed.includes('.')) {
-    const octets = trimmed.split('.');
+  if (trimmed.includes(".")) {
+    const octets = trimmed.split(".");
     if (octets.length !== 4) return trimmed; // Not a normal IPv4.
     return `${octets[0]}.${octets[1]}.x.x`;
   }

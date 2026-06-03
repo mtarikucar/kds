@@ -1,6 +1,10 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { CreateStockItemCategoryDto } from '../dto/create-stock-item-category.dto';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+} from "@nestjs/common";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { CreateStockItemCategoryDto } from "../dto/create-stock-item-category.dto";
 
 @Injectable()
 export class StockItemCategoriesService {
@@ -10,7 +14,7 @@ export class StockItemCategoriesService {
     return this.prisma.stockItemCategory.findMany({
       where: { tenantId },
       include: { _count: { select: { stockItems: true } } },
-      orderBy: { name: 'asc' },
+      orderBy: { name: "asc" },
     });
   }
 
@@ -19,7 +23,7 @@ export class StockItemCategoriesService {
       where: { id, tenantId },
       include: { _count: { select: { stockItems: true } } },
     });
-    if (!category) throw new NotFoundException('Stock item category not found');
+    if (!category) throw new NotFoundException("Stock item category not found");
     return category;
   }
 
@@ -27,21 +31,27 @@ export class StockItemCategoriesService {
     const existing = await this.prisma.stockItemCategory.findUnique({
       where: { tenantId_name: { tenantId, name: dto.name } },
     });
-    if (existing) throw new ConflictException('Category with this name already exists');
+    if (existing)
+      throw new ConflictException("Category with this name already exists");
 
     return this.prisma.stockItemCategory.create({
       data: { ...dto, tenantId },
     });
   }
 
-  async update(id: string, dto: Partial<CreateStockItemCategoryDto>, tenantId: string) {
+  async update(
+    id: string,
+    dto: Partial<CreateStockItemCategoryDto>,
+    tenantId: string,
+  ) {
     await this.findOne(id, tenantId);
 
     if (dto.name) {
       const existing = await this.prisma.stockItemCategory.findFirst({
         where: { tenantId, name: dto.name, NOT: { id } },
       });
-      if (existing) throw new ConflictException('Category with this name already exists');
+      if (existing)
+        throw new ConflictException("Category with this name already exists");
     }
 
     // Compound WHERE so the write is tenant-scoped independently of the
@@ -51,14 +61,20 @@ export class StockItemCategoriesService {
       where: { id, tenantId },
       data: dto,
     });
-    if (claim.count === 0) throw new NotFoundException('Stock item category not found');
-    return this.prisma.stockItemCategory.findFirstOrThrow({ where: { id, tenantId } });
+    if (claim.count === 0)
+      throw new NotFoundException("Stock item category not found");
+    return this.prisma.stockItemCategory.findFirstOrThrow({
+      where: { id, tenantId },
+    });
   }
 
   async remove(id: string, tenantId: string) {
     await this.findOne(id, tenantId);
-    const claim = await this.prisma.stockItemCategory.deleteMany({ where: { id, tenantId } });
-    if (claim.count === 0) throw new NotFoundException('Stock item category not found');
+    const claim = await this.prisma.stockItemCategory.deleteMany({
+      where: { id, tenantId },
+    });
+    if (claim.count === 0)
+      throw new NotFoundException("Stock item category not found");
     return { id };
   }
 }

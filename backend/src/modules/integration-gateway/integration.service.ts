@@ -1,12 +1,22 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'node:crypto';
-import { v7 as uuidv7 } from 'uuid';
-import { PrismaService } from '../../prisma/prisma.service';
-import { OutboxService } from '../outbox/outbox.service';
-import { IntegrationAdapter } from './integration-adapter.interface';
-import { YemeksepetiAdapter } from './adapters/yemeksepeti.adapter';
-import { GetirAdapter } from './adapters/getir.adapter';
-import { TrendyolYemekAdapter } from './adapters/trendyol-yemek.adapter';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
+import {
+  createCipheriv,
+  createDecipheriv,
+  randomBytes,
+  createHash,
+} from "node:crypto";
+import { v7 as uuidv7 } from "uuid";
+import { PrismaService } from "../../prisma/prisma.service";
+import { OutboxService } from "../outbox/outbox.service";
+import { IntegrationAdapter } from "./integration-adapter.interface";
+import { YemeksepetiAdapter } from "./adapters/yemeksepeti.adapter";
+import { GetirAdapter } from "./adapters/getir.adapter";
+import { TrendyolYemekAdapter } from "./adapters/trendyol-yemek.adapter";
 
 /**
  * Integration Gateway: catalog of installable providers, tenant-side
@@ -48,13 +58,15 @@ export class IntegrationService {
 
   listProviders(kind?: string) {
     return this.prisma.integrationProviderDef.findMany({
-      where: { status: 'published', ...(kind ? { kind } : {}) },
-      orderBy: [{ kind: 'asc' }, { name: 'asc' }],
+      where: { status: "published", ...(kind ? { kind } : {}) },
+      orderBy: [{ kind: "asc" }, { name: "asc" }],
     });
   }
 
   async findProviderOrThrow(id: string) {
-    const row = await this.prisma.integrationProviderDef.findUnique({ where: { id } });
+    const row = await this.prisma.integrationProviderDef.findUnique({
+      where: { id },
+    });
     if (!row) throw new NotFoundException(`Provider not found: ${id}`);
     return row;
   }
@@ -63,10 +75,16 @@ export class IntegrationService {
 
   async connect(
     tenantId: string,
-    input: { providerId: string; branchId?: string; credentials?: Record<string, unknown>; config?: Record<string, unknown> },
+    input: {
+      providerId: string;
+      branchId?: string;
+      credentials?: Record<string, unknown>;
+      config?: Record<string, unknown>;
+    },
   ) {
     const provider = await this.findProviderOrThrow(input.providerId);
-    if (provider.status !== 'published') throw new BadRequestException('Provider not available');
+    if (provider.status !== "published")
+      throw new BadRequestException("Provider not available");
 
     const credentialsEnc = input.credentials
       ? this.encrypt(tenantId, JSON.stringify(input.credentials))
@@ -83,12 +101,12 @@ export class IntegrationService {
         // the structural check on SharedArrayBuffer. Widen explicitly.
         credentialsEnc: credentialsEnc ? new Uint8Array(credentialsEnc) : null,
         config: input.config as any,
-        status: 'connected',
+        status: "connected",
       },
     });
     await this.outbox
       .append({
-        type: 'integration.connected.v1',
+        type: "integration.connected.v1",
         tenantId,
         payload: { connectionId: row.id, providerId: input.providerId },
       })
@@ -100,7 +118,7 @@ export class IntegrationService {
     return this.prisma.integrationConnection.findMany({
       where: { tenantId },
       include: { provider: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 
@@ -108,18 +126,18 @@ export class IntegrationService {
     const row = await this.prisma.integrationConnection.findFirst({
       where: { id: connectionId, tenantId },
     });
-    if (!row) throw new NotFoundException('Connection not found');
+    if (!row) throw new NotFoundException("Connection not found");
     // Compound WHERE on the write too — providerId outbox emit below
     // reads from `row`, but the update itself must remain tenant-scoped
     // in case the row's tenantId mutates (today it can't, but defense-
     // in-depth).
     await this.prisma.integrationConnection.updateMany({
       where: { id: connectionId, tenantId },
-      data: { status: 'disconnected', credentialsEnc: null },
+      data: { status: "disconnected", credentialsEnc: null },
     });
     await this.outbox
       .append({
-        type: 'integration.disconnected.v1',
+        type: "integration.disconnected.v1",
         tenantId,
         payload: { connectionId, providerId: row.providerId },
       })
@@ -149,20 +167,32 @@ export class IntegrationService {
     // PayTR-style infinite-retry providers don't hammer us indefinitely.
     // Internal observability via the logger gets the operator's attention.
     if (!tenantId) {
-      this.logger.warn(`Dropping webhook with empty tenantId (provider=${providerId})`);
-      return { ignored: true, reason: 'missing tenant' };
+      this.logger.warn(
+        `Dropping webhook with empty tenantId (provider=${providerId})`,
+      );
+      return { ignored: true, reason: "missing tenant" };
     }
     const [tenant, provider] = await Promise.all([
-      this.prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true } }),
-      this.prisma.integrationProviderDef.findUnique({ where: { id: providerId }, select: { id: true } }),
+      this.prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: { id: true },
+      }),
+      this.prisma.integrationProviderDef.findUnique({
+        where: { id: providerId },
+        select: { id: true },
+      }),
     ]);
     if (!tenant) {
-      this.logger.warn(`Dropping webhook for unknown tenantId=${tenantId} (provider=${providerId})`);
-      return { ignored: true, reason: 'unknown tenant' };
+      this.logger.warn(
+        `Dropping webhook for unknown tenantId=${tenantId} (provider=${providerId})`,
+      );
+      return { ignored: true, reason: "unknown tenant" };
     }
     if (!provider) {
-      this.logger.warn(`Dropping webhook for unknown providerId=${providerId} (tenant=${tenantId})`);
-      return { ignored: true, reason: 'unknown provider' };
+      this.logger.warn(
+        `Dropping webhook for unknown providerId=${providerId} (tenant=${tenantId})`,
+      );
+      return { ignored: true, reason: "unknown provider" };
     }
 
     // Bound the body BEFORE JSON.parse so a 100MB blob doesn't burn CPU
@@ -171,7 +201,7 @@ export class IntegrationService {
       this.logger.warn(
         `Dropping oversized webhook body (provider=${providerId} tenant=${tenantId} bytes=${raw.length})`,
       );
-      return { ignored: true, reason: 'payload too large' };
+      return { ignored: true, reason: "payload too large" };
     }
 
     // -- HMAC verification gate. -----------------------------------------
@@ -200,37 +230,39 @@ export class IntegrationService {
       this.logger.warn(
         `No signing adapter for provider=${providerId} — dropping webhook (tenant=${tenantId})`,
       );
-      return { ignored: true, reason: 'no adapter' };
+      return { ignored: true, reason: "no adapter" };
     }
     const connection = await this.prisma.integrationConnection.findFirst({
-      where: { tenantId, providerId, status: 'connected' },
+      where: { tenantId, providerId, status: "connected" },
     });
     if (!connection || !connection.credentialsEnc) {
       this.logger.warn(
         `No connected credentials for provider=${providerId} tenant=${tenantId} — dropping webhook`,
       );
-      return { ignored: true, reason: 'no connection' };
+      return { ignored: true, reason: "no connection" };
     }
     let credentials: Record<string, unknown>;
     try {
-      credentials = JSON.parse(this.decrypt(tenantId, Buffer.from(connection.credentialsEnc)));
+      credentials = JSON.parse(
+        this.decrypt(tenantId, Buffer.from(connection.credentialsEnc)),
+      );
     } catch (e: any) {
       this.logger.error(
         `Failed to decrypt credentials for provider=${providerId} tenant=${tenantId}: ${e?.message ?? e}`,
       );
-      return { ignored: true, reason: 'decrypt failed' };
+      return { ignored: true, reason: "decrypt failed" };
     }
 
     // Coalesce signature header sources. Each adapter knows which one its
     // platform uses; we pass all candidates through and let the adapter
     // pick. Length-capped to keep log/storage bounded.
     const signature = String(
-      headers['x-signature']
-        ?? headers['x-vendor-hmac']
-        ?? headers['x-hub-signature-256']
-        ?? headers['trendyol-signature']
-        ?? headers['stripe-signature']
-        ?? '',
+      headers["x-signature"] ??
+        headers["x-vendor-hmac"] ??
+        headers["x-hub-signature-256"] ??
+        headers["trendyol-signature"] ??
+        headers["stripe-signature"] ??
+        "",
     ).slice(0, 200);
 
     // Adapter instances are singleton-scoped. init() mutates `this.cfg`,
@@ -247,7 +279,7 @@ export class IntegrationService {
       this.logger.warn(
         `Webhook signature/parse failed for provider=${providerId} tenant=${tenantId}: ${e?.message ?? e}`,
       );
-      return { ignored: true, reason: 'verify failed' };
+      return { ignored: true, reason: "verify failed" };
     }
 
     // Replay protection. The HMAC verify above proves the body+sig was
@@ -265,30 +297,31 @@ export class IntegrationService {
     // that legitimately resend identical bodies more than a day apart
     // (e.g. daily heartbeats) won't trip the gate.
     if (signature) {
-      const recentDuplicate = await this.prisma.integrationWebhookEvent.findFirst({
-        where: {
-          tenantId,
-          providerId,
-          signature,
-          receivedAt: { gte: new Date(Date.now() - 24 * 60 * 60_000) },
-        },
-        select: { id: true, receivedAt: true },
-      });
+      const recentDuplicate =
+        await this.prisma.integrationWebhookEvent.findFirst({
+          where: {
+            tenantId,
+            providerId,
+            signature,
+            receivedAt: { gte: new Date(Date.now() - 24 * 60 * 60_000) },
+          },
+          select: { id: true, receivedAt: true },
+        });
       if (recentDuplicate) {
         this.logger.warn(
           `Replay rejected: duplicate signature for provider=${providerId} tenant=${tenantId} ` +
             `— original event ${recentDuplicate.id} received at ${recentDuplicate.receivedAt.toISOString()}`,
         );
-        return { ignored: true, reason: 'duplicate' };
+        return { ignored: true, reason: "duplicate" };
       }
     }
 
     let parsed: any = {};
     try {
-      parsed = JSON.parse(raw.toString('utf8'));
+      parsed = JSON.parse(raw.toString("utf8"));
     } catch {
       // Some providers send urlencoded — leave parsed as raw bytes in payload.
-      parsed = { _raw: raw.toString('utf8') };
+      parsed = { _raw: raw.toString("utf8") };
     }
 
     const row = await this.prisma.integrationWebhookEvent.create({
@@ -297,10 +330,10 @@ export class IntegrationService {
         tenantId,
         connectionId: connection.id,
         providerId,
-        type: parsed?.type ?? parsed?.event ?? 'unknown',
+        type: parsed?.type ?? parsed?.event ?? "unknown",
         signature,
         payload: parsed as any,
-        result: 'received',
+        result: "received",
       },
     });
 
@@ -326,21 +359,26 @@ export class IntegrationService {
       // read access to the repo could decrypt every tenant's integration
       // credentials. Dev/test still falls back so local workflows don't
       // demand the env be set.
-      if (process.env.NODE_ENV === 'production') {
-        throw new Error('INTEGRATION_KEY env var must be set in production');
+      if (process.env.NODE_ENV === "production") {
+        throw new Error("INTEGRATION_KEY env var must be set in production");
       }
-      return createHash('sha256').update(`dev-only-do-not-use-in-prod:${tenantId}`).digest();
+      return createHash("sha256")
+        .update(`dev-only-do-not-use-in-prod:${tenantId}`)
+        .digest();
     }
     // Per-tenant key derivation — leaking one tenant's payload doesn't help
     // decrypt another's. Cheap and fast; replace with KMS-issued DEKs.
-    return createHash('sha256').update(`${base}:${tenantId}`).digest();
+    return createHash("sha256").update(`${base}:${tenantId}`).digest();
   }
 
   private encrypt(tenantId: string, plaintext: string): Buffer {
     const key = this.deriveKey(tenantId);
     const iv = randomBytes(12);
-    const cipher = createCipheriv('aes-256-gcm', key, iv);
-    const ct = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+    const cipher = createCipheriv("aes-256-gcm", key, iv);
+    const ct = Buffer.concat([
+      cipher.update(plaintext, "utf8"),
+      cipher.final(),
+    ]);
     const tag = cipher.getAuthTag();
     // Format: iv (12) || tag (16) || ct
     return Buffer.concat([iv, tag, ct]);
@@ -355,8 +393,10 @@ export class IntegrationService {
     const iv = blob.subarray(0, 12);
     const tag = blob.subarray(12, 28);
     const ct = blob.subarray(28);
-    const decipher = createDecipheriv('aes-256-gcm', key, iv);
+    const decipher = createDecipheriv("aes-256-gcm", key, iv);
     decipher.setAuthTag(tag);
-    return Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8');
+    return Buffer.concat([decipher.update(ct), decipher.final()]).toString(
+      "utf8",
+    );
   }
 }

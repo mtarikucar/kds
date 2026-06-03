@@ -1,14 +1,20 @@
-import { Injectable, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
-import { fold } from './entitlement-engine';
+import {
+  Injectable,
+  Logger,
+  OnModuleDestroy,
+  OnModuleInit,
+  Optional,
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../prisma/prisma.service";
+import { fold } from "./entitlement-engine";
 import {
   EMPTY_ENTITLEMENT_SET,
   EntitlementGrant,
   EntitlementSet,
   EntitlementValue,
-} from './entitlement.types';
-import { EntitlementInvalidationBus } from './entitlement-invalidation.bus';
+} from "./entitlement.types";
+import { EntitlementInvalidationBus } from "./entitlement-invalidation.bus";
 
 /**
  * Read & write side of the entitlement engine.
@@ -27,7 +33,10 @@ import { EntitlementInvalidationBus } from './entitlement-invalidation.bus';
 @Injectable()
 export class EntitlementService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(EntitlementService.name);
-  private readonly cache = new Map<string, { set: EntitlementSet; expiresAt: number }>();
+  private readonly cache = new Map<
+    string,
+    { set: EntitlementSet; expiresAt: number }
+  >();
   private readonly cacheTtlMs = 30_000;
 
   // Iter-75 — cache eviction. The Map is keyed by `${tenantId}::${branchId}`
@@ -62,7 +71,9 @@ export class EntitlementService implements OnModuleInit, OnModuleDestroy {
     // Register the local cache-drop callback with the bus. When a peer
     // replica publishes an invalidation, we drop our own cache for that
     // tenant — without publishing again (the bus filters by senderId).
-    this.invalidationBus?.registerListener((tenantId) => this.invalidateLocal(tenantId));
+    this.invalidationBus?.registerListener((tenantId) =>
+      this.invalidateLocal(tenantId),
+    );
 
     // Periodic eviction. `unref` so the timer doesn't keep the Node
     // process alive past shutdown.
@@ -109,7 +120,10 @@ export class EntitlementService implements OnModuleInit, OnModuleDestroy {
    * `delete` then `set` (the natural pattern of cache.set on every
    * read miss) keeps the order LRU-ish.
    */
-  private setCacheEntry(key: string, value: { set: EntitlementSet; expiresAt: number }): void {
+  private setCacheEntry(
+    key: string,
+    value: { set: EntitlementSet; expiresAt: number },
+  ): void {
     // Re-set on existing key updates insertion order if we delete first.
     if (this.cache.has(key)) this.cache.delete(key);
     this.cache.set(key, value);
@@ -124,10 +138,13 @@ export class EntitlementService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Read the effective entitlement set for a tenant. Cached. */
-  async getForTenant(tenantId: string, branchId: string | null = null): Promise<EntitlementSet> {
+  async getForTenant(
+    tenantId: string,
+    branchId: string | null = null,
+  ): Promise<EntitlementSet> {
     if (!tenantId) return EMPTY_ENTITLEMENT_SET;
 
-    const cacheKey = `${tenantId}::${branchId ?? '-'}`;
+    const cacheKey = `${tenantId}::${branchId ?? "-"}`;
     const hit = this.cache.get(cacheKey);
     if (hit && hit.expiresAt > Date.now()) {
       // v2.8.95 — true LRU on cache hit. JS Map preserves insertion
@@ -164,7 +181,7 @@ export class EntitlementService implements OnModuleInit, OnModuleDestroy {
       .map((r) => ({
         tenantId: r.tenantId,
         branchId: r.branchId,
-        scope: (r.scope as 'tenant' | 'branch' | 'device') ?? 'tenant',
+        scope: (r.scope as "tenant" | "branch" | "device") ?? "tenant",
         key: r.key,
         value: r.value as EntitlementValue,
         source: r.source,
@@ -172,7 +189,10 @@ export class EntitlementService implements OnModuleInit, OnModuleDestroy {
       }));
 
     const set = fold(grants, now);
-    this.setCacheEntry(cacheKey, { set, expiresAt: Date.now() + this.cacheTtlMs });
+    this.setCacheEntry(cacheKey, {
+      set,
+      expiresAt: Date.now() + this.cacheTtlMs,
+    });
     return set;
   }
 
@@ -208,13 +228,15 @@ export class EntitlementService implements OnModuleInit, OnModuleDestroy {
   async setGrantsForSource(
     tenantId: string,
     source: string,
-    grants: ReadonlyArray<Omit<EntitlementGrant, 'tenantId' | 'source'>>,
+    grants: ReadonlyArray<Omit<EntitlementGrant, "tenantId" | "source">>,
   ): Promise<void> {
     await this.prisma.$transaction(async (tx) => {
       await this.setGrantsForSourceTx(tx, tenantId, source, grants);
     });
     this.invalidate(tenantId);
-    this.logger.debug(`Reprojected source=${source} tenant=${tenantId} grants=${grants.length}`);
+    this.logger.debug(
+      `Reprojected source=${source} tenant=${tenantId} grants=${grants.length}`,
+    );
   }
 
   /**
@@ -232,7 +254,7 @@ export class EntitlementService implements OnModuleInit, OnModuleDestroy {
     tx: Prisma.TransactionClient,
     tenantId: string,
     source: string,
-    grants: ReadonlyArray<Omit<EntitlementGrant, 'tenantId' | 'source'>>,
+    grants: ReadonlyArray<Omit<EntitlementGrant, "tenantId" | "source">>,
   ): Promise<void> {
     await tx.featureEntitlement.deleteMany({ where: { tenantId, source } });
     if (grants.length === 0) return;
@@ -251,7 +273,9 @@ export class EntitlementService implements OnModuleInit, OnModuleDestroy {
 
   /** Revoke every grant from one source. */
   async revokeSource(tenantId: string, source: string): Promise<void> {
-    await this.prisma.featureEntitlement.deleteMany({ where: { tenantId, source } });
+    await this.prisma.featureEntitlement.deleteMany({
+      where: { tenantId, source },
+    });
     this.invalidate(tenantId);
   }
 
@@ -261,7 +285,8 @@ export class EntitlementService implements OnModuleInit, OnModuleDestroy {
     const res = await this.prisma.featureEntitlement.deleteMany({
       where: { validUntil: { lt: now } },
     });
-    if (res.count > 0) this.logger.log(`Swept ${res.count} expired entitlement rows`);
+    if (res.count > 0)
+      this.logger.log(`Swept ${res.count} expired entitlement rows`);
     // Cache is conservatively cleared — sweep is rare and ttl is short.
     this.cache.clear();
     return res.count;

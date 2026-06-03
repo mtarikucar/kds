@@ -1,13 +1,14 @@
-import { SetMetadata } from '@nestjs/common';
+import { SetMetadata } from "@nestjs/common";
 
-export const CHECK_LIMIT_KEY = 'checkLimit';
+export const CHECK_LIMIT_KEY = "checkLimit";
 
 export enum LimitType {
-  USERS = 'maxUsers',
-  TABLES = 'maxTables',
-  PRODUCTS = 'maxProducts',
-  CATEGORIES = 'maxCategories',
-  MONTHLY_ORDERS = 'maxMonthlyOrders',
+  USERS = "maxUsers",
+  TABLES = "maxTables",
+  BRANCHES = "maxBranches",
+  PRODUCTS = "maxProducts",
+  CATEGORIES = "maxCategories",
+  MONTHLY_ORDERS = "maxMonthlyOrders",
 }
 
 /**

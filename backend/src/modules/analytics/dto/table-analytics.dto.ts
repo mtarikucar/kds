@@ -1,175 +1,187 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class TableUtilizationDto {
-  @ApiProperty({ description: 'Table ID' })
+  @ApiProperty({ description: "Table ID" })
   tableId: string;
 
-  @ApiProperty({ description: 'Table number' })
+  @ApiProperty({ description: "Table number" })
   tableNumber: string;
 
-  @ApiPropertyOptional({ description: 'Table section' })
+  @ApiPropertyOptional({ description: "Table section" })
   section?: string;
 
-  @ApiProperty({ description: 'Table capacity' })
+  @ApiProperty({ description: "Table capacity" })
   capacity: number;
 
-  @ApiProperty({ description: 'Total minutes table was occupied' })
+  @ApiProperty({ description: "Total minutes table was occupied" })
   occupiedMinutes: number;
 
-  @ApiProperty({ description: 'Total minutes with active dining' })
+  @ApiProperty({ description: "Total minutes with active dining" })
   diningMinutes: number;
 
-  @ApiProperty({ description: 'Total minutes occupied but idle (no orders)' })
+  @ApiProperty({ description: "Total minutes occupied but idle (no orders)" })
   idleMinutes: number;
 
-  @ApiProperty({ description: 'Total minutes table was empty' })
+  @ApiProperty({ description: "Total minutes table was empty" })
   emptyMinutes: number;
 
-  @ApiProperty({ description: 'Number of table turns (sessions)' })
+  @ApiProperty({ description: "Number of table turns (sessions)" })
   sessions: number;
 
-  @ApiProperty({ description: 'Total revenue generated' })
+  @ApiProperty({ description: "Total revenue generated" })
   revenue: number;
 
-  @ApiProperty({ description: 'Number of orders' })
+  @ApiProperty({ description: "Number of orders" })
   orders: number;
 
-  @ApiProperty({ description: 'Utilization score (0-100)' })
+  @ApiProperty({ description: "Utilization score (0-100)" })
   utilizationScore: number;
 
-  @ApiProperty({ description: 'Revenue per minute when occupied' })
+  @ApiProperty({ description: "Revenue per minute when occupied" })
   revenuePerMinute: number;
 
-  @ApiPropertyOptional({ description: 'Average session duration in minutes' })
+  @ApiPropertyOptional({ description: "Average session duration in minutes" })
   avgSessionDuration?: number;
 
-  @ApiPropertyOptional({ description: 'Average order value' })
+  @ApiPropertyOptional({ description: "Average order value" })
   avgOrderValue?: number;
 
   @ApiPropertyOptional({
-    description: 'Peak hours occupancy (hour -> percentage)',
+    description: "Peak hours occupancy (hour -> percentage)",
     type: Object,
-    example: { '12': 80, '13': 95, '19': 100 }
+    example: { "12": 80, "13": 95, "19": 100 },
   })
   peakHours?: Record<number, number>;
 }
 
 export class TableUtilizationSummaryDto {
-  @ApiProperty({ description: 'Total number of tables' })
+  @ApiProperty({ description: "Total number of tables" })
   totalTables: number;
 
-  @ApiProperty({ description: 'Average utilization across all tables (0-100)' })
+  @ApiProperty({ description: "Average utilization across all tables (0-100)" })
   avgUtilization: number;
 
-  @ApiProperty({ description: 'Total revenue from all tables' })
+  @ApiProperty({ description: "Total revenue from all tables" })
   totalRevenue: number;
 
-  @ApiProperty({ description: 'Total table turns (sessions)' })
+  @ApiProperty({ description: "Total table turns (sessions)" })
   totalSessions: number;
 
-  @ApiProperty({ description: 'Most utilized table' })
+  @ApiProperty({ description: "Most utilized table" })
   topTable: TableUtilizationDto;
 
-  @ApiProperty({ description: 'Least utilized table' })
+  @ApiProperty({ description: "Least utilized table" })
   bottomTable: TableUtilizationDto;
 
-  @ApiProperty({ description: 'Tables with low utilization (< 50%)', type: [TableUtilizationDto] })
+  @ApiProperty({
+    description: "Tables with low utilization (< 50%)",
+    type: [TableUtilizationDto],
+  })
   underutilizedTables: TableUtilizationDto[];
 
-  @ApiProperty({ description: 'Peak occupancy hour (0-23)' })
+  @ApiProperty({ description: "Peak occupancy hour (0-23)" })
   peakHour: number;
 
-  @ApiProperty({ description: 'Peak occupancy percentage' })
+  @ApiProperty({ description: "Peak occupancy percentage" })
   peakOccupancy: number;
 }
 
 export class TableAnalyticsResponseDto {
-  @ApiProperty({ description: 'Date for this analytics data' })
+  @ApiProperty({ description: "Date for this analytics data" })
   date: Date;
 
-  @ApiProperty({ description: 'Summary statistics' })
+  @ApiProperty({ description: "Summary statistics" })
   summary: TableUtilizationSummaryDto;
 
-  @ApiProperty({ description: 'Per-table utilization data', type: [TableUtilizationDto] })
+  @ApiProperty({
+    description: "Per-table utilization data",
+    type: [TableUtilizationDto],
+  })
   tables: TableUtilizationDto[];
 }
 
 export class TableComparisonDto {
-  @ApiProperty({ description: 'Table ID' })
+  @ApiProperty({ description: "Table ID" })
   tableId: string;
 
-  @ApiProperty({ description: 'Table number' })
+  @ApiProperty({ description: "Table number" })
   tableNumber: string;
 
-  @ApiProperty({ description: 'Current period utilization (0-100)' })
+  @ApiProperty({ description: "Current period utilization (0-100)" })
   currentUtilization: number;
 
-  @ApiProperty({ description: 'Previous period utilization (0-100)' })
+  @ApiProperty({ description: "Previous period utilization (0-100)" })
   previousUtilization: number;
 
-  @ApiProperty({ description: 'Change in utilization percentage' })
+  @ApiProperty({ description: "Change in utilization percentage" })
   change: number;
 
-  @ApiProperty({ description: 'Current period revenue' })
+  @ApiProperty({ description: "Current period revenue" })
   currentRevenue: number;
 
-  @ApiProperty({ description: 'Previous period revenue' })
+  @ApiProperty({ description: "Previous period revenue" })
   previousRevenue: number;
 
-  @ApiProperty({ description: 'Revenue change percentage' })
+  @ApiProperty({ description: "Revenue change percentage" })
   revenueChange: number;
 }
 
 export class TableTrendDto {
-  @ApiProperty({ description: 'Date' })
+  @ApiProperty({ description: "Date" })
   date: Date;
 
-  @ApiProperty({ description: 'Average utilization across all tables' })
+  @ApiProperty({ description: "Average utilization across all tables" })
   avgUtilization: number;
 
-  @ApiProperty({ description: 'Total revenue' })
+  @ApiProperty({ description: "Total revenue" })
   totalRevenue: number;
 
-  @ApiProperty({ description: 'Total sessions' })
+  @ApiProperty({ description: "Total sessions" })
   totalSessions: number;
 }
 
 export class TableAnalyticsTrendResponseDto {
-  @ApiProperty({ description: 'Start date' })
+  @ApiProperty({ description: "Start date" })
   startDate: Date;
 
-  @ApiProperty({ description: 'End date' })
+  @ApiProperty({ description: "End date" })
   endDate: Date;
 
-  @ApiProperty({ description: 'Daily trend data', type: [TableTrendDto] })
+  @ApiProperty({ description: "Daily trend data", type: [TableTrendDto] })
   trends: TableTrendDto[];
 
-  @ApiPropertyOptional({ description: 'Per-table comparison', type: [TableComparisonDto] })
+  @ApiPropertyOptional({
+    description: "Per-table comparison",
+    type: [TableComparisonDto],
+  })
   tableComparisons?: TableComparisonDto[];
 }
 
 export class CustomerBehaviorDto {
-  @ApiProperty({ description: 'Average time spent dining (minutes)' })
+  @ApiProperty({ description: "Average time spent dining (minutes)" })
   avgDiningTime: number;
 
-  @ApiProperty({ description: 'Average idle time after dining (minutes)' })
+  @ApiProperty({ description: "Average idle time after dining (minutes)" })
   avgIdleTime: number;
 
-  @ApiProperty({ description: 'Ratio of idle to dining time' })
+  @ApiProperty({ description: "Ratio of idle to dining time" })
   idleToDiningRatio: number;
 
-  @ApiProperty({ description: 'Average party size' })
+  @ApiProperty({ description: "Average party size" })
   avgPartySize: number;
 
-  @ApiProperty({ description: 'Peak arrival hour (0-23)' })
+  @ApiProperty({ description: "Peak arrival hour (0-23)" })
   peakArrivalHour: number;
 
-  @ApiProperty({ description: 'Peak departure hour (0-23)' })
+  @ApiProperty({ description: "Peak departure hour (0-23)" })
   peakDepartureHour: number;
 
-  @ApiProperty({ description: 'Average order value' })
+  @ApiProperty({ description: "Average order value" })
   avgOrderValue: number;
 
-  @ApiPropertyOptional({ description: 'Hourly distribution of arrivals', type: Object })
+  @ApiPropertyOptional({
+    description: "Hourly distribution of arrivals",
+    type: Object,
+  })
   arrivalDistribution?: Record<number, number>;
 }

@@ -1,14 +1,14 @@
-import { OrderStatus } from '../../../common/constants/order-status.enum';
+import { OrderStatus } from "../../../common/constants/order-status.enum";
 
 /**
  * Adapter method names that can be dispatched by status sync.
  */
 export type PlatformActionName =
-  | 'acceptOrder'
-  | 'markPreparing'
-  | 'markReady'
-  | 'markPickedUp'
-  | 'cancelOrder';
+  | "acceptOrder"
+  | "markPreparing"
+  | "markReady"
+  | "markPickedUp"
+  | "cancelOrder";
 
 /**
  * Maps internal KDS order statuses to platform adapter method names.
@@ -20,10 +20,10 @@ export type PlatformActionName =
 // themselves. We sync PENDING / PREPARING / READY / CANCELLED; the
 // platform owns the later transitions (picked up, delivered).
 export const STATUS_TO_PLATFORM_ACTION: Record<string, PlatformActionName> = {
-  [OrderStatus.PENDING]: 'acceptOrder',
-  [OrderStatus.PREPARING]: 'markPreparing',
-  [OrderStatus.READY]: 'markReady',
-  [OrderStatus.CANCELLED]: 'cancelOrder',
+  [OrderStatus.PENDING]: "acceptOrder",
+  [OrderStatus.PREPARING]: "markPreparing",
+  [OrderStatus.READY]: "markReady",
+  [OrderStatus.CANCELLED]: "cancelOrder",
 };
 
 /**
@@ -39,7 +39,7 @@ export const SYNCABLE_STATUSES = new Set([
 /**
  * Polling-based platforms that need periodic order fetching.
  */
-export const POLLING_PLATFORMS = ['GETIR', 'MIGROS', 'TRENDYOL'] as const;
+export const POLLING_PLATFORMS = ["GETIR", "MIGROS", "TRENDYOL"] as const;
 
 /**
  * Minimum polling intervals per platform (in milliseconds).

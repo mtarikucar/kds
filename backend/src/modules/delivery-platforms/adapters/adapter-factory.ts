@@ -1,10 +1,10 @@
-import { Injectable } from '@nestjs/common';
-import { DeliveryPlatform } from '../constants/platform.enum';
-import { PlatformAdapter } from '../interfaces/platform-adapter.interface';
-import { GetirAdapter } from './getir.adapter';
-import { MigrosAdapter } from './migros.adapter';
-import { TrendyolAdapter } from './trendyol.adapter';
-import { YemeksepetiAdapter } from './yemeksepeti.adapter';
+import { Injectable } from "@nestjs/common";
+import { DeliveryPlatform } from "../constants/platform.enum";
+import { PlatformAdapter } from "../interfaces/platform-adapter.interface";
+import { GetirAdapter } from "./getir.adapter";
+import { MigrosAdapter } from "./migros.adapter";
+import { TrendyolAdapter } from "./trendyol.adapter";
+import { YemeksepetiAdapter } from "./yemeksepeti.adapter";
 
 @Injectable()
 export class AdapterFactory {

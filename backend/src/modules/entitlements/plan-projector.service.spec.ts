@@ -262,11 +262,18 @@ describe('PlanProjectorService.projectTenant', () => {
       'reservationSystem',
       'personnelManagement',
       'deliveryIntegration',
+      // v3.0.0 — POS access tier-gate (BASIC+). FREE plans get
+      // posAccess=false, every other tier gets true; projector mirrors
+      // the column verbatim so PlanFeatureGuard can read it.
+      'posAccess',
     ];
     // Same intent for numeric limit columns.
     const EXPECTED_LIMITS = [
       'maxUsers',
       'maxTables',
+      // v3.0.0 — branch cap. FREE/BASIC=1, PRO=3, BUSINESS=-1.
+      // extra_branch add-on SUMs onto this via the engine fold.
+      'maxBranches',
       'maxProducts',
       'maxCategories',
       'maxMonthlyOrders',

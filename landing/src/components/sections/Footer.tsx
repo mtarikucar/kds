@@ -2,6 +2,7 @@
 
 import { Link } from '@/i18n/routing';
 import { useTranslations } from 'next-intl';
+import { Phone } from 'lucide-react';
 
 export default function Footer() {
   const t = useTranslations('footer');
@@ -54,10 +55,11 @@ export default function Footer() {
                 {t('address')}
               </p>
               <a
-                href="tel:+905466780495"
-                className="text-sm text-slate-500 hover:text-slate-900 transition-colors block"
+                href="tel:+908508407303"
+                className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-900 transition-colors"
               >
-                {t('phone')}
+                <Phone className="h-4 w-4 shrink-0 text-orange-500" />
+                <span dir="ltr">{t('phone')}</span>
               </a>
             </div>
           </div>

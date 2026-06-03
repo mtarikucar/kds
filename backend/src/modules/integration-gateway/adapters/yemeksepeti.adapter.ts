@@ -1,7 +1,10 @@
-import { createHmac } from 'node:crypto';
-import { Injectable, Logger } from '@nestjs/common';
-import { IntegrationAdapter, IntegrationKind } from '../integration-adapter.interface';
-import { verifyHmacHex } from '../sig-verify';
+import { createHmac } from "node:crypto";
+import { Injectable, Logger } from "@nestjs/common";
+import {
+  IntegrationAdapter,
+  IntegrationKind,
+} from "../integration-adapter.interface";
+import { verifyHmacHex } from "../sig-verify";
 
 /**
  * Yemeksepeti delivery adapter (scaffold).
@@ -17,15 +20,15 @@ import { verifyHmacHex } from '../sig-verify';
  */
 @Injectable()
 export class YemeksepetiAdapter implements IntegrationAdapter {
-  readonly id = 'yemeksepeti';
-  readonly kind: IntegrationKind = 'delivery';
+  readonly id = "yemeksepeti";
+  readonly kind: IntegrationKind = "delivery";
   readonly configSchema = {
-    type: 'object',
-    required: ['apiKey', 'secret'],
+    type: "object",
+    required: ["apiKey", "secret"],
     properties: {
-      apiKey: { type: 'string', description: 'Yemeksepeti vendor API key' },
-      secret: { type: 'string', description: 'Webhook signing secret' },
-      vendorId: { type: 'string', description: 'Vendor id on Yemeksepeti' },
+      apiKey: { type: "string", description: "Yemeksepeti vendor API key" },
+      secret: { type: "string", description: "Webhook signing secret" },
+      vendorId: { type: "string", description: "Vendor id on Yemeksepeti" },
     },
   };
 
@@ -37,21 +40,29 @@ export class YemeksepetiAdapter implements IntegrationAdapter {
   }
 
   async healthCheck() {
-    return { ok: Boolean(this.cfg.apiKey), details: { configured: Boolean(this.cfg.apiKey) } };
+    return {
+      ok: Boolean(this.cfg.apiKey),
+      details: { configured: Boolean(this.cfg.apiKey) },
+    };
   }
 
-  async parseWebhook(signature: string, raw: Buffer | string): Promise<unknown[]> {
-    const body = typeof raw === 'string' ? raw : raw.toString('utf8');
+  async parseWebhook(
+    signature: string,
+    raw: Buffer | string,
+  ): Promise<unknown[]> {
+    const body = typeof raw === "string" ? raw : raw.toString("utf8");
     // Empty secret used to silently accept unsigned webhooks, which is a
     // fail-open misconfig: a connection saved without a `secret` field
     // would let any unsigned POST in. Reject explicitly so the operator
     // sees the gap.
     if (!this.cfg.secret) {
-      throw new Error('yemeksepeti: webhook secret not configured');
+      throw new Error("yemeksepeti: webhook secret not configured");
     }
-    const expected = createHmac('sha256', this.cfg.secret).update(body).digest('hex');
+    const expected = createHmac("sha256", this.cfg.secret)
+      .update(body)
+      .digest("hex");
     if (!verifyHmacHex(expected, signature)) {
-      throw new Error('yemeksepeti: invalid signature');
+      throw new Error("yemeksepeti: invalid signature");
     }
     try {
       const parsed = JSON.parse(body);
@@ -61,7 +72,7 @@ export class YemeksepetiAdapter implements IntegrationAdapter {
       return [
         {
           providerId: this.id,
-          type: parsed?.eventType ?? parsed?.status ?? 'order.update',
+          type: parsed?.eventType ?? parsed?.status ?? "order.update",
           payload: parsed,
         },
       ];

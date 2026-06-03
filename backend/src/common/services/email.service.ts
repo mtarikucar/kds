@@ -1,14 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
-import { Transporter } from 'nodemailer';
-import * as fsp from 'fs/promises';
-import * as path from 'path';
-import * as Handlebars from 'handlebars';
-import { maskEmail } from '../helpers/pii-mask.helper';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import * as nodemailer from "nodemailer";
+import { Transporter } from "nodemailer";
+import * as fsp from "fs/promises";
+import * as path from "path";
+import * as Handlebars from "handlebars";
+import { maskEmail } from "../helpers/pii-mask.helper";
 
 // Register Handlebars helpers
-Handlebars.registerHelper('currentYear', () => new Date().getFullYear());
+Handlebars.registerHelper("currentYear", () => new Date().getFullYear());
 
 export interface EmailOptions {
   to: string;
@@ -30,23 +30,26 @@ export class EmailService {
   // Misses are NOT cached — compileTemplate throws on a missing
   // template (auth needs to surface that loudly); we don't want a
   // failure entry to outlive the missing-file condition.
-  private readonly templateCache = new Map<string, HandlebarsTemplateDelegate>();
+  private readonly templateCache = new Map<
+    string,
+    HandlebarsTemplateDelegate
+  >();
 
   constructor(private configService: ConfigService) {
     // Use process.cwd() instead of __dirname for bundled production builds
-    this.templatesPath = path.join(process.cwd(), 'templates/emails');
+    this.templatesPath = path.join(process.cwd(), "templates/emails");
     this.initializeTransporter();
   }
 
   private initializeTransporter() {
-    const host = this.configService.get<string>('EMAIL_HOST');
-    const port = this.configService.get<number>('EMAIL_PORT');
-    const user = this.configService.get<string>('EMAIL_USER');
-    const pass = this.configService.get<string>('EMAIL_PASSWORD');
+    const host = this.configService.get<string>("EMAIL_HOST");
+    const port = this.configService.get<number>("EMAIL_PORT");
+    const user = this.configService.get<string>("EMAIL_USER");
+    const pass = this.configService.get<string>("EMAIL_PASSWORD");
 
     if (!host || !user || !pass) {
       this.logger.warn(
-        'Email configuration missing. Emails will be logged instead of sent.',
+        "Email configuration missing. Emails will be logged instead of sent.",
       );
       return;
     }
@@ -64,9 +67,9 @@ export class EmailService {
     // Verify connection
     this.transporter.verify((error) => {
       if (error) {
-        this.logger.error('Email transporter verification failed:', error);
+        this.logger.error("Email transporter verification failed:", error);
       } else {
-        this.logger.log('Email transporter is ready to send emails');
+        this.logger.log("Email transporter is ready to send emails");
       }
     });
   }
@@ -95,15 +98,19 @@ export class EmailService {
         this.logger.log(`[EMAIL MOCK] To: ${maskEmail(to)}`);
         this.logger.log(`[EMAIL MOCK] Subject: ${subject}`);
         this.logger.log(`[EMAIL MOCK] Template: ${template}`);
-        this.logger.log(`[EMAIL MOCK] Context keys: ${Object.keys(context).join(', ')}`);
+        this.logger.log(
+          `[EMAIL MOCK] Context keys: ${Object.keys(context).join(", ")}`,
+        );
         return true;
       }
 
-      const from = this.configService.get<string>('EMAIL_FROM') || this.configService.get<string>('EMAIL_USER');
+      const from =
+        this.configService.get<string>("EMAIL_FROM") ||
+        this.configService.get<string>("EMAIL_USER");
 
       // Send email
       const info = await this.transporter.sendMail({
-        from: `"${this.configService.get<string>('APP_NAME', 'HummyTummy')}" <${from}>`,
+        from: `"${this.configService.get<string>("APP_NAME", "HummyTummy")}" <${from}>`,
         to,
         subject,
         html,
@@ -112,10 +119,15 @@ export class EmailService {
       // PII: mask recipient in the structured log stream — message id is
       // the actual debugging hook, not the full address (see iter-30
       // commit message + pii-mask.helper.ts for context).
-      this.logger.log(`Email sent successfully to ${maskEmail(to)}. Message ID: ${info.messageId}`);
+      this.logger.log(
+        `Email sent successfully to ${maskEmail(to)}. Message ID: ${info.messageId}`,
+      );
       return true;
     } catch (error) {
-      this.logger.error(`Failed to send email to ${maskEmail(options.to)}`, error as any);
+      this.logger.error(
+        `Failed to send email to ${maskEmail(options.to)}`,
+        error as any,
+      );
       return false;
     }
   }
@@ -125,7 +137,11 @@ export class EmailService {
    * Use only for transactional system notices (status changes, etc.) where
    * a bespoke template would be overkill.
    */
-  async sendPlainEmail(to: string, subject: string, body: string): Promise<boolean> {
+  async sendPlainEmail(
+    to: string,
+    subject: string,
+    body: string,
+  ): Promise<boolean> {
     try {
       if (!this.transporter) {
         // v2.8.97 — same masking as sendEmail above. Body length is
@@ -137,10 +153,10 @@ export class EmailService {
         return true;
       }
       const from =
-        this.configService.get<string>('EMAIL_FROM') ||
-        this.configService.get<string>('EMAIL_USER');
+        this.configService.get<string>("EMAIL_FROM") ||
+        this.configService.get<string>("EMAIL_USER");
       await this.transporter.sendMail({
-        from: `"${this.configService.get<string>('APP_NAME', 'HummyTummy')}" <${from}>`,
+        from: `"${this.configService.get<string>("APP_NAME", "HummyTummy")}" <${from}>`,
         to,
         subject,
         text: body,
@@ -170,11 +186,13 @@ export class EmailService {
     }
   }
 
-  private async loadTemplate(templateName: string): Promise<HandlebarsTemplateDelegate> {
+  private async loadTemplate(
+    templateName: string,
+  ): Promise<HandlebarsTemplateDelegate> {
     const cached = this.templateCache.get(templateName);
     if (cached) return cached;
     const templatePath = path.join(this.templatesPath, `${templateName}.hbs`);
-    const source = await fsp.readFile(templatePath, 'utf-8');
+    const source = await fsp.readFile(templatePath, "utf-8");
     const compiled = Handlebars.compile(source);
     this.templateCache.set(templateName, compiled);
     return compiled;
@@ -183,16 +201,19 @@ export class EmailService {
   /**
    * Send password reset email
    */
-  async sendPasswordResetEmail(email: string, resetToken: string): Promise<boolean> {
-    const resetLink = `${this.configService.get<string>('FRONTEND_URL', 'http://localhost:5173')}/reset-password?token=${resetToken}`;
+  async sendPasswordResetEmail(
+    email: string,
+    resetToken: string,
+  ): Promise<boolean> {
+    const resetLink = `${this.configService.get<string>("FRONTEND_URL", "http://localhost:5173")}/reset-password?token=${resetToken}`;
 
     return this.sendEmail({
       to: email,
-      subject: 'Password Reset Request',
-      template: 'password-reset',
+      subject: "Password Reset Request",
+      template: "password-reset",
       context: {
         resetLink,
-        expiresIn: '1 hour',
+        expiresIn: "1 hour",
       },
     });
   }
@@ -208,12 +229,12 @@ export class EmailService {
   ): Promise<boolean> {
     return this.sendEmail({
       to: email,
-      subject: 'Email Doğrulama Kodu - HummyTummy',
-      template: 'email-verification-code',
+      subject: "Email Doğrulama Kodu - HummyTummy",
+      template: "email-verification-code",
       context: {
         userName,
         code,
-        expiresIn: '1 saat',
+        expiresIn: "1 saat",
       },
     });
   }
@@ -228,12 +249,12 @@ export class EmailService {
   ): Promise<boolean> {
     return this.sendEmail({
       to: email,
-      subject: 'Welcome to HummyTummy!',
-      template: 'welcome',
+      subject: "Welcome to HummyTummy!",
+      template: "welcome",
       context: {
         userName,
-        restaurantName: restaurantName || 'our platform',
-        loginLink: `${this.configService.get<string>('FRONTEND_URL', 'http://localhost:5173')}/login`,
+        restaurantName: restaurantName || "our platform",
+        loginLink: `${this.configService.get<string>("FRONTEND_URL", "http://localhost:5173")}/login`,
       },
     });
   }

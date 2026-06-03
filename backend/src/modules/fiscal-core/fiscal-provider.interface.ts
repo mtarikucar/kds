@@ -1,21 +1,26 @@
 // Provider-neutral fiscal contracts. Every yazarkasa brand or e-Fatura
 // integration implements `FiscalProvider`.
 
-export type FiscalCapability = 'receipt' | 'invoice' | 'cancel' | 'z_report' | 'x_report';
+export type FiscalCapability =
+  | "receipt"
+  | "invoice"
+  | "cancel"
+  | "z_report"
+  | "x_report";
 
 export interface FiscalLine {
   productCode: string;
   name: string;
   qty: number;
   unitPriceCents: number;
-  vatRate: number;       // 0, 1, 8, 10, 18, 20 for TR
-  vatGroup?: string;     // 'A'..'F' yazarkasa dept code
+  vatRate: number; // 0, 1, 8, 10, 18, 20 for TR
+  vatGroup?: string; // 'A'..'F' yazarkasa dept code
   discountCents?: number;
 }
 
 export interface FiscalPaymentLine {
-  method: 'cash' | 'card' | 'qr' | 'voucher' | 'ticket';
-  brand?: string;        // VISA/MC for card; sodexo/multinet for ticket
+  method: "cash" | "card" | "qr" | "voucher" | "ticket";
+  brand?: string; // VISA/MC for card; sodexo/multinet for ticket
   amountCents: number;
 }
 
@@ -29,7 +34,7 @@ export interface FiscalReceiptRequest {
   customer?: { taxId?: string; name?: string; addr?: string };
   idempotencyKey: string;
   // 'cash_receipt' (yazarkasa receipt) | 'einvoice' (e-Fatura) | 'earsiv' (e-Arşiv)
-  kind?: 'cash_receipt' | 'einvoice' | 'earsiv';
+  kind?: "cash_receipt" | "einvoice" | "earsiv";
 }
 
 export interface FiscalReceiptResult {
@@ -37,7 +42,7 @@ export interface FiscalReceiptResult {
   receiptId: string;
   fiscalNo?: string;
   fiscalZNo?: string;
-  status: 'queued' | 'issued' | 'failed';
+  status: "queued" | "issued" | "failed";
   error?: string;
   raw?: Record<string, unknown>;
 }
@@ -45,7 +50,7 @@ export interface FiscalReceiptResult {
 export interface FiscalDeviceStatus {
   providerId: string;
   fiscalDeviceId: string;
-  status: 'online' | 'offline' | 'error' | 'maintenance';
+  status: "online" | "offline" | "error" | "maintenance";
   details?: Record<string, unknown>;
 }
 

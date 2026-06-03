@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsBoolean, IsObject, IsOptional } from 'class-validator';
+import { ApiProperty } from "@nestjs/swagger";
+import { IsBoolean, IsObject, IsOptional } from "class-validator";
 
 export class TourProgressDto {
   @ApiProperty({ required: false })
@@ -18,7 +18,7 @@ export class TourProgressDto {
 
 export class UpdateOnboardingDto {
   @ApiProperty({
-    description: 'Whether the user has seen the welcome modal',
+    description: "Whether the user has seen the welcome modal",
     required: false,
   })
   @IsBoolean()
@@ -26,7 +26,7 @@ export class UpdateOnboardingDto {
   hasSeenWelcome?: boolean;
 
   @ApiProperty({
-    description: 'Tour progress for each tour type',
+    description: "Tour progress for each tour type",
     required: false,
   })
   @IsObject()
@@ -34,7 +34,7 @@ export class UpdateOnboardingDto {
   tourProgress?: Record<string, TourProgressDto>;
 
   @ApiProperty({
-    description: 'Skip all tours flag',
+    description: "Skip all tours flag",
     required: false,
   })
   @IsBoolean()

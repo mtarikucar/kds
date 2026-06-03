@@ -1,6 +1,6 @@
-import { IsOptional, IsString, Length } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
-import { EmptyStringToUndefined } from '../../../common/dto/transforms';
+import { IsOptional, IsString, Length } from "class-validator";
+import { ApiPropertyOptional } from "@nestjs/swagger";
+import { EmptyStringToUndefined } from "../../../common/dto/transforms";
 
 /**
  * Body for POST /orders/:id/write-off — manager absorbs the remaining
@@ -12,7 +12,7 @@ import { EmptyStringToUndefined } from '../../../common/dto/transforms';
 export class WriteOffOrderDto {
   @ApiPropertyOptional({
     description:
-      'Free-form reason for the write-off (no-show, comp, manager discretion). Persisted on Payment.notes for audit.',
+      "Free-form reason for the write-off (no-show, comp, manager discretion). Persisted on Payment.notes for audit.",
   })
   @EmptyStringToUndefined()
   @IsString()

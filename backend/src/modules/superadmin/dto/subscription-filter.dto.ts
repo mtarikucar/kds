@@ -1,14 +1,27 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsIn, IsUUID, IsOptional, IsString, IsInt, Min, Max, IsNumber, IsBoolean, IsDateString, MaxLength } from 'class-validator';
-import { PartialType } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  IsEnum,
+  IsIn,
+  IsUUID,
+  IsOptional,
+  IsString,
+  IsInt,
+  Min,
+  Max,
+  IsNumber,
+  IsBoolean,
+  IsDateString,
+  MaxLength,
+} from "class-validator";
+import { PartialType } from "@nestjs/swagger";
+import { Type } from "class-transformer";
 
 const SUBSCRIPTION_STATUSES = [
-  'ACTIVE',
-  'CANCELLED',
-  'EXPIRED',
-  'PAST_DUE',
-  'TRIALING',
+  "ACTIVE",
+  "CANCELLED",
+  "EXPIRED",
+  "PAST_DUE",
+  "TRIALING",
 ] as const;
 
 export class SubscriptionFilterDto {
@@ -17,12 +30,12 @@ export class SubscriptionFilterDto {
   @IsIn(SUBSCRIPTION_STATUSES)
   status?: (typeof SUBSCRIPTION_STATUSES)[number];
 
-  @ApiPropertyOptional({ description: 'Filter by plan ID' })
+  @ApiPropertyOptional({ description: "Filter by plan ID" })
   @IsOptional()
   @IsUUID()
   planId?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by tenant ID' })
+  @ApiPropertyOptional({ description: "Filter by tenant ID" })
   @IsOptional()
   @IsUUID()
   tenantId?: string;
@@ -72,10 +85,10 @@ export class CreatePlanDto {
   @Min(0)
   yearlyPrice: number;
 
-  @ApiPropertyOptional({ default: 'TRY' })
+  @ApiPropertyOptional({ default: "TRY" })
   @IsOptional()
   @IsString()
-  currency?: string = 'TRY';
+  currency?: string = "TRY";
 
   @ApiPropertyOptional({ default: 0 })
   @IsOptional()
@@ -173,7 +186,7 @@ export class CreatePlanDto {
   @IsBoolean()
   isActive?: boolean = true;
 
-  @ApiPropertyOptional({ description: 'Discount percentage (0-100)' })
+  @ApiPropertyOptional({ description: "Discount percentage (0-100)" })
   @IsOptional()
   @Type(() => Number)
   @IsNumber()
@@ -181,22 +194,27 @@ export class CreatePlanDto {
   @Max(100)
   discountPercentage?: number;
 
-  @ApiPropertyOptional({ description: 'Discount label (e.g. "Ramazan Kampanyasi")' })
+  @ApiPropertyOptional({
+    description: 'Discount label (e.g. "Ramazan Kampanyasi")',
+  })
   @IsOptional()
   @IsString()
   discountLabel?: string;
 
-  @ApiPropertyOptional({ description: 'Discount start date (ISO string)' })
+  @ApiPropertyOptional({ description: "Discount start date (ISO string)" })
   @IsOptional()
   @IsDateString()
   discountStartDate?: string;
 
-  @ApiPropertyOptional({ description: 'Discount end date (ISO string)' })
+  @ApiPropertyOptional({ description: "Discount end date (ISO string)" })
   @IsOptional()
   @IsDateString()
   discountEndDate?: string;
 
-  @ApiPropertyOptional({ description: 'Whether discount is active', default: false })
+  @ApiPropertyOptional({
+    description: "Whether discount is active",
+    default: false,
+  })
   @IsOptional()
   @IsBoolean()
   isDiscountActive?: boolean;
@@ -207,20 +225,20 @@ export class CreatePlanDto {
 export class UpdatePlanDto extends PartialType(CreatePlanDto) {}
 
 export class ExtendSubscriptionDto {
-  @ApiProperty({ description: 'Number of days to extend' })
+  @ApiProperty({ description: "Number of days to extend" })
   @Type(() => Number)
   @IsInt()
   @Min(1)
   days: number;
 
-  @ApiPropertyOptional({ description: 'Reason for extension' })
+  @ApiPropertyOptional({ description: "Reason for extension" })
   @IsOptional()
   @IsString()
   reason?: string;
 }
 
 export class UpdateSubscriptionDto {
-  @ApiPropertyOptional({ description: 'New plan ID' })
+  @ApiPropertyOptional({ description: "New plan ID" })
   @IsOptional()
   @IsUUID()
   planId?: string;
@@ -232,15 +250,16 @@ export class UpdateSubscriptionDto {
 
   @ApiPropertyOptional({
     description:
-      'Override trial end timestamp (ISO 8601). Support uses this to extend a trial; ' +
-      'E2E tests use it to fast-forward the trial-expiry sweep.',
+      "Override trial end timestamp (ISO 8601). Support uses this to extend a trial; " +
+      "E2E tests use it to fast-forward the trial-expiry sweep.",
   })
   @IsOptional()
   @IsDateString()
   trialEnd?: string;
 
   @ApiPropertyOptional({
-    description: 'Override trial start timestamp (ISO 8601). Paired with trialEnd for trial-window edits.',
+    description:
+      "Override trial start timestamp (ISO 8601). Paired with trialEnd for trial-window edits.",
   })
   @IsOptional()
   @IsDateString()

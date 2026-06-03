@@ -127,8 +127,9 @@ model Tenant {
   shiftTemplates       ShiftTemplate[]
   shiftAssignments     ShiftAssignment[]
   shiftSwapRequests    ShiftSwapRequest[]
-  marketingCommissions Commission[]       @relation("MarketingCommissions")
-  convertedLead        Lead?              @relation("ConvertedTenant")
+  // Step-F decoupling: marketing's Commission.tenantId and Lead.convertedTenantId
+  // are now soft (no FK) references — the back-relations were dropped so the
+  // marketing tables can live in a separate DB.
 
   // Previously-orphaned relations (migration 20260420180000 adds the FKs).
   // Listed here so Prisma keeps the TS-side relation graph in sync.
@@ -963,6 +964,7 @@ model SubscriptionPlan {
   // Feature limits
   maxUsers         Int @default(1)
   maxTables        Int @default(5)
+  maxBranches      Int @default(1)
   maxProducts      Int @default(50)
   maxCategories    Int @default(10)
   maxMonthlyOrders Int @default(100)
@@ -978,6 +980,11 @@ model SubscriptionPlan {
   reservationSystem   Boolean @default(false)
   personnelManagement Boolean @default(false)
   deliveryIntegration Boolean @default(false)
+  // v3.0.0 — POS access is tier-gated (BASIC+). FREE post-trial fallback
+  // loses POS UI + /pos-settings; backend pos-settings.controller and the
+  // frontend /pos route both check `feature.posAccess`. Default true so
+  // every new plan row inherits access unless the seed/data step flips it.
+  posAccess           Boolean @default(true)
 
   // Discount settings
   discountPercentage Int? // Discount percentage (e.g., 25 for 25%)
@@ -1003,7 +1010,7 @@ model SubscriptionPlan {
   currentPlanTenants  Tenant[]            @relation("CurrentPlan")
   scheduledDowngrades Subscription[]      @relation("ScheduledDowngrade")
   pendingPlanChanges  PendingPlanChange[] @relation("PendingPlanChange")
-  leadOffers          LeadOffer[]
+  // Step-F decoupling: LeadOffer.planId is now a soft (no-FK) reference + plan snapshot.
 
   @@map("subscription_plans")
 }
@@ -1125,8 +1132,8 @@ model SubscriptionPayment {
   // subscription) so re-resolves are stable even if the marketer
   // later rotates their code.
   referralCode              String?
+  // Step-F decoupling: soft (no-FK) reference to the marketing-owned marketer.
   referredByMarketingUserId String?
-  referredBy                MarketingUser? @relation("ReferredByMarketer", fields: [referredByMarketingUserId], references: [id], onDelete: SetNull)
 
   // Relations
   invoice Invoice?
@@ -3303,7 +3310,6 @@ model MarketingUser {
   offers           LeadOffer[]
   commissions      Commission[]
   notifications    MarketingNotification[]
-  referredPayments SubscriptionPayment[]   @relation("ReferredByMarketer")
 
   @@index([email])
   @@index([role])
@@ -3338,8 +3344,9 @@ model Lead {
   assignedTo   MarketingUser? @relation("AssignedRep", fields: [assignedToId], references: [id], onDelete: SetNull)
 
   // Conversion tracking
+  // Step-F decoupling: soft (no-FK) reference to the core-owned tenant. @unique
+  // is a marketing-local invariant (one lead per converted tenant), kept.
   convertedTenantId String?   @unique
-  convertedTenant   Tenant?   @relation("ConvertedTenant", fields: [convertedTenantId], references: [id], onDelete: SetNull)
   convertedAt       DateTime?
 
   createdAt DateTime @default(now())
@@ -3424,7 +3431,16 @@ model MarketingTask {
 model LeadOffer {
   id          String            @id @default(uuid())
   planId      String?
-  plan        SubscriptionPlan? @relation(fields: [planId], references: [id], onDelete: SetNull)
+
+  /// Step-E plan snapshot, captured at offer-create time via the provisioning
+  /// port (CoreProvisioningPort.describePlan) so the offer stays self-contained
+  /// once the plan FK is dropped (Step F) and the plan moves to a separate DB.
+  /// Soft data — nullable; planId stays the canonical (soft) reference.
+  planCode         String?
+  planName         String?
+  planMonthlyPrice Decimal? @db.Decimal(10, 2)
+  planCurrency     String?
+
   customPrice Decimal?          @db.Decimal(10, 2)
   // v2.8.97 — was Decimal(5, 2) which capped the discount at 999.99
   // TRY. Sales reps offering a four-digit lira discount on enterprise
@@ -3460,8 +3476,8 @@ model Commission {
   type     String // SIGNUP, RENEWAL, UPSELL
   status   String  @default("PENDING") // PENDING, APPROVED, PAID
   period   String // "2026-04" (YYYY-MM format)
+  // Step-F decoupling: soft (no-FK) reference to the core-owned tenant.
   tenantId String?
-  tenant   Tenant? @relation("MarketingCommissions", fields: [tenantId], references: [id], onDelete: SetNull)
   leadId   String?
   lead     Lead?   @relation("CommissionLead", fields: [leadId], references: [id], onDelete: SetNull)
   notes    String? @db.Text
@@ -3479,6 +3495,14 @@ model Commission {
   /// rows per commission lifetime) and we never need to join on it.
   auditLog     Json?
 
+  /// Step-C decoupling: the SubscriptionPayment.id that triggered this credit.
+  /// Set by the marketing SettlementCommissionConsumer so RENEWAL/UPSELL credits
+  /// are exactly-once under event replay. A partial-unique on
+  /// (sourcePaymentId, type) — WHERE sourcePaymentId IS NOT NULL — enforces it
+  /// at the DB; declared in raw SQL since Prisma can't express partial uniques.
+  /// Soft reference (no FK): the payment lives in the core context.
+  sourcePaymentId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -3488,6 +3512,7 @@ model Commission {
   @@index([period])
   @@index([status])
   @@index([period, status])
+  @@index([sourcePaymentId])
   @@map("commissions")
 }
 
@@ -3524,6 +3549,144 @@ model MarketingDistributionConfig {
   updatedAt        DateTime @updatedAt
 
   @@map("marketing_distribution_config")
+}
+
+/// Phase-2 telephony: a single-line sales-call log over the company Netgsm line.
+/// Click-to-dial + manual outcome logging behind the TelephonyProvider
+/// abstraction. marketingUserId / leadId are soft references to the
+/// marketing-owned MarketingUser / Lead (no FK — keeps the model portable and
+/// avoids back-relations). externalCallId / durationSec / recordingUrl are the
+/// seams a future Netgsm API/webhook provider fills.
+model SalesCall {
+  id              String    @id @default(uuid())
+  marketingUserId String
+  leadId          String?
+  direction       String    @default("OUTBOUND") // OUTBOUND, INBOUND
+  toPhone         String
+  providerId      String // 'netgsm-lite', ...
+  status          String    @default("INITIATED") // INITIATED, CONNECTED, NO_ANSWER, BUSY, FAILED, CANCELLED
+  externalCallId  String?
+  durationSec     Int?
+  recordingUrl    String?
+  notes           String?   @db.Text
+  startedAt       DateTime  @default(now())
+  endedAt         DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([marketingUserId, startedAt(sort: Desc)])
+  @@index([leadId])
+  @@index([status])
+  @@map("sales_calls")
+}
+
+/// Phase-3 installation ops (inside the marketing context). A crew is an
+/// install team with a per-day job capacity used for availability checks.
+model InstallationCrew {
+  id            String   @id @default(uuid())
+  name          String
+  active        Boolean  @default(true)
+  dailyCapacity Int      @default(1)
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([active])
+  @@map("installation_crews")
+}
+
+/// An installation job, auto-created on lead→customer conversion
+/// (marketing.lead.converted.v1) and scheduled to a crew. tenantId is a soft
+/// (no-FK) reference to the core tenant; leadId/crewId are soft references to
+/// the marketing-owned Lead / InstallationCrew. Site/contact are snapshotted
+/// from the lead so the job never reads core tables.
+model InstallationJob {
+  id              String    @id @default(uuid())
+  tenantId        String
+  leadId          String?
+  crewId          String?
+  status          String    @default("REQUESTED") // REQUESTED, SCHEDULED, IN_PROGRESS, DONE, CANCELLED, NO_SHOW
+  scheduledDate   DateTime? @db.Date
+  scheduledWindow String? // MORNING, AFTERNOON, FULL_DAY
+  siteAddress     String?
+  siteCity        String?
+  contactName     String?
+  contactPhone    String?
+  notes           String?   @db.Text
+  requestedAt     DateTime  @default(now())
+  scheduledAt     DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  tasks InstallationTask[]
+
+  @@index([status])
+  @@index([crewId, scheduledDate])
+  @@index([tenantId])
+  @@index([scheduledDate])
+  @@map("installation_jobs")
+}
+
+/// A checklist item within an installation job.
+model InstallationTask {
+  id        String          @id @default(uuid())
+  jobId     String
+  job       InstallationJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  title     String
+  done      Boolean         @default(false)
+  position  Int             @default(0)
+  createdAt DateTime        @default(now())
+
+  @@index([jobId])
+  @@map("installation_tasks")
+}
+
+/// Phase-4 sales targets/quotas. A manager sets a per-rep, per-period (YYYY-MM)
+/// target for a metric; the performance service compares it to the actual
+/// computed from marketing-owned data (won leads, commission amount, connected
+/// calls). marketingUserId / setById are soft references to MarketingUser.
+model SalesTarget {
+  id              String   @id @default(uuid())
+  marketingUserId String
+  period          String // YYYY-MM
+  metric          String // WON_LEADS, COMMISSION_AMOUNT, CONNECTED_CALLS
+  targetValue     Decimal  @db.Decimal(14, 2)
+  setById         String
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([marketingUserId, period, metric])
+  @@index([period])
+  @@index([marketingUserId, period])
+  @@map("sales_targets")
+}
+
+/// Phase-1 marketing-decoupling provisioning ledger. Written by CORE's
+/// TenantProvisioningService when a marketing Lead is converted into a paying
+/// tenant. It is (a) the durable idempotency anchor — one row per lead, unique
+/// on leadId AND idempotencyKey, so a retried/concurrent conversion never mints
+/// a second tenant — and (b) the reconciliation source for orphan-tenant
+/// recovery (left-join against leads.convertedTenantId IS NULL when marketing
+/// finalization fails after core provisioning succeeds).
+///
+/// All columns are plain SOFT references (no FK): leadId points at a
+/// marketing-owned table, and tenant/user/subscription must NOT cascade-delete
+/// this audit/idempotency row. This keeps the ledger valid after the Phase-5
+/// physical DB split, where it becomes the provisioning service's own table.
+model TenantProvisioningLog {
+  id             String   @id @default(uuid())
+  leadId         String   @unique
+  idempotencyKey String   @unique
+  tenantId       String
+  adminUserId    String
+  subscriptionId String?
+  createdAt      DateTime @default(now())
+
+  @@index([tenantId])
+  @@map("tenant_provisioning_log")
 }
 
 // ========================================

@@ -1,5 +1,11 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsNotEmpty, IsString, MaxLength, MinLength } from 'class-validator';
+import { ApiProperty } from "@nestjs/swagger";
+import {
+  IsEmail,
+  IsNotEmpty,
+  IsString,
+  MaxLength,
+  MinLength,
+} from "class-validator";
 
 export class SuperAdminLoginDto {
   // Caps mirror iter-43 (auth) / iter-46 (users). Even with the
@@ -8,13 +14,13 @@ export class SuperAdminLoginDto {
   // truncation runs — a distributed attack against a megabyte
   // password still amplifies CPU cost. 128 covers any realistic
   // strong password; 254 is RFC 5321 SMTP local+domain max.
-  @ApiProperty({ example: 'admin@example.com' })
+  @ApiProperty({ example: "admin@example.com" })
   @IsEmail()
   @IsNotEmpty()
   @MaxLength(254)
   email: string;
 
-  @ApiProperty({ example: 'securepassword123' })
+  @ApiProperty({ example: "securepassword123" })
   @IsString()
   @IsNotEmpty()
   @MinLength(8)

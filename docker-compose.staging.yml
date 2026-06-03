@@ -99,9 +99,13 @@ services:
       timeout: 10s
       retries: 5
       # Cold bootstrap of the HummyTummy-sized backend takes ~3-4 min on
-      # this 1 CPU / 1GB limit (NestJS module init + Prisma introspection
-      # over 50+ tables). 240s leaves margin against the observed cold
-      # path.
+      # this 1 CPU / 1GB limit. NestJS registers hundreds of routes from
+      # marketplace + hardware-store + fiscal + caller + integration-
+      # gateway + outbound-webhooks before opening its HTTP listener,
+      # plus Prisma client introspection across 50+ tables. Old 40s
+      # start_period tripped well before the listener was up, causing
+      # docker compose to declare unhealthy → deploy.sh aborted. 240s
+      # leaves comfortable margin against the observed cold path.
       start_period: 240s
     networks:
       - kds_staging_network

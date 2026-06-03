@@ -1,10 +1,10 @@
-import { IsEnum } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsEnum } from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
 
 export enum OrderItemStatus {
-  PENDING = 'PENDING',
-  PREPARING = 'PREPARING',
-  READY = 'READY',
+  PENDING = "PENDING",
+  PREPARING = "PREPARING",
+  READY = "READY",
 }
 
 /**
@@ -17,7 +17,7 @@ export enum OrderItemStatus {
  * status the client wants to transition to.
  */
 export class UpdateOrderItemStatusDto {
-  @ApiProperty({ enum: OrderItemStatus, description: 'Order item status' })
+  @ApiProperty({ enum: OrderItemStatus, description: "Order item status" })
   @IsEnum(OrderItemStatus)
   status!: OrderItemStatus;
 }

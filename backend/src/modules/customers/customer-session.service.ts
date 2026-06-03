@@ -1,8 +1,8 @@
-import { Injectable, Logger, UnauthorizedException } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { randomBytes } from 'crypto';
-import { PrismaService } from '../../prisma/prisma.service';
-import { withAdvisoryLock } from '../../common/scheduling/advisory-lock';
+import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { randomBytes } from "crypto";
+import { PrismaService } from "../../prisma/prisma.service";
+import { withAdvisoryLock } from "../../common/scheduling/advisory-lock";
 
 @Injectable()
 export class CustomerSessionService {
@@ -50,7 +50,7 @@ export class CustomerSessionService {
       select: { id: true },
     });
     if (!tenant) {
-      throw new UnauthorizedException('Invalid tenant');
+      throw new UnauthorizedException("Invalid tenant");
     }
     if (tableId) {
       const table = await this.prisma.table.findFirst({
@@ -58,11 +58,11 @@ export class CustomerSessionService {
         select: { id: true },
       });
       if (!table) {
-        throw new UnauthorizedException('Invalid table for this tenant');
+        throw new UnauthorizedException("Invalid table for this tenant");
       }
     }
 
-    const sessionId = randomBytes(32).toString('hex');
+    const sessionId = randomBytes(32).toString("hex");
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 4);
 
@@ -108,18 +108,18 @@ export class CustomerSessionService {
       },
     });
 
-    if (!session) throw new UnauthorizedException('Invalid session');
+    if (!session) throw new UnauthorizedException("Invalid session");
     if (new Date() > session.expiresAt || !session.isActive) {
-      throw new UnauthorizedException('Session expired');
+      throw new UnauthorizedException("Session expired");
     }
     if (expectedTenantId && session.tenantId !== expectedTenantId) {
-      throw new UnauthorizedException('Invalid session');
+      throw new UnauthorizedException("Invalid session");
     }
     if (session.customer && session.customer.tenantId !== session.tenantId) {
       // Defensive: customer linked to this session belongs to a different
       // tenant. Should never happen if linkCustomerToSession is tenant-scoped
       // (see below); treat as session invalid.
-      throw new UnauthorizedException('Invalid session');
+      throw new UnauthorizedException("Invalid session");
     }
     return session;
   }
@@ -129,14 +129,19 @@ export class CustomerSessionService {
    * same tenant as the session. Updates orders referencing the session's
    * sessionId only when they also belong to the same tenant.
    */
-  async linkCustomerToSession(sessionId: string, customerId: string, phone?: string) {
+  async linkCustomerToSession(
+    sessionId: string,
+    customerId: string,
+    phone?: string,
+  ) {
     const session = await this.getSession(sessionId);
 
     const customer = await this.prisma.customer.findFirst({
       where: { id: customerId, tenantId: session.tenantId },
       select: { id: true },
     });
-    if (!customer) throw new UnauthorizedException('Invalid customer for session');
+    if (!customer)
+      throw new UnauthorizedException("Invalid customer for session");
 
     const updated = await this.prisma.customerSession.update({
       where: { sessionId },
@@ -192,7 +197,7 @@ export class CustomerSessionService {
       include: {
         customer: { select: { id: true, name: true, phone: true } },
       },
-      orderBy: { lastActivity: 'desc' },
+      orderBy: { lastActivity: "desc" },
       take: CustomerSessionService.ACTIVE_SESSIONS_HARD_CAP,
     });
   }
@@ -206,14 +211,14 @@ export class CustomerSessionService {
         expiresAt: { gt: new Date() },
       },
       include: { customer: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   }
 
   async getSessionsByCustomer(customerId: string, tenantId: string) {
     return this.prisma.customerSession.findMany({
       where: { customerId, tenantId },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: 10,
     });
   }
@@ -257,7 +262,9 @@ export class CustomerSessionService {
    * historical session rows doesn't cascade.
    */
   async deleteOldSessions(): Promise<number> {
-    const cutoff = new Date(Date.now() - CustomerSessionService.SESSION_DELETE_AFTER_MS);
+    const cutoff = new Date(
+      Date.now() - CustomerSessionService.SESSION_DELETE_AFTER_MS,
+    );
     const result = await this.prisma.customerSession.deleteMany({
       where: {
         isActive: false,
@@ -276,7 +283,7 @@ export class CustomerSessionService {
   async sweepSessions(): Promise<void> {
     await withAdvisoryLock(
       this.prisma,
-      'customer-sessions.sweep',
+      "customer-sessions.sweep",
       async () => {
         const deactivated = await this.cleanupExpiredSessions();
         const deleted = await this.deleteOldSessions();

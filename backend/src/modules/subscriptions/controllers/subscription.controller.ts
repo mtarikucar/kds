@@ -8,18 +8,18 @@ import {
   Param,
   Query,
   Request,
-} from '@nestjs/common';
-import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
-import { SubscriptionService } from '../services/subscription.service';
-import { BillingService } from '../services/billing.service';
-import { UsageService } from '../services/usage.service';
-import { Public } from '../../auth/decorators/public.decorator';
-import { Roles } from '../../auth/decorators/roles.decorator';
-import { UserRole } from '../../../common/constants/roles.enum';
-import { CreateSubscriptionDto } from '../dto/create-subscription.dto';
-import { UpdateSubscriptionDto } from '../dto/update-subscription.dto';
-import { ChangePlanDto } from '../dto/change-plan.dto';
-import { CancelSubscriptionDto } from '../dto/cancel-subscription.dto';
+} from "@nestjs/common";
+import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+import { SubscriptionService } from "../services/subscription.service";
+import { BillingService } from "../services/billing.service";
+import { UsageService } from "../services/usage.service";
+import { Public } from "../../auth/decorators/public.decorator";
+import { Roles } from "../../auth/decorators/roles.decorator";
+import { UserRole } from "../../../common/constants/roles.enum";
+import { CreateSubscriptionDto } from "../dto/create-subscription.dto";
+import { UpdateSubscriptionDto } from "../dto/update-subscription.dto";
+import { ChangePlanDto } from "../dto/change-plan.dto";
+import { CancelSubscriptionDto } from "../dto/cancel-subscription.dto";
 
 /**
  * Every :id endpoint threads `req.user.tenantId` into the service so
@@ -27,9 +27,9 @@ import { CancelSubscriptionDto } from '../dto/cancel-subscription.dto';
  * TenantGuard / RolesGuard) are applied via APP_GUARD — no need to
  * redeclare them here.
  */
-@ApiTags('subscriptions')
+@ApiTags("subscriptions")
 @ApiBearerAuth()
-@Controller('subscriptions')
+@Controller("subscriptions")
 export class SubscriptionController {
   constructor(
     private readonly subscriptionService: SubscriptionService,
@@ -38,12 +38,12 @@ export class SubscriptionController {
   ) {}
 
   @Public()
-  @Get('plans')
+  @Get("plans")
   async getPlans() {
     return this.subscriptionService.getAvailablePlans();
   }
 
-  @Get('effective-features')
+  @Get("effective-features")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getEffectiveFeatures(@Request() req) {
     return this.subscriptionService.getEffectiveFeatures(req.user.tenantId);
@@ -52,24 +52,24 @@ export class SubscriptionController {
   // v2.8.88 — usage snapshot feeds the Plan & Erişim page kotalar grid
   // + dashboard quota mini-cards. 60s cached per tenant; safe to call
   // on every render.
-  @Get('usage/snapshot')
+  @Get("usage/snapshot")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getUsageSnapshot(@Request() req) {
     return this.usageService.getSnapshot(req.user.tenantId);
   }
 
-  @Get('current')
+  @Get("current")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getCurrentSubscription(@Request() req) {
     return this.subscriptionService.getCurrentSubscription(req.user.tenantId);
   }
 
-  @Get('tenant/invoices')
+  @Get("tenant/invoices")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getTenantInvoices(
     @Request() req,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
   ) {
     return this.billingService.getTenantInvoices(
       req.user.tenantId,
@@ -78,9 +78,9 @@ export class SubscriptionController {
     );
   }
 
-  @Get(':id')
+  @Get(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async getSubscription(@Param('id') id: string, @Request() req) {
+  async getSubscription(@Param("id") id: string, @Request() req) {
     return this.subscriptionService.getSubscriptionById(id, req.user.tenantId);
   }
 
@@ -90,10 +90,10 @@ export class SubscriptionController {
     return this.subscriptionService.createSubscription(req.user.tenantId, dto);
   }
 
-  @Patch(':id')
+  @Patch(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async updateSubscription(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body() dto: UpdateSubscriptionDto,
     @Request() req,
   ) {
@@ -104,35 +104,38 @@ export class SubscriptionController {
     );
   }
 
-  @Post(':id/change-plan')
+  @Post(":id/change-plan")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async changePlan(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body() dto: ChangePlanDto,
     @Request() req,
   ) {
     return this.subscriptionService.changePlan(id, req.user.tenantId, dto);
   }
 
-  @Get(':id/scheduled-downgrade')
+  @Get(":id/scheduled-downgrade")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async getScheduledDowngrade(@Param('id') id: string, @Request() req) {
-    return this.subscriptionService.getScheduledDowngrade(id, req.user.tenantId);
+  async getScheduledDowngrade(@Param("id") id: string, @Request() req) {
+    return this.subscriptionService.getScheduledDowngrade(
+      id,
+      req.user.tenantId,
+    );
   }
 
-  @Delete(':id/scheduled-downgrade')
+  @Delete(":id/scheduled-downgrade")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async cancelScheduledDowngrade(@Param('id') id: string, @Request() req) {
+  async cancelScheduledDowngrade(@Param("id") id: string, @Request() req) {
     return this.subscriptionService.cancelScheduledDowngrade(
       id,
       req.user.tenantId,
     );
   }
 
-  @Post(':id/cancel')
+  @Post(":id/cancel")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async cancelSubscription(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body() body: CancelSubscriptionDto,
     @Request() req,
   ) {
@@ -144,22 +147,22 @@ export class SubscriptionController {
     );
   }
 
-  @Post(':id/reactivate')
+  @Post(":id/reactivate")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async reactivateSubscription(@Param('id') id: string, @Request() req) {
+  async reactivateSubscription(@Param("id") id: string, @Request() req) {
     return this.subscriptionService.reactivateSubscription(
       id,
       req.user.tenantId,
     );
   }
 
-  @Get(':id/invoices')
+  @Get(":id/invoices")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   async getInvoices(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Request() req,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
   ) {
     return this.billingService.getSubscriptionInvoices(
       id,

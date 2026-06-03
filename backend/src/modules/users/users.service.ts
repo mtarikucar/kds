@@ -7,18 +7,18 @@ import {
   ForbiddenException,
   Inject,
   forwardRef,
-} from '@nestjs/common';
-import * as bcrypt from 'bcryptjs';
-import { Prisma } from '@prisma/client';
-import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../prisma/prisma.service';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { UpdateProfileDto, UpdateEmailDto } from './dto/update-profile.dto';
-import { UpdateOnboardingDto } from './dto/update-onboarding.dto';
-import { AuthService } from '../auth/auth.service';
-import { UserRole } from '../../common/constants/roles.enum';
-import { EntitlementService } from '../entitlements/entitlement.service';
+} from "@nestjs/common";
+import * as bcrypt from "bcryptjs";
+import { Prisma } from "@prisma/client";
+import { ConfigService } from "@nestjs/config";
+import { PrismaService } from "../../prisma/prisma.service";
+import { CreateUserDto } from "./dto/create-user.dto";
+import { UpdateUserDto } from "./dto/update-user.dto";
+import { UpdateProfileDto, UpdateEmailDto } from "./dto/update-profile.dto";
+import { UpdateOnboardingDto } from "./dto/update-onboarding.dto";
+import { AuthService } from "../auth/auth.service";
+import { UserRole } from "../../common/constants/roles.enum";
+import { EntitlementService } from "../entitlements/entitlement.service";
 
 const LIST_SELECT = {
   id: true,
@@ -69,17 +69,22 @@ export class UsersService {
    * Engine wins when populated; falls back to the plan column on
    * empty engine (projector race / brand-new tenant).
    */
-  private async resolveMaxUsers(tenantId: string, planMaxUsers: number): Promise<number> {
+  private async resolveMaxUsers(
+    tenantId: string,
+    planMaxUsers: number,
+  ): Promise<number> {
     const set = await this.entitlements.getForTenant(tenantId, null);
-    const engineLimit = set.limits['limit.maxUsers'];
-    if (typeof engineLimit === 'number') return engineLimit;
+    const engineLimit = set.limits["limit.maxUsers"];
+    if (typeof engineLimit === "number") return engineLimit;
     return planMaxUsers;
   }
 
   private bcryptCost(): number {
-    const raw = this.configService.get<string>('BCRYPT_COST');
+    const raw = this.configService.get<string>("BCRYPT_COST");
     const parsed = raw ? parseInt(raw, 10) : NaN;
-    return Number.isFinite(parsed) && parsed >= 10 && parsed <= 15 ? parsed : 12;
+    return Number.isFinite(parsed) && parsed >= 10 && parsed <= 15
+      ? parsed
+      : 12;
   }
 
   /**
@@ -95,7 +100,7 @@ export class UsersService {
       where: {
         tenantId,
         role: UserRole.ADMIN,
-        status: 'ACTIVE',
+        status: "ACTIVE",
         ...(excludeUserId ? { NOT: { id: excludeUserId } } : {}),
       },
     });
@@ -110,11 +115,14 @@ export class UsersService {
       select: { role: true, status: true },
     });
     if (!target) return;
-    if (target.role !== UserRole.ADMIN || target.status !== 'ACTIVE') return;
-    const otherAdmins = await this.countActiveAdminsExcept(tenantId, targetUserId);
+    if (target.role !== UserRole.ADMIN || target.status !== "ACTIVE") return;
+    const otherAdmins = await this.countActiveAdminsExcept(
+      tenantId,
+      targetUserId,
+    );
     if (otherAdmins === 0) {
       throw new BadRequestException(
-        'Cannot demote or deactivate the last active admin of this restaurant',
+        "Cannot demote or deactivate the last active admin of this restaurant",
       );
     }
   }
@@ -126,8 +134,11 @@ export class UsersService {
   ) {
     // A MANAGER must not be able to mint an ADMIN — that would be a
     // privilege escalation. Only an existing ADMIN can create ADMINs.
-    if (createUserDto.role === UserRole.ADMIN && actor.role !== UserRole.ADMIN) {
-      throw new ForbiddenException('Only an ADMIN can create another ADMIN');
+    if (
+      createUserDto.role === UserRole.ADMIN &&
+      actor.role !== UserRole.ADMIN
+    ) {
+      throw new ForbiddenException("Only an ADMIN can create another ADMIN");
     }
 
     const existingUser = await this.prisma.user.findUnique({
@@ -135,10 +146,13 @@ export class UsersService {
     });
     if (existingUser) {
       // Generic message — prevents cross-tenant email enumeration.
-      throw new ConflictException('Email is not available');
+      throw new ConflictException("Email is not available");
     }
 
-    const hashedPassword = await bcrypt.hash(createUserDto.password, this.bcryptCost());
+    const hashedPassword = await bcrypt.hash(
+      createUserDto.password,
+      this.bcryptCost(),
+    );
 
     // Enforce the subscription's maxUsers cap. Without this, an ADMIN
     // on a 3-user plan can mint 100 users — reactivateUser already
@@ -149,14 +163,17 @@ export class UsersService {
     // PlanFeatureGuard / reactivateUser).
     return this.prisma.$transaction(async (tx) => {
       const subscription = await tx.subscription.findFirst({
-        where: { tenantId, status: { in: ['ACTIVE', 'TRIALING', 'PAST_DUE'] } },
+        where: { tenantId, status: { in: ["ACTIVE", "TRIALING", "PAST_DUE"] } },
         include: { plan: true },
       });
       if (subscription?.plan) {
-        const effectiveMax = await this.resolveMaxUsers(tenantId, subscription.plan.maxUsers);
+        const effectiveMax = await this.resolveMaxUsers(
+          tenantId,
+          subscription.plan.maxUsers,
+        );
         if (effectiveMax !== -1) {
           const activeCount = await tx.user.count({
-            where: { tenantId, status: 'ACTIVE' },
+            where: { tenantId, status: "ACTIVE" },
           });
           if (activeCount >= effectiveMax) {
             throw new ForbiddenException(
@@ -175,7 +192,7 @@ export class UsersService {
           role: createUserDto.role,
           // Admin/Manager-created accounts are already vetted — skip the
           // PENDING_APPROVAL flow used by public self-registration.
-          status: 'ACTIVE',
+          status: "ACTIVE",
           tenantId,
         },
         select: LIST_SELECT,
@@ -200,11 +217,11 @@ export class UsersService {
    * the operator wondering why the filter returned zero rows.
    */
   private static readonly USER_STATUS_ALLOW = new Set([
-    'ACTIVE',
-    'INACTIVE',
-    'PENDING',
-    'REJECTED',
-    'SUSPENDED',
+    "ACTIVE",
+    "INACTIVE",
+    "PENDING",
+    "REJECTED",
+    "SUSPENDED",
   ]);
 
   async findAll(tenantId: string, filters: UserListFilters = {}) {
@@ -213,15 +230,21 @@ export class UsersService {
 
     if (filters.status && !UsersService.USER_STATUS_ALLOW.has(filters.status)) {
       throw new BadRequestException(
-        `status must be one of: ${[...UsersService.USER_STATUS_ALLOW].join(', ')}`,
+        `status must be one of: ${[...UsersService.USER_STATUS_ALLOW].join(", ")}`,
       );
     }
-    if (filters.role && !Object.values(UserRole).includes(filters.role as UserRole)) {
+    if (
+      filters.role &&
+      !Object.values(UserRole).includes(filters.role as UserRole)
+    ) {
       throw new BadRequestException(
-        `role must be one of: ${Object.values(UserRole).join(', ')}`,
+        `role must be one of: ${Object.values(UserRole).join(", ")}`,
       );
     }
-    if (filters.search && filters.search.length > UsersService.USER_SEARCH_MAX_LEN) {
+    if (
+      filters.search &&
+      filters.search.length > UsersService.USER_SEARCH_MAX_LEN
+    ) {
       throw new BadRequestException(
         `search must be ${UsersService.USER_SEARCH_MAX_LEN} chars or less`,
       );
@@ -232,9 +255,9 @@ export class UsersService {
     if (filters.role) where.role = filters.role;
     if (filters.search) {
       where.OR = [
-        { firstName: { contains: filters.search, mode: 'insensitive' } },
-        { lastName: { contains: filters.search, mode: 'insensitive' } },
-        { email: { contains: filters.search, mode: 'insensitive' } },
+        { firstName: { contains: filters.search, mode: "insensitive" } },
+        { lastName: { contains: filters.search, mode: "insensitive" } },
+        { email: { contains: filters.search, mode: "insensitive" } },
       ];
     }
 
@@ -242,7 +265,7 @@ export class UsersService {
       this.prisma.user.findMany({
         where,
         select: LIST_SELECT,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -291,21 +314,21 @@ export class UsersService {
     // change their own role (avoids "MANAGER promotes self to ADMIN").
     if (dto.role !== undefined && dto.role !== existing.role) {
       if (actor.role !== UserRole.ADMIN) {
-        throw new ForbiddenException('Only ADMIN can change roles');
+        throw new ForbiddenException("Only ADMIN can change roles");
       }
       if (actor.id === id) {
-        throw new ForbiddenException('You cannot change your own role');
+        throw new ForbiddenException("You cannot change your own role");
       }
       // If the target is currently the only active admin, don't demote.
       if (
         existing.role === UserRole.ADMIN &&
         dto.role !== UserRole.ADMIN &&
-        existing.status === 'ACTIVE'
+        existing.status === "ACTIVE"
       ) {
         const otherAdmins = await this.countActiveAdminsExcept(tenantId, id);
         if (otherAdmins === 0) {
           throw new BadRequestException(
-            'Cannot demote the last active admin of this restaurant',
+            "Cannot demote the last active admin of this restaurant",
           );
         }
       }
@@ -316,7 +339,7 @@ export class UsersService {
         where: { email: dto.email },
       });
       if (collision && collision.id !== id) {
-        throw new ConflictException('Email is not available');
+        throw new ConflictException("Email is not available");
       }
     }
 
@@ -373,7 +396,7 @@ export class UsersService {
           data: {
             userId: id,
             tenantId,
-            action: 'ROLE_CHANGED',
+            action: "ROLE_CHANGED",
             metadata: {
               by: actor.id,
               from: existing.role,
@@ -387,12 +410,14 @@ export class UsersService {
           data: {
             userId: id,
             tenantId,
-            action: 'CREDENTIAL_CHANGED',
+            action: "CREDENTIAL_CHANGED",
             metadata: {
               by: actor.id,
               fields: [
-                dto.password !== undefined ? 'password' : null,
-                dto.email !== undefined && dto.email !== existing.email ? 'email' : null,
+                dto.password !== undefined ? "password" : null,
+                dto.email !== undefined && dto.email !== existing.email
+                  ? "email"
+                  : null,
               ].filter(Boolean),
             },
           },
@@ -404,7 +429,7 @@ export class UsersService {
 
   async remove(id: string, tenantId: string, actorId: string) {
     if (id === actorId) {
-      throw new BadRequestException('You cannot delete your own account');
+      throw new BadRequestException("You cannot delete your own account");
     }
 
     const target = await this.prisma.user.findFirst({
@@ -421,7 +446,7 @@ export class UsersService {
     // Soft delete. Tombstone the email so the same address can be used
     // to sign up again (global uniqueness otherwise blocks re-hires and
     // role-based addresses like info@restaurant.com).
-    const tombstonedEmail = target.email.endsWith('@tombstone.kds')
+    const tombstonedEmail = target.email.endsWith("@tombstone.kds")
       ? target.email
       : `${target.email}+deleted-${id}@tombstone.kds`;
 
@@ -433,7 +458,7 @@ export class UsersService {
       const claim = await tx.user.updateMany({
         where: { id, tenantId },
         data: {
-          status: 'INACTIVE',
+          status: "INACTIVE",
           email: tombstonedEmail,
           tokenVersion: { increment: 1 },
         },
@@ -469,7 +494,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
 
     return this.prisma.user.update({
@@ -501,7 +526,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
 
     const isPasswordValid = await bcrypt.compare(
@@ -509,14 +534,14 @@ export class UsersService {
       user.password,
     );
     if (!isPasswordValid) {
-      throw new BadRequestException('Current password is incorrect');
+      throw new BadRequestException("Current password is incorrect");
     }
 
     const existing = await this.prisma.user.findUnique({
       where: { email: updateEmailDto.email },
     });
     if (existing && existing.id !== userId) {
-      throw new ConflictException('Email is not available');
+      throw new ConflictException("Email is not available");
     }
 
     const updatedUser = await this.prisma.$transaction(async (tx) => {
@@ -555,7 +580,10 @@ export class UsersService {
     try {
       await this.authService.sendEmailVerification(userId);
     } catch (error) {
-      this.logger.error('Failed to send verification email after email update', error as any);
+      this.logger.error(
+        "Failed to send verification email after email update",
+        error as any,
+      );
     }
 
     return updatedUser;
@@ -590,7 +618,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
 
     return user;
@@ -611,16 +639,19 @@ export class UsersService {
   async approveUser(userId: string, approverId: string, tenantId: string) {
     return this.prisma.$transaction(async (tx) => {
       const subscription = await tx.subscription.findFirst({
-        where: { tenantId, status: { in: ['ACTIVE', 'TRIALING', 'PAST_DUE'] } },
+        where: { tenantId, status: { in: ["ACTIVE", "TRIALING", "PAST_DUE"] } },
         include: { plan: true },
       });
       let effectiveMax: number | null = null;
       if (subscription?.plan) {
-        effectiveMax = await this.resolveMaxUsers(tenantId, subscription.plan.maxUsers);
+        effectiveMax = await this.resolveMaxUsers(
+          tenantId,
+          subscription.plan.maxUsers,
+        );
       }
       if (effectiveMax !== null && effectiveMax !== -1) {
         const activeCount = await tx.user.count({
-          where: { tenantId, status: 'ACTIVE' },
+          where: { tenantId, status: "ACTIVE" },
         });
         if (activeCount >= effectiveMax) {
           throw new ForbiddenException(
@@ -633,17 +664,17 @@ export class UsersService {
         where: {
           id: userId,
           tenantId,
-          status: 'PENDING_APPROVAL',
+          status: "PENDING_APPROVAL",
         },
         data: {
-          status: 'ACTIVE',
+          status: "ACTIVE",
           approvedAt: new Date(),
           approvedById: approverId,
         },
       });
 
       if (result.count === 0) {
-        throw new NotFoundException('Onay bekleyen kullanıcı bulunamadı');
+        throw new NotFoundException("Onay bekleyen kullanıcı bulunamadı");
       }
 
       return tx.user.findUnique({
@@ -661,26 +692,29 @@ export class UsersService {
   async reactivateUser(userId: string, tenantId: string, actorId: string) {
     return this.prisma.$transaction(async (tx) => {
       const target = await tx.user.findFirst({
-        where: { id: userId, tenantId, status: 'INACTIVE' },
+        where: { id: userId, tenantId, status: "INACTIVE" },
       });
       if (!target) {
-        throw new NotFoundException('Pasif kullanıcı bulunamadı');
+        throw new NotFoundException("Pasif kullanıcı bulunamadı");
       }
 
       // PAST_DUE counts as live (grace window) to stay consistent with
       // PlanFeatureGuard, otherwise CRUD breaks while the feature gate
       // still says "you can do this".
       const subscription = await tx.subscription.findFirst({
-        where: { tenantId, status: { in: ['ACTIVE', 'TRIALING', 'PAST_DUE'] } },
+        where: { tenantId, status: { in: ["ACTIVE", "TRIALING", "PAST_DUE"] } },
         include: { plan: true },
       });
       if (!subscription?.plan) {
-        throw new ForbiddenException('No active subscription found');
+        throw new ForbiddenException("No active subscription found");
       }
-      const effectiveMax = await this.resolveMaxUsers(tenantId, subscription.plan.maxUsers);
+      const effectiveMax = await this.resolveMaxUsers(
+        tenantId,
+        subscription.plan.maxUsers,
+      );
       if (effectiveMax !== -1) {
         const activeCount = await tx.user.count({
-          where: { tenantId, status: 'ACTIVE' },
+          where: { tenantId, status: "ACTIVE" },
         });
         if (activeCount >= effectiveMax) {
           throw new ForbiddenException(
@@ -690,14 +724,14 @@ export class UsersService {
       }
 
       // Restore the original email if it was tombstoned during soft-delete.
-      const emailUpdate = target.email.includes('+deleted-')
-        ? { email: target.email.replace(/\+deleted-[^@]+@tombstone\.kds$/, '') }
+      const emailUpdate = target.email.includes("+deleted-")
+        ? { email: target.email.replace(/\+deleted-[^@]+@tombstone\.kds$/, "") }
         : {};
 
       return tx.user.update({
         where: { id: userId },
         data: {
-          status: 'ACTIVE',
+          status: "ACTIVE",
           reactivatedAt: new Date(),
           reactivatedById: actorId,
           // Stale approval data is cleared so audit reflects "reactivation,
@@ -717,14 +751,14 @@ export class UsersService {
    */
   async rejectUser(userId: string, tenantId: string) {
     const target = await this.prisma.user.findFirst({
-      where: { id: userId, tenantId, status: 'PENDING_APPROVAL' },
+      where: { id: userId, tenantId, status: "PENDING_APPROVAL" },
       select: { id: true, email: true },
     });
     if (!target) {
-      throw new NotFoundException('Onay bekleyen kullanıcı bulunamadı');
+      throw new NotFoundException("Onay bekleyen kullanıcı bulunamadı");
     }
 
-    const tombstonedEmail = target.email.endsWith('@tombstone.kds')
+    const tombstonedEmail = target.email.endsWith("@tombstone.kds")
       ? target.email
       : `${target.email}+rejected-${userId}@tombstone.kds`;
 
@@ -732,14 +766,14 @@ export class UsersService {
     // pre-check above is later regressed. Status filter also serializes
     // concurrent reject calls — only the first one transitions the row.
     const claim = await this.prisma.user.updateMany({
-      where: { id: userId, tenantId, status: 'PENDING_APPROVAL' },
+      where: { id: userId, tenantId, status: "PENDING_APPROVAL" },
       data: {
-        status: 'REJECTED',
+        status: "REJECTED",
         email: tombstonedEmail,
       },
     });
     if (claim.count === 0) {
-      throw new NotFoundException('Onay bekleyen kullanıcı bulunamadı');
+      throw new NotFoundException("Onay bekleyen kullanıcı bulunamadı");
     }
     return this.prisma.user.findUnique({
       where: { id: userId },
@@ -760,7 +794,7 @@ export class UsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
 
     const defaultOnboarding = {
@@ -772,14 +806,17 @@ export class UsersService {
     return user.onboardingData || defaultOnboarding;
   }
 
-  async updateOnboarding(userId: string, updateOnboardingDto: UpdateOnboardingDto) {
+  async updateOnboarding(
+    userId: string,
+    updateOnboardingDto: UpdateOnboardingDto,
+  ) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { onboardingData: true },
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
 
     const currentData = (user.onboardingData as any) || {
@@ -790,7 +827,9 @@ export class UsersService {
 
     const updatedData = {
       hasSeenWelcome:
-        updateOnboardingDto.hasSeenWelcome ?? currentData.hasSeenWelcome ?? false,
+        updateOnboardingDto.hasSeenWelcome ??
+        currentData.hasSeenWelcome ??
+        false,
       skipAllTours:
         updateOnboardingDto.skipAllTours ?? currentData.skipAllTours ?? false,
       tourProgress: {

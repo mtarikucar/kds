@@ -1,20 +1,20 @@
-import { Logger } from '@nestjs/common';
-import * as Twilio from 'twilio';
-import { SmsProvider, SmsSendResult } from './sms-provider.interface';
-import { maskPhone } from '../../../common/helpers/pii-mask.helper';
+import { Logger } from "@nestjs/common";
+import * as Twilio from "twilio";
+import { SmsProvider, SmsSendResult } from "./sms-provider.interface";
+import { maskPhone } from "../../../common/helpers/pii-mask.helper";
 
 export class TwilioProvider implements SmsProvider {
-  readonly name = 'twilio';
+  readonly name = "twilio";
   private readonly logger = new Logger(TwilioProvider.name);
   private client: Twilio.Twilio | null = null;
   private from: string;
 
   constructor(accountSid?: string, authToken?: string, phoneNumber?: string) {
-    this.from = phoneNumber || '';
+    this.from = phoneNumber || "";
 
     if (accountSid && authToken) {
       this.client = Twilio.default(accountSid, authToken);
-      this.logger.log('Twilio provider initialized');
+      this.logger.log("Twilio provider initialized");
     }
   }
 
@@ -24,7 +24,7 @@ export class TwilioProvider implements SmsProvider {
 
   async send(to: string, message: string): Promise<SmsSendResult> {
     if (!this.client || !this.from) {
-      return { success: false, error: 'Twilio not configured' };
+      return { success: false, error: "Twilio not configured" };
     }
 
     try {
@@ -34,14 +34,16 @@ export class TwilioProvider implements SmsProvider {
         to,
       });
 
-      this.logger.log(`SMS sent via Twilio to ${maskPhone(to)} (SID: ${result.sid})`);
+      this.logger.log(
+        `SMS sent via Twilio to ${maskPhone(to)} (SID: ${result.sid})`,
+      );
       return { success: true, messageId: result.sid };
     } catch (error) {
       // Non-retryable errors
       if (
         error.code === 21211 || // Invalid phone number
         error.code === 21408 || // Permission denied
-        error.code === 21610    // Unsubscribed recipient
+        error.code === 21610 // Unsubscribed recipient
       ) {
         return { success: false, error: `Non-retryable: ${error.message}` };
       }

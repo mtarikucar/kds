@@ -28,14 +28,14 @@ import { decryptString } from "../../../common/helpers/encryption.helper";
  * explicitly so the failure surfaces as a 400 before any SubscriptionPayment
  * / PendingSelfPayment row is reserved.
  */
-const PAYTR_SUPPORTED_CURRENCIES = new Set(['TRY', 'TL']);
-const PAYTR_WIRE_CURRENCY = 'TL';
+const PAYTR_SUPPORTED_CURRENCIES = new Set(["TRY", "TL"]);
+const PAYTR_WIRE_CURRENCY = "TL";
 
 function assertPaytrCurrency(currency: string): void {
   if (!PAYTR_SUPPORTED_CURRENCIES.has(currency)) {
     throw new BadRequestException(
       `PayTR yalnızca TRY desteklemektedir — istenen para birimi: ${currency}. ` +
-        'Planı/siparişi TRY ile fiyatlandırın veya başka bir ödeme sağlayıcısı seçin.',
+        "Planı/siparişi TRY ile fiyatlandırın veya başka bir ödeme sağlayıcısı seçin.",
     );
   }
 }
@@ -352,11 +352,11 @@ export class PaytrAdapter {
     // synthetic OID and the settlement service would treat it as a
     // genuine paid invoice. Fail loud at startup rather than silently
     // accept the misconfig.
-    const fake = this.config.get<string>('PAYTR_USE_FAKE_ADAPTER');
-    const env = this.config.get<string>('NODE_ENV');
-    if (env === 'production' && fake === 'true') {
+    const fake = this.config.get<string>("PAYTR_USE_FAKE_ADAPTER");
+    const env = this.config.get<string>("NODE_ENV");
+    if (env === "production" && fake === "true") {
       throw new Error(
-        'PAYTR_USE_FAKE_ADAPTER=true is forbidden in production — refusing to boot',
+        "PAYTR_USE_FAKE_ADAPTER=true is forbidden in production — refusing to boot",
       );
     }
   }

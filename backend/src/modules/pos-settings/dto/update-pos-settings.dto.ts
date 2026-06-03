@@ -1,42 +1,53 @@
-import { IsBoolean, IsIn, IsOptional, IsString } from 'class-validator';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsIn, IsOptional, IsString } from "class-validator";
+import { ApiPropertyOptional } from "@nestjs/swagger";
 
 export class UpdatePosSettingsDto {
-  @ApiPropertyOptional({ description: 'Enable tableless mode (orders without table selection)' })
+  @ApiPropertyOptional({
+    description: "Enable tableless mode (orders without table selection)",
+  })
   @IsBoolean()
   @IsOptional()
   enableTablelessMode?: boolean;
 
-  @ApiPropertyOptional({ description: 'Enable two-step checkout (separate order creation and payment)' })
+  @ApiPropertyOptional({
+    description:
+      "Enable two-step checkout (separate order creation and payment)",
+  })
   @IsBoolean()
   @IsOptional()
   enableTwoStepCheckout?: boolean;
 
-  @ApiPropertyOptional({ description: 'Show product images in POS menu' })
+  @ApiPropertyOptional({ description: "Show product images in POS menu" })
   @IsBoolean()
   @IsOptional()
   showProductImages?: boolean;
 
-  @ApiPropertyOptional({ description: 'Enable customer ordering from QR menu' })
+  @ApiPropertyOptional({ description: "Enable customer ordering from QR menu" })
   @IsBoolean()
   @IsOptional()
   enableCustomerOrdering?: boolean;
 
   @ApiPropertyOptional({
     description:
-      'Enable customer self-pay via PayTR hosted iFrame from QR menu. Requires a configured PayTR merchant account.',
+      "Enable customer self-pay via PayTR hosted iFrame from QR menu. Requires a configured PayTR merchant account.",
   })
   @IsBoolean()
   @IsOptional()
   enableCustomerSelfPay?: boolean;
 
-  @ApiPropertyOptional({ description: 'Default floor plan view mode', enum: ['2d', '3d'] })
+  @ApiPropertyOptional({
+    description: "Default floor plan view mode",
+    enum: ["2d", "3d"],
+  })
   @IsString()
-  @IsIn(['2d', '3d'])
+  @IsIn(["2d", "3d"])
   @IsOptional()
-  defaultMapView?: '2d' | '3d';
+  defaultMapView?: "2d" | "3d";
 
-  @ApiPropertyOptional({ description: 'Require SERVED status for dine-in payment in two-step checkout' })
+  @ApiPropertyOptional({
+    description:
+      "Require SERVED status for dine-in payment in two-step checkout",
+  })
   @IsBoolean()
   @IsOptional()
   requireServedForDineInPayment?: boolean;

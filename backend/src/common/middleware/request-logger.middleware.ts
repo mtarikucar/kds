@@ -1,6 +1,6 @@
-import { Injectable, NestMiddleware } from '@nestjs/common';
-import { Request, Response, NextFunction } from 'express';
-import { LoggerService } from '../services/logger.service';
+import { Injectable, NestMiddleware } from "@nestjs/common";
+import { Request, Response, NextFunction } from "express";
+import { LoggerService } from "../services/logger.service";
 
 /**
  * Request logger middleware
@@ -8,11 +8,11 @@ import { LoggerService } from '../services/logger.service';
  */
 @Injectable()
 export class RequestLoggerMiddleware implements NestMiddleware {
-  private readonly logger = new LoggerService('HTTP');
+  private readonly logger = new LoggerService("HTTP");
 
   use(req: Request, res: Response, next: NextFunction): void {
     const { method, originalUrl, ip } = req;
-    const userAgent = req.get('user-agent') || '';
+    const userAgent = req.get("user-agent") || "";
     const startTime = Date.now();
 
     // Generate unique request ID
@@ -29,19 +29,24 @@ export class RequestLoggerMiddleware implements NestMiddleware {
     });
 
     // Log response when finished
-    res.on('finish', () => {
+    res.on("finish", () => {
       const { statusCode } = res;
-      const contentLength = res.get('content-length');
+      const contentLength = res.get("content-length");
       const responseTime = Date.now() - startTime;
 
-      const level = statusCode >= 500 ? 'error' : statusCode >= 400 ? 'warn' : 'http';
+      const level =
+        statusCode >= 500 ? "error" : statusCode >= 400 ? "warn" : "http";
 
-      this.logger.logWithLevel(level, `${method} ${originalUrl} ${statusCode}`, {
-        requestId,
-        statusCode,
-        contentLength: contentLength || 0,
-        responseTime: `${responseTime}ms`,
-      });
+      this.logger.logWithLevel(
+        level,
+        `${method} ${originalUrl} ${statusCode}`,
+        {
+          requestId,
+          statusCode,
+          contentLength: contentLength || 0,
+          responseTime: `${responseTime}ms`,
+        },
+      );
     });
 
     next();

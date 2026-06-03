@@ -9,10 +9,10 @@ import {
   MaxLength,
   Min,
   ValidateNested,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { EmptyStringToNumber } from '../../../common/dto/transforms';
+} from "class-validator";
+import { Type } from "class-transformer";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { EmptyStringToNumber } from "../../../common/dto/transforms";
 
 // Iter-93: keep per-line ingredient count modest. A recipe with hundreds
 // of distinct stock items is implausible (most kitchens have 5-30
@@ -26,34 +26,39 @@ const RECIPE_NAME_MAX = 200;
 const RECIPE_NOTES_MAX = 2000;
 
 export class RecipeIngredientDto {
-  @ApiProperty({ description: 'Stock item UUID' })
+  @ApiProperty({ description: "Stock item UUID" })
   @IsUUID()
   stockItemId!: string;
 
-  @ApiProperty({ description: 'Quantity needed per recipe yield', minimum: 0 })
+  @ApiProperty({ description: "Quantity needed per recipe yield", minimum: 0 })
   @IsNumber()
   @Min(0)
   quantity!: number;
 }
 
 export class CreateRecipeDto {
-  @ApiProperty({ description: 'Product UUID this recipe is for' })
+  @ApiProperty({ description: "Product UUID this recipe is for" })
   @IsUUID()
   productId!: string;
 
-  @ApiPropertyOptional({ description: 'Recipe name (defaults to product name)' })
+  @ApiPropertyOptional({
+    description: "Recipe name (defaults to product name)",
+  })
   @IsString()
   @IsOptional()
   @MaxLength(RECIPE_NAME_MAX)
   name?: string;
 
-  @ApiPropertyOptional({ description: 'Recipe notes' })
+  @ApiPropertyOptional({ description: "Recipe notes" })
   @IsString()
   @IsOptional()
   @MaxLength(RECIPE_NOTES_MAX)
   notes?: string;
 
-  @ApiPropertyOptional({ description: 'Number of portions this recipe makes', minimum: 1 })
+  @ApiPropertyOptional({
+    description: "Number of portions this recipe makes",
+    minimum: 1,
+  })
   @EmptyStringToNumber()
   @IsNumber()
   @Min(1)
@@ -62,7 +67,7 @@ export class CreateRecipeDto {
 
   @ApiProperty({
     type: [RecipeIngredientDto],
-    description: 'Recipe ingredients (stockItemId must be unique)',
+    description: "Recipe ingredients (stockItemId must be unique)",
     minItems: 1,
     maxItems: MAX_RECIPE_INGREDIENTS,
   })

@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { UserFilterDto, UserActivityFilterDto } from '../dto/user-filter.dto';
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { UserFilterDto, UserActivityFilterDto } from "../dto/user-filter.dto";
 
 @Injectable()
 export class SuperAdminUsersService {
@@ -13,9 +13,9 @@ export class SuperAdminUsersService {
 
     if (search) {
       where.OR = [
-        { email: { contains: search, mode: 'insensitive' } },
-        { firstName: { contains: search, mode: 'insensitive' } },
-        { lastName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: "insensitive" } },
+        { firstName: { contains: search, mode: "insensitive" } },
+        { lastName: { contains: search, mode: "insensitive" } },
       ];
     }
 
@@ -34,7 +34,7 @@ export class SuperAdminUsersService {
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
         select: {
@@ -97,7 +97,7 @@ export class SuperAdminUsersService {
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
 
     // Get user's order statistics
@@ -106,7 +106,7 @@ export class SuperAdminUsersService {
         where: { userId: id },
       }),
       this.prisma.order.aggregate({
-        where: { userId: id, status: 'PAID' },
+        where: { userId: id, status: "PAID" },
         _sum: { finalAmount: true },
       }),
     ]);
@@ -121,8 +121,11 @@ export class SuperAdminUsersService {
   }
 
   async setEmailVerified(id: string, emailVerified: boolean) {
-    const user = await this.prisma.user.findUnique({ where: { id }, select: { id: true } });
-    if (!user) throw new NotFoundException('User not found');
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: { id: true },
+    });
+    if (!user) throw new NotFoundException("User not found");
     return this.prisma.user.update({
       where: { id },
       data: { emailVerified },
@@ -150,7 +153,7 @@ export class SuperAdminUsersService {
     const [activities, total] = await Promise.all([
       this.prisma.userActivity.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         skip: (page - 1) * limit,
         take: limit,
       }),

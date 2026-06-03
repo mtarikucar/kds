@@ -1,5 +1,5 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
-import { EventEmitter } from 'node:events';
+import { Injectable, Logger, OnModuleDestroy } from "@nestjs/common";
+import { EventEmitter } from "node:events";
 
 export type DomainEventHandler = (event: DomainEvent) => void | Promise<void>;
 
@@ -60,13 +60,13 @@ export class DomainEventBus implements OnModuleDestroy {
 
   /** Wildcard subscribe for cross-cutting consumers (audit log, metrics). */
   onAny(handler: DomainEventHandler): void {
-    this.emitter.on('*', handler);
+    this.emitter.on("*", handler);
   }
 
   async dispatch(event: DomainEvent): Promise<void> {
     const listeners = [
       ...(this.emitter.listeners(event.type) as DomainEventHandler[]),
-      ...(this.emitter.listeners('*') as DomainEventHandler[]),
+      ...(this.emitter.listeners("*") as DomainEventHandler[]),
     ];
     for (const l of listeners) {
       // Per-listener isolation: a thrown handler is logged but does not

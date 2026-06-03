@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, Phone } from 'lucide-react';
 import { Link } from '@/i18n/routing';
 import { useScrollDirection } from '@/hooks/useScrollDirection';
 import { useTranslations } from 'next-intl';
@@ -85,6 +85,14 @@ export default function Navbar() {
 
           {/* Desktop Actions */}
           <div className="hidden lg:flex items-center gap-4">
+            <a
+              href="tel:+908508407303"
+              dir="ltr"
+              className={`hidden xl:flex items-center gap-1.5 text-sm font-medium transition-colors duration-300 ${textSecondary}`}
+            >
+              <Phone className="h-4 w-4" />
+              +90 850 840 73 03
+            </a>
             <LanguageSwitcher />
             <a
               href="/app/login"
@@ -145,6 +153,15 @@ export default function Navbar() {
             ),
           )}
           <div className="pt-4 mt-4 border-t border-slate-200 space-y-3">
+            <a
+              href="tel:+908508407303"
+              dir="ltr"
+              className="flex items-center gap-2 px-4 py-3 text-base font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50 rounded-lg transition-colors"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              <Phone className="h-5 w-5 text-orange-500" />
+              +90 850 840 73 03
+            </a>
             <LanguageSwitcher />
             <a
               href="/app/login"

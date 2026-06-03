@@ -1,12 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { ReservationStatus } from '../constants/reservation-status.enum';
-import { TableStatus } from '../../tables/dto/create-table.dto';
+import { Injectable, Logger } from "@nestjs/common";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { PrismaService } from "../../../prisma/prisma.service";
+import { ReservationStatus } from "../constants/reservation-status.enum";
+import { TableStatus } from "../../tables/dto/create-table.dto";
 // v2.8.95 — both autoHoldUpcoming and releaseExpiredHolds mutate
 // shared table state on a 5-minute tick. Without a per-replica lock
 // every replica double-flips tables and double-emits NO_SHOW events.
-import { withAdvisoryLock } from '../../../common/scheduling/advisory-lock';
+import { withAdvisoryLock } from "../../../common/scheduling/advisory-lock";
 
 /**
  * Default pre-start hold window when a tenant has no ReservationSettings
@@ -53,12 +53,12 @@ export class ReservationSchedulerService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  @Cron(CronExpression.EVERY_5_MINUTES, { name: 'reservation-auto-hold' })
+  @Cron(CronExpression.EVERY_5_MINUTES, { name: "reservation-auto-hold" })
   async autoHoldUpcoming(): Promise<{ held: number }> {
     let outcome = { held: 0 };
     await withAdvisoryLock(
       this.prisma,
-      'reservation-auto-hold',
+      "reservation-auto-hold",
       async () => {
         outcome = await this.autoHoldUpcomingInner();
       },
@@ -102,10 +102,11 @@ export class ReservationSchedulerService {
 
     let held = 0;
     for (const r of candidates) {
-      const offsetMin = offsetByTenant.get(r.tenantId) ?? DEFAULT_HOLD_OFFSET_MINUTES;
+      const offsetMin =
+        offsetByTenant.get(r.tenantId) ?? DEFAULT_HOLD_OFFSET_MINUTES;
       const windowEnd = new Date(now.getTime() + offsetMin * 60_000);
 
-      const [sh, sm] = r.startTime.split(':').map(Number);
+      const [sh, sm] = r.startTime.split(":").map(Number);
       const startDt = new Date(r.date);
       startDt.setHours(sh, sm, 0, 0);
 
@@ -130,17 +131,19 @@ export class ReservationSchedulerService {
     }
 
     if (held > 0) {
-      this.logger.log(`auto-hold: marked ${held} table(s) RESERVED for upcoming reservations`);
+      this.logger.log(
+        `auto-hold: marked ${held} table(s) RESERVED for upcoming reservations`,
+      );
     }
     return { held };
   }
 
-  @Cron(CronExpression.EVERY_5_MINUTES, { name: 'reservation-release-holds' })
+  @Cron(CronExpression.EVERY_5_MINUTES, { name: "reservation-release-holds" })
   async releaseExpiredHolds(): Promise<{ released: number }> {
     let outcome = { released: 0 };
     await withAdvisoryLock(
       this.prisma,
-      'reservation-release-holds',
+      "reservation-release-holds",
       async () => {
         outcome = await this.releaseExpiredHoldsInner();
       },
@@ -191,14 +194,16 @@ export class ReservationSchedulerService {
         //       waiter can use it for a walk-in. The dialog UX only
         //       exposes "seat" within this grace, after which the row
         //       has no actionable path anyway.
-        const [eh, em] = r.endTime.split(':').map(Number);
+        const [eh, em] = r.endTime.split(":").map(Number);
         const endDt = new Date(r.date);
         endDt.setHours(eh, em, 0, 0);
 
-        const [sh, sm] = r.startTime.split(':').map(Number);
+        const [sh, sm] = r.startTime.split(":").map(Number);
         const startDt = new Date(r.date);
         startDt.setHours(sh, sm, 0, 0);
-        const graceEnd = new Date(startDt.getTime() + GRACE_AFTER_START_MINUTES * 60_000);
+        const graceEnd = new Date(
+          startDt.getTime() + GRACE_AFTER_START_MINUTES * 60_000,
+        );
 
         if (endDt < now) {
           shouldRelease = true;
@@ -209,7 +214,9 @@ export class ReservationSchedulerService {
           await this.prisma.reservation.updateMany({
             where: {
               id: r.id,
-              status: { in: [ReservationStatus.CONFIRMED, ReservationStatus.PENDING] },
+              status: {
+                in: [ReservationStatus.CONFIRMED, ReservationStatus.PENDING],
+              },
             },
             data: { status: ReservationStatus.NO_SHOW },
           });
@@ -237,7 +244,9 @@ export class ReservationSchedulerService {
     }
 
     if (released > 0) {
-      this.logger.log(`release-holds: cleared ${released} stale RESERVED hold(s)`);
+      this.logger.log(
+        `release-holds: cleared ${released} stale RESERVED hold(s)`,
+      );
     }
     return { released };
   }
@@ -247,7 +256,9 @@ export class ReservationSchedulerService {
    * without a settings row are absent from the map; callers fall back
    * to {@link DEFAULT_HOLD_OFFSET_MINUTES}.
    */
-  private async fetchOffsets(tenantIds: string[]): Promise<Map<string, number>> {
+  private async fetchOffsets(
+    tenantIds: string[],
+  ): Promise<Map<string, number>> {
     if (tenantIds.length === 0) return new Map();
     const rows = await this.prisma.reservationSettings.findMany({
       where: { tenantId: { in: tenantIds } },

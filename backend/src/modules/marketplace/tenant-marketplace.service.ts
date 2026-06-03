@@ -1,9 +1,15 @@
-import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
-import { OutboxService } from '../outbox/outbox.service';
-import { EventTypes } from '../outbox/event-types';
-import { AddOnCatalogService } from './addon-catalog.service';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from "@nestjs/common";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../prisma/prisma.service";
+import { OutboxService } from "../outbox/outbox.service";
+import { EventTypes } from "../outbox/event-types";
+import { AddOnCatalogService } from "./addon-catalog.service";
 
 /**
  * Tenant-facing operations: purchase, cancel, list-mine.
@@ -29,19 +35,27 @@ export class TenantMarketplaceService {
     private readonly outbox: OutboxService,
   ) {}
 
-  async purchase(tenantId: string, input: { addOnCode: string; quantity?: number; branchId?: string; paymentRef?: string }) {
+  async purchase(
+    tenantId: string,
+    input: {
+      addOnCode: string;
+      quantity?: number;
+      branchId?: string;
+      paymentRef?: string;
+    },
+  ) {
     const addOn = await this.catalog.findByCodeOrThrow(input.addOnCode);
     // Default-deny: an add-on status the catalog UI doesn't know about
     // (a new lifecycle state added later, a typo in a manual update)
     // must NOT silently mint a TenantAddOn row. Previously the code
     // only blocked 'archived' / 'draft' — anything else fell through
     // to `create`. Allowlist published-only.
-    if (addOn.status !== 'published') {
+    if (addOn.status !== "published") {
       throw new BadRequestException(
-        addOn.status === 'archived'
-          ? 'This add-on is no longer available for purchase'
-          : addOn.status === 'draft'
-            ? 'This add-on is not yet published'
+        addOn.status === "archived"
+          ? "This add-on is no longer available for purchase"
+          : addOn.status === "draft"
+            ? "This add-on is not yet published"
             : `Add-on is not available for purchase (status=${addOn.status})`,
       );
     }
@@ -54,26 +68,26 @@ export class TenantMarketplaceService {
         where: { id: tenantId },
         include: { currentPlan: { select: { name: true } } },
       });
-      if (!tenant) throw new NotFoundException('Tenant not found');
+      if (!tenant) throw new NotFoundException("Tenant not found");
 
       const planName = tenant.currentPlan?.name ?? null;
       const activeAddOns = await this.prisma.tenantAddOn.findMany({
-        where: { tenantId, status: 'active' },
+        where: { tenantId, status: "active" },
         include: { addOn: { select: { code: true } } },
       });
       const haveAddOnCodes = new Set(activeAddOns.map((ta) => ta.addOn.code));
 
       const missing: string[] = [];
       for (const dep of addOn.deps) {
-        if (dep.startsWith('plan:')) {
-          if (`plan:${planName ?? ''}` !== dep) missing.push(dep);
+        if (dep.startsWith("plan:")) {
+          if (`plan:${planName ?? ""}` !== dep) missing.push(dep);
         } else if (!haveAddOnCodes.has(dep)) {
           missing.push(dep);
         }
       }
       if (missing.length > 0) {
         throw new BadRequestException(
-          `Add-on requires: ${missing.join(', ')}. Upgrade your plan or purchase the required add-ons first.`,
+          `Add-on requires: ${missing.join(", ")}. Upgrade your plan or purchase the required add-ons first.`,
         );
       }
     }
@@ -84,7 +98,10 @@ export class TenantMarketplaceService {
     // Recurring add-ons project a 30-day window so the cancellation flow has
     // a meaningful `currentPeriodEnd`. Real billing cycles are aligned to
     // the parent Subscription cycle once Phase 5 checkout wires them up.
-    const currentPeriodEnd = addOn.billing === 'oneTime' ? null : new Date(now.getTime() + 30 * 24 * 3600 * 1000);
+    const currentPeriodEnd =
+      addOn.billing === "oneTime"
+        ? null
+        : new Date(now.getTime() + 30 * 24 * 3600 * 1000);
 
     // Wrap the idempotency-check, dup-check, and create in a SERIALIZABLE
     // transaction. The TenantAddOn table has no partial unique index on
@@ -116,12 +133,12 @@ export class TenantMarketplaceService {
               tenantId,
               addOnId: addOn.id,
               branchId: input.branchId ?? null,
-              status: 'active',
+              status: "active",
             },
           });
           if (dup) {
             throw new BadRequestException(
-              `Add-on "${addOn.code}" is already active for this ${input.branchId ? 'branch' : 'tenant'}. Cancel the existing subscription or change quantity instead.`,
+              `Add-on "${addOn.code}" is already active for this ${input.branchId ? "branch" : "tenant"}. Cancel the existing subscription or change quantity instead.`,
             );
           }
 
@@ -131,7 +148,7 @@ export class TenantMarketplaceService {
               addOnId: addOn.id,
               branchId: input.branchId,
               quantity: qty,
-              status: 'active',
+              status: "active",
               activatedAt: now,
               currentPeriodStart: now,
               currentPeriodEnd,
@@ -147,10 +164,10 @@ export class TenantMarketplaceService {
       // the client retries cleanly and sees the now-committed winner.
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
-        err.code === 'P2034'
+        err.code === "P2034"
       ) {
         throw new ConflictException(
-          'Concurrent purchase detected — please retry. Your request did not double-charge.',
+          "Concurrent purchase detected — please retry. Your request did not double-charge.",
         );
       }
       throw err;
@@ -168,7 +185,9 @@ export class TenantMarketplaceService {
           quantity: qty,
         },
       })
-      .catch((e) => this.logger.warn(`AddOnPurchased emit failed: ${(e as Error).message}`));
+      .catch((e) =>
+        this.logger.warn(`AddOnPurchased emit failed: ${(e as Error).message}`),
+      );
 
     return row;
   }
@@ -177,8 +196,9 @@ export class TenantMarketplaceService {
     const row = await this.prisma.tenantAddOn.findFirst({
       where: { id: tenantAddOnId, tenantId },
     });
-    if (!row) throw new NotFoundException('Add-on not found for this tenant');
-    if (row.status !== 'active') throw new BadRequestException(`Cannot cancel — status is ${row.status}`);
+    if (!row) throw new NotFoundException("Add-on not found for this tenant");
+    if (row.status !== "active")
+      throw new BadRequestException(`Cannot cancel — status is ${row.status}`);
 
     const now = new Date();
     // v2.8.96 — fold claim + post-fetch + emit into one transaction.
@@ -194,13 +214,20 @@ export class TenantMarketplaceService {
     // outbox event; the count check below makes the loser explicit.
     return this.prisma.$transaction(async (tx) => {
       const claim = await tx.tenantAddOn.updateMany({
-        where: { id: tenantAddOnId, tenantId, status: 'active' },
+        where: { id: tenantAddOnId, tenantId, status: "active" },
         data: immediate
-          ? { status: 'cancelled', cancelledAt: now, endedAt: now, cancelAtPeriodEnd: false }
+          ? {
+              status: "cancelled",
+              cancelledAt: now,
+              endedAt: now,
+              cancelAtPeriodEnd: false,
+            }
           : { cancelAtPeriodEnd: true, cancelledAt: now },
       });
       if (claim.count === 0) {
-        throw new BadRequestException('Cancel raced with another request — refresh and retry');
+        throw new BadRequestException(
+          "Cancel raced with another request — refresh and retry",
+        );
       }
       const updated = await tx.tenantAddOn.findFirstOrThrow({
         where: { id: tenantAddOnId, tenantId },
@@ -218,7 +245,7 @@ export class TenantMarketplaceService {
               payload: {
                 tenantId,
                 addOnId: row.id,
-                addOnCode: '<lookup>', // intentionally elided — projector reads canonical state
+                addOnCode: "<lookup>", // intentionally elided — projector reads canonical state
               },
             },
             tx,
@@ -237,7 +264,7 @@ export class TenantMarketplaceService {
     return this.prisma.tenantAddOn.findMany({
       where: { tenantId },
       include: { addOn: true },
-      orderBy: { activatedAt: 'desc' },
+      orderBy: { activatedAt: "desc" },
     });
   }
 }

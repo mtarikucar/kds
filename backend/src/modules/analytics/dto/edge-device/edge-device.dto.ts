@@ -9,24 +9,24 @@ import {
   Min,
   Max,
   IsObject,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { EmptyStringToNumber } from '../../../../common/dto/transforms';
+} from "class-validator";
+import { Type } from "class-transformer";
+import { EmptyStringToNumber } from "../../../../common/dto/transforms";
 
 // Enums
 export enum PersonState {
-  STANDING = 'STANDING',
-  SITTING = 'SITTING',
-  MOVING = 'MOVING',
-  WAITING = 'WAITING',
-  UNKNOWN = 'UNKNOWN',
+  STANDING = "STANDING",
+  SITTING = "SITTING",
+  MOVING = "MOVING",
+  WAITING = "WAITING",
+  UNKNOWN = "UNKNOWN",
 }
 
 export enum EdgeDeviceStatus {
-  ONLINE = 'ONLINE',
-  OFFLINE = 'OFFLINE',
-  ERROR = 'ERROR',
-  UPDATING = 'UPDATING',
+  ONLINE = "ONLINE",
+  OFFLINE = "OFFLINE",
+  ERROR = "ERROR",
+  UPDATING = "UPDATING",
 }
 
 // Edge Device Registration
@@ -262,7 +262,7 @@ export class EdgeDeviceConfigDto {
 // Edge Device Command (sent to device)
 export class EdgeDeviceCommandDto {
   @IsString()
-  command: 'START' | 'STOP' | 'RESTART' | 'RECALIBRATE' | 'UPDATE_CONFIG';
+  command: "START" | "STOP" | "RESTART" | "RECALIBRATE" | "UPDATE_CONFIG";
 
   @IsOptional()
   @IsObject()

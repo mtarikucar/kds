@@ -3,15 +3,15 @@ import {
   BadRequestException,
   NotFoundException,
   Logger,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import sharp from 'sharp';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { PrismaService } from '../../prisma/prisma.service';
-import { randomUUID } from 'crypto';
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import sharp from "sharp";
+import * as fs from "fs/promises";
+import * as path from "path";
+import { PrismaService } from "../../prisma/prisma.service";
+import { randomUUID } from "crypto";
 
-const ALLOWED_IMAGE_FORMATS = new Set(['jpeg', 'png', 'webp']);
+const ALLOWED_IMAGE_FORMATS = new Set(["jpeg", "png", "webp"]);
 
 @Injectable()
 export class UploadService {
@@ -20,17 +20,18 @@ export class UploadService {
   private readonly uploadsRoot: string;
   private readonly baseUrl: string;
   private readonly maxFileSize = 5 * 1024 * 1024; // 5MB
-  private readonly allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  private readonly allowedMimeTypes = ["image/jpeg", "image/png", "image/webp"];
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly configService: ConfigService,
   ) {
-    this.uploadsRoot = path.resolve(process.cwd(), 'uploads');
-    this.uploadsDir = path.join(this.uploadsRoot, 'products');
-    this.baseUrl = this.configService.get('BACKEND_URL') ||
-                   this.configService.get('FRONTEND_URL') ||
-                   'http://localhost:3000';
+    this.uploadsRoot = path.resolve(process.cwd(), "uploads");
+    this.uploadsDir = path.join(this.uploadsRoot, "products");
+    this.baseUrl =
+      this.configService.get("BACKEND_URL") ||
+      this.configService.get("FRONTEND_URL") ||
+      "http://localhost:3000";
     this.ensureUploadDir();
     this.ensureLogosDir();
   }
@@ -45,13 +46,15 @@ export class UploadService {
   private async assertIsAllowedImage(buffer: Buffer): Promise<void> {
     let metadata;
     try {
-      metadata = await sharp(buffer, { failOn: 'error' }).metadata();
+      metadata = await sharp(buffer, { failOn: "error" }).metadata();
     } catch {
-      throw new BadRequestException('Invalid image file');
+      throw new BadRequestException("Invalid image file");
     }
     const format = metadata.format?.toLowerCase();
     if (!format || !ALLOWED_IMAGE_FORMATS.has(format)) {
-      throw new BadRequestException('Invalid file type. Only JPEG, PNG, and WebP are allowed');
+      throw new BadRequestException(
+        "Invalid file type. Only JPEG, PNG, and WebP are allowed",
+      );
     }
   }
 
@@ -65,7 +68,7 @@ export class UploadService {
   }
 
   private async ensureLogosDir() {
-    const logosDir = path.join(process.cwd(), 'uploads', 'logos');
+    const logosDir = path.join(process.cwd(), "uploads", "logos");
     try {
       await fs.access(logosDir);
     } catch {
@@ -80,30 +83,30 @@ export class UploadService {
   ): Promise<{ url: string }> {
     // Validate file
     if (!file) {
-      throw new BadRequestException('No file provided');
+      throw new BadRequestException("No file provided");
     }
 
     if (file.size > this.maxFileSize) {
-      throw new BadRequestException('File size exceeds 5MB limit');
+      throw new BadRequestException("File size exceeds 5MB limit");
     }
 
     if (!this.allowedMimeTypes.includes(file.mimetype)) {
       throw new BadRequestException(
-        'Invalid file type. Only JPEG, PNG, and WebP are allowed',
+        "Invalid file type. Only JPEG, PNG, and WebP are allowed",
       );
     }
     await this.assertIsAllowedImage(file.buffer);
 
     const uniqueFilename = `${tenantId}-logo-${Date.now()}.png`;
-    const logosDir = path.join(process.cwd(), 'uploads', 'logos');
+    const logosDir = path.join(process.cwd(), "uploads", "logos");
     const filePath = path.join(logosDir, uniqueFilename);
-    const relativePath = path.join('uploads', 'logos', uniqueFilename);
+    const relativePath = path.join("uploads", "logos", uniqueFilename);
 
     try {
       // Optimize and save image using Sharp - resize for logo
       const optimizedBuffer = await sharp(file.buffer)
         .resize(512, 512, {
-          fit: 'inside',
+          fit: "inside",
           withoutEnlargement: true,
         })
         .png({ quality: 90 })
@@ -121,14 +124,14 @@ export class UploadService {
       await this.pruneTenantLogos(logosDir, tenantId, uniqueFilename);
 
       // Return the URL
-      const absoluteUrl = `${this.baseUrl}/${relativePath.replace(/\\/g, '/')}`;
+      const absoluteUrl = `${this.baseUrl}/${relativePath.replace(/\\/g, "/")}`;
 
       this.logger.log(`Uploaded logo ${uniqueFilename} for tenant ${tenantId}`);
 
       return { url: absoluteUrl };
     } catch (error) {
       this.logger.error(`Failed to upload logo: ${error.message}`);
-      throw new BadRequestException('Failed to upload logo');
+      throw new BadRequestException("Failed to upload logo");
     }
   }
 
@@ -171,16 +174,16 @@ export class UploadService {
   ): Promise<any> {
     // Validate file
     if (!file) {
-      throw new BadRequestException('No file provided');
+      throw new BadRequestException("No file provided");
     }
 
     if (file.size > this.maxFileSize) {
-      throw new BadRequestException('File size exceeds 5MB limit');
+      throw new BadRequestException("File size exceeds 5MB limit");
     }
 
     if (!this.allowedMimeTypes.includes(file.mimetype)) {
       throw new BadRequestException(
-        'Invalid file type. Only JPEG, PNG, and WebP are allowed',
+        "Invalid file type. Only JPEG, PNG, and WebP are allowed",
       );
     }
     await this.assertIsAllowedImage(file.buffer);
@@ -188,7 +191,7 @@ export class UploadService {
     // Ignore client-supplied file extension to dodge path-traversal via
     // crafted filenames; sharp re-encodes to JPEG below so the .jpg suffix
     // matches the on-disk bytes.
-    const fileExtension = '.jpg';
+    const fileExtension = ".jpg";
     const uniqueFilename = `${randomUUID()}${fileExtension}`;
     const tenantDir = path.join(this.uploadsDir, tenantId);
 
@@ -200,13 +203,18 @@ export class UploadService {
     }
 
     const filePath = path.join(tenantDir, uniqueFilename);
-    const relativePath = path.join('uploads', 'products', tenantId, uniqueFilename);
+    const relativePath = path.join(
+      "uploads",
+      "products",
+      tenantId,
+      uniqueFilename,
+    );
 
     try {
       // Optimize and save image using Sharp
       const optimizedBuffer = await sharp(file.buffer)
         .resize(1200, 1200, {
-          fit: 'inside',
+          fit: "inside",
           withoutEnlargement: true,
         })
         .jpeg({ quality: 85 })
@@ -237,7 +245,7 @@ export class UploadService {
       try {
         await fs.unlink(filePath);
       } catch {}
-      throw new BadRequestException('Failed to upload image');
+      throw new BadRequestException("Failed to upload image");
     }
   }
 
@@ -246,7 +254,7 @@ export class UploadService {
     tenantId: string,
   ): Promise<any[]> {
     if (!files || files.length === 0) {
-      throw new BadRequestException('No files provided');
+      throw new BadRequestException("No files provided");
     }
 
     const uploadPromises = files.map((file) =>
@@ -265,14 +273,17 @@ export class UploadService {
     });
 
     if (!image) {
-      throw new NotFoundException('Image not found');
+      throw new NotFoundException("Image not found");
     }
 
     // Extract relative path from absolute URL and contain within uploadsRoot.
     // Defense-in-depth: today the url is always constructed server-side, but
     // a future import path or DB migration could introduce untrusted URLs.
-    const urlPath = image.url.replace(this.baseUrl, '');
-    const resolvedPath = path.resolve(process.cwd(), urlPath.replace(/^\/+/, ''));
+    const urlPath = image.url.replace(this.baseUrl, "");
+    const resolvedPath = path.resolve(
+      process.cwd(),
+      urlPath.replace(/^\/+/, ""),
+    );
     if (!resolvedPath.startsWith(this.uploadsRoot + path.sep)) {
       this.logger.warn(
         `Refusing to delete path outside uploads root: ${resolvedPath}`,
@@ -281,7 +292,9 @@ export class UploadService {
       try {
         await fs.unlink(resolvedPath);
       } catch (error) {
-        this.logger.warn(`Failed to delete file ${resolvedPath}: ${error.message}`);
+        this.logger.warn(
+          `Failed to delete file ${resolvedPath}: ${error.message}`,
+        );
       }
     }
 
@@ -314,10 +327,10 @@ export class UploadService {
         include: {
           image: true,
         },
-        orderBy: { order: 'asc' },
+        orderBy: { order: "asc" },
         take: UploadService.LIST_HARD_CAP,
       });
-      return productToImages.map(pti => ({ ...pti.image, order: pti.order }));
+      return productToImages.map((pti) => ({ ...pti.image, order: pti.order }));
     }
 
     // Get all images for tenant — previously unbounded; an admin who
@@ -327,7 +340,7 @@ export class UploadService {
       where: {
         tenantId,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: UploadService.LIST_HARD_CAP,
     });
   }
@@ -349,7 +362,7 @@ export class UploadService {
       },
     });
 
-    const usedIds = usedImageIds.map(pti => pti.imageId);
+    const usedIds = usedImageIds.map((pti) => pti.imageId);
 
     return this.prisma.productImage.findMany({
       where: {
@@ -358,7 +371,7 @@ export class UploadService {
           notIn: usedIds,
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: UploadService.LIST_HARD_CAP,
     });
   }
@@ -377,7 +390,7 @@ export class UploadService {
     });
 
     if (!image) {
-      throw new NotFoundException('Image not found');
+      throw new NotFoundException("Image not found");
     }
 
     // Cross-tenant attachment guard: without this, a tenant with a
@@ -389,7 +402,7 @@ export class UploadService {
       select: { id: true },
     });
     if (!product) {
-      throw new NotFoundException('Product not found');
+      throw new NotFoundException("Product not found");
     }
 
     // Create or update link in junction table

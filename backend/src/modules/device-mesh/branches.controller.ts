@@ -1,23 +1,37 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
-import { UserRole } from '../../common/constants/roles.enum';
-import { BranchesService } from './branches.service';
-import { CreateBranchDto, UpdateBranchDto } from './dto/branch.dto';
-import { PlanFeatureGuard } from '../subscriptions/guards/plan-feature.guard';
-import { RequiresFeature } from '../subscriptions/decorators/requires-feature.decorator';
-import { PlanFeature } from '../../common/constants/subscription.enum';
-import { SkipBranchScope } from '../auth/decorators/skip-branch-scope.decorator';
-import { HARD_RESTRICTED_ROLES } from '../../common/constants/roles.enum';
-import { PrismaService } from '../../prisma/prisma.service';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from "@nestjs/common";
+import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { UserRole } from "../../common/constants/roles.enum";
+import { BranchesService } from "./branches.service";
+import { CreateBranchDto, UpdateBranchDto } from "./dto/branch.dto";
+import { PlanFeatureGuard } from "../subscriptions/guards/plan-feature.guard";
+import { RequiresFeature } from "../subscriptions/decorators/requires-feature.decorator";
+import {
+  CheckLimit,
+  LimitType,
+} from "../subscriptions/decorators/check-limit.decorator";
+import { PlanFeature } from "../../common/constants/subscription.enum";
+import { SkipBranchScope } from "../auth/decorators/skip-branch-scope.decorator";
+import { HARD_RESTRICTED_ROLES } from "../../common/constants/roles.enum";
+import { PrismaService } from "../../prisma/prisma.service";
 
-@ApiTags('Branches')
+@ApiTags("Branches")
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard, PlanFeatureGuard)
 @SkipBranchScope()
-@Controller('v1/branches')
+@Controller("v1/branches")
 export class BranchesController {
   constructor(
     private readonly branches: BranchesService,
@@ -39,7 +53,7 @@ export class BranchesController {
    * only. Pre-v3 hard-restricted roles got a 403 trying to call list()
    * and the BranchPicker had nothing to render.
    */
-  @Get('visible')
+  @Get("visible")
   async visible(@Req() req: any) {
     const user = req.user;
     const role = user.role as string;
@@ -48,7 +62,11 @@ export class BranchesController {
       // for these roles — refusing here would be a server bug.
       if (!user.primaryBranchId) return [];
       const branch = await this.prisma.branch.findFirst({
-        where: { id: user.primaryBranchId, tenantId: user.tenantId, status: 'active' },
+        where: {
+          id: user.primaryBranchId,
+          tenantId: user.tenantId,
+          status: "active",
+        },
         select: { id: true, name: true, address: true, status: true },
       });
       return branch ? [branch] : [];
@@ -57,18 +75,18 @@ export class BranchesController {
       return this.prisma.branch.findMany({
         where: {
           tenantId: user.tenantId,
-          status: 'active',
+          status: "active",
           id: { in: user.allowedBranchIds ?? [] },
         },
         select: { id: true, name: true, address: true, status: true },
-        orderBy: { createdAt: 'asc' },
+        orderBy: { createdAt: "asc" },
       });
     }
     // ADMIN — empty allow-list = wildcard.
     return this.prisma.branch.findMany({
-      where: { tenantId: user.tenantId, status: 'active' },
+      where: { tenantId: user.tenantId, status: "active" },
       select: { id: true, name: true, address: true, status: true },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
     });
   }
 
@@ -84,9 +102,9 @@ export class BranchesController {
     return this.branches.list(req.user.tenantId);
   }
 
-  @Get(':id')
+  @Get(":id")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  one(@Req() req: any, @Param('id') id: string) {
+  one(@Req() req: any, @Param("id") id: string) {
     return this.branches.findOrThrow(req.user.tenantId, id);
   }
 
@@ -97,25 +115,39 @@ export class BranchesController {
   // routes through the engine, so an `extra_branch` add-on or PRO+
   // plan unlocks. Reads stay open for everyone (staff need to see
   // which branches exist to route orders).
+  //
+  // v3.0.0 — @CheckLimit(BRANCHES) also enforces the numeric cap
+  // (FREE/BASIC=1, PRO=3, BUSINESS=-1). MULTI_LOCATION feature gate
+  // fires first; tenants without it never reach the count check.
+  // Tenants with MULTI_LOCATION still bounce off the cap once the
+  // count of active branches reaches the engine-resolved limit
+  // (plan + extra_branch add-on grants summed).
   @Post()
   @Roles(UserRole.ADMIN)
   @RequiresFeature(PlanFeature.MULTI_LOCATION)
-  @ApiOperation({ summary: 'Create a new branch (ADMIN only, MULTI_LOCATION feature)' })
+  @CheckLimit(LimitType.BRANCHES)
+  @ApiOperation({
+    summary: "Create a new branch (ADMIN only, MULTI_LOCATION feature)",
+  })
   create(@Req() req: any, @Body() body: CreateBranchDto) {
     return this.branches.create(req.user.tenantId, body);
   }
 
-  @Patch(':id')
+  @Patch(":id")
   @Roles(UserRole.ADMIN)
   @RequiresFeature(PlanFeature.MULTI_LOCATION)
-  update(@Req() req: any, @Param('id') id: string, @Body() body: UpdateBranchDto) {
+  update(
+    @Req() req: any,
+    @Param("id") id: string,
+    @Body() body: UpdateBranchDto,
+  ) {
     return this.branches.update(req.user.tenantId, id, body);
   }
 
-  @Delete(':id')
+  @Delete(":id")
   @Roles(UserRole.ADMIN)
   @RequiresFeature(PlanFeature.MULTI_LOCATION)
-  archive(@Req() req: any, @Param('id') id: string) {
+  archive(@Req() req: any, @Param("id") id: string) {
     return this.branches.archive(req.user.tenantId, id);
   }
 }

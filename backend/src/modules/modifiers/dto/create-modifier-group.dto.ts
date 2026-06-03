@@ -8,12 +8,12 @@ import {
   Max,
   MaxLength,
   Min,
-} from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+} from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
 
 export enum SelectionType {
-  SINGLE = 'SINGLE',
-  MULTIPLE = 'MULTIPLE',
+  SINGLE = "SINGLE",
+  MULTIPLE = "MULTIPLE",
 }
 
 export class CreateModifierGroupDto {
@@ -21,19 +21,22 @@ export class CreateModifierGroupDto {
   // generous, descriptions paragraph-sized. Without caps an admin or a
   // bug-driven write could persist a 100KB blob — Modifier.description
   // is Postgres TEXT, no implicit ceiling.
-  @ApiProperty({ example: 'sauces' })
+  @ApiProperty({ example: "sauces" })
   @IsString()
   @IsNotEmpty()
   @MaxLength(100)
   name: string;
 
-  @ApiProperty({ example: 'Soslar' })
+  @ApiProperty({ example: "Soslar" })
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
   displayName: string;
 
-  @ApiProperty({ example: 'Ürününüze eklemek istediğiniz sosları seçin', required: false })
+  @ApiProperty({
+    example: "Ürününüze eklemek istediğiniz sosları seçin",
+    required: false,
+  })
   @IsString()
   @IsOptional()
   @MaxLength(2000)

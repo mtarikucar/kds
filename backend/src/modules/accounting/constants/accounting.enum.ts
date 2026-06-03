@@ -8,20 +8,20 @@ export enum TaxRate {
 export const DEFAULT_TAX_RATE = TaxRate.TEN;
 
 export enum InvoiceStatus {
-  DRAFT = 'DRAFT',
-  ISSUED = 'ISSUED',
-  SENT = 'SENT',
-  CANCELLED = 'CANCELLED',
+  DRAFT = "DRAFT",
+  ISSUED = "ISSUED",
+  SENT = "SENT",
+  CANCELLED = "CANCELLED",
 }
 
 export enum AccountingProvider {
-  NONE = 'NONE',
-  PARASUT = 'PARASUT',
-  LOGO = 'LOGO',
-  FORIBA = 'FORIBA',
+  NONE = "NONE",
+  PARASUT = "PARASUT",
+  LOGO = "LOGO",
+  FORIBA = "FORIBA",
 }
 
 export enum InvoiceType {
-  SALES = 'SALES',
-  REFUND = 'REFUND',
+  SALES = "SALES",
+  REFUND = "REFUND",
 }

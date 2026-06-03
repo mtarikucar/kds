@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { api } from '../../lib/api';
+import { getApiErrorMessage } from '../../lib/api-error';
+import i18n from '../../i18n/config';
 
 export type DeviceKind =
   | 'tablet_waiter'
@@ -68,9 +70,19 @@ export const useCreateDeviceSlot = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: deviceKeys.all });
-      toast.success('Device slot created. Use the pair code on the device.');
+      toast.success(
+        i18n.t('devices:slot.created', {
+          defaultValue: 'Device slot created. Use the pair code on the device.',
+        }),
+      );
     },
-    onError: (e: any) => toast.error(e.response?.data?.message ?? 'Failed to create slot'),
+    onError: (e) =>
+      toast.error(
+        getApiErrorMessage(
+          e,
+          i18n.t('devices:slot.createFailed', { defaultValue: 'Failed to create slot' }),
+        ),
+      ),
   });
 };
 
@@ -83,8 +95,17 @@ export const useRetireDevice = () => {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: deviceKeys.all });
-      toast.success('Device retired');
+      toast.success(
+        i18n.t('devices:retired', { defaultValue: 'Device retired' }),
+      );
     },
+    onError: (e) =>
+      toast.error(
+        getApiErrorMessage(
+          e,
+          i18n.t('devices:retireFailed', { defaultValue: 'Failed to retire device' }),
+        ),
+      ),
   });
 };
 

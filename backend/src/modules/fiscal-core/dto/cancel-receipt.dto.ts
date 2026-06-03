@@ -1,4 +1,4 @@
-import { IsString, MaxLength, MinLength } from 'class-validator';
+import { IsString, MaxLength, MinLength } from "class-validator";
 
 /**
  * Body for POST /v1/fiscal/receipts/:id/cancel.

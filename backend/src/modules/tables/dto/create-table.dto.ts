@@ -1,10 +1,19 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsOptional, IsInt, Max, MaxLength, Min, IsEnum } from 'class-validator';
+import { ApiProperty } from "@nestjs/swagger";
+import {
+  IsString,
+  IsNotEmpty,
+  IsOptional,
+  IsInt,
+  Max,
+  MaxLength,
+  Min,
+  IsEnum,
+} from "class-validator";
 
 export enum TableStatus {
-  AVAILABLE = 'AVAILABLE',
-  OCCUPIED = 'OCCUPIED',
-  RESERVED = 'RESERVED',
+  AVAILABLE = "AVAILABLE",
+  OCCUPIED = "OCCUPIED",
+  RESERVED = "RESERVED",
 }
 
 export class CreateTableDto {
@@ -12,7 +21,7 @@ export class CreateTableDto {
   // ceiling) and the @@unique(tenantId, number) constraint from accepting
   // a multi-MB blob as the canonical id of a physical table. Realistic
   // restaurant numbering schemes never exceed 16 chars ("Patio-12-A").
-  @ApiProperty({ example: '1' })
+  @ApiProperty({ example: "1" })
   @IsString()
   @IsNotEmpty()
   @MaxLength(32)
@@ -29,13 +38,17 @@ export class CreateTableDto {
   @Max(200)
   capacity: number;
 
-  @ApiProperty({ example: 'Main Hall', required: false })
+  @ApiProperty({ example: "Main Hall", required: false })
   @IsString()
   @IsOptional()
   @MaxLength(100)
   section?: string;
 
-  @ApiProperty({ enum: TableStatus, example: TableStatus.AVAILABLE, default: TableStatus.AVAILABLE })
+  @ApiProperty({
+    enum: TableStatus,
+    example: TableStatus.AVAILABLE,
+    default: TableStatus.AVAILABLE,
+  })
   @IsEnum(TableStatus)
   @IsOptional()
   status?: TableStatus;

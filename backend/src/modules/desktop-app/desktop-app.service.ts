@@ -1,8 +1,13 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { PrismaService } from '../../prisma/prisma.service';
-import { CreateReleaseDto } from './dto/create-release.dto';
-import { UpdateReleaseDto } from './dto/update-release.dto';
-import { UpdateManifestDto, PlatformManifest } from './dto/update-manifest.dto';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from "@nestjs/common";
+import { PrismaService } from "../../prisma/prisma.service";
+import { CreateReleaseDto } from "./dto/create-release.dto";
+import { UpdateReleaseDto } from "./dto/update-release.dto";
+import { UpdateManifestDto, PlatformManifest } from "./dto/update-manifest.dto";
 
 @Injectable()
 export class DesktopAppService {
@@ -20,7 +25,9 @@ export class DesktopAppService {
     });
 
     if (existing) {
-      throw new BadRequestException(`Release version ${createReleaseDto.version} already exists`);
+      throw new BadRequestException(
+        `Release version ${createReleaseDto.version} already exists`,
+      );
     }
 
     const release = await this.prisma.desktopRelease.create({
@@ -39,7 +46,7 @@ export class DesktopAppService {
    */
   async findAll() {
     return this.prisma.desktopRelease.findMany({
-      orderBy: { pubDate: 'desc' },
+      orderBy: { pubDate: "desc" },
     });
   }
 
@@ -49,7 +56,7 @@ export class DesktopAppService {
   async findPublished() {
     return this.prisma.desktopRelease.findMany({
       where: { published: true },
-      orderBy: { pubDate: 'desc' },
+      orderBy: { pubDate: "desc" },
     });
   }
 
@@ -59,11 +66,11 @@ export class DesktopAppService {
   async findLatest() {
     const release = await this.prisma.desktopRelease.findFirst({
       where: { published: true },
-      orderBy: { pubDate: 'desc' },
+      orderBy: { pubDate: "desc" },
     });
 
     if (!release) {
-      throw new NotFoundException('No published releases found');
+      throw new NotFoundException("No published releases found");
     }
 
     return release;
@@ -124,7 +131,7 @@ export class DesktopAppService {
     const release = await this.findOne(id);
 
     if (release.published) {
-      throw new BadRequestException('Release is already published');
+      throw new BadRequestException("Release is already published");
     }
 
     const updated = await this.prisma.desktopRelease.update({
@@ -147,7 +154,7 @@ export class DesktopAppService {
     const release = await this.findOne(id);
 
     if (!release.published) {
-      throw new BadRequestException('Release is not published');
+      throw new BadRequestException("Release is not published");
     }
 
     const updated = await this.prisma.desktopRelease.update({
@@ -173,7 +180,7 @@ export class DesktopAppService {
     });
 
     this.logger.log(`Deleted desktop release: ${id}`);
-    return { message: 'Release deleted successfully' };
+    return { message: "Release deleted successfully" };
   }
 
   /**
@@ -201,11 +208,14 @@ export class DesktopAppService {
    * Check for updates (Tauri updater endpoint)
    * Returns update manifest if newer version available
    */
-  async checkForUpdates(platform: string, currentVersion: string): Promise<UpdateManifestDto | null> {
+  async checkForUpdates(
+    platform: string,
+    currentVersion: string,
+  ): Promise<UpdateManifestDto | null> {
     // Get latest published release
     const latestRelease = await this.prisma.desktopRelease.findFirst({
       where: { published: true },
-      orderBy: { pubDate: 'desc' },
+      orderBy: { pubDate: "desc" },
     });
 
     if (!latestRelease) {
@@ -220,31 +230,31 @@ export class DesktopAppService {
     }
 
     // Build platform manifests
-    const platforms: UpdateManifestDto['platforms'] = {};
+    const platforms: UpdateManifestDto["platforms"] = {};
 
     if (latestRelease.windowsUrl && latestRelease.windowsSignature) {
-      platforms['windows-x86_64'] = {
+      platforms["windows-x86_64"] = {
         url: latestRelease.windowsUrl,
         signature: latestRelease.windowsSignature,
       };
     }
 
     if (latestRelease.macArmUrl && latestRelease.macArmSignature) {
-      platforms['darwin-aarch64'] = {
+      platforms["darwin-aarch64"] = {
         url: latestRelease.macArmUrl,
         signature: latestRelease.macArmSignature,
       };
     }
 
     if (latestRelease.macIntelUrl && latestRelease.macIntelSignature) {
-      platforms['darwin-x86_64'] = {
+      platforms["darwin-x86_64"] = {
         url: latestRelease.macIntelUrl,
         signature: latestRelease.macIntelSignature,
       };
     }
 
     if (latestRelease.linuxUrl && latestRelease.linuxSignature) {
-      platforms['linux-x86_64'] = {
+      platforms["linux-x86_64"] = {
         url: latestRelease.linuxUrl,
         signature: latestRelease.linuxSignature,
       };
@@ -253,7 +263,9 @@ export class DesktopAppService {
     // Check if requested platform is available
     const platformKey = this.normalizePlatform(platform);
     if (!platforms[platformKey]) {
-      this.logger.warn(`Platform ${platform} not available for version ${latestRelease.version}`);
+      this.logger.warn(
+        `Platform ${platform} not available for version ${latestRelease.version}`,
+      );
       return null;
     }
 
@@ -274,10 +286,13 @@ export class DesktopAppService {
    */
   private compareVersions(v1: string, v2: string): number {
     const toParts = (v: string) =>
-      v.replace(/^v/, '').split('.').map((part) => {
-        const n = parseInt(part, 10);
-        return Number.isNaN(n) ? 0 : n;
-      });
+      v
+        .replace(/^v/, "")
+        .split(".")
+        .map((part) => {
+          const n = parseInt(part, 10);
+          return Number.isNaN(n) ? 0 : n;
+        });
     const parts1 = toParts(v1);
     const parts2 = toParts(v2);
 

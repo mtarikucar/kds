@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, Length, MaxLength } from 'class-validator';
+import { ApiProperty } from "@nestjs/swagger";
+import { IsNotEmpty, IsString, Length, MaxLength } from "class-validator";
 
 // JWTs serialized by @nestjs/jwt are ~500-1000 chars in practice.
 // 4096 leaves plenty of headroom for future claim additions while
@@ -9,7 +9,7 @@ import { IsNotEmpty, IsString, Length, MaxLength } from 'class-validator';
 const JWT_MAX_LENGTH = 4096;
 
 export class Verify2FADto {
-  @ApiProperty({ description: 'Temporary token from login' })
+  @ApiProperty({ description: "Temporary token from login" })
   @IsString()
   @IsNotEmpty()
   @MaxLength(JWT_MAX_LENGTH)
@@ -19,7 +19,7 @@ export class Verify2FADto {
    * A 6-digit TOTP code OR a 10-char backup code. Bounded by Length so
    * the endpoint can't be abused with enormous strings.
    */
-  @ApiProperty({ description: '6-digit TOTP code or 10-char backup code' })
+  @ApiProperty({ description: "6-digit TOTP code or 10-char backup code" })
   @IsString()
   @IsNotEmpty()
   @Length(6, 10)
@@ -38,7 +38,10 @@ export class Setup2FAResponseDto {
 }
 
 export class Enable2FADto {
-  @ApiProperty({ description: '6-digit TOTP code to verify setup', example: '123456' })
+  @ApiProperty({
+    description: "6-digit TOTP code to verify setup",
+    example: "123456",
+  })
   @IsString()
   @IsNotEmpty()
   @Length(6, 6)
@@ -46,13 +49,13 @@ export class Enable2FADto {
 }
 
 export class Disable2FADto {
-  @ApiProperty({ description: 'Current account password' })
+  @ApiProperty({ description: "Current account password" })
   @IsString()
   @IsNotEmpty()
   @MaxLength(200)
   currentPassword: string;
 
-  @ApiProperty({ description: '6-digit TOTP code or 10-char backup code' })
+  @ApiProperty({ description: "6-digit TOTP code or 10-char backup code" })
   @IsString()
   @IsNotEmpty()
   @Length(6, 10)
@@ -60,7 +63,7 @@ export class Disable2FADto {
 }
 
 export class RegenerateBackupCodesDto {
-  @ApiProperty({ description: '6-digit TOTP code' })
+  @ApiProperty({ description: "6-digit TOTP code" })
   @IsString()
   @IsNotEmpty()
   @Length(6, 6)

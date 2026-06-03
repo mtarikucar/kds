@@ -1,6 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { PlatformLogDirection, PlatformLogAction } from '../constants/platform.enum';
+import { Injectable, Logger } from "@nestjs/common";
+import { PrismaService } from "../../../prisma/prisma.service";
+import {
+  PlatformLogDirection,
+  PlatformLogAction,
+} from "../constants/platform.enum";
 
 export interface LogEntry {
   tenantId: string;
@@ -45,7 +48,7 @@ export class DeliveryLogService {
       }
       if (!branchId) {
         this.logger.warn(
-          `Cannot create delivery log without branchId (tenant=${entry.tenantId}, order=${entry.orderId ?? 'n/a'})`,
+          `Cannot create delivery log without branchId (tenant=${entry.tenantId}, order=${entry.orderId ?? "n/a"})`,
         );
         return null;
       }
@@ -80,14 +83,12 @@ export class DeliveryLogService {
    * inadvertently turn into long-term PII storage.
    */
   scrubPii<T>(raw: T): unknown {
-    if (raw == null || typeof raw !== 'object') return raw;
+    if (raw == null || typeof raw !== "object") return raw;
     const redacted: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-      if (
-        /phone|email|address|customer|name|buyer|recipient|gsm/i.test(key)
-      ) {
-        redacted[key] = '[redacted]';
-      } else if (value && typeof value === 'object') {
+      if (/phone|email|address|customer|name|buyer|recipient|gsm/i.test(key)) {
+        redacted[key] = "[redacted]";
+      } else if (value && typeof value === "object") {
         redacted[key] = this.scrubPii(value);
       } else {
         redacted[key] = value;
@@ -103,7 +104,7 @@ export class DeliveryLogService {
         retryCount: { lt: 3 },
         nextRetryAt: { lte: new Date() },
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { createdAt: "asc" },
       take: limit,
     });
   }
@@ -152,7 +153,7 @@ export class DeliveryLogService {
     const [logs, total] = await Promise.all([
       this.prisma.deliveryPlatformLog.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         take: filters?.limit || 50,
         skip: filters?.offset || 0,
       }),

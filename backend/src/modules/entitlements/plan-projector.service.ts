@@ -1,10 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { Prisma } from '@prisma/client';
-import { PrismaService } from '../../prisma/prisma.service';
-import { withAdvisoryLock } from '../../common/scheduling/advisory-lock';
-import { EntitlementService } from './entitlement.service';
-import { EntitlementGrant } from './entitlement.types';
+import { Injectable, Logger } from "@nestjs/common";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { Prisma } from "@prisma/client";
+import { PrismaService } from "../../prisma/prisma.service";
+import { withAdvisoryLock } from "../../common/scheduling/advisory-lock";
+import { EntitlementService } from "./entitlement.service";
+import { EntitlementGrant } from "./entitlement.types";
 
 /**
  * Projects the legacy SubscriptionPlan + Tenant.featureOverrides /
@@ -41,24 +41,33 @@ export class PlanProjectorService {
   // list and fails when the projector and schema diverge. If you're
   // adding a new flag, update both.
   private static readonly FEATURE_COLUMNS = [
-    'advancedReports',
-    'multiLocation',
-    'customBranding',
-    'apiAccess',
-    'prioritySupport',
-    'inventoryTracking',
-    'kdsIntegration',
-    'reservationSystem',
-    'personnelManagement',
-    'deliveryIntegration',
+    "advancedReports",
+    "multiLocation",
+    "customBranding",
+    "apiAccess",
+    "prioritySupport",
+    "inventoryTracking",
+    "kdsIntegration",
+    "reservationSystem",
+    "personnelManagement",
+    "deliveryIntegration",
+    // v3.0.0 — POS access is tier-gated (FREE post-trial fallback loses
+    // POS UI). The column is sourced directly from SubscriptionPlan,
+    // mirrored as feature.posAccess on the engine; PlanFeatureGuard +
+    // <FeatureGate feature="posAccess"> both read the engine grant.
+    "posAccess",
   ] as const;
 
   private static readonly LIMIT_COLUMNS = [
-    'maxUsers',
-    'maxTables',
-    'maxProducts',
-    'maxCategories',
-    'maxMonthlyOrders',
+    "maxUsers",
+    "maxTables",
+    // v3.0.0 — branches were implicitly capped at "1 unless multiLocation"
+    // before; now the column carries the per-tier cap (FREE/BASIC=1,
+    // PRO=3, BUSINESS=-1) and the extra_branch add-on SUMs onto it.
+    "maxBranches",
+    "maxProducts",
+    "maxCategories",
+    "maxMonthlyOrders",
   ] as const;
 
   constructor(
@@ -91,7 +100,7 @@ export class PlanProjectorService {
       return this.freePlanCache.plan;
     }
     const plan = await this.prisma.subscriptionPlan.findUnique({
-      where: { name: 'FREE' as any },
+      where: { name: "FREE" as any },
     });
     if (plan) {
       this.freePlanCache = { plan, expiresAt: now + 5 * 60_000 };
@@ -105,7 +114,9 @@ export class PlanProjectorService {
     // caller awaits the chain head; new callers extend it. Failures
     // propagate naturally because we await before continuing.
     const prior = this.tenantLocks.get(tenantId) ?? Promise.resolve();
-    const next = prior.catch(() => undefined).then(() => this.projectTenantInner(tenantId));
+    const next = prior
+      .catch(() => undefined)
+      .then(() => this.projectTenantInner(tenantId));
     this.tenantLocks.set(tenantId, next);
     try {
       await next;
@@ -147,10 +158,10 @@ export class PlanProjectorService {
     const activeSub = await this.prisma.subscription.findFirst({
       where: {
         tenantId,
-        status: { in: ['ACTIVE', 'TRIALING'] },
+        status: { in: ["ACTIVE", "TRIALING"] },
       },
       select: { id: true, status: true },
-      orderBy: { updatedAt: 'desc' },
+      orderBy: { updatedAt: "desc" },
     });
     const isAccessPaid = activeSub != null;
     const effectivePlan = isAccessPaid
@@ -176,14 +187,16 @@ export class PlanProjectorService {
       );
     }
 
-    const planSource = effectivePlan ? `plan:${effectivePlan.name}` : 'plan:NONE';
-    const planGrants: Array<Omit<EntitlementGrant, 'tenantId' | 'source'>> = [];
+    const planSource = effectivePlan
+      ? `plan:${effectivePlan.name}`
+      : "plan:NONE";
+    const planGrants: Array<Omit<EntitlementGrant, "tenantId" | "source">> = [];
 
     if (effectivePlan) {
       for (const col of PlanProjectorService.FEATURE_COLUMNS) {
         if ((effectivePlan as any)[col]) {
           planGrants.push({
-            scope: 'tenant',
+            scope: "tenant",
             branchId: null,
             key: `feature.${col}`,
             value: true,
@@ -193,9 +206,9 @@ export class PlanProjectorService {
       }
       for (const col of PlanProjectorService.LIMIT_COLUMNS) {
         const v = (effectivePlan as any)[col];
-        if (typeof v === 'number') {
+        if (typeof v === "number") {
           planGrants.push({
-            scope: 'tenant',
+            scope: "tenant",
             branchId: null,
             key: `limit.${col}`,
             value: v,
@@ -205,13 +218,16 @@ export class PlanProjectorService {
       }
     }
 
-    const overrideGrants: Array<Omit<EntitlementGrant, 'tenantId' | 'source'>> = [];
-    const featureOverrides = (tenant.featureOverrides as Record<string, boolean> | null) ?? null;
-    const limitOverrides = (tenant.limitOverrides as Record<string, number> | null) ?? null;
+    const overrideGrants: Array<Omit<EntitlementGrant, "tenantId" | "source">> =
+      [];
+    const featureOverrides =
+      (tenant.featureOverrides as Record<string, boolean> | null) ?? null;
+    const limitOverrides =
+      (tenant.limitOverrides as Record<string, number> | null) ?? null;
     if (featureOverrides) {
       for (const [k, v] of Object.entries(featureOverrides)) {
         overrideGrants.push({
-          scope: 'tenant',
+          scope: "tenant",
           branchId: null,
           key: `feature.${k}`,
           value: { __replace: Boolean(v) } as any,
@@ -222,7 +238,7 @@ export class PlanProjectorService {
     if (limitOverrides) {
       for (const [k, v] of Object.entries(limitOverrides)) {
         overrideGrants.push({
-          scope: 'tenant',
+          scope: "tenant",
           branchId: null,
           key: `limit.${k}`,
           value: { __replace: Number(v) } as any,
@@ -252,7 +268,12 @@ export class PlanProjectorService {
     // entitlement cache is invalidated ONCE at the end so peer
     // replicas refresh atomically too.
     await this.prisma.$transaction(async (tx) => {
-      await this.entitlements.setGrantsForSourceTx(tx, tenantId, planSource, planGrants);
+      await this.entitlements.setGrantsForSourceTx(
+        tx,
+        tenantId,
+        planSource,
+        planGrants,
+      );
 
       // Clear stale plan:* sources from prior plans (downgrade, switch).
       // Now inside the txn so the window where both plans' grants are
@@ -260,14 +281,19 @@ export class PlanProjectorService {
       await tx.featureEntitlement.deleteMany({
         where: {
           tenantId,
-          source: { startsWith: 'plan:', not: planSource },
+          source: { startsWith: "plan:", not: planSource },
         },
       });
 
       // Overrides → admin source. Overrides REPLACE the plan value via
       // the engine's __replace wrapper. Empty objects emit no grants
       // (which deletes any prior override:admin rows).
-      await this.entitlements.setGrantsForSourceTx(tx, tenantId, 'override:admin', overrideGrants);
+      await this.entitlements.setGrantsForSourceTx(
+        tx,
+        tenantId,
+        "override:admin",
+        overrideGrants,
+      );
 
       await this.projectAddOnsTx(tx, tenantId);
     });
@@ -295,7 +321,7 @@ export class PlanProjectorService {
     tenantId: string,
   ): Promise<void> {
     const activeAddOns = await tx.tenantAddOn.findMany({
-      where: { tenantId, status: 'active' },
+      where: { tenantId, status: "active" },
       include: { addOn: true },
     });
 
@@ -304,43 +330,48 @@ export class PlanProjectorService {
       const source = `addon:${ta.addOn.code}:${ta.id}`;
       desiredSources.add(source);
 
-      const grants: Array<Omit<EntitlementGrant, 'tenantId' | 'source'>> = [];
+      const grants: Array<Omit<EntitlementGrant, "tenantId" | "source">> = [];
       const catalogGrants = (ta.addOn.grants as Record<string, unknown>) ?? {};
       const validUntil = ta.currentPeriodEnd ?? null;
 
       for (const [key, raw] of Object.entries(catalogGrants)) {
-        if (key.startsWith('feature.')) {
+        if (key.startsWith("feature.")) {
           grants.push({
-            scope: ta.branchId ? 'branch' : 'tenant',
+            scope: ta.branchId ? "branch" : "tenant",
             branchId: ta.branchId,
             key,
             value: Boolean(raw),
             validUntil,
           });
-        } else if (key.startsWith('limit.')) {
-          const n = typeof raw === 'number' ? raw : 0;
+        } else if (key.startsWith("limit.")) {
+          const n = typeof raw === "number" ? raw : 0;
           const scaled = n === -1 ? -1 : n * ta.quantity;
           grants.push({
-            scope: ta.branchId ? 'branch' : 'tenant',
+            scope: ta.branchId ? "branch" : "tenant",
             branchId: ta.branchId,
             key,
             value: scaled,
             validUntil,
           });
-        } else if (key.startsWith('integration.')) {
+        } else if (key.startsWith("integration.")) {
           if (Array.isArray(raw)) {
             grants.push({
-              scope: ta.branchId ? 'branch' : 'tenant',
+              scope: ta.branchId ? "branch" : "tenant",
               branchId: ta.branchId,
               key,
-              value: raw.filter((x) => typeof x === 'string'),
+              value: raw.filter((x) => typeof x === "string"),
               validUntil,
             });
           }
         }
       }
 
-      await this.entitlements.setGrantsForSourceTx(tx, tenantId, source, grants);
+      await this.entitlements.setGrantsForSourceTx(
+        tx,
+        tenantId,
+        source,
+        grants,
+      );
     }
 
     // Revoke stale add-on sources. Now inside the outer projectTenant
@@ -348,13 +379,13 @@ export class PlanProjectorService {
     // and "stale addon sources cleared" doesn't exist.
     if (desiredSources.size === 0) {
       await tx.featureEntitlement.deleteMany({
-        where: { tenantId, source: { startsWith: 'addon:' } },
+        where: { tenantId, source: { startsWith: "addon:" } },
       });
     } else {
       await tx.featureEntitlement.deleteMany({
         where: {
           tenantId,
-          source: { startsWith: 'addon:', notIn: Array.from(desiredSources) },
+          source: { startsWith: "addon:", notIn: Array.from(desiredSources) },
         },
       });
     }
@@ -378,7 +409,9 @@ export class PlanProjectorService {
       await this.projectTenant(t.id);
       projected++;
     }
-    this.logger.log(`Entitlement backfill: scanned=${tenants.length} projected=${projected}`);
+    this.logger.log(
+      `Entitlement backfill: scanned=${tenants.length} projected=${projected}`,
+    );
     return { scanned: tenants.length, projected };
   }
 
@@ -388,21 +421,27 @@ export class PlanProjectorService {
    * per tenant) and idempotent. Runs at 03:15 UTC to avoid the report jobs
    * at 03:00.
    */
-  @Cron('15 3 * * *')
+  @Cron("15 3 * * *")
   async reconcileNightly(): Promise<void> {
     await withAdvisoryLock(
       this.prisma,
-      'entitlements.reconcileNightly',
+      "entitlements.reconcileNightly",
       async () => {
-        const tenants = await this.prisma.tenant.findMany({ select: { id: true } });
+        const tenants = await this.prisma.tenant.findMany({
+          select: { id: true },
+        });
         for (const t of tenants) {
           try {
             await this.projectTenant(t.id);
           } catch (e) {
-            this.logger.warn(`projectTenant ${t.id} failed: ${(e as Error).message}`);
+            this.logger.warn(
+              `projectTenant ${t.id} failed: ${(e as Error).message}`,
+            );
           }
         }
-        this.logger.log(`Nightly entitlement reconcile: ${tenants.length} tenants`);
+        this.logger.log(
+          `Nightly entitlement reconcile: ${tenants.length} tenants`,
+        );
       },
       this.logger,
     );
@@ -418,7 +457,7 @@ export class PlanProjectorService {
   async sweepExpired(): Promise<void> {
     await withAdvisoryLock(
       this.prisma,
-      'entitlements.sweepExpired',
+      "entitlements.sweepExpired",
       async () => {
         await this.entitlements.sweepExpired();
       },

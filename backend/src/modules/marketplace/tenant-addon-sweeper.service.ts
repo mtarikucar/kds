@@ -1,9 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
-import { PrismaService } from '../../prisma/prisma.service';
-import { withAdvisoryLock } from '../../common/scheduling/advisory-lock';
-import { OutboxService } from '../outbox/outbox.service';
-import { EventTypes } from '../outbox/event-types';
+import { Injectable, Logger } from "@nestjs/common";
+import { Cron } from "@nestjs/schedule";
+import { PrismaService } from "../../prisma/prisma.service";
+import { withAdvisoryLock } from "../../common/scheduling/advisory-lock";
+import { OutboxService } from "../outbox/outbox.service";
+import { EventTypes } from "../outbox/event-types";
 
 /**
  * Nightly sweeper that closes out tenant add-ons whose billing window has
@@ -27,9 +27,14 @@ export class TenantAddOnSweeperService {
     private readonly outbox: OutboxService,
   ) {}
 
-  @Cron('0 3 * * *')
+  @Cron("0 3 * * *")
   async runDaily(): Promise<void> {
-    await withAdvisoryLock(this.prisma, 'marketplace.addonSweeper', () => this.runOnce(), this.logger);
+    await withAdvisoryLock(
+      this.prisma,
+      "marketplace.addonSweeper",
+      () => this.runOnce(),
+      this.logger,
+    );
   }
 
   /** Inner body — extracted so tests can call it without the lock wrapper. */
@@ -38,7 +43,7 @@ export class TenantAddOnSweeperService {
 
     const expired = await this.prisma.tenantAddOn.findMany({
       where: {
-        status: 'active',
+        status: "active",
         currentPeriodEnd: { lte: now, not: null },
       },
       select: {
@@ -50,7 +55,7 @@ export class TenantAddOnSweeperService {
       },
     });
     if (expired.length === 0) {
-      this.logger.debug('No tenant add-ons past period end');
+      this.logger.debug("No tenant add-ons past period end");
       return;
     }
 
@@ -58,16 +63,20 @@ export class TenantAddOnSweeperService {
     let rolled = 0;
     for (const row of expired) {
       try {
-        if (row.cancelAtPeriodEnd || row.addOn.billing === 'oneTime') {
+        if (row.cancelAtPeriodEnd || row.addOn.billing === "oneTime") {
           await this.prisma.tenantAddOn.update({
             where: { id: row.id },
-            data: { status: 'cancelled', endedAt: now },
+            data: { status: "cancelled", endedAt: now },
           });
           await this.outbox
             .append({
               type: EventTypes.AddOnCancelled,
               tenantId: row.tenantId,
-              payload: { tenantId: row.tenantId, addOnId: row.id, addOnCode: row.addOn.code },
+              payload: {
+                tenantId: row.tenantId,
+                addOnId: row.id,
+                addOnCode: row.addOn.code,
+              },
             })
             .catch(() => undefined);
           closed++;
@@ -83,9 +92,13 @@ export class TenantAddOnSweeperService {
           rolled++;
         }
       } catch (e) {
-        this.logger.warn(`sweep failed for tenantAddOn=${row.id}: ${(e as Error).message}`);
+        this.logger.warn(
+          `sweep failed for tenantAddOn=${row.id}: ${(e as Error).message}`,
+        );
       }
     }
-    this.logger.log(`tenant-addon sweep: scanned=${expired.length} closed=${closed} rolled=${rolled}`);
+    this.logger.log(
+      `tenant-addon sweep: scanned=${expired.length} closed=${closed} rolled=${rolled}`,
+    );
   }
 }
