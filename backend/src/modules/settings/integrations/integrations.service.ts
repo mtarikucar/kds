@@ -142,21 +142,19 @@ export class IntegrationsService {
   }
 
   async create(tenantId: string, createDto: CreateIntegrationDto) {
-    const existing = await this.prisma.integrationSettings.findUnique({
+    // v3.0.1 — findFirst instead of findUnique on the compound key.
+    // Prisma 6 rejects the (tenantId, branchId, integrationType, provider)
+    // findUnique when branchId is null at the client-validation layer,
+    // regardless of the DB constraint's NULLS NOT DISTINCT. findFirst
+    // hits the same compound index and accepts the null. Same fix as
+    // every settings.service in the v3.0.1 sweep — see
+    // common/scoping/branch-scope.ts loadBranchSettings note.
+    const existing = await this.prisma.integrationSettings.findFirst({
       where: {
-        // v3.0.0 — IntegrationSettings now compounds branchId into
-        // its uniqueness invariant so a per-branch override can
-        // co-exist with the tenant-default row of the same provider.
-        // The IntegrationsService is currently the tenant-level
-        // surface (CRUD lives at /v1/integrations, not under a
-        // /v1/branches/:id/integrations route yet); branchId=null is
-        // the tenant-default address.
-        tenantId_branchId_integrationType_provider: {
-          tenantId,
-          branchId: null,
-          integrationType: createDto.integrationType,
-          provider: createDto.provider,
-        },
+        tenantId,
+        branchId: null,
+        integrationType: createDto.integrationType,
+        provider: createDto.provider,
       },
     });
     if (existing) {

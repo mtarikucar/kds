@@ -144,12 +144,24 @@ export class AccountingSettingsService {
    * v3.0.1: atomic increment via updateMany (compound-unique upsert
    * disallowed with branchId: null). Two concurrent calls still get
    * distinct numbers because PostgreSQL serialises the row update.
+   *
+   * v3.0.2 — `tx` is now MANDATORY. Pre-v3.0.2 the find→increment→re-read
+   * cycle on the no-tx path could span multiple pool connections, and
+   * two concurrent calls without a tx could mint the same number
+   * between the read and the updateMany. Every existing caller already
+   * passes `tx` (sales-invoice.service has two such call sites), so
+   * the change is interface-tightening, not a behavior change.
    */
   async getNextInvoiceNumber(
     tenantId: string,
-    tx?: Prisma.TransactionClient,
+    tx: Prisma.TransactionClient,
   ): Promise<string> {
-    const db = tx ?? this.prisma;
+    if (!tx) {
+      throw new Error(
+        "getNextInvoiceNumber must be called inside a Prisma transaction — pass `tx` so the read-then-increment-then-re-read cycle is atomic. Sequence gaps and duplicate numbers were possible on the no-tx path.",
+      );
+    }
+    const db = tx;
     let settings = await db.accountingSettings.findFirst({
       where: { tenantId, branchId: null },
     });

@@ -8,6 +8,8 @@ import {
   mockPrismaClient,
   MockPrismaClient,
 } from '../../../common/test/prisma-mock.service';
+import { BranchScope } from '../../../common/scoping/branch-scope';
+import { UserRole } from '../../../common/constants/roles.enum';
 
 /**
  * Focused test: verifies that orders.service.create writes a versioned
@@ -97,14 +99,17 @@ describe('OrdersService — kitchen ticket snapshot persistence', () => {
   });
 
   it('writes a versioned kitchenTicketSnapshot via order.update after create', async () => {
-    await service.create(
-      {
-        type: 'DINE_IN',
-        items: [{ productId: 'p-1', quantity: 2 }],
-      } as any,
-      userId,
+    // v3.0.1 audit fix — orders.service.create now takes BranchScope first.
+    const scope: BranchScope = {
       tenantId,
-    );
+      branchId: 'branch-1',
+      userId,
+      role: UserRole.WAITER,
+    };
+    await service.create(scope, {
+      type: 'DINE_IN',
+      items: [{ productId: 'p-1', quantity: 2 }],
+    } as any);
 
     expect(prisma.order.update).toHaveBeenCalled();
     const updateCalls = (prisma.order.update as jest.Mock).mock.calls;

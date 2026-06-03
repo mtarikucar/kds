@@ -221,12 +221,8 @@ export class OrdersService {
     );
   }
 
-  async create(
-    createOrderDto: CreateOrderDto,
-    userId: string,
-    tenantId: string,
-  ) {
-    const created = await this.createInner(createOrderDto, userId, tenantId);
+  async create(scope: BranchScope, createOrderDto: CreateOrderDto) {
+    const created = await this.createInner(scope, createOrderDto);
     // Outbox emit happens AFTER the transaction commits so consumers don't
     // see an order that later rolled back. Best-effort: a failed emit logs
     // a warning but never undoes a committed order.
@@ -234,11 +230,8 @@ export class OrdersService {
     return created;
   }
 
-  private async createInner(
-    createOrderDto: CreateOrderDto,
-    userId: string,
-    tenantId: string,
-  ) {
+  private async createInner(scope: BranchScope, createOrderDto: CreateOrderDto) {
+    const { tenantId, userId } = scope;
     return withTransaction(
       {
         name: "order.create",
@@ -246,6 +239,7 @@ export class OrdersService {
         tags: {
           "order.type": createOrderDto.type,
           "tenant.id": tenantId,
+          "branch.id": scope.branchId,
           "user.id": userId,
           has_table: String(!!createOrderDto.tableId),
         },
@@ -260,15 +254,24 @@ export class OrdersService {
         });
 
         // Idempotency fast-path: if the client supplied a key and we've
-        // already recorded an order for this (tenantId, key), return the
-        // existing row instead of creating a duplicate. The DB has a
-        // partial unique index on (tenantId, idempotencyKey) WHERE key
-        // IS NOT NULL — this pre-check is the responsiveness path; the
-        // P2002 catch in createWithOrderNumberRetry handles concurrent
-        // retries authoritatively.
+        // already recorded an order for this (tenantId, branchId, key),
+        // return the existing row instead of creating a duplicate.
+        //
+        // v3.0.1 audit fix — branchId is now part of the idempotency
+        // address. Pre-fix the lookup AND the DB partial unique were
+        // (tenantId, idempotencyKey) only; a POS terminal in branch B2
+        // retrying with idempotencyKey=k could collide with a different
+        // order created in branch B1 by another tablet using the same
+        // key (UUIDv4 client-side, very low odds but non-zero, and any
+        // chain that templates keys deterministically would hit it).
+        // The DB migration also widens the partial unique to
+        // (tenantId, branchId, idempotencyKey).
         if (createOrderDto.idempotencyKey) {
           const existing = await this.prisma.order.findFirst({
-            where: { tenantId, idempotencyKey: createOrderDto.idempotencyKey },
+            where: {
+              ...branchScope(scope),
+              idempotencyKey: createOrderDto.idempotencyKey,
+            },
             include: {
               orderItems: {
                 include: {
@@ -526,12 +529,15 @@ export class OrdersService {
             if (createOrderDto.tableId) {
               createData.tableId = createOrderDto.tableId;
             }
-            // Inherit the table's branch onto the order so the new branch-scoped
-            // reports (and KDS routing) pick it up. Null is fine — pre-Branch
-            // tables keep null which falls into tenant-wide queries.
-            if (tableBranchId) {
-              createData.branchId = tableBranchId;
-            }
+            // v3.0.1 audit fix — always stamp branchId from the caller's
+            // BranchScope. Pre-fix only the tableId path inherited the
+            // branch from the Table row, so tableless/counter/QR-self
+            // orders ended up at branchId=null and disappeared from
+            // every branchScope()-filtered read (KDS, reports, daily
+            // totals). The table-derived branchId still wins when the
+            // order is seated, because BranchGuard already proved the
+            // caller's scope matches the table's branch upstream.
+            createData.branchId = tableBranchId ?? scope.branchId;
 
             return this.prisma.order.create({
               data: createData,

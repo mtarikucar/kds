@@ -185,12 +185,24 @@ export class ReservationsService {
 
     // Walk-in / no-table reservations still need a branchId (v3.0.0 strict
     // schema). This endpoint is @Public(), so there's no @CurrentScope —
-    // fall back to the tenant's first branch (the "Main" branch created
-    // at tenant bootstrap). Multi-branch tenants that want a specific
-    // branch should pass tableId.
+    // fall back to the tenant's first ACTIVE branch (the "Main" branch
+    // created at tenant bootstrap). Multi-branch tenants that want a
+    // specific branch must pass tableId, since the public DTO doesn't
+    // yet carry an explicit branch selector.
+    //
+    // v3.0.1 audit follow-up: this fallback dumps every anonymous
+    // walk-in onto whichever branch was created first, which is
+    // surprising for chains with several locations. TODO(v3.1) —
+    // add `branchCode` to the public CreateReservationDto and prefer
+    // that when present; fall back to oldest-active only when the
+    // caller omitted both tableId and branchCode. Track in
+    // backlog/reservations-multi-branch-public.md.
+    //
+    // `status: 'active'` excludes archived branches so a
+    // freshly-archived "Main" doesn't trap incoming bookings.
     if (!resolvedBranchId) {
       const defaultBranch = await this.prisma.branch.findFirst({
-        where: { tenantId },
+        where: { tenantId, status: "active" },
         orderBy: { createdAt: "asc" },
         select: { id: true },
       });
