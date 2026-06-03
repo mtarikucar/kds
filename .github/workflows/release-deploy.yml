@@ -91,6 +91,9 @@ jobs:
           MARKETING_INGEST_TOKEN: ${{ secrets.MARKETING_INGEST_TOKEN }}
           ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
           INTEGRATION_KEY: ${{ secrets.INTEGRATION_KEY }}
+          NETGSM_USERCODE: ${{ secrets.NETGSM_USERCODE }}
+          NETGSM_PASSWORD: ${{ secrets.NETGSM_PASSWORD }}
+          NETGSM_MSGHEADER: ${{ secrets.NETGSM_MSGHEADER }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}
           PAYTR_MERCHANT_KEY: ${{ secrets.PAYTR_MERCHANT_KEY }}
@@ -116,6 +119,7 @@ jobs:
             MARKETING_INGEST_TOKEN
             ENCRYPTION_MASTER_KEY
             INTEGRATION_KEY
+            NETGSM_USERCODE NETGSM_PASSWORD NETGSM_MSGHEADER
             REDIS_PASSWORD
             PAYTR_MERCHANT_ID PAYTR_MERCHANT_KEY PAYTR_MERCHANT_SALT
           )
@@ -319,6 +323,9 @@ jobs:
           MARKETING_INGEST_TOKEN: ${{ secrets.MARKETING_INGEST_TOKEN }}
           ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
           INTEGRATION_KEY: ${{ secrets.INTEGRATION_KEY }}
+          NETGSM_USERCODE: ${{ secrets.NETGSM_USERCODE }}
+          NETGSM_PASSWORD: ${{ secrets.NETGSM_PASSWORD }}
+          NETGSM_MSGHEADER: ${{ secrets.NETGSM_MSGHEADER }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}
           PAYTR_MERCHANT_KEY: ${{ secrets.PAYTR_MERCHANT_KEY }}
@@ -382,6 +389,14 @@ jobs:
           EMAIL_PASSWORD=${EMAIL_PASSWORD}
           EMAIL_FROM=${EMAIL_FROM}
           ADMIN_EMAIL=contact@hummytummy.com
+
+          # Customer OTP SMS (NetGSM). The backend REFUSES to boot in production
+          # without a configured provider (sms.service.ts) — there is no silent
+          # mock fallback in prod unless ALLOW_MOCK_SMS_IN_PROD=true.
+          SMS_PROVIDER=netgsm
+          NETGSM_USERCODE=${NETGSM_USERCODE}
+          NETGSM_PASSWORD=${NETGSM_PASSWORD}
+          NETGSM_MSGHEADER=${NETGSM_MSGHEADER}
 
           DEFAULT_TRIAL_DAYS=14
           TRIAL_REMINDER_DAYS=3
