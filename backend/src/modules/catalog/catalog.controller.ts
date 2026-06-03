@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { Throttle } from "@nestjs/throttler";
 import { Public } from "../auth/decorators/public.decorator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
@@ -61,8 +62,16 @@ export class TenantCatalogController {
   // marketing Lead (source=HARDWARE_QUOTE) — these devices can't be bought
   // directly (the checkout guard blocks them); sale/activation/transfer go
   // through an authorized dealer/service + GİB.
+  //
+  // v3.0.1 round-4 audit fix — throttled. A compromised manager token can
+  // otherwise fire unbounded leads at the marketing board (the DTO caps
+  // qty ≤ 999 but not request frequency). Picked the `short` tier
+  // (3 requests / 10 sec) because legitimate admins place at most one
+  // quote request per few seconds; bursty hardware-shopping sessions
+  // still fit comfortably.
   @Post("quote-request")
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  @Throttle({ short: { ttl: 10_000, limit: 3 }, long: { ttl: 60_000, limit: 20 } })
   @ApiOperation({
     summary:
       "Request a quote for a QUOTE_ONLY device — creates a lead (ADMIN, MANAGER).",

@@ -26,7 +26,8 @@
     "WEBSITE": "Web sitesi",
     "PHONE": "Telefon",
     "OTHER": "Diğer",
-    "AI_RESEARCH": "AI Araştırma"
+    "AI_RESEARCH": "AI Araştırma",
+    "HARDWARE_QUOTE": "Donanım Teklifi"
   },
   "activityType": {
     "CALL": "Telefon",

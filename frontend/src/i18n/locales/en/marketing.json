@@ -26,7 +26,8 @@
     "WEBSITE": "Website",
     "PHONE": "Phone",
     "OTHER": "Other",
-    "AI_RESEARCH": "AI Research"
+    "AI_RESEARCH": "AI Research",
+    "HARDWARE_QUOTE": "Hardware Quote"
   },
   "activityType": {
     "CALL": "Call",

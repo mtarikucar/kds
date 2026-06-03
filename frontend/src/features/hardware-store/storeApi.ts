@@ -146,7 +146,21 @@ export const useConfirmCheckout = () => {
       return r.data;
     },
     onSuccess: () => {
-      qc.invalidateQueries(); // entitlements + addons + devices may all change
+      // v3.0.1 round-4 audit fix — targeted invalidation. Pre-fix this
+      // called `qc.invalidateQueries()` with no key, which nuked the
+      // entire query cache: every POS/KDS/orders/menu list refetched
+      // immediately on the same tick. With a heavily-loaded admin
+      // session this was the largest single jank source after a
+      // hardware purchase. Hit only the surfaces the confirm flow
+      // actually changes: subscriptions (entitlements + add-ons),
+      // devices (a new device slot or activation may have been
+      // provisioned), hardware orders (the new row), and marketplace
+      // listings (capacity counters).
+      qc.invalidateQueries({ queryKey: ['subscriptions'] });
+      qc.invalidateQueries({ queryKey: ['entitlements'] });
+      qc.invalidateQueries({ queryKey: ['devices'] });
+      qc.invalidateQueries({ queryKey: ['hardware-orders'] });
+      qc.invalidateQueries({ queryKey: ['marketplace'] });
       toast.success('Order placed.');
     },
     onError: (e: any) => toast.error(e.response?.data?.message ?? 'Checkout failed'),

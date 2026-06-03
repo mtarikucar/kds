@@ -107,7 +107,15 @@ export class QuoteService {
         // (uncertified scale) are dropped from the quote even if a tampered
         // client managed to add them — they never reach intent/payment/
         // provision. Mirrors the existing unpublished-product behavior above.
-        if (product.saleMode && product.saleMode !== "DIRECT_SALE") {
+        //
+        // v3.0.1 round-4 audit fix — fail-closed: explicit `!== "DIRECT_SALE"`
+        // without the truthiness short-circuit. Pre-fix `product.saleMode &&
+        // product.saleMode !== "DIRECT_SALE"` let a null/empty saleMode fall
+        // through as buyable. The schema defaults the column to "DIRECT_SALE"
+        // and the seed sets it on every row, but a manually-inserted row,
+        // a partial backfill, or a future DB shape change could silently
+        // re-open the gap. Treat absent as not-direct = NOT buyable.
+        if (product.saleMode !== "DIRECT_SALE") {
           warnings.push(`Hardware not directly purchasable: ${product.sku}`);
           continue;
         }
@@ -147,6 +155,12 @@ export class QuoteService {
           priceCents: number;
           currency: string;
           serviceMeta?: any;
+          // v3.0.1 round-4 — surface the regulatory tier on the priced
+          // line. The post-quote consumer (CheckoutService.confirm,
+          // InstallationRequest.create) wants to see why a service was
+          // priced and the analytics layer separates DIRECT_SALE installs
+          // from legacy (no-saleMode) ones.
+          saleMode?: string;
         } | null = null;
         try {
           const product = await this.catalog.findBySkuOrThrow(item.code);
@@ -157,11 +171,28 @@ export class QuoteService {
             warnings.push(`Not purchasable as service: ${item.code}`);
             continue;
           }
+          // Regulatory tier guard (TR law) — same fail-closed gate as the
+          // hardware branch. A service row (e.g. a fiscal yazarkasa-install /
+          // GİB-activation offering) can carry any saleMode, so a non-
+          // DIRECT_SALE service must be dropped here too — otherwise it would
+          // be priced/paid/provisioned (incl. an InstallationRequest),
+          // bypassing the QUOTE_ONLY control. Legacy in-memory service codes
+          // (catch block below) have no row and stay DIRECT_SALE.
+          if (product.saleMode !== "DIRECT_SALE") {
+            warnings.push(`Service not directly purchasable: ${item.code}`);
+            continue;
+          }
           resolved = {
             name: product.name,
             priceCents: product.priceCents,
             currency: product.currency,
             serviceMeta: product.serviceMeta,
+            // Forward the resolved tier onto the line so the post-quote
+            // audit trail (and the CheckoutService's intent-create step)
+            // can see why this service was priced — the regulatory gate
+            // already passed but the original tier value is useful for
+            // analytics and the dealer-quote sub-flow.
+            saleMode: product.saleMode,
           };
         } catch {
           const legacy = LEGACY_SERVICE_PRICES_CENTS[item.code];
@@ -171,6 +202,9 @@ export class QuoteService {
               priceCents: legacy.priceCents,
               currency: "TRY",
               serviceMeta: undefined,
+              // Legacy hardcoded codes are direct-sale by construction;
+              // they predate the saleMode column.
+              saleMode: "DIRECT_SALE",
             };
           }
         }
@@ -194,6 +228,7 @@ export class QuoteService {
             // and preferredDates/notes (for InstallationRequest) without
             // re-fetching the product row.
             serviceMeta: resolved.serviceMeta,
+            saleMode: resolved.saleMode,
             preferredDates: item.preferredDates,
             notes: item.notes,
           },

@@ -26,7 +26,8 @@
     "WEBSITE": "Website",
     "PHONE": "Phone",
     "OTHER": "Other",
-    "AI_RESEARCH": "AI исследование"
+    "AI_RESEARCH": "AI исследование",
+    "HARDWARE_QUOTE": "Запрос на оборудование"
   },
   "activityType": {
     "CALL": "Call",

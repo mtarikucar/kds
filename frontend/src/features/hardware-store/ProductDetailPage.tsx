@@ -95,6 +95,12 @@ function HardwareDetail({
   // which CTA renders; the server-side checkout guard is authoritative.
   const mode = product.saleMode ?? 'DIRECT_SALE';
   const partner = product.partnerRedirect ?? null;
+  // Only trust an absolute http(s) URL as a clickable outbound link (guards a
+  // stored javascript:/data: payload; the server validates the scheme too).
+  const safePartnerUrl =
+    partner?.partnerUrl && /^https?:\/\//i.test(partner.partnerUrl)
+      ? partner.partnerUrl
+      : undefined;
   const complianceEntries = Object.entries(product.complianceDocs ?? {}).filter(
     ([, v]) => v !== null && v !== undefined && v !== '' && v !== false,
   );
@@ -243,14 +249,14 @@ function HardwareDetail({
                 POS hizmeti HummyTummy tarafından değil, anlaşmalı banka/ödeme kuruluşu
                 tarafından sağlanır.
               </p>
-              {partner?.partnerUrl ? (
+              {safePartnerUrl ? (
                 <a
-                  href={partner.partnerUrl}
+                  href={safePartnerUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="block w-full rounded-md bg-indigo-600 px-3 py-2 text-center text-sm font-medium text-white hover:bg-indigo-700"
                 >
-                  {partner.partnerName
+                  {partner?.partnerName
                     ? `${partner.partnerName} ile devam et`
                     : 'Banka/Ödeme kuruluşuna git'}
                 </a>
@@ -658,4 +664,136 @@ function localizeDetails(raw: unknown): {
     return (obj[lang] as any) ?? (obj.tr as any) ?? (obj.en as any) ?? {};
   }
   return obj as any;
+}
+
+// "Teklif Al" form for a QUOTE_ONLY device (yazarkasa / YN ÖKC). Posts to the
+// catalog quote-request endpoint, which records a marketing Lead
+// (source=HARDWARE_QUOTE) for a rep to run the dealer/installation + GİB
+// process. Prefills from the signed-in tenant user.
+function QuoteRequestForm({ sku }: { sku: string }) {
+  const user = useAuthStore((s) => s.user);
+  const requestQuote = useRequestQuote();
+  const [done, setDone] = useState(false);
+  const [contactPerson, setContactPerson] = useState(
+    user ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() : '',
+  );
+  const [phone, setPhone] = useState<string>((user as any)?.phone ?? '');
+  const [email, setEmail] = useState<string>(user?.email ?? '');
+  const [qty, setQty] = useState(1);
+  const [notes, setNotes] = useState('');
+
+  if (done) {
+    return (
+      <div className="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+        Teklif talebiniz alındı. Ekibimiz yetkili bayi/servis süreci için en kısa sürede
+        sizinle iletişime geçecek.
+      </div>
+    );
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!contactPerson.trim()) {
+      toast.error('Lütfen yetkili kişi adını girin.');
+      return;
+    }
+    await requestQuote.mutateAsync({
+      sku,
+      qty,
+      contactPerson: contactPerson.trim(),
+      phone: phone.trim() || undefined,
+      email: email.trim() || undefined,
+      notes: notes.trim() || undefined,
+    });
+    setDone(true);
+    toast.success('Teklif talebiniz gönderildi.');
+  }
+
+  const inputCls = 'w-full rounded border px-2 py-1.5 text-sm';
+  return (
+    <form onSubmit={submit} className="space-y-2">
+      <input
+        className={inputCls}
+        placeholder="Yetkili kişi *"
+        value={contactPerson}
+        onChange={(e) => setContactPerson(e.target.value)}
+        maxLength={120}
+        required
+      />
+      <div className="flex gap-2">
+        <input
+          className={inputCls}
+          placeholder="Telefon"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          maxLength={40}
+        />
+        <input
+          className="w-20 rounded border px-2 py-1.5 text-sm"
+          type="number"
+          min={1}
+          max={999}
+          value={qty}
+          onChange={(e) => setQty(Math.max(1, Math.min(999, Number(e.target.value) || 1)))}
+          aria-label="Adet"
+        />
+      </div>
+      <input
+        className={inputCls}
+        type="email"
+        placeholder="E-posta"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        maxLength={200}
+      />
+      <textarea
+        className={inputCls}
+        placeholder="Not (opsiyonel)"
+        rows={2}
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        maxLength={2000}
+      />
+      <button
+        type="submit"
+        disabled={requestQuote.isPending}
+        className="w-full rounded-md bg-amber-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {requestQuote.isPending ? 'Gönderiliyor…' : 'Teklif Al'}
+      </button>
+    </form>
+  );
+}
+
+// Seller-responsibility compliance docs (Tier 3 / DIRECT_SALE). Renders URL
+// values as links, boolean true as a check, everything else as text.
+function ComplianceBlock({ entries }: { entries: [string, unknown][] }) {
+  if (!entries.length) {
+    return <p className="text-sm text-gray-500">Belge girilmedi.</p>;
+  }
+  return (
+    <dl className="divide-y rounded-lg border">
+      {entries.map(([k, v]) => (
+        <div
+          key={k}
+          className="grid grid-cols-1 gap-1 px-4 py-3 sm:grid-cols-[220px_1fr] sm:gap-4"
+        >
+          <dt className="text-sm font-medium text-gray-500">
+            {COMPLIANCE_LABELS_TR[k] ?? prettyKey(k)}
+          </dt>
+          <dd className="text-sm text-gray-900">
+            {typeof v === 'string' && /^(https?:\/\/|\/)/.test(v) ? (
+              <a href={v} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                Belgeyi görüntüle →
+              </a>
+            ) : v === true ? (
+              'Var ✓'
+            ) : (
+              String(v)
+            )}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
 }

@@ -26,7 +26,8 @@
     "WEBSITE": "Website",
     "PHONE": "Phone",
     "OTHER": "Other",
-    "AI_RESEARCH": "AI tadqiqot"
+    "AI_RESEARCH": "AI tadqiqot",
+    "HARDWARE_QUOTE": "Uskuna taklifi"
   },
   "activityType": {
     "CALL": "Call",

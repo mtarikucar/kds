@@ -465,7 +465,12 @@ function HardwareCard({ p, onAdd }: { p: HardwareProduct; onAdd: () => void }) {
   const showLowStock = (p.available ?? 0) > 0 && (p.available ?? 0) <= 5;
   const mode = saleModeOf(p);
   const detailHref = `/admin/store/${encodeURIComponent(p.sku)}`;
-  const partnerUrl = p.partnerRedirect?.partnerUrl;
+  // Only trust an absolute http(s) URL as a clickable outbound link — guards
+  // against a stored javascript:/data: payload (defense-in-depth; the server
+  // also validates the scheme at publish time).
+  const rawPartnerUrl = p.partnerRedirect?.partnerUrl;
+  const partnerUrl =
+    rawPartnerUrl && /^https?:\/\//i.test(rawPartnerUrl) ? rawPartnerUrl : undefined;
   return (
     <article className="overflow-hidden rounded-lg border bg-white">
       {p.images?.[0] && <ProductImage src={p.images[0]} alt={p.name} />}

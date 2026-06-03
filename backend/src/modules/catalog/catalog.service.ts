@@ -208,7 +208,16 @@ export class CatalogService {
       effectiveDocs,
     );
     const effectiveStatus = input.status ?? exists.status;
-    if (effectiveStatus === "published") {
+    // Only gate at meaningful moments so routine edits (e.g. a price tweak)
+    // on an already-published product aren't blocked: when transitioning into
+    // published, or when this update touches the regulated fields.
+    const publishing = input.status === "published" && exists.status !== "published";
+    const touchingRegulated =
+      input.saleMode !== undefined ||
+      input.partnerRedirect !== undefined ||
+      input.complianceDocs !== undefined ||
+      input.category !== undefined;
+    if (effectiveStatus === "published" && (publishing || touchingRegulated)) {
       this.assertPublishable(
         saleMode,
         input.partnerRedirect ?? (exists.partnerRedirect as any),
@@ -294,9 +303,13 @@ export class CatalogService {
     if (saleMode === "PARTNER_REDIRECT") {
       const url = (partnerRedirect as { partnerUrl?: unknown } | null)
         ?.partnerUrl;
-      if (typeof url !== "string" || !url.trim()) {
+      // Must be an absolute http(s) URL. The value is rendered as an outbound
+      // <a href target=_blank> in the authenticated admin SPA, so reject
+      // javascript:/data:/protocol-relative payloads at write time (stored-XSS
+      // / open-redirect guard) — not just a non-empty string.
+      if (typeof url !== "string" || !/^https?:\/\/\S+/i.test(url.trim())) {
         throw new BadRequestException(
-          "PARTNER_REDIRECT products require partnerRedirect.partnerUrl before publishing",
+          "PARTNER_REDIRECT products require a valid http(s) partnerRedirect.partnerUrl before publishing",
         );
       }
       return;
@@ -377,6 +390,34 @@ export class CatalogService {
     });
     const qty = Math.min(999, Math.max(1, input.qty ?? 1));
     const summary = `[Donanım teklif talebi] ${product.name} (SKU: ${product.sku}) × ${qty}`;
+    // v3.0.1 round-4 audit fix — freeze a structured snapshot of the
+    // catalog row + request payload at write time. Pre-fix the Lead row
+    // carried only the freeform summary string in `notes`; the marketing
+    // rep had no context if the admin later renamed/archived the SKU
+    // between request and dealer follow-up. The snapshot captures every
+    // field the dealer's offer template needs, plus the tier so a future
+    // "Teklif Al for PARTNER_REDIRECT" wouldn't be confused with the
+    // QUOTE_ONLY YN ÖKC flow.
+    const productSnapshot = {
+      capturedAt: new Date().toISOString(),
+      tenantName: tenant?.name ?? null,
+      product: {
+        id: product.id,
+        sku: product.sku,
+        name: product.name,
+        saleMode: product.saleMode,
+        category: product.category ?? null,
+        priceCents: product.priceCents ?? null,
+        currency: product.currency ?? null,
+      },
+      request: {
+        qty,
+        contactPerson: input.contactPerson,
+        phone: input.phone ?? null,
+        email: input.email ?? null,
+        notes: input.notes ?? null,
+      },
+    };
     const lead = await this.prisma.lead.create({
       data: {
         businessName: tenant?.name || input.contactPerson,
@@ -386,6 +427,10 @@ export class CatalogService {
         businessType: "OTHER",
         source: "HARDWARE_QUOTE",
         notes: input.notes ? `${summary}\n\n${input.notes}` : summary,
+        // Soft-FK to the originating tenant; lets reports + dealer
+        // dashboards filter without joining through fuzzy `businessName`.
+        originTenantId: tenantId,
+        productSnapshot: productSnapshot as any,
       },
       select: { id: true, status: true, source: true, createdAt: true },
     });

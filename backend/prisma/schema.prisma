@@ -123,10 +123,10 @@ model Tenant {
   stockSettings       StockSettings[]
 
   // Personnel management relations
-  attendances          Attendance[]
-  shiftTemplates       ShiftTemplate[]
-  shiftAssignments     ShiftAssignment[]
-  shiftSwapRequests    ShiftSwapRequest[]
+  attendances       Attendance[]
+  shiftTemplates    ShiftTemplate[]
+  shiftAssignments  ShiftAssignment[]
+  shiftSwapRequests ShiftSwapRequest[]
   // Step-F decoupling: marketing's Commission.tenantId and Lead.convertedTenantId
   // are now soft (no FK) references — the back-relations were dropped so the
   // marketing tables can live in a separate DB.
@@ -154,11 +154,10 @@ model Tenant {
   // v2.8.93 — Branch + Device picked up the missing tenant FK + cascade.
   // Inverse relations declared here so Prisma keeps the TS-side graph
   // consistent. Pre-fix both tables were orphan-prone.
-  branches            Branch[]
-  devices             Device[]
+  branches              Branch[]
+  devices               Device[]
   // v3.0.0 — m:n user↔branch allow-list (BranchGuard reads it).
   userBranchAssignments UserBranchAssignment[]
-
 
   @@index([currentPlanId])
   @@index([status])
@@ -264,22 +263,21 @@ model User {
   primaryBranchId String?
   primaryBranch   Branch? @relation("UserPrimaryBranch", fields: [primaryBranchId], references: [id], onDelete: Restrict)
 
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  refreshTokens              RefreshToken[]
-  orders                     Order[]
-  approvedOrders             Order[]                @relation("ApprovedOrders")
-  acknowledgedWaiterRequests WaiterRequest[]        @relation("AcknowledgedWaiterRequests")
-  acknowledgedBillRequests   BillRequest[]          @relation("AcknowledgedBillRequests")
-  stockMovements             StockMovement[]
-  notifications              Notification[]
-  readNotifications          UserNotificationRead[]
-  zReports                   ZReport[]
-  cashDrawerMovements        CashDrawerMovement[]
-  approvedCashDrawerMovements CashDrawerMovement[] @relation("CashDrawerApprovedBy")
+  refreshTokens               RefreshToken[]
+  orders                      Order[]
+  approvedOrders              Order[]                @relation("ApprovedOrders")
+  acknowledgedWaiterRequests  WaiterRequest[]        @relation("AcknowledgedWaiterRequests")
+  acknowledgedBillRequests    BillRequest[]          @relation("AcknowledgedBillRequests")
+  stockMovements              StockMovement[]
+  notifications               Notification[]
+  readNotifications           UserNotificationRead[]
+  zReports                    ZReport[]
+  cashDrawerMovements         CashDrawerMovement[]
+  approvedCashDrawerMovements CashDrawerMovement[]   @relation("CashDrawerApprovedBy")
 
   // Personnel management relations
   attendances          Attendance[]
@@ -291,13 +289,12 @@ model User {
   // Legal consents — every accepted version of KVKK / Mesafeli Satış
   // / İade / Terms is recorded for audit. Cascade-delete with the user
   // because a removed user can't be asked to re-accept anything.
-  consents Consent[]
+  consents                 Consent[]
   // v3.0.0 — m:n allow-list of branches the user may roam.
   // BranchGuard consults this on every request for
   // ADMIN/MANAGER roles.
   branchAssignments        UserBranchAssignment[]
   grantedBranchAssignments UserBranchAssignment[] @relation("UserBranchAssignmentGrantor")
-
 
   @@index([tenantId])
   @@index([tenantId, primaryBranchId])
@@ -339,7 +336,6 @@ model UserBranchAssignment {
   @@index([tenantId, branchId])
   @@map("user_branch_assignments")
 }
-
 
 // ========================================
 // MENU MANAGEMENT
@@ -571,13 +567,13 @@ model Table {
   reservations     Reservation[]     @relation("ReservationAssignedTable")
 
   @@unique([tenantId, number])
-  @@index([tenantId])
-  @@index([tenantId, groupId])
-  @@index([tenantId, branchId])
   // v3.0.0 — compound unique enables (tableId, branchId) FK
   // back-references from Reservation/Order so a row can never
   // point at a table from a different branch at the DB layer.
   @@unique([id, branchId])
+  @@index([tenantId])
+  @@index([tenantId, groupId])
+  @@index([tenantId, branchId])
   @@map("tables")
 }
 
@@ -650,7 +646,7 @@ model Order {
   // aren't returned by branch-scoped queries, which is the correct
   // behavior (they're shown in tenant-wide reports).
   branchId String
-  branch   Branch  @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -789,6 +785,9 @@ model Payment {
   // a nullable column, which would inflate the index footprint.
   // Consumers should expect at most one row.
   salesInvoices SalesInvoice[]
+  // v3.0.0 — branch scope.
+  branchId      String
+  branch        Branch         @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   // NOTE: @@unique([orderId, idempotencyKey]) does NOT dedupe null keys in
   // Postgres (multiple NULLs are considered distinct). Migration
@@ -801,12 +800,7 @@ model Payment {
   @@index([status])
   @@index([tenantId, status])
   @@index([tenantId, createdAt])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("payments")
 }
 
@@ -846,6 +840,9 @@ model OrderItemPayment {
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
+  // v3.0.0 — branch scope.
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@index([paymentId])
   @@index([orderItemId])
@@ -853,12 +850,7 @@ model OrderItemPayment {
   // Hot read path for "which items on this order are paid?" — service
   // aggregates by orderItemId, then joins to payment.status.
   @@index([orderItemId, paymentId])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("order_item_payments")
 }
 
@@ -892,17 +884,15 @@ model PendingSelfPayment {
   expiresAt   DateTime
   createdAt   DateTime  @default(now())
   succeededAt DateTime?
+  // v3.0.0 — branch scope.
+  branchId    String
+  branch      Branch    @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@index([sessionId])
   @@index([tenantId])
   @@index([expiresAt])
   @@index([tenantId, status, requestHash])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("pending_self_payments")
 }
 
@@ -927,6 +917,9 @@ model StockMovement {
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
+  // v3.0.0 — branch scope.
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@index([tenantId])
   @@index([productId])
@@ -936,12 +929,7 @@ model StockMovement {
   // alone; this compound index serves the date-bounded variant
   // without a sequential scan over the tenant's history.
   @@index([tenantId, createdAt])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("stock_movements")
 }
 
@@ -1259,13 +1247,12 @@ model QrMenuSettings {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@index([tenantId])
   // v3.0.0 — branch scope.
-  branchId String?
-  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  @@unique([tenantId, branchId])
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
+  @@unique([tenantId, branchId])
+  @@index([tenantId])
   @@map("qr_menu_settings")
 }
 
@@ -1292,13 +1279,12 @@ model PosSettings {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@index([tenantId])
   // v3.0.0 — branch scope.
-  branchId String?
-  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  @@unique([tenantId, branchId])
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
+  @@unique([tenantId, branchId])
+  @@index([tenantId])
   @@map("pos_settings")
 }
 
@@ -1339,13 +1325,12 @@ model ReservationSettings {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@index([tenantId])
   // v3.0.0 — branch scope.
-  branchId String?
-  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  @@unique([tenantId, branchId])
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
+  @@unique([tenantId, branchId])
+  @@index([tenantId])
   @@map("reservation_settings")
 }
 
@@ -1383,13 +1368,12 @@ model SmsSettings {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@index([tenantId])
   // v3.0.0 — branch scope.
-  branchId String?
-  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  @@unique([tenantId, branchId])
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
+  @@unique([tenantId, branchId])
+  @@index([tenantId])
   @@map("sms_settings")
 }
 
@@ -1441,6 +1425,9 @@ model Reservation {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  // v3.0.0 — branch scope.
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@unique([tenantId, reservationNumber])
   @@index([tenantId])
@@ -1450,12 +1437,7 @@ model Reservation {
   // Overlap-check query: WHERE tenantId AND tableId AND date AND
   // startTime/endTime range. tableId+date+startTime covers it.
   @@index([tenantId, tableId, date, startTime])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("reservations")
 }
 
@@ -1486,16 +1468,14 @@ model IntegrationSettings {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  // v3.0.0 — branch scope.
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@unique([tenantId, branchId, integrationType, provider])
   @@index([tenantId])
   @@index([integrationType])
-  // v3.0.0 — branch scope.
-  branchId String?
-  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("integration_settings")
 }
 
@@ -1785,7 +1765,10 @@ model Notification {
   expiresAt DateTime?
 
   // Relations
-  readBy UserNotificationRead[]
+  readBy   UserNotificationRead[]
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch                 @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@index([tenantId])
   @@index([userId])
@@ -1794,12 +1777,7 @@ model Notification {
   // (expiresAt IS NULL OR expiresAt > now()). Composite covers the
   // tenant scope + global vs targeted + expiry filter in one index.
   @@index([tenantId, isGlobal, expiresAt])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("notifications")
 }
 
@@ -1842,18 +1820,16 @@ model WaiterRequest {
   completedAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  // v3.0.0 — branch scope.
+  branchId    String
+  branch      Branch    @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@index([tableId])
   @@index([status])
   @@index([sessionId])
   @@index([tenantId])
   @@index([tenantId, status])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("waiter_requests")
 }
 
@@ -1874,18 +1850,16 @@ model BillRequest {
   completedAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  // v3.0.0 — branch scope.
+  branchId    String
+  branch      Branch    @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@index([tableId])
   @@index([status])
   @@index([sessionId])
   @@index([tenantId])
   @@index([tenantId, status])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("bill_requests")
 }
 
@@ -2026,17 +2000,15 @@ model ZReport {
 
   // Relations
   cashDrawerMovements CashDrawerMovement[]
+  // v3.0.0 — branch scope.
+  branchId            String
+  branch              Branch               @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@unique([tenantId, reportNumber])
   @@index([tenantId])
   @@index([reportDate])
   @@index([closedById])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("z_reports")
 }
 
@@ -2066,16 +2038,19 @@ model CashDrawerMovement {
   // toward the cash drawer reconciliation. OPENING / CLOSING /
   // CASH_IN are auto-APPROVED on insert (they're traceable to the
   // owning sale or to the open-shift action itself).
-  approvalStatus    String    @default("APPROVED") // DRAFT, APPROVED, REJECTED
-  approvedById      String?
-  approvedBy        User?     @relation("CashDrawerApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
-  approvedAt        DateTime?
-  rejectionReason   String?
+  approvalStatus  String    @default("APPROVED") // DRAFT, APPROVED, REJECTED
+  approvedById    String?
+  approvedBy      User?     @relation("CashDrawerApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvedAt      DateTime?
+  rejectionReason String?
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
+  // v3.0.0 — branch scope.
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@index([tenantId])
   @@index([tenantId, createdAt])
@@ -2083,12 +2058,7 @@ model CashDrawerMovement {
   @@index([userId])
   @@index([createdAt])
   @@index([tenantId, approvalStatus])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("cash_drawer_movements")
 }
 
@@ -2307,17 +2277,15 @@ model Camera {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  // v3.0.0 — branch scope.
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@unique([tenantId, name])
   @@index([tenantId])
   @@index([status])
   @@index([edgeDeviceId])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("cameras")
 }
 
@@ -2348,17 +2316,15 @@ model OccupancyRecord {
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, timestamp])
   @@index([tableId])
   @@index([trackingId, timestamp])
   @@index([state])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("occupancy_records")
 }
 
@@ -2382,16 +2348,14 @@ model TrafficFlowRecord {
 
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@unique([tenantId, hourBucket, cellX, cellZ])
-  @@index([tenantId, hourBucket])
-  @@index([cellX, cellZ])
   // v3.0.0 — branch scope.
   branchId String
   branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
+  @@unique([tenantId, hourBucket, cellX, cellZ])
+  @@index([tenantId, hourBucket])
+  @@index([cellX, cellZ])
   @@index([tenantId, branchId])
-
   @@map("traffic_flow_records")
 }
 
@@ -2431,16 +2395,14 @@ model TableAnalytics {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  // v3.0.0 — branch scope.
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@unique([tableId, date])
   @@index([tenantId, date])
   @@index([tableId])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("table_analytics")
 }
 
@@ -2485,17 +2447,15 @@ model AnalyticsInsight {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  // v3.0.0 — branch scope.
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@index([tenantId, status])
   @@index([tenantId, type])
   @@index([tenantId, createdAt])
   @@index([severity])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("analytics_insights")
 }
 
@@ -2525,16 +2485,14 @@ model AnalyticsHeatmapCache {
 
   createdAt DateTime @default(now())
   expiresAt DateTime // Cache expiration
+  // v3.0.0 — branch scope.
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@unique([tenantId, startTime, endTime, granularity, metric])
   @@index([tenantId, metric])
   @@index([expiresAt])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("analytics_heatmap_cache")
 }
 
@@ -2581,16 +2539,14 @@ model EdgeDevice {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  // v3.0.0 — branch scope.
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@unique([tenantId, deviceId])
   @@index([tenantId])
   @@index([status])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("edge_devices")
 }
 
@@ -2680,18 +2636,16 @@ model DeliveryPlatformLog {
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
+  // v3.0.0 — branch scope.
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@index([tenantId])
   @@index([platform])
   @@index([orderId])
   @@index([success])
   @@index([nextRetryAt])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("delivery_platform_logs")
 }
 
@@ -2777,17 +2731,15 @@ model StockItem {
   ingredientMovements IngredientMovement[]
   wasteLogs           WasteLog[]
   stockCountItems     StockCountItem[]
+  // v3.0.0 — branch scope.
+  branchId            String
+  branch              Branch               @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@unique([tenantId, sku])
   @@index([tenantId])
   @@index([categoryId])
   @@index([isActive])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("stock_items")
 }
 
@@ -2810,16 +2762,14 @@ model StockBatch {
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
+  // v3.0.0 — branch scope.
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@index([tenantId])
   @@index([stockItemId])
   @@index([expiryDate])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("stock_batches")
 }
 
@@ -2840,14 +2790,12 @@ model Recipe {
 
   // Relations
   ingredients RecipeIngredient[]
+  // v3.0.0 — branch scope.
+  branchId    String
+  branch      Branch             @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@index([tenantId])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("recipes")
 }
 
@@ -2934,18 +2882,16 @@ model PurchaseOrder {
   receivedAt  DateTime?
 
   // Relations
-  items PurchaseOrderItem[]
+  items    PurchaseOrderItem[]
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch              @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@unique([tenantId, orderNumber])
   @@index([tenantId])
   @@index([supplierId])
   @@index([status])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("purchase_orders")
 }
 
@@ -2987,6 +2933,9 @@ model IngredientMovement {
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
+  // v3.0.0 — branch scope.
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@index([tenantId])
   @@index([stockItemId])
@@ -2998,12 +2947,7 @@ model IngredientMovement {
   // Per-tenant date-bounded queries (cost / waste / "last 30 days for
   // this tenant") — the dominant access pattern for cross-item reports.
   @@index([tenantId, createdAt])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("ingredient_movements")
 }
 
@@ -3022,17 +2966,15 @@ model WasteLog {
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
+  // v3.0.0 — branch scope.
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@index([tenantId])
   @@index([stockItemId])
   @@index([reason])
   @@index([createdAt])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("waste_logs")
 }
 
@@ -3051,16 +2993,14 @@ model StockCount {
   completedAt DateTime?
 
   // Relations
-  items StockCountItem[]
+  items    StockCountItem[]
+  // v3.0.0 — branch scope.
+  branchId String
+  branch   Branch           @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@index([tenantId])
   @@index([status])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("stock_counts")
 }
 
@@ -3101,13 +3041,12 @@ model StockSettings {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@index([tenantId])
   // v3.0.0 — branch scope.
-  branchId String?
-  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  @@unique([tenantId, branchId])
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
+  @@unique([tenantId, branchId])
+  @@index([tenantId])
   @@map("stock_settings")
 }
 
@@ -3145,18 +3084,16 @@ model Attendance {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  // v3.0.0 — branch scope.
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@unique([userId, date])
   @@index([tenantId])
   @@index([tenantId, date])
   @@index([userId])
   @@index([status])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("attendances")
 }
 
@@ -3177,14 +3114,12 @@ model ShiftTemplate {
 
   // Relations
   assignments ShiftAssignment[]
+  // v3.0.0 — branch scope.
+  branchId    String
+  branch      Branch            @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@index([tenantId])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("shift_templates")
 }
 
@@ -3210,18 +3145,16 @@ model ShiftAssignment {
   attendances           Attendance[]
   swapRequestsRequester ShiftSwapRequest[] @relation("SwapRequester")
   swapRequestsTarget    ShiftSwapRequest[] @relation("SwapTarget")
+  // v3.0.0 — branch scope.
+  branchId              String
+  branch                Branch             @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@unique([userId, date])
   @@index([tenantId])
   @@index([tenantId, date])
   @@index([userId])
   @@index([shiftTemplateId])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("shift_assignments")
 }
 
@@ -3256,17 +3189,15 @@ model ShiftSwapRequest {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  // v3.0.0 — branch scope.
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@index([tenantId])
   @@index([requesterId])
   @@index([targetId])
   @@index([status])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("shift_swap_requests")
 }
 
@@ -3306,12 +3237,12 @@ model MarketingUser {
   updatedAt DateTime @updatedAt
 
   // Relations
-  leads            Lead[]                  @relation("AssignedRep")
-  activities       LeadActivity[]
-  tasks            MarketingTask[]
-  offers           LeadOffer[]
-  commissions      Commission[]
-  notifications    MarketingNotification[]
+  leads         Lead[]                  @relation("AssignedRep")
+  activities    LeadActivity[]
+  tasks         MarketingTask[]
+  offers        LeadOffer[]
+  commissions   Commission[]
+  notifications MarketingNotification[]
 
   @@index([email])
   @@index([role])
@@ -3360,6 +3291,20 @@ model Lead {
   offers      LeadOffer[]
   commissions Commission[]    @relation("CommissionLead")
 
+  // v3.0.1 round-4 — hardware "Teklif Al" leads (source=HARDWARE_QUOTE)
+  // capture (a) the requesting tenant via soft-FK string and (b) a
+  // frozen snapshot of the catalog row + requested qty at request time.
+  // Pre-fix the Lead row carried only `notes = "<name> (SKU) × qty"` —
+  // if the admin renamed/archived the catalog row between request and
+  // dealer follow-up, the rep lost the original context. Snapshot is
+  // intentionally schema-less JSON so future tier requirements (delivery
+  // window, install type, etc.) extend without a migration. `originTenantId`
+  // stays a String (no FK) so marketing's eventual physical-split to its
+  // own DB stays clean — the FK direction would otherwise pin marketing
+  // to core's tenant table.
+  productSnapshot Json?
+  originTenantId  String?
+
   @@index([assignedToId])
   @@index([status])
   @@index([city])
@@ -3370,6 +3315,7 @@ model Lead {
   @@index([priority])
   @@index([assignedToId, status])
   @@index([status, createdAt])
+  @@index([originTenantId])
   @@map("leads")
 }
 
@@ -3431,8 +3377,8 @@ model MarketingTask {
 }
 
 model LeadOffer {
-  id          String            @id @default(uuid())
-  planId      String?
+  id     String  @id @default(uuid())
+  planId String?
 
   /// Step-E plan snapshot, captured at offer-create time via the provisioning
   /// port (CoreProvisioningPort.describePlan) so the offer stays self-contained
@@ -3443,15 +3389,15 @@ model LeadOffer {
   planMonthlyPrice Decimal? @db.Decimal(10, 2)
   planCurrency     String?
 
-  customPrice Decimal?          @db.Decimal(10, 2)
+  customPrice Decimal?  @db.Decimal(10, 2)
   // v2.8.97 — was Decimal(5, 2) which capped the discount at 999.99
   // TRY. Sales reps offering a four-digit lira discount on enterprise
   // tiers would have hit a silent precision overflow. Aligned with
   // every other money column in the schema (Decimal(10, 2)).
-  discount    Decimal?          @db.Decimal(10, 2)
+  discount    Decimal?  @db.Decimal(10, 2)
   trialDays   Int?
-  notes       String?           @db.Text
-  status      String            @default("DRAFT") // DRAFT, SENT, ACCEPTED, REJECTED, EXPIRED
+  notes       String?   @db.Text
+  status      String    @default("DRAFT") // DRAFT, SENT, ACCEPTED, REJECTED, EXPIRED
   validUntil  DateTime?
   sentAt      DateTime?
   respondedAt DateTime?
@@ -3734,13 +3680,12 @@ model AccountingSettings {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
-  @@index([tenantId])
   // v3.0.0 — branch scope.
-  branchId String?
-  branch   Branch? @relation(fields: [branchId], references: [id], onDelete: Restrict)
-  @@unique([tenantId, branchId])
+  branchId  String?
+  branch    Branch?  @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
+  @@unique([tenantId, branchId])
+  @@index([tenantId])
   @@map("accounting_settings")
 }
 
@@ -4042,28 +3987,28 @@ model MarketplaceAddOn {
 }
 
 model TenantAddOn {
-  id                  String   @id @default(uuid())
-  tenantId            String
-  addOnId             String
-  addOn               MarketplaceAddOn @relation(fields: [addOnId], references: [id], onDelete: Restrict)
+  id                 String           @id @default(uuid())
+  tenantId           String
+  addOnId            String
+  addOn              MarketplaceAddOn @relation(fields: [addOnId], references: [id], onDelete: Restrict)
   // Optional branch scope. Null means tenant-wide; once branches land in
   // Phase 3 the marketplace UI will require a branch for capacity add-ons.
-  branchId            String?
+  branchId           String?
   // Multiplies numeric grants (capacity add-ons buy in quantity).
-  quantity            Int      @default(1)
+  quantity           Int              @default(1)
   // active during the period; cancelled stays visible until cancelAtPeriodEnd
   // hits the next billing tick; expired = ended billing period, no entitlement.
-  status              String   @default("active")
+  status             String           @default("active")
   // Billing cycle bookkeeping. One-time add-ons set start = end = activatedAt.
-  activatedAt         DateTime @default(now())
-  currentPeriodStart  DateTime?
-  currentPeriodEnd    DateTime?
-  cancelAtPeriodEnd   Boolean  @default(false)
-  cancelledAt         DateTime?
-  endedAt             DateTime?
+  activatedAt        DateTime         @default(now())
+  currentPeriodStart DateTime?
+  currentPeriodEnd   DateTime?
+  cancelAtPeriodEnd  Boolean          @default(false)
+  cancelledAt        DateTime?
+  endedAt            DateTime?
   // Link to the invoice/payment row that paid for this. Nullable for free
   // add-ons (promo grants, admin-issued comps).
-  paymentRef          String?
+  paymentRef         String?
 
   @@index([tenantId, status])
   @@index([addOnId])
@@ -4086,68 +4031,67 @@ model TenantAddOn {
 // vendor brand — capability presence is what routes commands.
 
 model Branch {
-  id          String   @id @default(uuid())
-  tenantId    String
+  id        String   @id @default(uuid())
+  tenantId  String
   // v2.8.93 — explicit Tenant FK + cascade. Pre-fix tenantId was a
   // free-form String column with no FK, so deleting a tenant left
   // orphan branches and a typo at write-time silently succeeded.
-  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  name        String   @default("Main")
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String   @default("Main")
   // Free-form code so chains can label as "IST-01", "ANK-Mall", etc.
-  code        String?
-  timezone    String   @default("UTC")
+  code      String?
+  timezone  String   @default("UTC")
   // Address stored as JSON to avoid premature normalization (single,
   // double, embedded formats vary by country).
-  address     Json?
-  status      String   @default("active") // active|suspended|archived
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  address   Json?
+  status    String   @default("active") // active|suspended|archived
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  devices     Device[]
-  bridges     LocalBridgeAgent[]
-  orders      Order[]
-  tables      Table[]
+  devices               Device[]
+  bridges               LocalBridgeAgent[]
+  orders                Order[]
+  tables                Table[]
   // v3.0.0 — strict branch-scope inverse relations.
-  deviceCommands DeviceCommand[]
-  payments Payment[]
-  orderItemPayments OrderItemPayment[]
-  pendingSelfPayments PendingSelfPayment[]
-  waiterRequests WaiterRequest[]
-  billRequests BillRequest[]
-  stockItems StockItem[]
-  stockBatches StockBatch[]
-  ingredientMovements IngredientMovement[]
-  wasteLogs WasteLog[]
-  stockMovements StockMovement[]
-  stockCounts StockCount[]
-  purchaseOrders PurchaseOrder[]
-  recipes Recipe[]
-  reservations Reservation[]
-  zReports ZReport[]
-  cashDrawerMovements CashDrawerMovement[]
-  attendances Attendance[]
-  shiftTemplates ShiftTemplate[]
-  shiftAssignments ShiftAssignment[]
-  shiftSwapRequests ShiftSwapRequest[]
-  cameras Camera[]
-  occupancyRecords OccupancyRecord[]
-  trafficFlowRecords TrafficFlowRecord[]
-  tableAnalytics TableAnalytics[]
-  analyticsInsights AnalyticsInsight[]
+  deviceCommands        DeviceCommand[]
+  payments              Payment[]
+  orderItemPayments     OrderItemPayment[]
+  pendingSelfPayments   PendingSelfPayment[]
+  waiterRequests        WaiterRequest[]
+  billRequests          BillRequest[]
+  stockItems            StockItem[]
+  stockBatches          StockBatch[]
+  ingredientMovements   IngredientMovement[]
+  wasteLogs             WasteLog[]
+  stockMovements        StockMovement[]
+  stockCounts           StockCount[]
+  purchaseOrders        PurchaseOrder[]
+  recipes               Recipe[]
+  reservations          Reservation[]
+  zReports              ZReport[]
+  cashDrawerMovements   CashDrawerMovement[]
+  attendances           Attendance[]
+  shiftTemplates        ShiftTemplate[]
+  shiftAssignments      ShiftAssignment[]
+  shiftSwapRequests     ShiftSwapRequest[]
+  cameras               Camera[]
+  occupancyRecords      OccupancyRecord[]
+  trafficFlowRecords    TrafficFlowRecord[]
+  tableAnalytics        TableAnalytics[]
+  analyticsInsights     AnalyticsInsight[]
   analyticsHeatmapCache AnalyticsHeatmapCache[]
-  edgeDevices EdgeDevice[]
-  notifications Notification[]
-  deliveryPlatformLogs DeliveryPlatformLog[]
-  posSettings PosSettings[]
-  qrMenuSettings QrMenuSettings[]
-  reservationSettings ReservationSettings[]
-  smsSettings SmsSettings[]
-  accountingSettings AccountingSettings[]
-  stockSettings StockSettings[]
-  integrationSettings IntegrationSettings[]
-  primaryUsers User[] @relation("UserPrimaryBranch")
-  userAssignments UserBranchAssignment[]
-
+  edgeDevices           EdgeDevice[]
+  notifications         Notification[]
+  deliveryPlatformLogs  DeliveryPlatformLog[]
+  posSettings           PosSettings[]
+  qrMenuSettings        QrMenuSettings[]
+  reservationSettings   ReservationSettings[]
+  smsSettings           SmsSettings[]
+  accountingSettings    AccountingSettings[]
+  stockSettings         StockSettings[]
+  integrationSettings   IntegrationSettings[]
+  primaryUsers          User[]                  @relation("UserPrimaryBranch")
+  userAssignments       UserBranchAssignment[]
 
   @@unique([tenantId, code])
   @@index([tenantId, status])
@@ -4158,50 +4102,50 @@ model Branch {
 // routing layer dispatches on the union of `capabilities`. Adding a new
 // hardware class is a config change, not a code change.
 model Device {
-  id              String   @id @default(uuid())
-  tenantId        String
+  id                String            @id @default(uuid())
+  tenantId          String
   // v2.8.93 — explicit Tenant FK + cascade. Matches the Branch fix
   // above; pre-fix a device's tenantId column had no DB-level integrity
   // check and orphan devices outlived their tenants.
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant            Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   // Optional until the device is assigned to a branch via pairing. Nullable
   // also covers a chain admin creating slots ahead of branch deployment.
-  branchId        String
-  branch          Branch  @relation(fields: [branchId], references: [id], onDelete: Restrict)
+  branchId          String
+  branch            Branch            @relation(fields: [branchId], references: [id], onDelete: Restrict)
   // tablet_waiter | tablet_customer | kds_screen | bar_screen | pos_terminal
   // yazarkasa | receipt_printer | kitchen_printer | caller_id | scanner | local_bridge
-  kind            String
+  kind              String
   // Capability tags — e.g. ['print_80mm', 'cash_drawer'] or ['display_kitchen'].
   // Free-form strings so a new firmware/feature can surface immediately.
-  capabilities    String[] @default([])
+  capabilities      String[]          @default([])
   // online|offline|busy|error|maintenance|retired
-  status          String   @default("unprovisioned")
+  status            String            @default("unprovisioned")
   // Wall-clock last successful heartbeat. Null while unprovisioned.
-  lastSeenAt      DateTime?
-  serial          String?
-  model           String?
+  lastSeenAt        DateTime?
+  serial            String?
+  model             String?
   // sold (HummyTummy fulfilled), rented, byo (customer brought their own).
-  ownership       String   @default("byo")
-  warrantyUntil   DateTime?
+  ownership         String            @default("byo")
+  warrantyUntil     DateTime?
   // When this device lives behind a bridge, the bridgeId is its parent.
   // Cloud-direct devices (tablets, KDS screens) have null bridgeId.
-  bridgeId        String?
-  bridge          LocalBridgeAgent? @relation(fields: [bridgeId], references: [id], onDelete: SetNull)
+  bridgeId          String?
+  bridge            LocalBridgeAgent? @relation(fields: [bridgeId], references: [id], onDelete: SetNull)
   // Pairing one-time-use bits. pairCode is what the user types; claimToken is
   // a single-use token returned by the API to bootstrap auth.
-  pairCode        String?  @unique
+  pairCode          String?           @unique
   pairCodeExpiresAt DateTime?
   // Rotating bearer token (sha256 hashed) issued post-pair. Refreshed via
   // /devices/:id/token/refresh. Never store the raw token at rest.
-  tokenHash       String?
-  tokenExpiresAt  DateTime?
+  tokenHash         String?
+  tokenExpiresAt    DateTime?
   // Free-form provisioning config — e.g. printer width, kitchen station id.
-  config          Json?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  config            Json?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
-  commands        DeviceCommand[]
-  logs            DeviceLog[]
+  commands DeviceCommand[]
+  logs     DeviceLog[]
 
   @@unique([tenantId, serial])
   @@index([tenantId, branchId, kind])
@@ -4213,54 +4157,52 @@ model Device {
 // Outbound commands to a device. Per-device FIFO with priority. Workers ack
 // by transitioning queued → done|failed with a result/error.
 model DeviceCommand {
-  id              String   @id @default(uuid())
-  tenantId        String
-  deviceId        String
-  device          Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  id             String    @id @default(uuid())
+  tenantId       String
+  deviceId       String
+  device         Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   // print_receipt | fiscal_receipt | charge_card | show_order | open_drawer | reboot ...
-  kind            String
-  payload         Json
+  kind           String
+  payload        Json
   // Higher = pulled first by the device.
-  priority        Int      @default(0)
-  status          String   @default("queued") // queued|inflight|done|failed|expired
-  attempts        Int      @default(0)
-  expiresAt       DateTime?
+  priority       Int       @default(0)
+  status         String    @default("queued") // queued|inflight|done|failed|expired
+  attempts       Int       @default(0)
+  expiresAt      DateTime?
   // Client-side idempotency key (UUIDv7 from producer). Unique per device
   // so retried sends don't duplicate.
-  idempotencyKey  String
-  result          Json?
-  error           String?
-  ackedAt         DateTime?
-  createdAt       DateTime @default(now())
+  idempotencyKey String
+  result         Json?
+  error          String?
+  ackedAt        DateTime?
+  createdAt      DateTime  @default(now())
   // Tracks the last transition. The sweeper uses this (not createdAt) to
   // detect "inflight for too long": a command created an hour ago but
   // claimed seconds ago must NOT be swept as stuck.
-  updatedAt       DateTime @updatedAt
+  updatedAt      DateTime  @updatedAt
+  // v3.0.0 — branch scope.
+  branchId       String
+  branch         Branch    @relation(fields: [branchId], references: [id], onDelete: Restrict)
 
   @@unique([deviceId, idempotencyKey])
   @@index([deviceId, status, priority(sort: Desc), createdAt])
   @@index([tenantId, status])
   @@index([status, updatedAt])
-  // v3.0.0 — branch scope.
-  branchId String
-  branch   Branch @relation(fields: [branchId], references: [id], onDelete: Restrict)
-
   @@index([tenantId, branchId])
-
   @@map("device_commands")
 }
 
 model DeviceLog {
-  id          String   @id @default(uuid())
-  tenantId    String
-  deviceId    String
-  device      Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  id        String   @id @default(uuid())
+  tenantId  String
+  deviceId  String
+  device    Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
   // info|warn|error|metric — keeps the table dense.
-  level       String
-  category    String   // 'heartbeat'|'command'|'capability'|'lifecycle'
-  message     String
-  payload     Json?
-  createdAt   DateTime @default(now())
+  level     String
+  category  String // 'heartbeat'|'command'|'capability'|'lifecycle'
+  message   String
+  payload   Json?
+  createdAt DateTime @default(now())
 
   @@index([deviceId, createdAt(sort: Desc)])
   @@index([tenantId, level, createdAt])
@@ -4270,30 +4212,30 @@ model DeviceLog {
 // Local Bridge Agent registry. One row per agent install (one per branch is
 // typical, but multiple are supported for redundancy or per-station bridges).
 model LocalBridgeAgent {
-  id              String   @id @default(uuid())
-  tenantId        String
-  branchId        String
-  branch          Branch   @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  id                    String    @id @default(uuid())
+  tenantId              String
+  branchId              String
+  branch                Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
   // Provisioning token: a one-time-use string embedded at manufacture or
   // generated when the bridge is associated with a branch via admin UI.
   // Hashed at rest (sha256); never raw.
   provisioningTokenHash String?
   // Rotating bearer token (sha256 hashed) post-claim.
-  tokenHash       String?
-  tokenExpiresAt  DateTime?
-  hostname        String?
-  os              String?
-  agentVersion    String?
+  tokenHash             String?
+  tokenExpiresAt        DateTime?
+  hostname              String?
+  os                    String?
+  agentVersion          String?
   // online|offline|claiming|retired
-  status          String   @default("claiming")
-  lastSeenAt      DateTime?
-  provisionedAt   DateTime?
+  status                String    @default("claiming")
+  lastSeenAt            DateTime?
+  provisionedAt         DateTime?
   // SKU code if this bridge came from the HummyTummy hardware store.
-  productSku      String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  productSku            String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
-  devices         Device[]
+  devices Device[]
 
   // Provisioning tokens are single-use across the entire fleet — making
   // the hash globally unique means a race between two concurrent claim
@@ -4334,68 +4276,68 @@ enum HardwareSaleMode {
 }
 
 model HardwareProduct {
-  id              String   @id @default(uuid())
-  sku             String   @unique
+  id                 String           @id @default(uuid())
+  sku                String           @unique
   // tablet|kds_screen|pos_terminal|printer|yazarkasa|bridge|scanner|caller_id|cash_drawer|other|service
   // 'service' is v2.8.87 — extends the model to carry installation/integration
   // service offerings (one-time labour). Service rows ignore rentalMonthlyCents,
   // serials, warrantyMonths; their meaning lives in `serviceMeta`.
-  category        String
-  name            String
-  brand           String?
-  model           String?
-  description     String?  @db.Text
+  category           String
+  name               String
+  brand              String?
+  model              String?
+  description        String?          @db.Text
   // Free-form specs: dimensions, ports, OS, etc.
   // Convention since v2.8.87: include `headlineSpecs: string[]` (max 3) for
   // the chip row on the storefront card. Storefront card reads
   // specs.headlineSpecs; falls back to nothing if absent.
-  specs           Json?
+  specs              Json?
   // Compat: { capabilities: ["print_80mm"], requiredPlan: ["PRO"], requiredAddOn: ["fiscal_hugin"] }
-  compat          Json?
+  compat             Json?
   // v2.8.87 — structured rich detail used by the product/service detail page.
   // Shape: { includes: string[], requirements: string[], faq: {q,a}[],
   //         steps: {title,body}[], videoUrl?, gallery?: string[] }
   // Per-locale variants supported via { tr: {...}, en: {...} } — the client
   // selects current locale, falls back to `tr`. Empty/null is fine: the
   // detail page degrades to spec-only.
-  details         Json?
+  details            Json?
   // v2.8.87 — service-only metadata. Shape:
   //   { durationHours?: number, geoCoverage?: string[],
   //     requiresBranch?: boolean, serviceType: 'onsite'|'remote'|'consultation' }
   // CheckoutService reads serviceType to decide whether to mint an
   // InstallationRequest at provision-time (`onsite` only).
-  serviceMeta     Json?
-  priceCents      Int
+  serviceMeta        Json?
+  priceCents         Int
   // For rental SKUs (e.g. HummyBox-Lite); null for sale-only.
   rentalMonthlyCents Int?
-  currency        String   @default("TRY")
-  warrantyMonths  Int      @default(12)
-  images          String[] @default([])
+  currency           String           @default("TRY")
+  warrantyMonths     Int              @default(12)
+  images             String[]         @default([])
   // in_stock|preorder|out_of_stock|discontinued
-  stockStatus     String   @default("in_stock")
+  stockStatus        String           @default("in_stock")
   // shippingProfile = { weightKg, dimsCm, carrier?, leadTimeDays }
-  shippingProfile Json?
+  shippingProfile    Json?
   // Lifecycle inside the catalog: published rows are sold in the public store;
   // draft is admin-only; archived hides from the store but keeps history.
-  status          String   @default("draft")
+  status             String           @default("draft")
   // Regulatory tier — see HardwareSaleMode enum above. Defaults to category
   // mapping at create time (CatalogService); existing rows backfill to
   // DIRECT_SALE then a data step sets yazarkasa→QUOTE_ONLY etc.
-  saleMode        HardwareSaleMode @default(DIRECT_SALE)
+  saleMode           HardwareSaleMode @default(DIRECT_SALE)
   // Tier 2 (PARTNER_REDIRECT) target the storefront links out to.
   // Shape: { partnerName: string, partnerUrl: string, disclaimer?: string }
-  partnerRedirect Json?
+  partnerRedirect    Json?
   // Tier 3 (DIRECT_SALE) seller-responsibility compliance docs, shown on the
   // product detail page and enforced (minimally) at publish time. Shape:
   //   { invoiceIssued?: bool, warrantyCertUrl?: string, distributorName?: string,
   //     ceConformityUrl?: string, turkishManualUrl?: string, serviceInfo?: string,
   //     returnTermsUrl?: string }
-  complianceDocs  Json?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  complianceDocs     Json?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
-  inventory       HardwareInventory[]
-  orderItems      HardwareOrderItem[]
+  inventory  HardwareInventory[]
+  orderItems HardwareOrderItem[]
 
   @@index([category, status])
   @@map("hardware_products")
@@ -4404,18 +4346,18 @@ model HardwareProduct {
 // Per-SKU stock counts and serial allocations. Single-warehouse for MVP;
 // adding `warehouseId` later is trivial.
 model HardwareInventory {
-  id          String   @id @default(uuid())
-  productId   String
-  product     HardwareProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+  id               String          @id @default(uuid())
+  productId        String
+  product          HardwareProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
   // available + allocated + shipped = lifetime received. The triple is kept
   // explicit so finance/ops queries don't need joins to derive flow stats.
-  available   Int      @default(0)
-  allocated   Int      @default(0)
-  shipped     Int      @default(0)
+  available        Int             @default(0)
+  allocated        Int             @default(0)
+  shipped          Int             @default(0)
   // Free serials pool (FIFO). When an order line allocates units, the first
   // N serials are popped and assigned to HardwareOrderItem.serials.
-  serialsAvailable String[] @default([])
-  updatedAt   DateTime @updatedAt
+  serialsAvailable String[]        @default([])
+  updatedAt        DateTime        @updatedAt
 
   @@unique([productId])
   @@map("hardware_inventory")
@@ -4445,9 +4387,9 @@ model HardwareOrder {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  items           HardwareOrderItem[]
-  shipments       Shipment[]
-  installations   InstallationRequest[]
+  items         HardwareOrderItem[]
+  shipments     Shipment[]
+  installations InstallationRequest[]
 
   @@index([tenantId, status])
   @@index([createdAt])
@@ -4475,18 +4417,18 @@ model HardwareOrder {
 ///   provisioned — CheckoutService.confirmAndProvision completed
 ///   failed      — PayTR callback verified status=failed (failureReason set)
 model CheckoutIntent {
-  id              String   @id @default(uuid())
+  id              String    @id @default(uuid())
   tenantId        String
-  paymentRef      String   @unique
+  paymentRef      String    @unique
   cartJson        Json
   amountCents     Int
-  currency        String   @default("TRY")
-  providerId      String   @default("paytr")
-  status          String   @default("pending")
+  currency        String    @default("TRY")
+  providerId      String    @default("paytr")
+  status          String    @default("pending")
   failureReason   String?
   hardwareOrderId String?
-  addOnIds        String[] @default([])
-  createdAt       DateTime @default(now())
+  addOnIds        String[]  @default([])
+  createdAt       DateTime  @default(now())
   succeededAt     DateTime?
   provisionedAt   DateTime?
   failedAt        DateTime?
@@ -4497,33 +4439,33 @@ model CheckoutIntent {
 }
 
 model HardwareOrderItem {
-  id          String   @id @default(uuid())
+  id          String          @id @default(uuid())
   orderId     String
-  order       HardwareOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  order       HardwareOrder   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId   String
   product     HardwareProduct @relation(fields: [productId], references: [id], onDelete: Restrict)
-  sku         String   // snapshot at purchase time
-  name        String   // snapshot
+  sku         String // snapshot at purchase time
+  name        String // snapshot
   qty         Int
   unitCents   Int
   // Serials allocated to this line item, in order of allocation.
-  serials     String[] @default([])
+  serials     String[]        @default([])
   // rent | sell — determines whether the resulting Device row is `rented`
   // or `sold` for warranty/billing purposes.
-  acquisition String   @default("sell")
+  acquisition String          @default("sell")
 
   @@index([orderId])
   @@map("hardware_order_items")
 }
 
 model Shipment {
-  id          String   @id @default(uuid())
+  id          String        @id @default(uuid())
   orderId     String
   order       HardwareOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  carrier     String   // 'manual'|'yurtici'|'aras'|'mng'|... — adapter id
+  carrier     String // 'manual'|'yurtici'|'aras'|'mng'|... — adapter id
   trackingNo  String?
   // pending|in_transit|out_for_delivery|delivered|returned|lost
-  status      String   @default("pending")
+  status      String        @default("pending")
   shippedAt   DateTime?
   deliveredAt DateTime?
   // Free-form payload for carrier-specific metadata (label url, etc.)
@@ -4535,21 +4477,21 @@ model Shipment {
 }
 
 model InstallationRequest {
-  id              String   @id @default(uuid())
-  tenantId        String
-  branchId        String?
-  hwOrderId       String?
-  hwOrder         HardwareOrder? @relation(fields: [hwOrderId], references: [id], onDelete: SetNull)
+  id             String         @id @default(uuid())
+  tenantId       String
+  branchId       String?
+  hwOrderId      String?
+  hwOrder        HardwareOrder? @relation(fields: [hwOrderId], references: [id], onDelete: SetNull)
   // requested|scheduled|in_progress|done|cancelled|no_show
-  status          String   @default("requested")
-  scheduledFor    DateTime?
-  assignedTo      String?  // SuperAdmin id (technician) — optional
+  status         String         @default("requested")
+  scheduledFor   DateTime?
+  assignedTo     String? // SuperAdmin id (technician) — optional
   // Operator-supplied preferences from the request form.
-  preferredDates  DateTime[] @default([])
-  notes           String?  @db.Text
-  completedAt     DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  preferredDates DateTime[]     @default([])
+  notes          String?        @db.Text
+  completedAt    DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   @@index([tenantId, status])
   @@index([scheduledFor])
@@ -4557,20 +4499,20 @@ model InstallationRequest {
 }
 
 model Warranty {
-  id          String   @id @default(uuid())
-  tenantId    String
+  id        String   @id @default(uuid())
+  tenantId  String
   // Device row this warranty covers (nullable until device is paired).
-  deviceId    String?
-  productId   String
-  serial      String
-  startAt     DateTime
-  endAt       DateTime
+  deviceId  String?
+  productId String
+  serial    String
+  startAt   DateTime
+  endAt     DateTime
   // Each claim is { date, issue, status, resolution? } appended into JSON
   // for now; promote to its own table once volume warrants.
-  claims      Json[]   @default([])
-  status      String   @default("active") // active|expired|claimed|voided
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  claims    Json[]   @default([])
+  status    String   @default("active") // active|expired|claimed|voided
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@unique([productId, serial])
   @@index([tenantId, status])
@@ -4586,27 +4528,27 @@ model Warranty {
 // adapter module that implements the FiscalProvider interface.
 
 model FiscalDeviceRecord {
-  id            String   @id @default(uuid())
-  tenantId      String
-  branchId      String?
+  id           String    @id @default(uuid())
+  tenantId     String
+  branchId     String?
   // 'efatura' (cloud, no hardware), 'hugin', 'beko', 'profilo', 'mock'
-  providerId    String
+  providerId   String
   // Optional link to the Device mesh row when this fiscal device is a
   // physical yazarkasa wired through a bridge.
-  deviceId      String?
-  serial        String
-  model         String?
+  deviceId     String?
+  serial       String
+  model        String?
   // Free-form capability tags: 'receipt', 'invoice', 'cancel', 'z_report'
-  capabilities  String[] @default([])
+  capabilities String[]  @default([])
   // online|offline|error|maintenance|retired
-  status        String   @default("offline")
-  lastSeenAt    DateTime?
+  status       String    @default("offline")
+  lastSeenAt   DateTime?
   // Provider-specific config (API keys, station code, VAT group map).
-  config        Json?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  config       Json?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
-  receipts      FiscalReceipt[]
+  receipts FiscalReceipt[]
 
   @@unique([tenantId, providerId, serial])
   @@index([tenantId, branchId, status])
@@ -4614,31 +4556,31 @@ model FiscalDeviceRecord {
 }
 
 model FiscalReceipt {
-  id              String   @id @default(uuid())
-  tenantId        String
+  id             String              @id @default(uuid())
+  tenantId       String
   // Order this receipt is for. Nullable so admin-driven manual receipts can
   // be issued (rare; supported for parity with the legacy flow).
-  orderId         String?
-  fiscalDeviceId  String
-  fiscalDevice    FiscalDeviceRecord @relation(fields: [fiscalDeviceId], references: [id], onDelete: Restrict)
-  providerId      String
+  orderId        String?
+  fiscalDeviceId String
+  fiscalDevice   FiscalDeviceRecord  @relation(fields: [fiscalDeviceId], references: [id], onDelete: Restrict)
+  providerId     String
   // The fiscal_no / Z-no the device emits — populated after the device acks.
-  fiscalNo        String?
-  fiscalZNo       String?
-  issuedAt        DateTime?
-  totalCents      Int
-  currency        String   @default("TRY")
-  vatBreakdown    Json     // { "20": 4000, "10": 500, "1": 0 }
+  fiscalNo       String?
+  fiscalZNo      String?
+  issuedAt       DateTime?
+  totalCents     Int
+  currency       String              @default("TRY")
+  vatBreakdown   Json // { "20": 4000, "10": 500, "1": 0 }
   // queued|inflight|issued|failed|cancelled
-  status          String   @default("queued")
+  status         String              @default("queued")
   // Per-call idempotency — survives retries from the outbox / device queue.
-  idempotencyKey  String
-  attempts        Int      @default(0)
-  lastError       String?
+  idempotencyKey String
+  attempts       Int                 @default(0)
+  lastError      String?
   // Append-only line items for audit.
-  lines           FiscalReceiptItem[]
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  lines          FiscalReceiptItem[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
 
   @@unique([tenantId, idempotencyKey])
   @@index([orderId])
@@ -4647,31 +4589,31 @@ model FiscalReceipt {
 }
 
 model FiscalReceiptItem {
-  id             String   @id @default(uuid())
+  id              String        @id @default(uuid())
   fiscalReceiptId String
-  fiscalReceipt  FiscalReceipt @relation(fields: [fiscalReceiptId], references: [id], onDelete: Cascade)
-  lineNo         Int
-  productCode    String
-  name           String
-  qty            Decimal  @db.Decimal(10, 3)
-  unitPriceCents Int
-  vatRate        Int
+  fiscalReceipt   FiscalReceipt @relation(fields: [fiscalReceiptId], references: [id], onDelete: Cascade)
+  lineNo          Int
+  productCode     String
+  name            String
+  qty             Decimal       @db.Decimal(10, 3)
+  unitPriceCents  Int
+  vatRate         Int
   // Yazarkasa department code in TR (A..F). Optional for non-TR providers.
-  vatGroup       String?
-  discountCents  Int      @default(0)
+  vatGroup        String?
+  discountCents   Int           @default(0)
 
   @@index([fiscalReceiptId, lineNo])
   @@map("fiscal_receipt_items")
 }
 
 model FiscalDayClose {
-  id            String   @id @default(uuid())
-  tenantId      String
+  id             String    @id @default(uuid())
+  tenantId       String
   fiscalDeviceId String
-  zNo           String?
-  openedAt      DateTime?
-  closedAt      DateTime?
-  totals        Json     // { 'card': 12345, 'cash': 6789, 'vat_20': 1500 }
+  zNo            String?
+  openedAt       DateTime?
+  closedAt       DateTime?
+  totals         Json // { 'card': 12345, 'cash': 6789, 'vat_20': 1500 }
 
   @@index([tenantId, closedAt])
   @@map("fiscal_day_closes")
@@ -4687,7 +4629,7 @@ model CallerEvent {
   branchId    String?
   // 'twilio', 'verimor', 'analog-caller-id-box', ...
   providerId  String
-  callId      String   // provider-side call id
+  callId      String // provider-side call id
   // 'incoming'|'answered'|'ended'|'missed'
   kind        String
   // E.164 if available; raw display otherwise.
@@ -4715,20 +4657,20 @@ model CallerEvent {
 
 model IntegrationProviderDef {
   // 'yemeksepeti', 'getir', 'iyzico', 'stripe', 'efatura', 'verimor', ...
-  id          String  @id
+  id           String   @id
   // 'delivery'|'payment'|'fiscal'|'voip'|'accounting'|'sms'|'whatsapp'
-  kind        String
-  name        String
-  description String?
+  kind         String
+  name         String
+  description  String?
   // JSON Schema of the credentials the adapter needs. Rendered by the
   // admin UI; values stored in IntegrationConnection.credentialsEnc.
   configSchema Json
   // Whether HummyTummy provides this adapter officially or it's a partner
   // contribution (community).
-  isOfficial  Boolean @default(true)
-  status      String  @default("published")  // published|deprecated
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  isOfficial   Boolean  @default(true)
+  status       String   @default("published") // published|deprecated
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   connections IntegrationConnection[]
 
@@ -4737,25 +4679,25 @@ model IntegrationProviderDef {
 }
 
 model IntegrationConnection {
-  id              String   @id @default(uuid())
-  tenantId        String
-  branchId        String?
-  providerId      String
-  provider        IntegrationProviderDef @relation(fields: [providerId], references: [id], onDelete: Restrict)
+  id             String                 @id @default(uuid())
+  tenantId       String
+  branchId       String?
+  providerId     String
+  provider       IntegrationProviderDef @relation(fields: [providerId], references: [id], onDelete: Restrict)
   // 'connected'|'error'|'pending'|'disconnected'
-  status          String   @default("pending")
+  status         String                 @default("pending")
   // Envelope-encrypted credentials JSON. Storage layer applies AES-256-GCM
   // with a tenant-scoped key derived from KMS. Until KMS lands the bytea is
   // encrypted with a process-wide key from env — never raw secrets.
-  credentialsEnc  Bytes?
+  credentialsEnc Bytes?
   // Non-secret provider-specific config (store id, channel, etc.).
-  config          Json?
-  lastEventAt     DateTime?
-  lastError       String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  config         Json?
+  lastEventAt    DateTime?
+  lastError      String?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
 
-  webhookEvents   IntegrationWebhookEvent[]
+  webhookEvents IntegrationWebhookEvent[]
 
   @@index([tenantId, providerId])
   @@index([status])
@@ -4763,23 +4705,23 @@ model IntegrationConnection {
 }
 
 model IntegrationWebhookEvent {
-  id              String   @id @default(uuid())
-  tenantId        String?
-  connectionId    String?
-  connection      IntegrationConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
-  providerId      String
+  id           String                 @id @default(uuid())
+  tenantId     String?
+  connectionId String?
+  connection   IntegrationConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  providerId   String
   // Provider-emitted event type, e.g. 'order.created', 'payment.succeeded'.
-  type            String
+  type         String
   // Truncated signature for audit; raw never stored.
-  signature       String?
+  signature    String?
   // Raw payload — kept for forensic replay. Auto-purged after 90d by the
   // existing audit retention job once that runs.
-  payload         Json
-  receivedAt      DateTime @default(now())
-  processedAt     DateTime?
-  result          String?
-  attempts        Int      @default(0)
-  lastError       String?
+  payload      Json
+  receivedAt   DateTime               @default(now())
+  processedAt  DateTime?
+  result       String?
+  attempts     Int                    @default(0)
+  lastError    String?
 
   @@index([connectionId, receivedAt])
   @@index([providerId, receivedAt])
@@ -4792,11 +4734,11 @@ model IntegrationWebhookEvent {
 // ========================================
 
 model TenantWebhookSubscription {
-  id                  String   @id @default(uuid())
+  id                  String    @id @default(uuid())
   tenantId            String
   url                 String
   // Event types the tenant wants to receive. "*" subscribes to everything.
-  events              String[] @default([])
+  events              String[]  @default([])
   // sha256 of the shared secret. Used as a fast-lookup fingerprint and
   // for backward-compatible verify-on-disk; the raw secret needed for the
   // outbound HMAC signature lives in `secretEnc` below, encrypted via KMS.
@@ -4808,33 +4750,33 @@ model TenantWebhookSubscription {
   secretEnc           Bytes?
   // active|paused. Auto-paused after `consecutiveFailures` >= 20 so a dead
   // endpoint doesn't drain the worker.
-  status              String   @default("active")
+  status              String    @default("active")
   lastDeliveryAt      DateTime?
   lastDeliveryCode    Int?
-  consecutiveFailures Int      @default(0)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  consecutiveFailures Int       @default(0)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  deliveries          WebhookDelivery[]
+  deliveries WebhookDelivery[]
 
   @@index([tenantId, status])
   @@map("tenant_webhook_subscriptions")
 }
 
 model WebhookDelivery {
-  id                  String   @id @default(uuid())
+  id                  String                    @id @default(uuid())
   subscriptionId      String
   subscription        TenantWebhookSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
   eventType           String
-  eventId             String              // outbox event id (UUIDv7)
+  eventId             String // outbox event id (UUIDv7)
   url                 String
-  status              String   @default("pending") // pending|delivered|failed
-  attempts            Int      @default(0)
+  status              String                    @default("pending") // pending|delivered|failed
+  attempts            Int                       @default(0)
   lastStatusCode      Int?
   lastResponseSnippet String?
   nextAttemptAt       DateTime?
   deliveredAt         DateTime?
-  createdAt           DateTime @default(now())
+  createdAt           DateTime                  @default(now())
 
   @@unique([subscriptionId, eventId])
   @@index([status, nextAttemptAt])
