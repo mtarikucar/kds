@@ -90,6 +90,7 @@ jobs:
           MARKETING_JWT_REFRESH_SECRET: ${{ secrets.MARKETING_JWT_REFRESH_SECRET }}
           MARKETING_INGEST_TOKEN: ${{ secrets.MARKETING_INGEST_TOKEN }}
           ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
+          INTEGRATION_KEY: ${{ secrets.INTEGRATION_KEY }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}
           PAYTR_MERCHANT_KEY: ${{ secrets.PAYTR_MERCHANT_KEY }}
@@ -114,6 +115,7 @@ jobs:
             MARKETING_JWT_SECRET MARKETING_JWT_REFRESH_SECRET
             MARKETING_INGEST_TOKEN
             ENCRYPTION_MASTER_KEY
+            INTEGRATION_KEY
             REDIS_PASSWORD
             PAYTR_MERCHANT_ID PAYTR_MERCHANT_KEY PAYTR_MERCHANT_SALT
           )
@@ -316,6 +318,7 @@ jobs:
           MARKETING_JWT_REFRESH_SECRET: ${{ secrets.MARKETING_JWT_REFRESH_SECRET }}
           MARKETING_INGEST_TOKEN: ${{ secrets.MARKETING_INGEST_TOKEN }}
           ENCRYPTION_MASTER_KEY: ${{ secrets.ENCRYPTION_MASTER_KEY }}
+          INTEGRATION_KEY: ${{ secrets.INTEGRATION_KEY }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           PAYTR_MERCHANT_ID: ${{ secrets.PAYTR_MERCHANT_ID }}
           PAYTR_MERCHANT_KEY: ${{ secrets.PAYTR_MERCHANT_KEY }}
@@ -351,6 +354,12 @@ jobs:
           MARKETING_JWT_SECRET=${MARKETING_JWT_SECRET}
           MARKETING_JWT_REFRESH_SECRET=${MARKETING_JWT_REFRESH_SECRET}
           ENCRYPTION_MASTER_KEY=${ENCRYPTION_MASTER_KEY}
+          # At-rest seed for per-tenant integration envelope keys (EnvKmsProvider
+          # + integration-gateway, HKDF-sha256). Required in prod by both the
+          # compose (${INTEGRATION_KEY:?}) and env-validation.ts. MUST be stable:
+          # if prod already holds encrypted integration credentials, this has to
+          # match the key they were encrypted under or they become undecryptable.
+          INTEGRATION_KEY=${INTEGRATION_KEY}
 
           MARKETING_INGEST_TOKEN=${MARKETING_INGEST_TOKEN}
 
