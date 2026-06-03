@@ -1,4 +1,5 @@
 import { getTranslations } from 'next-intl/server';
+import { appHref } from '@/lib/urls';
 import { Link } from '@/i18n/routing';
 import Navbar from '@/components/layout/Navbar';
 import Footer from '@/components/sections/Footer';
@@ -13,10 +14,10 @@ import ProductImage from './ProductImage';
  * doesn't hammer the backend. The cache headers on the API response control
  * downstream CDN behavior; the `revalidate` here is the server-side ISR knob.
  *
- * The "Buy" CTA bridges to the SPA at /app/admin/store?sku=<sku>. The SPA's
+ * The "Buy" CTA bridges to the SPA at /admin/store?sku=<sku>. The SPA's
  * StorePage reads that query param, auto-adds the matching product to the
  * in-memory cart, and continues to checkout. If the visitor isn't logged in
- * yet, the SPA's auth guard redirects to /app/login first and bounces back
+ * yet, the SPA's auth guard redirects to /login first and bounces back
  * to the store with the query param preserved.
  */
 
@@ -49,6 +50,11 @@ interface HardwareProduct {
   serviceMeta: Record<string, unknown> | null;
   // v2.8.87: low-stock badge ("Son N adet") uses this.
   available: number;
+  // Regulatory sale tier (TR law). Drives the CTA: a fiscal yazarkasa
+  // (QUOTE_ONLY) or bank POS (PARTNER_REDIRECT) must NOT show a "Satın Al"
+  // button. Treat undefined as DIRECT_SALE for back-compat.
+  saleMode?: 'DIRECT_SALE' | 'QUOTE_ONLY' | 'PARTNER_REDIRECT' | 'RECOMMENDED_ONLY';
+  partnerRedirect?: { partnerName?: string; partnerUrl?: string; disclaimer?: string } | null;
 }
 
 async function fetchProducts(): Promise<HardwareProduct[]> {
@@ -94,6 +100,18 @@ function formatPrice(cents: number, currency: string): string {
 
 function gibCertified(p: HardwareProduct): boolean {
   return Boolean(p.compat && (p.compat as { gibCertified?: boolean }).gibCertified === true);
+}
+
+// Regulatory tier — undefined means DIRECT_SALE (back-compat). Only chooses
+// which CTA the public storefront renders; the server is authoritative.
+function saleModeOf(p: HardwareProduct): NonNullable<HardwareProduct['saleMode']> {
+  return p.saleMode ?? 'DIRECT_SALE';
+}
+
+// Only trust an absolute http(s) URL as a clickable outbound link.
+function safePartnerUrl(p: HardwareProduct): string | null {
+  const u = p.partnerRedirect?.partnerUrl;
+  return typeof u === 'string' && /^https?:\/\//i.test(u) ? u : null;
 }
 
 function sourceUrl(p: HardwareProduct): string | null {
@@ -261,6 +279,8 @@ function HardwareCard({ p, t }: { p: HardwareProduct; t: any }) {
   const isOos = p.stockStatus === 'out_of_stock' || p.stockStatus === 'discontinued';
   const src = sourceUrl(p);
   const showGibBadge = gibCertified(p);
+  const mode = saleModeOf(p);
+  const partnerUrl = safePartnerUrl(p);
   const headline = headlineSpecs(p);
   const stockLabel =
     p.stockStatus === 'out_of_stock'
@@ -324,16 +344,50 @@ function HardwareCard({ p, t }: { p: HardwareProduct; t: any }) {
           <div className="mb-3 text-xs text-slate-500">
             {t('warrantyMonths', { months: p.warrantyMonths })}
           </div>
+          {/* CTA branches by regulatory tier (TR law). A fiscal yazarkasa or
+              bank POS must NOT show a "Satın Al" button on the public site —
+              only DIRECT_SALE devices bridge to the in-app purchase flow. */}
           <div className="flex items-center justify-between gap-2">
-            <a
-              href={`/app/admin/store?sku=${encodeURIComponent(p.sku)}`}
-              className={`flex-1 rounded-md px-3 py-2 text-center text-sm font-medium text-white transition-colors ${
-                isOos ? 'cursor-not-allowed bg-slate-300' : 'bg-slate-900 hover:bg-slate-800'
-              }`}
-              aria-disabled={isOos}
-            >
-              {t('buy')}
-            </a>
+            {mode === 'DIRECT_SALE' ? (
+              <a
+                href={appHref(`/admin/store?sku=${encodeURIComponent(p.sku)}`)}
+                className={`flex-1 rounded-md px-3 py-2 text-center text-sm font-medium text-white transition-colors ${
+                  isOos ? 'cursor-not-allowed bg-slate-300' : 'bg-slate-900 hover:bg-slate-800'
+                }`}
+                aria-disabled={isOos}
+              >
+                {t('buy')}
+              </a>
+            ) : mode === 'QUOTE_ONLY' ? (
+              <Link
+                href="/contact"
+                className="flex-1 rounded-md bg-amber-600 px-3 py-2 text-center text-sm font-medium text-white hover:bg-amber-700"
+              >
+                Teklif Al
+              </Link>
+            ) : mode === 'PARTNER_REDIRECT' ? (
+              partnerUrl ? (
+                <a
+                  href={partnerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 rounded-md bg-indigo-600 px-3 py-2 text-center text-sm font-medium text-white hover:bg-indigo-700"
+                >
+                  Kuruluşa git
+                </a>
+              ) : (
+                <Link
+                  href="/contact"
+                  className="flex-1 rounded-md bg-indigo-600 px-3 py-2 text-center text-sm font-medium text-white hover:bg-indigo-700"
+                >
+                  Bilgi Al
+                </Link>
+              )
+            ) : (
+              <span className="flex-1 rounded-md bg-slate-100 px-3 py-2 text-center text-sm font-medium text-slate-600">
+                Önerilen ekipman
+              </span>
+            )}
             {src && (
               <a
                 href={src}
@@ -345,6 +399,16 @@ function HardwareCard({ p, t }: { p: HardwareProduct; t: any }) {
               </a>
             )}
           </div>
+          {mode === 'QUOTE_ONLY' && (
+            <p className="mt-2 text-[11px] leading-snug text-amber-700">
+              Bu ürün doğrudan satışa kapalıdır; yetkili bayi/servis üzerinden teklif ve kurulum süreci başlatılır.
+            </p>
+          )}
+          {mode === 'PARTNER_REDIRECT' && (
+            <p className="mt-2 text-[11px] leading-snug text-indigo-700">
+              POS hizmeti HummyTummy tarafından değil, anlaşmalı banka/ödeme kuruluşu tarafından sağlanır.
+            </p>
+          )}
           {/* v2.8.87: Detaylar link to the new detail page. Uses
               next-intl's Link so locale prefix is preserved. */}
           <Link
@@ -363,6 +427,7 @@ function HardwareCard({ p, t }: { p: HardwareProduct; t: any }) {
 function ServiceCard({ p, t }: { p: HardwareProduct; t: any }) {
   const stype = serviceTypeChip(p);
   const hours = durationHours(p);
+  const mode = saleModeOf(p);
   // Service cards are intentionally lighter — no manufacturer link,
   // no rental, no warranty months. The chips communicate everything
   // structural; clicking the card opens the detail page.
@@ -390,13 +455,27 @@ function ServiceCard({ p, t }: { p: HardwareProduct; t: any }) {
             {formatPrice(p.priceCents, p.currency)}
           </div>
           <div className="flex items-center gap-2">
-            <a
-              href={`/app/admin/store?sku=${encodeURIComponent(p.sku)}`}
-              className="flex-1 rounded-md bg-slate-900 px-3 py-2 text-center text-sm font-medium text-white hover:bg-slate-800"
-            >
-              {t('buy')}
-            </a>
+            {mode === 'DIRECT_SALE' ? (
+              <a
+                href={appHref(`/admin/store?sku=${encodeURIComponent(p.sku)}`)}
+                className="flex-1 rounded-md bg-slate-900 px-3 py-2 text-center text-sm font-medium text-white hover:bg-slate-800"
+              >
+                {t('buy')}
+              </a>
+            ) : (
+              <Link
+                href="/contact"
+                className="flex-1 rounded-md bg-amber-600 px-3 py-2 text-center text-sm font-medium text-white hover:bg-amber-700"
+              >
+                Teklif Al
+              </Link>
+            )}
           </div>
+          {mode !== 'DIRECT_SALE' && (
+            <p className="mt-2 text-[11px] leading-snug text-amber-700">
+              Bu hizmet doğrudan satışa kapalıdır; yetkili bayi/servis üzerinden teklif süreci başlatılır.
+            </p>
+          )}
           <Link
             href={`/store/${p.sku}` as any}
             className="mt-2 block text-center text-xs font-medium text-slate-500 hover:text-slate-900"

@@ -6,10 +6,17 @@ import {
 } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../../prisma/prisma.service";
+import { OutboxService } from "../outbox/outbox.service";
 import {
   CATEGORY_DEFAULT_SALE_MODE,
   SaleMode,
 } from "./dto/create-hardware-product.dto";
+
+// Hardware-quote event type. Kept as a literal (not an import from the
+// marketing module) so the core catalog stays decoupled from marketing for
+// the Phase-5 split. Must match MarketingEventTypes.HardwareQuoteRequested in
+// src/modules/marketing/events/marketing-event-types.ts (the consumer side).
+const HARDWARE_QUOTE_EVENT = "marketing.lead.hardware_quote.v1";
 
 /**
  * Hardware product catalog. The public store reads `published` rows; the
@@ -18,7 +25,11 @@ import {
  */
 @Injectable()
 export class CatalogService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // OutboxModule is @Global, so OutboxService injects without a module import.
+    private readonly outbox: OutboxService,
+  ) {}
 
   async listPublic(filters?: { category?: string }) {
     const rows = await this.prisma.hardwareProduct.findMany({
@@ -62,14 +73,14 @@ export class CatalogService {
    * consume — adding a private field to HardwareProduct/HardwareInventory
    * does NOT bleed into the public payload unless explicitly listed here.
    */
-  private toPublicView(row: any) {
-    const available =
-      Array.isArray(row.inventory) && row.inventory.length > 0
-        ? row.inventory.reduce(
-            (acc: number, inv: any) => acc + (inv.available ?? 0),
-            0,
-          )
-        : 0;
+  private toPublicView<
+    T extends { inventory?: Array<{ available?: number | null }> | null },
+  >(row: T) {
+    const inventory = Array.isArray(row.inventory) ? row.inventory : [];
+    const available = inventory.reduce(
+      (acc, inv) => acc + (inv.available ?? 0),
+      0,
+    );
     // Strip the inventory relation entirely from the public payload —
     // we replace it with a single scalar `available` field.
     const { inventory: _omitted, ...rest } = row;
@@ -374,19 +385,16 @@ export class CatalogService {
    * authorized-dealer/service + GİB offer/installation process.
    *
    * Decoupling note: we write the shared `leads` row directly via Prisma
-   * rather than importing the marketing module (which doesn't export its
-   * leads service). The lead is unassigned, so it lands in the manager's
-   * lead pool on the marketing board.
+   * Decoupled write path: instead of writing the marketing-owned `leads`
+   * table directly, we emit a `marketing.lead.hardware_quote` outbox event.
+   * The marketing HardwareQuoteConsumer creates + auto-assigns the lead. This
+   * keeps the core catalog free of marketing-table writes (Phase-5 split) and
+   * gets auto-assignment for free. The event's idempotencyKey + the consumer's
+   * deterministic externalRef dedup collapse double-submits into one lead.
    *
-   * Known follow-ups (pinned to the v3.1 marketing-DB split, see
-   * marketing-decoupling.arch.spec KNOWN_VIOLATIONS): this direct write should
-   * become a `marketing.lead.hardware_quote` outbox event consumed by the
-   * marketing LeadIngestService, which would also run the auto-assigner
-   * (this path deliberately leaves the lead in the unassigned pool until
-   * then) — moving both the decoupling and the auto-assignment off the
-   * core module in one change. Until WON, the quote has no automated
-   * InstallationJob: a fiscal-device install must not be auto-provisioned
-   * ahead of the dealer/GİB process, so the rep creates it manually.
+   * Note: until the quote reaches WON there is no automated InstallationJob —
+   * a fiscal-device install must not be auto-provisioned ahead of the
+   * dealer/GİB process, so the rep creates it manually.
    */
   async requestQuote(
     tenantId: string,
@@ -440,40 +448,28 @@ export class CatalogService {
       },
     };
     const notes = input.notes ? `${summary}\n\n${input.notes}` : summary;
-    // Idempotency: a double-submit / retry / second tab must not pile up
-    // duplicate leads for the same device. A deterministic externalRef
-    // (`hwq:<tenant>:<sku>`, namespaced so it can't collide with CRM refs)
-    // is @unique, so the upsert collapses repeat requests for the same SKU
-    // into one lead — refreshing the contact + snapshot — while different
-    // devices and different tenants stay distinct. We intentionally do NOT
-    // touch `status`, so a rep's in-progress work survives a resubmit.
-    const externalRef = `hwq:${tenantId}:${product.sku}`;
-    const lead = await this.prisma.lead.upsert({
-      where: { externalRef },
-      create: {
+    // Deterministic dedup/idempotency key (`hwq:<tenant>:<sku>`, namespaced so
+    // it can't collide with CRM external refs). The consumer upserts the lead
+    // on this externalRef, so resubmits collapse into one lead; passing it as
+    // the outbox idempotencyKey also keeps retried emits to a single row.
+    const dedupRef = `hwq:${tenantId}:${product.sku}`;
+    await this.outbox.append({
+      type: HARDWARE_QUOTE_EVENT,
+      tenantId,
+      idempotencyKey: dedupRef,
+      payload: {
+        tenantId,
+        dedupRef,
         businessName: tenant?.name || input.contactPerson,
         contactPerson: input.contactPerson,
-        phone: input.phone,
-        email: input.email,
-        businessType: "OTHER",
-        source: "HARDWARE_QUOTE",
+        phone: input.phone ?? null,
+        email: input.email ?? null,
         notes,
-        // Soft-FK to the originating tenant; lets reports + dealer
-        // dashboards filter without joining through fuzzy `businessName`.
-        originTenantId: tenantId,
-        productSnapshot: productSnapshot as any,
-        externalRef,
+        productSnapshot,
+        occurredAt: new Date().toISOString(),
       },
-      update: {
-        contactPerson: input.contactPerson,
-        phone: input.phone,
-        email: input.email,
-        notes,
-        productSnapshot: productSnapshot as any,
-      },
-      select: { id: true, status: true, source: true, createdAt: true },
     });
-    return { ok: true, leadId: lead.id, status: lead.status };
+    return { ok: true };
   }
 
   /** Inventory ops — adjust stock and serials in one place to keep totals consistent. */

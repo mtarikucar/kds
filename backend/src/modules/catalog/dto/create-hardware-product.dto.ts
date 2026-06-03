@@ -14,31 +14,18 @@ import {
   Min,
 } from "class-validator";
 import { MaxJsonBytes } from "../../../common/dto/max-json-bytes.validator";
+import { CATEGORY_VALUES } from "../category-vocabulary";
 
 // Cap on every free-form JSON column: generous for legit metadata, but stops
 // a multi-MB blob being persisted and then serialized on every public
 // storefront load (toPublicView). Mirrors the description/images caps.
 const JSON_FIELD_MAX_BYTES = 16_384;
 
-// Categories the seed + frontend storefront actually use, plus a few
-// generic buckets. Kept in sync with frontend/src/features/hardware-store/
-// StorePage.tsx and backend/prisma/seeds/seed-marketplace.ts. Adding a
-// category requires touching all three.
-const CATEGORIES = [
-  "yazarkasa", // YN ÖKC (GİB-certified)
-  "pos_terminal", // generic POS terminal (non-fiscal)
-  "printer", // thermal receipt + kitchen printers
-  "kds_screen", // kitchen display screen
-  "tablet", // garson / customer-facing tablet
-  "scanner", // barcode scanner
-  "caller_id", // arayan numara modülü
-  "cash_drawer", // para çekmecesi
-  "bridge", // network bridge (HummyBox)
-  "scale", // tartı
-  "cable",
-  "accessory",
-  "service", // installation / setup services
-] as const;
+// Allowed category values for the @IsIn gate — derived from the single
+// category vocabulary (value + TR label + order) in ../category-vocabulary,
+// which the storefront also fetches via GET /v1/catalog/categories. Adding a
+// category is now a one-place change.
+const CATEGORIES = CATEGORY_VALUES;
 const STATUSES = ["draft", "published", "archived"] as const;
 
 // Regulatory sale tiers (TR law). Kept as plain string literals to mirror the

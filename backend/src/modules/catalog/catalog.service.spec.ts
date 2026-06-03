@@ -28,7 +28,7 @@ describe('CatalogService — public view (v2.8.87)', () => {
         findMany: jest.fn(),
       },
     };
-    svc = new CatalogService(prisma);
+    svc = new CatalogService(prisma, { append: jest.fn() } as any);
   });
 
   function makeRow(overrides: any = {}) {
@@ -153,7 +153,7 @@ describe('CatalogService — saleMode (regulatory tiers)', () => {
       $transaction: jest.fn(async (cb: any) => cb(tx)),
       hardwareProduct: { findUnique: jest.fn() },
     };
-    svc = new CatalogService(prisma);
+    svc = new CatalogService(prisma, { append: jest.fn() } as any);
   });
 
   const base = { name: 'X', priceCents: 1000 };
@@ -244,24 +244,22 @@ describe('CatalogService — saleMode (regulatory tiers)', () => {
 });
 
 /**
- * "Teklif Al" → marketing Lead (source=HARDWARE_QUOTE). Only QUOTE_ONLY
- * devices use this flow; everything else is bought directly, redirected, or
- * recommended-only.
+ * "Teklif Al" → emits a HARDWARE_QUOTE outbox event (consumed by the marketing
+ * HardwareQuoteConsumer). The core catalog never writes the leads table. Only
+ * QUOTE_ONLY devices use this flow.
  */
 describe('CatalogService — requestQuote', () => {
   let prisma: any;
+  let outbox: any;
   let svc: CatalogService;
 
   beforeEach(() => {
     prisma = {
       hardwareProduct: { findUnique: jest.fn() },
       tenant: { findUnique: jest.fn().mockResolvedValue({ name: 'Acme Cafe' }) },
-      lead: {
-        // requestQuote upserts on a deterministic externalRef for idempotency.
-        upsert: jest.fn(async ({ create }: any) => ({ id: 'l1', status: 'NEW', ...create })),
-      },
     };
-    svc = new CatalogService(prisma);
+    outbox = { append: jest.fn() };
+    svc = new CatalogService(prisma, outbox);
   });
 
   function row(overrides: any = {}) {
@@ -283,21 +281,24 @@ describe('CatalogService — requestQuote', () => {
     await expect(
       svc.requestQuote('t1', { sku: 'yk-x', contactPerson: 'Ali' }),
     ).rejects.toBeInstanceOf(BadRequestException);
-    expect(prisma.lead.upsert).not.toHaveBeenCalled();
+    expect(outbox.append).not.toHaveBeenCalled();
   });
 
-  it('upserts a HARDWARE_QUOTE lead for a quote-only SKU with tenant + SKU context + dedup ref', async () => {
+  it('emits a HARDWARE_QUOTE outbox event with tenant + SKU context + dedup ref (no direct lead write)', async () => {
     prisma.hardwareProduct.findUnique.mockResolvedValue(row());
     const out: any = await svc.requestQuote('t1', { sku: 'yk-x', qty: 2, contactPerson: 'Ali' });
     expect(out.ok).toBe(true);
-    const arg = prisma.lead.upsert.mock.calls[0][0];
-    // Deterministic dedup key so resubmits collapse into one lead.
-    expect(arg.where.externalRef).toBe('hwq:t1:yk-x');
-    expect(arg.create.source).toBe('HARDWARE_QUOTE');
-    expect(arg.create.businessName).toBe('Acme Cafe');
-    expect(arg.create.contactPerson).toBe('Ali');
-    expect(arg.create.externalRef).toBe('hwq:t1:yk-x');
-    expect(arg.create.notes).toContain('yk-x');
-    expect(arg.create.notes).toContain('× 2');
+    // Core never touches the leads table.
+    expect((prisma as any).lead).toBeUndefined();
+    const ev = outbox.append.mock.calls[0][0];
+    expect(ev.type).toBe('marketing.lead.hardware_quote.v1');
+    // idempotencyKey == dedup key so retried emits collapse to one row.
+    expect(ev.idempotencyKey).toBe('hwq:t1:yk-x');
+    expect(ev.tenantId).toBe('t1');
+    expect(ev.payload.dedupRef).toBe('hwq:t1:yk-x');
+    expect(ev.payload.businessName).toBe('Acme Cafe');
+    expect(ev.payload.contactPerson).toBe('Ali');
+    expect(ev.payload.notes).toContain('yk-x');
+    expect(ev.payload.notes).toContain('× 2');
   });
 });

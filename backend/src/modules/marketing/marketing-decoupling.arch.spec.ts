@@ -108,18 +108,11 @@ describe('marketing decoupling — split readiness (architecture fitness)', () =
     }
     walk(SRC_ROOT);
 
-    // v3.0.1 round-4 — known violation pinned for v3.1 refactor.
-    // catalog.service.ts:requestQuote writes Lead directly when an
-    // admin requests a hardware quote on a QUOTE_ONLY device. The
-    // file's own comment block ("When marketing splits to its own DB
-    // this should become an outbox event instead of a direct write")
-    // acknowledges the seam; the v3.1 follow-up is to route the
-    // request through an outbox event consumed by a marketing-side
-    // LeadIngestService. Pinning the exact-equal expectation locks
-    // current state — if a NEW core module starts writing marketing
-    // tables, this assertion fails. If the v3.1 refactor lands, this
-    // pin must be tightened back to `[]`.
-    const KNOWN_VIOLATIONS = ['src/modules/catalog/catalog.service.ts'];
-    expect(offenders.sort()).toEqual(KNOWN_VIOLATIONS.sort());
+    // The v3.1 refactor landed: catalog.service.ts:requestQuote no longer
+    // writes Lead directly — it emits a `marketing.lead.hardware_quote.v1`
+    // outbox event consumed by the marketing HardwareQuoteConsumer. So the
+    // symmetric guard is now clean: NO core module writes marketing-owned
+    // tables. Any new offender fails here.
+    expect(offenders.sort()).toEqual([]);
   });
 });

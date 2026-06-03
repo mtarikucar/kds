@@ -19,6 +19,7 @@ import { UserRole } from "../../common/constants/roles.enum";
 import { SuperAdminGuard } from "../superadmin/guards/superadmin.guard";
 import { SuperAdminRoute } from "../superadmin/decorators/superadmin.decorator";
 import { CatalogService } from "./catalog.service";
+import { HARDWARE_CATEGORIES } from "./category-vocabulary";
 import { CreateHardwareProductDto } from "./dto/create-hardware-product.dto";
 import { UpdateHardwareProductDto } from "./dto/update-hardware-product.dto";
 import { ReceiveStockDto } from "./dto/receive-stock.dto";
@@ -34,6 +35,16 @@ export class CatalogController {
   @ApiOperation({ summary: "Public hardware store — published products only" })
   listPublic(@Query("category") category?: string) {
     return this.catalog.listPublic({ category });
+  }
+
+  @Public()
+  @Get("categories")
+  @ApiOperation({
+    summary:
+      "Category vocabulary (value + TR label + order) — single source for storefront filters",
+  })
+  categories() {
+    return HARDWARE_CATEGORIES;
   }
 
   @Public()

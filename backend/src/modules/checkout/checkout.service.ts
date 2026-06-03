@@ -125,7 +125,7 @@ export class CheckoutService {
         const onsiteServiceLines = hardwareLines.filter(
           (l) =>
             l.type === "service" &&
-            ((l.meta as any)?.serviceMeta?.serviceType === "onsite" ||
+            (l.meta?.serviceMeta?.serviceType === "onsite" ||
               // Legacy fallback (the 2 hardcoded codes don't carry
               // serviceMeta from the catalog).
               l.code.startsWith("onsite_install")),
@@ -163,9 +163,8 @@ export class CheckoutService {
         hardwareOrderId = order.id;
 
         for (const l of hardwareLines.filter((l) => l.type === "hardware")) {
-          const productId = (l.meta as any)?.productId as string;
-          const acquisition =
-            ((l.meta as any)?.acquisition as "sell" | "rent") ?? "sell";
+          const productId = l.meta?.productId as string;
+          const acquisition = l.meta?.acquisition ?? "sell";
           // Allocate stock inside the same tx so over-selling is impossible.
           const { serials } = await this.catalog.allocate(productId, l.qty, tx);
           await tx.hardwareOrderItem.create({
@@ -189,21 +188,21 @@ export class CheckoutService {
         // branchId / preferredDates / notes come from the cart line meta
         // populated at quote time.
         for (const l of onsiteServiceLines) {
-          const meta = (l.meta ?? {}) as Record<string, unknown>;
+          const meta = l.meta ?? {};
           await tx.installationRequest.create({
             data: {
               id: uuidv7(),
               tenantId,
               hwOrderId: order.id,
-              branchId: (meta.branchId as string) ?? null,
+              branchId: meta.branchId ?? null,
               status: "requested",
               preferredDates:
                 Array.isArray(meta.preferredDates) &&
                 meta.preferredDates.length > 0
-                  ? (meta.preferredDates as string[]).map((d) => new Date(d))
+                  ? meta.preferredDates.map((d) => new Date(d))
                   : [],
               notes:
-                (meta.notes as string) ??
+                meta.notes ??
                 `Auto-created from checkout (service: ${l.code})`,
             },
           });
@@ -214,7 +213,7 @@ export class CheckoutService {
       // Already-deduped by the catalog service; dependency checks run inside
       // tenantMarketplace.purchase.
       for (const l of addOnLines) {
-        const branchId = (l.meta as any)?.branchId as string | undefined;
+        const branchId = l.meta?.branchId;
         const ta = await this.tenantMarketplace.purchase(tenantId, {
           addOnCode: l.code,
           quantity: l.qty,
@@ -236,7 +235,7 @@ export class CheckoutService {
             payload: {
               tenantId,
               planCode: l.code,
-              billingCycle: (l.meta as any)?.billingCycle ?? "MONTHLY",
+              billingCycle: l.meta?.billingCycle ?? "MONTHLY",
               paymentRef,
             } as any,
             idempotencyKey: uuidv7(),

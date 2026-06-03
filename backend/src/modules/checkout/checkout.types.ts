@@ -63,6 +63,29 @@ export interface Cart {
   branchId?: string;
 }
 
+// Per-line metadata the QuoteService producer attaches and the
+// CheckoutService consumer reads post-payment. Typed (instead of a bare
+// Record) so a key rename between producer and consumer is caught by the
+// compiler. All keys optional — which ones are present depends on the line
+// `type` (plan: planId/billingCycle; addon: addOnId/kind/branchId; hardware:
+// productId/acquisition/warrantyMonths; service: branchId/serviceMeta/
+// preferredDates/notes).
+export interface PricedLineMeta {
+  planId?: string;
+  billingCycle?: string;
+  addOnId?: string;
+  kind?: string;
+  branchId?: string;
+  productId?: string;
+  acquisition?: "sell" | "rent";
+  warrantyMonths?: number;
+  serviceMeta?: Record<string, unknown> | null;
+  // Regulatory tier snapshot on service lines (forwarded by QuoteService).
+  saleMode?: string;
+  preferredDates?: string[];
+  notes?: string;
+}
+
 export interface PricedLine {
   type: CartItem["type"];
   code: string;
@@ -73,8 +96,8 @@ export interface PricedLine {
   // Billed monthly|yearly|oneTime — drives the invoice rendering and the
   // recurring-vs-one-time split.
   cadence: "monthly" | "yearly" | "oneTime";
-  // Free-form metadata the checkout flow may need to wire up post-payment.
-  meta?: Record<string, unknown>;
+  // Per-line metadata wired up post-payment (see PricedLineMeta).
+  meta?: PricedLineMeta;
 }
 
 export interface CartQuote {

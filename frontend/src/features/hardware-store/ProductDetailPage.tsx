@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { useGetProductBySku, useRequestQuote, type HardwareProduct } from './storeApi';
+import {
+  useGetProductBySku,
+  useRequestQuote,
+  formatMoney,
+  SALE_MODE_DISCLAIMER_TR,
+  type HardwareProduct,
+} from './storeApi';
 import { useCartStore } from './cartStore';
 import { useListBranches } from '../branches/branchesApi';
 import { useAuthStore } from '../../store/authStore';
@@ -114,11 +120,9 @@ function HardwareDetail({
   const details = useMemo(() => localizeDetails(product.details), [product.details]);
 
   function fmt(cents: number): string {
-    return (cents / 100).toLocaleString('tr-TR', {
-      style: 'currency',
-      currency: product.currency || 'TRY',
-      maximumFractionDigits: 0,
-    });
+    // Shared formatter — one decimals policy across card + detail (cents
+    // visible), and currency is non-optional in the product contract.
+    return formatMoney(cents, product.currency);
   }
 
   function add() {
@@ -238,16 +242,14 @@ function HardwareDetail({
                 Liste fiyatı — kesin fiyat ve kurulum teklifte netleşir.
               </div>
               <p className="text-sm text-amber-900">
-                Bu ürün doğrudan satışa kapalıdır. Yetkili bayi/servis üzerinden teklif ve
-                kurulum süreci başlatılır (GİB aktivasyonu dahil).
+                {SALE_MODE_DISCLAIMER_TR.QUOTE_ONLY} (GİB aktivasyonu dahil).
               </p>
               <QuoteRequestForm sku={product.sku} />
             </div>
           ) : mode === 'PARTNER_REDIRECT' ? (
             <div className="space-y-3 rounded-xl border border-indigo-200 bg-indigo-50 p-5">
               <p className="text-sm text-indigo-900">
-                POS hizmeti HummyTummy tarafından değil, anlaşmalı banka/ödeme kuruluşu
-                tarafından sağlanır.
+                {SALE_MODE_DISCLAIMER_TR.PARTNER_REDIRECT}
               </p>
               {safePartnerUrl ? (
                 <a
@@ -365,11 +367,9 @@ function ServiceDetail({
   const branchValid = !requiresBranch || Boolean(branchId);
 
   function fmt(cents: number): string {
-    return (cents / 100).toLocaleString('tr-TR', {
-      style: 'currency',
-      currency: product.currency || 'TRY',
-      maximumFractionDigits: 0,
-    });
+    // Shared formatter — one decimals policy across card + detail (cents
+    // visible), and currency is non-optional in the product contract.
+    return formatMoney(cents, product.currency);
   }
 
   function add() {

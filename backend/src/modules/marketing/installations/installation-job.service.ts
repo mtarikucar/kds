@@ -72,17 +72,30 @@ export class InstallationJobService {
     });
     if (existing) return existing;
 
-    return this.prisma.installationJob.create({
-      data: {
-        tenantId: input.tenantId,
-        leadId: input.leadId ?? null,
-        contactName: input.contactName ?? null,
-        contactPhone: input.contactPhone ?? null,
-        siteAddress: input.siteAddress ?? null,
-        siteCity: input.siteCity ?? null,
-        status: 'REQUESTED',
-      },
-    });
+    try {
+      return await this.prisma.installationJob.create({
+        data: {
+          tenantId: input.tenantId,
+          leadId: input.leadId ?? null,
+          contactName: input.contactName ?? null,
+          contactPhone: input.contactPhone ?? null,
+          siteAddress: input.siteAddress ?? null,
+          siteCity: input.siteCity ?? null,
+          status: 'REQUESTED',
+        },
+      });
+    } catch (e) {
+      // Backs the partial unique index (tenantId WHERE status<>'CANCELLED'):
+      // if a concurrent consumer won the race, return its job instead of
+      // surfacing a 500 / minting a duplicate.
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        const won = await this.prisma.installationJob.findFirst({
+          where: { tenantId: input.tenantId, status: { not: 'CANCELLED' } },
+        });
+        if (won) return won;
+      }
+      throw e;
+    }
   }
 
   create(dto: CreateJobDto) {

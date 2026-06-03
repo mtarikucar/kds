@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   useListProducts,
+  useCategories,
   useQuoteCart,
   useCreateCheckoutIntent,
+  formatMoney,
+  SALE_MODE_DISCLAIMER_TR,
   type HardwareProduct,
   type CartQuote,
   type ShippingAddress,
@@ -58,43 +61,10 @@ function ProductImage({ src, alt }: { src: string; alt: string }) {
  * lets the landing's "Sipariş ver" CTA hand off a one-click checkout.
  */
 
-// Categories must match the backend CreateHardwareProductDto enum
-// (see backend/src/modules/catalog/dto/create-hardware-product.dto.ts).
-// 'service' filters the storefront down to hizmetler — also rendered
-// in its own dedicated section above the hardware grid (v2.8.87).
-const CATEGORIES = [
-  'all',
-  'yazarkasa',
-  'pos_terminal',
-  'printer',
-  'kds_screen',
-  'tablet',
-  'scanner',
-  'caller_id',
-  'cash_drawer',
-  'bridge',
-  'scale',
-  'cable',
-  'accessory',
-  'service',
-];
-
-const CATEGORY_LABELS_TR: Record<string, string> = {
-  all: 'Tüm kategoriler',
-  yazarkasa: 'Yazarkasa POS',
-  pos_terminal: 'POS Terminal',
-  printer: 'Yazıcı',
-  kds_screen: 'KDS Ekranı',
-  tablet: 'Tablet',
-  scanner: 'Barkod Okuyucu',
-  caller_id: 'Arayan Numara',
-  cash_drawer: 'Para Çekmecesi',
-  bridge: 'Network Bridge',
-  scale: 'Tartı',
-  cable: 'Kablo',
-  accessory: 'Aksesuar',
-  service: 'Kurulum & Hizmet',
-};
+// Category vocabulary (value + TR label) is fetched from the backend
+// (GET /v1/catalog/categories, via useCategories) so the filter can't drift
+// from the @IsIn gate / seed. The "all" sentinel is prepended client-side.
+const ALL_CATEGORY = { value: 'all', labelTr: 'Tüm kategoriler' };
 
 // LocalStorage key for the BYO disclaimer dismiss state. Versioned in case
 // we update the copy later — bumping the suffix re-shows the banner.
@@ -134,6 +104,9 @@ export default function StorePage() {
   // product in a category that's not currently filtered still resolves.
   const { data: products = [], isLoading } = useListProducts(category === 'all' ? undefined : category);
   const { data: allProducts = [] } = useListProducts(undefined);
+  // Category filter options from the backend vocabulary (single source).
+  const { data: fetchedCategories = [] } = useCategories();
+  const categoryOptions = [ALL_CATEGORY, ...fetchedCategories];
   const quote = useQuoteCart();
   const intent = useCreateCheckoutIntent();
   const user = useAuthStore((s) => s.user);
@@ -266,9 +239,9 @@ export default function StorePage() {
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {CATEGORY_LABELS_TR[c] ?? c.replace(/_/g, ' ')}
+              {categoryOptions.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.labelTr}
                 </option>
               ))}
             </select>
@@ -355,10 +328,7 @@ export default function StorePage() {
                       </div>
                       <div className="flex flex-col items-end gap-1">
                         <span className="whitespace-nowrap">
-                          {(lineCents / 100).toLocaleString('tr-TR', {
-                            style: 'currency',
-                            currency: l.product.currency,
-                          })}
+                          {formatMoney(lineCents, l.product.currency)}
                         </span>
                         <button
                           className="text-xs text-red-600 hover:underline"
@@ -449,7 +419,7 @@ function Row({ label, cents, currency, bold }: { label: string; cents: number; c
   return (
     <div className={`flex items-center justify-between ${bold ? 'border-t pt-1 font-medium' : ''}`}>
       <span>{label}</span>
-      <span>{(cents / 100).toLocaleString('tr-TR', { style: 'currency', currency })}</span>
+      <span>{formatMoney(cents, currency)}</span>
     </div>
   );
 }
@@ -520,9 +490,16 @@ function HardwareCard({ p, onAdd }: { p: HardwareProduct; onAdd: () => void }) {
         )}
         <p className="mt-1 line-clamp-2 text-sm text-gray-600">{p.description}</p>
         <div className="mt-3 flex items-center justify-between gap-2">
-          <span className="text-lg font-medium">
-            {(p.priceCents / 100).toLocaleString('tr-TR', { style: 'currency', currency: p.currency })}
-          </span>
+          {/* For non-DIRECT_SALE the price is a reference list price, not a
+              sale price — qualify it so the card doesn't read as a firm
+              "buy at this price" next to a "satışa kapalı" disclaimer. */}
+          {mode === 'DIRECT_SALE' ? (
+            <span className="text-lg font-medium">{formatMoney(p.priceCents, p.currency)}</span>
+          ) : (
+            <span className="text-sm text-gray-500">
+              Liste: {formatMoney(p.priceCents, p.currency)}
+            </span>
+          )}
           {/* CTA branches by regulatory tier (TR law). Only DIRECT_SALE
               carts; the rest route to the detail page (full disclaimer +
               quote form) or out to a licensed bank/PSP. */}
@@ -571,12 +548,12 @@ function HardwareCard({ p, onAdd }: { p: HardwareProduct; onAdd: () => void }) {
         </div>
         {mode === 'QUOTE_ONLY' && (
           <p className="mt-2 text-[11px] leading-snug text-amber-700">
-            Bu ürün doğrudan satışa kapalıdır; yetkili bayi/servis üzerinden teklif ve kurulum süreci başlatılır.
+            {SALE_MODE_DISCLAIMER_TR.QUOTE_ONLY}
           </p>
         )}
         {mode === 'PARTNER_REDIRECT' && (
           <p className="mt-2 text-[11px] leading-snug text-indigo-700">
-            POS hizmeti HummyTummy tarafından değil, anlaşmalı banka/ödeme kuruluşu tarafından sağlanır.
+            {SALE_MODE_DISCLAIMER_TR.PARTNER_REDIRECT}
           </p>
         )}
         <div className="mt-2 flex items-center justify-between text-xs text-gray-500">
@@ -615,7 +592,7 @@ function ServiceCard({ p }: { p: HardwareProduct }) {
         <p className="mt-1 line-clamp-3 text-sm text-gray-600">{p.description}</p>
         <div className="mt-3 flex items-center justify-between">
           <span className="text-lg font-medium">
-            {(p.priceCents / 100).toLocaleString('tr-TR', { style: 'currency', currency: p.currency })}
+            {formatMoney(p.priceCents, p.currency)}
           </span>
           <Link
             to={`/admin/store/${encodeURIComponent(p.sku)}`}

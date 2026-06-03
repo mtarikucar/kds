@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { appHref } from '@/lib/urls';
 import { getTranslations } from 'next-intl/server';
 import type { Metadata } from 'next';
 import { Link } from '@/i18n/routing';
@@ -46,6 +47,9 @@ interface PublicProduct {
   images: string[];
   stockStatus: string;
   available: number;
+  // Regulatory sale tier (TR law) — drives the CTA. undefined = DIRECT_SALE.
+  saleMode?: 'DIRECT_SALE' | 'QUOTE_ONLY' | 'PARTNER_REDIRECT' | 'RECOMMENDED_ONLY';
+  partnerRedirect?: { partnerName?: string; partnerUrl?: string; disclaimer?: string } | null;
 }
 
 function apiBase(): string {
@@ -122,6 +126,15 @@ function gibCertified(p: PublicProduct): boolean {
   return Boolean(p.compat && (p.compat as { gibCertified?: boolean }).gibCertified === true);
 }
 
+function saleModeOf(p: PublicProduct): NonNullable<PublicProduct['saleMode']> {
+  return p.saleMode ?? 'DIRECT_SALE';
+}
+
+function safePartnerUrl(p: PublicProduct): string | null {
+  const u = p.partnerRedirect?.partnerUrl;
+  return typeof u === 'string' && /^https?:\/\//i.test(u) ? u : null;
+}
+
 export default async function ProductDetailPage(
   { params }: { params: Promise<{ locale: string; sku: string }> },
 ) {
@@ -135,6 +148,8 @@ export default async function ProductDetailPage(
   const isService = product.category === 'service';
   const isOos = product.stockStatus === 'out_of_stock' || product.stockStatus === 'discontinued';
   const showGib = gibCertified(product);
+  const mode = saleModeOf(product);
+  const partnerUrl = safePartnerUrl(product);
 
   // details payload may be locale-keyed { tr: {...}, en: {...} } or flat.
   // Pick locale variant, fall back to tr, then flat.
@@ -232,17 +247,64 @@ export default async function ProductDetailPage(
                   <div className="mt-1 text-xs text-slate-500">
                     {t('warrantyMonths', { months: product.warrantyMonths })}
                   </div>
-                  <a
-                    href={`/app/admin/store?sku=${encodeURIComponent(product.sku)}`}
-                    className={`mt-4 inline-flex w-full items-center justify-center rounded-md px-4 py-2.5 text-sm font-medium text-white transition-colors ${
-                      isOos
-                        ? 'cursor-not-allowed bg-slate-300'
-                        : 'bg-slate-900 hover:bg-slate-800'
-                    }`}
-                    aria-disabled={isOos}
-                  >
-                    {isOos ? t('outOfStock') : t('detail.buy')}
-                  </a>
+                  {/* CTA branches by regulatory tier (TR law). */}
+                  {mode === 'DIRECT_SALE' ? (
+                    <a
+                      href={appHref(`/admin/store?sku=${encodeURIComponent(product.sku)}`)}
+                      className={`mt-4 inline-flex w-full items-center justify-center rounded-md px-4 py-2.5 text-sm font-medium text-white transition-colors ${
+                        isOos
+                          ? 'cursor-not-allowed bg-slate-300'
+                          : 'bg-slate-900 hover:bg-slate-800'
+                      }`}
+                      aria-disabled={isOos}
+                    >
+                      {isOos ? t('outOfStock') : t('detail.buy')}
+                    </a>
+                  ) : mode === 'QUOTE_ONLY' ? (
+                    <>
+                      <Link
+                        href="/contact"
+                        className="mt-4 inline-flex w-full items-center justify-center rounded-md bg-amber-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-amber-700"
+                      >
+                        Teklif Al
+                      </Link>
+                      <p className="mt-3 text-xs leading-snug text-amber-700">
+                        Bu ürün doğrudan satışa kapalıdır. Yetkili bayi/servis üzerinden teklif ve
+                        kurulum süreci başlatılır (GİB aktivasyonu dahil). Yukarıdaki fiyat liste
+                        fiyatıdır; kesin fiyat teklifte netleşir.
+                      </p>
+                    </>
+                  ) : mode === 'PARTNER_REDIRECT' ? (
+                    <>
+                      {partnerUrl ? (
+                        <a
+                          href={partnerUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-4 inline-flex w-full items-center justify-center rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"
+                        >
+                          {product.partnerRedirect?.partnerName
+                            ? `${product.partnerRedirect.partnerName} ile devam et`
+                            : 'Banka/Ödeme kuruluşuna git'}
+                        </a>
+                      ) : (
+                        <Link
+                          href="/contact"
+                          className="mt-4 inline-flex w-full items-center justify-center rounded-md bg-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-indigo-700"
+                        >
+                          Bilgi Al
+                        </Link>
+                      )}
+                      <p className="mt-3 text-xs leading-snug text-indigo-700">
+                        POS hizmeti HummyTummy tarafından değil, anlaşmalı banka/ödeme kuruluşu
+                        tarafından sağlanır.
+                      </p>
+                    </>
+                  ) : (
+                    <p className="mt-4 rounded-md bg-slate-100 px-4 py-2.5 text-center text-sm font-medium text-slate-600">
+                      Önerilen ekipman — doğrudan satışı yapılmamaktadır.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
